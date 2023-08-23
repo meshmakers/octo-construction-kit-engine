@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <Description>Contracts of Octo Mesh Construction Kit Compiler and Repository Management</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Contracts</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Contracts</RootNamespace>
     </PropertyGroup>
@@ -37,6 +40,19 @@
       <EmbeddedResource Include="Serialization\Schema\ck-meta.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
     </ItemGroup>
     
 </Project>

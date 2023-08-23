@@ -13,5 +13,8 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <ImplicitUsings>true</ImplicitUsings>
         <TargetFramework>net7.0</TargetFramework>
+        <RepositoryUrl>https://github.com/meshmakers/octo-construction-kit-compiler</RepositoryUrl>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageProjectUrl>https://www.meshmakers.io</PackageProjectUrl>
     </PropertyGroup>
 </Project>

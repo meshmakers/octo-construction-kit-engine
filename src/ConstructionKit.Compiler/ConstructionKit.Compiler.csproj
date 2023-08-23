@@ -1,5 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
+        <Description>The Octo Mesh Construction Kit Compiler and Repository Management</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Compiler</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
     </PropertyGroup>
@@ -41,5 +44,17 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
     </ItemGroup>
 </Project>

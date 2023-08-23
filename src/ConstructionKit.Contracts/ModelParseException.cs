@@ -2,16 +2,22 @@ using System.Text.Json;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
+/// <summary>
+/// Used to indicate an exception during model parsing operations
+/// </summary>
 public class ModelParseException : CkModelException
 {
+    /// <inheritdoc />
     public ModelParseException()
     {
     }
 
+    /// <inheritdoc />
     public ModelParseException(string message) : base(message)
     {
     }
 
+    /// <inheritdoc />
     public ModelParseException(string message, Exception inner) : base(message, inner)
     {
     }
@@ -21,42 +27,42 @@ public class ModelParseException : CkModelException
         return new ModelParseException($"Unexpected token parsing '{elementName}'. Expected String, got '{(object)readerTokenType}'.");
     }
 
-    public static Exception ValueCannotBeEmpty(string elementName)
+    internal static Exception ValueCannotBeEmpty(string elementName)
     {
         return new ModelParseException($"Value cannot be null or empty for element '{elementName}'.");
     }
 
-    public static Exception CannotDeserializeModel(string filePath)
+    internal static Exception CannotDeserializeModel(string filePath)
     {
         return new ModelParseException($"File '{filePath}' contains invalid construction kit model.");
     }
     
-    public static Exception CannotDeserializeModel()
+    internal static Exception CannotDeserializeModel()
     {
         return new ModelParseException($"Stream contains invalid construction kit model.");
     }
     
-    public static Exception SchemaValidationFailed()
+    internal static Exception SchemaValidationFailed()
     {
         return new ModelParseException($"Stream contains invalid construction kit model so that the schema validation failed.");
     }
 
-    public static Exception CannotDeserializeRtModel(string filePath)
+    internal static Exception CannotDeserializeRtModel(string filePath)
     {
         return new ModelParseException($"File '{filePath}' contains invalid runtime model.");
     }
     
-    public static Exception CannotDeserializeModeByJsonString(string jsonString)
+    internal static Exception CannotDeserializeModeByJsonString(string jsonString)
     {
         return new ModelParseException($"JSON string '{jsonString}' contains invalid construction kit model.");
     }
 
-    public static Exception CommonErrorReadCkModel(string filePath, Exception exception)
+    internal static Exception CommonErrorReadCkModel(string filePath, Exception exception)
     {
         return new ModelParseException($"File '{filePath}' cannot be read.", exception);
     }
     
-    public static Exception CommonErrorReadRtModel(Exception exception)
+    internal static Exception CommonErrorReadRtModel(Exception exception)
     {
         return new ModelParseException($"Cannot be read runtime model.", exception);
     }

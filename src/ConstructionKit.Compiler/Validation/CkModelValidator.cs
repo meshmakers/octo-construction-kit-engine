@@ -8,12 +8,21 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Validation;
 
+/// <summary>
+/// Implementation of <see cref="ICkModelValidator"/> that validates a compiled model.
+/// </summary>
 public class CkModelValidator : ICkModelValidator
 {
     private readonly IDependencyResolver _dependencyResolver;
     private readonly IInheritanceResolver _inheritanceResolver;
     private readonly IElementResolver _elementResolver;
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="CkModelValidator"/> class.
+    /// </summary>
+    /// <param name="dependencyResolver"></param>
+    /// <param name="inheritanceResolver"></param>
+    /// <param name="elementResolver"></param>
     public CkModelValidator(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
         IElementResolver elementResolver)
     {
@@ -22,6 +31,7 @@ public class CkModelValidator : ICkModelValidator
         _elementResolver = elementResolver;
     }
 
+    /// <inheritdoc />
     public async Task ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
 

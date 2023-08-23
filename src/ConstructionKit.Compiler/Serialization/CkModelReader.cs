@@ -6,12 +6,21 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Serialization;
 
+/// <summary>
+/// Reads a CK model from a file.
+/// </summary>
 public class CkModelReader
 {
     private readonly ICkModelValidator _ckModelValidator;
     private readonly ILogger<CkModelReader> _logger;
     private readonly ICkSerializer _ckSerializer;
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="CkModelReader"/> class.
+    /// </summary>
+    /// <param name="logger"></param>
+    /// <param name="ckSerializer"></param>
+    /// <param name="ckModelValidator"></param>
     public CkModelReader(ILogger<CkModelReader> logger, ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
     {
         _ckModelValidator = ckModelValidator;
@@ -19,6 +28,13 @@ public class CkModelReader
         _ckSerializer = ckSerializer;
     }
 
+    /// <summary>
+    /// Reads a CK model from a file.
+    /// </summary>
+    /// <param name="filePath"></param>
+    /// <param name="operationResult"></param>
+    /// <param name="cancellationToken"></param>
+    /// <exception cref="Exception"></exception>
     public async Task ReadAsync(string filePath, OperationResult operationResult, CancellationToken? cancellationToken = null)
     {
         _logger.LogInformation("Reading CK model...");

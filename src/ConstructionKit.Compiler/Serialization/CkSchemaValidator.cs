@@ -9,33 +9,42 @@ using YamlDotNet.RepresentationModel;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Serialization;
 
+/// <summary>
+/// Implements a validator for the CK model in JSON or YAML format.
+/// </summary>
 public class CkSchemaValidator : ICkSchemaValidator
 {
+    /// <inheritdoc />
     public bool ValidateElementsInJson(Stream stream, OperationResult operationResult)
     {
         return ValidateModelJson(stream, CkSchema.ElementsSchema, operationResult);
     }
 
+    /// <inheritdoc />
     public bool ValidateMetaInJson(Stream stream, OperationResult operationResult)
     {
         return ValidateModelJson(stream, CkSchema.MetaSchema, operationResult);
     }
 
+    /// <inheritdoc />
     public bool ValidateCompiledModelInJson(Stream stream, OperationResult operationResult)
     {
         return ValidateModelJson(stream, CkSchema.CompiledModelSchema, operationResult);
     }
 
+    /// <inheritdoc />
     public bool ValidateElementsInYaml(Stream stream, OperationResult operationResult)
     {
         return ValidateModelYaml(stream, CkSchema.ElementsSchema, operationResult);
     }
 
+    /// <inheritdoc />
     public bool ValidateMetaInYaml(Stream stream, OperationResult operationResult)
     {
         return ValidateModelYaml(stream, CkSchema.MetaSchema, operationResult);
     }
 
+    /// <inheritdoc />
     public bool ValidateCompiledModelInYaml(Stream stream, OperationResult operationResult)
     {
         return ValidateModelYaml(stream, CkSchema.CompiledModelSchema, operationResult);

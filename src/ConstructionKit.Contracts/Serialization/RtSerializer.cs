@@ -1,10 +1,19 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
+/// <summary>
+/// Represents the runtime model serializer
+/// </summary>
 public static class RtSerializer
 {
+    /// <summary>
+    /// Serializes
+    /// </summary>
+    /// <param name="streamWriter"></param>
+    /// <param name="model"></param>
     public static async Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto model)
     {
         var options = new JsonSerializerOptions {  DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault };
@@ -12,6 +21,12 @@ public static class RtSerializer
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, model, options);
     }
 
+    /// <summary>
+    /// Deserializes
+    /// </summary>
+    /// <param name="textReader"></param>
+    /// <param name="entityDeserializedAction"></param>
+    /// <param name="cancellationToken"></param>
     public static async Task DeserializeAsync(StreamReader textReader, Func<RtEntityDto, Task> entityDeserializedAction,
         CancellationToken? cancellationToken = null)
     {

@@ -8,15 +8,24 @@ using YamlDotNet.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
+/// <summary>
+/// Represents an assignment of a CK type to a CK association role and the target CK type.
+/// </summary>
 [DebuggerDisplay("{" + nameof(CkRoleId) + "} -> {" + nameof(TargetCkTypeId) + "}")]
 public class CkTypeAssociationDto
 {
+    /// <summary>
+    /// Gets or sets the association role id.
+    /// </summary>
     [JsonPropertyName("id")]
     [YamlMember(Alias = "id")]
     [JsonRequired]
     [JsonConverter(typeof(CkIdAssociationIdConverter))]
     public CkId<CkAssociationRoleId> CkRoleId { get; set; }
 
+    /// <summary>
+    /// Gets or sets the target CK type id.
+    /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdTypeIdConverter))]
     public CkId<CkTypeId> TargetCkTypeId { get; set; }

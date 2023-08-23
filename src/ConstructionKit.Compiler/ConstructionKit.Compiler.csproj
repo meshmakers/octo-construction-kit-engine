@@ -6,6 +6,19 @@
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
     </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <OutputPath>..\..\bin\Debug\</OutputPath>
+        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.ConstructionKit.Compiler.xml</DocumentationFile>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <OutputPath>..\..\bin\Release\</OutputPath>
+        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.ConstructionKit.Compiler.xml</DocumentationFile>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+    </PropertyGroup>
+    
     <ItemGroup>
       <Folder Include="Caching\" />
       <Folder Include="Engineering\" />

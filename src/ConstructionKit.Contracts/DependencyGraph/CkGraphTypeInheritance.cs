@@ -1,5 +1,10 @@
+// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
+/// <summary>
+/// Defines the inheritance of a construction kit type
+/// </summary>
 public class CkGraphTypeInheritance 
 {
     /// <summary>

@@ -7,8 +7,12 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Resolvers;
 
+/// <summary>
+/// Implementation of <see cref="IElementResolver"/> that resolves the elements of a compiled model.
+/// </summary>
 public class ElementResolver : IElementResolver
 {
+    /// <inheritdoc />
     public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, OperationResult validationResult)
     {
         var ckModelGraph = new CkModelGraph();

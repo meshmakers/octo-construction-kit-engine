@@ -3,6 +3,9 @@ using Json.Schema;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 
+/// <summary>
+/// Manages the construction kit schemas
+/// </summary>
 public static class CkSchema
 {
     private static readonly JsonSchema ElementsSchemaInternal;
@@ -24,10 +27,19 @@ public static class CkSchema
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-associationRole")));
     }
 
+    /// <summary>
+    /// Returns the construction kit elements schema
+    /// </summary>
     public static JsonSchema ElementsSchema => ElementsSchemaInternal.Bundle();
 
+    /// <summary>
+    /// Returns the construction kit meta schema
+    /// </summary>
     public static JsonSchema MetaSchema => MetaSchemaInternal.Bundle();
 
+    /// <summary>
+    /// Returns the construction kit compiled model schema
+    /// </summary>
     public static JsonSchema CompiledModelSchema => CompiledModelSchemaInternal.Bundle();
 
     private static JsonSchema GetSchema(string resourcesStreamPath)

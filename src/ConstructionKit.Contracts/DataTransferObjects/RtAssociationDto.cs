@@ -2,17 +2,26 @@
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
+/// <summary>
+/// Defines an association between two entities
+/// </summary>
 public class RtAssociationDto
 {
-    [JsonPropertyName("roleId")]
+    /// <summary>
+    /// Gets or sets the role id of the association.
+    /// </summary>
     [JsonRequired]
-    public string RoleId { get; set; } = null!;
+    public CkId<CkAssociationRoleId> RoleId { get; set; } = null!;
 
-    [JsonPropertyName("targetRtId")]
+    /// <summary>
+    /// Gets or sets the target rt id.
+    /// </summary>
     [JsonRequired]
     public OctoObjectId TargetRtId { get; set; }
     
-    [JsonPropertyName("targetCkTypeId")] 
+    /// <summary>
+    /// Gets or sets the target ck type id.
+    /// </summary>
     [JsonRequired]
     public CkId<CkTypeId> TargetCkTypeId { get; set; }
 }

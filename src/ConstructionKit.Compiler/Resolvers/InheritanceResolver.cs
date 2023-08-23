@@ -7,17 +7,25 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Resolvers;
 
+/// <summary>
+/// Implementation of <see cref="IInheritanceResolver"/> that resolves the inheritance of a compiled model.
+/// </summary>
 public class InheritanceResolver : IInheritanceResolver
 {
     private readonly ILogger<InheritanceResolver> _logger;
     private readonly HashSet<CkId<CkTypeId>> _handledTypesHashSet;
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="InheritanceResolver"/> class.
+    /// </summary>
+    /// <param name="logger"></param>
     public InheritanceResolver(ILogger<InheritanceResolver> logger)
     {
         _handledTypesHashSet = new HashSet<CkId<CkTypeId>>();
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public CkModelGraph Resolve(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph, OperationResult operationResult)
     {
         _logger.LogInformation("Starting resolving inheritance");

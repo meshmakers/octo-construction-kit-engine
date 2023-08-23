@@ -22,6 +22,10 @@ public class CkYamlSerializer : ICkYamlSerializer
     private readonly IDeserializer _deserializer;
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
+    /// <summary>
+    /// Creates a new instance of the <see cref="CkYamlSerializer"/> class.
+    /// </summary>
+    /// <param name="ckSchemaValidator"></param>
     public CkYamlSerializer(ICkSchemaValidator ckSchemaValidator)
     {
         _ckSchemaValidator = ckSchemaValidator;
@@ -49,24 +53,28 @@ public class CkYamlSerializer : ICkYamlSerializer
             .Build();
     }
 
+    /// <inheritdoc />
     public Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel)
     {
         _serializer.Serialize(streamWriter, compiledModel);
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SerializeAsync(StreamWriter streamWriter, CkMetaRootDto metaRootDto)
     {
         _serializer.Serialize(streamWriter, metaRootDto);
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task SerializeAsync(StreamWriter streamWriter, CkElementsRootDto elementsRootDto)
     {
         _serializer.Serialize(streamWriter, elementsRootDto);
         return Task.CompletedTask;
     }
 
+    /// <inheritdoc />
     public Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, OperationResult operationResult)
     {
         _ckSchemaValidator.ValidateMetaInYaml(stream, operationResult);
@@ -80,6 +88,7 @@ public class CkYamlSerializer : ICkYamlSerializer
         return Task.FromResult(ckMetaDto);
     }
 
+    /// <inheritdoc />
     public Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, OperationResult operationResult)
     {
         _ckSchemaValidator.ValidateElementsInYaml(stream, operationResult);
@@ -93,6 +102,7 @@ public class CkYamlSerializer : ICkYamlSerializer
         return Task.FromResult(ckElementsDto);
     }
 
+    /// <inheritdoc />
     public async Task<CkCompiledModelRoot?> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
@@ -100,6 +110,7 @@ public class CkYamlSerializer : ICkYamlSerializer
         return await DeserializeCompiledModelRootAsync(memStream, operationResult);
     }
 
+    /// <inheritdoc />
     public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)
     {
         _ckSchemaValidator.ValidateCompiledModelInYaml(stream, operationResult);

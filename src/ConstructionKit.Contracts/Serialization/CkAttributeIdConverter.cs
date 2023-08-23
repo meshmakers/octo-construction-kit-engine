@@ -7,8 +7,12 @@ using YamlDotNet.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
+/// <summary>
+/// Converter for System.Text.Json and YamlDotNet for <see cref="CkAttributeId"/>
+/// </summary>
 public class CkAttributeIdConverter : JsonConverter<CkAttributeId>, IYamlTypeConverter
 {
+    /// <inheritdoc />
     public override CkAttributeId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var str = reader.TokenType == JsonTokenType.String
@@ -17,22 +21,26 @@ public class CkAttributeIdConverter : JsonConverter<CkAttributeId>, IYamlTypeCon
         return !string.IsNullOrEmpty(str) ? new CkAttributeId(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkAttributeId));
     }
 
+    /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CkAttributeId value, JsonSerializerOptions options)
     {
         writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
 
+    /// <inheritdoc />
     public bool Accepts(Type type)
     {
         return type == typeof(CkAttributeId);
     }
 
+    /// <inheritdoc />
     public object ReadYaml(IParser parser, Type type)
     {
         var value = parser.Consume<Scalar>().Value;
         return new CkAttributeId(value); 
     }
 
+    /// <inheritdoc />
     public void WriteYaml(IEmitter emitter, object? value, Type type)
     {
         var ckAttributeId = (CkAttributeId)value!;

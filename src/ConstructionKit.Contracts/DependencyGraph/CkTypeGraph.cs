@@ -1,6 +1,8 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+// ReSharper disable UnusedMember.Global
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
@@ -54,7 +56,9 @@ public class CkTypeGraph
     /// </summary>
     public CkGraphDirectedAssociations Associations { get; }
 
-
+    /// <summary>
+    /// Returns a list of indexes including inherited ones.
+    /// </summary>
     public ICollection<CkTypeIndexDto>? Indexes { get; set; }
 
     /// <summary>

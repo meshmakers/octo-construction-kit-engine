@@ -11,35 +11,10 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<CkAttributeId>, ICkKey
 {
     /// <summary>
-    /// Defines the name of the attribute, e. g. "Designation"
+    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="attributeId"/>.
     /// </summary>
-    public string AttributeId { get; }
-
-    public CkVersion Version { get; }
-
-    public string FullName => IsEmpty ? "" : $"{AttributeId}-{Version}";
-
-    public string SemanticVersionedFullName
-    {
-        get
-        {
-            if (IsEmpty)
-            {
-                return "";
-            }
-            
-            var s = AttributeId;
-            if (Version.Major > 1)
-            {
-                s += $"-{Version.Major}";
-            }
-
-            return s;
-        }
-    }
-    
-    public bool IsEmpty => string.IsNullOrWhiteSpace(AttributeId);
-    
+    /// <param name="attributeId"></param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public CkAttributeId(string attributeId)
     {
         var typeIndex = attributeId.IndexOf("-", StringComparison.Ordinal);
@@ -60,17 +35,66 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
         }
     }
 
-    public CkAttributeId(string attributeId, string typeVersion = "1.0.0")
+    /// <summary>
+    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="attributeId"/> and <paramref name="attributeVersion"/>.
+    /// </summary>
+    /// <param name="attributeId"></param>
+    /// <param name="attributeVersion"></param>
+    public CkAttributeId(string attributeId, string attributeVersion = "1.0.0")
     {
         AttributeId = attributeId;
-        Version = typeVersion;
+        Version = attributeVersion;
     }
 
+    /// <summary>
+    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="value"/>.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
     public static implicit operator CkAttributeId(string value)
     {
         return new CkAttributeId(value);
     }
+    
+    /// <summary>
+    /// Defines the name of the attribute, e. g. "Designation"
+    /// </summary>
+    public string AttributeId { get; }
 
+    /// <summary>
+    /// Returns the version of the attribute, e. g. "1.0.0"
+    /// </summary>
+    public CkVersion Version { get; }
+
+    /// <summary>
+    /// Returns the full name of the attribute, e. g. "Designation-1.0.0"
+    /// </summary>
+    public string FullName => IsEmpty ? "" : $"{AttributeId}-{Version}";
+
+    /// <inheritdoc />
+    public string SemanticVersionedFullName
+    {
+        get
+        {
+            if (IsEmpty)
+            {
+                return "";
+            }
+            
+            var s = AttributeId;
+            if (Version.Major > 1)
+            {
+                s += $"-{Version.Major}";
+            }
+
+            return s;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsEmpty => string.IsNullOrWhiteSpace(AttributeId);
+
+    /// <inheritdoc />
     public int CompareTo(CkAttributeId other)
     {
         var result = String.Compare(AttributeId, other.AttributeId, StringComparison.Ordinal);
@@ -82,71 +106,85 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
         return Version.CompareTo(other.Version);
     }
 
+    /// <inheritdoc />
     public TypeCode GetTypeCode()
     {
         return TypeCode.Object;
     }
 
+    /// <inheritdoc />
     public bool ToBoolean(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public byte ToByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public char ToChar(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public DateTime ToDateTime(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public decimal ToDecimal(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public double ToDouble(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public short ToInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public int ToInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public long ToInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public sbyte ToSByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public float ToSingle(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public string ToString(IFormatProvider? provider)
     {
         return FullName;
     }
 
+    /// <inheritdoc />
     public object ToType(Type conversionType, IFormatProvider? provider)
     {
         switch (Type.GetTypeCode(conversionType))
@@ -165,16 +203,19 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ushort ToUInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public uint ToUInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ulong ToUInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
@@ -189,6 +230,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
         return FullName;
     }
 
+    /// <inheritdoc />
     public override bool Equals(object? obj)
     {
         if (obj == null)
@@ -201,21 +243,35 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
         return AttributeId == other.AttributeId && Version == other.Version;
     }
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         return HashCode.Combine(AttributeId, Version);
     }
 
+    /// <inheritdoc />
     public bool Equals(CkAttributeId other)
     {
         return AttributeId == other.AttributeId && Version.Equals(other.Version);
     }
 
+    /// <summary>
+    /// Compares two <see cref="CkAttributeId"/> instances for equality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator ==(CkAttributeId p1, CkAttributeId p2)
     {
         return p1.Equals(p2);
     }
 
+    /// <summary>
+    /// Compares two <see cref="CkAttributeId"/> instances for inequality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator !=(CkAttributeId p1, CkAttributeId p2)
     {
         return !p1.Equals(p2);

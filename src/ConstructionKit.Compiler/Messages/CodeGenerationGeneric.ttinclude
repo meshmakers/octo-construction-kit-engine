@@ -1,0 +1,33 @@
+<#+ 
+
+    T GetDocument<T>(string jsonFilePath)
+    {
+        string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
+        return System.Text.Json.JsonSerializer.Deserialize<T>(jsonContent);
+    }
+    
+    public static IEnumerable<string> ExtractPlaceholders(string input)
+    {
+        var matches = System.Text.RegularExpressions.Regex.Matches(input, @"\{(.*?)\}");
+        foreach (System.Text.RegularExpressions.Match match in matches)
+        {
+            yield return match.Groups[1].Value;
+        }
+    }
+
+    void CreateHeader()
+    {
+#>
+//------------------------------------------------------------------------------
+// <auto-generate>
+//     The code was generated from a template.
+//
+//     Modifications to this file may result in incorrect behavior and will be lost if
+//     the code is regenerated.
+// </auto-generated>
+//------------------------------------------------------------------------------
+<#+ 
+
+    }
+	
+  #>

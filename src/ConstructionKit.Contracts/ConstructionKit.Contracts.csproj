@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.Contracts</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.Contracts</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <PackageReference Include="JsonSchema.Net" Version="5.1.3" />
+      <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2307.21001" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+      <PackageReference Include="YamlDotNet" Version="13.2.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="Serialization\Schema\ck-compiled-model.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-compiled-model.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="Serialization\Schema\ck-element-associationRole.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-element-associationRole.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="Serialization\Schema\ck-element-attribute.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-element-attribute.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="Serialization\Schema\ck-element-type.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-element-type.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="Serialization\Schema\ck-elements.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-elements.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <None Remove="Serialization\Schema\ck-meta.json" />
+      <EmbeddedResource Include="Serialization\Schema\ck-meta.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+    
+</Project>

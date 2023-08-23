@@ -1,0 +1,134 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",  
+  "type": "object",
+  "title": "CkType",
+  "description": "A construction kit type definition",
+  "properties": {
+    "typeId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_.]+$"
+    },
+    "derivedFromCkTypeId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+    },
+    "isFinal": {
+      "type": "boolean"
+    },
+    "isAbstract": {
+      "type": "boolean"
+    },
+    "attributes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+          },
+          "name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.]+$"
+          },
+          "isAutoCompleteEnabled": {
+            "type": "boolean",
+            "$comment": "If true, the attribute uses auto complete."
+          },
+          "autoCompleteFilter": {
+            "type": "string",
+            "$comment": "The filter for auto complete defined by a regex expression."
+          },
+          "autoCompleteLimit": {
+            "type": "integer",
+            "$comment": "The amount of entries in auto complete filter."
+          },
+          "autoIncrementReference": {
+            "type": "string",
+            "$comment": "The reference to the attribute that is used for auto increment."
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name"
+        ]
+      }
+    },
+    "indexes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "indexType": {
+            "type": "string",
+            "enum": [
+              "None",
+              "Ascending",
+              "Text"
+            ]
+          },
+          "language": {
+            "type": "string"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "weight": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "attributeNames": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9_.]+$"
+                  }
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "attributeNames"
+              ]
+            }
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "indexType"
+        ]
+      }
+    },
+    "associations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+          },
+          "targetCkTypeId": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+          }
+        },
+        "required": [
+          "id",
+          "targetCkTypeId"
+        ]
+      }
+    },
+    "enableChangeStreamPreAndPostImages": {
+      "type": "boolean"
+    }
+  },
+  "additionalProperties": false,
+  "additionalItems": false,
+  "required": [
+    "typeId"
+  ]
+}

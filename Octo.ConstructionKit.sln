@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Contracts", "src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj", "{E4B6B8A8-01FD-43AB-8127-93D4EF599746}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{EDFCC05C-B86D-435F-9593-21846D5530D0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{8BC26415-C7AE-4140-AB3A-3B4AB3EE60E3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Compiler", "src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj", "{33867532-FEE1-4C19-9E2B-3929B9C78624}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Compiler.Tests", "tests\ConstructionKit.Compiler.Tests\ConstructionKit.Compiler.Tests.csproj", "{73D23A89-9B73-4C67-8F8B-94C2A6492F28}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E4B6B8A8-01FD-43AB-8127-93D4EF599746}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E4B6B8A8-01FD-43AB-8127-93D4EF599746}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E4B6B8A8-01FD-43AB-8127-93D4EF599746}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E4B6B8A8-01FD-43AB-8127-93D4EF599746}.Release|Any CPU.Build.0 = Release|Any CPU
+		{33867532-FEE1-4C19-9E2B-3929B9C78624}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{33867532-FEE1-4C19-9E2B-3929B9C78624}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{33867532-FEE1-4C19-9E2B-3929B9C78624}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{33867532-FEE1-4C19-9E2B-3929B9C78624}.Release|Any CPU.Build.0 = Release|Any CPU
+		{73D23A89-9B73-4C67-8F8B-94C2A6492F28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{73D23A89-9B73-4C67-8F8B-94C2A6492F28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{73D23A89-9B73-4C67-8F8B-94C2A6492F28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{73D23A89-9B73-4C67-8F8B-94C2A6492F28}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{E4B6B8A8-01FD-43AB-8127-93D4EF599746} = {EDFCC05C-B86D-435F-9593-21846D5530D0}
+		{33867532-FEE1-4C19-9E2B-3929B9C78624} = {EDFCC05C-B86D-435F-9593-21846D5530D0}
+		{73D23A89-9B73-4C67-8F8B-94C2A6492F28} = {8BC26415-C7AE-4140-AB3A-3B4AB3EE60E3}
+	EndGlobalSection
+EndGlobal

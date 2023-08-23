@@ -1,0 +1,46 @@
+{
+  "types": [
+    {
+      "typeId": "Location",
+      "derivedFrCkTypeId": "System/Entity",
+      "isFinal": true,
+      "isAbstract": true,
+      "attributes": [
+        {
+          "id": "Test/Designation",
+          "name": "Designation"
+        }
+      ]
+    },
+    {
+      "typeId": "Planet",
+      "derivedFromCkTypeId": "Test/Location",
+      "isFinal": false,
+      "isAbstract": false
+    },
+    {
+      "typeId": "City",
+      "derivedFromCkTypeId": "Test/Location",
+      "isFinal": true,
+      "isAbstract": false
+    },
+    {
+      "typeId": "PoliticalOrganization",
+      "derivedFromCkTypeId": "System/Entity",
+      "isFinal": true,
+      "isAbstract": false,
+      "attributes": [
+        {
+          "id": "Test/Designation",
+          "name": "Designation"
+        }
+      ],
+      "associations": [
+        {
+          "id": "System/Related",
+          "targetCkTypeId": "Test/City"
+        }
+      ]
+    }
+  ]
+}

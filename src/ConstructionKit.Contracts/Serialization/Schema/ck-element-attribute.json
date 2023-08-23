@@ -1,0 +1,53 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "CkAttribute",
+  "description": "A construction kit attribute definition",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_.]+$"
+    },
+    "valueType": {
+      "type": "string",
+      "enum": [
+        "String",
+        "Boolean",
+        "DateTime",
+        "Int",
+        "Double"
+      ]
+    },
+    "defaultValues": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "selectionValues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "required": [
+          "key",
+          "name"
+        ]
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "valueType"
+  ]
+}

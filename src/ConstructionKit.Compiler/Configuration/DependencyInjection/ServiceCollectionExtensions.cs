@@ -1,0 +1,44 @@
+using Meshmakers.Octo.ConstructionKit.Compiler.ModelRepositories;
+using Meshmakers.Octo.ConstructionKit.Compiler.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Compiler.Serialization;
+using Meshmakers.Octo.ConstructionKit.Compiler.Services;
+using Meshmakers.Octo.ConstructionKit.Compiler.Validation;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
+using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+
+// ReSharper disable once CheckNamespace
+namespace Microsoft.Extensions.DependencyInjection;
+
+public static class ServiceCollectionExtensions
+{
+    public static IServiceCollection AddCkModelCompiler(
+        this IServiceCollection services)
+    {
+        // Adding resolvers
+        services.AddTransient<IDependencyResolver, DependencyResolver>();
+        services.AddTransient<IElementResolver, ElementResolver>();
+        services.AddTransient<IInheritanceResolver, InheritanceResolver>();
+        
+        // Adding serializers
+        services.AddTransient<ICkSerializer, CkYamlSerializer>();
+        services.AddTransient<ICkYamlSerializer, CkYamlSerializer>();
+        services.AddTransient<ICkJsonSerializer, CkJsonSerializer>();
+        services.AddTransient<ICkSchemaValidator, CkSchemaValidator>();
+        
+        // Model stuff
+        services.AddTransient<ICkModelValidator, CkModelValidator>();
+        services.AddSingleton<ICkModelRepositoryManager, CkModelRepositoryManager>();
+        
+        // Adding services
+        services.AddSingleton<ICompilerService, CompilerService>();
+        
+        
+        // Add here sources of Ck model repositories
+        services.AddTransient<ICkModelRepository, LocalFileSystemCkModelRepository>();
+
+        return services;
+    }
+}

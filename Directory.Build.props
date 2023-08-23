@@ -1,0 +1,17 @@
+<Project>
+    <PropertyGroup>
+        <BaseDirectoryBuildPath>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</BaseDirectoryBuildPath>
+    </PropertyGroup>
+    <Import Condition="Exists($(BaseDirectoryBuildPath))" Project="$(BaseDirectoryBuildPath)" />
+    <PropertyGroup>
+        <RepositoryUrl>https://github.com/meshmakers/octo-core</RepositoryUrl>
+        <Authors>meshmakers GmbH</Authors>
+        <Company>meshmakers GmbH</Company>
+        <Copyright>https://www.meshmakers.io</Copyright>
+        <LangVersion>latestmajor</LangVersion>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <ImplicitUsings>true</ImplicitUsings>
+        <TargetFramework>net7.0</TargetFramework>
+    </PropertyGroup>
+</Project>

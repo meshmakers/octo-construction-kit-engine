@@ -1,0 +1,178 @@
+{
+  "compilerMessages": [
+    {
+      "key": "UnknownCkModel",
+      "number": 1,
+      "level": "ERROR",
+      "text": "Repository does not contain construction kit model '{modelId}'."
+    },
+    {
+      "key": "UnknownAttributeOfCkTypeIdInSource",
+      "number": 2,
+      "level": "ERROR",
+      "text": "Attribute Id '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "UnknownCkDerivedIdOfCkTypeIdInSource",
+      "number": 3,
+      "level": "ERROR",
+      "text": "Derived CkTypeId '{derivedCkTypeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "UnknownAssociationRoleOfCkTypeIdInSource",
+      "number": 4,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines unknown association role '{roleId}'. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "UnknownTargetCkTypeIdOfCkTypeIdInSource",
+      "number": 5,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines unknown association role target CkTypeId '{targetCkTypeId}'. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "AttributeIdNotUnique",
+      "number": 6,
+      "level": "ERROR",
+      "text": "AttributeId '{ckAttributeId}' is not unique."
+    },
+    {
+      "key": "AssociationRoleIdNotUnique",
+      "number": 7,
+      "level": "ERROR",
+      "text": "AssociationRoleId '{ckAssociationId}' is not unique."
+    },
+    {
+      "key": "TypeIdNotUnique",
+      "number": 8,
+      "level": "ERROR",
+      "text": "TypeId '{ckTypeId}' is not unique."
+    },
+    {
+      "key": "InheritanceMissing",
+      "number": 9,
+      "level": "FATALERROR",
+      "text": "TypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set."
+    },
+    {
+      "key": "CircularDependency",
+      "number": 10,
+      "level": "ERROR",
+      "text": "ModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies."
+    },
+    {
+      "key": "UnknownCkTypeIdForInheritance",
+      "number": 11,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{ckTypeId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "CkTypeIdAttributeIdNotUniqueByInheritance",
+      "number": 12,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint."
+    },
+    {
+      "key": "CkTypeIdAttributeNameNotUniqueByInheritance",
+      "number": 13,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint."
+    },
+    {
+      "key": "CkTypeIdAssociationNotUnique",
+      "number": 14,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}' that violates the unique association constraint"
+    },
+    {
+      "key": "CkTypeIdAttributeNameNotUnique",
+      "number": 15,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint."
+    },
+    {
+      "key": "CkTypeIdAttributeIdNotUnique",
+      "number": 16,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint."
+    },
+    {
+      "key": "CkTypeIdOutAssociationNotUniqueByInheritance",
+      "number": 17,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines an outgoing AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}' by inheritance that violates the unique association role id constraint"
+    },
+    {
+      "key": "CkTypeIdUnknownTargetCkTypeIdForAssociation",
+      "number": 18,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "CkTypeIdUnknown",
+      "number": 19,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "CkTypeIdMultipleOutgoingAssociationRepresentingSameRole",
+      "number": 20,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines an outgoing AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}'. This association is also defined between CkTypeId '{otherCkTypeId}' and target CkTypeId '{otherTargetCkTypeId}'."
+    },
+    {
+      "key": "DerivedFromCkTypeIdThatIsFinal",
+      "number": 21,
+      "level": "FATALERROR",
+      "text": "CkTypeId '{baseCkTypeId}' is final, but CkTypeId '{derivedTypeId}' is derived from it."
+    },
+    {
+      "key": "DirectoryMustBeEmpty",
+      "number": 22,
+      "level": "FATALERROR",
+      "text": "Directory '{directory}' must be empty."
+    },
+    {
+      "key": "ModelIdContainsInvalidCharacters",
+      "number": 23,
+      "level": "FATALERROR",
+      "text": "ModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "CkTypeIdContainsInvalidCharacters",
+      "number": 24,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "CkAttributeIdContainsInvalidCharacters",
+      "number": 25,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "CkAssociationIdContainsInvalidCharacters",
+      "number": 26,
+      "level": "ERROR",
+      "text": "CkAssociationId '{ckAssociationId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "SchemaValidationError",
+      "number": 27,
+      "level": "ERROR",
+      "text": "Schema validation failed: '{errorMessage}'"
+    },
+    {
+      "key": "DirectoryDoesNotExist",
+      "number": 28,
+      "level": "FATALERROR",
+      "text": "Directory '{directoryPath}' does not exist."
+    },
+    {
+      "key": "FileDoesNotExist",
+      "number": 29,
+      "level": "FATALERROR",
+      "text": "File '{filePath}' does not exist."
+    }
+  ]
+}

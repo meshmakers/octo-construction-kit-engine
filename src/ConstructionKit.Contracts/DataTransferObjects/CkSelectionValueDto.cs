@@ -5,11 +5,20 @@ using System.Text.Json.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
+/// <summary>
+/// Defines selection values for a ck attribute.
+/// </summary>
 public class CkSelectionValueDto
 {
+    /// <summary>
+    /// Key of the selection value.
+    /// </summary>
     [JsonRequired] 
     public int Key { get; set; }
 
+    /// <summary>
+    /// Display name of the selection value.
+    /// </summary>
     [JsonRequired] 
     public string Name { get; set; } = null!;
 }

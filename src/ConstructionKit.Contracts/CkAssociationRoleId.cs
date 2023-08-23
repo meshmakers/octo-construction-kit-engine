@@ -11,35 +11,10 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, IEquatable<CkAssociationRoleId>, ICkKey
 {
     /// <summary>
-    /// Defines the name of the association, e. g. "ParentChild"
+    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="roleId"/>.
     /// </summary>
-    public string RoleId { get; }
-    
-    public CkVersion Version { get; }
-
-    public string FullName => IsEmpty ? "" : $"{RoleId}-{Version}";
-
-    public string SemanticVersionedFullName
-    {
-        get
-        {
-            if (IsEmpty)
-            {
-                return "";
-            }
-            
-            var s = RoleId;
-            if (Version.Major > 1)
-            {
-                s += $"-{Version.Major}";
-            }
-
-            return s;
-        }
-    }
-
-    public bool IsEmpty => string.IsNullOrWhiteSpace(RoleId);
-
+    /// <param name="roleId"></param>
+    /// <exception cref="ArgumentOutOfRangeException"></exception>
     public CkAssociationRoleId(string roleId)
     {
         var typeIndex = roleId.IndexOf("-", StringComparison.Ordinal);
@@ -59,17 +34,66 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         }
     }
 
-    public CkAssociationRoleId(string roleId, string typeVersion = "1.0.0") 
+    /// <summary>
+    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="roleId"/> and <paramref name="associationRoleVersion"/>.
+    /// </summary>
+    /// <param name="roleId"></param>
+    /// <param name="associationRoleVersion"></param>
+    public CkAssociationRoleId(string roleId, string associationRoleVersion = "1.0.0") 
     {
         RoleId = roleId;
-        Version = typeVersion;
+        Version = associationRoleVersion;
     }
     
+    /// <summary>
+    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="value"/>.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
     public static implicit operator CkAssociationRoleId(string value)
     {
         return new CkAssociationRoleId(value);
     }
+    
+    /// <summary>
+    /// Defines the name of the association, e. g. "ParentChild"
+    /// </summary>
+    public string RoleId { get; }
+    
+    /// <summary>
+    /// Returns the version of the association role, e. g. "1.0.0"
+    /// </summary>
+    public CkVersion Version { get; }
 
+    /// <summary>
+    /// Returns the full name of the association role, e. g. "ParentChild-1.0.0"
+    /// </summary>
+    public string FullName => IsEmpty ? "" : $"{RoleId}-{Version}";
+
+    /// <inheritdoc />
+    public string SemanticVersionedFullName
+    {
+        get
+        {
+            if (IsEmpty)
+            {
+                return "";
+            }
+            
+            var s = RoleId;
+            if (Version.Major > 1)
+            {
+                s += $"-{Version.Major}";
+            }
+
+            return s;
+        }
+    }
+
+    /// <inheritdoc />
+    public bool IsEmpty => string.IsNullOrWhiteSpace(RoleId);
+
+    /// <inheritdoc />
     public int CompareTo(CkAssociationRoleId other)
     {
         var result = String.Compare(RoleId, other.RoleId, StringComparison.Ordinal);
@@ -81,76 +105,91 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         return Version.CompareTo(other.Version);
     }
 
+    /// <inheritdoc />
     public bool Equals(CkAssociationRoleId other)
     {
         return RoleId == other.RoleId && Equals(Version, other.Version);
     }
 
+    /// <inheritdoc />
     public TypeCode GetTypeCode()
     {
         return TypeCode.Object;
     }
 
+    /// <inheritdoc />
     public bool ToBoolean(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public byte ToByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public char ToChar(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public DateTime ToDateTime(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public decimal ToDecimal(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public double ToDouble(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public short ToInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public int ToInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public long ToInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public sbyte ToSByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public float ToSingle(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public string ToString(IFormatProvider? provider)
     {
         return FullName;
     }
 
+    /// <inheritdoc />
     public object ToType(Type conversionType, IFormatProvider? provider)
     {
         switch (Type.GetTypeCode(conversionType))
@@ -169,16 +208,19 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ushort ToUInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public uint ToUInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ulong ToUInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
@@ -193,6 +235,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         return FullName;
     }
 
+    /// <inheritdoc />
     public override bool Equals(object? obj)
     {
         if (obj == null)
@@ -205,6 +248,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         return RoleId == other.RoleId && Version == other.Version;
     }
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -216,11 +260,23 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         }
     }
     
+    /// <summary>
+    /// Compares two <see cref="CkAssociationRoleId"/> instances for equality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator ==(CkAssociationRoleId p1, CkAssociationRoleId p2)
     {
         return p1.Equals(p2);
     }
 
+    /// <summary>
+    /// Compares two <see cref="CkAssociationRoleId"/> instances for inequality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator !=(CkAssociationRoleId p1, CkAssociationRoleId p2)
     {
         return !p1.Equals(p2);

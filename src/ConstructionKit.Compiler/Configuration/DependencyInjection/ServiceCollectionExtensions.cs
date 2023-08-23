@@ -12,8 +12,16 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
 
+/// <summary>
+/// Extension methods for adding Ck model compiler services to the DI container.
+/// </summary>
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds Ck model compiler services to the DI container.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
     public static IServiceCollection AddCkModelCompiler(
         this IServiceCollection services)
     {

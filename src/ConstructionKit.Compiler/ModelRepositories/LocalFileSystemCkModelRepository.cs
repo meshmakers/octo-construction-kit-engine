@@ -6,20 +6,31 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.ModelRepositories;
 
+/// <summary>
+/// CkModel repository that uses the local file system to store the compiled models.
+/// </summary>
 public class LocalFileSystemCkModelRepository : ICkModelRepository
 {
     private readonly IOptions<LocalCkModelRepositoryOptions> _options;
     private readonly ICkJsonSerializer _ckJsonSerializer;
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="LocalFileSystemCkModelRepository"/> class.
+    /// </summary>
+    /// <param name="options"></param>
+    /// <param name="ckJsonSerializer"></param>
     public LocalFileSystemCkModelRepository(IOptions<LocalCkModelRepositoryOptions> options, ICkJsonSerializer ckJsonSerializer)
     {
         _options = options;
         _ckJsonSerializer = ckJsonSerializer;
     }
-    
+
+    /// <inheritdoc />
     public int Order => 0;
+    /// <inheritdoc />
     public string RepositoryName => "Local Repository";
 
+    /// <inheritdoc />
     public Task<bool> LookupModelIdAsync(CkModelId modelId)
     {
         if (!TryGetModelPath(modelId, out _))
@@ -30,6 +41,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         return Task.FromResult(true);
     }
 
+    /// <inheritdoc />
     public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId)
     {
         if (!TryGetModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
@@ -48,11 +60,13 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         return compiledModelRoot;
     }
 
+    /// <inheritdoc />
     public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel)
     {
         throw new NotImplementedException();
     }
 
+    /// <inheritdoc />
     public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel)
     {
         throw new NotImplementedException();

@@ -17,6 +17,9 @@ public class CkJsonSerializer : ICkJsonSerializer
     private readonly JsonSerializerOptions _options;
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
+    /// <summary>
+    /// Creates a new instance of the <see cref="CkJsonSerializer"/> class.
+    /// </summary>
     public CkJsonSerializer()
     {
         _options = new JsonSerializerOptions 
@@ -30,22 +33,26 @@ public class CkJsonSerializer : ICkJsonSerializer
             }
         };
     }
-    
+
+    /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, compiledModel, _options);
     }
     
+    /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkMetaRootDto metaRootDto)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, metaRootDto, _options);
     }
 
+    /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkElementsRootDto elementsRootDto)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, elementsRootDto, _options);
     }
 
+    /// <inheritdoc />
     public async Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, OperationResult operationResult)
     {
         try
@@ -60,6 +67,7 @@ public class CkJsonSerializer : ICkJsonSerializer
         }
     }
 
+    /// <inheritdoc />
     public async Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, OperationResult operationResult)
     {
         try
@@ -75,6 +83,7 @@ public class CkJsonSerializer : ICkJsonSerializer
     }
 
 
+    /// <inheritdoc />
     public async Task<CkCompiledModelRoot?> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult) 
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
@@ -83,6 +92,7 @@ public class CkJsonSerializer : ICkJsonSerializer
     }
 
 
+    /// <inheritdoc />
     public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)
     {
         try

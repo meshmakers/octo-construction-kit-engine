@@ -1,5 +1,8 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
+/// <summary>
+/// Interface of a versioned construction kit element id
+/// </summary>
 public interface ICkKey : IConvertible
 {
     /// <summary>

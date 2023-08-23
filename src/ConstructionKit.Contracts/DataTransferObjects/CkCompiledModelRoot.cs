@@ -14,20 +14,35 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 [OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.CompiledModelSchema))]
 public class CkCompiledModelRoot : CkMetaRootDto
 {
+    /// <summary>
+    /// The URI of the schema for the compiled CK model.
+    /// </summary>
     public const string CkCompiledModelSchemaUri = "https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json";
     
+    /// <summary>
+    /// The URI of the schema for the compiled CK model used for serialization.
+    /// </summary>
     [YamlMember(Alias = "$schema")]
     [JsonPropertyName("$schema")]
     public override string SchemaUri { get; } = CkCompiledModelSchemaUri;
     
+    /// <summary>
+    /// Returns types of the model
+    /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkTypeDto>? Types { get; set; }
 
+    /// <summary>
+    /// Returns associations of the model
+    /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkAssociationRoleDto>? AssociationRoles { get; set; }
 
+    /// <summary>
+    /// Returns attributes of the model
+    /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkAttributeDto>? Attributes { get; set; }

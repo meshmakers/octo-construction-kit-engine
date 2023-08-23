@@ -2,7 +2,16 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
 
+/// <summary>
+/// Interface for resolving construction kit dependencies
+/// </summary>
 public interface IDependencyResolver
 {
+    /// <summary>
+    /// Resolves the dependencies of the given construction kit model ids
+    /// </summary>
+    /// <param name="dependencies"></param>
+    /// <param name="operationResult"></param>
+    /// <returns></returns>
     Task<CkAggregatedModelElements> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, OperationResult operationResult);
 }

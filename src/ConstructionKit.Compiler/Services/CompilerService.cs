@@ -8,17 +8,26 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Services;
 
+/// <summary>
+/// Implements a compiler service for the construction kit.
+/// </summary>
 public class CompilerService : ICompilerService
 {
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkModelValidator _ckModelValidator;
 
+    /// <summary>
+    /// Creates a new instance of the <see cref="CompilerService"/> class.
+    /// </summary>
+    /// <param name="ckSerializer"></param>
+    /// <param name="ckModelValidator"></param>
     public CompilerService(ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
     {
         _ckSerializer = ckSerializer;
         _ckModelValidator = ckModelValidator;
     }
 
+    /// <inheritdoc />
     public async Task CreateNewAsync(string rootPath)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
@@ -86,6 +95,7 @@ public class CompilerService : ICompilerService
         }
     }
 
+    /// <inheritdoc />
     public async Task CompileAsync(string rootPath)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);

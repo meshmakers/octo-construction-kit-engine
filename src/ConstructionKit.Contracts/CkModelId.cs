@@ -12,11 +12,10 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
 {
     private readonly string? _modelId;
 
-    public override bool Equals(object? obj)
-    {
-        return obj is CkModelId other && Equals(other);
-    }
-
+    /// <summary>
+    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="ckModelId"/>.
+    /// </summary>
+    /// <param name="ckModelId"></param>
     public CkModelId(string ckModelId)
     {
         var versionIndex = ckModelId.IndexOf("-", StringComparison.Ordinal);
@@ -32,24 +31,44 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
         }
     }
 
+    /// <summary>
+    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="modelId"/> and <paramref name="modelVersion"/>.
+    /// </summary>
+    /// <param name="modelId"></param>
+    /// <param name="modelVersion"></param>
     public CkModelId(string modelId, string modelVersion)
     {
         _modelId = modelId;
         ModelVersion = modelVersion;
     }
 
+    /// <summary>
+    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="value"/>.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
     public static implicit operator CkModelId(string value)
     {
         return new CkModelId(value);
     }
 
+    /// <summary>
+    /// Returns the id of the model, e. g. "System"
+    /// </summary>
     public string ModelId => _modelId ?? "";
 
+    /// <summary>
+    /// Returns the version of the model, e. g. "1.0.0"
+    /// </summary>
     public CkVersion ModelVersion { get; }
 
+    /// <summary>
+    /// Returns the full name of the model, e. g. "System-1.0.0"
+    /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
     public string FullName => IsEmpty ? "" : $"{ModelId}-{ModelVersion}";
 
+    /// <inheritdoc />
     public string SemanticVersionedFullName
     {
         get
@@ -68,74 +87,89 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
             return s;
         }
     }
-    
+
+    /// <inheritdoc />
     public bool IsEmpty => string.IsNullOrWhiteSpace(ModelId);
 
+    /// <inheritdoc />
     public TypeCode GetTypeCode()
     {
         return TypeCode.Object;
     }
 
+    /// <inheritdoc />
     public bool ToBoolean(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
-
+    
+    /// <inheritdoc />
     public byte ToByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
-
+    
+    /// <inheritdoc />
     public char ToChar(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public DateTime ToDateTime(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public decimal ToDecimal(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public double ToDouble(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public short ToInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public int ToInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public long ToInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public sbyte ToSByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public float ToSingle(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public string ToString(IFormatProvider? provider)
     {
         return FullName;
     }
 
+    /// <inheritdoc />
     public object ToType(Type conversionType, IFormatProvider? provider)
     {
         switch (Type.GetTypeCode(conversionType))
@@ -153,21 +187,25 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ushort ToUInt16(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public uint ToUInt32(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public ulong ToUInt64(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
 
+    /// <inheritdoc />
     public int CompareTo(CkModelId other)
     {
         var result = String.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
@@ -179,6 +217,13 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
         return ModelVersion.CompareTo(other.ModelVersion);
     }
 
+    /// <inheritdoc />
+    public override bool Equals(object? obj)
+    {
+        return obj is CkModelId other && Equals(other);
+    }
+
+    /// <inheritdoc />
     public bool Equals(CkModelId other)
     {
         return ModelId == other.ModelId && Equals(ModelVersion, other.ModelVersion);
@@ -193,6 +238,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
         return FullName;
     }
 
+    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -204,11 +250,23 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
         }
     }
 
+    /// <summary>
+    /// Compares two <see cref="CkModelId"/>s for equality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator ==(CkModelId p1, CkModelId p2)
     {
         return p1.Equals(p2);
     }
 
+    /// <summary>
+    /// Compares two <see cref="CkModelId"/> values for inequality.
+    /// </summary>
+    /// <param name="p1"></param>
+    /// <param name="p2"></param>
+    /// <returns></returns>
     public static bool operator !=(CkModelId p1, CkModelId p2)
     {
         return !p1.Equals(p2);

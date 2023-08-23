@@ -40,6 +40,7 @@ public class CompilerMessage
     /// </summary>
     public string MessageText { get; }
 
+    /// <inheritdoc />
     public override string ToString()
     {
         return $"{CreateDateTime.ToShortTimeString()} {MessageLevel} {MessageNumber}: {MessageText}";

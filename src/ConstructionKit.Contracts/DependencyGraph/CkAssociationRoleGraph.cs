@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
@@ -9,6 +10,11 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 [DebuggerDisplay("{" + nameof(CkRoleId) + "}")]
 public class CkAssociationRoleGraph
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="CkAssociationRoleGraph"/>.
+    /// </summary>
+    /// <param name="ckAssociationCkRoleId"></param>
+    /// <param name="associationRoleDto"></param>
     public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckAssociationCkRoleId, CkAssociationRoleDto associationRoleDto)
     {
         CkRoleId = ckAssociationCkRoleId;
@@ -18,6 +24,9 @@ public class CkAssociationRoleGraph
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
     }
     
+    /// <summary>
+    /// Returns the ck association id of the association role.
+    /// </summary>
     public CkId<CkAssociationRoleId> CkRoleId { get; }
 
     /// <summary>

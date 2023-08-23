@@ -1,9 +1,9 @@
 steps:
-- task: Assembly-Info-NetCore@2
+- task: Assembly-Info-NetCore@3
   displayName: "Versioning (no nuget)"
   inputs:
-    FileNames: |
-      Directory.Build.props
+    Path: '$(Build.SourcesDirectory)'
+    FileNames: '**/*.csproj'
     InsertAttributes: true
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)

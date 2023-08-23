@@ -1,11 +1,10 @@
-using CkModel.Compiler.SystemTests.Fixtures;
-using Meshmakers.Octo.SystematizedData.CkModel.Compiler;
-using Meshmakers.Octo.SystematizedData.CkModel.Contracts;
-using Meshmakers.Octo.SystematizedData.CkModel.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
-namespace CkModel.Compiler.SystemTests;
+namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests;
 
 public class CompilerTests : IClassFixture<TemporaryDirectoryFixture>
 {

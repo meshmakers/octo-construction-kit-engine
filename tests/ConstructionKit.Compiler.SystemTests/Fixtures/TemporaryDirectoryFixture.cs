@@ -1,4 +1,4 @@
-namespace CkModel.Compiler.SystemTests.Fixtures;
+namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 
 public class TemporaryDirectoryFixture : ServiceCollectionFixture, IDisposable
 {

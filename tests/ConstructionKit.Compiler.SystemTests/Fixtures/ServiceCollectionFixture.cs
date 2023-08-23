@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace CkModel.Compiler.SystemTests.Fixtures;
+namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 
 public class ServiceCollectionFixture
 {

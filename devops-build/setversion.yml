@@ -3,7 +3,7 @@ steps:
   displayName: "Versioning (no nuget)"
   inputs:
     FileNames: |
-      **/*.csproj
+      Directory.Build.props
     InsertAttributes: true
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)

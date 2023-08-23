@@ -2,8 +2,7 @@ using System.Runtime.CompilerServices;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 [assembly:InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.Tests")]
-[assembly:InternalsVisibleTo("ConstructionKit.Compiler.SystemTests")]
-[assembly:InternalsVisibleTo("Meshmakers.Octo.SystematizedData.Persistence.SystemTests")]
+[assembly:InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.SystemTests")]
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler;
 

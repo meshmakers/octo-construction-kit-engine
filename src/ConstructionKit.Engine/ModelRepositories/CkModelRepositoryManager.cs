@@ -34,4 +34,25 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
 
         throw ModelRepositoryException.ModelNotFoundInRepositories(ckModelId);
     }
+
+    /// <inheritdoc />
+    public IEnumerable<Tuple<string, string>> GetRepositoryList()
+    {
+        foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x=> x.Order))
+        {
+            yield return new Tuple<string, string>(ckModelRepository.RepositoryName, ckModelRepository.Description);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModelRoot, bool isForced)
+    {
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        await ckModelRepository.PublishModelAsync(ckCompiledModelRoot, isForced);
+    }
 }

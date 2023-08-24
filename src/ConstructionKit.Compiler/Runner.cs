@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler;
@@ -28,6 +29,12 @@ internal class Runner
 
             return 0;
         }
+        catch (ArgumentValueMissingException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
+            _parser.ShowUsageInformation(Constants.OctoExeName);
+            return -1; 
+        }
         catch (MandatoryArgumentsMissingException ex)
         {
             _logger.LogError("{Message}", ex.Message);
@@ -39,6 +46,11 @@ internal class Runner
             _logger.LogError("{Message}", ex.Message);
             _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
+        }
+        catch (ModelRepositoryException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
+            return -2;
         }
         catch (Exception ex)
         {

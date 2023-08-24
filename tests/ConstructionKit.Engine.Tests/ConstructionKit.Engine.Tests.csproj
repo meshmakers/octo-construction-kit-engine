@@ -4,6 +4,7 @@
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Engine.Tests</RootNamespace>
+        <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>

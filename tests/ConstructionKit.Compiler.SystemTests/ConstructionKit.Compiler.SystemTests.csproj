@@ -2,11 +2,6 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
-
-        <IsPackable>false</IsPackable>
-
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler.SystemTests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler.SystemTests</RootNamespace>

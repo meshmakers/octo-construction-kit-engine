@@ -18,7 +18,7 @@ internal class CompileCommand : Command<OctoToolOptions>
         _compilerService = compilerService;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
-            new[] { "Root path of construction kit model directory" }, 1);
+            new[] { "Root path of construction kit model directory" }, true, 1);
     }
 
     public override async Task Execute()

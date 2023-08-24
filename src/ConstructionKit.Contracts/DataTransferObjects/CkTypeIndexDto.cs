@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using YamlDotNet.Serialization;
 
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -27,6 +28,7 @@ public class CkTypeIndexDto
     /// <summary>
     /// Gets or sets the language of the index.
     /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Language { get; set; }
 
     /// <summary>

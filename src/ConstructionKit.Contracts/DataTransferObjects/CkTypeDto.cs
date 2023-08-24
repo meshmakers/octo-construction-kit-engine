@@ -24,6 +24,7 @@ public class CkTypeDto
     /// Defines the base type of this type. Only one type may not have a base type: System/Entity
     /// </summary>
     [JsonConverter(typeof(CkIdTypeIdConverter))]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkTypeId>? DerivedFromCkTypeId { get; set; }
 
     /// <summary>
@@ -41,6 +42,7 @@ public class CkTypeDto
     /// <summary>
     ///     Gets or sets a list of attributes
     /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkTypeAttributeDto>? Attributes { get; set; }
 
     /// <summary>

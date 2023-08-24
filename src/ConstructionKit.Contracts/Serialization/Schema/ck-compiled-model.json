@@ -22,21 +22,21 @@
       "type": "array",
       "items": {
         "type": "object",
-        "$ref": "ck-element-attribute.json"
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json"
       }
     },
     "types": {
       "type": "array",
       "items": {
         "type": "object",
-        "$ref": "ck-element-type.json"
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json"
       }
     },
     "associationRoles":{
       "type": "array",
       "items": {
         "type": "object",
-        "$ref": "ck-element-associationRole.json"
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-associationRole.schema.json"
       }
     }
   },

@@ -5,6 +5,7 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.Engine</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Engine</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Engine</RootNamespace>
+        <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

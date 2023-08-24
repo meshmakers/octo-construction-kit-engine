@@ -28,12 +28,15 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     /// <inheritdoc />
     public int Order => 0;
     /// <inheritdoc />
-    public string RepositoryName => "Local Repository";
+    public string RepositoryName => "LocalRepository";  
+
+    /// <inheritdoc />
+    public string Description => $"Local file system repository at '{_options.Value.RootPath}'";
 
     /// <inheritdoc />
     public Task<bool> LookupModelIdAsync(CkModelId modelId)
     {
-        if (!TryGetModelPath(modelId, out _))
+        if (!TryGetExistingModelPath(modelId, out _))
         {
             return Task.FromResult(false);
         }
@@ -44,7 +47,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     /// <inheritdoc />
     public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId)
     {
-        if (!TryGetModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
+        if (!TryGetExistingModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
         {
             throw ModelRepositoryException.ModelNotFound(modelId, RepositoryName);
         }
@@ -61,9 +64,19 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel)
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false)
     {
-        throw new NotImplementedException();
+        var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
+        if (File.Exists(compiledModelFilePath) && !force)
+        {
+            throw ModelRepositoryException.ModelAlreadyExists(ckCompiledModel.ModelId, RepositoryName);
+        }
+
+        var path = Path.GetDirectoryName(compiledModelFilePath)!;
+        Directory.CreateDirectory(path);
+
+        await using var streamWriter = new StreamWriter(compiledModelFilePath);
+        await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel);
     }
 
     /// <inheritdoc />
@@ -72,25 +85,19 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         throw new NotImplementedException();
     }
 
-    private bool TryGetModelPath(CkModelId ckModelId, out string? compiledModelFilePath)
+    private string CreatePath(CkModelId ckModelId)
     {
         var rootPath = _options.Value.RootPath;
         var modelPath = Path.Combine(rootPath, "ck-models", ckModelId.ModelId);
-        if (!Directory.Exists(modelPath))
-        {
-            compiledModelFilePath = null;
-            return false;
-        }
-        
         var modelVersionPath = Path.Combine(modelPath, ckModelId.ModelVersion.Major.ToString());
-        if (!Directory.Exists(modelVersionPath))
-        {
-            compiledModelFilePath = null;
-            return false;
-        }
-        
-        string compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.yaml";
-        compiledModelFilePath = Path.Combine(modelPath, compiledModelFile);
+        string compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.json";
+        var compiledModelFilePath = Path.Combine(modelVersionPath, compiledModelFile);
+        return compiledModelFilePath;
+    }
+
+    private bool TryGetExistingModelPath(CkModelId ckModelId, out string? compiledModelFilePath)
+    {
+        compiledModelFilePath = CreatePath(ckModelId);
         if (!File.Exists(compiledModelFilePath))
         {
             compiledModelFilePath = null;

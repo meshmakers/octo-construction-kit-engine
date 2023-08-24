@@ -35,4 +35,14 @@ public class ModelRepositoryException : Exception
     {
         return new ModelRepositoryException($"Error loading model '{ckModelId}' from repository '{repositoryName}'.{Environment.NewLine}{operationResult.GetMessages()}");
     }
+    
+    internal static Exception ModelAlreadyExists(CkModelId ckModelId, string repositoryName)
+    {
+        return new ModelRepositoryException($"Model '{ckModelId}' already exists in repository '{repositoryName}'.");
+    }
+
+    internal static Exception ModelRepositoryNotFound(string repositoryName)
+    {
+        return new ModelRepositoryException($"Model repository '{repositoryName}' not found.");
+    }
 }

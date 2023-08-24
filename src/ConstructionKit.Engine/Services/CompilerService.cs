@@ -1,0 +1,188 @@
+using Meshmakers.Common.Shared;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+
+namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
+
+/// <summary>
+/// Implements a compiler service for the construction kit.
+/// </summary>
+public class CompilerService : ICompilerService
+{
+    private readonly ICkSerializer _ckSerializer;
+    private readonly ICkModelValidator _ckModelValidator;
+
+    /// <summary>
+    /// Creates a new instance of the <see cref="CompilerService"/> class.
+    /// </summary>
+    /// <param name="ckSerializer"></param>
+    /// <param name="ckModelValidator"></param>
+    public CompilerService(ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
+    {
+        _ckSerializer = ckSerializer;
+        _ckModelValidator = ckModelValidator;
+    }
+
+    /// <inheritdoc />
+    public async Task CreateNewAsync(string rootPath)
+    {
+        ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
+
+        OperationResult operationResult = new OperationResult();
+
+        if (Directory.Exists(rootPath) && Directory.EnumerateFileSystemEntries(rootPath).Any())
+        {
+            operationResult.AddMessage(MessageCodes.DirectoryMustBeEmpty(rootPath));
+            throw CompilerException.DirectoryMustBeEmpty(rootPath, operationResult);
+        }
+
+        var typesDirectory = Path.Combine(rootPath, CompilerStatics.TypesDirectoryName);
+        var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
+        var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
+        Directory.CreateDirectory(attributesDirectory);
+        Directory.CreateDirectory(associationsDirectory);
+        Directory.CreateDirectory(typesDirectory);
+
+        var modelDto = new CkMetaRootDto
+        {
+            ModelId = "Sample1",
+            Dependencies = new List<CkModelId> { new("System") }
+        };
+
+        await using var streamWriter = new StreamWriter(Path.Combine(rootPath, CompilerStatics.MetadataFile));
+        await _ckSerializer.SerializeAsync(streamWriter, modelDto);
+
+        var ckTypeDto = new CkTypeDto
+        {
+            TypeId = "SampleType1",
+            DerivedFromCkTypeId = "System/Entity",
+            Attributes =
+                new List<CkTypeAttributeDto> { new() { CkAttributeId = "Sample1/SampleAttribute", AttributeName = "MyAttribute" } },
+            Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "Sample1/Testing", TargetCkTypeId = "System/Entity" } }
+        };
+        await using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
+        await _ckSerializer.SerializeAsync(streamWriterEntity, new CkElementsRootDto { Types = new List<CkTypeDto> { ckTypeDto } });
+
+        var ckAttributeDto = new CkAttributeDto
+        {
+            AttributeId = "SampleAttribute",
+            ValueType = AttributeValueTypesDto.String
+        };
+        await using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, CompilerStatics.Sample1Attribute));
+        await _ckSerializer.SerializeAsync(streamWriterAttribute,
+            new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } });
+
+        var ckAssociationRoleDto = new CkAssociationRoleDto
+        {
+            AssociationRoleId = "Testing",
+            InboundName = "Tests",
+            OutboundName = "TestedBy",
+            InboundMultiplicity = MultiplicitiesDto.N,
+            OutboundMultiplicity = MultiplicitiesDto.ZeroOrOne
+        };
+        await using var streamWriterAssociations =
+            new StreamWriter(Path.Combine(associationsDirectory, CompilerStatics.Sample1Association));
+        await _ckSerializer.SerializeAsync(streamWriterAssociations,
+            new CkElementsRootDto { AssociationRoles = new List<CkAssociationRoleDto> { ckAssociationRoleDto } });
+
+        if (operationResult.HasErrors)
+        {
+            throw CompilerException.OperationResultWithErrors(operationResult);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task CompileAsync(string rootPath)
+    {
+        ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
+
+        OperationResult operationResult = new OperationResult();
+
+        if (!Directory.Exists(rootPath))
+        {
+            operationResult.AddMessage(MessageCodes.DirectoryDoesNotExist(rootPath));
+            throw CompilerException.DirectoryDoesNotExist(rootPath, operationResult);
+        }
+
+        var typesDirectory = Path.Combine(rootPath, CompilerStatics.TypesDirectoryName);
+        var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
+        var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
+
+        var modelPath = Path.Combine(rootPath, CompilerStatics.MetadataFile);
+        if (!File.Exists(modelPath))
+        {
+            operationResult.AddMessage(MessageCodes.FileDoesNotExist(modelPath));
+            throw CompilerException.FileDoesNotExist(modelPath, operationResult);
+        }
+
+        await using var stream = File.OpenRead(modelPath);
+        var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, operationResult);
+
+        var types = new List<CkTypeDto>();
+        if (Directory.Exists(typesDirectory))
+        {
+            foreach (var typeFile in Directory.EnumerateFiles(typesDirectory, "*.yaml"))
+            {
+                await using var streamType = File.OpenRead(typeFile);
+                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, operationResult);
+                if (elementsRootDto.Types != null)
+                {
+                    types.AddRange(elementsRootDto.Types);
+                }
+            }
+        }
+
+        var attributes = new List<CkAttributeDto>();
+        if (Directory.Exists(attributesDirectory))
+        {
+            foreach (var attributeFile in Directory.EnumerateFiles(attributesDirectory, "*.yaml"))
+            {
+                await using var streamAttribute = File.OpenRead(attributeFile);
+                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAttribute, operationResult);
+                if (elementsRootDto.Attributes != null)
+                {
+                    attributes.AddRange(elementsRootDto.Attributes);
+                }
+            }
+        }
+
+        var associationRoles = new List<CkAssociationRoleDto>();
+        if (Directory.Exists(associationsDirectory))
+        {
+            foreach (var associationFile in Directory.EnumerateFiles(associationsDirectory, "*.yaml"))
+            {
+                await using var streamAssociation = File.OpenRead(associationFile);
+                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAssociation, operationResult);
+                if (elementsRootDto.AssociationRoles != null)
+                {
+                    associationRoles.AddRange(elementsRootDto.AssociationRoles);
+                }
+            }
+        }
+        
+        CkCompiledModelRoot compiledModelRoot = new CkCompiledModelRoot
+        {
+            ModelId = ckMetaDto.ModelId,
+            Dependencies = ckMetaDto.Dependencies,
+            Types = types,
+            Attributes = attributes,
+            AssociationRoles = associationRoles
+        };
+
+        await _ckModelValidator.ValidateAsync(compiledModelRoot, operationResult);
+        
+        if (operationResult.HasErrors)
+        {
+            throw CompilerException.OperationResultWithErrors(operationResult);
+        }
+
+        string compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
+        await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
+        await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot);
+    }
+}
+     

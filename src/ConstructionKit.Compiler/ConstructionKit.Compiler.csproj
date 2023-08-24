@@ -1,63 +1,15 @@
 <Project Sdk="Microsoft.NET.Sdk">
+
     <PropertyGroup>
-        <Description>The Octo Mesh Construction Kit Compiler and Repository Management</Description>
+        <OutputType>Exe</OutputType>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>octo-ckc</ToolCommandName>
+        <Description>Octo Mesh Construction Kit Compiler</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>Meshmakers.Octo.ConstructionKit.Compiler</PackageId>
-        <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler</AssemblyName>
+        <AssemblyName>octo-ckc</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
     </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.ConstructionKit.Compiler.xml</DocumentationFile>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.ConstructionKit.Compiler.xml</DocumentationFile>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
-    
-    <ItemGroup>
-      <Folder Include="Caching\" />
-      <Folder Include="Engineering\" />
-    </ItemGroup>
-    <ItemGroup>
-      <PackageReference Include="JsonSchema.Net" Version="5.1.3" />
-      <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
-      <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />
-      <PackageReference Include="System.Text.Json" Version="7.0.3" />
-      <PackageReference Include="Yaml2JsonNode" Version="1.2.4" />
-      <PackageReference Include="YamlDotNet" Version="13.2.0" />
-    </ItemGroup>
-    <ItemGroup>
-      <None Update="Validation\Messages\MessageCode.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-      </None>
-      <None Update="Validation\Messages\test.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>test.cs</LastGenOutput>
-      </None>
-      <None Update="Messages\MessageCodes.tt">
-        <Generator>TextTemplatingFileGenerator</Generator>
-        <LastGenOutput>MessageCodes.cs</LastGenOutput>
-      </None>
-    </ItemGroup>
-    <ItemGroup>
-      <Compile Update="Validation\Messages\test.cs">
-        <AutoGen>True</AutoGen>
-        <DesignTime>True</DesignTime>
-        <DependentUpon>test.tt</DependentUpon>
-      </Compile>
-      <Compile Update="Messages\MessageCodes.cs">
-        <DependentUpon>MessageCodes.tt</DependentUpon>
-      </Compile>
-    </ItemGroup>
-    <ItemGroup>
-      <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
-    </ItemGroup>
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>

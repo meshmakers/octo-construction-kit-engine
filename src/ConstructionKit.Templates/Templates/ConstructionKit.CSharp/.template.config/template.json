@@ -1,0 +1,37 @@
+﻿{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Meshmakers GmbH and Contributors",
+  "classifications": [
+    "Octo Mesh",
+    "Construction Kit"
+  ],
+  "identity": "Meshmakers.Octo.ConstructionKit.Templates.CSharp",
+  "groupIdentity": "Meshmakers.Octo",
+  "name": "Octo Mesh Construction Kit Library",
+  "description": "Create Octo Mesh Construction Kit Library",
+  "shortName": "ConstructionKit",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "GeneratedConstructionKitProject",
+  "defaultName": "ConstructionKit",
+  "preferNameDirectory": true,
+  "postActions": [
+    {
+      "actionId": "C1292EF6-BFFB-4BD7-A18C-F1ECAD3023A8",
+      "description": "Add Octo Mesh Construction Kit Compiler reference",
+      "continueOnError": false,
+      "manualInstructions": [
+        {
+          "text": "Add the Octo Mesh Construction Kit compiler package to your project via nuget"
+        }
+      ],
+      "args": {
+        "referenceType": "package",
+        "reference": "Meshmakers.Octo.ConstructionKit.Compiler",
+        "projectFileExtensions": ".csproj"
+      }
+    }
+  ]
+}

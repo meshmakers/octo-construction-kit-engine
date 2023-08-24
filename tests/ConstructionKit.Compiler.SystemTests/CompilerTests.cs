@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 

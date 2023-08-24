@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <IsPackable>true</IsPackable>
+        <PackageType>Template</PackageType>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Templates</PackageId>
+        <Title>Octo Mesh Construction Kit Templates</Title>
+        <PackageTags>dotnet-new templates Octo Mesh Construction Kit Sdk KubeOps</PackageTags>
+        <PackageDescription>dotnet new templates for Octo Mesh Construction Kits.</PackageDescription>
+
+        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+
+        <IncludeContentInPack>true</IncludeContentInPack>
+        <IncludeBuildOutput>false</IncludeBuildOutput>
+        <ContentTargetFolders>content</ContentTargetFolders>
+        <NoWarn>$(NoWarn);NU5128</NoWarn>
+        <RootNamespace>Compiler.Templates</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**" />
+        <Compile Remove="**\*" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Templates\ConstructionKit.CSharp\ConstructionKit\" />
+    </ItemGroup>
+</Project>

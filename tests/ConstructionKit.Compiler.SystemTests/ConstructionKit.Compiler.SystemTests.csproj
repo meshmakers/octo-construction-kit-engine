@@ -30,7 +30,7 @@
 
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj" />
+      <ProjectReference Include="..\..\src\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
     </ItemGroup>
 
 </Project>

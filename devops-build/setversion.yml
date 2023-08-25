@@ -11,3 +11,4 @@ steps:
     FileVersionNumber: $(Build.BuildNumber)
     InformationalVersion: $(Build.BuildNumber)
     PackageVersion: $(Build.BuildNumber)
+    DisableTelemetry: true

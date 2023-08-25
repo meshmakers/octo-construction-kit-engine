@@ -1,0 +1,63 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
+
+    <Target Name="BaseConfig">
+
+        <ItemGroup>
+            <ConstructionKit Include="ConstructionKit" />
+        </ItemGroup>
+
+        <PropertyGroup>
+            <OctoCompilerToolName Condition="'$(OctoCompilerToolName)' == ''">meshmakers.octo.constructionkit.compiler</OctoCompilerToolName>
+            <IsOctoCompilerInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoCompilerToolName)))</IsOctoCompilerInstalled>
+        </PropertyGroup>
+
+        <Exec Command="dotnet tool list --local" StandardOutputImportance="Low" ConsoleToMsBuild="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput" />
+        </Exec>
+
+
+        <Message Condition="'$(IsOctoCompilerInstalled)' == 'false'" Importance="High" Text="Restoring OctoMesh construction kit compiler" />
+        <Exec Condition="'$(IsOctoCompilerInstalled)' == 'false'" Command="dotnet tool restore">
+        </Exec>
+
+        <Exec Command="dotnet tool list --local" StandardOutputImportance="Low" ConsoleToMsBuild="true">
+            <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput" />
+        </Exec>
+        <PropertyGroup>
+            <IsOctoCompilerInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoCompilerToolName)))</IsOctoCompilerInstalled>
+        </PropertyGroup>
+        <Error Condition="'$(IsOctoCompilerInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is not installed and cannot be stored." />
+
+    </Target>
+
+    <Target Name="CompileConstructionKit" DependsOnTargets="BaseConfig">
+
+        <Message Condition="!Exists(@(ConstructionKit))" Importance="High" Text="Create new construction kit library" />
+        <Exec Condition="!Exists(@(ConstructionKit))" Command="dotnet octo-ckc -c new -p @(ConstructionKit)">
+        </Exec>
+
+        <Message Condition="Exists(@(ConstructionKit))" Importance="High" Text="Compiling construction kit library" />
+        <Exec Condition="Exists(@(ConstructionKit))" Command="dotnet octo-ckc -c compile -p @(ConstructionKit)">
+        </Exec>
+
+    </Target>
+
+    <Target Name="GenerateT4" DependsOnTargets="BaseConfig">
+        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 %(TextTemplate.Identity) -c $(RootNameSpace).%(TextTemplate.Filename) -o %(TextTemplate.Filename).Generated.cs" />
+    </Target>
+
+    <Target Name="TextTemplateClean" AfterTargets="Clean">
+        <Delete Files="@(Generated)" />
+    </Target>
+
+    <Target Name="GetAssemblyAfterTimestamp" AfterTargets="CoreCompile">
+        <PropertyGroup>
+            <KubeOpsAssemblyTimestampAfterCompile>%(IntermediateAssembly.ModifiedTime)</KubeOpsAssemblyTimestampAfterCompile>
+        </PropertyGroup>
+    </Target>
+
+    <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig">
+        <CallTarget Condition="'$(OctoSkipCkCompile)' == ''" Targets="CompileConstructionKit" />
+    </Target>
+
+</Project>

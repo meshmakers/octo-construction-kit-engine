@@ -17,20 +17,30 @@
   "sourceName": "GeneratedConstructionKitProject",
   "defaultName": "ConstructionKit",
   "preferNameDirectory": true,
+  "symbols": {
+    "compilerVersion": {
+      "type": "parameter",
+      "datatype": "string",
+      "replaces": "CompilerVersion",
+      "defaultValue": "0.0.2308.25003",
+      "description": "Version of OctoMesh Construction Kit Compiler to install."
+    }
+  },
   "postActions": [
     {
-      "actionId": "C1292EF6-BFFB-4BD7-A18C-F1ECAD3023A8",
-      "description": "Add Octo Mesh Construction Kit Compiler reference",
+      "actionId": "3A7C4B45-1F5D-4A30-959A-51B88E82B5D2",
+      "description": "Installs the Octo Mesh Construction Kit Compiler dotnet tool",
       "continueOnError": false,
       "manualInstructions": [
         {
-          "text": "Add the Octo Mesh Construction Kit compiler package to your project via nuget"
+          "text": "Add the 'Meshmakers.Octo.ConstructionKit.Compiler' package to your project via nuget"
         }
       ],
       "args": {
-        "referenceType": "package",
-        "reference": "Meshmakers.Octo.ConstructionKit.Compiler",
-        "projectFileExtensions": ".csproj"
+        "executable": "dotnet",
+        "args": "tool install -g 'Meshmakers.Octo.ConstructionKit.Compiler' --version (compilerVersion)",
+        "redirectStandardOutput": false,
+        "redirectStandardError": false
       }
     }
   ]

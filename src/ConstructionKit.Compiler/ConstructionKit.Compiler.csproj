@@ -8,6 +8,7 @@
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>Meshmakers.Octo.ConstructionKit.Compiler</PackageId>
         <PackageIcon>meshmakers64.png</PackageIcon>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <AssemblyName>octo-ckc</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
         <TargetFramework>net7.0</TargetFramework>

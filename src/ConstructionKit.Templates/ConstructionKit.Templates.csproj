@@ -1,21 +1,45 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <IsPackable>true</IsPackable>
         <PackageType>Template</PackageType>
         <PackageId>Meshmakers.Octo.ConstructionKit.Templates</PackageId>
         <Title>Octo Mesh Construction Kit Templates</Title>
-        <PackageTags>dotnet-new templates Octo Mesh Construction Kit Sdk KubeOps</PackageTags>
+        <PackageTags>dotnet-new templates OctoMesh ConstructionKit SDK</PackageTags>
         <PackageDescription>dotnet new templates for Octo Mesh Construction Kits.</PackageDescription>
-
-        <TargetFrameworks>netstandard2.0</TargetFrameworks>
+        <PackageIcon>meshmakers64.png</PackageIcon>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        
+        <TargetFramework>netstandard2.0</TargetFramework>
 
         <IncludeContentInPack>true</IncludeContentInPack>
         <IncludeBuildOutput>false</IncludeBuildOutput>
         <ContentTargetFolders>content</ContentTargetFolders>
         <NoWarn>$(NoWarn);NU5128</NoWarn>
-        <RootNamespace>Compiler.Templates</RootNamespace>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.Templates</RootNamespace>
     </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <OutputPath>..\..\bin\Debug\</OutputPath>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <OutputPath>..\..\bin\Release\</OutputPath>
+    </PropertyGroup>
+    
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
+    </ItemGroup>
 
     <ItemGroup>
         <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**" />
@@ -23,6 +47,8 @@
     </ItemGroup>
 
     <ItemGroup>
+      <Folder Include="Templates\ConstructionKit.CSharp\.template.config\postActions\" />
+      <Folder Include="Templates\ConstructionKit.CSharp\CkModelEntities\" />
       <Folder Include="Templates\ConstructionKit.CSharp\ConstructionKit\" />
     </ItemGroup>
 </Project>

@@ -5,8 +5,8 @@
     <Import Condition="Exists($(BaseDirectoryBuildPath))" Project="$(BaseDirectoryBuildPath)" />
     <PropertyGroup>
         <RepositoryUrl>https://github.com/meshmakers/octo-core</RepositoryUrl>
-        <Authors>meshmakers GmbH and Contributor</Authors>
-        <Company>meshmakers GmbH and Contributor</Company>
+        <Authors>meshmakers GmbH and Contributors</Authors>
+        <Company>meshmakers GmbH and Contributors</Company>
         <Copyright>(c) 2022-2023 meshmakers GmbH</Copyright>
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>

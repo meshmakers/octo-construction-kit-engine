@@ -1,6 +1,6 @@
 steps:
 - task: Assembly-Info-NetCore@3
-  displayName: "Versioning (no nuget)"
+  displayName: "Setting version number to $(Build.BuildNumber)"
   inputs:
     Path: '$(Build.SourcesDirectory)/src/'
     FileNames: '**/*.csproj'
@@ -12,3 +12,14 @@ steps:
     InformationalVersion: $(Build.BuildNumber)
     PackageVersion: $(Build.BuildNumber)
     DisableTelemetry: true
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      # Replace placeholder in a file with build number
+      $file = $(Build.SourcesDirectory)/src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/.template.config/template.json
+      $fileContent = Get-Content $file
+      $fileContent = $fileContent -replace '0.0.0.0', $(Build.BuildNumber)
+      $fileContent | Set-Content $file
+  displayName: 'Updates dotnet template version'
+    

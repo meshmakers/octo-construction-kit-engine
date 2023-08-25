@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "meshmakers.octo.constructionkit.compiler": {
+      "version": "0.0.2308.25003",
+      "commands": [
+        "octo-ckc"
+      ]
+    }
+  }
+}

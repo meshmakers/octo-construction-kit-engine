@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "meshmakers.octo.constructionkit.compiler": {
-      "version": "0.0.2308.25003",
+      "version": "0.0.0.0",
       "commands": [
         "octo-ckc"
       ]

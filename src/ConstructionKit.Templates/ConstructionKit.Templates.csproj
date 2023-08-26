@@ -47,7 +47,6 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Templates\ConstructionKit.CSharp\.template.config\postActions\" />
       <Folder Include="Templates\ConstructionKit.CSharp\CkModelEntities\" />
       <Folder Include="Templates\ConstructionKit.CSharp\ConstructionKit\" />
     </ItemGroup>

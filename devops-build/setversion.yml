@@ -3,7 +3,8 @@ steps:
   displayName: "Setting version number to $(Build.BuildNumber)"
   inputs:
     Path: '$(Build.SourcesDirectory)/src/'
-    FileNames: '**/*.csproj'
+    FileNames: |
+      'src/*/*.csproj'
     InsertAttributes: true
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)

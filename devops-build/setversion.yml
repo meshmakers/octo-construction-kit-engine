@@ -4,7 +4,7 @@ steps:
   inputs:
     FileNames: |
       **/*.csproj
-      !src/ConstructionKit.Templates/*.csproj
+      !src/ConstructionKit.Templates/Templates/**/*.csproj
     InsertAttributes: true
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)

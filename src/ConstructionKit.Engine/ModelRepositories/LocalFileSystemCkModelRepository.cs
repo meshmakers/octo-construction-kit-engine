@@ -53,7 +53,11 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         }
 
         OperationResult operationResult = new();
+#if NETSTANDARD2_0
+        using var streamReader = File.OpenRead(compiledModelFilePath);
+#else
         await using var streamReader = File.OpenRead(compiledModelFilePath);
+#endif
         var compiledModelRoot = await _ckJsonSerializer.DeserializeCompiledModelRootAsync(streamReader, operationResult);
         if (operationResult.HasErrors)
         {
@@ -75,7 +79,11 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
         Directory.CreateDirectory(path);
 
+#if NETSTANDARD2_0
+        using var streamWriter = new StreamWriter(compiledModelFilePath);
+#else
         await using var streamWriter = new StreamWriter(compiledModelFilePath);
+#endif        
         await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel);
     }
 

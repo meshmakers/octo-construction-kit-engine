@@ -8,7 +8,7 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.Contracts</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Contracts</RootNamespace>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFrameworks>net7.0;netstandard2.0</TargetFrameworks>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -27,6 +27,7 @@
       <PackageReference Include="JsonSchema.Net" Version="5.1.3" />
       <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2307.21001" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="7.0.1" />
+      <PackageReference Include="System.Text.Json" Version="7.0.3" />
       <PackageReference Include="YamlDotNet" Version="13.2.0" />
     </ItemGroup>
 

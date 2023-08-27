@@ -1,11 +1,4 @@
 <#+ 
-
-    T GetDocument<T>(string jsonFilePath)
-    {
-        string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
-        return System.Text.Json.JsonSerializer.Deserialize<T>(jsonContent);
-    }
-    
     public static IEnumerable<string> ExtractPlaceholders(string input)
     {
         var matches = System.Text.RegularExpressions.Regex.Matches(input, @"\{(.*?)\}");

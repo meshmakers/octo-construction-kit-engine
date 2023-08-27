@@ -12,7 +12,7 @@ internal class OctoValidatingJsonConverterFactory : JsonConverterFactory
     private readonly ConcurrentDictionary<Type, JsonConverter?> _cache = new();
 
     /// <summary>Specifies the output format.</summary>
-    public OutputFormat? OutputFormat { get; init; }
+    public OutputFormat? OutputFormat { get; set; }
 
     /// <summary>
     /// Specifies whether the `format` keyword should be required to provide
@@ -21,7 +21,7 @@ internal class OctoValidatingJsonConverterFactory : JsonConverterFactory
     /// format-annotation vocabulary requirement in the `$vocabulary` keyword in
     /// a meta-schema declaring draft 2020-12.
     /// </summary>
-    public bool? RequireFormatValidation { get; init; }
+    public bool? RequireFormatValidation { get; set;  }
 
     /// <summary>When overridden in a derived class, determines whether the converter instance can convert the specified object type.</summary>
     /// <param name="typeToConvert">The type of the object to check whether it can be converted by this converter instance.</param>

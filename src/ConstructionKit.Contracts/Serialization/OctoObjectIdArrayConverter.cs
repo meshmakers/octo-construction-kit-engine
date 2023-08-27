@@ -26,7 +26,7 @@ public class OctoObjectIdArrayConverter : JsonConverter<OctoObjectId[]>
                 ? reader.GetString()
                 : throw new Exception(
                     $"Unexpected token parsing ObjectId. Expected String, got {(object)reader.TokenType}.");
-            list.Add(string.IsNullOrEmpty(str) ? OctoObjectId.Empty : new OctoObjectId(str));
+            list.Add(!string.IsNullOrEmpty(str) && str != null ? new OctoObjectId(str) : OctoObjectId.Empty);
             reader.Read();
         }
 

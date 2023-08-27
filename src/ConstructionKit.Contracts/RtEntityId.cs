@@ -31,7 +31,7 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <summary>
     /// The construction kit type id.
     /// </summary>
-    public CkId<CkTypeId> CkTypeId { get; init; }
+    public CkId<CkTypeId> CkTypeId { get; }
     
     /// <summary>
     /// The runtime id.

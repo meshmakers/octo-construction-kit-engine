@@ -86,7 +86,18 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
     /// <inheritdoc />
     public override int GetHashCode()
     {
+#if NETSTANDARD2_0
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 24 + ModelId.GetHashCode();
+            hash = hash * 24 + Key.GetHashCode();
+            return hash;
+        }
+#else
         return HashCode.Combine(ModelId, Key);
+#endif
+       
     }
 
 

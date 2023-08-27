@@ -18,7 +18,7 @@ public class OctoObjectIdConverter : JsonConverter<OctoObjectId>, IYamlTypeConve
             ? reader.GetString()
             : throw new Exception(
                 $"Unexpected token parsing ObjectId. Expected String, got {(object)reader.TokenType}.");
-        return string.IsNullOrEmpty(str) ? OctoObjectId.Empty : new OctoObjectId(str);
+        return !string.IsNullOrEmpty(str) && str != null ? new OctoObjectId(str) : OctoObjectId.Empty;
     }
 
     /// <inheritdoc />

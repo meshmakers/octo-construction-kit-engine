@@ -55,7 +55,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     {
         return new CkAttributeId(value);
     }
-    
+
     /// <summary>
     /// Defines the name of the attribute, e. g. "Designation"
     /// </summary>
@@ -80,7 +80,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
             {
                 return "";
             }
-            
+
             var s = AttributeId;
             if (Version.Major > 1)
             {
@@ -246,7 +246,17 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     /// <inheritdoc />
     public override int GetHashCode()
     {
-        return HashCode.Combine(AttributeId, Version);
+#if NETSTANDARD2_0
+        unchecked
+        {
+            int hash = 17;
+            hash = hash * 23 + AttributeId.GetHashCode();
+            hash = hash * 23 + Version.GetHashCode();
+            return hash;
+        }
+#else
+            return HashCode.Combine(AttributeId, Version);
+#endif
     }
 
     /// <inheritdoc />

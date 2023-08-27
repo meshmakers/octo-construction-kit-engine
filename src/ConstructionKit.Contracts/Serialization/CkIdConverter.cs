@@ -39,7 +39,7 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
             : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType);
-        return !string.IsNullOrEmpty(str) ? new CkId<TKey>(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
+        return !string.IsNullOrEmpty(str) && str != null ? new CkId<TKey>(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
     }
 
     /// <inheritdoc />

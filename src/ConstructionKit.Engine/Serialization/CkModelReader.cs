@@ -43,7 +43,11 @@ public class CkModelReader
 
         try
         {
+#if NETSTANDARD2_0
+            using var stream = File.OpenRead(filePath);
+#else
             await using var stream = File.OpenRead(filePath);
+#endif
             model = await _ckSerializer.DeserializeCompiledModelRootAsync(stream, operationResult);
 
             if (model == null)
@@ -58,7 +62,5 @@ public class CkModelReader
 
         _logger.LogInformation("Validating CK model...");
         await _ckModelValidator.ValidateAsync(model, operationResult);
-
-        
     }
 }

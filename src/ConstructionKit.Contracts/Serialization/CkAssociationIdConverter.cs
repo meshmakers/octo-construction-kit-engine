@@ -18,7 +18,7 @@ public class CkAssociationIdConverter : JsonConverter<CkAssociationRoleId>, IYam
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
             : throw ModelParseException.UnexpectedToken(nameof(CkAssociationRoleId), reader.TokenType);
-        return !string.IsNullOrEmpty(str) ? new CkAssociationRoleId(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkAssociationRoleId));
+        return !string.IsNullOrEmpty(str) && str != null ? new CkAssociationRoleId(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkAssociationRoleId));
     }
 
     /// <inheritdoc />

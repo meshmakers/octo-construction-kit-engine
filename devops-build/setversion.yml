@@ -4,8 +4,9 @@ steps:
   inputs:
     Path: '$(Build.SourcesDirectory)/src/'
     FileNames: |
-      '**/*.csproj'
-      !'src/ConstructionKit.Templates/*.csproj'
+      'src/ConstructionKit.Compiler/*.csproj'
+      'src/ConstructionKit.Contracts/*.csproj'
+      'src/ConstructionKit.Engine/*.csproj'
     InsertAttributes: true
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)

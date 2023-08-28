@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -14,6 +15,18 @@ public class CkGraphAssociations
     {
         Owned = new List<CkTypeAssociationDto>();
         Inherited = new List<CkTypeAssociationDto>();
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="CkGraphAssociations"/>
+    /// </summary>
+    /// <param name="owned"></param>
+    /// <param name="inherited"></param>
+    [JsonConstructor]
+    public CkGraphAssociations(ICollection<CkTypeAssociationDto> owned, ICollection<CkTypeAssociationDto> inherited)
+    {
+        Owned = owned;
+        Inherited = inherited;
     }
     
     /// <summary>

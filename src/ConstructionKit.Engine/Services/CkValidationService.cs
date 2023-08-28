@@ -51,6 +51,16 @@ public class CkValidationService : ICkValidationService
         if (compiledModel.Dependencies != null)
         {
             aggregatedModelElements = await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, operationResult);
+            
+            // Add attributes and roles
+            foreach (var ckAssociationRoleDto in aggregatedModelElements.CkAssociationRoles)
+            {
+                modelGraph.GetOrCreateAssociationRoles(ckAssociationRoleDto.Key, ckAssociationRoleDto.Value);
+            }
+            foreach (var ckAttributeDto in aggregatedModelElements.CkAttributes)
+            {
+                modelGraph.GetOrCreateAttribute(ckAttributeDto.Key, ckAttributeDto.Value);
+            }
         }
 
         // We suppose that the dependent models are already validated and we can use them.

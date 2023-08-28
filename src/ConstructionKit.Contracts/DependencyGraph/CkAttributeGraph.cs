@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
@@ -21,6 +22,23 @@ public class CkAttributeGraph
         ValueType = attributeDto.ValueType;
         DefaultValues = attributeDto.DefaultValues;
         SelectionValues = attributeDto.SelectionValues;
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="CkAttributeGraph"/>.
+    /// </summary>
+    /// <param name="ckAttributeId"></param>
+    /// <param name="valueType"></param>
+    /// <param name="defaultValues"></param>
+    /// <param name="selectionValues"></param>
+    [JsonConstructor]
+    public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, 
+        ICollection<object>? defaultValues, ICollection<CkSelectionValueDto>? selectionValues)
+    {
+        CkAttributeId = ckAttributeId;
+        ValueType = valueType;
+        DefaultValues = defaultValues;
+        SelectionValues = selectionValues;
     }
     
     /// <summary>

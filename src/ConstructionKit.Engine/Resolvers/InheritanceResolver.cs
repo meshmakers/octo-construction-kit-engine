@@ -29,7 +29,7 @@ public class InheritanceResolver : IInheritanceResolver
     public CkModelGraph Resolve(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph, OperationResult operationResult)
     {
         _logger.LogInformation("Starting resolving inheritance");
-
+        
         foreach (var ckTypeKeyValue in aggregatedModelElements.CkTypes)
         {
             var typeGraph = GetOrCreateTypeGraph(modelGraph, aggregatedModelElements, ckTypeKeyValue.Key, operationResult);

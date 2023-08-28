@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
@@ -12,6 +14,18 @@ public class CkGraphDirectedAssociations
     {
         In = new CkGraphAssociations();
         Out = new CkGraphAssociations();
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="CkGraphDirectedAssociations"/>
+    /// </summary>
+    /// <param name="in"></param>
+    /// <param name="out"></param>
+    [JsonConstructor]
+    public CkGraphDirectedAssociations(CkGraphAssociations @in, CkGraphAssociations @out)
+    {
+        In = @in;
+        Out = @out;
     }
     
     /// <summary>

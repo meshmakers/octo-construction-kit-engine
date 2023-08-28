@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
-using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 /// </summary>
 public class CkModelReader
 {
-    private readonly ICkModelValidator _ckModelValidator;
+    private readonly ICkValidationService _ckValidationService;
     private readonly ILogger<CkModelReader> _logger;
     private readonly ICkSerializer _ckSerializer;
 
@@ -20,10 +20,10 @@ public class CkModelReader
     /// </summary>
     /// <param name="logger"></param>
     /// <param name="ckSerializer"></param>
-    /// <param name="ckModelValidator"></param>
-    public CkModelReader(ILogger<CkModelReader> logger, ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
+    /// <param name="ckValidationService"></param>
+    public CkModelReader(ILogger<CkModelReader> logger, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
     {
-        _ckModelValidator = ckModelValidator;
+        _ckValidationService = ckValidationService;
         _logger = logger;
         _ckSerializer = ckSerializer;
     }
@@ -61,6 +61,6 @@ public class CkModelReader
         }
 
         _logger.LogInformation("Validating CK model...");
-        await _ckModelValidator.ValidateAsync(model, operationResult);
+        await _ckValidationService.ValidateAsync(model, operationResult);
     }
 }

@@ -4,7 +4,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 /// Used to indicate an exception during model repository operations
 /// </summary>
-public class ModelRepositoryException : Exception
+public class ModelRepositoryException : CkModelException
 {
     /// <inheritdoc />
     public ModelRepositoryException()

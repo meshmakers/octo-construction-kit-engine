@@ -10,7 +10,7 @@ public class ServiceCollectionFixture
     public ServiceCollectionFixture()
     {
         Services = new ServiceCollection();
-        Services.AddCkModelCompiler();
+        Services.AddConstructionKit();
         Services.AddLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();

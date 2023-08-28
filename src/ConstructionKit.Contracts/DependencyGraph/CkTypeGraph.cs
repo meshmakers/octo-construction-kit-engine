@@ -75,7 +75,7 @@ public class CkTypeGraph
     /// Adds a list of base types of the current type
     /// </summary>
     /// <param name="baseTypeList"></param>
-    public void AddBaseTypes(IEnumerable<CkGraphTypeInheritance> baseTypeList)
+    internal void AddBaseTypes(IEnumerable<CkGraphTypeInheritance> baseTypeList)
     {
         _baseTypes.AddRange(baseTypeList);
     }

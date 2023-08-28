@@ -23,7 +23,6 @@
     </PropertyGroup>
     
     <ItemGroup>
-      <Folder Include="Caching\" />
       <Folder Include="Engineering\" />
     </ItemGroup>
     <ItemGroup>

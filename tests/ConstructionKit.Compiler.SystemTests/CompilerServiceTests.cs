@@ -7,12 +7,12 @@ using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests;
 
-public class CompilerTests : IClassFixture<TemporaryDirectoryFixture>
+public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
 {
     private readonly TemporaryDirectoryFixture _fixture;
     private readonly ITestOutputHelper _testOutputHelper;
 
-    public CompilerTests(TemporaryDirectoryFixture fixture, ITestOutputHelper testOutputHelper)
+    public CompilerServiceTests(TemporaryDirectoryFixture fixture, ITestOutputHelper testOutputHelper)
     {
         _fixture = fixture;
         _testOutputHelper = testOutputHelper;
@@ -59,13 +59,30 @@ public class CompilerTests : IClassFixture<TemporaryDirectoryFixture>
 
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
             await compilerService.CreateNewAsync(rootPath);
-            await compilerService.CompileAsync(rootPath);
+            await compilerService.CompileAsync(rootPath, false);
 
             Assert.True(Directory.Exists(rootPath));
-            Assert.True(File.Exists(Path.Combine(rootPath, CompilerStatics.MetadataFile)));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, CompilerStatics.TypesDirectoryName)));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName)));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName)));
+            Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.yaml")));
+            Assert.False(File.Exists(Path.Combine(rootPath, "ck-sample1.cache.json")));
+
+        }
+    }
+    
+    [Fact]
+    public async Task Compile_WithCache_ok()
+    {
+        await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
+        {
+            string rootPath = _fixture.CreateTempDirectory();
+            _testOutputHelper.WriteLine($"Directory: {rootPath}");
+
+            var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
+            await compilerService.CreateNewAsync(rootPath);
+            await compilerService.CompileAsync(rootPath, true);
+
+            Assert.True(Directory.Exists(rootPath));
+            Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.yaml")));
+            Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.cache.json")));
         }
     }
 }

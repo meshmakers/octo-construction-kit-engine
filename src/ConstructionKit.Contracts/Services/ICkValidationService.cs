@@ -1,11 +1,11 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 /// <summary>
 /// Validates a compiled model. This validation validates logical consistency of the model.
 /// </summary>
-public interface ICkModelValidator
+public interface ICkValidationService
 {
     /// <summary>
     /// Checks the logical consistency of the compiled model.

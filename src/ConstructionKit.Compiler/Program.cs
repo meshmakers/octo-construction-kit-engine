@@ -43,7 +43,7 @@ internal static class Program
     {
         var services = new ServiceCollection();
 
-        services.AddCkModelCompiler();
+        services.AddConstructionKit();
 
         // Runner is the custom class
         services.AddTransient<Runner>();

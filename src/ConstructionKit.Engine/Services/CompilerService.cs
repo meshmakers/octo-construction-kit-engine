@@ -3,7 +3,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -14,17 +13,20 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 public class CompilerService : ICompilerService
 {
     private readonly ICkSerializer _ckSerializer;
-    private readonly ICkModelValidator _ckModelValidator;
+    private readonly ICkValidationService _ckValidationService;
+    private readonly ICkCacheService _ckCacheService;
 
     /// <summary>
     /// Creates a new instance of the <see cref="CompilerService"/> class.
     /// </summary>
     /// <param name="ckSerializer"></param>
-    /// <param name="ckModelValidator"></param>
-    public CompilerService(ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
+    /// <param name="ckValidationService"></param>
+    /// <param name="ckCacheService"></param>
+    public CompilerService(ICkSerializer ckSerializer, ICkValidationService ckValidationService, ICkCacheService ckCacheService)
     {
         _ckSerializer = ckSerializer;
-        _ckModelValidator = ckModelValidator;
+        _ckValidationService = ckValidationService;
+        _ckCacheService = ckCacheService;
     }
 
     /// <inheritdoc />
@@ -114,7 +116,7 @@ public class CompilerService : ICompilerService
     }
 
     /// <inheritdoc />
-    public async Task CompileAsync(string rootPath)
+    public async Task CompileAsync(string rootPath, bool createCacheFile)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
 
@@ -207,13 +209,13 @@ public class CompilerService : ICompilerService
             AssociationRoles = associationRoles
         };
 
-        await _ckModelValidator.ValidateAsync(compiledModelRoot, operationResult);
+        await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);
         
         if (operationResult.HasErrors)
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
-
+        
         string compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
@@ -221,6 +223,30 @@ public class CompilerService : ICompilerService
         await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
 #endif
         await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot);
+        
+        if (createCacheFile)
+        {
+            await CreateCacheFileAsync(compiledModelRoot, rootPath, operationResult);
+        }
+    }
+
+    private async Task CreateCacheFileAsync(CkCompiledModelRoot compiledModelRoot, string rootPath, OperationResult operationResult)
+    {
+        var tempTenantId = Guid.NewGuid().ToString();
+        _ckCacheService.CreateTenant(tempTenantId);
+        await _ckCacheService.LoadCkModelAsync(tempTenantId, compiledModelRoot, operationResult);
+        if (operationResult.HasErrors)
+        {
+            throw CompilerException.OperationResultWithErrors(operationResult);
+        }
+        
+        string compiledModelCacheFile = $"ck-{compiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.cache.json";
+#if NETSTANDARD2_0
+        using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
+#else
+        await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
+#endif
+        await _ckCacheService.SaveCacheAsync(tempTenantId, streamWriter.BaseStream);
     }
 }
      

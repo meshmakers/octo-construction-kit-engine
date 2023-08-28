@@ -5,6 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
 
@@ -114,6 +115,7 @@ internal class CkCache : IDisposable
         { 
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter() }
         };
 
         await JsonSerializer.SerializeAsync(stream, _modelGraph.ToCkCacheRoot(), options);
@@ -125,6 +127,7 @@ internal class CkCache : IDisposable
         { 
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter() }
         };
         
         var ckCacheRoot = await JsonSerializer.DeserializeAsync<CkCacheRoot>(stream, options);
@@ -144,6 +147,7 @@ internal class CkCache : IDisposable
         { 
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter() }
         };
         
         var ckCacheRoot = JsonSerializer.Deserialize<CkCacheRoot>(memStream, options);

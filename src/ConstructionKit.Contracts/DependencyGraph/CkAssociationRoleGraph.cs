@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
@@ -22,6 +23,25 @@ public class CkAssociationRoleGraph
         OutboundName = associationRoleDto.OutboundName;
         InboundMultiplicity = associationRoleDto.InboundMultiplicity;
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="CkAssociationRoleGraph"/>.
+    /// </summary>
+    /// <param name="ckRoleId"></param>
+    /// <param name="inboundName"></param>
+    /// <param name="outboundName"></param>
+    /// <param name="inboundMultiplicity"></param>
+    /// <param name="outboundMultiplicity"></param>
+    [JsonConstructor]
+    public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckRoleId, string inboundName, string outboundName, 
+        MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity)
+    {
+        CkRoleId = ckRoleId;
+        InboundName = inboundName;
+        OutboundName = outboundName;
+        InboundMultiplicity = inboundMultiplicity;
+        OutboundMultiplicity = outboundMultiplicity;
     }
     
     /// <summary>

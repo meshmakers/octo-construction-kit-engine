@@ -1,5 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Linq.Expressions;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -29,6 +31,30 @@ public class CkTypeGraph
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         Associations = new();
         Attributes = new List<CkTypeAttributeDto>();
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="CkTypeGraph"/>.
+    /// </summary>
+    /// <param name="ckTypeId"></param>
+    /// <param name="isAbstract"></param>
+    /// <param name="isFinal"></param>
+    /// <param name="baseTypes"></param>
+    /// <param name="attributes"></param>
+    /// <param name="indexes"></param>
+    /// <param name="associations"></param>
+    [JsonConstructor]
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, IReadOnlyCollection<CkGraphTypeInheritance> baseTypes, 
+        ICollection<CkTypeAttributeDto> attributes, ICollection<CkTypeIndexDto>? indexes, CkGraphDirectedAssociations associations)
+    {
+        CkTypeId = ckTypeId;
+        IsAbstract = isAbstract;
+        IsFinal = isFinal;
+        _baseTypes = new List<CkGraphTypeInheritance>(baseTypes);
+        BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
+        Indexes = indexes;
+        Associations = associations;
+        Attributes = attributes;
     }
 
     /// <summary>
@@ -69,6 +95,7 @@ public class CkTypeGraph
     /// <summary>
     /// Returns a string that describes the inheritance chain
     /// </summary>
+    [JsonIgnore]
     public string Path => CkTypeId + ": " + string.Join("->", BaseTypes.Select(x => x.BaseCkTypeId));
 
     /// <summary>

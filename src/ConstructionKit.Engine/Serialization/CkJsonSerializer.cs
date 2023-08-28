@@ -84,13 +84,34 @@ public class CkJsonSerializer : ICkJsonSerializer
 
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult) 
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult) 
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return await DeserializeCompiledModelRootAsync(memStream, operationResult);
     }
 
+    /// <inheritdoc />
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult)
+    {
+        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        using var memStream = new MemoryStream(byteArray);
+        return DeserializeCompiledModelRoot(memStream, operationResult);
+    }
+
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, OperationResult operationResult)
+    {
+        try
+        {
+            var ckModelRoot = JsonSerializer.Deserialize<CkCompiledModelRoot>(stream, _options);
+            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel();
+        }
+        catch (JsonException e)
+        {
+            CheckException(operationResult, e);
+            throw ModelParseException.CannotDeserializeModel();
+        }
+    }
 
     /// <inheritdoc />
     public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)

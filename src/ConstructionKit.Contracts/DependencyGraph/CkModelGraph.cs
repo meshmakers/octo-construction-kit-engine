@@ -8,7 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// </summary>
 public class CkModelGraph
 {
-    private readonly IDictionary<CkId<CkTypeId>, CkTypeGraph> _entities;
+    private readonly IDictionary<CkId<CkTypeId>, CkTypeGraph> _types;
     private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
 
@@ -17,14 +17,28 @@ public class CkModelGraph
     /// </summary>
     public CkModelGraph()
     {
-        _entities = new Dictionary<CkId<CkTypeId>, CkTypeGraph>();
+        _types = new Dictionary<CkId<CkTypeId>, CkTypeGraph>();
         _attributes = new Dictionary<CkId<CkAttributeId>, CkAttributeGraph>();
         _associationRoles = new Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
-        Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_entities);
+        Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
     }
 
+    /// <summary>
+    /// Creates a new instance of <see cref="CkModelGraph"/>.
+    /// </summary>
+    /// <param name="ckCacheRoot">A cache root object from deserialization</param>
+    public CkModelGraph(CkCacheRoot ckCacheRoot)
+    {
+        _types = ckCacheRoot.Types.ToDictionary(k => k.CkTypeId, v=> v);
+        _attributes = ckCacheRoot.Attributes.ToDictionary(k => k.CkAttributeId, v=> v);
+        _associationRoles = ckCacheRoot.AssociationRoles.ToDictionary(k => k.CkRoleId, v=> v);
+        Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
+        Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
+        AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
+    }
+    
     /// <summary>
     /// Returns the types of the model.
     /// </summary>
@@ -39,6 +53,20 @@ public class CkModelGraph
     /// Returns the association roles of the model.
     /// </summary>
     public IReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRoles { get; }
+    
+    /// <summary>
+    /// Returns the root object of the compiled version of a CK model.
+    /// </summary>
+    /// <returns></returns>
+    public CkCacheRoot ToCkCacheRoot()
+    {
+        return new()
+        {
+            Types = _types.Values.ToList(),
+            Attributes = _attributes.Values.ToList(),
+            AssociationRoles = _associationRoles.Values.ToList()
+        };
+    }
 
     /// <summary>
     /// Gets or creates a new attribute.
@@ -46,7 +74,7 @@ public class CkModelGraph
     /// <param name="ckAttributeId"></param>
     /// <param name="ckAttributeDto"></param>
     /// <returns></returns>
-    public CkAttributeGraph GetOrCreateAttribute(CkId<CkAttributeId> ckAttributeId, CkAttributeDto ckAttributeDto)
+    internal CkAttributeGraph GetOrCreateAttribute(CkId<CkAttributeId> ckAttributeId, CkAttributeDto ckAttributeDto)
     {
         if (_attributes.TryGetValue(ckAttributeId, out var ckAttributeGraph))
         {
@@ -64,15 +92,15 @@ public class CkModelGraph
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
     /// <returns></returns>
-    public CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
+    internal CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
     {
-        if (_entities.TryGetValue(ckTypeId, out var ckTypeGraph))
+        if (_types.TryGetValue(ckTypeId, out var ckTypeGraph))
         {
             return ckTypeGraph;
         }
         
         ckTypeGraph = new(ckTypeId, ckTypeDto.IsAbstract, ckTypeDto.IsFinal);
-        _entities.Add(ckTypeId, ckTypeGraph);
+        _types.Add(ckTypeId, ckTypeGraph);
         return ckTypeGraph;
     }
 
@@ -82,7 +110,7 @@ public class CkModelGraph
     /// <param name="ckAssociationId"></param>
     /// <param name="ckAssociationRole"></param>
     /// <returns></returns>
-    public CkAssociationRoleGraph GetOrCreateAssociationRoles(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
+    internal CkAssociationRoleGraph GetOrCreateAssociationRoles(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
     {
         if (_associationRoles.TryGetValue(ckAssociationId, out var ckAssociationRoleGraph))
         {

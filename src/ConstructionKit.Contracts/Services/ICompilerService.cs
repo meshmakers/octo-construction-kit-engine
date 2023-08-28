@@ -11,11 +11,12 @@ public interface ICompilerService
     /// <param name="rootPath">Local root path where the construction kit model is to be crated.</param>
     /// <returns></returns>
     Task CreateNewAsync(string rootPath);
-    
+
     /// <summary>
     /// Compiles the construction kit model.
     /// </summary>
     /// <param name="rootPath">Local root path where the construction kit model exists.</param>
+    /// <param name="createCacheFile">When true, a cache file is created parallel to the compiled construction kit model containing all dependencies</param>
     /// <returns></returns>
-    Task CompileAsync(string rootPath);
+    Task CompileAsync(string rootPath, bool createCacheFile);
 }

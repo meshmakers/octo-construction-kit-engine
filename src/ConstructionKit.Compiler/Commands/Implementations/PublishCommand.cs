@@ -3,7 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
-using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -13,18 +13,18 @@ internal class PublishCommand : Command<OctoToolOptions>
 {
     private readonly ICkModelRepositoryManager _ckModelRepositoryManager;
     private readonly ICkSerializer _ckSerializer;
-    private readonly ICkModelValidator _ckModelValidator;
+    private readonly ICkValidationService _ckValidationService;
     private readonly IArgument _pathArg;
     private readonly IArgument _repositoryArg;
     private readonly IArgument _forceArg;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryManager ckModelRepositoryManager, ICkSerializer ckSerializer, ICkModelValidator ckModelValidator)
+        ICkModelRepositoryManager ckModelRepositoryManager, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
         : base(logger, "Publish", "Publish a compiled construction kit to a repository", options)
     {
         _ckModelRepositoryManager = ckModelRepositoryManager;
         _ckSerializer = ckSerializer;
-        _ckModelValidator = ckModelValidator;
+        _ckValidationService = ckValidationService;
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             new[] { "Path of compiled construction kit model file" }, true, 1);
@@ -58,7 +58,7 @@ internal class PublishCommand : Command<OctoToolOptions>
                 return;
             }
             
-            await _ckModelValidator.ValidateAsync(ckCompiledModelRoot, operationResult);
+            await _ckValidationService.ValidateAsync(ckCompiledModelRoot, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error validating model \'{FilePath}\'", filePath);

@@ -3,27 +3,27 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
-using Meshmakers.Octo.ConstructionKit.Contracts.Validation;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
-namespace Meshmakers.Octo.ConstructionKit.Engine.Validation;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
 /// <summary>
-/// Implementation of <see cref="ICkModelValidator"/> that validates a compiled model.
+/// Implementation of <see cref="ICkValidationService"/> that validates a compiled model.
 /// </summary>
-public class CkModelValidator : ICkModelValidator
+public class CkValidationService : ICkValidationService
 {
     private readonly IDependencyResolver _dependencyResolver;
     private readonly IInheritanceResolver _inheritanceResolver;
     private readonly IElementResolver _elementResolver;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="CkModelValidator"/> class.
+    /// Creates a new instance of the <see cref="CkValidationService"/> class.
     /// </summary>
     /// <param name="dependencyResolver"></param>
     /// <param name="inheritanceResolver"></param>
     /// <param name="elementResolver"></param>
-    public CkModelValidator(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
+    public CkValidationService(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
         IElementResolver elementResolver)
     {
         _dependencyResolver = dependencyResolver;
@@ -34,7 +34,6 @@ public class CkModelValidator : ICkModelValidator
     /// <inheritdoc />
     public async Task ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
-
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
         CkModelGraph modelGraph = _elementResolver.Resolve(compiledModel, operationResult);
         

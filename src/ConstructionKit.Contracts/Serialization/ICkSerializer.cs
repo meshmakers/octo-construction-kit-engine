@@ -53,7 +53,15 @@ public interface ICkSerializer
     /// <param name="s">The text containing the construction kit to read</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<CkCompiledModelRoot?> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult);
+    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult);
+    
+    /// <summary>
+    /// Deserializes the compiled model from a string.
+    /// </summary>
+    /// <param name="s">The text containing the construction kit to read</param>
+    /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
+    /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
+    CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult);
     
     /// <summary>
     /// Deserializes the compiled model from the stream.

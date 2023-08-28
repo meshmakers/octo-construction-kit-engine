@@ -7,7 +7,6 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;

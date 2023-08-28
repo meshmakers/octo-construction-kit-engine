@@ -39,9 +39,9 @@
         }
     }
 #>
-using Meshmakers.Octo.SystematizedData.CkModel.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
-namespace Meshmakers.Octo.SystematizedData.CkModel.Compiler.Messages;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
 /// <summary>
 /// Defines possible messages for:

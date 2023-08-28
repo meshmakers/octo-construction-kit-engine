@@ -103,7 +103,7 @@ public class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
@@ -111,7 +111,20 @@ public class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult)
+    {
+        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        using var memStream = new MemoryStream(byteArray);
+        return DeserializeCompiledModelRoot(memStream, operationResult);
+    }
+
+    /// <inheritdoc />
     public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)
+    {
+        return Task.FromResult(DeserializeCompiledModelRoot(stream, operationResult));
+    }
+    
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, OperationResult operationResult)
     {
         _ckSchemaValidator.ValidateCompiledModelInYaml(stream, operationResult);
         if (operationResult.HasErrors)
@@ -121,6 +134,6 @@ public class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckModelRoot = _deserializer.Deserialize<CkCompiledModelRoot>(streamReader);
-        return Task.FromResult(ckModelRoot);
+        return ckModelRoot;
     }
 }

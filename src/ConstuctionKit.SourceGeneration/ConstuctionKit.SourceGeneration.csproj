@@ -31,15 +31,13 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" GeneratePathProperty="true"/>
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" GeneratePathProperty="true"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0"/>
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all"/>
 
         <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
         <None Include="$(OutputPath)\Meshmakers.Octo.ConstructionKit.Engine.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
         <None Include="$(OutputPath)\Meshmakers.Octo.ConstructionKit.Contracts.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
-        <None Include="$(PKGMicrosoft_Extensions_DependencyInjection)\lib\net7.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
-        <None Include="$(PKGMicrosoft_Extensions_Logging)\lib\net7.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
     </ItemGroup>
 
 
@@ -64,6 +62,7 @@
         <ItemGroup>
             <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false"/>
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false"/>
+            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" PackagePath="analyzers/dotnet/cs" />
         </ItemGroup>
         <Message Importance="high" Text="go @(ResolvedCompileFileDefinitions)"/>
     </Target>

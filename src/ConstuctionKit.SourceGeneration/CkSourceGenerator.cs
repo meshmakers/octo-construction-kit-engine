@@ -11,11 +11,11 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 [Generator]
-public class CkEntitySourceGenerator : IIncrementalGenerator
+public class CkSourceGenerator : IIncrementalGenerator
 {
     private readonly ServiceProvider _serviceProvider;
 
-    public CkEntitySourceGenerator()
+    public CkSourceGenerator()
     {
         var services = new ServiceCollection();
         services.AddLogging(loggingBuilder =>
@@ -29,9 +29,8 @@ public class CkEntitySourceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-
         var options = context.AnalyzerConfigOptionsProvider;
-        
+
         var ckCacheFiles = context.AdditionalTextsProvider
             .Where(text =>
             {
@@ -42,7 +41,7 @@ public class CkEntitySourceGenerator : IIncrementalGenerator
             .Select((text, token) => new Tuple<string, string?>(Path.GetFileName(text.Path).ToLower(), text.GetText(token)?.ToString()))
             .Where(tuple => tuple.Item2 is not null)
             .Collect();
-        
+
         var ckCompiledCkModels = context.AdditionalTextsProvider
             .Where(text =>
             {
@@ -53,20 +52,22 @@ public class CkEntitySourceGenerator : IIncrementalGenerator
             .Select((text, token) => new Tuple<string, string?>(Path.GetFileName(text.Path).ToLower(), text.GetText(token)?.ToString()))
             .Where(tuple => tuple.Item2 is not null)
             .Collect();
-        
+
         context.RegisterSourceOutput(ckCacheFiles.Combine(ckCompiledCkModels).Combine(options), GenerateCode);
     }
 
-    private void GenerateCode(SourceProductionContext context, ((ImmutableArray<Tuple<string, string?>> Left, ImmutableArray<Tuple<string, string?>> Right) Left, AnalyzerConfigOptionsProvider Right) args)
+    private void GenerateCode(SourceProductionContext context,
+        ((ImmutableArray<Tuple<string, string?>> Left, ImmutableArray<Tuple<string, string?>> Right) Left, AnalyzerConfigOptionsProvider
+            Right) args)
     {
         var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
         var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
 
         var (ckCacheFileTuples, ckCompiledModelTuples) = args.Left;
         var options = args.Right;
-        
+
         options.GlobalOptions.TryGetValue("build_property.rootnamespace", out var rootNamespace);
-        
+
         foreach (var ckCacheFile in ckCacheFileTuples)
         {
             var tenantId = ckCacheFile.Item1;
@@ -84,6 +85,7 @@ public class CkEntitySourceGenerator : IIncrementalGenerator
             {
                 continue;
             }
+
             var operationResult = new OperationResult();
             var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(ckCompiledModelRootTuple.Item2, operationResult);
             if (operationResult.Messages.Any())
@@ -93,19 +95,23 @@ public class CkEntitySourceGenerator : IIncrementalGenerator
             }
 
             string tenantId = $"ck-{ckCompiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.cache.json";
+            var ns = $"{rootNamespace ?? "Undefined"}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
 
             if (ckCompiledModelRoot.Types != null)
             {
                 foreach (var ckTypeDto in ckCompiledModelRoot.Types)
                 {
-                    var ns = $"{rootNamespace ?? "Undefined"}.Generated.v{ckTypeDto.TypeId.Version.Major.ToString()}";
                     var code = CkTypeCkTypeCodeGenerator.Instance.Generate(ns, ckTypeDto, tenantId, ckCacheService);
                     if (!String.IsNullOrWhiteSpace(code))
                     {
                         context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);
                     }
-                } 
+                }
             }
+
+            var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
+                ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
+            context.AddSource($"{ns}.CkIds.g.cs", generatedCode);
         }
     }
 

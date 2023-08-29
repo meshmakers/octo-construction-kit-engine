@@ -4,8 +4,9 @@
         <TargetFramework>net7.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <RootNamespace>ConsoleApp1</RootNamespace>
+        <RootNamespace>Meshmakers.ConstructionKit.Samples.SourceGenerator</RootNamespace>
         <OctoCompilerToolPath>../../bin/$(Configuration)/net7.0/octo-ckc</OctoCompilerToolPath>
+        <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
     
     <Import Project="../../src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/Build/OctoCk.targets"  />

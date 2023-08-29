@@ -1,0 +1,32 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
+types:
+- typeId: SampleType3
+  derivedFromCkTypeId: Sample1/SampleType2
+  attributes:
+  - id: System/Enabled
+    name: Enabled
+- typeId: SampleType2
+  derivedFromCkTypeId: Sample1/SampleType1
+  attributes:
+  - id: System/Name
+    name: Name
+- typeId: SampleType1
+  derivedFromCkTypeId: System/Entity
+  attributes:
+  - id: Sample1/SampleAttribute
+    name: MyAttribute
+  associations:
+  - id: Sample1/Testing
+    targetCkTypeId: System/Entity
+associationRoles:
+- id: Testing
+  inboundName: Tests
+  outboundName: TestedBy
+  inboundMultiplicity: N
+  outboundMultiplicity: ZeroOrOne
+attributes:
+- id: SampleAttribute
+  valueType: String
+modelId: Sample1
+dependencies:
+- System

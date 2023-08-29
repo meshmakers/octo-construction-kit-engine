@@ -1,0 +1,7 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+associationRoles:
+- id: Testing
+  inboundName: Tests
+  outboundName: TestedBy
+  inboundMultiplicity: N
+  outboundMultiplicity: ZeroOrOne

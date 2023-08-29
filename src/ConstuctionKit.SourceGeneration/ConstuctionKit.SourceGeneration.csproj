@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+        <PackageId>Meshmakers.Octo.ConstructionKit.SourceGeneration</PackageId>
+        <Title>Octo Mesh Construction Kit Source Generators</Title>
+        <PackageTags>Source generators of OctoMesh ConstructionKit SDK</PackageTags>
+        <PackageDescription>Contains source generators for Octo Mesh Construction Kits.</PackageDescription>
+        <PackageIcon>meshmakers64.png</PackageIcon>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.SourceGeneration</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.SourceGeneration</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" GeneratePathProperty="true" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" GeneratePathProperty="true" />
+
+<!--        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+<!--        <None Include="$(PKGMeshmakers_Octo_ConstructionKit_Engine)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+<!--        <None Include="$(PKGMeshmakers_Octo_ConstructionKit_Contracts)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+<!--        <None Include="$(PKGMicrosoft_Extensions_DependencyInjection)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+<!--        <None Include="$(PKGMicrosoft_Extensions_Logging)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+    </ItemGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <OutputPath>..\..\bin\Debug\</OutputPath>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <OutputPath>..\..\bin\Release\</OutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all"  />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
+    </PropertyGroup>
+
+    <Target Name="GetDependencyTargetPaths" AfterTargets="ResolvePackageDependenciesForBuild">
+        <ItemGroup>
+            <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false" />
+            <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false" />
+        </ItemGroup>
+    </Target>
+    
+</Project>

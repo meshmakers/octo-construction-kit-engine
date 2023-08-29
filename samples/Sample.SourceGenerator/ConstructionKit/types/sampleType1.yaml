@@ -1,0 +1,10 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+types:
+- typeId: SampleType1
+  derivedFromCkTypeId: System/Entity
+  attributes:
+  - id: Sample1/SampleAttribute
+    name: MyAttribute
+  associations:
+  - id: Sample1/Testing
+    targetCkTypeId: System/Entity

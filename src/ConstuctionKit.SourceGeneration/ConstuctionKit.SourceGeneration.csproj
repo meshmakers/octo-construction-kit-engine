@@ -23,7 +23,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" GeneratePathProperty="true" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0" GeneratePathProperty="true" />
 
-<!--        <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
+        <None Include="$(OutputPath)\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
 <!--        <None Include="$(PKGMeshmakers_Octo_ConstructionKit_Engine)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
 <!--        <None Include="$(PKGMeshmakers_Octo_ConstructionKit_Contracts)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
 <!--        <None Include="$(PKGMicrosoft_Extensions_DependencyInjection)\lib\netstandard2.0\*.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />-->
@@ -64,6 +64,7 @@
             <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false" />
         </ItemGroup>
+        <Message Importance="high" Text="go @(ResolvedCompileFileDefinitions)" />
     </Target>
     
 </Project>

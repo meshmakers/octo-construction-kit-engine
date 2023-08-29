@@ -45,20 +45,6 @@
 
     </Target>
 
-    <Target Name="GenerateT4" DependsOnTargets="BaseConfig">
-        <Exec WorkingDirectory="$(ProjectDir)" Command="dotnet t4 %(TextTemplate.Identity) -c $(RootNameSpace).%(TextTemplate.Filename) -o %(TextTemplate.Filename).Generated.cs" />
-    </Target>
-
-    <Target Name="TextTemplateClean" AfterTargets="Clean">
-        <Delete Files="@(Generated)" />
-    </Target>
-
-    <Target Name="GetAssemblyAfterTimestamp" AfterTargets="CoreCompile">
-        <PropertyGroup>
-            <KubeOpsAssemblyTimestampAfterCompile>%(IntermediateAssembly.ModifiedTime)</KubeOpsAssemblyTimestampAfterCompile>
-        </PropertyGroup>
-    </Target>
-
     <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig">
         <CallTarget Condition="'$(IsOctoCompilerInstalled)' == 'false'" Targets="RestoreCompiler" />
         <CallTarget Condition="'$(OctoSkipCkCompile)' == ''" Targets="CompileConstructionKit" />

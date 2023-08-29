@@ -1,22 +1,16 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
-    <LangVersion>latestmajor</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>true</ImplicitUsings>
-  </PropertyGroup>
-  
-  <Import Project="Build\OctoCk.targets" />
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+    </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="Mono.TextTemplating.Roslyn" Version="2.2.1" />
-  </ItemGroup>
+    <Import Project="Build\OctoCk.targets"/>
 
-  <ItemGroup>
-    <TextTemplate Include="**\*.tt" />
-    <Generated Include="**\*.Generated.cs" />
-  </ItemGroup>
-
-
+    <ItemGroup>
+        <PackageReference Include="Meshmakers.Octo.ConstructionKit.Contracts" Version="0.0.0.0"/>
+        <PackageReference Include="Meshmakers.Octo.ConstructionKit.SourceGeneration" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Version="0.0.0.0"/>
+    </ItemGroup>
 </Project>

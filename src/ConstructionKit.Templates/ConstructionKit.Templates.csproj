@@ -45,8 +45,4 @@
         <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**" />
         <Compile Remove="**\*" />
     </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Templates\ConstructionKit.CSharp\ConstructionKit\" />
-    </ItemGroup>
 </Project>

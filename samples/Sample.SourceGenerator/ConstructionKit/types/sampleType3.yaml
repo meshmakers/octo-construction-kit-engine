@@ -1,0 +1,7 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+types:
+- typeId: SampleType3
+  derivedFromCkTypeId: Sample1/SampleType2
+  attributes:
+  - id: System/Enabled
+    name: Enabled

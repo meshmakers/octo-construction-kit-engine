@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RootNamespace>ConsoleApp1</RootNamespace>
+        <OctoCompilerToolPath>../../bin/$(Configuration)/net7.0/octo-ckc</OctoCompilerToolPath>
+    </PropertyGroup>
+    
+    <Import Project="../../src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/Build/OctoCk.targets"  />
+
+    <ItemGroup>
+      <ProjectReference Include="..\..\src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
+      <ProjectReference Include="..\..\src\ConstuctionKit.SourceGeneration\ConstuctionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    </ItemGroup>
+    <ItemGroup>
+      <Reference Include="Persistence.Contracts">
+        <HintPath>..\..\..\octo-core\bin\Debug\SystematizedData\Persistance\net7.0\Persistence.Contracts.dll</HintPath>
+      </Reference>
+    </ItemGroup>
+    <ItemGroup>
+      <None Remove="ConstructionKit\ck-sample1.yaml" />
+      <None Remove="ConstructionKit\ck-sample1.cache.json" />
+    </ItemGroup>
+    <ItemGroup>
+      <AdditionalFiles Include="ConstructionKit\ck-sample1.cache.json" />
+      <AdditionalFiles Include="ConstructionKit\ck-sample1.yaml" />
+    </ItemGroup>
+</Project>

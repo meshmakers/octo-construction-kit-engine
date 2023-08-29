@@ -36,6 +36,16 @@ internal class CkCache : IDisposable
         if (compiledModel.Dependencies != null)
         {
             aggregatedModelElements = await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, operationResult);
+            
+            // Add attributes and roles
+            foreach (var ckAssociationRoleDto in aggregatedModelElements.CkAssociationRoles)
+            {
+                _modelGraph.GetOrCreateAssociationRoles(ckAssociationRoleDto.Key, ckAssociationRoleDto.Value);
+            }
+            foreach (var ckAttributeDto in aggregatedModelElements.CkAttributes)
+            {
+                _modelGraph.GetOrCreateAttribute(ckAttributeDto.Key, ckAttributeDto.Value);
+            }
         }
 
         _inheritanceResolver.Resolve(aggregatedModelElements, _modelGraph, operationResult);

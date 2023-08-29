@@ -1,6 +1,8 @@
-using ConsoleApp1.Generated.v1;
 
-namespace ConsoleApp1;
+
+using Meshmakers.ConstructionKit.Samples.SourceGenerator.Generated.Sample1.v1;
+
+namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
 
 public class Test
 {

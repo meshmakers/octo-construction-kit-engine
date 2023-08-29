@@ -51,7 +51,7 @@ stages:
       - task: DotNetCoreCLI@2
         displayName: 'Build'
         inputs:
-          command: 'build'
+          command: 'publish'
           projects:  $(SolutionFile)
           arguments: '--configuration $(BuildConfiguration)'
       - task: DotNetCoreCLI@2

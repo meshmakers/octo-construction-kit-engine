@@ -4,7 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
-public class CkIdsCodeGenerator
+internal class CkIdsCodeGenerator
 {
     /// <summary>
     /// Returns the singleton instance of <see cref="CkIdsCodeGenerator"/>

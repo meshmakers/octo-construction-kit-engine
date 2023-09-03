@@ -10,6 +10,7 @@
     </PropertyGroup>
     
     <Import Project="../../src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/Build/OctoCk.targets"  />
+    <Import Project="../../src/ConstuctionKit.SourceGeneration/build/ConstructionKit.SourceGeneration.props"/>
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
@@ -27,5 +28,9 @@
     <ItemGroup>
       <AdditionalFiles Include="ConstructionKit\ck-sample1.cache.json" />
       <AdditionalFiles Include="ConstructionKit\ck-sample1.yaml" />
+      <AdditionalFiles Include="ConstructionKit\ck-sample2.cache.json" />
+      <EmbeddedResource Include="ConstructionKit\ck-sample2.yaml">
+          <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
+      </EmbeddedResource>
     </ItemGroup>
 </Project>

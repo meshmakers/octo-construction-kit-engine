@@ -1,10 +1,8 @@
-using System.Collections.Immutable;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -29,89 +27,93 @@ public class CkSourceGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        var options = context.AnalyzerConfigOptionsProvider;
+        var globalOptions = context.AnalyzerConfigOptionsProvider.Select(GlobalOptions.Select);
 
-        var ckCacheFiles = context.AdditionalTextsProvider
-            .Where(text =>
+        var ckModelCandidates = context.AdditionalTextsProvider
+            .Where(static x =>
             {
-                var fileName = Path.GetFileName(text.Path);
-                return fileName.StartsWith("ck-", StringComparison.OrdinalIgnoreCase)
-                       && text.Path.EndsWith(".cache.json", StringComparison.OrdinalIgnoreCase);
+                var fileName = Path.GetFileName(x.Path).ToLower();
+                return fileName.StartsWith("ck-") && (fileName.EndsWith(".cache.json") || fileName.EndsWith(".yaml"));
             })
-            .Select((text, token) => new Tuple<string, string?>(Path.GetFileName(text.Path).ToLower(), text.GetText(token)?.ToString()))
-            .Where(tuple => tuple.Item2 is not null)
-            .Collect();
-
-        var ckCompiledCkModels = context.AdditionalTextsProvider
-            .Where(text =>
-            {
-                var fileName = Path.GetFileName(text.Path);
-                return fileName.StartsWith("ck-", StringComparison.OrdinalIgnoreCase)
-                       && text.Path.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase);
-            })
-            .Select((text, token) => new Tuple<string, string?>(Path.GetFileName(text.Path).ToLower(), text.GetText(token)?.ToString()))
-            .Where(tuple => tuple.Item2 is not null)
-            .Collect();
-
-        context.RegisterSourceOutput(ckCacheFiles.Combine(ckCompiledCkModels).Combine(options), GenerateCode);
+            .Select(static (f, _) => new AdditionalTextWithHash(f, Guid.NewGuid()));
+        
+        var monitor = ckModelCandidates.Collect().SelectMany(static (x, _) => GroupCkModelFiles.Group(x));
+        
+        var inputs = monitor
+            .Combine(globalOptions)
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Select(static (x, _) => FileOptions.Select(
+                file: x.Left.Left,
+                options: x.Right,
+                globalOptions: x.Left.Right
+            ))
+            .Where(static x => x.IsValid);
+        
+        context.RegisterSourceOutput(inputs, GenerateCode);
     }
 
-    private void GenerateCode(SourceProductionContext context,
-        ((ImmutableArray<Tuple<string, string?>> Left, ImmutableArray<Tuple<string, string?>> Right) Left, AnalyzerConfigOptionsProvider
-            Right) args)
+    private void GenerateCode(SourceProductionContext context, FileOptions fileOptions)
     {
         var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
         var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
-
-        var (ckCacheFileTuples, ckCompiledModelTuples) = args.Left;
-        var options = args.Right;
-
-        options.GlobalOptions.TryGetValue("build_property.rootnamespace", out var rootNamespace);
-
-        foreach (var ckCacheFile in ckCacheFileTuples)
+        
+        var tenantId = fileOptions.GroupedFile.MainFile.Hash.ToString();
+        
+        ckCacheService.CreateTenant(tenantId);
+        fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);
+        var sourceText = cacheFile.GetText();
+        if (sourceText == null)
         {
-            var tenantId = ckCacheFile.Item1;
-            var cacheJson = ckCacheFile.Item2;
-            if (!string.IsNullOrWhiteSpace(cacheJson))
-            {
-                ckCacheService.CreateTenant(tenantId);
-                ckCacheService.RestoreCache(tenantId, cacheJson);
-            }
+            
+            var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
+                null,
+                fileOptions.GroupedFile.CacheFile.File.Path);
+            context.ReportDiagnostic(error);
+            return;
+        }
+        ckCacheService.RestoreCache(tenantId, sourceText.ToString());
+        
+        fileOptions.GroupedFile.MainFile.Deconstruct(out var mainFile, out _);
+        sourceText = mainFile.GetText();
+        if (sourceText == null)
+        {
+            var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
+                null,
+                fileOptions.GroupedFile.MainFile.File.Path);
+            context.ReportDiagnostic(error);
+            return;
+        }
+        
+        var operationResult = new OperationResult();
+        var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), operationResult);
+        if (operationResult.Messages.Any())
+        {
+            ReportOperationResults(context, operationResult);
+            return;
         }
 
-        foreach (var ckCompiledModelRootTuple in ckCompiledModelTuples)
+        var ns = $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
+        
+        if (ckCompiledModelRoot.Types != null)
         {
-            if (ckCompiledModelRootTuple.Item2 == null)
+            foreach (var ckTypeDto in ckCompiledModelRoot.Types)
             {
-                continue;
-            }
-
-            var operationResult = new OperationResult();
-            var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(ckCompiledModelRootTuple.Item2, operationResult);
-            if (operationResult.Messages.Any())
-            {
-                ReportOperationResults(context, operationResult);
-                continue;
-            }
-
-            string tenantId = $"ck-{ckCompiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.cache.json";
-            var ns = $"{rootNamespace ?? "Undefined"}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
-
-            if (ckCompiledModelRoot.Types != null)
-            {
-                foreach (var ckTypeDto in ckCompiledModelRoot.Types)
+                var code = CkTypeCodeGenerator.Instance.Generate(ns, ckTypeDto, tenantId, ckCacheService);
+                if (!String.IsNullOrWhiteSpace(code))
                 {
-                    var code = CkTypeCkTypeCodeGenerator.Instance.Generate(ns, ckTypeDto, tenantId, ckCacheService);
-                    if (!String.IsNullOrWhiteSpace(code))
-                    {
-                        context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);
-                    }
+                    context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);
                 }
             }
+        }
+        
+        var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
+            ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
+        context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);
 
-            var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
-                ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
-            context.AddSource($"{ns}.CkIds.g.cs", generatedCode);
+        if (fileOptions.GenerateCkModelServiceClass)
+        {
+            generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace, ckCompiledModelRoot.ModelId);
+            context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
         }
     }
 

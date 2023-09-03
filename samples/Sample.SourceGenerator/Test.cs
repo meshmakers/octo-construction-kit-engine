@@ -1,6 +1,6 @@
 
 
-using Meshmakers.ConstructionKit.Samples.SourceGenerator.Generated.Sample1.v1;
+using Meshmakers.ConstructionKit.Samples.SourceGenerator.ConstructionKit.Generated.Sample1.v1;
 
 namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
 

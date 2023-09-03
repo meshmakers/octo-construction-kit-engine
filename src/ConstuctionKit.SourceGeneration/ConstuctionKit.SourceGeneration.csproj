@@ -54,6 +54,11 @@
         </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="AnalyzerReleases.Shipped.md" />
+      <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    </ItemGroup>
+
     <PropertyGroup>
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>
@@ -64,7 +69,6 @@
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false"/>
             <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" PackagePath="analyzers/dotnet/cs" />
         </ItemGroup>
-        <Message Importance="high" Text="go @(ResolvedCompileFileDefinitions)"/>
     </Target>
 
 </Project>

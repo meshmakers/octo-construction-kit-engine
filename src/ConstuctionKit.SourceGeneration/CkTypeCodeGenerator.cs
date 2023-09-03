@@ -7,23 +7,23 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 /// <summary>
 /// Generates code for a CK type
 /// </summary>
-public class CkTypeCkTypeCodeGenerator : ICkTypeCodeGenerator
+public class CkTypeCodeGenerator : ICkTypeCodeGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkTypeCkTypeCodeGenerator"/>
+    /// Returns the singleton instance of <see cref="CkTypeCodeGenerator"/>
     /// </summary>
-    public static readonly CkTypeCkTypeCodeGenerator Instance = new();
+    public static readonly CkTypeCodeGenerator Instance = new();
 
     /// <inheritdoc />
     public override bool Equals(object? obj)
     {
-        return obj is CkTypeCkTypeCodeGenerator;
+        return obj is CkTypeCodeGenerator;
     }
 
     /// <inheritdoc />
     public bool Equals(ICkTypeCodeGenerator? other)
     {
-        return other is CkTypeCkTypeCodeGenerator;
+        return other is CkTypeCodeGenerator;
     }
 
     /// <inheritdoc />

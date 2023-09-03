@@ -7,11 +7,11 @@
         <ImplicitUsings>true</ImplicitUsings>
     </PropertyGroup>
 
-    <Import Project="Build\OctoCk.targets"/>
+    <Import Project="$(PkgMeshmakers_Octo_ConstructionKit_SourceGeneration)build\OctoCk.targets"/>
 
     <ItemGroup>
         <PackageReference Include="Meshmakers.Octo.ConstructionKit.Contracts" Version="0.0.0.0"/>
-        <PackageReference Include="Meshmakers.Octo.ConstructionKit.SourceGeneration" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Version="0.0.0.0"/>
+        <PackageReference Include="Meshmakers.Octo.ConstructionKit.SourceGeneration" OutputItemType="Analyzer" GeneratePathProperty="true"  ReferenceOutputAssembly="false" Version="0.0.0.0"/>
     </ItemGroup>
 
     <ItemGroup>

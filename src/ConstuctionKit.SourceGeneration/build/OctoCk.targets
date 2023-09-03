@@ -1,0 +1,53 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
+
+    <Target Name="BaseConfig">
+
+        <ItemGroup>
+            <ConstructionKitFolder Include="ConstructionKit" />
+        </ItemGroup>
+
+        <PropertyGroup>
+            <IsOctoCompilerInstalled Condition="'$(OctoCompilerToolPath)' == ''">$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoCompilerToolName)))</IsOctoCompilerInstalled>
+            <IsOctoCompilerInstalled Condition="'$(OctoCompilerToolPath)' != ''">true</IsOctoCompilerInstalled>
+            
+            <OctoCompilerToolName Condition="'$(OctoCompilerToolName)' == ''">meshmakers.octo.constructionkit.compiler</OctoCompilerToolName>
+            <OctoCompilerToolPath Condition="'$(OctoCompilerToolPath)' == ''">dotnet octo-ckc</OctoCompilerToolPath>
+        </PropertyGroup>
+    </Target>
+    
+    <Target Name="RestoreCompiler" DependsOnTargets="BaseConfig">
+        <Exec Command="dotnet tool list --local" StandardOutputImportance="Low">
+            <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput" />
+        </Exec>
+
+        <Message Condition="'$(IsOctoCompilerInstalled)' == 'false'" Importance="High" Text="Restoring OctoMesh construction kit compiler" />
+        <Exec Condition="'$(IsOctoCompilerInstalled)' == 'false'" Command="dotnet tool restore">
+        </Exec>
+
+        <Exec Command="dotnet tool list --local" StandardOutputImportance="Low">
+            <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput" />
+        </Exec>
+        <PropertyGroup>
+            <IsOctoCompilerInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoCompilerToolName)))</IsOctoCompilerInstalled>
+        </PropertyGroup>
+        <Error Condition="'$(IsOctoCompilerInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is not installed and cannot be stored." />
+    </Target>
+
+    <Target Name="CompileConstructionKit" DependsOnTargets="BaseConfig">
+
+        <Message Condition="!Exists(@(ConstructionKitFolder))" Importance="High" Text="Create new construction kit library" />
+        <Exec Condition="!Exists(@(ConstructionKitFolder))" Command="$(OctoCompilerToolPath) -c new -p @(ConstructionKitFolder)">
+        </Exec>
+
+        <Message Condition="Exists(@(ConstructionKitFolder))" Importance="High" Text="Compiling construction kit library" />
+        <Exec Condition="Exists(@(ConstructionKitFolder))" Command="$(OctoCompilerToolPath) -c compile -p @(ConstructionKitFolder) -c">
+        </Exec>
+
+    </Target>
+
+    <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig">
+        <CallTarget Condition="'$(IsOctoCompilerInstalled)' == 'false'" Targets="RestoreCompiler" />
+        <CallTarget Condition="'$(OctoSkipCkCompile)' == ''" Targets="CompileConstructionKit" />
+    </Target>
+
+</Project>

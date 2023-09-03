@@ -52,11 +52,11 @@
             <PackagePath/>
             <Link>LICENSE</Link>
         </None>
-    </ItemGroup>
-
-    <ItemGroup>
-      <None Remove="AnalyzerReleases.Shipped.md" />
-      <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <None Include="build/OctoCk.targets">
+            <Pack>true</Pack>
+            <PackagePath>build</PackagePath>
+        </None>
+        
     </ItemGroup>
 
     <PropertyGroup>

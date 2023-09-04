@@ -1,4 +1,5 @@
 using System.Text;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
@@ -41,7 +42,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
             }
             else
             {
-                ckBaseType = $" : {ckType.DerivedFromCkTypeId.Value.Key.TypeId}";
+                ckBaseType = $" : {ckType.DerivedFromCkTypeId.Value.Key.TypeId.MakeClassName()}";
             }
         }
 
@@ -56,7 +57,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit type {ckType.TypeId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public partial class {ckType.TypeId.TypeId}{ckBaseType}");
+        sb.AppendLine($"public partial class {ckType.TypeId.TypeId.MakeClassName()}{ckBaseType}");
         sb.AppendLine("{");
         if (ckType.Attributes != null)
         {

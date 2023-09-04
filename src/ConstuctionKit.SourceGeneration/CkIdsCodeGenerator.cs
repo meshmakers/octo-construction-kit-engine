@@ -25,10 +25,10 @@ internal class CkIdsCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit model {ckModelId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public static class {ckModelId.ModelId}CkIds");
+        sb.AppendLine($"public static class {ckModelId.ModelId.MakeClassName()}CkIds");
         sb.AppendLine("{");
         
-        sb.AppendLine($"    public static readonly CkModelId {ckModelId.ModelId}ModelId = new(\"{ckModelId.SemanticVersionedFullName}\");");
+        sb.AppendLine($"    public static readonly CkModelId {ckModelId.ModelId.MakeClassName()}ModelId = new(\"{ckModelId.SemanticVersionedFullName}\");");
 
         if (ckTypes != null)
         {
@@ -37,7 +37,7 @@ internal class CkIdsCodeGenerator
 
             foreach (var ckTypeDto in ckTypes.OrderBy(x=> x.TypeId.TypeId))
             {
-                sb.AppendLine($"    public static readonly CkTypeId {ckTypeDto.TypeId.TypeId} = new(\"{ckTypeDto.TypeId.SemanticVersionedFullName}\");");
+                sb.AppendLine($"    public static readonly CkTypeId {ckTypeDto.TypeId.TypeId.MakeClassName()} = new(\"{ckTypeDto.TypeId.SemanticVersionedFullName}\");");
             }
         }
         
@@ -48,7 +48,7 @@ internal class CkIdsCodeGenerator
                 sb.AppendLine();
                 sb.AppendLine("    // Attributes");
                 
-                sb.AppendLine($"    public static readonly CkAttributeId {ckAttributeDto.AttributeId.AttributeId} = new(\"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\");");
+                sb.AppendLine($"    public static readonly CkAttributeId {ckAttributeDto.AttributeId.AttributeId.MakeClassName()} = new(\"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\");");
             }
         }
                 
@@ -59,7 +59,7 @@ internal class CkIdsCodeGenerator
                 sb.AppendLine();
                 sb.AppendLine("    // Associations");
                 
-                sb.AppendLine($"    public static readonly CkAssociationRoleId {ckAssociationRoleDto.AssociationRoleId.RoleId} = new(\"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\");");
+                sb.AppendLine($"    public static readonly CkAssociationRoleId {ckAssociationRoleDto.AssociationRoleId.RoleId.MakeClassName()} = new(\"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\");");
             }
         }
         

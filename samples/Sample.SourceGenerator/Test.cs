@@ -4,11 +4,46 @@ using Meshmakers.ConstructionKit.Samples.SourceGenerator.ConstructionKit.Generat
 
 namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
 
+public enum AttributeValueTypes
+{
+    Int,
+    String,
+    Boolean
+}
+
+
+public class RtSystemEntity
+{
+    public RtSystemEntity()
+    {
+    }
+
+    public TValue? GetAttributeValueOrDefault<TValue>(string attributeName, TValue? defaultValue = default)
+        where TValue : struct
+    {
+        return null;
+    }
+
+    public string? GetAttributeStringValueOrDefault(string attributeName)
+    {
+        return null;
+    }
+
+    public object? GetAttributeValueOrDefault(string attributeName, object? defaultValue = default)
+    {
+        return null;
+    }
+
+    public void SetAttributeValue(string attributeName, AttributeValueTypes attributeValueType, object? value)
+    {
+    }
+}
+
 public class Test
 {
     public Test()
     {
-        SampleType1 sampleType1 = new()
+        RtSample1SampleType1 sampleType1 = new()
         {
             MyAttribute = "test"
         };

@@ -16,11 +16,6 @@
       <ProjectReference Include="..\..\src\ConstuctionKit.SourceGeneration\ConstuctionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
     <ItemGroup>
-      <Reference Include="Persistence.Contracts">
-        <HintPath>..\..\..\octo-core\bin\Debug\SystematizedData\Persistance\net7.0\Persistence.Contracts.dll</HintPath>
-      </Reference>
-    </ItemGroup>
-    <ItemGroup>
       <None Remove="ConstructionKit\ck-sample1.yaml" />
       <None Remove="ConstructionKit\ck-sample1.cache.json" />
     </ItemGroup>

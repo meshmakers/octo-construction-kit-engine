@@ -98,7 +98,7 @@ public class CkSourceGenerator : IIncrementalGenerator
         {
             foreach (var ckTypeDto in ckCompiledModelRoot.Types)
             {
-                var code = CkTypeCodeGenerator.Instance.Generate(ns, ckTypeDto, tenantId, ckCacheService);
+                var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
                 if (!String.IsNullOrWhiteSpace(code))
                 {
                     context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);

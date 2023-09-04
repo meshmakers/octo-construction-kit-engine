@@ -26,12 +26,12 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Represents a embedded version of construction kit model {ckModelId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public class {ckModelId.ModelId}CkEmbeddedModel : ICkEmbeddedModel");
+        sb.AppendLine($"public class {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel : ICkEmbeddedModel");
         sb.AppendLine("{");
         sb.AppendLine();
         sb.AppendLine($"   private readonly ICkJsonSerializer _ckJsonSerializer;");
         sb.AppendLine();
-        sb.AppendLine($"   public {ckModelId.ModelId}CkEmbeddedModel(ICkJsonSerializer ckJsonSerializer)");
+        sb.AppendLine($"   public {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel(ICkJsonSerializer ckJsonSerializer)");
         sb.AppendLine("    {");
         sb.AppendLine("        _ckJsonSerializer = ckJsonSerializer;");
         sb.AppendLine("    }");
@@ -44,7 +44,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine($"        var ckModelNamespace = \"{ckModelIdNs}\";");
         sb.AppendLine("        var resourceName = $\"{ckModelNamespace}.{ckModelFileName}\";");
         sb.AppendLine();
-        sb.AppendLine($"         using (var stream = typeof({ckModelId.ModelId}CkEmbeddedModel).Assembly.GetManifestResourceStream(resourceName))");
+        sb.AppendLine($"         using (var stream = typeof({ckModelId.ModelId.MakeClassName()}CkEmbeddedModel).Assembly.GetManifestResourceStream(resourceName))");
         sb.AppendLine("         {");
         sb.AppendLine("             if (stream == null)");
         sb.AppendLine("             {");

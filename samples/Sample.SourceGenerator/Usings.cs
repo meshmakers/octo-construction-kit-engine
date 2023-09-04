@@ -1,0 +1,1 @@
+global using Meshmakers.ConstructionKit.Samples.SourceGenerator.ConstructionKit.Generated.Sample1.v1;

@@ -56,7 +56,10 @@
             <Pack>true</Pack>
             <PackagePath>build</PackagePath>
         </None>
-        
+        <None Include="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.props">
+            <Pack>true</Pack>
+            <PackagePath>build</PackagePath>
+        </None>
     </ItemGroup>
 
     <PropertyGroup>

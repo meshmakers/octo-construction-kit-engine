@@ -9,8 +9,7 @@
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
     
-    <Import Project="../../src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/Build/OctoCk.targets"  />
-    <Import Project="../../src/ConstuctionKit.SourceGeneration/build/ConstructionKit.SourceGeneration.props"/>
+    <Import Project="../../src/ConstuctionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />

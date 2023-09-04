@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
+    <Import Project="Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
 
     <Target Name="BaseConfig">
-
         <ItemGroup>
             <ConstructionKitFolder Include="ConstructionKit" />
         </ItemGroup>

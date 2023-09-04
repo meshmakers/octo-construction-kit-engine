@@ -52,7 +52,7 @@
             <PackagePath/>
             <Link>LICENSE</Link>
         </None>
-        <None Include="build/OctoCk.targets">
+        <None Include="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.targets">
             <Pack>true</Pack>
             <PackagePath>build</PackagePath>
         </None>

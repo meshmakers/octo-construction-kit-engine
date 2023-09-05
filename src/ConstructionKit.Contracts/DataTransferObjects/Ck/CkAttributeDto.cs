@@ -4,7 +4,7 @@ using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 /// <summary>
 /// Represents an attribute
@@ -37,4 +37,10 @@ public class CkAttributeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public ICollection<CkSelectionValueDto>? SelectionValues { get; set; }
+    
+    /// <summary>
+    /// If true, the attribute is optional, that means it can be null
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsOptional { get; set; }
 }

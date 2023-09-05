@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 using YamlDotNet.Serialization;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 /// <summary>
 /// A part of a CK model.

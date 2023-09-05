@@ -1,7 +1,3 @@
-
-
-using Meshmakers.ConstructionKit.Samples.SourceGenerator.ConstructionKit.Generated.Sample1.v1;
-
 namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
 
 public enum AttributeValueTypes

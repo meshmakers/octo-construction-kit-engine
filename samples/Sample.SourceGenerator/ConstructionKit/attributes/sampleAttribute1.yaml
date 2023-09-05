@@ -2,3 +2,4 @@ $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 attributes:
 - id: SampleAttribute
   valueType: String
+  isOptional: true

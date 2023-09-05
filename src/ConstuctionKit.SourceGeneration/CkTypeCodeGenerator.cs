@@ -1,6 +1,8 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
@@ -58,7 +60,15 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         {
             foreach (var ckTypeAttributeDto in ckType.Attributes)
             {
-                GenerateProperty(ckTypeAttributeDto, sb, cacheTenantId, cacheService);
+                CkAttributeGraph ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
+                if (ckAttributeGraph.IsOptional)
+                {
+                    GenerateNullableProperty(ckTypeAttributeDto, sb, ckAttributeGraph);
+                }
+                else
+                {
+                    GenerateNonNullableProperty(ckTypeAttributeDto, sb, ckAttributeGraph);
+                }
             }
         }
 
@@ -82,45 +92,94 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine($"  // Unsupported by Generator: {ckTypeAssociationDto.CkRoleId}->{ckTypeAssociationDto.TargetCkTypeId}");
     }
 
-    private static void GenerateProperty(CkTypeAttributeDto ckTypeAttributeDto, StringBuilder sb, string cacheTenantId, ICkCacheService cacheService)
+    private static void GenerateNullableProperty(CkTypeAttributeDto ckTypeAttributeDto, StringBuilder sb, CkAttributeGraph ckAttributeGraph)
     {
-        var ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
-        
         switch (ckAttributeGraph.ValueType)
         {
             case AttributeValueTypesDto.String:
                 sb.AppendLine($"  public string? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeStringValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.String, value);");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypes.String, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Int:
                 sb.AppendLine($"  public long? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValueOrDefault<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Int, value);");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypes.Int, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.DateTime:
                 sb.AppendLine($"  public System.DateTime? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.DateTime, value);");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypes.DateTime, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Double:
                 sb.AppendLine($"  public double? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValueOrDefault<double>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Double, value);");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypes.Double, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Boolean:
                 sb.AppendLine($"  public bool? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValueOrDefault<bool>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Boolean, value);");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypes.Boolean, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.BinaryLinked:
+                sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
+                break;
+        }
+    }
+
+    private static void GenerateNonNullableProperty(CkTypeAttributeDto ckTypeAttributeDto, StringBuilder sb, CkAttributeGraph ckAttributeGraph)
+    {
+        switch (ckAttributeGraph.ValueType)
+        {
+            case AttributeValueTypesDto.String:
+                sb.AppendLine($"  public string {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeStringValue(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.String, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.Int:
+                sb.AppendLine($"  public long {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Int, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.DateTime:
+                sb.AppendLine($"  public System.DateTime {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.DateTime, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.Double:
+                sb.AppendLine($"  public double {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<double>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Double, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.Boolean:
+                sb.AppendLine($"  public bool {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<bool>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.Boolean, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.BinaryLinked:

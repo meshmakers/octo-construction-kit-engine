@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 

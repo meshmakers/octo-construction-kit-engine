@@ -24,13 +24,28 @@ public class RtSystemEntity
     {
         return null;
     }
+    
+    public string GetAttributeStringValue(string attributeName)
+    {
+        throw new InvalidOperationException();
+    }
 
     public object? GetAttributeValueOrDefault(string attributeName, object? defaultValue = default)
     {
         return null;
     }
+    
+    public TValue GetAttributeValue<TValue>(string attributeName, TValue defaultValue = default)
+        where TValue : struct
+    {
+        throw new InvalidOperationException();
+    }
 
     public void SetAttributeValue(string attributeName, AttributeValueTypes attributeValueType, object? value)
+    {
+    }
+    
+    public void SetAttributeValueNonNullable(string attributeName, AttributeValueTypes attributeValueType, object value)
     {
     }
 }

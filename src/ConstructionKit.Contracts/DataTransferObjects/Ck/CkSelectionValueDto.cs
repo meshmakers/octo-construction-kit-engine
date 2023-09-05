@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 /// <summary>
 /// Defines selection values for a ck attribute.

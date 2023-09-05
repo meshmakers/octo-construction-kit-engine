@@ -43,6 +43,9 @@
           "name"
         ]
       }
+    },
+    "isOptional": {
+      "type": "boolean"
     }
   },
   "additionalProperties": false,

@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -22,8 +24,9 @@ public class CkAttributeGraph
         ValueType = attributeDto.ValueType;
         DefaultValues = attributeDto.DefaultValues;
         SelectionValues = attributeDto.SelectionValues;
+        IsOptional = attributeDto.IsOptional;
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="CkAttributeGraph"/>.
     /// </summary>
@@ -31,14 +34,16 @@ public class CkAttributeGraph
     /// <param name="valueType"></param>
     /// <param name="defaultValues"></param>
     /// <param name="selectionValues"></param>
+    /// <param name="isOptional">When true, the attribute value is optional, that means the value can be null.</param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, 
-        ICollection<object>? defaultValues, ICollection<CkSelectionValueDto>? selectionValues)
+        ICollection<object>? defaultValues, ICollection<CkSelectionValueDto>? selectionValues, bool isOptional)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
         DefaultValues = defaultValues;
         SelectionValues = selectionValues;
+        IsOptional = isOptional;
     }
     
     /// <summary>
@@ -60,4 +65,9 @@ public class CkAttributeGraph
     /// Returns the selection values of the attribute.
     /// </summary>
     public ICollection<CkSelectionValueDto>? SelectionValues { get; }
+    
+    /// <summary>
+    /// If true, the attribute is optional, that means it can be null
+    /// </summary>
+    public bool IsOptional { get; }
 }

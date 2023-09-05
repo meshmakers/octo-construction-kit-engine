@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.Linq.Expressions;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+
 // ReSharper disable UnusedMember.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 

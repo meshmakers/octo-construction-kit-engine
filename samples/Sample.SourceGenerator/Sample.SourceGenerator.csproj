@@ -9,6 +9,8 @@
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
     
+    <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"  />
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
 
     <ItemGroup>

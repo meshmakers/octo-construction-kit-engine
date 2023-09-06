@@ -18,11 +18,11 @@ steps:
     targetType: 'inline'
     script: |
       # Replace placeholder in a file with build number
-      $file = '$(Build.SourcesDirectory)/src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/.config/dotnet-tools.json'
+      $file = '$(Build.SourcesDirectory)/src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets'
       $fileContent = Get-Content $file
       $fileContent = $fileContent -replace '0.0.0.0', '$(Build.BuildNumber)'
       $fileContent | Set-Content $file
-  displayName: 'Updates dotnet template version'
+  displayName: 'Updates dotnet targets compiler version'
 - task: PowerShell@2
   inputs:
     targetType: 'inline'

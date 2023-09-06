@@ -9,11 +9,11 @@
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
     
-    <Import Project="../../src/ConstuctionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
 
     <ItemGroup>
       <ProjectReference Include="..\..\src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
-      <ProjectReference Include="..\..\src\ConstuctionKit.SourceGeneration\ConstuctionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+      <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
     </ItemGroup>
     <ItemGroup>
       <None Remove="ConstructionKit\ck-sample1.yaml" />

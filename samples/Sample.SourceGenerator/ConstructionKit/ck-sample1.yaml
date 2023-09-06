@@ -17,6 +17,8 @@ types:
     name: MyAttribute
   - id: Sample1/DateTimeAttribute
     name: DateTimeAttribute
+  - id: Sample1/Type
+    name: Type
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity
@@ -32,6 +34,13 @@ attributes:
   isOptional: true
 - id: DateTimeAttribute
   valueType: DateTime
+- id: Type
+  valueType: Int
+  selectionValues:
+  - key: 1
+    name: a
+  - key: 2
+    name: b
 modelId: Sample1
 dependencies:
 - System

@@ -15,6 +15,8 @@ types:
   attributes:
   - id: Sample1/SampleAttribute
     name: MyAttribute
+  - id: Sample1/DateTimeAttribute
+    name: DateTimeAttribute
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity
@@ -28,6 +30,8 @@ attributes:
 - id: SampleAttribute
   valueType: String
   isOptional: true
+- id: DateTimeAttribute
+  valueType: DateTime
 modelId: Sample1
 dependencies:
 - System

@@ -60,4 +60,10 @@ public class CompilerException : Exception
     {
         return new CompilerException($"File '{modelPath}' does not exist", operationResult);
     }
+
+    internal static Exception ModelParseFailed(string path, ModelParseException modelParseException, OperationResult operationResult)
+    {
+        return new CompilerException($"Model parse failed for '{path}': {modelParseException.Message}",
+            modelParseException, operationResult);
+    }
 }

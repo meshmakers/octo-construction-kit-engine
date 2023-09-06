@@ -5,6 +5,8 @@ types:
   attributes:
   - id: Sample1/SampleAttribute
     name: MyAttribute
+  - id: Sample1/DateTimeAttribute
+    name: DateTimeAttribute
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity

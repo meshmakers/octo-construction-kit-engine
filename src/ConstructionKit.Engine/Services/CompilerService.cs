@@ -59,10 +59,10 @@ public class CompilerService : ICompilerService
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, CompilerStatics.MetadataFile));
 #else
         await using var streamWriter = new StreamWriter(Path.Combine(rootPath, CompilerStatics.MetadataFile));
-#endif    
+#endif
         await _ckSerializer.SerializeAsync(streamWriter, modelDto);
 
-        
+
         var ckTypeDto = new CkTypeDto
         {
             TypeId = "SampleType1",
@@ -75,9 +75,9 @@ public class CompilerService : ICompilerService
         using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
 #else
         await using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
-#endif    
+#endif
         await _ckSerializer.SerializeAsync(streamWriterEntity, new CkElementsRootDto { Types = new List<CkTypeDto> { ckTypeDto } });
-        
+
         var ckAttributeDto = new CkAttributeDto
         {
             AttributeId = "SampleAttribute",
@@ -87,7 +87,7 @@ public class CompilerService : ICompilerService
         using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, CompilerStatics.Sample1Attribute));
 #else
         await using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, CompilerStatics.Sample1Attribute));
-#endif          
+#endif
         await _ckSerializer.SerializeAsync(streamWriterAttribute,
             new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } });
 
@@ -99,14 +99,14 @@ public class CompilerService : ICompilerService
             InboundMultiplicity = MultiplicitiesDto.N,
             OutboundMultiplicity = MultiplicitiesDto.ZeroOrOne
         };
-        
+
 #if NETSTANDARD2_0
         using var streamWriterAssociations =
             new StreamWriter(Path.Combine(associationsDirectory, CompilerStatics.Sample1Association));
 #else
         await using var streamWriterAssociations =
             new StreamWriter(Path.Combine(associationsDirectory, CompilerStatics.Sample1Association));
-#endif         
+#endif
         await _ckSerializer.SerializeAsync(streamWriterAssociations,
             new CkElementsRootDto { AssociationRoles = new List<CkAssociationRoleDto> { ckAssociationRoleDto } });
 
@@ -144,7 +144,7 @@ public class CompilerService : ICompilerService
         using var stream = File.OpenRead(modelPath);
 #else
         await using var stream = File.OpenRead(modelPath);
-#endif          
+#endif
         var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, operationResult);
 
         var types = new List<CkTypeDto>();
@@ -152,15 +152,22 @@ public class CompilerService : ICompilerService
         {
             foreach (var typeFile in Directory.EnumerateFiles(typesDirectory, "*.yaml"))
             {
-#if NETSTANDARD2_0
-                using var streamType = File.OpenRead(typeFile);
-#else
-                await using var streamType = File.OpenRead(typeFile);
-#endif                 
-                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, operationResult);
-                if (elementsRootDto.Types != null)
+                try
                 {
-                    types.AddRange(elementsRootDto.Types);
+#if NETSTANDARD2_0
+                    using var streamType = File.OpenRead(typeFile);
+#else
+                    await using var streamType = File.OpenRead(typeFile);
+#endif
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, operationResult);
+                    if (elementsRootDto.Types != null)
+                    {
+                        types.AddRange(elementsRootDto.Types);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    throw CompilerException.ModelParseFailed(typeFile, e, operationResult);
                 }
             }
         }
@@ -170,15 +177,22 @@ public class CompilerService : ICompilerService
         {
             foreach (var attributeFile in Directory.EnumerateFiles(attributesDirectory, "*.yaml"))
             {
-#if NETSTANDARD2_0
-                using var streamAttribute = File.OpenRead(attributeFile);
-#else
-                await using var streamAttribute = File.OpenRead(attributeFile);
-#endif                  
-                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAttribute, operationResult);
-                if (elementsRootDto.Attributes != null)
+                try
                 {
-                    attributes.AddRange(elementsRootDto.Attributes);
+#if NETSTANDARD2_0
+                    using var streamAttribute = File.OpenRead(attributeFile);
+#else
+                    await using var streamAttribute = File.OpenRead(attributeFile);
+#endif
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAttribute, operationResult);
+                    if (elementsRootDto.Attributes != null)
+                    {
+                        attributes.AddRange(elementsRootDto.Attributes);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    throw CompilerException.ModelParseFailed(attributeFile, e, operationResult);
                 }
             }
         }
@@ -188,19 +202,26 @@ public class CompilerService : ICompilerService
         {
             foreach (var associationFile in Directory.EnumerateFiles(associationsDirectory, "*.yaml"))
             {
-#if NETSTANDARD2_0
-                using var streamAssociation = File.OpenRead(associationFile);
-#else
-                await using var streamAssociation = File.OpenRead(associationFile);
-#endif                
-                var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAssociation, operationResult);
-                if (elementsRootDto.AssociationRoles != null)
+                try
                 {
-                    associationRoles.AddRange(elementsRootDto.AssociationRoles);
+#if NETSTANDARD2_0
+                    using var streamAssociation = File.OpenRead(associationFile);
+#else
+                    await using var streamAssociation = File.OpenRead(associationFile);
+#endif
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAssociation, operationResult);
+                    if (elementsRootDto.AssociationRoles != null)
+                    {
+                        associationRoles.AddRange(elementsRootDto.AssociationRoles);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    throw CompilerException.ModelParseFailed(associationFile, e, operationResult);
                 }
             }
         }
-        
+
         CkCompiledModelRoot compiledModelRoot = new CkCompiledModelRoot
         {
             ModelId = ckMetaDto.ModelId,
@@ -211,12 +232,12 @@ public class CompilerService : ICompilerService
         };
 
         await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);
-        
+
         if (operationResult.HasErrors)
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
-        
+
         string compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
@@ -224,7 +245,7 @@ public class CompilerService : ICompilerService
         await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
 #endif
         await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot);
-        
+
         if (createCacheFile)
         {
             await CreateCacheFileAsync(compiledModelRoot, rootPath, operationResult);
@@ -240,7 +261,7 @@ public class CompilerService : ICompilerService
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
-        
+
         string compiledModelCacheFile = $"ck-{compiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.cache.json";
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
@@ -250,4 +271,3 @@ public class CompilerService : ICompilerService
         await _ckCacheService.SaveCacheAsync(tempTenantId, streamWriter.BaseStream);
     }
 }
-     

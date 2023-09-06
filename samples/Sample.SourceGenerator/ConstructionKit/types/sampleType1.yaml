@@ -7,6 +7,8 @@ types:
     name: MyAttribute
   - id: Sample1/DateTimeAttribute
     name: DateTimeAttribute
+  - id: Sample1/Type
+    name: Type
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity

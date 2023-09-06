@@ -9,7 +9,7 @@
             <IsOctoCompilerInstalled Condition="'$(OctoCompilerToolPath)' != ''">true</IsOctoCompilerInstalled>
             <OctoDotNetTools>$([System.IO.Path]::Combine($([System.Environment]::GetFolderPath(SpecialFolder.UserProfile)), '.dotnet/tools/'))</OctoDotNetTools>
             <OctoCompilerToolPath Condition="'$(OctoCompilerToolPath)' == ''">$([System.IO.Path]::Combine($(OctoDotNetTools), 'octo-ckc'))</OctoCompilerToolPath>
-            <OctoCompilerToolVersion Condition="'$(OctoCompilerToolVersion)' == ''">0.0.2309.5002</OctoCompilerToolVersion>
+            <OctoCompilerToolVersion Condition="'$(OctoCompilerToolVersion)' == ''">0.0.0.0</OctoCompilerToolVersion>
             <OctoCompilerToolName Condition="'$(OctoCompilerToolName)' == ''">meshmakers.octo.constructionkit.compiler</OctoCompilerToolName>
         </PropertyGroup>
     </Target>

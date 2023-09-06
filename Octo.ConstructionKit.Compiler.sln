@@ -16,7 +16,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Templates",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Compiler", "src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj", "{36ABE0A9-6063-4FEC-A815-29763BC98003}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstuctionKit.SourceGeneration", "src\ConstuctionKit.SourceGeneration\ConstuctionKit.SourceGeneration.csproj", "{37B0E927-6F8B-4856-825F-504556D6C32C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.SourceGeneration", "src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj", "{37B0E927-6F8B-4856-825F-504556D6C32C}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{2C93FF66-BA58-4045-9021-01D93D163984}"
 EndProject

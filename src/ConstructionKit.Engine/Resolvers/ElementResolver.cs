@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
@@ -35,6 +34,23 @@ public class ElementResolver : IElementResolver
                     validationResult.AddMessage(MessageCodes.AttributeIdNotUnique(ckAttributeId));
                     continue;
                 }
+
+                if (ckAttribute.SelectionValues != null)
+                {
+                    bool ignoreAttribute = false;
+                    foreach (var ckSelectionValueGroup in 
+                             ckAttribute.SelectionValues.GroupBy(x => x.Key).Where(x => x.Count() > 1))
+                    {
+                        validationResult.AddMessage(MessageCodes.SelectionValueNotUnique(ckAttributeId, ckSelectionValueGroup.Key));
+                        ignoreAttribute = true;
+                    }
+
+                    if (ignoreAttribute)
+                    {
+                        continue;
+                    }
+                }
+                
                 ckModelGraph.GetOrCreateAttribute(ckAttributeId, ckAttribute);
             }
         }

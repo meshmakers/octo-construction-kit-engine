@@ -118,6 +118,9 @@ internal static class MessageCodes
     internal static CompilerMessage FileDoesNotExist(object filePath) =>
         GetMessage("FileDoesNotExist", filePath);
 
+    internal static CompilerMessage SelectionValueNotUnique(object ckAttributeId, object key) =>
+        GetMessage("SelectionValueNotUnique", ckAttributeId, key);
+
     private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
     {
         {
@@ -293,6 +296,12 @@ internal static class MessageCodes
              new CompilerMessageTemplate(MessageLevel.FatalError,
                  29, "File '{filePath}' does not exist.",
                  new [] {"filePath"})
+        },
+        {
+            "SelectionValueNotUnique",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 30, "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times.",
+                 new [] {"ckAttributeId", "key"})
         },
     };
 }

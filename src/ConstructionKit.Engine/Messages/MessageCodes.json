@@ -173,6 +173,12 @@
       "number": 29,
       "level": "FATALERROR",
       "text": "File '{filePath}' does not exist."
+    },
+    {
+      "key": "SelectionValueNotUnique",
+      "number": 30,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times."
     }
   ]
 }

@@ -13,7 +13,6 @@ public class CkSelectionValueDto
     /// <summary>
     /// Key of the selection value.
     /// </summary>
-    [JsonRequired] 
     public int Key { get; set; }
 
     /// <summary>

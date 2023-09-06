@@ -4,7 +4,8 @@ public enum AttributeValueTypes
 {
     Int,
     String,
-    Boolean
+    Boolean,
+    DateTime
 }
 
 

@@ -3,3 +3,5 @@ attributes:
 - id: SampleAttribute
   valueType: String
   isOptional: true
+- id: DateTimeAttribute
+  valueType: DateTime

@@ -113,9 +113,9 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.DateTime:
-                sb.AppendLine($"  public System.DateTime? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public global::System.DateTime? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName +
+                sb.AppendLine("      get => GetAttributeValueOrDefault<global::System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName +
                               "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypes.DateTime, value);");
@@ -162,9 +162,9 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.DateTime:
-                sb.AppendLine($"  public System.DateTime {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public global::System.DateTime {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValue<System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeValue<global::System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypes.DateTime, value);");
                 sb.AppendLine("  }");
                 break;

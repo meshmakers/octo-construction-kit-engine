@@ -29,6 +29,20 @@ internal class Runner
 
             return 0;
         }
+        catch (CompilerException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
+
+            ex.OperationResult.WriteMessagesToLogger(_logger);
+            
+            return -3;
+        }
+        catch (CkModelException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
+            
+            return -2; 
+        }
         catch (ArgumentValueMissingException ex)
         {
             _logger.LogError("{Message}", ex.Message);
@@ -46,11 +60,6 @@ internal class Runner
             _logger.LogError("{Message}", ex.Message);
             _parser.ShowUsageInformation(Constants.OctoExeName);
             return -1;
-        }
-        catch (ModelRepositoryException ex)
-        {
-            _logger.LogError("{Message}", ex.Message);
-            return -2;
         }
         catch (Exception ex)
         {

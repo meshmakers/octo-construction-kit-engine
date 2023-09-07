@@ -36,7 +36,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine("        _ckJsonSerializer = ckJsonSerializer;");
         sb.AppendLine("    }");
         sb.AppendLine();
-        sb.AppendLine("    public CkModelId ModelId { get;}");
+        sb.AppendLine($"    public CkModelId ModelId => new CkModelId(\"{ckModelId.FullName}\");");
         sb.AppendLine();
         sb.AppendLine("    public async Task<CkCompiledModelRoot> GetCompiledModelRootAsync(OperationResult operationResult)");
         sb.AppendLine("    {");

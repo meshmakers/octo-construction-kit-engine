@@ -53,14 +53,15 @@ stages:
         inputs:
           command: 'build'
           projects:  $(SolutionFile)
-          arguments: '--configuration $(BuildConfiguration)'
+          arguments: '--configuration $(buildConfiguration)'
       - task: DotNetCoreCLI@2
         displayName: 'Test'
         inputs:
           command: 'test'
+          arguments: '--configuration $(buildConfiguration)'
           projects: |
-            '**/*Tests.csproj'
-            !'**/*SystemTests.csproj'
+            **/*Tests.csproj
+            !**/*SystemTests.csproj
           testRunTitle: 'CI'
       - task: PublishSymbols@2
         displayName: Publish symbols path

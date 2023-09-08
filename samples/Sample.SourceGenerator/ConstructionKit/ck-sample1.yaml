@@ -41,6 +41,7 @@ attributes:
     name: a
   - key: 2
     name: b
+records: []
 modelId: Sample1
 dependencies:
 - System

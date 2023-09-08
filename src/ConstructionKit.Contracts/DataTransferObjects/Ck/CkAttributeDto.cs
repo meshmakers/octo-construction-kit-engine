@@ -51,4 +51,10 @@ public class CkAttributeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsOptional { get; set; }
+    
+    /// <summary>
+    /// A optional description of the attribute
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? Description { get; set; }
 }

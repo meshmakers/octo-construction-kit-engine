@@ -60,5 +60,10 @@ public enum AttributeValueTypesDto
     /// <summary>
     /// Indicates that the attribute value is a time span.
     /// </summary>
-    TimeSpan = 12
+    TimeSpan = 12,
+    
+    /// <summary>
+    /// Indicates that the attribute value is an enum.
+    /// </summary>
+    Enum = 13,
 }

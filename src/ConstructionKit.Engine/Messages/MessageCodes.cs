@@ -118,8 +118,8 @@ internal static class MessageCodes
     internal static CompilerMessage FileDoesNotExist(object filePath) =>
         GetMessage("FileDoesNotExist", filePath);
 
-    internal static CompilerMessage SelectionValueNotUnique(object ckAttributeId, object key) =>
-        GetMessage("SelectionValueNotUnique", ckAttributeId, key);
+    internal static CompilerMessage SelectionValueNotUnique(object ckEnumId, object key) =>
+        GetMessage("SelectionValueNotUnique", ckEnumId, key);
 
     internal static CompilerMessage CkRecordIdUndefined(object ckAttributeId) =>
         GetMessage("CkRecordIdUndefined", ckAttributeId);
@@ -159,6 +159,15 @@ internal static class MessageCodes
 
     internal static CompilerMessage UnknownDerivedFromCkRecordIdInSource(object derivedCkRecordId, object ckRecordId) =>
         GetMessage("UnknownDerivedFromCkRecordIdInSource", derivedCkRecordId, ckRecordId);
+
+    internal static CompilerMessage CkEnumIdContainsInvalidCharacters(object ckEnumId) =>
+        GetMessage("CkEnumIdContainsInvalidCharacters", ckEnumId);
+
+    internal static CompilerMessage EnumIdNotUnique(object ckEnumId) =>
+        GetMessage("EnumIdNotUnique", ckEnumId);
+
+    internal static CompilerMessage CkEnumIdUndefined(object ckAttributeId) =>
+        GetMessage("CkEnumIdUndefined", ckAttributeId);
 
     private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
     {
@@ -339,8 +348,8 @@ internal static class MessageCodes
         {
             "SelectionValueNotUnique",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 30, "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times.",
-                 new [] {"ckAttributeId", "key"})
+                 30, "CkEnumId '{ckEnumId}' has defined key '{key}' which is used several times.",
+                 new [] {"ckEnumId", "key"})
         },
         {
             "CkRecordIdUndefined",
@@ -419,6 +428,24 @@ internal static class MessageCodes
              new CompilerMessageTemplate(MessageLevel.Error,
                  43, "Derived CkRecordId '{derivedCkRecordId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
                  new [] {"derivedCkRecordId", "ckRecordId"})
+        },
+        {
+            "CkEnumIdContainsInvalidCharacters",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 44, "CkEnumId '{ckEnumId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
+                 new [] {"ckEnumId"})
+        },
+        {
+            "EnumIdNotUnique",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 45, "CkEnumId '{ckEnumId}' is not unique.",
+                 new [] {"ckEnumId"})
+        },
+        {
+            "CkEnumIdUndefined",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 46, "CkAttributeId '{ckAttributeId}' is defined as Enum, but the ValueCkEnumId is missing.",
+                 new [] {"ckAttributeId"})
         },
     };
 }

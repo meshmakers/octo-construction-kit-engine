@@ -18,11 +18,14 @@ internal static class CompilerStatics
     public const string AssociationsDirectoryName = "associations";
     public const string TypesDirectoryName = "types";
     public const string RecordsDirectoryName = "records";
+    public const string EnumsDirectoryName = "enums";
     public const string MetadataFile = "ckModel.yaml";
     public const string Sample1Entity = "sampleType1.yaml";
     public const string Sample1Record = "sampleRecord1.yaml";
+    public const string Sample1Enum = "sampleEnum1.yaml";
     public const string Sample1Attribute1 = "sampleAttribute1.yaml";
     public const string Sample1Attribute2 = "sampleAttribute2.yaml";
+    public const string Sample1Attribute3 = "sampleAttribute3.yaml";
     public const string Sample1Association = "sampleAssocation1.yaml";
 
 }

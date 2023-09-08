@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -13,6 +12,7 @@ public class CkModelGraph
     private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
     private readonly IDictionary<CkId<CkRecordId>, CkRecordGraph> _records;
+    private readonly IDictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkModelGraph"/>.
@@ -23,10 +23,12 @@ public class CkModelGraph
         _attributes = new Dictionary<CkId<CkAttributeId>, CkAttributeGraph>();
         _associationRoles = new Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
         _records = new Dictionary<CkId<CkRecordId>, CkRecordGraph>();
+        _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
+        Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
     }
 
     /// <summary>
@@ -39,10 +41,12 @@ public class CkModelGraph
         _attributes = ckCacheRoot.Attributes.ToDictionary(k => k.CkAttributeId, v=> v);
         _associationRoles = ckCacheRoot.AssociationRoles.ToDictionary(k => k.CkRoleId, v=> v);
         _records = ckCacheRoot.Records.ToDictionary(k => k.CkRecordId, v=> v);
+        _enums = ckCacheRoot.Enums.ToDictionary(k => k.CkEnumId, v=> v);
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
+        Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
     }
     
     /// <summary>
@@ -66,6 +70,11 @@ public class CkModelGraph
     public IReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph> Records { get; }
     
     /// <summary>
+    /// Returns the enums of the model.
+    /// </summary>
+    public IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums { get; }
+    
+    /// <summary>
     /// Returns the root object of the compiled version of a CK model.
     /// </summary>
     /// <returns></returns>
@@ -75,7 +84,9 @@ public class CkModelGraph
         {
             Types = _types.Values.ToList(),
             Attributes = _attributes.Values.ToList(),
-            AssociationRoles = _associationRoles.Values.ToList()
+            AssociationRoles = _associationRoles.Values.ToList(),
+            Records = _records.Values.ToList(),
+            Enums = _enums.Values.ToList()
         };
     }
 
@@ -149,5 +160,23 @@ public class CkModelGraph
         ckRecordGraph = new(ckRecordId, ckRecordDto.IsAbstract, ckRecordDto.IsFinal);
         _records.Add(ckRecordId, ckRecordGraph);
         return ckRecordGraph;
+    }
+    
+    /// <summary>
+    /// Gets or creates a new enum.
+    /// </summary>
+    /// <param name="ckEnumId"></param>
+    /// <param name="ckEnumDto"></param>
+    /// <returns></returns>
+    internal CkEnumGraph GetOrCreateEnum(CkId<CkEnumId> ckEnumId, CkEnumDto ckEnumDto)
+    {
+        if (_enums.TryGetValue(ckEnumId, out var ckEnumGraph))
+        {
+            return ckEnumGraph;
+        }
+        
+        ckEnumGraph = new(ckEnumId, ckEnumDto);
+        _enums.Add(ckEnumId, ckEnumGraph);
+        return ckEnumGraph;
     }
 }

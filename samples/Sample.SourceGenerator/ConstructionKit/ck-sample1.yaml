@@ -34,14 +34,27 @@ attributes:
   isOptional: true
 - id: DateTimeAttribute
   valueType: DateTime
+- id: TestEnum
+  valueType: Enum
+  valueCkEnumId: Sample1/TestEnum
 - id: Type
-  valueType: Int
-  selectionValues:
+  valueType: Record
+  valueCkRecordId: Sample1/RecordA
+records:
+- recordId: RecordA
+  attributes:
+  - id: Sample1/SampleAttribute
+    name: MyAttribute
+  - id: Sample1/DateTimeAttribute
+    name: DateTimeAttribute
+enums:
+- enumId: TestEnum
+  useFlags: false
+  values:
   - key: 1
     name: a
   - key: 2
     name: b
-records: []
 modelId: Sample1
 dependencies:
 - System

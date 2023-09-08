@@ -26,6 +26,7 @@ public static class CkSchema
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-type")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-associationRole")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-record")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-enum")));
     }
 
     /// <summary>

@@ -6,6 +6,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
@@ -14,6 +15,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 /// </summary>
 public class CompilerService : ICompilerService
 {
+    private readonly ILogger<CompilerService> _logger;
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
     private readonly ICkCacheService _ckCacheService;
@@ -21,11 +23,13 @@ public class CompilerService : ICompilerService
     /// <summary>
     /// Creates a new instance of the <see cref="CompilerService"/> class.
     /// </summary>
+    /// <param name="logger"></param>
     /// <param name="ckSerializer"></param>
     /// <param name="ckValidationService"></param>
     /// <param name="ckCacheService"></param>
-    public CompilerService(ICkSerializer ckSerializer, ICkValidationService ckValidationService, ICkCacheService ckCacheService)
+    public CompilerService(ILogger<CompilerService> logger, ICkSerializer ckSerializer, ICkValidationService ckValidationService, ICkCacheService ckCacheService)
     {
+        _logger = logger;
         _ckSerializer = ckSerializer;
         _ckValidationService = ckValidationService;
         _ckCacheService = ckCacheService;
@@ -48,10 +52,12 @@ public class CompilerService : ICompilerService
         var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
         var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
         var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
+        var enumsDirectory = Path.Combine(rootPath, CompilerStatics.EnumsDirectoryName);
         Directory.CreateDirectory(recordsDirectory);
         Directory.CreateDirectory(attributesDirectory);
         Directory.CreateDirectory(associationsDirectory);
         Directory.CreateDirectory(typesDirectory);
+        Directory.CreateDirectory(enumsDirectory);
 
         var modelDto = new CkMetaRootDto
         {
@@ -74,7 +80,8 @@ public class CompilerService : ICompilerService
                 new List<CkTypeAttributeDto>
                 {
                     new() { CkAttributeId = "Sample1/SampleAttribute1", AttributeName = "MyAttribute" },
-                    new() { CkAttributeId = "Sample1/SampleAttribute2", AttributeName = "MyRecord" }
+                    new() { CkAttributeId = "Sample1/SampleAttribute2", AttributeName = "MyRecord" },
+                    new() { CkAttributeId = "Sample1/SampleAttribute3", AttributeName = "MyEnum" }
                 },
             Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "Sample1/Testing", TargetCkTypeId = "System/Entity" } }
         };
@@ -98,6 +105,13 @@ public class CompilerService : ICompilerService
             ValueCkRecordId = "Sample1/SampleRecord"
         };
         await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute2, ckAttributeDto);
+        ckAttributeDto = new CkAttributeDto
+        {
+            AttributeId = "SampleAttribute3",
+            ValueType = AttributeValueTypesDto.Enum,
+            ValueCkEnumId = "Sample1/SampleEnum"
+        };
+        await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute3, ckAttributeDto);
         
         // Write Record
         var ckRecordDto = new CkRecordDto
@@ -113,6 +127,24 @@ public class CompilerService : ICompilerService
 #endif
         await _ckSerializer.SerializeAsync(streamWriterRecord, new CkElementsRootDto { Records = new List<CkRecordDto> { ckRecordDto } });
         
+        // Write Enum
+        var ckEnumDto = new CkEnumDto
+        {
+            EnumId = "SampleEnum",
+            Values = 
+                new List<CkSelectionValueDto>
+                {
+                    new() { Key = 0, Name = "Name0" },
+                    new() { Key = 1, Name = "Name1" },
+                    new() { Key = 2, Name = "Name2" }
+                },
+        };
+#if NETSTANDARD2_0
+        using var streamWriterEnum = new StreamWriter(Path.Combine(enumsDirectory, CompilerStatics.Sample1Enum));
+#else
+        await using var streamWriterEnum = new StreamWriter(Path.Combine(enumsDirectory, CompilerStatics.Sample1Enum));
+#endif
+        await _ckSerializer.SerializeAsync(streamWriterEnum, new CkElementsRootDto { Enums = new List<CkEnumDto> { ckEnumDto } });
 
         // Write Association
         var ckAssociationRoleDto = new CkAssociationRoleDto
@@ -161,6 +193,7 @@ public class CompilerService : ICompilerService
         if (!Directory.Exists(rootPath))
         {
             operationResult.AddMessage(MessageCodes.DirectoryDoesNotExist(rootPath));
+            operationResult.WriteMessagesToLogger(_logger);
             throw CompilerException.DirectoryDoesNotExist(rootPath, operationResult);
         }
 
@@ -168,11 +201,13 @@ public class CompilerService : ICompilerService
         var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
         var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
         var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
+        var enumsDirectory = Path.Combine(rootPath, CompilerStatics.EnumsDirectoryName);
 
         var modelPath = Path.Combine(rootPath, CompilerStatics.MetadataFile);
         if (!File.Exists(modelPath))
         {
             operationResult.AddMessage(MessageCodes.FileDoesNotExist(modelPath));
+            operationResult.WriteMessagesToLogger(_logger);
             throw CompilerException.FileDoesNotExist(modelPath, operationResult);
         }
 
@@ -203,6 +238,7 @@ public class CompilerService : ICompilerService
                 }
                 catch (ModelParseException e)
                 {
+                    operationResult.WriteMessagesToLogger(_logger);
                     throw CompilerException.ModelParseFailed(typeFile, e, operationResult);
                 }
             }
@@ -228,7 +264,34 @@ public class CompilerService : ICompilerService
                 }
                 catch (ModelParseException e)
                 {
+                    operationResult.WriteMessagesToLogger(_logger);
                     throw CompilerException.ModelParseFailed(recordFile, e, operationResult);
+                }
+            }
+        }
+        
+        var enums = new List<CkEnumDto>();
+        if (Directory.Exists(enumsDirectory))
+        {
+            foreach (var enumFile in Directory.EnumerateFiles(enumsDirectory, "*.yaml"))
+            {
+                try
+                {
+#if NETSTANDARD2_0
+                    using var streamEnum = File.OpenRead(enumFile);
+#else
+                    await using var streamEnum = File.OpenRead(enumFile);
+#endif
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamEnum, operationResult);
+                    if (elementsRootDto.Enums != null)
+                    {
+                        enums.AddRange(elementsRootDto.Enums);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    operationResult.WriteMessagesToLogger(_logger);
+                    throw CompilerException.ModelParseFailed(enumFile, e, operationResult);
                 }
             }
         }
@@ -253,6 +316,7 @@ public class CompilerService : ICompilerService
                 }
                 catch (ModelParseException e)
                 {
+                    operationResult.WriteMessagesToLogger(_logger);
                     throw CompilerException.ModelParseFailed(attributeFile, e, operationResult);
                 }
             }
@@ -278,6 +342,7 @@ public class CompilerService : ICompilerService
                 }
                 catch (ModelParseException e)
                 {
+                    operationResult.WriteMessagesToLogger(_logger);
                     throw CompilerException.ModelParseFailed(associationFile, e, operationResult);
                 }
             }
@@ -290,13 +355,15 @@ public class CompilerService : ICompilerService
             Types = types,
             Attributes = attributes,
             AssociationRoles = associationRoles,
-            Records = records
+            Records = records,
+            Enums = enums
         };
 
         var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);
 
         if (operationResult.HasErrors)
         {
+            operationResult.WriteMessagesToLogger(_logger);
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
 

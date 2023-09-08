@@ -9,7 +9,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents a construction kit type in the dependency graph
+/// Represents a construction kit record in the dependency graph
 /// </summary>
 [DebuggerDisplay("{" + nameof(Path) + "}")]
 public class CkRecordGraph

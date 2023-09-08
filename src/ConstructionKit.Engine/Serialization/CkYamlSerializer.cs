@@ -36,11 +36,13 @@ public class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkModelIdConverter())
             .WithTypeConverter(new CkTypeIdConverter())
             .WithTypeConverter(new CkRecordIdConverter())
+            .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationIdConverter())
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
+            .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationIdConverter())
             .Build();
         _deserializer = new DeserializerBuilder()
@@ -48,11 +50,13 @@ public class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkModelIdConverter())
             .WithTypeConverter(new CkTypeIdConverter())
             .WithTypeConverter(new CkRecordIdConverter())
+            .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationIdConverter())
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
+            .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationIdConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();

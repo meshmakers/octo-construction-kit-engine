@@ -109,7 +109,12 @@ internal class CkCache : IDisposable
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters =
             {
-                new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter()
+                new CkIdAttributeIdConverter(), 
+                new CkIdAssociationIdConverter(), 
+                new CkIdTypeIdConverter(),
+                new CkIdRecordIdConverter(),
+                new CkIdEnumIdConverter(),
+                new CkModelIdConverter()
             }
         };
 
@@ -124,7 +129,12 @@ internal class CkCache : IDisposable
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters =
             {
-                new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter()
+                new CkIdAttributeIdConverter(), 
+                new CkIdAssociationIdConverter(), 
+                new CkIdTypeIdConverter(),
+                new CkIdRecordIdConverter(),
+                new CkIdEnumIdConverter(),
+                new CkModelIdConverter()
             }
         };
 
@@ -148,7 +158,12 @@ internal class CkCache : IDisposable
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             Converters =
             {
-                new CkIdAttributeIdConverter(), new CkIdAssociationIdConverter(), new CkIdTypeIdConverter(), new CkModelIdConverter()
+                new CkIdAttributeIdConverter(), 
+                new CkIdAssociationIdConverter(), 
+                new CkIdTypeIdConverter(),
+                new CkIdRecordIdConverter(),
+                new CkIdEnumIdConverter(),
+                new CkModelIdConverter()
             }
         };
 

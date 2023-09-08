@@ -29,8 +29,14 @@ public class CkCacheRoot
     public List<CkAttributeGraph> Attributes { get; set; } = new();
     
     /// <summary>
-    /// Returns records of teh model
+    /// Returns records of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     public List<CkRecordGraph> Records { get; set; } = new();
+    
+    /// <summary>
+    /// Returns enums of the model
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    public List<CkEnumGraph> Enums { get; set; } = new();
 }

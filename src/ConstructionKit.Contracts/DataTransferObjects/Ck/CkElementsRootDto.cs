@@ -50,4 +50,11 @@ public class CkElementsRootDto
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkRecordDto>? Records { get; set; }
+    
+    /// <summary>
+    /// Returns enums of the model that are used for enum attributes
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkEnumDto>? Enums { get; set; }
 }

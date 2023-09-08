@@ -41,16 +41,16 @@
         <None Update="sampleData\files\malformedAttributeValue.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="sampleData\files\noschema.yaml">
+        <None Update="sampleData\files\noSchema.yaml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="sampleData\files\noschema.json">
+        <None Update="sampleData\files\noSchema.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="sampleData\files\noschema_malformed.json">
+        <None Update="sampleData\files\noSchema_malformed.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="sampleData\files\noschema_malformed.yaml">
+        <None Update="sampleData\files\noSchema_malformed.yaml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
         <None Update="sampleData\files\attributes-ok.json">

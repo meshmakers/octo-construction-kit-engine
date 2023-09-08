@@ -8,6 +8,10 @@ public enum AttributeValueTypes
     DateTime
 }
 
+public class RtRecord : RtSystemEntity
+{
+    
+}
 
 public class RtSystemEntity
 {

@@ -106,6 +106,18 @@ public class CkSourceGenerator : IIncrementalGenerator
             }
         }
         
+        if (ckCompiledModelRoot.Records != null)
+        {
+            foreach (var ckRecordDto in ckCompiledModelRoot.Records)
+            {
+                var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto, tenantId, ckCacheService);
+                if (!String.IsNullOrWhiteSpace(code))
+                {
+                    context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.RecordId}.g.cs", code);
+                }
+            }
+        }
+        
         var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
             ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
         context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);

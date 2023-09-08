@@ -18,6 +18,7 @@ public class CkAggregatedModelElements
         CkAttributes = new();
         CkAssociationRoles = new();
         CkRecords = new Dictionary<CkId<CkRecordId>, CkRecordDto>();
+        CkEnums = new Dictionary<CkId<CkEnumId>, CkEnumDto>();
     }
 
     /// <summary>
@@ -40,11 +41,15 @@ public class CkAggregatedModelElements
     /// </summary>
     public Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleDto> CkAssociationRoles { get; }
     
-    
     /// <summary>
     /// Returns a dictionary of CK records.
     /// </summary>
     public Dictionary<CkId<CkRecordId>, CkRecordDto> CkRecords { get; }
+    
+    /// <summary>
+    /// Returns a dictionary of CK enums.
+    /// </summary>
+    public Dictionary<CkId<CkEnumId>, CkEnumDto> CkEnums { get; }
 
     /// <summary>
     /// Appends the model elements of the given <paramref name="ckCompiledModelRoot"/> to this instance.
@@ -83,6 +88,14 @@ public class CkAggregatedModelElements
             foreach (var ckRecordDto in ckCompiledModelRoot.Records)
             {
                 CkRecords.Add(new CkId<CkRecordId>(ckCompiledModelRoot.ModelId, ckRecordDto.RecordId), ckRecordDto);
+            }
+        }
+        
+        if (ckCompiledModelRoot.Enums != null)
+        {
+            foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
+            {
+                CkEnums.Add(new CkId<CkEnumId>(ckCompiledModelRoot.ModelId, ckEnumDto.EnumId), ckEnumDto);
             }
         }
     }

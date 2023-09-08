@@ -23,10 +23,15 @@
             "IntArray",
             "Record",
             "RecordArray",
-            "TimeSpan"
+            "TimeSpan",
+            "Enum"
           ]
         },
         "valueCkRecordId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "valueCkEnumId": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
         },
@@ -34,25 +39,6 @@
           "type": "array",
           "items": {
             "type": "object"
-          }
-        },
-        "selectionValues": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "key": {
-                "type": "integer"
-              },
-              "name": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "key",
-              "name"
-            ]
           }
         },
         "isOptional": {

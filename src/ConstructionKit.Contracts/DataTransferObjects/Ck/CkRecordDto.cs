@@ -23,7 +23,7 @@ public class CkRecordDto
     /// <summary>
     /// Defines the base record of this record. 
     /// </summary>
-    [JsonConverter(typeof(CkIdTypeIdConverter))]
+    [JsonConverter(typeof(CkIdRecordIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkRecordId>? DerivedFromCkRecordId { get; set; }
     

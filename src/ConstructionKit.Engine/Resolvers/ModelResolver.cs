@@ -67,6 +67,11 @@ public class ModelResolver : IModelResolver
             {
                 modelGraph.GetOrCreateRecord(ckRecordDto.Key, ckRecordDto.Value);
             }
+            
+            foreach (var ckEnumDto in aggregatedModelElements.CkEnums)
+            {
+                modelGraph.GetOrCreateEnum(ckEnumDto.Key, ckEnumDto.Value);
+            }
 
             foreach (var ckAttributeDto in aggregatedModelElements.CkAttributes)
             {

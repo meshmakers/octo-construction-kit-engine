@@ -178,7 +178,7 @@
       "key": "SelectionValueNotUnique",
       "number": 30,
       "level": "ERROR",
-      "text": "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times."
+      "text": "CkEnumId '{ckEnumId}' has defined key '{key}' which is used several times."
     },
     {
       "key": "CkRecordIdUndefined",
@@ -257,6 +257,24 @@
       "number": 43,
       "level": "ERROR",
       "text": "Derived CkRecordId '{derivedCkRecordId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "CkEnumIdContainsInvalidCharacters",
+      "number": 44,
+      "level": "ERROR",
+      "text": "CkEnumId '{ckEnumId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "EnumIdNotUnique",
+      "number": 45,
+      "level": "ERROR",
+      "text": "CkEnumId '{ckEnumId}' is not unique."
+    },
+    {
+      "key": "CkEnumIdUndefined",
+      "number": 46,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' is defined as Enum, but the ValueCkEnumId is missing."
     }
   ]
 }

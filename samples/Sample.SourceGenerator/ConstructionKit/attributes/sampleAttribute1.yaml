@@ -5,10 +5,9 @@ attributes:
   isOptional: true
 - id: DateTimeAttribute
   valueType: DateTime
+- id: TestEnum
+  valueType: Enum
+  valueCkEnumId: Sample1/TestEnum
 - id: Type
-  valueType: Int
-  selectionValues:
-  - key: 1
-    name: a
-  - key: 2
-    name: b
+  valueType: Record
+  valueCkRecordId: Sample1/RecordA  

@@ -6,64 +6,64 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 /// Represents a versioned construction kit type id
 /// </summary>
-[DebuggerDisplay("{" + nameof(RecordId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkRecordIdConverter))]
-public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecordId>, ICkKey
+[DebuggerDisplay("{" + nameof(EnumId) + "} ({" + nameof(Version) + "})")]
+[System.Text.Json.Serialization.JsonConverter(typeof(CkEnumIdConverter))]
+public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="recordId"/>.
+    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="enumId"/>.
     /// </summary>
-    /// <param name="recordId"></param>
+    /// <param name="enumId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkRecordId(string recordId)
+    public CkEnumId(string enumId)
     {
-        var typeIndex = recordId.IndexOf("-", StringComparison.Ordinal);
+        var typeIndex = enumId.IndexOf("-", StringComparison.Ordinal);
         if (typeIndex < 0)
         {
-            RecordId = recordId;
+            EnumId = enumId;
             Version = "1.0.0";
         }
         else
         {
-            RecordId = recordId.Substring(0, typeIndex);
-            Version = recordId.Substring(typeIndex + 1);
+            EnumId = enumId.Substring(0, typeIndex);
+            Version = enumId.Substring(typeIndex + 1);
         }
-        if (string.IsNullOrWhiteSpace(RecordId))
+        if (string.IsNullOrWhiteSpace(EnumId))
         {
-            throw new ArgumentOutOfRangeException(nameof(recordId), recordId, $"{nameof(recordId)} must contain a record id");
+            throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
         }
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="recordId"/> and <paramref name="version"/>.
+    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="enumId"/> and <paramref name="version"/>.
     /// </summary>
-    /// <param name="recordId"></param>
+    /// <param name="enumId"></param>
     /// <param name="version"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkRecordId(string recordId, string version = "1.0.0") 
+    public CkEnumId(string enumId, string version = "1.0.0") 
     {
-        RecordId = recordId;
+        EnumId = enumId;
         Version = version;
-        if (string.IsNullOrWhiteSpace(RecordId))
+        if (string.IsNullOrWhiteSpace(EnumId))
         {
-            throw new ArgumentOutOfRangeException(nameof(recordId), recordId, $"{nameof(recordId)} must contain a record id");
+            throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
         }
     }
     
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="value"/>.
+    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="value"/>.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
-    public static implicit operator CkRecordId(string value)
+    public static implicit operator CkEnumId(string value)
     {
-        return new CkRecordId(value);
+        return new CkEnumId(value);
     }
 
     /// <summary>
     /// Defines the name of the type, e. g. "Person"
     /// </summary>
-    public string RecordId { get; }
+    public string EnumId { get; }
     
     /// <summary>
     /// Returns the version of the type, e. g. "1.0.0"
@@ -71,7 +71,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     public CkVersion Version { get; }
 
     /// <inheritdoc />
-    public string FullName => IsEmpty ? "" : $"{RecordId}-{Version}";
+    public string FullName => IsEmpty ? "" : $"{EnumId}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -83,7 +83,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
                 return "";
             }
             
-            var s = RecordId;
+            var s = EnumId;
             if (Version.Major > 1)
             {
                 s += $"-{Version.Major}";
@@ -94,13 +94,13 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(RecordId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(EnumId);
 
 
     /// <inheritdoc />
-    public int CompareTo(CkRecordId other)
+    public int CompareTo(CkEnumId other)
     {
-        var result = String.Compare(RecordId, other.RecordId, StringComparison.Ordinal);
+        var result = String.Compare(EnumId, other.EnumId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -110,9 +110,9 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <inheritdoc />
-    public bool Equals(CkRecordId other)
+    public bool Equals(CkEnumId other)
     {
-        return RecordId == other.RecordId && Equals(Version, other.Version);
+        return EnumId == other.EnumId && Equals(Version, other.Version);
     }
 
     /// <inheritdoc />
@@ -201,7 +201,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             case TypeCode.String:
                 return ToString(provider);
             case TypeCode.Object:
-                if (conversionType == typeof(object) || conversionType == typeof(CkRecordId))
+                if (conversionType == typeof(object) || conversionType == typeof(CkEnumId))
                 {
                     return this;
                 }
@@ -247,9 +247,9 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             return false;
         }
         
-        var other = (CkRecordId)obj;
+        var other = (CkEnumId)obj;
         
-        return RecordId == other.RecordId && Version == other.Version;
+        return EnumId == other.EnumId && Version == other.Version;
     }
 
     /// <inheritdoc />
@@ -258,30 +258,30 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
         unchecked
         {
             int hash = 17;
-            hash = hash * 23 + RecordId.GetHashCode();
+            hash = hash * 23 + EnumId.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
     }
     
     /// <summary>
-    /// Compares two <see cref="CkRecordId"/> instances for equality.
+    /// Compares two <see cref="CkEnumId"/> instances for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
     /// <returns></returns>
-    public static bool operator ==(CkRecordId p1, CkRecordId p2)
+    public static bool operator ==(CkEnumId p1, CkEnumId p2)
     {
         return p1.Equals(p2);
     }
 
     /// <summary>
-    /// Compares two <see cref="CkRecordId"/>s for inequality.
+    /// Compares two <see cref="CkEnumId"/>s for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
     /// <returns></returns>
-    public static bool operator !=(CkRecordId p1, CkRecordId p2)
+    public static bool operator !=(CkEnumId p1, CkEnumId p2)
     {
         return !p1.Equals(p2);
     }

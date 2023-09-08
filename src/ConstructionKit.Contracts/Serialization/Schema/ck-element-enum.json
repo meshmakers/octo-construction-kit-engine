@@ -1,0 +1,44 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-enum.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "CkEnum": {
+      "type": "object",
+      "title": "CkEnum",
+      "description": "A construction kit enum definition, used at attribute types",
+      "properties": {
+        "enumId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "name"
+            ]
+          }
+        },
+        "useFlags": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "additionalItems": false,
+      "required": [
+        "enumId"
+      ]
+    }
+  }
+}

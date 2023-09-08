@@ -1,5 +1,6 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -9,36 +10,34 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 /// <summary>
 /// Generates code for a CK type
 /// </summary>
-public class CkTypeCodeGenerator : ICkTypeCodeGenerator
+public class CkRecordCodeGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkTypeCodeGenerator"/>
+    /// Returns the singleton instance of <see cref="CkRecordCodeGenerator"/>
     /// </summary>
-    public static readonly CkTypeCodeGenerator Instance = new();
+    public static readonly CkRecordCodeGenerator Instance = new();
 
     /// <inheritdoc />
     public override bool Equals(object? obj)
     {
-        return obj is CkTypeCodeGenerator;
+        return obj is CkRecordCodeGenerator;
     }
 
-    /// <inheritdoc />
-    public bool Equals(ICkTypeCodeGenerator? other)
+    public bool Equals(CkRecordCodeGenerator? other)
     {
-        return other is CkTypeCodeGenerator;
+        return other is CkRecordCodeGenerator;
     }
 
     /// <inheritdoc />
     public override int GetHashCode() => GetType().GetHashCode();
 
-    /// <inheritdoc />
-    public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId, ICkCacheService cacheService)
+    public string Generate(string ns, CkModelId modelId, CkRecordDto ckRecord, string cacheTenantId, ICkCacheService cacheService)
     {
-        var ckBaseType = "";
-        if (ckType.DerivedFromCkTypeId != null)
+        var ckBaseType = " : RtRecord";
+        if (ckRecord.DerivedFromCkRecordId != null)
         {
-            ckBaseType = $" : Rt{ckType.DerivedFromCkTypeId.Value.ModelId.ModelId.MakeClassName()}" +
-                         $"{ckType.DerivedFromCkTypeId.Value.Key.TypeId.MakeClassName()}";
+            ckBaseType = $" : Rt{ckRecord.DerivedFromCkRecordId.Value.ModelId.ModelId.MakeClassName()}" +
+                         $"{ckRecord.DerivedFromCkRecordId.Value.Key.RecordId.MakeClassName()}Record";
         }
 
         StringBuilder sb = new();
@@ -50,14 +49,13 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();
         sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Generated from construction kit type {ckType.TypeId.FullName}");
+        sb.AppendLine($"/// Generated from construction kit type {ckRecord.RecordId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"[CkId({modelId.ModelId.MakeClassName()}CkIds.ModelId, {modelId.ModelId.MakeClassName()}CkIds.{ckType.TypeId.TypeId.MakeClassName()})]");
-        sb.AppendLine($"public partial class Rt{modelId.ModelId.MakeClassName()}{ckType.TypeId.TypeId.MakeClassName()}{ckBaseType}");
+        sb.AppendLine($"public partial class Rt{modelId.ModelId.MakeClassName()}{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
         sb.AppendLine("{");
-        if (ckType.Attributes != null)
+        if (ckRecord.Attributes != null)
         {
-            foreach (var ckTypeAttributeDto in ckType.Attributes)
+            foreach (var ckTypeAttributeDto in ckRecord.Attributes)
             {
                 CkAttributeGraph ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
                 if (!string.IsNullOrWhiteSpace(ckAttributeGraph.Description))
@@ -66,7 +64,6 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
                     sb.AppendLine($"  /// {ckAttributeGraph.Description}");
                     sb.AppendLine("  /// </summary>");
                     sb.AppendLine($"  public string? {ckTypeAttributeDto.AttributeName}");
-   
                 }
                 
                 if (ckAttributeGraph.IsOptional)
@@ -80,23 +77,10 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
             }
         }
 
-        if (ckType.Associations != null)
-        {
-            foreach (var ckTypeAssociationDto in ckType.Associations)
-            {
-                GenerateNavigation(ckTypeAssociationDto, sb, cacheTenantId, cacheService);
-            }
-        }
-
         sb.AppendLine("}");
 
         return sb.ToString();
     }
 
-    private void GenerateNavigation(CkTypeAssociationDto ckTypeAssociationDto, StringBuilder sb, string cacheTenantId, ICkCacheService cacheService)
-    {
-        //var ckAssociationRoleGraph = cacheService.GetCkAssociationRole(cacheTenantId, ckTypeAssociationDto.CkRoleId);
-
-        sb.AppendLine($"  // Unsupported by Generator: {ckTypeAssociationDto.CkRoleId}->{ckTypeAssociationDto.TargetCkTypeId}");
-    }
+   
 }

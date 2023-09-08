@@ -34,6 +34,13 @@
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-record.schema.json#/definitions/CkRecord"
       }
+    },
+    "enums":{
+      "type": "array",
+      "items": {
+        "type": "object",
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-enum.schema.json#/definitions/CkEnum"
+      }
     }
   },
   "additionalProperties": false

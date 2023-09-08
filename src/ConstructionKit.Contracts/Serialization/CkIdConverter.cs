@@ -35,6 +35,13 @@ public class CkIdRecordIdConverter : CkIdConverter<CkRecordId>
 }
 
 /// <summary>
+/// Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkEnumId}"/>
+/// </summary>
+public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>
+{
+}
+
+/// <summary>
 /// Converter for System.Text.Json and YamlDotNet for <see cref="CkId{TKey}"/>
 /// </summary>
 /// <typeparam name="TKey"></typeparam>

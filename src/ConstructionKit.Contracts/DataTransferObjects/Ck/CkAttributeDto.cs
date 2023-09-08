@@ -33,18 +33,19 @@ public class CkAttributeDto
     [JsonConverter(typeof(CkIdRecordIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkRecordId>? ValueCkRecordId { get; set; }
+    
+    /// <summary>
+    /// Defines the record of the attribute if the value type is a model.
+    /// </summary>
+    [JsonConverter(typeof(CkIdEnumIdConverter))]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public CkId<CkEnumId>? ValueCkEnumId { get; set; }
 
     /// <summary>
     /// Default value of the attribute
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public ICollection<object>? DefaultValues { get; set; }
-
-    /// <summary>
-    /// Selection values of the attribute
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public ICollection<CkSelectionValueDto>? SelectionValues { get; set; }
     
     /// <summary>
     /// If true, the attribute is optional, that means it can be null

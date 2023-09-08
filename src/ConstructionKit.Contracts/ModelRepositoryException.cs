@@ -45,4 +45,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Model repository '{repositoryName}' not found.");
     }
+
+    internal static Exception ModelRepositoryNotWritable(string repositoryName)
+    {
+        return new ModelRepositoryException($"Model repository '{repositoryName}' is not writable.");
+    }
 }

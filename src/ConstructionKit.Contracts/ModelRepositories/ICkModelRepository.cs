@@ -24,18 +24,24 @@ public interface ICkModelRepository
     public string Description { get; }
     
     /// <summary>
+    /// Returns true if the repository can be used to publish or update models, otherwise false.
+    /// </summary>
+    bool CanWrite { get; }
+    
+    /// <summary>
     /// Looks up a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
     /// <returns>True if the model exists in this repository, otherwise false</returns>
     Task<bool> LookupModelIdAsync(CkModelId modelId);
-    
+
     /// <summary>
     /// Gets a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
+    /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
     /// <returns>The deserialized and schema validated construction kit model</returns>
-    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId);
+    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult);
 
     /// <summary>
     /// Publishes a model to the repository

@@ -50,5 +50,10 @@ public enum AttributeValueTypesDto
     /// <summary>
     /// Indicates that the attribute value is a complex object - a so called record.
     /// </summary>
-    Record = 10
+    Record = 10,
+    
+    /// <summary>
+    /// Indicates that the attribute value is an array of complex objects - so called records.
+    /// </summary>
+    RecordArray = 11,
 }

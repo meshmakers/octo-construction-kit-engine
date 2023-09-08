@@ -12,8 +12,9 @@ public interface ICkModelRepositoryManager
     /// Looks up a model by its id 
     /// </summary>
     /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
     /// <returns>If existing the deserialized and validated construction kit model</returns>
-    public Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId);
+    public Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult);
 
     /// <summary>
     /// Returns a list of known construction kit model repositories

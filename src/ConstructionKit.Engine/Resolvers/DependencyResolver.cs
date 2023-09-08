@@ -37,7 +37,7 @@ internal class DependencyResolver : IDependencyResolver
             var ckDependency = dependencies[i];
             
             _logger.LogInformation("Resolving dependency '{CkTypeId}'", ckDependency);
-            var ckDependencyRootModel = await _ckModelRepositoryManager.LookupCkModelAsync(ckDependency);
+            var ckDependencyRootModel = await _ckModelRepositoryManager.LookupCkModelAsync(ckDependency, operationResult);
             if (ckDependencyRootModel == null)
             {
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(ckDependency));

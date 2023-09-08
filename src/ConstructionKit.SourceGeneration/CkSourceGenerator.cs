@@ -114,6 +114,9 @@ public class CkSourceGenerator : IIncrementalGenerator
         {
             generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace, ckCompiledModelRoot.ModelId);
             context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
+            
+            generatedCode = CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId);
+            context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
         }
     }
 

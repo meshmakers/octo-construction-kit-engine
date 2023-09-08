@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         
         // Add here sources of Ck model repositories
         services.AddTransient<ICkModelRepository, LocalFileSystemCkModelRepository>();
+        services.AddTransient<ICkModelRepository, EmbeddedResourceCkModelRepository>();
 
         return services;
     }

@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 
@@ -22,14 +21,14 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId)
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult)
     {
         foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x=> x.Order))
         {
             var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId);
             if (hasBeenFound)
             {
-                return await ckModelRepository.GetModelAsync(ckModelId);
+                return await ckModelRepository.GetModelAsync(ckModelId, operationResult);
             }
         }
 
@@ -52,6 +51,11 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
         if (ckModelRepository == null)
         {
             throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        if (!ckModelRepository.CanWrite)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
 
         await ckModelRepository.PublishModelAsync(ckCompiledModelRoot, isForced);

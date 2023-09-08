@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -27,12 +26,15 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public int Order => 0;
+    public int Order => 10;
     /// <inheritdoc />
     public string RepositoryName => "LocalRepository";  
 
     /// <inheritdoc />
     public string Description => $"Local file system repository at '{_options.Value.RootPath}'";
+
+    /// <inheritdoc />
+    public bool CanWrite => true;
 
     /// <inheritdoc />
     public Task<bool> LookupModelIdAsync(CkModelId modelId)
@@ -46,14 +48,13 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId)
+    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult)
     {
         if (!TryGetExistingModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
         {
             throw ModelRepositoryException.ModelNotFound(modelId, RepositoryName);
         }
 
-        OperationResult operationResult = new();
 #if NETSTANDARD2_0
         using var streamReader = File.OpenRead(compiledModelFilePath);
 #else

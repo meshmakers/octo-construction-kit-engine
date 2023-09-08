@@ -51,7 +51,8 @@ public class ElementResolver : IElementResolver
                     }
                 }
 
-                if (ckAttribute.ValueType == AttributeValueTypesDto.Record && ckAttribute.ValueCkRecordId == null)
+                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray) 
+                    && ckAttribute.ValueCkRecordId == null)
                 {
                     validationResult.AddMessage(MessageCodes.CkRecordIdUndefined(ckAttributeId));
                     continue;

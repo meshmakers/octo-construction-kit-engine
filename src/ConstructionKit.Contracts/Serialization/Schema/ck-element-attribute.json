@@ -55,6 +55,9 @@
         },
         "isOptional": {
           "type": "boolean"
+        },
+        "description": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

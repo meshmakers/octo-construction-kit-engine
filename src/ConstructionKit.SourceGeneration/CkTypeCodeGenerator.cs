@@ -61,6 +61,15 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
             foreach (var ckTypeAttributeDto in ckType.Attributes)
             {
                 CkAttributeGraph ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
+                if (!string.IsNullOrWhiteSpace(ckAttributeGraph.Description))
+                {
+                    sb.AppendLine("  /// <summary>");
+                    sb.AppendLine($"  /// {ckAttributeGraph.Description}");
+                    sb.AppendLine("  /// </summary>");
+                    sb.AppendLine($"  public string? {ckTypeAttributeDto.AttributeName}");
+   
+                }
+                
                 if (ckAttributeGraph.IsOptional)
                 {
                     GenerateNullableProperty(ckTypeAttributeDto, sb, ckAttributeGraph);

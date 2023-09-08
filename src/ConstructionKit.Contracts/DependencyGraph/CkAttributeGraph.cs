@@ -26,6 +26,7 @@ public class CkAttributeGraph
         DefaultValues = attributeDto.DefaultValues;
         SelectionValues = attributeDto.SelectionValues;
         IsOptional = attributeDto.IsOptional;
+        Description = attributeDto.Description;
     }
 
     /// <summary>
@@ -37,9 +38,10 @@ public class CkAttributeGraph
     /// <param name="defaultValues"></param>
     /// <param name="selectionValues"></param>
     /// <param name="isOptional">When true, the attribute value is optional, that means the value can be null.</param>
+    /// <param name="description">A optional description to the attribute</param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        ICollection<object>? defaultValues, ICollection<CkSelectionValueDto>? selectionValues, bool isOptional)
+        ICollection<object>? defaultValues, ICollection<CkSelectionValueDto>? selectionValues, bool isOptional, string? description)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
@@ -47,6 +49,7 @@ public class CkAttributeGraph
         DefaultValues = defaultValues;
         SelectionValues = selectionValues;
         IsOptional = isOptional;
+        Description = description;
     }
     
     /// <summary>
@@ -78,4 +81,9 @@ public class CkAttributeGraph
     /// If true, the attribute is optional, that means it can be null
     /// </summary>
     public bool IsOptional { get; }
+    
+    /// <summary>
+    /// A optional description of the attribute
+    /// </summary>
+    public string? Description { get; set; }
 }

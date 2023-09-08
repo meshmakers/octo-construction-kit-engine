@@ -46,7 +46,9 @@ public class CompilerService : ICompilerService
 
         var typesDirectory = Path.Combine(rootPath, CompilerStatics.TypesDirectoryName);
         var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
+        var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
         var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
+        Directory.CreateDirectory(recordsDirectory);
         Directory.CreateDirectory(attributesDirectory);
         Directory.CreateDirectory(associationsDirectory);
         Directory.CreateDirectory(typesDirectory);
@@ -69,7 +71,11 @@ public class CompilerService : ICompilerService
             TypeId = "SampleType1",
             DerivedFromCkTypeId = "System/Entity",
             Attributes =
-                new List<CkTypeAttributeDto> { new() { CkAttributeId = "Sample1/SampleAttribute", AttributeName = "MyAttribute" } },
+                new List<CkTypeAttributeDto>
+                {
+                    new() { CkAttributeId = "Sample1/SampleAttribute1", AttributeName = "MyAttribute" },
+                    new() { CkAttributeId = "Sample1/SampleAttribute2", AttributeName = "MyRecord" }
+                },
             Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "Sample1/Testing", TargetCkTypeId = "System/Entity" } }
         };
 #if NETSTANDARD2_0
@@ -81,17 +87,34 @@ public class CompilerService : ICompilerService
 
         var ckAttributeDto = new CkAttributeDto
         {
-            AttributeId = "SampleAttribute",
+            AttributeId = "SampleAttribute1",
             ValueType = AttributeValueTypesDto.String
         };
+        await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute1, ckAttributeDto);        
+        ckAttributeDto = new CkAttributeDto
+        {
+            AttributeId = "SampleAttribute2",
+            ValueType = AttributeValueTypesDto.Record,
+            ValueCkRecordId = "Sample1/SampleRecord"
+        };
+        await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute2, ckAttributeDto);
+        
+        // Write Record
+        var ckRecordDto = new CkRecordDto
+        {
+            RecordId = "SampleRecord",
+            Attributes =
+                new List<CkTypeAttributeDto> { new() { CkAttributeId = "Sample1/SampleAttribute", AttributeName = "MyAttribute" } },
+        };
 #if NETSTANDARD2_0
-        using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, CompilerStatics.Sample1Attribute));
+        using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));
 #else
-        await using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, CompilerStatics.Sample1Attribute));
+        await using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));
 #endif
-        await _ckSerializer.SerializeAsync(streamWriterAttribute,
-            new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } });
+        await _ckSerializer.SerializeAsync(streamWriterRecord, new CkElementsRootDto { Records = new List<CkRecordDto> { ckRecordDto } });
+        
 
+        // Write Association
         var ckAssociationRoleDto = new CkAssociationRoleDto
         {
             AssociationRoleId = "Testing",
@@ -117,6 +140,17 @@ public class CompilerService : ICompilerService
         }
     }
 
+    private async Task WriteAttributeAsync(string attributesDirectory, string attributeFileName, CkAttributeDto ckAttributeDto)
+    {
+#if NETSTANDARD2_0
+        using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, attributeFileName));
+#else
+        await using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, attributeFileName));
+#endif
+        await _ckSerializer.SerializeAsync(streamWriterAttribute,
+            new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } });
+    }
+
     /// <inheritdoc />
     public async Task CompileAsync(string rootPath, bool createCacheFile)
     {
@@ -133,6 +167,7 @@ public class CompilerService : ICompilerService
         var typesDirectory = Path.Combine(rootPath, CompilerStatics.TypesDirectoryName);
         var attributesDirectory = Path.Combine(rootPath, CompilerStatics.AttributesDirectoryName);
         var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
+        var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
 
         var modelPath = Path.Combine(rootPath, CompilerStatics.MetadataFile);
         if (!File.Exists(modelPath))
@@ -169,6 +204,31 @@ public class CompilerService : ICompilerService
                 catch (ModelParseException e)
                 {
                     throw CompilerException.ModelParseFailed(typeFile, e, operationResult);
+                }
+            }
+        }
+        
+        var records = new List<CkRecordDto>();
+        if (Directory.Exists(recordsDirectory))
+        {
+            foreach (var recordFile in Directory.EnumerateFiles(recordsDirectory, "*.yaml"))
+            {
+                try
+                {
+#if NETSTANDARD2_0
+                    using var streamRecord = File.OpenRead(recordFile);
+#else
+                    await using var streamRecord = File.OpenRead(recordFile);
+#endif
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamRecord, operationResult);
+                    if (elementsRootDto.Records != null)
+                    {
+                        records.AddRange(elementsRootDto.Records);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    throw CompilerException.ModelParseFailed(recordFile, e, operationResult);
                 }
             }
         }
@@ -229,7 +289,8 @@ public class CompilerService : ICompilerService
             Dependencies = ckMetaDto.Dependencies,
             Types = types,
             Attributes = attributes,
-            AssociationRoles = associationRoles
+            AssociationRoles = associationRoles,
+            Records = records
         };
 
         var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);

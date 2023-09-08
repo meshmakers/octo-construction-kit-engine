@@ -19,7 +19,7 @@ public class CkTypeGraph
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     
     /// <summary>
-    /// Constructor
+    /// Creates a new instance of <see cref="CkTypeGraph"/>.
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="isAbstract"></param>

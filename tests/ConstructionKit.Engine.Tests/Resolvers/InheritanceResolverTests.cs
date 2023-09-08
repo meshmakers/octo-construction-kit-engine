@@ -1,12 +1,12 @@
 using FakeItEasy;
-using Meshmakers.Octo.ConstructionKit.Compiler.Tests.sampleData.sample_TypeNotDerivedFromSystemEntity_fail;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_TypeNotDerivedFromSystemEntity_fail;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.Resolvers;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Resolvers;
 
 public class InheritanceResolverTests
 {
@@ -319,4 +319,6 @@ public class InheritanceResolverTests
         Assert.Equal(MessageLevel.FatalError, operationResult.Messages[0].MessageLevel);
         Assert.Equal(9, operationResult.Messages[0].MessageNumber);
     }
+    
+
 }

@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Xunit.Abstractions;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.Serializers;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Serializers;
 
 public class JsonSerializerTests
 {

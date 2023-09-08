@@ -1,0 +1,38 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+records:
+  - recordId: RecordA
+    isAbstract: false
+    isFinal: true
+    attributes:
+      - id: Designation
+        valueType: String    
+attributes:
+  - id: RecordA
+    valueType: Record    
+    ckRecordId: RecordA
+types:
+  - typeId: Location
+    derivedFromCkTypeId: System/Entity 
+    isFinal: true
+    isAbstract: true
+    attributes:
+      - id: Test/Designation
+        name: Designation
+  - typeId: Planet
+    derivedFromCkTypeId: Test/Location
+    isFinal: false
+    isAbstract: false
+  - typeId: City
+    derivedFromCkTypeId: Test/Location
+    isFinal: true
+    isAbstract: false
+  - typeId: PoliticalOrganization
+    derivedFromCkTypeId: System/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: Test/Designation
+        name: Designation
+    associations:
+      - id: System/Related
+        targetCkTypeId: Test/City

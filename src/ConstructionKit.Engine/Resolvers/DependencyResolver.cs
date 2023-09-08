@@ -1,7 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
-using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Microsoft.Extensions.Logging;
 
@@ -24,6 +23,7 @@ internal class DependencyResolver : IDependencyResolver
 
         _logger.LogInformation("Starting resolving dependencies");
         await Resolve(dependencies, aggregatedModelElements, operationResult);
+        _logger.LogInformation("Resolving dependencies completed");
 
         return aggregatedModelElements;
     }

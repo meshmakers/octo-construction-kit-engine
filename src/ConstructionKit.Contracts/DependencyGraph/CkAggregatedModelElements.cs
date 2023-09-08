@@ -17,6 +17,7 @@ public class CkAggregatedModelElements
         CkTypes = new();
         CkAttributes = new();
         CkAssociationRoles = new();
+        CkRecords = new Dictionary<CkId<CkRecordId>, CkRecordDto>();
     }
 
     /// <summary>
@@ -38,6 +39,12 @@ public class CkAggregatedModelElements
     /// Returns a dictionary of CK association roles.
     /// </summary>
     public Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleDto> CkAssociationRoles { get; }
+    
+    
+    /// <summary>
+    /// Returns a dictionary of CK records.
+    /// </summary>
+    public Dictionary<CkId<CkRecordId>, CkRecordDto> CkRecords { get; }
 
     /// <summary>
     /// Appends the model elements of the given <paramref name="ckCompiledModelRoot"/> to this instance.
@@ -68,6 +75,14 @@ public class CkAggregatedModelElements
             foreach (var ckTypeDto in ckCompiledModelRoot.Types)
             {
                 CkTypes.Add(new CkId<CkTypeId>(ckCompiledModelRoot.ModelId, ckTypeDto.TypeId), ckTypeDto);
+            }
+        }
+                
+        if (ckCompiledModelRoot.Records != null)
+        {
+            foreach (var ckRecordDto in ckCompiledModelRoot.Records)
+            {
+                CkRecords.Add(new CkId<CkRecordId>(ckCompiledModelRoot.ModelId, ckRecordDto.RecordId), ckRecordDto);
             }
         }
     }

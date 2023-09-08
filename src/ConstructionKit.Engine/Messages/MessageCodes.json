@@ -179,6 +179,84 @@
       "number": 30,
       "level": "ERROR",
       "text": "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times."
+    },
+    {
+      "key": "CkRecordIdUndefined",
+      "number": 31,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' is defined as Record, but the ValueCkRecordId is missing."
+    },
+    {
+      "key": "CkRecordIdContainsInvalidCharacters",
+      "number": 32,
+      "level": "ERROR",
+      "text": "CkRecordId '{ckRecordId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+    },
+    {
+      "key": "RecordIdNotUnique",
+      "number": 33,
+      "level": "ERROR",
+      "text": "RecordId '{ckRecordId}' is not unique."
+    },
+    {
+      "key": "CkRecordIdUnknown",
+      "number": 34,
+      "level": "FATALERROR",
+      "text": "CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "UnknownCkRecordIdForInheritance",
+      "number": 35,
+      "level": "FATALERROR",
+      "text": "CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "DerivedFromCkRecordIdThatIsFinal",
+      "number": 36,
+      "level": "FATALERROR",
+      "text": "CkRecordId '{baseCkRecordId}' is final, but CkRecordId '{derivedCkRecordId}' is derived from it."
+    },
+    {
+      "key": "CkRecordIdAttributeNameNotUnique",
+      "number": 37,
+      "level": "FATALERROR",
+      "text": "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint."
+    },
+    {
+      "key": "CkRecordIdAttributeIdNotUniqueByInheritance",
+      "number": 38,
+      "level": "ERROR",
+      "text": "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint."
+    },
+    {
+      "key": "CkRecordIdAttributeIdNotUnique",
+      "number": 39,
+      "level": "FATALERROR",
+      "text": "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint."
+    },
+    {
+      "key": "CkRecordIdAttributeNameNotUniqueByInheritance",
+      "number": 40,
+      "level": "ERROR",
+      "text": "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint."
+    },
+    {
+      "key": "AttributeUsesUnknownCkRecordId",
+      "number": 41,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' uses unknown CkRecordId '{ckRecordId}'. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "UnknownAttributeOfCkRecordIdInSource",
+      "number": 42,
+      "level": "ERROR",
+      "text": "Attribute Id '{ckAttributeId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "UnknownDerivedFromCkRecordIdInSource",
+      "number": 43,
+      "level": "ERROR",
+      "text": "Derived CkRecordId '{derivedCkRecordId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model."
     }
   ]
 }

@@ -1,6 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests;
 
 public class CkIdTests
 {

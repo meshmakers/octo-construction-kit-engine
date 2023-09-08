@@ -1,6 +1,7 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
 /// Resolves inheritance of ck types

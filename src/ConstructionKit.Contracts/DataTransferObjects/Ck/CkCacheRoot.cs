@@ -27,4 +27,10 @@ public class CkCacheRoot
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     public List<CkAttributeGraph> Attributes { get; set; } = new();
+    
+    /// <summary>
+    /// Returns records of teh model
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    public List<CkRecordGraph> Records { get; set; } = new();
 }

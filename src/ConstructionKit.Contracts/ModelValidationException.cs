@@ -38,6 +38,11 @@ public class ModelValidationException : CkModelException
         return new ModelValidationException($"CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing.");
     }
     
+    internal static Exception UnknownCkRecordId(CkId<CkRecordId> ckRecordId)
+    {
+        return new ModelValidationException($"CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.");
+    }
+    
     internal static Exception CkTypeIdAlreadyExistsInDatabase(CkId<CkTypeId> ckTypeId)
     {
         return new ModelValidationException($"CkTypeId '{ckTypeId}' already exists in database.");
@@ -105,6 +110,29 @@ public class ModelValidationException : CkModelException
     internal static Exception ModelIdContainsInvalidCharacters(string modelId)
     {
         return new ModelValidationException($"ModelId '{modelId}' contains invalid characters. Only a-z, A-Z, 0-9, _ and . are allowed.");
+    }
+    
+    internal static Exception DerivedFromCkRecordIdThatIsFinal(CkId<CkRecordId> currentCkRecordId, CkId<CkRecordId> lastCkRecordId)
+    {
+        return new ModelValidationException(
+            $"CkRecordId '{currentCkRecordId}' is final, but CkRecordId '{lastCkRecordId}' is derived from it.");
+    }
+    
+    internal static Exception UnknownCkRecordIdForInheritance(CkId<CkRecordId> ckRecordId)
+    {
+        return new ModelValidationException($"CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.");
+    }
+    
+    internal static Exception DuplicateAttributeNamesInCkRecord(CkId<CkRecordId> ckRecordId, IEnumerable<string> select)
+    {
+        var attributeNames = string.Join(", ", select);
+        return new ModelValidationException($"CkRecordId '{ckRecordId}' has duplicate attribute names: '{attributeNames}'");
+    }
+    
+    internal static Exception DuplicateAttributeIdsInCkRecord(CkId<CkRecordId> ckRecordId, IEnumerable<CkId<CkAttributeId>> duplicateAttributeIds)
+    {
+        var attributeIds = string.Join(", ", duplicateAttributeIds);
+        return new ModelValidationException($"CkRecordId '{ckRecordId}' has duplicate attribute IDs: '{attributeIds}'");
     }
 }
 

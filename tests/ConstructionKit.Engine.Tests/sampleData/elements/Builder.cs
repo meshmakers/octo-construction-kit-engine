@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.sampleData.elements;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.elements;
 
 public class Builder
 {

@@ -1,0 +1,72 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-record.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "CkRecord": {
+      "type": "object",
+      "title": "CkRecord",
+      "description": "A construction kit record definition, used at attribute types",
+      "properties": {
+        "recordId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "derivedFromCkRecordId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "isFinal": {
+          "type": "boolean"
+        },
+        "isAbstract": {
+          "type": "boolean"
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_.]+$"
+              },
+              "isAutoCompleteEnabled": {
+                "type": "boolean",
+                "$comment": "If true, the attribute uses auto complete."
+              },
+              "autoCompleteFilter": {
+                "type": "string",
+                "$comment": "The filter for auto complete defined by a regex expression."
+              },
+              "autoCompleteLimit": {
+                "type": "integer",
+                "$comment": "The amount of entries in auto complete filter."
+              },
+              "autoIncrementReference": {
+                "type": "string",
+                "$comment": "The reference to the attribute that is used for auto increment."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ]
+          }
+        },
+        "enableChangeStreamPreAndPostImages": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "additionalItems": false,
+      "required": [
+        "typeId"
+      ]
+    }
+  }
+}

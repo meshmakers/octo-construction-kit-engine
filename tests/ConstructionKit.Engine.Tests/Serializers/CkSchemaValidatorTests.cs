@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.Serializers;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Serializers;
 
 public class CkSchemaValidatorTests
 {

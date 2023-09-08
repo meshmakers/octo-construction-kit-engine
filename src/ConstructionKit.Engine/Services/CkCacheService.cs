@@ -1,12 +1,10 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
-using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Caching;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
@@ -15,23 +13,16 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 /// </summary>
 public class CkCacheService : ICkCacheService
 {
-    private readonly IDependencyResolver _dependencyResolver;
-    private readonly IInheritanceResolver _inheritanceResolver;
-    private readonly IElementResolver _elementResolver;
+    private readonly IModelResolver _modelResolver;
     private readonly ConcurrentDictionary<string, CkCache> _ckCaches;
 
     /// <summary>
     /// Creates a new instance of the <see cref="CkCacheService"/> class.
     /// </summary>
-    /// <param name="dependencyResolver"></param>
-    /// <param name="inheritanceResolver"></param>
-    /// <param name="elementResolver"></param>
-    public CkCacheService(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
-        IElementResolver elementResolver)
+    /// <param name="modelResolver"></param>
+    public CkCacheService(IModelResolver modelResolver)
     {
-        _dependencyResolver = dependencyResolver;
-        _inheritanceResolver = inheritanceResolver;
-        _elementResolver = elementResolver;
+        _modelResolver = modelResolver;
         _ckCaches = new ConcurrentDictionary<string, CkCache>();
     }
 
@@ -41,8 +32,7 @@ public class CkCacheService : ICkCacheService
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     public void CreateTenant(string tenantId)
     {
-        _ckCaches[tenantId] = new CkCache(tenantId, _dependencyResolver, _inheritanceResolver,
-            _elementResolver);
+        _ckCaches[tenantId] = new CkCache(tenantId, _modelResolver);
     }
 
     /// <summary>
@@ -52,7 +42,7 @@ public class CkCacheService : ICkCacheService
     /// <param name="compiledModel">The compiled construction kit model</param>
     /// <param name="operationResult">Validation results during schema validation and model validation</param>
     /// <exception cref="Exception"></exception>
-    public async Task LoadCkModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult)
+    public async Task LoadCompiledModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
@@ -60,6 +50,22 @@ public class CkCacheService : ICkCacheService
         }
         
         await ckCache.LoadCkModelAsync(compiledModel, operationResult);
+    }
+
+    /// <summary>
+    /// Loads a already analyzed model into a tenant cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="modelGraph">The ready analyzed graph model</param>
+    /// <exception cref="Exception"></exception>
+    public void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        ckCache.LoadCkModelGraph(modelGraph);
     }
     
     /// <summary>

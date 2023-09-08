@@ -19,6 +19,8 @@
             "DateTime",
             "Int",
             "Double",
+            "StringArray",
+            "IntArray",
             "Record"
           ]
         },

@@ -63,7 +63,6 @@ public class CkRecordCodeGenerator
                     sb.AppendLine("  /// <summary>");
                     sb.AppendLine($"  /// {ckAttributeGraph.Description}");
                     sb.AppendLine("  /// </summary>");
-                    sb.AppendLine($"  public string? {ckTypeAttributeDto.AttributeName}");
                 }
                 
                 if (ckAttributeGraph.IsOptional)

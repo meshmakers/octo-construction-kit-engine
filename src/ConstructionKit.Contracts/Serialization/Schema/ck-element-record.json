@@ -65,7 +65,7 @@
       "additionalProperties": false,
       "additionalItems": false,
       "required": [
-        "typeId"
+        "recordId"
       ]
     }
   }

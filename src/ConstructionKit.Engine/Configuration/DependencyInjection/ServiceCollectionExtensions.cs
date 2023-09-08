@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
-using Meshmakers.Octo.ConstructionKit.Contracts.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
@@ -26,7 +25,9 @@ public static class ServiceCollectionExtensions
         // Adding resolvers
         services.AddTransient<IDependencyResolver, DependencyResolver>();
         services.AddTransient<IElementResolver, ElementResolver>();
+        services.AddTransient<IReferenceResolver, ReferenceResolver>();
         services.AddTransient<IInheritanceResolver, InheritanceResolver>();
+        services.AddTransient<IModelResolver, ModelResolver>();
         
         // Adding serializers
         services.AddTransient<ICkSerializer, CkYamlSerializer>();

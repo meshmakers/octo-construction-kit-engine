@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.Messages;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Messages;
 
 public class MessageTexts
 {

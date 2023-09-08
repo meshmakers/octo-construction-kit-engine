@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -25,6 +26,13 @@ public class CkAttributeDto
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AttributeValueTypesDto ValueType { get; set; }
+    
+    /// <summary>
+    /// Defines the record of the attribute if the value type is a model.
+    /// </summary>
+    [JsonConverter(typeof(CkIdRecordIdConverter))]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public CkId<CkRecordId>? ValueCkRecordId { get; set; }
 
     /// <summary>
     /// Default value of the attribute

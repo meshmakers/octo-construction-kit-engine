@@ -2,6 +2,7 @@ using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
@@ -231,7 +232,7 @@ public class CompilerService : ICompilerService
             AssociationRoles = associationRoles
         };
 
-        await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);
+        var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult);
 
         if (operationResult.HasErrors)
         {
@@ -248,21 +249,17 @@ public class CompilerService : ICompilerService
 
         if (createCacheFile)
         {
-            await CreateCacheFileAsync(compiledModelRoot, rootPath, operationResult);
+            await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, rootPath);
         }
     }
 
-    private async Task CreateCacheFileAsync(CkCompiledModelRoot compiledModelRoot, string rootPath, OperationResult operationResult)
+    private async Task CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string rootPath)
     {
         var tempTenantId = Guid.NewGuid().ToString();
         _ckCacheService.CreateTenant(tempTenantId);
-        await _ckCacheService.LoadCkModelAsync(tempTenantId, compiledModelRoot, operationResult);
-        if (operationResult.HasErrors)
-        {
-            throw CompilerException.OperationResultWithErrors(operationResult);
-        }
-
-        string compiledModelCacheFile = $"ck-{compiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.cache.json";
+        _ckCacheService.LoadCkModelGraph(tempTenantId, ckModelGraph);
+        
+        string compiledModelCacheFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.cache.json";
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
 #else

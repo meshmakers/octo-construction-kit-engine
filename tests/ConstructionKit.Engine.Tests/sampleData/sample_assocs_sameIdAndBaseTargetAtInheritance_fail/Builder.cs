@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests.sampleData.sample_assocs_sameIdAndBaseTargetAtInheritance_fail;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_assocs_sameIdAndBaseTargetAtInheritance_fail;
 
 public class Builder
 {

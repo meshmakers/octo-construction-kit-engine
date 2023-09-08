@@ -43,4 +43,11 @@ public class CkElementsRootDto
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkAttributeDto>? Attributes { get; set; }
+    
+    /// <summary>
+    /// Returns records of the model that are used for complex attributes
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkRecordDto>? Records { get; set; }
 }

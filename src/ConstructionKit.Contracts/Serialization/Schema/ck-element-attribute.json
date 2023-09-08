@@ -1,56 +1,65 @@
 {
   "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "title": "CkAttribute",
-  "description": "A construction kit attribute definition",
-  "properties": {
-    "id": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9-_.]+$"
-    },
-    "valueType": {
-      "type": "string",
-      "enum": [
-        "String",
-        "Boolean",
-        "DateTime",
-        "Int",
-        "Double"
-      ]
-    },
-    "defaultValues": {
-      "type": "array",
-      "items": {
-        "type": "object"
-      }
-    },
-    "selectionValues": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "key": {
-            "type": "integer"
-          },
-          "name": {
-            "type": "string"
+  "definitions": {
+    "CkAttribute": {
+      "type": "object",
+      "title": "CkAttribute",
+      "description": "A construction kit attribute definition",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "String",
+            "Boolean",
+            "DateTime",
+            "Int",
+            "Double",
+            "Record"
+          ]
+        },
+        "valueCkRecordId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "defaultValues": {
+          "type": "array",
+          "items": {
+            "type": "object"
           }
         },
-        "additionalProperties": false,
-        "required": [
-          "key",
-          "name"
-        ]
-      }
-    },
-    "isOptional": {
-      "type": "boolean"
+        "selectionValues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "name"
+            ]
+          }
+        },
+        "isOptional": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "valueType"
+      ]
     }
-  },
-  "additionalProperties": false,
-  "required": [
-    "id",
-    "valueType"
-  ]
+  }
 }

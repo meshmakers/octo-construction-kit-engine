@@ -28,6 +28,13 @@ public class CkIdAssociationIdConverter : CkIdConverter<CkAssociationRoleId>
 }
 
 /// <summary>
+/// Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkRecordId}"/>
+/// </summary>
+public class CkIdRecordIdConverter : CkIdConverter<CkRecordId>
+{
+}
+
+/// <summary>
 /// Converter for System.Text.Json and YamlDotNet for <see cref="CkId{TKey}"/>
 /// </summary>
 /// <typeparam name="TKey"></typeparam>

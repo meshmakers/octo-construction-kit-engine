@@ -1,0 +1,125 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Resolvers;
+
+public class ReferenceResolverTests
+{
+    [Fact]
+    public void Resolve_OK()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample1.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+    }
+    
+    [Fact]
+    public void Resolve_Records_OK()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.records1.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+    }
+    
+    [Fact]
+    public void Resolve_Attribute_CkRecordIdDoesNotExist_CompilerErrorMessage()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.records1_recordIdDoesNotExist.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(41, operationResult.Messages[0].MessageNumber);
+    }
+    
+    [Fact]
+    public void Resolve_Record_AttributeDoesNotExist_CompilerErrorMessage()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.records1_attributeIdDoesNotExist.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(42, operationResult.Messages[0].MessageNumber);
+    }
+    
+        
+    [Fact]
+    public void Resolve_Record_DerivedDoesNotExist_CompilerErrorMessage()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.records1_derivedFromDoesNotExist.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(43, operationResult.Messages[0].MessageNumber);
+    }
+    
+    [Fact]
+    public void Resolve_Type_DerivedDoesNotExist_CompilerErrorMessage()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample_types_unknownTypeId.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(3, operationResult.Messages[0].MessageNumber);
+    }
+    
+    [Fact]
+    public void Resolve_Type_AttributeDoesNotExist_CompilerErrorMessage()
+    {
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample_types_unkownAttributeId.Builder.Build());
+        
+        OperationResult operationResult = new();
+        ReferenceResolver modelResolver = new();
+        CkModelGraph graph = new();
+        modelResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(2, operationResult.Messages[0].MessageNumber);
+    }
+}

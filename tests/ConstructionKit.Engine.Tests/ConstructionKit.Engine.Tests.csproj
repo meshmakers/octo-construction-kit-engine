@@ -65,6 +65,12 @@
         <None Update="sampleData\files\associations-ok.yaml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="sampleData\files\recordAttributeWithoutCkRecordId.yaml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="sampleData\files\recordAttributeWithoutCkRecordId.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 

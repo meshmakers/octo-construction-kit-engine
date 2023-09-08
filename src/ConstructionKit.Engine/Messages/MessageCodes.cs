@@ -121,6 +121,45 @@ internal static class MessageCodes
     internal static CompilerMessage SelectionValueNotUnique(object ckAttributeId, object key) =>
         GetMessage("SelectionValueNotUnique", ckAttributeId, key);
 
+    internal static CompilerMessage CkRecordIdUndefined(object ckAttributeId) =>
+        GetMessage("CkRecordIdUndefined", ckAttributeId);
+
+    internal static CompilerMessage CkRecordIdContainsInvalidCharacters(object ckRecordId) =>
+        GetMessage("CkRecordIdContainsInvalidCharacters", ckRecordId);
+
+    internal static CompilerMessage RecordIdNotUnique(object ckRecordId) =>
+        GetMessage("RecordIdNotUnique", ckRecordId);
+
+    internal static CompilerMessage CkRecordIdUnknown(object ckRecordId) =>
+        GetMessage("CkRecordIdUnknown", ckRecordId);
+
+    internal static CompilerMessage UnknownCkRecordIdForInheritance(object ckRecordId) =>
+        GetMessage("UnknownCkRecordIdForInheritance", ckRecordId);
+
+    internal static CompilerMessage DerivedFromCkRecordIdThatIsFinal(object baseCkRecordId, object derivedCkRecordId) =>
+        GetMessage("DerivedFromCkRecordIdThatIsFinal", baseCkRecordId, derivedCkRecordId);
+
+    internal static CompilerMessage CkRecordIdAttributeNameNotUnique(object ckRecordId, object attributeName) =>
+        GetMessage("CkRecordIdAttributeNameNotUnique", ckRecordId, attributeName);
+
+    internal static CompilerMessage CkRecordIdAttributeIdNotUniqueByInheritance(object ckRecordId, object ckAttributeId) =>
+        GetMessage("CkRecordIdAttributeIdNotUniqueByInheritance", ckRecordId, ckAttributeId);
+
+    internal static CompilerMessage CkRecordIdAttributeIdNotUnique(object ckRecordId, object ckAttributeId) =>
+        GetMessage("CkRecordIdAttributeIdNotUnique", ckRecordId, ckAttributeId);
+
+    internal static CompilerMessage CkRecordIdAttributeNameNotUniqueByInheritance(object ckRecordId, object attributeName) =>
+        GetMessage("CkRecordIdAttributeNameNotUniqueByInheritance", ckRecordId, attributeName);
+
+    internal static CompilerMessage AttributeUsesUnknownCkRecordId(object ckAttributeId, object ckRecordId) =>
+        GetMessage("AttributeUsesUnknownCkRecordId", ckAttributeId, ckRecordId);
+
+    internal static CompilerMessage UnknownAttributeOfCkRecordIdInSource(object ckAttributeId, object ckRecordId) =>
+        GetMessage("UnknownAttributeOfCkRecordIdInSource", ckAttributeId, ckRecordId);
+
+    internal static CompilerMessage UnknownDerivedFromCkRecordIdInSource(object derivedCkRecordId, object ckRecordId) =>
+        GetMessage("UnknownDerivedFromCkRecordIdInSource", derivedCkRecordId, ckRecordId);
+
     private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
     {
         {
@@ -302,6 +341,84 @@ internal static class MessageCodes
              new CompilerMessageTemplate(MessageLevel.Error,
                  30, "CkAttributeId '{ckAttributeId}' has defined key '{key}' which is used several times.",
                  new [] {"ckAttributeId", "key"})
+        },
+        {
+            "CkRecordIdUndefined",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 31, "CkAttributeId '{ckAttributeId}' is defined as Record, but the ValueCkRecordId is missing.",
+                 new [] {"ckAttributeId"})
+        },
+        {
+            "CkRecordIdContainsInvalidCharacters",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 32, "CkRecordId '{ckRecordId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
+                 new [] {"ckRecordId"})
+        },
+        {
+            "RecordIdNotUnique",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 33, "RecordId '{ckRecordId}' is not unique.",
+                 new [] {"ckRecordId"})
+        },
+        {
+            "CkRecordIdUnknown",
+             new CompilerMessageTemplate(MessageLevel.FatalError,
+                 34, "CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.",
+                 new [] {"ckRecordId"})
+        },
+        {
+            "UnknownCkRecordIdForInheritance",
+             new CompilerMessageTemplate(MessageLevel.FatalError,
+                 35, "CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.",
+                 new [] {"ckRecordId"})
+        },
+        {
+            "DerivedFromCkRecordIdThatIsFinal",
+             new CompilerMessageTemplate(MessageLevel.FatalError,
+                 36, "CkRecordId '{baseCkRecordId}' is final, but CkRecordId '{derivedCkRecordId}' is derived from it.",
+                 new [] {"baseCkRecordId", "derivedCkRecordId"})
+        },
+        {
+            "CkRecordIdAttributeNameNotUnique",
+             new CompilerMessageTemplate(MessageLevel.FatalError,
+                 37, "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
+                 new [] {"ckRecordId", "attributeName"})
+        },
+        {
+            "CkRecordIdAttributeIdNotUniqueByInheritance",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 38, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint.",
+                 new [] {"ckRecordId", "ckAttributeId"})
+        },
+        {
+            "CkRecordIdAttributeIdNotUnique",
+             new CompilerMessageTemplate(MessageLevel.FatalError,
+                 39, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint.",
+                 new [] {"ckRecordId", "ckAttributeId"})
+        },
+        {
+            "CkRecordIdAttributeNameNotUniqueByInheritance",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 40, "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint.",
+                 new [] {"ckRecordId", "attributeName"})
+        },
+        {
+            "AttributeUsesUnknownCkRecordId",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 41, "CkAttributeId '{ckAttributeId}' uses unknown CkRecordId '{ckRecordId}'. This may happen because a dependency to another construction kit model is missing.",
+                 new [] {"ckAttributeId", "ckRecordId"})
+        },
+        {
+            "UnknownAttributeOfCkRecordIdInSource",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 42, "Attribute Id '{ckAttributeId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
+                 new [] {"ckAttributeId", "ckRecordId"})
+        },
+        {
+            "UnknownDerivedFromCkRecordIdInSource",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 43, "Derived CkRecordId '{derivedCkRecordId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
+                 new [] {"derivedCkRecordId", "ckRecordId"})
         },
     };
 }

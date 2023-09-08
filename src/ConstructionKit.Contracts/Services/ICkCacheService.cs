@@ -22,7 +22,15 @@ public interface ICkCacheService
     /// <param name="compiledModel">The compiled construction kit model</param>
     /// <param name="operationResult">Validation results during schema validation and model validation</param>
     /// <exception cref="Exception"></exception>
-    Task LoadCkModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult);
+    Task LoadCompiledModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult);
+
+    /// <summary>
+    /// Loads a already analyzed model into a tenant cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="modelGraph">The ready analyzed graph model</param>
+    /// <exception cref="Exception"></exception>
+    void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph);
 
     /// <summary>
     /// Unload a tenant cache.

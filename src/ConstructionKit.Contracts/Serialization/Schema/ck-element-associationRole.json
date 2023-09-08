@@ -1,43 +1,47 @@
 {
   "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-associationRole.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9-_.]+$"
-    },
-    "inboundName": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9_.]+$"
-    },
-    "outboundName": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9_.]+$"
-    },
-    "inboundMultiplicity": {
-      "type": "string",
-      "enum": [
-        "ZeroOrOne",
-        "One",
-        "N"
-      ]
-    },
-    "outboundMultiplicity": {
-      "type": "string",
-      "enum": [
-        "ZeroOrOne",
-        "One",
-        "N"
+  "definitions": {
+    "CkAssociationRole": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "inboundName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.]+$"
+        },
+        "outboundName": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.]+$"
+        },
+        "inboundMultiplicity": {
+          "type": "string",
+          "enum": [
+            "ZeroOrOne",
+            "One",
+            "N"
+          ]
+        },
+        "outboundMultiplicity": {
+          "type": "string",
+          "enum": [
+            "ZeroOrOne",
+            "One",
+            "N"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "inboundName",
+        "outboundName",
+        "inboundMultiplicity",
+        "outboundMultiplicity"
       ]
     }
-  },
-  "additionalProperties": false,
-  "required": [
-    "id",
-    "inboundName",
-    "outboundName",
-    "inboundMultiplicity",
-    "outboundMultiplicity"
-  ]
+  }
 }

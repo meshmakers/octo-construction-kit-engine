@@ -31,6 +31,16 @@ public enum AttributeValueTypesDto
     /// Indicates that the attribute value is a double.
     /// </summary>
     Double = 6,
+    
+    /// <summary>
+    /// Indicates that the attribute value is a string array.
+    /// </summary>
+    StringArray = 7,
+
+    /// <summary>
+    /// Indicates that the attribute value is an integer array.
+    /// </summary>
+    IntArray = 8,
 
     /// <summary>
     /// Indicates that the attribute value is a binary file in a storage linked to the attribute.

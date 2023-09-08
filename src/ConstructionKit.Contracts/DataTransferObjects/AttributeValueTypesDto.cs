@@ -56,4 +56,9 @@ public enum AttributeValueTypesDto
     /// Indicates that the attribute value is an array of complex objects - so called records.
     /// </summary>
     RecordArray = 11,
+    
+    /// <summary>
+    /// Indicates that the attribute value is a time span.
+    /// </summary>
+    TimeSpan = 12
 }

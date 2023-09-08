@@ -22,7 +22,8 @@
             "StringArray",
             "IntArray",
             "Record",
-            "RecordArray"
+            "RecordArray",
+            "TimeSpan"
           ]
         },
         "valueCkRecordId": {

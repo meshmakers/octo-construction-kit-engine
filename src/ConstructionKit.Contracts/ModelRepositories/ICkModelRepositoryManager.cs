@@ -12,21 +12,33 @@ public interface ICkModelRepositoryManager
     /// </summary>
     /// <param name="ckModelId">The construction kit model id</param>
     /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>If existing the deserialized and validated construction kit model</returns>
-    public Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult);
+    public Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult, object? sourceIdentifier = null);
 
     /// <summary>
     /// Returns a list of known construction kit model repositories
     /// </summary>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    IEnumerable<Tuple<string, string>> GetRepositoryList();
+    IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null);
 
     /// <summary>
     /// Publishes a model to a repository
     /// </summary>
     /// <param name="repositoryName">Name of Repository.</param>
-    /// <param name="ckCompiledModelRoot">Deserialized construction kit model.</param>
+    /// <param name="ckCompiledModel">Deserialized construction kit model.</param>
     /// <param name="isForced">When true, existing construction kit models are replaced.</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModelRoot, bool isForced);
+    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null);
+    
+    /// <summary>
+    /// Updates a model to a repository
+    /// </summary>
+    /// <param name="repositoryName">Name of Repository.</param>
+    /// <param name="ckCompiledModel">The validated construction kit model</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <returns></returns>
+    Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null);
 }

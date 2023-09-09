@@ -21,14 +21,19 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult, object? sourceIdentifier = null)
     {
         foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x=> x.Order))
         {
-            var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId);
+            if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+            {
+                continue;
+            }
+            
+            var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId, sourceIdentifier);
             if (hasBeenFound)
             {
-                return await ckModelRepository.GetModelAsync(ckModelId, operationResult);
+                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier);
             }
         }
 
@@ -36,21 +41,31 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public IEnumerable<Tuple<string, string>> GetRepositoryList()
+    public IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null)
     {
         foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x=> x.Order))
         {
+            if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+            {
+                continue;
+            }
+            
             yield return new Tuple<string, string>(ckModelRepository.RepositoryName, ckModelRepository.Description);
         }
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModelRoot, bool isForced)
+    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
         if (ckModelRepository == null)
         {
             throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+        
+        if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+        {
+            throw ModelRepositoryException.ModelRepositoryDoesNotSupportSourceIdentifier(repositoryName);
         }
 
         if (!ckModelRepository.CanWrite)
@@ -58,6 +73,28 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
             throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
 
-        await ckModelRepository.PublishModelAsync(ckCompiledModelRoot, isForced);
+        await ckModelRepository.PublishModelAsync(ckCompiledModel, isForced, sourceIdentifier);
+    }
+
+    /// <inheritdoc />
+    public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null)
+    {
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+        
+        if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+        {
+            throw ModelRepositoryException.ModelRepositoryDoesNotSupportSourceIdentifier(repositoryName);
+        }
+
+        if (!ckModelRepository.CanWrite)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
+        }
+        
+        await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier);
     }
 }

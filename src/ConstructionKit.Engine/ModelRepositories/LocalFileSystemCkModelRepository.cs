@@ -37,7 +37,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     public bool CanWrite => true;
 
     /// <inheritdoc />
-    public Task<bool> LookupModelIdAsync(CkModelId modelId)
+    public Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         if (!TryGetExistingModelPath(modelId, out _))
         {
@@ -48,7 +48,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null)
     {
         if (!TryGetExistingModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
         {
@@ -70,7 +70,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false)
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null)
     {
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
         if (File.Exists(compiledModelFilePath) && !force)
@@ -90,7 +90,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel)
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null)
     {
         throw new NotImplementedException();
     }

@@ -35,6 +35,12 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
     /// <inheritdoc />
     public bool CanWrite => true;
+    
+    /// <inheritdoc />
+    public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
+    {
+        return sourceIdentifier == null;
+    }
 
     /// <inheritdoc />
     public Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null)

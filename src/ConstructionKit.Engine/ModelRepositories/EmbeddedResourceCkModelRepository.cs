@@ -32,6 +32,12 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
     public bool CanWrite => false;
 
     /// <inheritdoc />
+    public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
+    {
+        return sourceIdentifier == null;
+    }
+
+    /// <inheritdoc />
     public Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         return Task.FromResult(_embeddedModels.Any(m=> m.ModelId == modelId));

@@ -28,6 +28,13 @@ public interface ICkModelRepository
     bool CanWrite { get; }
 
     /// <summary>
+    /// Returns true, if the defined source identifier ist supported by the repository.
+    /// </summary>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <returns></returns>
+    bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
+
+    /// <summary>
     /// Looks up a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>

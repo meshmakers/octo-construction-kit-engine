@@ -116,6 +116,13 @@
               "targetCkTypeId": {
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+              },
+              "targetAttributes":{
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+                }
               }
             },
             "required": [

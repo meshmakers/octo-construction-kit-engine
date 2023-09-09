@@ -169,6 +169,9 @@ internal static class MessageCodes
     internal static CompilerMessage CkEnumIdUndefined(object ckAttributeId) =>
         GetMessage("CkEnumIdUndefined", ckAttributeId);
 
+    internal static CompilerMessage CkTypeIdUnknownTargetAttributeIdForAssociation(object originCkTypeId, object roleId, object targetCkAttributeId, object targetCkTypeId) =>
+        GetMessage("CkTypeIdUnknownTargetAttributeIdForAssociation", originCkTypeId, roleId, targetCkAttributeId, targetCkTypeId);
+
     private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
     {
         {
@@ -446,6 +449,12 @@ internal static class MessageCodes
              new CompilerMessageTemplate(MessageLevel.Error,
                  46, "CkAttributeId '{ckAttributeId}' is defined as Enum, but the ValueCkEnumId is missing.",
                  new [] {"ckAttributeId"})
+        },
+        {
+            "CkTypeIdUnknownTargetAttributeIdForAssociation",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 47, "CkTypeId '{originCkTypeId}' defines for role id '{roleId}' an unknown target AttributeId '{targetCkAttributeId}' for CkType '{targetCkTypeId}'.",
+                 new [] {"originCkTypeId", "roleId", "targetCkAttributeId", "targetCkTypeId"})
         },
     };
 }

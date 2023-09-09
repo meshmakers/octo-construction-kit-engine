@@ -29,6 +29,10 @@ public class CkTypeAssociationDto
     [JsonRequired]
     [JsonConverter(typeof(CkIdTypeIdConverter))]
     public CkId<CkTypeId> TargetCkTypeId { get; set; }
-
-
+    
+    /// <summary>
+    ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkId<CkAttributeId>>? TargetAttributes { get; set; }
 }

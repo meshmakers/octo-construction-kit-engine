@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
-using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_TypeNotDerivedFromSystemEntity_fail;
+
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Resolvers;
@@ -308,7 +308,7 @@ public class InheritanceResolverTests
 
         CkAggregatedModelElements ckAggregatedModelElements = new();
         ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
-        ckAggregatedModelElements.AppendModel(Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample_TypeNotDerivedFromSystemEntity_fail.Builder.Build());
 
         OperationResult operationResult = new();
         InheritanceResolver inheritanceResolver = new(logger);
@@ -320,5 +320,39 @@ public class InheritanceResolverTests
         Assert.Equal(9, operationResult.Messages[0].MessageNumber);
     }
     
+    [Fact]
+    public void AssociationWithTargetAttributes_OK()
+    {
+        var logger = A.Fake<ILogger<InheritanceResolver> >();
 
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample_associationWithAttributes.Builder.Build());
+
+        OperationResult operationResult = new();
+        InheritanceResolver inheritanceResolver = new(logger);
+        CkModelGraph graph = new();
+        inheritanceResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+    }
+    
+    [Fact]
+    public void AssociationWithTargetAttributes_NotExistingAttribute_CompilerErrorMessage()
+    {
+        var logger = A.Fake<ILogger<InheritanceResolver> >();
+
+        CkAggregatedModelElements ckAggregatedModelElements = new();
+        ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
+        ckAggregatedModelElements.AppendModel(sampleData.sample_associationWithAttributes_NotFound_fail.Builder.Build());
+
+        OperationResult operationResult = new();
+        InheritanceResolver inheritanceResolver = new(logger);
+        CkModelGraph graph = new();
+        inheritanceResolver.Resolve(ckAggregatedModelElements, graph, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(47, operationResult.Messages[0].MessageNumber);
+    }
 }

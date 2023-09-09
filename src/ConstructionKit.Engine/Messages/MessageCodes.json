@@ -275,6 +275,12 @@
       "number": 46,
       "level": "ERROR",
       "text": "CkAttributeId '{ckAttributeId}' is defined as Enum, but the ValueCkEnumId is missing."
+    },
+    {
+      "key": "CkTypeIdUnknownTargetAttributeIdForAssociation",
+      "number": 47,
+      "level": "ERROR",
+      "text": "CkTypeId '{originCkTypeId}' defines for role id '{roleId}' an unknown target AttributeId '{targetCkAttributeId}' for CkType '{targetCkTypeId}'."
     }
   ]
 }

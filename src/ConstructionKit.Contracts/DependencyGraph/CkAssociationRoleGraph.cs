@@ -25,8 +25,9 @@ public class CkAssociationRoleGraph
         OutboundName = associationRoleDto.OutboundName;
         InboundMultiplicity = associationRoleDto.InboundMultiplicity;
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
+        Attributes = associationRoleDto.Attributes ?? new List<CkTypeAttributeDto>();
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="CkAssociationRoleGraph"/>.
     /// </summary>
@@ -35,15 +36,17 @@ public class CkAssociationRoleGraph
     /// <param name="outboundName"></param>
     /// <param name="inboundMultiplicity"></param>
     /// <param name="outboundMultiplicity"></param>
+    /// <param name="attributes"></param>
     [JsonConstructor]
     public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckRoleId, string inboundName, string outboundName, 
-        MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity)
+        MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity, ICollection<CkTypeAttributeDto> attributes)
     {
         CkRoleId = ckRoleId;
         InboundName = inboundName;
         OutboundName = outboundName;
         InboundMultiplicity = inboundMultiplicity;
         OutboundMultiplicity = outboundMultiplicity;
+        Attributes = attributes;
     }
     
     /// <summary>
@@ -70,4 +73,9 @@ public class CkAssociationRoleGraph
     ///     Multiplicity of the outbound association
     /// </summary>
     public MultiplicitiesDto OutboundMultiplicity { get; }
+    
+    /// <summary>
+    ///     Gets or sets a list of attributes for the association role
+    /// </summary>
+    public ICollection<CkTypeAttributeDto> Attributes { get; set; }
 }

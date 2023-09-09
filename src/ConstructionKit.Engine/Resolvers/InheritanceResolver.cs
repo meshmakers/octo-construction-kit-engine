@@ -158,7 +158,24 @@ public class InheritanceResolver : IInheritanceResolver
 
                     continue;
                 }
+                
+                // Check if there are target attributes defined and if they are valid
+                if (typeAssociation.TargetAttributes != null)
+                {
+                    var invalidCkAttributeIds = typeAssociation.TargetAttributes.Where(a => 
+                        targetCkTypeGraph.Attributes.All(b => b.CkAttributeId != a)).ToList();
 
+                    invalidCkAttributeIds.ForEach(a =>
+                    {
+                        operationResult.AddMessage(MessageCodes.CkTypeIdUnknownTargetAttributeIdForAssociation(ckTypeDto.TypeId,
+                            typeAssociation.CkRoleId, a, typeAssociation.TargetCkTypeId));
+                    });
+
+                    if (invalidCkAttributeIds.Any())
+                    {
+                        continue;
+                    }
+                }
 
                 targetCkTypeGraph.Associations.In.Owned.Add(typeAssociation);
                 originTypeGraph.Associations.Out.Owned.Add(typeAssociation);

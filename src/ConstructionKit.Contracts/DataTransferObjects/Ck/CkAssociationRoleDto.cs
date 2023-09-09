@@ -29,7 +29,7 @@ public class CkAssociationRoleDto
     /// </summary>
     [JsonRequired]
     public string OutboundName { get; set; } = null!;
-    
+
     /// <summary>
     ///     Multiplicity of the inbound association
     /// </summary>
@@ -43,4 +43,10 @@ public class CkAssociationRoleDto
     [JsonConverter(typeof(JsonStringEnumConverter))]
     [JsonRequired]
     public MultiplicitiesDto OutboundMultiplicity { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a list of attributes for the association role
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkTypeAttributeDto>? Attributes { get; set; }
 }

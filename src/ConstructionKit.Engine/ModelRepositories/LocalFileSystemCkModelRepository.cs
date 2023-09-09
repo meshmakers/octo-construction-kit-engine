@@ -54,7 +54,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null)
+    public async Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         if (!TryGetExistingModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
         {
@@ -76,7 +77,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null)
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, 
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
         if (File.Exists(compiledModelFilePath) && !force)
@@ -96,7 +98,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null)
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
     {
         throw new NotImplementedException();
     }

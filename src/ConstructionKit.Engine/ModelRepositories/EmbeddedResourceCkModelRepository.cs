@@ -44,7 +44,8 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null)
+    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null, 
+        CancellationToken? cancellationToken = null)
     {
         var embeddedModel = _embeddedModels.FirstOrDefault(m => m.ModelId == modelId);
         if (embeddedModel == null)
@@ -56,13 +57,15 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null)
+    public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
     {
         throw ModelRepositoryException.ModelRepositoryNotWritable(RepositoryName);
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null)
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
     {
         throw ModelRepositoryException.ModelRepositoryNotWritable(RepositoryName);
     }

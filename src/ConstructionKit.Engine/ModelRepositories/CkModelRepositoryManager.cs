@@ -21,7 +21,8 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult, object? sourceIdentifier = null)
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x=> x.Order))
         {
@@ -55,9 +56,11 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null)
+    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, 
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
         if (ckModelRepository == null)
         {
             throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
@@ -77,9 +80,11 @@ public class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null)
+    public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
     {
-        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, 
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
         if (ckModelRepository == null)
         {
             throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);

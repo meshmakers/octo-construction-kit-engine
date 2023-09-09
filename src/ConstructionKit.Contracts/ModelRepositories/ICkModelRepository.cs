@@ -1,4 +1,3 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
@@ -27,34 +26,38 @@ public interface ICkModelRepository
     /// Returns true if the repository can be used to publish or update models, otherwise false.
     /// </summary>
     bool CanWrite { get; }
-    
+
     /// <summary>
     /// Looks up a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>True if the model exists in this repository, otherwise false</returns>
-    Task<bool> LookupModelIdAsync(CkModelId modelId);
+    Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null);
 
     /// <summary>
     /// Gets a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
     /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>The deserialized and schema validated construction kit model</returns>
-    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult);
+    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null);
 
     /// <summary>
     /// Publishes a model to the repository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
     /// <param name="force">Forces the operation by replacing model files if they exist.</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false); 
+    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null); 
     
     /// <summary>
     /// Updates a model in the repository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel);
+    Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null);
 }

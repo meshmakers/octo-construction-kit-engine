@@ -17,7 +17,6 @@
     <ItemGroup>
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2305.5002" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2305.5002" />
-        <PackageReference Include="Meshmakers.Octo.Sdk.ServiceClient" Version="0.0.2306.23003" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.4" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />

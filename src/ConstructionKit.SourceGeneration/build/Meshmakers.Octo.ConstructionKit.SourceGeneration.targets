@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
     <Target Name="BaseConfig">
         <ItemGroup>
-            <ConstructionKitFolder Include="ConstructionKit" />
+            <ConstructionKitFolder Condition="'$(ConstructionKitFolder)' == ''" Include="ConstructionKit" />
         </ItemGroup>
 
         <PropertyGroup>
@@ -41,12 +41,17 @@
 
     <Target Name="CompileConstructionKit" DependsOnTargets="BaseConfig">
 
-        <Message Condition="!Exists(@(ConstructionKitFolder))" Importance="High" Text="Create new construction kit library" />
-        <Exec Condition="!Exists(@(ConstructionKitFolder))" Command="$(OctoCompilerToolPath) -c new -p @(ConstructionKitFolder)">
+        <ItemGroup>
+            <!-- Define a temporary item group to iterate through -->
+            <_ConstructionKitFolder Include="@(ConstructionKitFolder)" />
+        </ItemGroup>
+        
+        <Message Condition="!Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Create new construction kit library" />
+        <Exec Condition="!Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c new -p %(_ConstructionKitFolder.Identity)">
         </Exec>
 
-        <Message Condition="Exists(@(ConstructionKitFolder))" Importance="High" Text="Compiling construction kit library" />
-        <Exec Condition="Exists(@(ConstructionKitFolder))" Command="$(OctoCompilerToolPath) -c compile -p @(ConstructionKitFolder) -c">
+        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library" />
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -c">
         </Exec>
 
     </Target>

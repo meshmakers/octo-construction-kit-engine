@@ -48,8 +48,9 @@ public interface ICkModelRepository
     /// <param name="modelId">The construction kit model id</param>
     /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns>The deserialized and schema validated construction kit model</returns>
-    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null);
+    Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>
     /// Publishes a model to the repository
@@ -57,14 +58,16 @@ public interface ICkModelRepository
     /// <param name="ckCompiledModel">The validated construction kit model</param>
     /// <param name="force">Forces the operation by replacing model files if they exist.</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
-    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null); 
+    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null, CancellationToken? cancellationToken = null); 
     
     /// <summary>
     /// Updates a model in the repository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
-    Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null);
+    Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 }

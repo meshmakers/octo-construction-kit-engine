@@ -1,7 +1,7 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
     <Target Name="BaseConfig">
         <ItemGroup>
-            <ConstructionKitFolder Condition="'$(ConstructionKitFolder)' == ''" Include="ConstructionKit" />
+            <ConstructionKitFolder Condition="'@(ConstructionKitFolder)' == ''" Include="ConstructionKit" />
         </ItemGroup>
 
         <PropertyGroup>
@@ -50,7 +50,7 @@
         <Exec Condition="!Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c new -p %(_ConstructionKitFolder.Identity)">
         </Exec>
 
-        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library" />
+        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)" />
         <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -c">
         </Exec>
 

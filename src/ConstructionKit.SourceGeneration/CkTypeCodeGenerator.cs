@@ -37,7 +37,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         var ckBaseType = "";
         if (ckType.DerivedFromCkTypeId != null)
         {
-            ckBaseType = $" : Rt{ckType.DerivedFromCkTypeId.Value.ModelId.ModelId.MakeClassName()}" +
+            ckBaseType = $" : Rt" +
                          $"{ckType.DerivedFromCkTypeId.Value.Key.TypeId.MakeClassName()}";
         }
 
@@ -53,7 +53,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine($"/// Generated from construction kit type {ckType.TypeId.FullName}");
         sb.AppendLine("/// </summary>");
         sb.AppendLine($"[CkId({modelId.ModelId.MakeClassName()}CkIds.ModelId, {modelId.ModelId.MakeClassName()}CkIds.{ckType.TypeId.TypeId.MakeClassName()})]");
-        sb.AppendLine($"public partial class Rt{modelId.ModelId.MakeClassName()}{ckType.TypeId.TypeId.MakeClassName()}{ckBaseType}");
+        sb.AppendLine($"public partial class Rt{ckType.TypeId.TypeId.MakeClassName()}{ckBaseType}");
         sb.AppendLine("{");
         if (ckType.Attributes != null)
         {

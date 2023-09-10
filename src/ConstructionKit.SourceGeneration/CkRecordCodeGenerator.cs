@@ -36,7 +36,7 @@ public class CkRecordCodeGenerator
         var ckBaseType = " : RtRecord";
         if (ckRecord.DerivedFromCkRecordId != null)
         {
-            ckBaseType = $" : Rt{ckRecord.DerivedFromCkRecordId.Value.ModelId.ModelId.MakeClassName()}" +
+            ckBaseType = $" : Rt" +
                          $"{ckRecord.DerivedFromCkRecordId.Value.Key.RecordId.MakeClassName()}Record";
         }
 
@@ -51,7 +51,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit type {ckRecord.RecordId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public partial class Rt{modelId.ModelId.MakeClassName()}{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
+        sb.AppendLine($"public partial class Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
         sb.AppendLine("{");
         if (ckRecord.Attributes != null)
         {

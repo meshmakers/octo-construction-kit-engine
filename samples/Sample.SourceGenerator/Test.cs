@@ -8,14 +8,14 @@ public enum AttributeValueTypes
     DateTime
 }
 
-public class RtRecord : RtSystemEntity
+public class RtRecord : RtEntity
 {
     
 }
 
-public class RtSystemEntity
+public class RtEntity
 {
-    public RtSystemEntity()
+    public RtEntity()
     {
     }
 
@@ -59,7 +59,7 @@ public class Test
 {
     public Test()
     {
-        RtSample1SampleType1 sampleType1 = new()
+        RtSampleType1 sampleType1 = new()
         {
             MyAttribute = "test"
         };

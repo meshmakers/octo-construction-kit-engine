@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Resolves inheritance of ck types
 /// </summary>
-public interface IInheritanceResolver
+internal interface IInheritanceResolver
 {
     /// <summary>
     /// Resolves the inheritance of the given model elements

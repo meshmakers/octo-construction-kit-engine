@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Implementation of <see cref="IElementResolver"/> that resolves the elements of a compiled model.
 /// </summary>
-public class ElementResolver : IElementResolver
+internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
     public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, OperationResult operationResult)

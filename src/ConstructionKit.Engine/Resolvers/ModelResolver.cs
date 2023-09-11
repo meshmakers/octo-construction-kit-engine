@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Resolver that resolves the elements of a compiled model.
 /// </summary>
-public class ModelResolver : IModelResolver
+internal class ModelResolver : IModelResolver
 {
     private readonly IDependencyResolver _dependencyResolver;
     private readonly IInheritanceResolver _inheritanceResolver;

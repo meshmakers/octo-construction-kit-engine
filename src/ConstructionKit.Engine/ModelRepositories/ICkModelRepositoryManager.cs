@@ -1,11 +1,12 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
+namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
 /// <summary>
 /// Manages the CK model repositories
 /// </summary>
-public interface ICkModelRepositoryManager
+internal interface ICkModelRepositoryManager
 {
     /// <summary>
     /// Looks up a model by its id 

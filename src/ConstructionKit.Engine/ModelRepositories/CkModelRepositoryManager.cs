@@ -7,7 +7,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 /// <summary>
 /// Manages the repositories that can be used to lookup a compiled model.
 /// </summary>
-public class CkModelRepositoryManager : ICkModelRepositoryManager
+internal class CkModelRepositoryManager : ICkModelRepositoryManager
 {
     private readonly IEnumerable<ICkModelRepository> _ckModelRepositories;
 

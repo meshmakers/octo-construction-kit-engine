@@ -1,5 +1,5 @@
 ﻿using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -7,13 +7,13 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class GetReposCommand : Command<OctoToolOptions>
 {
-    private readonly ICkModelRepositoryManager _ckModelRepositoryManager;
+    private readonly ICkModelRepositoryService _ckModelRepositoryService;
     
     public GetReposCommand(ILogger<GetReposCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryManager ckModelRepositoryManager)
+        ICkModelRepositoryService ckModelRepositoryService)
         : base(logger, "GetRepos", "Gets a list of known Construction Kit Repositories", options)
     {
-        _ckModelRepositoryManager = ckModelRepositoryManager;
+        _ckModelRepositoryService = ckModelRepositoryService;
 
     }
 
@@ -21,7 +21,7 @@ internal class GetReposCommand : Command<OctoToolOptions>
     {
         Logger.LogInformation("Construction Kit Model Repositories:");
 
-        var list = _ckModelRepositoryManager.GetRepositoryList();
+        var list = _ckModelRepositoryService.GetRepositoryList();
         foreach (var tuple in list)
         {
             Logger.LogInformation("- '{Name}': {Description}", tuple.Item1, tuple.Item2);

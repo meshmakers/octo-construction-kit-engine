@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Interface for resolving references of construction kit elements.  E. g. derived types, records or cross references
 /// </summary>
-public interface IReferenceResolver
+internal interface IReferenceResolver
 {
     /// <summary>
     /// Resolves and checks cross reference within the model graph.

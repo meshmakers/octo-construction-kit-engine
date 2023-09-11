@@ -1,7 +1,6 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
@@ -11,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class PublishCommand : Command<OctoToolOptions>
 {
-    private readonly ICkModelRepositoryManager _ckModelRepositoryManager;
+    private readonly ICkModelRepositoryService _ckModelRepositoryService;
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
     private readonly IArgument _pathArg;
@@ -19,10 +18,10 @@ internal class PublishCommand : Command<OctoToolOptions>
     private readonly IArgument _forceArg;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryManager ckModelRepositoryManager, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
+        ICkModelRepositoryService ckModelRepositoryService, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
         : base(logger, "Publish", "Publish a compiled construction kit to a repository", options)
     {
-        _ckModelRepositoryManager = ckModelRepositoryManager;
+        _ckModelRepositoryService = ckModelRepositoryService;
         _ckSerializer = ckSerializer;
         _ckValidationService = ckValidationService;
 
@@ -66,7 +65,7 @@ internal class PublishCommand : Command<OctoToolOptions>
                 return;
             }
         
-            await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced);
+            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced);
         
             Logger.LogInformation("Construction kit model published");
         }

@@ -1,4 +1,3 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
@@ -64,6 +63,24 @@ public interface ICkCacheService
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
     CkAssociationRoleGraph GetCkAssociationRole(string tenantId, CkId<CkAssociationRoleId> ckAssociationRoleId);
+
+    /// <summary>
+    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckRecordId">Construction Kit record id.</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    CkRecordGraph GetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId);
+
+    /// <summary>
+    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckEnumId">Construction Kit record id.</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    CkEnumGraph GetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId);
 
     /// <summary>
     /// Saves the cache to a stream.

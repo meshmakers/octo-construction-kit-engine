@@ -138,6 +138,40 @@ public class CkCacheService : ICkCacheService
     }
     
     /// <summary>
+    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckRecordId">Construction Kit record id.</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public CkRecordGraph GetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        return ckCache.GetCkRecord(ckRecordId);
+    }
+    
+    /// <summary>
+    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckEnumId">Construction Kit record id.</param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public CkEnumGraph GetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        return ckCache.GetCkEnum(ckEnumId);
+    }
+    
+    /// <summary>
     /// Saves the cache to a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>

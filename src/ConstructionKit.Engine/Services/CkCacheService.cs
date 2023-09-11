@@ -1,10 +1,8 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Caching;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -15,18 +13,15 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 public class CkCacheService : ICkCacheService
 {
     private readonly ILogger<CkCacheService> _logger;
-    private readonly IModelResolver _modelResolver;
     private readonly ConcurrentDictionary<string, CkCache> _ckCaches;
 
     /// <summary>
     /// Creates a new instance of the <see cref="CkCacheService"/> class.
     /// </summary>
     /// <param name="logger">Instance of the logger interface</param>
-    /// <param name="modelResolver">Interface of the model resolver that bundles the mechanisms of loading a compiled ck model to a graph including dependencies</param>
-    public CkCacheService(ILogger<CkCacheService> logger, IModelResolver modelResolver)
+    public CkCacheService(ILogger<CkCacheService> logger)
     {
         _logger = logger;
-        _modelResolver = modelResolver;
         _ckCaches = new ConcurrentDictionary<string, CkCache>();
     }
 
@@ -36,24 +31,7 @@ public class CkCacheService : ICkCacheService
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     public void CreateTenant(string tenantId)
     {
-        _ckCaches[tenantId] = new CkCache(_logger, tenantId, _modelResolver);
-    }
-
-    /// <summary>
-    /// Loads a compiled model into a tenant cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="compiledModel">The compiled construction kit model</param>
-    /// <param name="operationResult">Validation results during schema validation and model validation</param>
-    /// <exception cref="Exception"></exception>
-    public async Task LoadCompiledModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult)
-    {
-        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
-        {
-            throw CkCacheException.CkCacheNotFound(tenantId);
-        }
-        
-        await ckCache.LoadCkModelAsync(compiledModel, operationResult);
+        _ckCaches[tenantId] = new CkCache(_logger, tenantId);
     }
 
     /// <summary>

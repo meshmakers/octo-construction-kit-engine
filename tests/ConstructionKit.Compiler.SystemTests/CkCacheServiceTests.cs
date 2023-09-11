@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
@@ -24,8 +25,11 @@ public class CkCacheServiceTests : IClassFixture<TemporaryDirectoryFixture>
         {
             var operationResult = new OperationResult();
             var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
+            var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
             ckCacheService.CreateTenant("test1");
-            await ckCacheService.LoadCompiledModelAsync("test1", sampleData.sample1.Builder.Build(), operationResult);
+
+            var ckModelGraph = await modelResolver.ResolveAsync(sampleData.sample1.Builder.Build(), operationResult);
+            ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
             Assert.NotNull(ckCacheService.GetCkType("test1", "sample1/Demo1"));
         }
@@ -41,8 +45,13 @@ public class CkCacheServiceTests : IClassFixture<TemporaryDirectoryFixture>
             
             var operationResult = new OperationResult();
             var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
+            var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+
             ckCacheService.CreateTenant("test1");
-            await ckCacheService.LoadCompiledModelAsync("test1", sampleData.sample1.Builder.Build(), operationResult);
+            
+            var ckModelGraph = await modelResolver.ResolveAsync(sampleData.sample1.Builder.Build(), operationResult);
+            ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
+            
             await using (var streamWriter = File.OpenWrite(filePath))
             {
                 await ckCacheService.SaveCacheAsync("test1", streamWriter);

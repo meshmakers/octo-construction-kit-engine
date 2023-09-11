@@ -5,7 +5,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
@@ -14,24 +13,15 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
 internal class CkCache : IDisposable
 {
     private readonly ILogger _logger;
-    private readonly IModelResolver _modelResolver;
     private CkModelGraph? _modelGraph;
 
-    internal CkCache(ILogger logger, string tenantId, IModelResolver modelResolver)
+    internal CkCache(ILogger logger, string tenantId)
     {
         _logger = logger;
-        _modelResolver = modelResolver;
         TenantId = tenantId;
     }
 
     public string TenantId { get; }
-
-    public async Task LoadCkModelAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
-    {
-        _logger.LogInformation("Loading compiled model into cache for tenant {TenantId}", TenantId);
-        _modelGraph = await _modelResolver.ResolveAsync(compiledModel, operationResult);
-        _logger.LogInformation("Loading compiled model into cache for tenant {TenantId} finished", TenantId);
-    }
 
     public void LoadCkModelGraph(CkModelGraph modelGraph)
     {

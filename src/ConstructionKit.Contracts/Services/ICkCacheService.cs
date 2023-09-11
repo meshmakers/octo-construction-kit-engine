@@ -15,15 +15,6 @@ public interface ICkCacheService
     void CreateTenant(string tenantId);
 
     /// <summary>
-    /// Loads a compiled model into a tenant cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="compiledModel">The compiled construction kit model</param>
-    /// <param name="operationResult">Validation results during schema validation and model validation</param>
-    /// <exception cref="Exception"></exception>
-    Task LoadCompiledModelAsync(string tenantId, CkCompiledModelRoot compiledModel, OperationResult operationResult);
-
-    /// <summary>
     /// Loads a already analyzed model into a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>

@@ -70,13 +70,13 @@
       "key": "CkTypeIdAttributeIdNotUniqueByInheritance",
       "number": 12,
       "level": "ERROR",
-      "text": "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint."
+      "text": "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates at derived CkTypeId '{derivedCkTypeId}' the unique attribute id constraint."
     },
     {
       "key": "CkTypeIdAttributeNameNotUniqueByInheritance",
       "number": 13,
       "level": "ERROR",
-      "text": "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint."
+      "text": "CkTypeId '{ckTypeId}' defines attribute names '{attributeNames}' by inheritance that violates the unique attribute name constraint."
     },
     {
       "key": "CkTypeIdAssociationNotUnique",
@@ -87,14 +87,14 @@
     {
       "key": "CkTypeIdAttributeNameNotUnique",
       "number": 15,
-      "level": "FATALERROR",
-      "text": "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint."
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines attribute names '{attributeName}' that violates the unique attribute name constraint."
     },
     {
       "key": "CkTypeIdAttributeIdNotUnique",
       "number": 16,
-      "level": "FATALERROR",
-      "text": "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint."
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines AttributeId(s) '{ckAttributeId}' that violates the unique attribute id constraint."
     },
     {
       "key": "CkTypeIdOutAssociationNotUniqueByInheritance",
@@ -219,26 +219,26 @@
     {
       "key": "CkRecordIdAttributeNameNotUnique",
       "number": 37,
-      "level": "FATALERROR",
+      "level": "ERROR",
       "text": "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint."
     },
     {
       "key": "CkRecordIdAttributeIdNotUniqueByInheritance",
       "number": 38,
       "level": "ERROR",
-      "text": "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint."
+      "text": "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates at derived CkRecordId '{derivedCkRecordId}' the unique attribute id constraint."
     },
     {
       "key": "CkRecordIdAttributeIdNotUnique",
       "number": 39,
-      "level": "FATALERROR",
-      "text": "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint."
+      "level": "ERROR",
+      "text": "CkRecordId '{ckRecordId}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint."
     },
     {
       "key": "CkRecordIdAttributeNameNotUniqueByInheritance",
       "number": 40,
       "level": "ERROR",
-      "text": "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint."
+      "text": "CkRecordId '{ckRecordId}' defines attribute name '{attributeNames}' by inheritance that violates the unique attribute name constraint."
     },
     {
       "key": "AttributeUsesUnknownCkRecordId",
@@ -281,6 +281,24 @@
       "number": 47,
       "level": "ERROR",
       "text": "CkTypeId '{originCkTypeId}' defines for role id '{roleId}' an unknown target AttributeId '{targetCkAttributeId}' for CkType '{targetCkTypeId}'."
+    },
+    {
+      "key": "CkTypeIdAssociationRoleIdUnknown",
+      "number": 48,
+      "level": "ERROR",
+      "text": "CkTypeId '{ckTypeId}' defines AssociationRoleId '{ckAssociationId}' that is unknown. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "CkAssociationRoleAttributeNameNotUnique",
+      "number": 49,
+      "level": "ERROR",
+      "text": "CkAssociationRole '{ckAssociationRole}' defines attribute name '{attributeName}' that violates the unique attribute name constraint."
+    },
+    {
+      "key": "CkAssociationRoleAttributeIdNotUnique",
+      "number": 50,
+      "level": "ERROR",
+      "text": "CkAssociationRole '{ckAssociationRole}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint."
     }
   ]
 }

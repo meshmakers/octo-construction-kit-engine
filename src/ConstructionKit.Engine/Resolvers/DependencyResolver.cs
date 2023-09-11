@@ -17,18 +17,16 @@ internal class DependencyResolver : IDependencyResolver
         _ckModelRepositoryManager = ckModelRepositoryManager;
     }
 
-    public async Task<CkAggregatedModelElements> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, OperationResult operationResult)
+    public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, OperationResult operationResult)
     {
-        CkAggregatedModelElements aggregatedModelElements = new();
-
         _logger.LogInformation("Starting resolving dependencies");
-        await Resolve(dependencies, aggregatedModelElements, operationResult);
+        await Resolve(dependencies, ckModelGraph, operationResult);
         _logger.LogInformation("Resolving dependencies completed");
 
-        return aggregatedModelElements;
+        return ckModelGraph;
     }
 
-    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkAggregatedModelElements aggregatedModelElements, OperationResult operationResult)
+    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph, OperationResult operationResult)
     {
         List<CkModelId> dependencies = new(ckRootDependencies);
 
@@ -48,7 +46,7 @@ internal class DependencyResolver : IDependencyResolver
             {
                 foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)      
                 {
-                    if (!aggregatedModelElements.CkModelDependencies.ContainsKey(ckChildDependency))
+                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency))
                     {
                         _logger.LogInformation("Adding additional dependency '{CkTypeId}'", ckChildDependency);
                         dependencies.Add(ckChildDependency);
@@ -57,7 +55,7 @@ internal class DependencyResolver : IDependencyResolver
             }
             
             _logger.LogInformation("Adding resolved dependency '{CkTypeId}' to dependency graph", ckDependencyRootModel.ModelId);
-            aggregatedModelElements.AppendModel(ckDependencyRootModel);
+            ckModelGraph.AppendModel(ckDependencyRootModel);
         }
     }
 }

@@ -5,6 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Caching;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
@@ -13,15 +14,18 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 /// </summary>
 public class CkCacheService : ICkCacheService
 {
+    private readonly ILogger<CkCacheService> _logger;
     private readonly IModelResolver _modelResolver;
     private readonly ConcurrentDictionary<string, CkCache> _ckCaches;
 
     /// <summary>
     /// Creates a new instance of the <see cref="CkCacheService"/> class.
     /// </summary>
-    /// <param name="modelResolver"></param>
-    public CkCacheService(IModelResolver modelResolver)
+    /// <param name="logger">Instance of the logger interface</param>
+    /// <param name="modelResolver">Interface of the model resolver that bundles the mechanisms of loading a compiled ck model to a graph including dependencies</param>
+    public CkCacheService(ILogger<CkCacheService> logger, IModelResolver modelResolver)
     {
+        _logger = logger;
         _modelResolver = modelResolver;
         _ckCaches = new ConcurrentDictionary<string, CkCache>();
     }
@@ -32,7 +36,7 @@ public class CkCacheService : ICkCacheService
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     public void CreateTenant(string tenantId)
     {
-        _ckCaches[tenantId] = new CkCache(tenantId, _modelResolver);
+        _ckCaches[tenantId] = new CkCache(_logger, tenantId, _modelResolver);
     }
 
     /// <summary>

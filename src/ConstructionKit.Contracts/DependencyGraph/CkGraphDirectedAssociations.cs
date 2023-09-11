@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
@@ -7,34 +8,44 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// </summary>
 public class CkGraphDirectedAssociations
 {
+
     /// <summary>
     /// Creates a new instance of <see cref="CkGraphDirectedAssociations"/>
     /// </summary>
-    public CkGraphDirectedAssociations()
+    public CkGraphDirectedAssociations(ICollection<CkTypeAssociationDto> definedAssociations)
     {
-        In = new CkGraphAssociations();
-        Out = new CkGraphAssociations();
+        DefinedAssociations = definedAssociations;
+        In = new CkGraphAssociationInheritance();
+        Out = new CkGraphAssociationInheritance();
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="CkGraphDirectedAssociations"/>
     /// </summary>
+    /// <param name="definedAssociations"></param>
     /// <param name="in"></param>
     /// <param name="out"></param>
     [JsonConstructor]
-    public CkGraphDirectedAssociations(CkGraphAssociations @in, CkGraphAssociations @out)
+    public CkGraphDirectedAssociations(ICollection<CkTypeAssociationDto> definedAssociations , CkGraphAssociationInheritance @in, CkGraphAssociationInheritance @out)
     {
+        DefinedAssociations = definedAssociations;
         In = @in;
         Out = @out;
     }
+        
+    /// <summary>
+    /// Returns the defined associations of the type
+    /// </summary>
+    public ICollection<CkTypeAssociationDto> DefinedAssociations { get; }
     
     /// <summary>
     /// Returns the inbound associations
     /// </summary>
-    public CkGraphAssociations In { get;  }
+    public CkGraphAssociationInheritance In { get;  }
     
     /// <summary>
     /// Returns the outbound associations
     /// </summary>
-    public CkGraphAssociations Out { get;  } 
+    public CkGraphAssociationInheritance Out { get;  } 
+    
 }

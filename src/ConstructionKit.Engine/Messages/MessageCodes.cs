@@ -64,11 +64,11 @@ internal static class MessageCodes
     internal static CompilerMessage UnknownCkTypeIdForInheritance(object ckTypeId) =>
         GetMessage("UnknownCkTypeIdForInheritance", ckTypeId);
 
-    internal static CompilerMessage CkTypeIdAttributeIdNotUniqueByInheritance(object ckTypeId, object ckAttributeId) =>
-        GetMessage("CkTypeIdAttributeIdNotUniqueByInheritance", ckTypeId, ckAttributeId);
+    internal static CompilerMessage CkTypeIdAttributeIdNotUniqueByInheritance(object ckTypeId, object ckAttributeId, object derivedCkTypeId) =>
+        GetMessage("CkTypeIdAttributeIdNotUniqueByInheritance", ckTypeId, ckAttributeId, derivedCkTypeId);
 
-    internal static CompilerMessage CkTypeIdAttributeNameNotUniqueByInheritance(object ckTypeId, object attributeName) =>
-        GetMessage("CkTypeIdAttributeNameNotUniqueByInheritance", ckTypeId, attributeName);
+    internal static CompilerMessage CkTypeIdAttributeNameNotUniqueByInheritance(object ckTypeId, object attributeNames) =>
+        GetMessage("CkTypeIdAttributeNameNotUniqueByInheritance", ckTypeId, attributeNames);
 
     internal static CompilerMessage CkTypeIdAssociationNotUnique(object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
         GetMessage("CkTypeIdAssociationNotUnique", ckTypeId, ckAssociationId, targetCkTypeId);
@@ -142,14 +142,14 @@ internal static class MessageCodes
     internal static CompilerMessage CkRecordIdAttributeNameNotUnique(object ckRecordId, object attributeName) =>
         GetMessage("CkRecordIdAttributeNameNotUnique", ckRecordId, attributeName);
 
-    internal static CompilerMessage CkRecordIdAttributeIdNotUniqueByInheritance(object ckRecordId, object ckAttributeId) =>
-        GetMessage("CkRecordIdAttributeIdNotUniqueByInheritance", ckRecordId, ckAttributeId);
+    internal static CompilerMessage CkRecordIdAttributeIdNotUniqueByInheritance(object ckRecordId, object ckAttributeId, object derivedCkRecordId) =>
+        GetMessage("CkRecordIdAttributeIdNotUniqueByInheritance", ckRecordId, ckAttributeId, derivedCkRecordId);
 
     internal static CompilerMessage CkRecordIdAttributeIdNotUnique(object ckRecordId, object ckAttributeId) =>
         GetMessage("CkRecordIdAttributeIdNotUnique", ckRecordId, ckAttributeId);
 
-    internal static CompilerMessage CkRecordIdAttributeNameNotUniqueByInheritance(object ckRecordId, object attributeName) =>
-        GetMessage("CkRecordIdAttributeNameNotUniqueByInheritance", ckRecordId, attributeName);
+    internal static CompilerMessage CkRecordIdAttributeNameNotUniqueByInheritance(object ckRecordId, object attributeNames) =>
+        GetMessage("CkRecordIdAttributeNameNotUniqueByInheritance", ckRecordId, attributeNames);
 
     internal static CompilerMessage AttributeUsesUnknownCkRecordId(object ckAttributeId, object ckRecordId) =>
         GetMessage("AttributeUsesUnknownCkRecordId", ckAttributeId, ckRecordId);
@@ -171,6 +171,15 @@ internal static class MessageCodes
 
     internal static CompilerMessage CkTypeIdUnknownTargetAttributeIdForAssociation(object originCkTypeId, object roleId, object targetCkAttributeId, object targetCkTypeId) =>
         GetMessage("CkTypeIdUnknownTargetAttributeIdForAssociation", originCkTypeId, roleId, targetCkAttributeId, targetCkTypeId);
+
+    internal static CompilerMessage CkTypeIdAssociationRoleIdUnknown(object ckTypeId, object ckAssociationId) =>
+        GetMessage("CkTypeIdAssociationRoleIdUnknown", ckTypeId, ckAssociationId);
+
+    internal static CompilerMessage CkAssociationRoleAttributeNameNotUnique(object ckAssociationRole, object attributeName) =>
+        GetMessage("CkAssociationRoleAttributeNameNotUnique", ckAssociationRole, attributeName);
+
+    internal static CompilerMessage CkAssociationRoleAttributeIdNotUnique(object ckAssociationRole, object ckAttributeId) =>
+        GetMessage("CkAssociationRoleAttributeIdNotUnique", ckAssociationRole, ckAttributeId);
 
     private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
     {
@@ -243,14 +252,14 @@ internal static class MessageCodes
         {
             "CkTypeIdAttributeIdNotUniqueByInheritance",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 12, "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint.",
-                 new [] {"ckTypeId", "ckAttributeId"})
+                 12, "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates at derived CkTypeId '{derivedCkTypeId}' the unique attribute id constraint.",
+                 new [] {"ckTypeId", "ckAttributeId", "derivedCkTypeId"})
         },
         {
             "CkTypeIdAttributeNameNotUniqueByInheritance",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 13, "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint.",
-                 new [] {"ckTypeId", "attributeName"})
+                 13, "CkTypeId '{ckTypeId}' defines attribute names '{attributeNames}' by inheritance that violates the unique attribute name constraint.",
+                 new [] {"ckTypeId", "attributeNames"})
         },
         {
             "CkTypeIdAssociationNotUnique",
@@ -260,14 +269,14 @@ internal static class MessageCodes
         },
         {
             "CkTypeIdAttributeNameNotUnique",
-             new CompilerMessageTemplate(MessageLevel.FatalError,
-                 15, "CkTypeId '{ckTypeId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 15, "CkTypeId '{ckTypeId}' defines attribute names '{attributeName}' that violates the unique attribute name constraint.",
                  new [] {"ckTypeId", "attributeName"})
         },
         {
             "CkTypeIdAttributeIdNotUnique",
-             new CompilerMessageTemplate(MessageLevel.FatalError,
-                 16, "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint.",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 16, "CkTypeId '{ckTypeId}' defines AttributeId(s) '{ckAttributeId}' that violates the unique attribute id constraint.",
                  new [] {"ckTypeId", "ckAttributeId"})
         },
         {
@@ -392,27 +401,27 @@ internal static class MessageCodes
         },
         {
             "CkRecordIdAttributeNameNotUnique",
-             new CompilerMessageTemplate(MessageLevel.FatalError,
+             new CompilerMessageTemplate(MessageLevel.Error,
                  37, "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
                  new [] {"ckRecordId", "attributeName"})
         },
         {
             "CkRecordIdAttributeIdNotUniqueByInheritance",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 38, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' by inheritance that violates the unique attribute id constraint.",
-                 new [] {"ckRecordId", "ckAttributeId"})
+                 38, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates at derived CkRecordId '{derivedCkRecordId}' the unique attribute id constraint.",
+                 new [] {"ckRecordId", "ckAttributeId", "derivedCkRecordId"})
         },
         {
             "CkRecordIdAttributeIdNotUnique",
-             new CompilerMessageTemplate(MessageLevel.FatalError,
-                 39, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates the unique attribute id constraint.",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 39, "CkRecordId '{ckRecordId}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint.",
                  new [] {"ckRecordId", "ckAttributeId"})
         },
         {
             "CkRecordIdAttributeNameNotUniqueByInheritance",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 40, "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' by inheritance that violates the unique attribute name constraint.",
-                 new [] {"ckRecordId", "attributeName"})
+                 40, "CkRecordId '{ckRecordId}' defines attribute name '{attributeNames}' by inheritance that violates the unique attribute name constraint.",
+                 new [] {"ckRecordId", "attributeNames"})
         },
         {
             "AttributeUsesUnknownCkRecordId",
@@ -455,6 +464,24 @@ internal static class MessageCodes
              new CompilerMessageTemplate(MessageLevel.Error,
                  47, "CkTypeId '{originCkTypeId}' defines for role id '{roleId}' an unknown target AttributeId '{targetCkAttributeId}' for CkType '{targetCkTypeId}'.",
                  new [] {"originCkTypeId", "roleId", "targetCkAttributeId", "targetCkTypeId"})
+        },
+        {
+            "CkTypeIdAssociationRoleIdUnknown",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 48, "CkTypeId '{ckTypeId}' defines AssociationRoleId '{ckAssociationId}' that is unknown. This may happen because a dependency to another construction kit model is missing.",
+                 new [] {"ckTypeId", "ckAssociationId"})
+        },
+        {
+            "CkAssociationRoleAttributeNameNotUnique",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 49, "CkAssociationRole '{ckAssociationRole}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
+                 new [] {"ckAssociationRole", "attributeName"})
+        },
+        {
+            "CkAssociationRoleAttributeIdNotUnique",
+             new CompilerMessageTemplate(MessageLevel.Error,
+                 50, "CkAssociationRole '{ckAssociationRole}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint.",
+                 new [] {"ckAssociationRole", "ckAttributeId"})
         },
     };
 }

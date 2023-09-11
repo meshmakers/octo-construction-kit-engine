@@ -13,6 +13,7 @@ public class CkModelGraph
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
     private readonly IDictionary<CkId<CkRecordId>, CkRecordGraph> _records;
     private readonly IDictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
+    private readonly IDictionary<CkModelId, ICollection<CkModelId>> _dependencies;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkModelGraph"/>.
@@ -24,11 +25,13 @@ public class CkModelGraph
         _associationRoles = new Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
         _records = new Dictionary<CkId<CkRecordId>, CkRecordGraph>();
         _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
+        _dependencies = new Dictionary<CkModelId, ICollection<CkModelId>>();
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
+        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
     }
 
     /// <summary>
@@ -42,11 +45,14 @@ public class CkModelGraph
         _associationRoles = ckCacheRoot.AssociationRoles.ToDictionary(k => k.CkRoleId, v=> v);
         _records = ckCacheRoot.Records.ToDictionary(k => k.CkRecordId, v=> v);
         _enums = ckCacheRoot.Enums.ToDictionary(k => k.CkEnumId, v=> v);
+        _dependencies = ckCacheRoot.Dependencies.ToDictionary(k => k.Key, v=> v.Value);
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
+        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
+
     }
     
     /// <summary>
@@ -73,6 +79,11 @@ public class CkModelGraph
     /// Returns the enums of the model.
     /// </summary>
     public IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums { get; }
+    
+    /// <summary>
+    /// Returns a list of model dependencies.
+    /// </summary>
+    public IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; }
     
     /// <summary>
     /// Returns the root object of the compiled version of a CK model.
@@ -121,8 +132,9 @@ public class CkModelGraph
             return ckTypeGraph;
         }
         
-        ckTypeGraph = new(ckTypeId, ckTypeDto.IsAbstract, ckTypeDto.IsFinal);
+        ckTypeGraph = new(ckTypeId, ckTypeDto);
         _types.Add(ckTypeId, ckTypeGraph);
+        
         return ckTypeGraph;
     }
 
@@ -132,7 +144,7 @@ public class CkModelGraph
     /// <param name="ckAssociationId"></param>
     /// <param name="ckAssociationRole"></param>
     /// <returns></returns>
-    internal CkAssociationRoleGraph GetOrCreateAssociationRoles(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
+    internal CkAssociationRoleGraph GetOrCreateAssociationRole(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
     {
         if (_associationRoles.TryGetValue(ckAssociationId, out var ckAssociationRoleGraph))
         {
@@ -157,7 +169,7 @@ public class CkModelGraph
             return ckRecordGraph;
         }
         
-        ckRecordGraph = new(ckRecordId, ckRecordDto.IsAbstract, ckRecordDto.IsFinal);
+        ckRecordGraph = new(ckRecordId, ckRecordDto);
         _records.Add(ckRecordId, ckRecordGraph);
         return ckRecordGraph;
     }
@@ -178,5 +190,54 @@ public class CkModelGraph
         ckEnumGraph = new(ckEnumId, ckEnumDto);
         _enums.Add(ckEnumId, ckEnumGraph);
         return ckEnumGraph;
+    }
+    
+    /// <summary>
+    /// Appends the model elements of the given <paramref name="ckCompiledModelRoot"/> to this instance.
+    /// </summary>
+    /// <param name="ckCompiledModelRoot">The compiled model root to append</param>
+    public void AppendModel(CkCompiledModelRoot ckCompiledModelRoot)
+    {
+        _dependencies.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Dependencies ?? new List<CkModelId>());
+        
+        if (ckCompiledModelRoot.Attributes != null)
+        {
+            foreach (var ckAttribute in ckCompiledModelRoot.Attributes)
+            {
+                GetOrCreateAttribute(new CkId<CkAttributeId>(ckCompiledModelRoot.ModelId, ckAttribute.AttributeId), ckAttribute);
+            }
+        }
+        
+        if (ckCompiledModelRoot.AssociationRoles != null)
+        {
+            foreach (var ckAssociationRole in ckCompiledModelRoot.AssociationRoles)
+            {
+                GetOrCreateAssociationRole(new CkId<CkAssociationRoleId>(ckCompiledModelRoot.ModelId, ckAssociationRole.AssociationRoleId), ckAssociationRole);
+            }
+        }
+        
+        if (ckCompiledModelRoot.Types != null)
+        {
+            foreach (var ckTypeDto in ckCompiledModelRoot.Types)
+            {
+                GetOrCreateType(new CkId<CkTypeId>(ckCompiledModelRoot.ModelId, ckTypeDto.TypeId), ckTypeDto);
+            }
+        }
+                
+        if (ckCompiledModelRoot.Records != null)
+        {
+            foreach (var ckRecordDto in ckCompiledModelRoot.Records)
+            {
+                GetOrCreateRecord(new CkId<CkRecordId>(ckCompiledModelRoot.ModelId, ckRecordDto.RecordId), ckRecordDto);
+            }
+        }
+        
+        if (ckCompiledModelRoot.Enums != null)
+        {
+            foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
+            {
+                GetOrCreateEnum(new CkId<CkEnumId>(ckCompiledModelRoot.ModelId, ckEnumDto.EnumId), ckEnumDto);
+            }
+        }
     }
 }

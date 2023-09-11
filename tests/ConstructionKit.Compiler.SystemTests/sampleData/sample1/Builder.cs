@@ -17,7 +17,13 @@ public class Builder
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
-                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
+                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related",
+                    Attributes = new List<CkTypeAttributeDto>
+                    {
+                        new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
+                        new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
+                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
+                    }
                 }
             },
             Attributes = new List<CkAttributeDto>
@@ -56,6 +62,18 @@ public class Builder
               {
                   AttributeId = "attribute7",
                   ValueType = AttributeValueTypesDto.String,
+              },
+              new()
+              {
+                  AttributeId = "Record1",
+                  ValueType = AttributeValueTypesDto.Record,
+                  ValueCkRecordId = "sample1/Record1"
+              },
+              new()
+              {
+                  AttributeId = "Enum1",
+                  ValueType = AttributeValueTypesDto.Enum,
+                  ValueCkEnumId = "sample1/Enum1"
               }
             },
             Types = new List<CkTypeDto>
@@ -79,7 +97,10 @@ public class Builder
                     {
                         new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
                         new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
-                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
+                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" },
+                        new() { CkAttributeId = "sample1/attribute7", AttributeName = "g" },
+                        new() { CkAttributeId = "sample1/Record1", AttributeName = "h" },
+                        new() { CkAttributeId = "sample1/Enum1", AttributeName = "i" }
                     },
                     Associations = new List<CkTypeAssociationDto>
                     {
@@ -98,6 +119,32 @@ public class Builder
                     
                 }
             },
+            Records = new List<CkRecordDto>
+            {
+                new()
+                {
+                    RecordId = "Record1",
+                    Attributes = new List<CkTypeAttributeDto>
+                    {
+                        new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
+                        new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
+                        new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
+                    }
+                }
+            },
+            Enums = new List<CkEnumDto>
+            {
+                new()
+                {
+                    EnumId = "Enum1",
+                    Values = new List<CkSelectionValueDto>
+                    {
+                        new() { Key = 0, Name = "Value1" },
+                        new() { Key = 1, Name = "Value2" },
+                        new() { Key = 2, Name = "Value3" },
+                    }
+                }
+            }
         };
     }
 }

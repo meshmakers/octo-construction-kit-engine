@@ -13,43 +13,37 @@ public class ReferenceResolver : IReferenceResolver
     /// <summary>
     /// Resolves and checks cross reference within the model graph.
     /// </summary>
-    /// <param name="aggregatedModelElements"></param>
     /// <param name="modelGraph"></param>
     /// <param name="operationResult"></param>
-    public void Resolve(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph,
+    public void Resolve(CkModelGraph modelGraph,
         OperationResult operationResult)
     {
-        CheckCkAttributes(aggregatedModelElements, operationResult);
+        CheckCkAttributes(modelGraph, operationResult);
 
-        CheckCkRecords(aggregatedModelElements, modelGraph, operationResult);
+        CheckCkRecords(modelGraph, operationResult);
 
-        CheckCkTypes(aggregatedModelElements, modelGraph, operationResult);
+        CheckCkTypes(modelGraph, operationResult);
     }
 
-    private static void CheckCkRecords(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph,
+    private static void CheckCkRecords(CkModelGraph modelGraph,
         OperationResult operationResult)
     {
-        foreach (var ckRecordKeyValue in aggregatedModelElements.CkRecords)
+        foreach (var ckRecordKeyValue in modelGraph.Records)
         {
             // Check 1.
-            if (ckRecordKeyValue.Value.Attributes != null)
+            foreach (var ckTypeAttribute in ckRecordKeyValue.Value.DefinedAttributes)
             {
-                foreach (var ckTypeAttribute in ckRecordKeyValue.Value.Attributes)
+                if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
-                    if (!aggregatedModelElements.CkAttributes.ContainsKey(ckTypeAttribute.CkAttributeId) &&
-                        !modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
-                    {
-                        operationResult.AddMessage(
-                            MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckRecordKeyValue.Key, ckTypeAttribute.CkAttributeId));
-                    }
+                    operationResult.AddMessage(
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckTypeAttribute.CkAttributeId, ckRecordKeyValue.Key));
                 }
             }
 
             // Check 2.
             if (ckRecordKeyValue.Value.DerivedFromCkRecordId != null)
             {
-                if (!aggregatedModelElements.CkRecords.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId.Value) &&
-                    !modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId.Value))
+                if (!modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId.Value))
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownDerivedFromCkRecordIdInSource(ckRecordKeyValue.Value.DerivedFromCkRecordId,
@@ -59,30 +53,25 @@ public class ReferenceResolver : IReferenceResolver
         }
     }
 
-    private static void CheckCkTypes(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph,
+    private static void CheckCkTypes(CkModelGraph modelGraph,
         OperationResult operationResult)
     {
-        foreach (var ckTypeKeyValue in aggregatedModelElements.CkTypes)
+        foreach (var ckTypeKeyValue in modelGraph.Types)
         {
             // Check 1.
-            if (ckTypeKeyValue.Value.Attributes != null)
+            foreach (var ckTypeAttribute in ckTypeKeyValue.Value.DefinedAttributes)
             {
-                foreach (var ckTypeAttribute in ckTypeKeyValue.Value.Attributes)
+                if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
-                    if (!aggregatedModelElements.CkAttributes.ContainsKey(ckTypeAttribute.CkAttributeId) &&
-                        !modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
-                    {
-                        operationResult.AddMessage(
-                            MessageCodes.UnknownAttributeOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
-                    }
+                    operationResult.AddMessage(
+                        MessageCodes.UnknownAttributeOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
                 }
             }
 
             // Check 2.
             if (ckTypeKeyValue.Value.DerivedFromCkTypeId != null)
             {
-                if (!aggregatedModelElements.CkTypes.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId.Value) &&
-                    !modelGraph.Types.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId.Value))
+                if (!modelGraph.Types.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId.Value))
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownCkDerivedIdOfCkTypeIdInSource(ckTypeKeyValue.Value.DerivedFromCkTypeId,
@@ -90,37 +79,32 @@ public class ReferenceResolver : IReferenceResolver
                 }
             }
 
-            if (ckTypeKeyValue.Value.Associations != null)
+            foreach (var ckTypeAssociation in ckTypeKeyValue.Value.Associations.DefinedAssociations)
             {
-                foreach (var ckTypeAssociation in ckTypeKeyValue.Value.Associations)
+                // Check 3.
+                if (!modelGraph.AssociationRoles.ContainsKey(ckTypeAssociation.CkRoleId))
                 {
-                    // Check 3.
-                    if (!aggregatedModelElements.CkAssociationRoles.ContainsKey(ckTypeAssociation.CkRoleId) &&
-                        !modelGraph.AssociationRoles.ContainsKey(ckTypeAssociation.CkRoleId))
-                    {
-                        operationResult.AddMessage(
-                            MessageCodes.UnknownAssociationRoleOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.CkRoleId));
-                    }
+                    operationResult.AddMessage(
+                        MessageCodes.UnknownAssociationRoleOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.CkRoleId));
+                }
 
-                    // Check 4.
-                    if (!aggregatedModelElements.CkTypes.ContainsKey(ckTypeAssociation.TargetCkTypeId) &&
-                        !modelGraph.Types.ContainsKey(ckTypeAssociation.TargetCkTypeId))
-                    {
-                        operationResult.AddMessage(
-                            MessageCodes.UnknownTargetCkTypeIdOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.TargetCkTypeId));
-                    }
+                // Check 4.
+                if (!modelGraph.Types.ContainsKey(ckTypeAssociation.TargetCkTypeId))
+                {
+                    operationResult.AddMessage(
+                        MessageCodes.UnknownTargetCkTypeIdOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.TargetCkTypeId));
                 }
             }
         }
     }
 
-    private static void CheckCkAttributes(CkAggregatedModelElements aggregatedModelElements, OperationResult operationResult)
+    private static void CheckCkAttributes(CkModelGraph ckModelGraph, OperationResult operationResult)
     {
-        foreach (var ckAttribute in aggregatedModelElements.CkAttributes)
+        foreach (var ckAttribute in ckModelGraph.Attributes)
         {
             if (ckAttribute.Value.ValueType == AttributeValueTypesDto.Record
                 && ckAttribute.Value.ValueCkRecordId != null
-                && !aggregatedModelElements.CkRecords.ContainsKey(ckAttribute.Value.ValueCkRecordId.Value))
+                && !ckModelGraph.Records.ContainsKey(ckAttribute.Value.ValueCkRecordId.Value))
             {
                 operationResult.AddMessage(
                     MessageCodes.AttributeUsesUnknownCkRecordId(ckAttribute.Key,

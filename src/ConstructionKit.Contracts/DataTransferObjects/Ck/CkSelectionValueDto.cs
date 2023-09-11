@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using YamlDotNet.Serialization;
 
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -20,4 +21,10 @@ public class CkSelectionValueDto
     /// </summary>
     [JsonRequired] 
     public string Name { get; set; } = null!;
+    
+    /// <summary>
+    /// A optional description of the enum value
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? Description { get; set; }
 }

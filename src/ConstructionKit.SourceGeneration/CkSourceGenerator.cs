@@ -117,6 +117,18 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
             }
         }
+                
+        if (ckCompiledModelRoot.Enums != null)
+        {
+            foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
+            {
+                var code = CkEnumCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckEnumDto, tenantId, ckCacheService);
+                if (!String.IsNullOrWhiteSpace(code))
+                {
+                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.EnumId}.g.cs", code);
+                }
+            }
+        }
         
         var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
             ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);

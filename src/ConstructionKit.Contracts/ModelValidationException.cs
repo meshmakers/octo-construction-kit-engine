@@ -58,17 +58,6 @@ public class ModelValidationException : CkModelException
         return new ModelValidationException($"Validation of Construction Kit Model failed:" + Environment.NewLine + error);
     }
 
-    internal static Exception DuplicateAttributeIdsInCkType(CkId<CkTypeId> ckTypeId, IEnumerable<CkId<CkAttributeId>> duplicateAttributeIds)
-    {
-        var attributeIds = string.Join(", ", duplicateAttributeIds);
-        return new ModelValidationException($"CkTypeId '{ckTypeId}' has duplicate attribute IDs: '{attributeIds}'");
-    }
-
-    internal static Exception DuplicateAttributeNamesInCkType(CkId<CkTypeId> ckTypeId, IEnumerable<string> select)
-    {
-        var attributeNames = string.Join(", ", select);
-        return new ModelValidationException($"CkTypeId '{ckTypeId}' has duplicate attribute names: '{attributeNames}'");
-    }
 
     internal static Exception CkTypeIdUsingSystemReservedAttributeNames(CkId<CkTypeId> ckTypeId, IEnumerable<string> systemReservedAttributeNames)
     {

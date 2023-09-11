@@ -118,7 +118,7 @@ public class CompilerService : ICompilerService
         {
             RecordId = "SampleRecord",
             Attributes =
-                new List<CkTypeAttributeDto> { new() { CkAttributeId = "Sample1/SampleAttribute", AttributeName = "MyAttribute" } },
+                new List<CkTypeAttributeDto> { new() { CkAttributeId = "Sample1/SampleAttribute1", AttributeName = "MyAttribute" } },
         };
 #if NETSTANDARD2_0
         using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));

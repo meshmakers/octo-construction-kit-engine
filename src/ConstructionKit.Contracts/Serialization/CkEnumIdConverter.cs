@@ -17,7 +17,7 @@ public class CkEnumIdConverter : JsonConverter<CkEnumId>, IYamlTypeConverter
     {
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
-            : throw ModelParseException.UnexpectedToken(nameof(CkEnumId), reader.TokenType);
+            : throw ModelParseException.UnexpectedToken(nameof(CkEnumId), reader.TokenType, nameof(JsonTokenType.String));
         return !string.IsNullOrEmpty(str) && str != null ? new CkEnumId(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkEnumId));
     }
 

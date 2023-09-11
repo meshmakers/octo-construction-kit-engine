@@ -22,11 +22,11 @@ public class ModelParseException : CkModelException
     {
     }
 
-    internal static Exception UnexpectedToken(string elementName, JsonTokenType readerTokenType)
+    internal static Exception UnexpectedToken(string elementName, JsonTokenType readerTokenType, string expectedString)
     {
-        return new ModelParseException($"Unexpected token parsing '{elementName}'. Expected String, got '{(object)readerTokenType}'.");
+        return new ModelParseException($"Unexpected token parsing '{elementName}'. Expected '{expectedString}', got '{(object)readerTokenType}'.");
     }
-
+    
     internal static Exception ValueCannotBeEmpty(string elementName)
     {
         return new ModelParseException($"Value cannot be null or empty for element '{elementName}'.");

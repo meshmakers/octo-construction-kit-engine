@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample1;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_assocs_unknownRoleId_fail;
 
 public class Builder
 {
@@ -17,13 +17,7 @@ public class Builder
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
-                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
-                        new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
-                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
-                    }
+                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
                 }
             },
             Attributes = new List<CkAttributeDto>
@@ -62,12 +56,6 @@ public class Builder
               {
                   AttributeId = "attribute7",
                   ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "Record1",
-                  ValueType = AttributeValueTypesDto.Record,
-                  ValueCkRecordId = "sample1/Record1"
               }
             },
             Types = new List<CkTypeDto>
@@ -91,12 +79,11 @@ public class Builder
                     {
                         new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
                         new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
-                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" },
-                        new() { CkAttributeId = "sample1/attribute7", AttributeName = "g" }
+                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
                     },
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" },
+                        new() { CkRoleId = "System/ParentChildDoesNotExist", TargetCkTypeId = "sample1/Demo1" },
                     }
                     
                 },
@@ -111,19 +98,7 @@ public class Builder
                     
                 }
             },
-            Records = new List<CkRecordDto>
-            {
-                new()
-                {
-                    RecordId = "Record1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
-                    }
-                }
-            }
+            Records = new List<CkRecordDto>()
         };
     }
 }

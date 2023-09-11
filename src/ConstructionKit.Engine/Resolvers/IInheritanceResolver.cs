@@ -11,9 +11,8 @@ public interface IInheritanceResolver
     /// <summary>
     /// Resolves the inheritance of the given model elements
     /// </summary>
-    /// <param name="aggregatedModelElements"></param>
     /// <param name="modelGraph"></param>
     /// <param name="operationResult"></param>
     /// <returns></returns>
-    CkModelGraph Resolve(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph, OperationResult operationResult);
+    CkModelGraph Resolve(CkModelGraph modelGraph, OperationResult operationResult);
 }

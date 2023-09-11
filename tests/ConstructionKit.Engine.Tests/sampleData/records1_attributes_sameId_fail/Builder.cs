@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_attributes_sameIdAtInheritance_fail;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.records1_attributes_sameId_fail;
 
 public class Builder
 {
@@ -10,7 +10,7 @@ public class Builder
     {
         return new CkCompiledModelRoot
         {
-            ModelId = new CkModelId("sample1", "1.0.0"),
+            ModelId = new CkModelId("TestRecords", "1.0.0"),
             Dependencies = new List<CkModelId> { new("System", "1.0.0") },
             AssociationRoles = new List<CkAssociationRoleDto>
             {
@@ -45,18 +45,32 @@ public class Builder
               new()
               {
                   AttributeId = "attribute5",
-                  ValueType = AttributeValueTypesDto.String,
+                  ValueType = AttributeValueTypesDto.Int,
               },
               new()
               {
                   AttributeId = "attribute6",
-                  ValueType = AttributeValueTypesDto.String,
+                  ValueType = AttributeValueTypesDto.Double,
               },
               new()
               {
-                  AttributeId = "attribute7",
-                  ValueType = AttributeValueTypesDto.String,
+                  AttributeId = "Record1",
+                  ValueType = AttributeValueTypesDto.Record,
+                  ValueCkRecordId = "TestRecords/Record1"
               }
+            },
+            Records = new List<CkRecordDto>
+            {
+                new()
+                {
+                    RecordId = "Record1",
+                    Attributes = new List<CkTypeAttributeDto>
+                    {
+                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "a" },
+                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "b" },
+                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" }
+                    }
+                }
             },
             Types = new List<CkTypeDto>
             {
@@ -66,38 +80,14 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes = new List<CkTypeAttributeDto>
                     {
-                        new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" } // attribute defined here
+                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "a" },
+                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "b" },
+                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" },
+                        new() { CkAttributeId = "TestRecords/Record1", AttributeName = "record" }
+
                     }
-                },
-                new()
-                {
-                    TypeId = "Demo2",
-                    DerivedFromCkTypeId = "sample1/Demo1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "sample1/attribute3", AttributeName = "d" }, // error here
-                        new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
-                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
-                    },
-                    Associations = new List<CkTypeAssociationDto>
-                    {
-                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" },
-                    }
-                    
-                },
-                new()
-                {
-                    TypeId = "Demo3",
-                    DerivedFromCkTypeId = "sample1/Demo2",
-                    Associations = new List<CkTypeAssociationDto>
-                    {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "System/Entity" },
-                    }
-                    
                 }
-            },
+            }
         };
     }
 }

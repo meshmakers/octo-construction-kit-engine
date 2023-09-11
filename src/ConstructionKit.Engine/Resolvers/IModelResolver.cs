@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-/// Interface for resolving the content of a compiled model.
+/// Interface for resolving the content of a compiled model including resolving dependencies.
 /// </summary>
 public interface IModelResolver
 {

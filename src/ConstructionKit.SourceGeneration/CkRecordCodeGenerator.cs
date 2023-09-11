@@ -1,6 +1,5 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -49,7 +48,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();
         sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Generated from construction kit type {ckRecord.RecordId.FullName}");
+        sb.AppendLine($"/// Generated from construction kit record {ckRecord.RecordId.FullName}");
         sb.AppendLine("/// </summary>");
         sb.AppendLine($"public partial class Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
         sb.AppendLine("{");

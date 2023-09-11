@@ -39,4 +39,10 @@ public class CkCacheRoot
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     public List<CkEnumGraph> Enums { get; set; } = new();
+    
+    /// <summary>
+    /// Returns a list of model dependencies of the graph
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    public Dictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; set; } = new();
 }

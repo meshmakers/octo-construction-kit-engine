@@ -12,7 +12,8 @@ public interface IDependencyResolver
     /// Resolves the dependencies of the given construction kit model ids
     /// </summary>
     /// <param name="dependencies"></param>
+    /// <param name="ckModelGraph"></param>
     /// <param name="operationResult"></param>
     /// <returns></returns>
-    Task<CkAggregatedModelElements> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, OperationResult operationResult);
+    Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,  OperationResult operationResult);
 }

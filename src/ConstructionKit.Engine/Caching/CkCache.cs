@@ -6,17 +6,20 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
 
 [DebuggerDisplay("{" + nameof(TenantId) + "}")]
 internal class CkCache : IDisposable
 {
+    private readonly ILogger _logger;
     private readonly IModelResolver _modelResolver;
     private CkModelGraph? _modelGraph;
-    
-    internal CkCache(string tenantId, IModelResolver modelResolver)
+
+    internal CkCache(ILogger logger, string tenantId, IModelResolver modelResolver)
     {
+        _logger = logger;
         _modelResolver = modelResolver;
         TenantId = tenantId;
     }
@@ -25,12 +28,16 @@ internal class CkCache : IDisposable
 
     public async Task LoadCkModelAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
+        _logger.LogInformation("Loading compiled model into cache for tenant {TenantId}", TenantId);
         _modelGraph = await _modelResolver.ResolveAsync(compiledModel, operationResult);
+        _logger.LogInformation("Loading compiled model into cache for tenant {TenantId} finished", TenantId);
     }
-    
+
     public void LoadCkModelGraph(CkModelGraph modelGraph)
     {
+        _logger.LogInformation("Loading model graph into cache for tenant {TenantId}", TenantId);
         _modelGraph = modelGraph;
+        _logger.LogInformation("Loading model graph into cache for tenant {TenantId} finished", TenantId);
     }
 
     public CkTypeGraph GetCkType(CkId<CkTypeId> ckTypeId)
@@ -103,40 +110,14 @@ internal class CkCache : IDisposable
             throw CkCacheException.CacheUnloaded(TenantId);
         }
 
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters =
-            {
-                new CkIdAttributeIdConverter(), 
-                new CkIdAssociationIdConverter(), 
-                new CkIdTypeIdConverter(),
-                new CkIdRecordIdConverter(),
-                new CkIdEnumIdConverter(),
-                new CkModelIdConverter()
-            }
-        };
+        var options = GetJsonSerializerOptions();
 
         await JsonSerializer.SerializeAsync(stream, _modelGraph.ToCkCacheRoot(), options);
     }
 
     public async Task RestoreCacheAsync(Stream stream)
     {
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters =
-            {
-                new CkIdAttributeIdConverter(), 
-                new CkIdAssociationIdConverter(), 
-                new CkIdTypeIdConverter(),
-                new CkIdRecordIdConverter(),
-                new CkIdEnumIdConverter(),
-                new CkModelIdConverter()
-            }
-        };
+        var options = GetJsonSerializerOptions();
 
         var ckCacheRoot = await JsonSerializer.DeserializeAsync<CkCacheRoot>(stream, options);
         if (ckCacheRoot == null)
@@ -152,20 +133,7 @@ internal class CkCache : IDisposable
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(jsonText);
         using var memStream = new MemoryStream(byteArray);
 
-        var options = new JsonSerializerOptions
-        {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters =
-            {
-                new CkIdAttributeIdConverter(), 
-                new CkIdAssociationIdConverter(), 
-                new CkIdTypeIdConverter(),
-                new CkIdRecordIdConverter(),
-                new CkIdEnumIdConverter(),
-                new CkModelIdConverter()
-            }
-        };
+        var options = GetJsonSerializerOptions();
 
         var ckCacheRoot = JsonSerializer.Deserialize<CkCacheRoot>(memStream, options);
         if (ckCacheRoot == null)
@@ -174,5 +142,21 @@ internal class CkCache : IDisposable
         }
 
         _modelGraph = new CkModelGraph(ckCacheRoot);
+    }
+
+    private static JsonSerializerOptions GetJsonSerializerOptions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        options.Converters.Add(new CkIdAttributeIdConverter());
+        options.Converters.Add(new CkIdAssociationIdConverter());
+        options.Converters.Add(new CkIdTypeIdConverter());
+        options.Converters.Add(new CkIdRecordIdConverter());
+        options.Converters.Add(new CkIdEnumIdConverter());
+        options.Converters.Add(new CkModelIdConverter());
+        return options;
     }
 }

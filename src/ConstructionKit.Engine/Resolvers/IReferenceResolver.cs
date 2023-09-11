@@ -11,9 +11,8 @@ public interface IReferenceResolver
     /// <summary>
     /// Resolves and checks cross reference within the model graph.
     /// </summary>
-    /// <param name="aggregatedModelElements"></param>
     /// <param name="modelGraph"></param>
     /// <param name="operationResult"></param>
-    void Resolve(CkAggregatedModelElements aggregatedModelElements, CkModelGraph modelGraph,
+    void Resolve(CkModelGraph modelGraph,
         OperationResult operationResult);
 }

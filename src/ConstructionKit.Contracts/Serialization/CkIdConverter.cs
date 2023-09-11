@@ -48,11 +48,27 @@ public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>
 public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter where TKey : struct, IComparable<TKey>, ICkKey
 {
     /// <inheritdoc />
+    public override CkId<TKey> ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var str = reader.TokenType == JsonTokenType.PropertyName
+            ? reader.GetString()
+            : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType, nameof(JsonTokenType.PropertyName));
+        
+        return !string.IsNullOrEmpty(str) && str != null ? new CkId<TKey>(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
+    }
+
+    /// <inheritdoc />
+    public override void WriteAsPropertyName(Utf8JsonWriter writer, CkId<TKey> value, JsonSerializerOptions options)
+    {
+        writer.WritePropertyName(value.ToString());
+    }
+
+    /// <inheritdoc />
     public override CkId<TKey> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
-            : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType);
+            : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType, nameof(JsonTokenType.String));
         return !string.IsNullOrEmpty(str) && str != null ? new CkId<TKey>(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
     }
 

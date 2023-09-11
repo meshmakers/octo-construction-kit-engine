@@ -51,41 +51,18 @@ public class ModelResolver : IModelResolver
         // Before the checks, we need to build a cache of the model.
         // We check if the can retrieve the model from one of the model repository sources (e.g. database).
         // We combine all entities, attributes and association roles into one list.
-        CkAggregatedModelElements aggregatedModelElements = new();
-        
         if (compiledModel.Dependencies != null)
         {
-            aggregatedModelElements = await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, operationResult);
-
-            // Add attributes, records and roles
-            foreach (var ckAssociationRoleDto in aggregatedModelElements.CkAssociationRoles)
-            {
-                modelGraph.GetOrCreateAssociationRoles(ckAssociationRoleDto.Key, ckAssociationRoleDto.Value);
-            }
-            
-            foreach (var ckRecordDto in aggregatedModelElements.CkRecords)
-            {
-                modelGraph.GetOrCreateRecord(ckRecordDto.Key, ckRecordDto.Value);
-            }
-            
-            foreach (var ckEnumDto in aggregatedModelElements.CkEnums)
-            {
-                modelGraph.GetOrCreateEnum(ckEnumDto.Key, ckEnumDto.Value);
-            }
-
-            foreach (var ckAttributeDto in aggregatedModelElements.CkAttributes)
-            {
-                modelGraph.GetOrCreateAttribute(ckAttributeDto.Key, ckAttributeDto.Value);
-            }
+            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult);
         }
         
         // We suppose that the dependent models are already validated and we can use them.
         // So we check the current to be validated model against the dependent models.
 
         // Check: Ensure that the model forces no circular dependencies.
-        if (aggregatedModelElements.CkModelDependencies.Any(x => x.Key.ModelId == compiledModel.ModelId.ModelId))
+        if (modelGraph.Dependencies.Any(x => x.Key.ModelId == compiledModel.ModelId.ModelId))
         {
-            var dependentModels = aggregatedModelElements.CkModelDependencies.Keys.Where(x => x.ModelId == compiledModel.ModelId.ModelId);
+            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == compiledModel.ModelId.ModelId);
 
             operationResult.AddMessage(
                 MessageCodes.CircularDependency(compiledModel.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
@@ -96,7 +73,7 @@ public class ModelResolver : IModelResolver
         // 2. entities.ckDerivedId -> Reference to a defined type.
         // 3. entities.associations.roleId -> Reference to a defined association role.
         // 4. entities.associations.targetCkTypeId -> Reference to a defined type.
-        _referenceResolver.Resolve(aggregatedModelElements, modelGraph, operationResult);
+        _referenceResolver.Resolve(modelGraph, operationResult);
 
         // Check: Inheritance.
         // 1. entities.ckDerivedId -> Only one type cannot have a derived type: System.Entity.
@@ -106,7 +83,7 @@ public class ModelResolver : IModelResolver
         // 5. entities.isFinal -> It is not possible that a type is final, but has a derived type.
         
         // Check 1-5 is done by inheritance resolver.
-        _inheritanceResolver.Resolve(aggregatedModelElements, modelGraph, operationResult);
+        _inheritanceResolver.Resolve(modelGraph, operationResult);
 
         return modelGraph;
     }

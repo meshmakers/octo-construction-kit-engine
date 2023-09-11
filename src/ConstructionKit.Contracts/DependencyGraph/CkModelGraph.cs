@@ -131,7 +131,7 @@ public class CkModelGraph
         {
             return ckTypeGraph;
         }
-        
+
         ckTypeGraph = new(ckTypeId, ckTypeDto);
         _types.Add(ckTypeId, ckTypeGraph);
         

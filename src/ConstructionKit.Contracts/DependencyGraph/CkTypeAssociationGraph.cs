@@ -5,17 +5,17 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents an association in the graph model.
+/// Represents an association assigned to a type in the graph model.
 /// </summary>
-public class CkAssociationGraph
+public class CkTypeAssociationGraph
 {
     /// <summary>
-    /// Creates a new instance of <see cref="CkAssociationGraph"/>.
+    /// Creates a new instance of <see cref="CkTypeAssociationGraph"/>.
     /// </summary>
     /// <param name="navigationPropertyName">Corresponding inbound/outbound name</param>
     /// <param name="multiplicity">The multiplicity of the target</param>
     /// <param name="ckTypeAssociationDto"></param>
-    public CkAssociationGraph(string navigationPropertyName, MultiplicitiesDto multiplicity, CkTypeAssociationDto ckTypeAssociationDto)
+    public CkTypeAssociationGraph(string navigationPropertyName, MultiplicitiesDto multiplicity, CkTypeAssociationDto ckTypeAssociationDto)
     {
         NavigationPropertyName = navigationPropertyName;
         Multiplicity = multiplicity;
@@ -25,7 +25,7 @@ public class CkAssociationGraph
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkAssociationGraph"/>.
+    /// Creates a new instance of <see cref="CkTypeAssociationGraph"/>.
     /// </summary>
     /// <param name="navigationPropertyName">Corresponding inbound/outbound name</param>
     /// <param name="multiplicity">The multiplicity of the target</param>
@@ -33,7 +33,7 @@ public class CkAssociationGraph
     /// <param name="targetCkTypeId"></param>
     /// <param name="targetAttributes"></param>
     [JsonConstructor]
-    public CkAssociationGraph(string navigationPropertyName, MultiplicitiesDto multiplicity, CkId<CkAssociationRoleId> ckRoleId,
+    public CkTypeAssociationGraph(string navigationPropertyName, MultiplicitiesDto multiplicity, CkId<CkAssociationRoleId> ckRoleId,
         CkId<CkTypeId> targetCkTypeId, IReadOnlyCollection<CkId<CkAttributeId>>? targetAttributes)
     {
         NavigationPropertyName = navigationPropertyName;

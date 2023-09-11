@@ -23,6 +23,7 @@ public class  CkAttributeGraph
         CkAttributeId = ckAttributeId;
         ValueType = attributeDto.ValueType;
         ValueCkRecordId = attributeDto.ValueCkRecordId;
+        ValueCkEnumId = attributeDto.ValueCkEnumId;
         DefaultValues = attributeDto.DefaultValues;
         IsOptional = attributeDto.IsOptional;
         Description = attributeDto.Description;
@@ -34,16 +35,18 @@ public class  CkAttributeGraph
     /// <param name="ckAttributeId"></param>
     /// <param name="valueType"></param>
     /// <param name="valueCkRecordId"></param>
+    /// <param name="valueCkEnumId"></param>
     /// <param name="defaultValues"></param>
     /// <param name="isOptional">When true, the attribute value is optional, that means the value can be null.</param>
     /// <param name="description">A optional description to the attribute</param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        ICollection<object>? defaultValues, bool isOptional, string? description)
+        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, bool isOptional, string? description)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
         ValueCkRecordId = valueCkRecordId;
+        ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
         IsOptional = isOptional;
         Description = description;
@@ -63,6 +66,11 @@ public class  CkAttributeGraph
     /// Defines the record type of the attribute if the value type is a record.
     /// </summary>
     public CkId<CkRecordId>? ValueCkRecordId { get; set; }
+    
+    /// <summary>
+    /// Defines the enum type of the attribute if the value type is an enum.
+    /// </summary>
+    public CkId<CkEnumId>? ValueCkEnumId { get; set; }
 
     /// <summary>
     /// Returns the default values of the attribute.

@@ -32,7 +32,7 @@ public class CkEnumGraph
     /// <param name="useFlags"></param>
     /// <param name="values"></param>
     [JsonConstructor]
-    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, ICollection<CkSelectionValueDto> values)
+    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, ICollection<CkEnumValueDto> values)
     {
         CkEnumId = ckEnumId;
         UseFlags = useFlags;
@@ -52,6 +52,6 @@ public class CkEnumGraph
     /// <summary>
     /// Returns the values of the enum.
     /// </summary>
-    public ICollection<CkSelectionValueDto> Values { get; }
+    public ICollection<CkEnumValueDto> Values { get; }
 
 }

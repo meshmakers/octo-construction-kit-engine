@@ -132,7 +132,7 @@ public class CompilerService : ICompilerService
         {
             EnumId = "SampleEnum",
             Values = 
-                new List<CkSelectionValueDto>
+                new List<CkEnumValueDto>
                 {
                     new() { Key = 0, Name = "Name0" },
                     new() { Key = 1, Name = "Name1" },

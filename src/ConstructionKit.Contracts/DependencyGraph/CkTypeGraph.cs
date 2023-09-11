@@ -16,7 +16,7 @@ public class CkTypeGraph
 {
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     private readonly List<CkGraphTypeInheritance> _derivedTypes;
-    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto> _allAttributes;
+    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkTypeGraph"/>.
@@ -31,13 +31,12 @@ public class CkTypeGraph
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         _baseTypes = new List<CkGraphTypeInheritance>();
         _derivedTypes = new List<CkGraphTypeInheritance>();
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(ckTypeDto.Attributes?.ToDictionary(
-            x => x.CkAttributeId) ?? new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>());
+        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = new(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeDto.Attributes ?? new List<CkTypeAttributeDto>());
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(_allAttributes);
+        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         Indexes = new Collection<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
     }
 
@@ -55,32 +54,32 @@ public class CkTypeGraph
     /// <param name="indexes"></param>
     /// <param name="associations"></param>
     [JsonConstructor]
-    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, 
-        IReadOnlyCollection<CkGraphTypeInheritance> baseTypes, 
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal,
+        IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
         CkId<CkTypeId>? derivedFromCkTypeId,
         IReadOnlyCollection<CkGraphTypeInheritance> derivedTypes,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
-        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto> allAttributes,
+        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
         IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations)
     {
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
         DerivedFromCkTypeId = derivedFromCkTypeId;
-        
+
         _baseTypes = new List<CkGraphTypeInheritance>(baseTypes);
         _derivedTypes = new List<CkGraphTypeInheritance>(derivedTypes);
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(allAttributes
-            .ToDictionary(k=> k.Key, v=> v.Value));
+        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(allAttributes
+            .ToDictionary(k => k.Key, v => v.Value));
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = associations;
         DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(_allAttributes);
+        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         Indexes = new List<CkTypeIndexDto>(indexes);
     }
-    
-    
+
+
     /// <summary>
     /// Defines the base type of this type. Only one type may not have a base type: System/Entity
     /// </summary>
@@ -105,7 +104,7 @@ public class CkTypeGraph
     /// Returns a list of base types of the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> BaseTypes { get; }
-    
+
     /// <summary>
     /// Returns a list of derived types of the given construction kit type
     /// </summary>
@@ -124,12 +123,12 @@ public class CkTypeGraph
     /// <summary>
     ///     Gets or sets a list of attributes that are defined by the current type
     /// </summary>
-    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; } 
-    
+    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; }
+
     /// <summary>
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto> AllAttributes { get; } 
+    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; }
 
     /// <summary>
     /// Returns a string that describes the inheritance chain
@@ -145,7 +144,7 @@ public class CkTypeGraph
     {
         _baseTypes.AddRange(baseTypeList);
     }
-    
+
     /// <summary>
     /// Adds a derived types of the current type
     /// </summary>
@@ -154,21 +153,22 @@ public class CkTypeGraph
     {
         _derivedTypes.Add(ckGraphTypeInheritance);
     }
-    
+
     /// <summary>
     /// Adds a attribute to the current type
     /// </summary>
-    /// <param name="ckTypeAttributeDto"></param>
-    internal bool TryAddAttribute(CkTypeAttributeDto ckTypeAttributeDto)
+    /// <param name="ckTypeAttributeGraph"></param>
+    internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
     {
-        if (_allAttributes.ContainsKey(ckTypeAttributeDto.CkAttributeId))
+        if (_allAttributes.ContainsKey(ckTypeAttributeGraph.CkAttributeId))
         {
             return false;
         }
-        _allAttributes.Add(ckTypeAttributeDto.CkAttributeId, ckTypeAttributeDto);
+
+        _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
         return true;
     }
-    
+
     /// <summary>
     /// Returns a list of derived types of the given construction kit type
     /// </summary>
@@ -181,7 +181,8 @@ public class CkTypeGraph
         {
             list.Add(CkTypeId);
         }
-        list.AddRange(_derivedTypes.Select(x=> x.InheritorCkTypeId));
+
+        list.AddRange(_derivedTypes.Select(x => x.InheritorCkTypeId));
 
         return list;
     }
@@ -198,8 +199,9 @@ public class CkTypeGraph
         {
             list.Add(CkTypeId);
         }
-        list.AddRange(_baseTypes.Select(x=> x.BaseCkTypeId));
 
-     return list;
+        list.AddRange(_baseTypes.Select(x => x.BaseCkTypeId));
+
+        return list;
     }
 }

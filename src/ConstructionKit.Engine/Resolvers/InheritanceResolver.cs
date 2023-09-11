@@ -66,6 +66,13 @@ public class InheritanceResolver : IInheritanceResolver
         {
             var baseTypes = GetBaseTypes(modelGraph, ckTypeId, operationResult);
             typeGraph.AddBaseTypes(baseTypes);
+
+            foreach (var ckTypeAttribute in typeGraph.DefinedAttributes)
+            {
+                typeGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
+            }
+
             _handledTypesHashSet.Add(ckTypeId);
         }
 
@@ -84,6 +91,13 @@ public class InheritanceResolver : IInheritanceResolver
         {
             var baseTypes = GetBaseRecords(modelGraph, ckRecordId, operationResult);
             recordGraph.AddBaseRecords(baseTypes);
+            
+            foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
+            {
+                recordGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
+            }
+            
             _handledRecordHashSet.Add(ckRecordId);
         }
 
@@ -101,8 +115,9 @@ public class InheritanceResolver : IInheritanceResolver
 
             foreach (var typeAttribute in baseCkType.DefinedAttributes)
             {
+                var ckTypeAttributeGraph = baseCkType.AllAttributes[typeAttribute.CkAttributeId];
                 // Here is checked if the attribute id already exists on the type (e. g. defined at type or inherited from another base type)
-                if (!originTypeGraph.TryAddAttribute(typeAttribute))
+                if (!originTypeGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkTypeIdAttributeIdNotUniqueByInheritance(baseCkType.CkTypeId, typeAttribute.CkAttributeId, originTypeGraph.CkTypeId));
@@ -173,9 +188,9 @@ public class InheritanceResolver : IInheritanceResolver
                 }
             }
 
-            var inAssociationGraph = new CkAssociationGraph(ckAssociationRole.OutboundName,
+            var inAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.OutboundName,
                 ckAssociationRole.OutboundMultiplicity, typeAssociation);
-            var outAssociationGraph = new CkAssociationGraph(ckAssociationRole.InboundName,
+            var outAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.InboundName,
                 ckAssociationRole.InboundMultiplicity, typeAssociation);
             targetCkTypeGraph.Associations.In.Owned.Add(inAssociationGraph);
             originTypeGraph.Associations.Out.Owned.Add(outAssociationGraph);
@@ -202,7 +217,8 @@ public class InheritanceResolver : IInheritanceResolver
             foreach (var typeAttribute in baseCkRecord.DefinedAttributes)
             {
                 // Here is checked if the attribute id already exists on the record (e. g. defined at record or inherited from another base record)
-                if (!originRecordGraph.TryAddAttribute(typeAttribute))
+                var ckTypeAttributeGraph = baseCkRecord.AllAttributes[typeAttribute.CkAttributeId];
+                if (!originRecordGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkRecordIdAttributeIdNotUniqueByInheritance(baseCkRecord.CkRecordId, typeAttribute.CkAttributeId, originRecordGraph.CkRecordId));

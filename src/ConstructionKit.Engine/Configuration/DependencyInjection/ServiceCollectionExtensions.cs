@@ -36,8 +36,8 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkSchemaValidator, CkSchemaValidator>();
         
         // Model stuff
-        services.AddTransient<ICkModelRepositoryManager, CkModelRepositoryManager>();
-        
+        services.AddSingleton<ICkModelRepositoryManager, CkModelRepositoryManager>();
+        services.AddTransient<Lazy<ICkModelRepositoryManager>>(sp => new Lazy<ICkModelRepositoryManager>(sp.GetRequiredService<ICkModelRepositoryManager>));
         // Adding services
         services.AddTransient<ICompilerService, CompilerService>();
         services.AddTransient<ICkValidationService, CkValidationService>();

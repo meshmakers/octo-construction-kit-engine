@@ -98,6 +98,11 @@ public class CkSourceGenerator : IIncrementalGenerator
         {
             foreach (var ckTypeDto in ckCompiledModelRoot.Types)
             {
+                if (ckCompiledModelRoot.ModelId.ModelId == "System" && ckTypeDto.TypeId.TypeId == "Entity")
+                {
+                    continue;
+                }
+                
                 var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
                 if (!String.IsNullOrWhiteSpace(code))
                 {

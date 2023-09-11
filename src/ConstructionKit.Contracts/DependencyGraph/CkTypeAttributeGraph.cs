@@ -21,6 +21,7 @@ public class CkTypeAttributeGraph
         CkAttributeId = ckAttributeId;
         AttributeName = ckTypeAttributeDto.AttributeName;
         AutoCompleteValues = ckTypeAttributeDto.AutoCompleteValues ?? ckTypeAttributeDto.AutoCompleteValues ?? new List<object>();
+        AutoIncrementReference = ckTypeAttributeDto.AutoIncrementReference;
         ValueType = ckAttributeGraph.ValueType;
         ValueCkRecordId = ckAttributeGraph.ValueCkRecordId;
         ValueCkEnumId = ckAttributeGraph.ValueCkEnumId;
@@ -28,7 +29,7 @@ public class CkTypeAttributeGraph
         IsOptional = ckAttributeGraph.IsOptional;
         Description = ckAttributeGraph.Description;
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="CkTypeAttributeGraph"/>.
     /// </summary>
@@ -38,17 +39,20 @@ public class CkTypeAttributeGraph
     /// <param name="valueType"></param>
     /// <param name="valueCkRecordId"></param>
     /// <param name="valueCkEnumId"></param>
+    /// <param name="autoIncrementReference"></param>
     /// <param name="defaultValues"></param>
     /// <param name="isOptional"></param>
     /// <param name="description"></param>
     [JsonConstructor]
     public CkTypeAttributeGraph( CkId<CkAttributeId> ckAttributeId, string attributeName, IReadOnlyCollection<object>? autoCompleteValues,
         AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId, CkId<CkEnumId>? valueCkEnumId,
+        string? autoIncrementReference,
         ICollection<object>? defaultValues, bool isOptional, string? description)
     {
         CkAttributeId = ckAttributeId;
         AttributeName = attributeName;
         AutoCompleteValues = autoCompleteValues ?? new List<object>();
+        AutoIncrementReference = autoIncrementReference;
         ValueType = valueType;
         ValueCkRecordId = valueCkRecordId;
         ValueCkEnumId = valueCkEnumId;
@@ -71,6 +75,11 @@ public class CkTypeAttributeGraph
     /// Gets or sets a list of values that are used for auto completion.
     /// </summary>
     public IReadOnlyCollection<object> AutoCompleteValues { get; }
+    
+    /// <summary>
+    /// If auto completion is enabled, this property defines the attribute that is used as a reference for the auto completion values.
+    /// </summary>
+    public string? AutoIncrementReference { get; }
     
     /// <summary>
     /// Value type of the attribute

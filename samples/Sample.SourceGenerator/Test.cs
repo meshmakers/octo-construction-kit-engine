@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+
 namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
 
 public enum AttributeValueTypes
@@ -46,11 +48,11 @@ public class RtEntity
         throw new InvalidOperationException();
     }
 
-    public void SetAttributeValue(string attributeName, AttributeValueTypes attributeValueType, object? value)
+    public void SetAttributeValue(string attributeName, AttributeValueTypesDto attributeValueType, object? value)
     {
     }
     
-    public void SetAttributeValueNonNullable(string attributeName, AttributeValueTypes attributeValueType, object value)
+    public void SetAttributeValueNonNullable(string attributeName, AttributeValueTypesDto attributeValueType, object value)
     {
     }
 }

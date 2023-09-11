@@ -19,6 +19,8 @@ types:
     name: DateTimeAttribute
   - id: Sample1/Type
     name: Type
+  - id: Sample1/TestEnum
+    name: TestEnum
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity

@@ -2,6 +2,32 @@
   "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
+    "CkTypeAttribute":{
+      "type": "object",
+      "title": "CkTypeAttribute",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.]+$"
+        },
+        "autoCompleteValues": {
+          "type": "array",
+          "$comment": "A list of values that are used for auto completion.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name"
+      ]
+    },
     "CkAttribute": {
       "type": "object",
       "title": "CkAttribute",

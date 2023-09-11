@@ -32,26 +32,8 @@ public class CkTypeAttributeDto
     public string AttributeName { get; set; } = null!;
 
     /// <summary>
-    /// Gets or sets a flag that indicates whether auto completion is enabled for this attribute.
+    /// Gets or sets a list of values that are used for auto completion.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public bool IsAutoCompleteEnabled { get; set; }
-
-    /// <summary>
-    /// If auto completion is enabled, this property defines the filter that is used to filter the auto completion values.
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public string? AutoCompleteFilter { get; set; }
-
-    /// <summary>
-    /// If auto completion is enabled, this property defines the limit of auto completion values.
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public int? AutoCompleteLimit { get; set; }
-
-    /// <summary>
-    /// If auto completion is enabled, this property defines the attribute that is used as a reference for the auto completion values.
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public string? AutoIncrementReference { get; set; }
+    public List<object>? AutoCompleteValues { get; set; }
 }

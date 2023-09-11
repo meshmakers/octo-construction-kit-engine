@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// Represents an attribute in the dependency graph
 /// </summary>
 [DebuggerDisplay("{" + nameof(CkAttributeId) + "}")]
-public class CkAttributeGraph
+public class  CkAttributeGraph
 {
     /// <summary>
     /// Creates a new instance of <see cref="CkAttributeGraph"/>.

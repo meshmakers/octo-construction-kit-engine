@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Implementation of <see cref="IInheritanceResolver"/> that resolves the inheritance of a compiled model.
 /// </summary>
-public class InheritanceResolver : IInheritanceResolver
+internal class InheritanceResolver : IInheritanceResolver
 {
     private readonly ILogger<InheritanceResolver> _logger;
     private readonly HashSet<CkId<CkTypeId>> _handledTypesHashSet;

@@ -310,7 +310,7 @@ public class InheritanceResolverTests
     [Fact]
     public void MissingInheritanceType_CompilerErrorMessage_ThrowsException()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph ckAggregatedModelElements = new();
         ckAggregatedModelElements.AppendModel(sampleData.sample1.Builder.Build());
@@ -327,7 +327,7 @@ public class InheritanceResolverTests
     [Fact]
     public void AssociationTargetUnknown_CompilerErrorMessage_ThrowsException()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph ckAggregatedModelElements = new();
         ckAggregatedModelElements.AppendModel(sampleData.systemFake.Builder.Build());
@@ -345,7 +345,7 @@ public class InheritanceResolverTests
     [Fact]
     public void DerivedFromFinal_CompilerErrorMessage_ThrowsException()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph modelGraph = new();
         modelGraph.AppendModel(sampleData.systemFake.Builder.Build());
@@ -363,7 +363,7 @@ public class InheritanceResolverTests
     [Fact]
     public void DerivedTypeDefinesFinal_OK()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph modelGraph = new();
         modelGraph.AppendModel(sampleData.systemFake.Builder.Build());
@@ -379,7 +379,7 @@ public class InheritanceResolverTests
     [Fact]
     public void TypeNotDerivedFromSystemEntity_CompilerErrorMessage_ThrowsException()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph modelGraph = new();
         modelGraph.AppendModel(sampleData.systemFake.Builder.Build());
@@ -397,7 +397,7 @@ public class InheritanceResolverTests
     [Fact]
     public void AssociationWithTargetAttributes_OK()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph modelGraph = new();
         modelGraph.AppendModel(sampleData.systemFake.Builder.Build());
@@ -413,7 +413,7 @@ public class InheritanceResolverTests
     [Fact]
     public void AssociationWithTargetAttributes_NotExistingAttribute_CompilerErrorMessage()
     {
-        var logger = A.Fake<ILogger<InheritanceResolver> >();
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
 
         CkModelGraph modelGraph = new();
         modelGraph.AppendModel(sampleData.systemFake.Builder.Build());

@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 /// <summary>
 /// Implements a validator for the CK model in JSON or YAML format.
 /// </summary>
-public class CkSchemaValidator : ICkSchemaValidator
+internal class CkSchemaValidator : ICkSchemaValidator
 {
     /// <inheritdoc />
     public bool ValidateElementsInJson(Stream stream, OperationResult operationResult)

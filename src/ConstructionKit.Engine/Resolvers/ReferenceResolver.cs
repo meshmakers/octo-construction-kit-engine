@@ -8,7 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Resolves and checks references of the model. E. g. derived types, records or cross references
 /// </summary>
-public class ReferenceResolver : IReferenceResolver
+internal class ReferenceResolver : IReferenceResolver
 {
     /// <summary>
     /// Resolves and checks cross reference within the model graph.

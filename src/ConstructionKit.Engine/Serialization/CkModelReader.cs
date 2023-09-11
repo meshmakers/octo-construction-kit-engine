@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 /// <summary>
 /// Reads a CK model from a file.
 /// </summary>
-public class CkModelReader
+internal class CkModelReader
 {
     private readonly ICkValidationService _ckValidationService;
     private readonly ILogger<CkModelReader> _logger;

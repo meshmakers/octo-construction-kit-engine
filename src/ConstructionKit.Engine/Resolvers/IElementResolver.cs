@@ -7,7 +7,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 /// Interface for resolving construction kit elements
 /// </summary>
-public interface IElementResolver
+internal interface IElementResolver
 {
     /// <summary>
     /// Resolves the given construction kit model root

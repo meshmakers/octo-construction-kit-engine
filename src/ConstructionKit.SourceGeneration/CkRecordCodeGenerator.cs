@@ -44,6 +44,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
+        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;");
         sb.AppendLine();
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();

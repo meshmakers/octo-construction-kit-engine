@@ -25,37 +25,7 @@
           "type": "array",
           "items": {
             "type": "object",
-            "properties": {
-              "id": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
-              },
-              "name": {
-                "type": "string",
-                "pattern": "^[a-zA-Z0-9_.]+$"
-              },
-              "isAutoCompleteEnabled": {
-                "type": "boolean",
-                "$comment": "If true, the attribute uses auto complete."
-              },
-              "autoCompleteFilter": {
-                "type": "string",
-                "$comment": "The filter for auto complete defined by a regex expression."
-              },
-              "autoCompleteLimit": {
-                "type": "integer",
-                "$comment": "The amount of entries in auto complete filter."
-              },
-              "autoIncrementReference": {
-                "type": "string",
-                "$comment": "The reference to the attribute that is used for auto increment."
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "id",
-              "name"
-            ]
+            "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json#/definitions/CkTypeAttribute"
           }
         },
         "enableChangeStreamPreAndPostImages": {

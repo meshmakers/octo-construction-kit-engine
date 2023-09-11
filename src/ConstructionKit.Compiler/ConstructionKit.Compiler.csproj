@@ -15,14 +15,14 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2305.5002" />
-        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2305.5002" />
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2309.9001" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2309.9001" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="7.0.4" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="7.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0" />
-        <PackageReference Include="NLog" Version="5.2.0" />
-        <PackageReference Include="NLog.Extensions.Logging" Version="5.3.0" />
-        <PackageReference Include="NLog.Schema" Version="5.2.0" />
+        <PackageReference Include="NLog" Version="5.2.4" />
+        <PackageReference Include="NLog.Extensions.Logging" Version="5.3.4" />
+        <PackageReference Include="NLog.Schema" Version="5.2.4" />
     </ItemGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

@@ -40,28 +40,28 @@ public class InheritanceResolverTests
         Assert.NotNull(modelGraph.Types["System/Entity"]);
         Assert.NotNull(modelGraph.Types["sample1/Demo1"]);
         Assert.NotNull(modelGraph.Types["sample1/Demo2"]);
-        Assert.Equal(0, modelGraph.Types["System/Entity"].AllAttributes.Count);
-        Assert.Equal(1, modelGraph.Types["System/Entity"].Associations.In.Owned.Count);
+        Assert.Empty(modelGraph.Types["System/Entity"].AllAttributes);
+        Assert.Single(modelGraph.Types["System/Entity"].Associations.In.Owned);
         Assert.Contains(modelGraph.Types["System/Entity"].Associations.In.Owned, a=> a.CkRoleId == "sample1/Related");
-        Assert.Equal(0, modelGraph.Types["System/Entity"].Associations.In.Inherited.Count);
-        Assert.Equal(0, modelGraph.Types["System/Entity"].Associations.Out.Owned.Count);
-        Assert.Equal(0, modelGraph.Types["System/Entity"].Associations.Out.Inherited.Count);
+        Assert.Empty(modelGraph.Types["System/Entity"].Associations.In.Inherited);
+        Assert.Empty(modelGraph.Types["System/Entity"].Associations.Out.Owned);
+        Assert.Empty(modelGraph.Types["System/Entity"].Associations.Out.Inherited);
         
         Assert.Equal(3, modelGraph.Types["sample1/Demo1"].AllAttributes.Count);
-        Assert.Equal(1, modelGraph.Types["sample1/Demo1"].Associations.In.Owned.Count);
+        Assert.Single(modelGraph.Types["sample1/Demo1"].Associations.In.Owned);
         Assert.Contains(modelGraph.Types["sample1/Demo1"].Associations.In.Owned, a=> a.CkRoleId == "System/ParentChild");
-        Assert.Equal(1, modelGraph.Types["sample1/Demo1"].Associations.In.Inherited.Count);
+        Assert.Single(modelGraph.Types["sample1/Demo1"].Associations.In.Inherited);
         Assert.Contains(modelGraph.Types["sample1/Demo1"].Associations.In.Inherited, a=> a.CkRoleId == "sample1/Related");
-        Assert.Equal(0, modelGraph.Types["sample1/Demo1"].Associations.Out.Inherited.Count);
-        Assert.Equal(0, modelGraph.Types["sample1/Demo1"].Associations.Out.Owned.Count);
+        Assert.Empty(modelGraph.Types["sample1/Demo1"].Associations.Out.Inherited);
+        Assert.Empty(modelGraph.Types["sample1/Demo1"].Associations.Out.Owned);
         
         Assert.Equal(7, modelGraph.Types["sample1/Demo2"].AllAttributes.Count);
-        Assert.Equal(0, modelGraph.Types["sample1/Demo2"].Associations.In.Owned.Count);
+        Assert.Empty(modelGraph.Types["sample1/Demo2"].Associations.In.Owned);
         Assert.Equal(2, modelGraph.Types["sample1/Demo2"].Associations.In.Inherited.Count);
         Assert.Contains(modelGraph.Types["sample1/Demo2"].Associations.In.Inherited, a=> a.CkRoleId == "sample1/Related");
         Assert.Contains(modelGraph.Types["sample1/Demo2"].Associations.In.Inherited, a=> a.CkRoleId == "System/ParentChild");
-        Assert.Equal(0, modelGraph.Types["sample1/Demo2"].Associations.Out.Inherited.Count);
-        Assert.Equal(1, modelGraph.Types["sample1/Demo2"].Associations.Out.Owned.Count);
+        Assert.Empty(modelGraph.Types["sample1/Demo2"].Associations.Out.Inherited);
+        Assert.Single(modelGraph.Types["sample1/Demo2"].Associations.Out.Owned);
         Assert.Contains(modelGraph.Types["sample1/Demo2"].Associations.Out.Owned, a=> a.CkRoleId == "System/ParentChild");
     }
 
@@ -83,7 +83,7 @@ public class InheritanceResolverTests
         Assert.NotNull(modelGraph.Types["System/Entity"]);
         Assert.NotNull(modelGraph.Types["sample1/Demo1"]);
         Assert.NotNull(modelGraph.Types["sample1/Demo2"]);
-        Assert.Equal(0, modelGraph.Types["System/Entity"].AllAttributes.Count);
+        Assert.Empty(modelGraph.Types["System/Entity"].AllAttributes);
         Assert.Equal(3, modelGraph.Types["sample1/Demo1"].AllAttributes.Count);
         Assert.Equal(7, modelGraph.Types["sample1/Demo2"].AllAttributes.Count);
     }
@@ -117,10 +117,10 @@ public class InheritanceResolverTests
         Assert.Contains(modelGraph.Types["sample1/Demo1"].DerivedTypes, x => x.InheritorCkTypeId == "sample1/Demo2");
         Assert.Contains(modelGraph.Types["sample1/Demo1"].DerivedTypes, x => x.InheritorCkTypeId == "sample1/Demo3");
         
-        Assert.Equal(1, modelGraph.Types["sample1/Demo2"].DerivedTypes.Count);
+        Assert.Single(modelGraph.Types["sample1/Demo2"].DerivedTypes);
         Assert.Contains(modelGraph.Types["sample1/Demo2"].DerivedTypes, x => x.InheritorCkTypeId == "sample1/Demo3");
 
-        Assert.Equal(0, modelGraph.Types["sample1/Demo3"].DerivedTypes.Count);
+        Assert.Empty(modelGraph.Types["sample1/Demo3"].DerivedTypes);
     }
     
     [Fact]

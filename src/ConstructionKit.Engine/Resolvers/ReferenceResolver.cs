@@ -18,11 +18,34 @@ public class ReferenceResolver : IReferenceResolver
     public void Resolve(CkModelGraph modelGraph,
         OperationResult operationResult)
     {
+        CheckCkAssociationRoles(modelGraph, operationResult);
+        
         CheckCkAttributes(modelGraph, operationResult);
 
         CheckCkRecords(modelGraph, operationResult);
 
         CheckCkTypes(modelGraph, operationResult);
+    }
+    
+    private static void CheckCkAssociationRoles(CkModelGraph modelGraph,
+        OperationResult operationResult)
+    {
+        foreach (var ckAssociationRoleKeyValue in modelGraph.AssociationRoles)
+        {
+            // Check 1.
+            foreach (var ckTypeAttribute in ckAssociationRoleKeyValue.Value.DefinedAttributes)
+            {
+                if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
+                {
+                    operationResult.AddMessage(
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckTypeAttribute.CkAttributeId, ckAssociationRoleKeyValue.Key));
+                    continue;
+                }
+
+                ckAssociationRoleKeyValue.Value.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
+            }
+        }
     }
 
     private static void CheckCkRecords(CkModelGraph modelGraph,
@@ -37,7 +60,11 @@ public class ReferenceResolver : IReferenceResolver
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckTypeAttribute.CkAttributeId, ckRecordKeyValue.Key));
+                    continue;
                 }
+
+                ckRecordKeyValue.Value.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
             }
 
             // Check 2.
@@ -65,7 +92,11 @@ public class ReferenceResolver : IReferenceResolver
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownAttributeOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
+                    continue;
                 }
+
+                ckTypeKeyValue.Value.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
             }
 
             // Check 2.

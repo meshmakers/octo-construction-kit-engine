@@ -16,7 +16,7 @@ public class CkRecordGraph
 {
     private readonly List<CkGraphRecordInheritance> _baseRecords;
     private readonly List<CkGraphRecordInheritance> _derivedRecords;
-    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto> _allAttributes;
+    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkRecordGraph"/>.
@@ -31,12 +31,11 @@ public class CkRecordGraph
         DerivedFromCkRecordId = ckRecordDto.DerivedFromCkRecordId;
         _baseRecords = new List<CkGraphRecordInheritance>();
         _derivedRecords = new List<CkGraphRecordInheritance>();
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(ckRecordDto.Attributes?.ToDictionary(
-            x => x.CkAttributeId) ?? new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>());
+        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
         DerivedRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_derivedRecords);
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckRecordDto.Attributes ?? new List<CkTypeAttributeDto>());
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(_allAttributes);
+        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
     }
 
     /// <summary>
@@ -56,7 +55,7 @@ public class CkRecordGraph
         CkId<CkRecordId>? derivedFromCkRecordId,
         IReadOnlyCollection<CkGraphRecordInheritance> derivedRecords,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
-        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto> allAttributes)
+        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes)
     {
         CkRecordId = ckRecordId;
         IsAbstract = isAbstract;
@@ -65,12 +64,12 @@ public class CkRecordGraph
         
         _baseRecords = new List<CkGraphRecordInheritance>(baseRecords);
         _derivedRecords = new List<CkGraphRecordInheritance>(derivedRecords);
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(allAttributes
+        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(allAttributes
             .ToDictionary(k=> k.Key, v=> v.Value));
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
         DerivedRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_derivedRecords);
         DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto>(_allAttributes);
+        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
     }
 
     /// <summary>
@@ -111,7 +110,7 @@ public class CkRecordGraph
     /// <summary>
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeDto> AllAttributes { get; } 
+    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; } 
 
     /// <summary>
     /// Returns a string that describes the inheritance chain
@@ -140,14 +139,14 @@ public class CkRecordGraph
     /// <summary>
     /// Adds a attribute to the current record
     /// </summary>
-    /// <param name="ckTypeAttributeDto"></param>
-    internal bool TryAddAttribute(CkTypeAttributeDto ckTypeAttributeDto)
+    /// <param name="ckTypeAttributeGraph"></param>
+    internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
     {
-        if (_allAttributes.ContainsKey(ckTypeAttributeDto.CkAttributeId))
+        if (_allAttributes.ContainsKey(ckTypeAttributeGraph.CkAttributeId))
         {
             return false;
         }
-        _allAttributes.Add(ckTypeAttributeDto.CkAttributeId, ckTypeAttributeDto);
+        _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
         return true;
     }
     

@@ -116,6 +116,9 @@ public class ElementResolver : IElementResolver
 
                 if (ckType.Attributes != null)
                 {
+                    
+                    
+                    
                     // Check if the defined attributes (=defined at CkType) have duplicate attribute ids
                     var duplicateAttributeIds = ckType.Attributes.GroupBy(x => x.CkAttributeId)
                         .Where(x => x.Count() > 1).Select(x => x.Key).ToList();

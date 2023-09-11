@@ -17,7 +17,7 @@ public class CkEnumDto
     /// </summary>
     public CkEnumDto()
     {
-        Values = new List<CkSelectionValueDto>();
+        Values = new List<CkEnumValueDto>();
     }
     
     /// <summary>
@@ -34,5 +34,5 @@ public class CkEnumDto
     /// <summary>
     /// Values of the enum
     /// </summary>
-    public ICollection<CkSelectionValueDto> Values { get; set; }
+    public ICollection<CkEnumValueDto> Values { get; set; }
 }

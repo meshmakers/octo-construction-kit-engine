@@ -1,6 +1,6 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -13,6 +13,8 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 [DebuggerDisplay("{" + nameof(CkRoleId) + "}")]
 public class CkAssociationRoleGraph
 {
+    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _attributes;
+
     /// <summary>
     /// Creates a new instance of <see cref="CkAssociationRoleGraph"/>.
     /// </summary>
@@ -25,7 +27,9 @@ public class CkAssociationRoleGraph
         OutboundName = associationRoleDto.OutboundName;
         InboundMultiplicity = associationRoleDto.InboundMultiplicity;
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
-        Attributes = associationRoleDto.Attributes ?? new List<CkTypeAttributeDto>();
+        DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(associationRoleDto.Attributes ?? new List<CkTypeAttributeDto>());
+        _attributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
+        Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_attributes);
     }
 
     /// <summary>
@@ -36,17 +40,23 @@ public class CkAssociationRoleGraph
     /// <param name="outboundName"></param>
     /// <param name="inboundMultiplicity"></param>
     /// <param name="outboundMultiplicity"></param>
+    /// <param name="definedAttributes"></param>
     /// <param name="attributes"></param>
     [JsonConstructor]
     public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckRoleId, string inboundName, string outboundName, 
-        MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity, ICollection<CkTypeAttributeDto> attributes)
+        MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity, 
+        IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
+        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> attributes)
     {
         CkRoleId = ckRoleId;
         InboundName = inboundName;
         OutboundName = outboundName;
         InboundMultiplicity = inboundMultiplicity;
         OutboundMultiplicity = outboundMultiplicity;
-        Attributes = attributes;
+        DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
+        _attributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(attributes
+            .ToDictionary(k=> k.Key, v=> v.Value));
+        Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_attributes);
     }
     
     /// <summary>
@@ -77,5 +87,25 @@ public class CkAssociationRoleGraph
     /// <summary>
     ///     Gets or sets a list of attributes for the association role
     /// </summary>
-    public ICollection<CkTypeAttributeDto> Attributes { get; set; }
+    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> Attributes { get; set; }
+    
+    /// <summary>
+    ///     Gets or sets a list of attributes that are defined by the current type
+    /// </summary>
+    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; }
+    
+    /// <summary>
+    /// Adds a attribute to the current association role
+    /// </summary>
+    /// <param name="ckTypeAttributeGraph"></param>
+    internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
+    {
+        if (_attributes.ContainsKey(ckTypeAttributeGraph.CkAttributeId))
+        {
+            return false;
+        }
+
+        _attributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
+        return true;
+    }
 }

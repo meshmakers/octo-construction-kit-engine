@@ -12,8 +12,8 @@ public class CkGraphAssociationInheritance
     /// </summary>
     public CkGraphAssociationInheritance()
     {
-        Owned = new List<CkAssociationGraph>();
-        Inherited = new List<CkAssociationGraph>();
+        Owned = new List<CkTypeAssociationGraph>();
+        Inherited = new List<CkTypeAssociationGraph>();
     }
     
     /// <summary>
@@ -22,7 +22,7 @@ public class CkGraphAssociationInheritance
     /// <param name="owned"></param>
     /// <param name="inherited"></param>
     [JsonConstructor]
-    public CkGraphAssociationInheritance(ICollection<CkAssociationGraph> owned, ICollection<CkAssociationGraph> inherited)
+    public CkGraphAssociationInheritance(ICollection<CkTypeAssociationGraph> owned, ICollection<CkTypeAssociationGraph> inherited)
     {
         Owned = owned;
         Inherited = inherited;
@@ -31,10 +31,10 @@ public class CkGraphAssociationInheritance
     /// <summary>
     /// Returns the owned associations
     /// </summary>
-    public ICollection<CkAssociationGraph> Owned { get;  }
+    public ICollection<CkTypeAssociationGraph> Owned { get;  }
     
     /// <summary>
     /// Returns the inherited associations
     /// </summary>
-    public ICollection<CkAssociationGraph> Inherited { get;}
+    public ICollection<CkTypeAssociationGraph> Inherited { get;}
 }

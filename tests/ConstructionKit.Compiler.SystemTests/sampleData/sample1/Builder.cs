@@ -137,7 +137,7 @@ public class Builder
                 new()
                 {
                     EnumId = "Enum1",
-                    Values = new List<CkSelectionValueDto>
+                    Values = new List<CkEnumValueDto>
                     {
                         new() { Key = 0, Name = "Value1" },
                         new() { Key = 1, Name = "Value2" },

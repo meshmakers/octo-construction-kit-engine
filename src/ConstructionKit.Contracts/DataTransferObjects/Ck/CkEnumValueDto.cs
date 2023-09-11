@@ -7,9 +7,9 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 /// <summary>
-/// Defines selection values for a ck attribute.
+/// Defines enum values for an enum type.
 /// </summary>
-public class CkSelectionValueDto
+public class CkEnumValueDto
 {
     /// <summary>
     /// Key of the selection value.

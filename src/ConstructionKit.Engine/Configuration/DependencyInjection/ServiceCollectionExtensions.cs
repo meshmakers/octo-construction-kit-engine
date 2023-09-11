@@ -36,12 +36,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkSchemaValidator, CkSchemaValidator>();
         
         // Model stuff
-        services.AddSingleton<ICkModelRepositoryManager, CkModelRepositoryManager>();
+        services.AddTransient<ICkModelRepositoryManager, CkModelRepositoryManager>();
         
         // Adding services
-        services.AddSingleton<ICompilerService, CompilerService>();
+        services.AddTransient<ICompilerService, CompilerService>();
         services.AddTransient<ICkValidationService, CkValidationService>();
-        services.AddTransient<ICkCacheService, CkCacheService>();
+        services.AddSingleton<ICkCacheService, CkCacheService>();
         
         // Add here sources of Ck model repositories
         services.AddTransient<ICkModelRepository, LocalFileSystemCkModelRepository>();

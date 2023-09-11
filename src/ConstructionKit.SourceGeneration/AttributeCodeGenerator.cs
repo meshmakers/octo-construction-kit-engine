@@ -1,4 +1,5 @@
 using System.Text;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -52,6 +53,19 @@ internal class AttributeCodeGenerator
                               "), AttributeValueTypesDto.Boolean, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.Enum:
+                if (ckAttributeGraph.ValueCkEnumId.HasValue)
+                {
+                    sb.AppendLine(
+                        $"  public Rt{ckAttributeGraph.ValueCkEnumId.Value.Key.EnumId.MakeClassName()}Enum? {ckTypeAttributeDto.AttributeName}");
+                    sb.AppendLine("  {");
+                    sb.AppendLine($"      get => GetAttributeValueOrDefault<Rt{ckAttributeGraph.ValueCkEnumId.Value.Key.EnumId.MakeClassName()}Enum>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                                  "), AttributeValueTypesDto.Int, value);");
+                    sb.AppendLine("  }");
+                }
+
+                break;
             case AttributeValueTypesDto.BinaryLinked:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;
@@ -97,6 +111,19 @@ internal class AttributeCodeGenerator
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.Boolean, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.Enum:
+                if (ckAttributeGraph.ValueCkEnumId.HasValue)
+                {
+                    sb.AppendLine(
+                        $"  public Rt{ckAttributeGraph.ValueCkEnumId.Value.Key.EnumId.MakeClassName()}Enum {ckTypeAttributeDto.AttributeName}");
+                    sb.AppendLine("  {");
+                    sb.AppendLine($"      get => GetAttributeValue<Rt{ckAttributeGraph.ValueCkEnumId.Value.Key.EnumId.MakeClassName()}Enum>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName +
+                                  "), AttributeValueTypesDto.Int, value);");
+                    sb.AppendLine("  }");
+                }
+
+                break;            
             case AttributeValueTypesDto.BinaryLinked:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;

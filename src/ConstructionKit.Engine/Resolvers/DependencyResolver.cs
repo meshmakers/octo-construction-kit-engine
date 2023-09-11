@@ -9,12 +9,12 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class DependencyResolver : IDependencyResolver
 {
     private readonly ILogger<DependencyResolver> _logger;
-    private readonly ICkModelRepositoryManager _ckModelRepositoryManager;
+    private readonly Lazy<ICkModelRepositoryManager> _ckModelRepositoryManagerLazy;
 
-    public DependencyResolver(ILogger<DependencyResolver> logger, ICkModelRepositoryManager ckModelRepositoryManager)
+    public DependencyResolver(ILogger<DependencyResolver> logger, Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
     {
         _logger = logger;
-        _ckModelRepositoryManager = ckModelRepositoryManager;
+        _ckModelRepositoryManagerLazy = ckModelRepositoryManagerLazy;
     }
 
     public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, OperationResult operationResult)
@@ -35,7 +35,7 @@ internal class DependencyResolver : IDependencyResolver
             var ckDependency = dependencies[i];
             
             _logger.LogInformation("Resolving dependency '{CkTypeId}'", ckDependency);
-            var ckDependencyRootModel = await _ckModelRepositoryManager.LookupCkModelAsync(ckDependency, operationResult);
+            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult);
             if (ckDependencyRootModel == null)
             {
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(ckDependency));

@@ -40,7 +40,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine();
         sb.AppendLine("    public async Task<CkCompiledModelRoot> GetCompiledModelRootAsync(OperationResult operationResult)");
         sb.AppendLine("    {");
-        sb.AppendLine("        var ckModelFileName = $\"ck-{ModelId.SemanticVersionedFullName.ToLower()}.json\";");
+        sb.AppendLine("        var ckModelFileName = $\"ck-{ModelId.SemanticVersionedFullName.ToLower()}.yaml\";");
         sb.AppendLine($"        var ckModelNamespace = \"{ckModelIdNs}\";");
         sb.AppendLine("        var resourceName = $\"{ckModelNamespace}.{ckModelFileName}\";");
         sb.AppendLine();

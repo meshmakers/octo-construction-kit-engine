@@ -38,6 +38,13 @@ public interface ICkCacheService
     void Unload(string tenantId);
 
     /// <summary>
+    /// Returns true if the tenant is loaded
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <returns></returns>
+    bool IsTenantLoaded(string tenantId);
+
+    /// <summary>
     /// Returns a <see cref="CkTypeGraph"/> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>

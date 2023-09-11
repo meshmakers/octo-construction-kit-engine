@@ -44,9 +44,19 @@ public class CkCacheException : CkModelException
     {
         return new CkCacheException($"CkAssociationRole '{ckAssociationRoleId}' not found in CkCache for tenant '{tenantId}'.");
     }
+    
+    internal static Exception CkRecordNotFound(string tenantId, CkId<CkRecordId> ckRecordId)
+    {
+        return new CkCacheException($"CkRecordId '{ckRecordId}' not found in CkCache for tenant '{tenantId}'.");
+    }
 
     internal static Exception CannotDeserializeCache(string tenantId)
     {
         return new CkCacheException($"Cannot deserialize CkCache for tenant '{tenantId}'.");
+    }
+
+    internal static Exception CkEnumNotFound(string tenantId, CkId<CkEnumId> ckEnumId)
+    {
+        return new CkCacheException($"CkEnumId '{ckEnumId}' not found in CkCache for tenant '{tenantId}'.");
     }
 }

@@ -84,6 +84,36 @@ internal class CkCache : IDisposable
 
         return ckAssociationRoleGraph;
     }
+    
+    public CkRecordGraph GetCkRecord(CkId<CkRecordId> ckRecordId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.Records.TryGetValue(ckRecordId, out var ckRecordGraph))
+        {
+            throw CkCacheException.CkRecordNotFound(TenantId, ckRecordId);
+        }
+
+        return ckRecordGraph;
+    }
+    
+    public CkEnumGraph GetCkEnum(CkId<CkEnumId> ckEnumId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.Enums.TryGetValue(ckEnumId, out var ckEnumGraph))
+        {
+            throw CkCacheException.CkEnumNotFound(TenantId, ckEnumId);
+        }
+
+        return ckEnumGraph;
+    }
 
     private void Dispose(bool disposing)
     {

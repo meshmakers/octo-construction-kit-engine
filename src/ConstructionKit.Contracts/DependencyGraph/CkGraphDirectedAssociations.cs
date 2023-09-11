@@ -47,5 +47,6 @@ public class CkGraphDirectedAssociations
     /// Returns the outbound associations
     /// </summary>
     public CkGraphAssociationInheritance Out { get;  } 
+   
     
 }

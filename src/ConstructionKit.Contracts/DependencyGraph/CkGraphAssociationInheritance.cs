@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+// ReSharper disable UnusedMember.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
@@ -37,4 +38,10 @@ public class CkGraphAssociationInheritance
     /// Returns the inherited associations
     /// </summary>
     public ICollection<CkTypeAssociationGraph> Inherited { get;}
+    
+    /// <summary>
+    /// Returns the sum of owned and inherited associations
+    /// </summary>
+    [JsonIgnore]
+    public ICollection<CkTypeAssociationGraph> All => Owned.Concat(Inherited).ToList();
 }

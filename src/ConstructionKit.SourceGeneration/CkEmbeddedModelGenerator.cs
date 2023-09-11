@@ -29,11 +29,11 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine($"public class {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel : ICkEmbeddedModel");
         sb.AppendLine("{");
         sb.AppendLine();
-        sb.AppendLine($"   private readonly ICkJsonSerializer _ckJsonSerializer;");
+        sb.AppendLine($"   private readonly ICkYamlSerializer _ckYamlSerializer;");
         sb.AppendLine();
-        sb.AppendLine($"   public {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel(ICkJsonSerializer ckJsonSerializer)");
+        sb.AppendLine($"   public {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel(ICkYamlSerializer ckYamlSerializer)");
         sb.AppendLine("    {");
-        sb.AppendLine("        _ckJsonSerializer = ckJsonSerializer;");
+        sb.AppendLine("        _ckYamlSerializer = ckYamlSerializer;");
         sb.AppendLine("    }");
         sb.AppendLine();
         sb.AppendLine($"    public CkModelId ModelId => new CkModelId(\"{ckModelId.FullName}\");");
@@ -50,7 +50,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine("             {");
         sb.AppendLine("                  throw new KeyNotFoundException($\"'{resourceName}' not found in resources.\");");
         sb.AppendLine("             }");
-        sb.AppendLine("             return await _ckJsonSerializer.DeserializeCompiledModelRootAsync(stream, operationResult);");
+        sb.AppendLine("             return await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, operationResult);");
         sb.AppendLine("         }");
         sb.AppendLine("");
         sb.AppendLine("    }");

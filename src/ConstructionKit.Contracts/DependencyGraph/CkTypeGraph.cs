@@ -178,7 +178,7 @@ public class CkTypeGraph
         }
 
         _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
-        _allAttributesByName.Add(ckTypeAttributeGraph.AttributeName, ckTypeAttributeGraph);
+        _allAttributesByName[ckTypeAttributeGraph.AttributeName] = ckTypeAttributeGraph;
         return true;
     }
 

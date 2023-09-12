@@ -26,7 +26,13 @@ public class ModelRepositoryException : CkModelException
         return new ModelRepositoryException($"Model '{ckModelId}' not found in one of the defined model repositories.");
     }
     
-    internal static Exception ModelNotFound(CkModelId ckModelId, string repositoryName)
+    /// <summary>
+    /// Creates an exception that indicates that a model was not found in a specific repository.
+    /// </summary>
+    /// <param name="ckModelId"></param>
+    /// <param name="repositoryName"></param>
+    /// <returns></returns>
+    public static Exception ModelNotFound(CkModelId ckModelId, string repositoryName)
     {
         return new ModelRepositoryException($"Model '{ckModelId}' not found in repository '{repositoryName}'.");
     }

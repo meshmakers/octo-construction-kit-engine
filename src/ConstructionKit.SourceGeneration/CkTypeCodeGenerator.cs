@@ -50,7 +50,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
-        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;");
+        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;");
         sb.AppendLine();
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();

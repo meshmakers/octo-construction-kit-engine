@@ -107,7 +107,7 @@ public class CkModelGraph
     /// <param name="ckAttributeId"></param>
     /// <param name="ckAttributeDto"></param>
     /// <returns></returns>
-    internal CkAttributeGraph GetOrCreateAttribute(CkId<CkAttributeId> ckAttributeId, CkAttributeDto ckAttributeDto)
+    public CkAttributeGraph GetOrCreateAttribute(CkId<CkAttributeId> ckAttributeId, CkAttributeDto ckAttributeDto)
     {
         if (_attributes.TryGetValue(ckAttributeId, out var ckAttributeGraph))
         {
@@ -125,7 +125,7 @@ public class CkModelGraph
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
     /// <returns></returns>
-    internal CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
+    public CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
     {
         if (_types.TryGetValue(ckTypeId, out var ckTypeGraph))
         {
@@ -144,7 +144,7 @@ public class CkModelGraph
     /// <param name="ckAssociationId"></param>
     /// <param name="ckAssociationRole"></param>
     /// <returns></returns>
-    internal CkAssociationRoleGraph GetOrCreateAssociationRole(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
+    public CkAssociationRoleGraph GetOrCreateAssociationRole(CkId<CkAssociationRoleId> ckAssociationId, CkAssociationRoleDto ckAssociationRole)
     {
         if (_associationRoles.TryGetValue(ckAssociationId, out var ckAssociationRoleGraph))
         {
@@ -162,7 +162,7 @@ public class CkModelGraph
     /// <param name="ckRecordId"></param>
     /// <param name="ckRecordDto"></param>
     /// <returns></returns>
-    internal CkRecordGraph GetOrCreateRecord(CkId<CkRecordId> ckRecordId, CkRecordDto ckRecordDto)
+    public CkRecordGraph GetOrCreateRecord(CkId<CkRecordId> ckRecordId, CkRecordDto ckRecordDto)
     {
         if (_records.TryGetValue(ckRecordId, out var ckRecordGraph))
         {
@@ -180,7 +180,7 @@ public class CkModelGraph
     /// <param name="ckEnumId"></param>
     /// <param name="ckEnumDto"></param>
     /// <returns></returns>
-    internal CkEnumGraph GetOrCreateEnum(CkId<CkEnumId> ckEnumId, CkEnumDto ckEnumDto)
+    public CkEnumGraph GetOrCreateEnum(CkId<CkEnumId> ckEnumId, CkEnumDto ckEnumDto)
     {
         if (_enums.TryGetValue(ckEnumId, out var ckEnumGraph))
         {

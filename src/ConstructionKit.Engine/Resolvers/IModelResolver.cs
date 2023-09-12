@@ -10,6 +10,14 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 public interface IModelResolver
 {
     /// <summary>
+    /// Resolves a list of model ids 
+    /// </summary>
+    /// <param name="ckModelIds"></param>
+    /// <param name="operationResult"></param>
+    /// <returns></returns>
+    Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult);
+    
+    /// <summary>
     /// Loads the compiled model into the resolver.
     /// </summary>
     /// <param name="compiledModel"></param>

@@ -28,14 +28,14 @@ public class CkAttributeDto
     public AttributeValueTypesDto ValueType { get; set; }
     
     /// <summary>
-    /// Defines the record of the attribute if the value type is a model.
+    /// Defines the record of the attribute if the value type is a record.
     /// </summary>
     [JsonConverter(typeof(CkIdRecordIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkRecordId>? ValueCkRecordId { get; set; }
     
     /// <summary>
-    /// Defines the record of the attribute if the value type is a model.
+    /// Defines the enum of the attribute if the value type is a enum.
     /// </summary>
     [JsonConverter(typeof(CkIdEnumIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
@@ -54,7 +54,7 @@ public class CkAttributeDto
     public bool IsOptional { get; set; }
     
     /// <summary>
-    /// A optional description of the attribute
+    /// An optional description of the attribute
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }

@@ -12,18 +12,18 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 public class CkEnumValueDto
 {
     /// <summary>
-    /// Key of the selection value.
+    /// Key of the enum value.
     /// </summary>
     public int Key { get; set; }
 
     /// <summary>
-    /// Display name of the selection value.
+    /// Name of the enum value.
     /// </summary>
     [JsonRequired] 
     public string Name { get; set; } = null!;
     
     /// <summary>
-    /// A optional description of the enum value
+    /// A optional description of the enum value.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }

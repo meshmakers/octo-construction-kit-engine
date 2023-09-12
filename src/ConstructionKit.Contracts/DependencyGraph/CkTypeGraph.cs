@@ -17,6 +17,7 @@ public class CkTypeGraph
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     private readonly List<CkGraphTypeInheritance> _derivedTypes;
     private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
+    private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkTypeGraph"/>.
@@ -32,11 +33,13 @@ public class CkTypeGraph
         _baseTypes = new List<CkGraphTypeInheritance>();
         _derivedTypes = new List<CkGraphTypeInheritance>();
         _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
+        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>();
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = new(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeDto.Attributes ?? new List<CkTypeAttributeDto>());
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
+        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
         Indexes = new Collection<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
     }
 
@@ -71,11 +74,14 @@ public class CkTypeGraph
         _derivedTypes = new List<CkGraphTypeInheritance>(derivedTypes);
         _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(allAttributes
             .ToDictionary(k => k.Key, v => v.Value));
+        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>(allAttributes
+            .ToDictionary(k => k.Value.AttributeName, v => v.Value));
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = associations;
         DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
+        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
         Indexes = new List<CkTypeIndexDto>(indexes);
     }
 
@@ -129,6 +135,12 @@ public class CkTypeGraph
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
     public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; }
+    
+    /// <summary>
+    ///     Gets or sets a list of attributes including inherited ones.
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, CkTypeAttributeGraph> AllAttributesByName { get; }
 
     /// <summary>
     /// Returns a string that describes the inheritance chain
@@ -166,6 +178,7 @@ public class CkTypeGraph
         }
 
         _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
+        _allAttributesByName.Add(ckTypeAttributeGraph.AttributeName, ckTypeAttributeGraph);
         return true;
     }
 

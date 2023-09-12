@@ -14,6 +14,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 public class CkAssociationRoleGraph
 {
     private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _attributes;
+    private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
 
     /// <summary>
     /// Creates a new instance of <see cref="CkAssociationRoleGraph"/>.
@@ -29,7 +30,9 @@ public class CkAssociationRoleGraph
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(associationRoleDto.Attributes ?? new List<CkTypeAttributeDto>());
         _attributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
+        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>();
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_attributes);
+        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
     }
 
     /// <summary>
@@ -56,7 +59,10 @@ public class CkAssociationRoleGraph
         DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
         _attributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(attributes
             .ToDictionary(k=> k.Key, v=> v.Value));
+        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>(attributes
+            .ToDictionary(k => k.Value.AttributeName, v => v.Value));
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_attributes);
+        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
     }
     
     /// <summary>
@@ -90,6 +96,12 @@ public class CkAssociationRoleGraph
     public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> Attributes { get; set; }
     
     /// <summary>
+    ///     Gets or sets a list of attributes that are defined by the current association by name
+    /// </summary>
+    [JsonIgnore]
+    public IReadOnlyDictionary<string, CkTypeAttributeGraph> AllAttributesByName { get; }
+    
+    /// <summary>
     ///     Gets or sets a list of attributes that are defined by the current type
     /// </summary>
     public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; }
@@ -106,6 +118,7 @@ public class CkAssociationRoleGraph
         }
 
         _attributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
+        _allAttributesByName.Add(ckTypeAttributeGraph.AttributeName, ckTypeAttributeGraph);
         return true;
     }
 }

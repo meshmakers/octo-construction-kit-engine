@@ -31,6 +31,17 @@ internal class ModelResolver : IModelResolver
         _elementResolver = elementResolver;
         _referenceResolver = referenceResolver;
     }
+    
+    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
+    {
+        CkModelGraph modelGraph = new CkModelGraph();
+        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, operationResult);
+
+        _referenceResolver.Resolve(modelGraph, operationResult);
+        _inheritanceResolver.Resolve(modelGraph, operationResult);
+
+        return modelGraph;
+    }
 
     /// <summary>
     /// Loads the compiled model into the resolver.

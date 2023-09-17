@@ -104,7 +104,7 @@ public class Builder
                     },
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" },
+                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1"},
                     }
                     
                 },

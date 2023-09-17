@@ -66,7 +66,21 @@ internal class AttributeCodeGenerator
                 }
 
                 break;
-            case AttributeValueTypesDto.BinaryLinked:
+            case AttributeValueTypesDto.StringArray:
+                sb.AppendLine($"  public IEnumerable<string>? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValuesOrDefault<string>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.IntArray:
+                sb.AppendLine($"  public IEnumerable<long>? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValuesOrDefault<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.IntArray, value);");
+                sb.AppendLine("  }");
+                break;
+            default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;
         }
@@ -124,7 +138,21 @@ internal class AttributeCodeGenerator
                 }
 
                 break;            
-            case AttributeValueTypesDto.BinaryLinked:
+            case AttributeValueTypesDto.StringArray:
+                sb.AppendLine($"  public IEnumerable<string> {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValues<string>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.IntArray:
+                sb.AppendLine($"  public IEnumerable<long> {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValues<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.IntArray, value);");
+                sb.AppendLine("  }");
+                break;
+            default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;
         }

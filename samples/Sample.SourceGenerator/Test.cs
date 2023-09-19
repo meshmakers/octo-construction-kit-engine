@@ -43,8 +43,7 @@ public class RtEntity
         return null;
     }
     
-    public TValue GetAttributeValue<TValue>(string attributeName, TValue defaultValue = default)
-        where TValue : struct
+    public TValue GetAttributeValue<TValue>(string attributeName)
     {
         throw new InvalidOperationException();
     }

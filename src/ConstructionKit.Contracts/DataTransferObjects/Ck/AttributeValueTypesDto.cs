@@ -66,4 +66,9 @@ public enum AttributeValueTypesDto
     /// Indicates that the attribute value is an enum.
     /// </summary>
     Enum = 13,
+    
+    /// <summary>
+    /// Indicates that the attribute value is a 64 bit integer.
+    /// </summary>
+    Int64 = 14
 }

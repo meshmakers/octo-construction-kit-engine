@@ -1,12 +1,11 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
-internal class AttributeCodeGenerator
+internal static class AttributeCodeGenerator
 {
     internal static void GenerateNullableProperty(CkTypeAttributeDto ckTypeAttributeDto, StringBuilder sb, CkAttributeGraph ckAttributeGraph)
     {
@@ -28,6 +27,14 @@ internal class AttributeCodeGenerator
                               "), AttributeValueTypesDto.Int, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.Int64:
+                sb.AppendLine($"  public int? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<int>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.Int64, value);");
+                sb.AppendLine("  }");
+                break;            
             case AttributeValueTypesDto.DateTime:
                 sb.AppendLine($"  public global::System.DateTime? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
@@ -124,12 +131,19 @@ internal class AttributeCodeGenerator
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Int:
-                sb.AppendLine($"  public long {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public int {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValue<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeValue<int>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.Int, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.Int64:
+                sb.AppendLine($"  public long {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.Int64, value);");
+                sb.AppendLine("  }");
+                break;            
             case AttributeValueTypesDto.DateTime:
                 sb.AppendLine($"  public global::System.DateTime {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");

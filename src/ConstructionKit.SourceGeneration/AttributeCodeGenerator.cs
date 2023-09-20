@@ -44,6 +44,24 @@ internal static class AttributeCodeGenerator
                               "), AttributeValueTypesDto.DateTime, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.TimeSpan:
+                sb.AppendLine($"  public global::System.TimeSpan? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<global::System.TimeSpan>(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.TimeSpan, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.DateTimeOffset:
+                sb.AppendLine($"  public global::System.DateTimeOffset? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<global::System.DateTimeOffset>(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.DateTimeOffset, value);");
+                sb.AppendLine("  }");
+                break;
             case AttributeValueTypesDto.Double:
                 sb.AppendLine($"  public double? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
@@ -149,6 +167,20 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValue<global::System.DateTime>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.DateTime, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.DateTimeOffset:
+                sb.AppendLine($"  public global::System.DateTimeOffset {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<global::System.DateTimeOffset>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.DateTimeOffset, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.TimeSpan:
+                sb.AppendLine($"  public global::System.TimeSpan {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<global::System.TimeSpan>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.TimeSpan, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Double:

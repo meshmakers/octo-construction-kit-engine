@@ -51,7 +51,8 @@
             "RecordArray",
             "TimeSpan",
             "Enum",
-            "Int64"
+            "Int64",
+            "DateTimeOffset"
           ]
         },
         "valueCkRecordId": {

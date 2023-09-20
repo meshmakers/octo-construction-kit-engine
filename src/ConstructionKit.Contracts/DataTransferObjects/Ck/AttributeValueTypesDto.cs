@@ -70,5 +70,10 @@ public enum AttributeValueTypesDto
     /// <summary>
     /// Indicates that the attribute value is a 64 bit integer.
     /// </summary>
-    Int64 = 14
+    Int64 = 14,
+    
+    /// <summary>
+    /// Indicates that the attribute value is a date time offset.
+    /// </summary>
+    DateTimeOffset = 15,
 }

@@ -67,7 +67,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 #else
         await using var streamReader = File.OpenRead(compiledModelFilePath);
 #endif
-        var compiledModelRoot = await _ckJsonSerializer.DeserializeCompiledModelRootAsync(streamReader, operationResult);
+        var compiledModelRoot = await _ckJsonSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult);
         if (operationResult.HasErrors)
         {
             throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);

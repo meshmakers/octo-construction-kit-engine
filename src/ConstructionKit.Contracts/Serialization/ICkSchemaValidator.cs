@@ -9,47 +9,53 @@ public interface ICkSchemaValidator
     /// Validates the elements in the stream using JSON format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in JSON format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateElementsInJson(Stream stream, OperationResult operationResult);
+    bool ValidateElementsInJson(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Validates the meta data in the stream using JSON format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in JSON format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateMetaInJson(Stream stream, OperationResult operationResult);
+    bool ValidateMetaInJson(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Validates the compiled model in the stream using JSON format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in JSON format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateCompiledModelInJson(Stream stream, OperationResult operationResult);
+    bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult);
 
     /// <summary>
     /// Validates the elements in the stream using YAML format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in YAML format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateElementsInYaml(Stream stream, OperationResult operationResult);
+    bool ValidateElementsInYaml(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Validates the meta data in the stream using YAML format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in YAML format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateMetaInYaml(Stream stream, OperationResult operationResult);
+    bool ValidateMetaInYaml(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Validates the compiled model in the stream using YAML format.
     /// </summary>
     /// <param name="stream">Stream containing construction kit model in YAML format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    bool ValidateCompiledModelInYaml(Stream stream, OperationResult operationResult);
+    bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult);
 }

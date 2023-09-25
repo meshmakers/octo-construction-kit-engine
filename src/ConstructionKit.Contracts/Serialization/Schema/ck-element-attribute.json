@@ -20,6 +20,9 @@
           "items": {
             "type": "string"
           }
+        },
+        "isOptional": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false,
@@ -68,9 +71,6 @@
           "items": {
             "type": "object"
           }
-        },
-        "isOptional": {
-          "type": "boolean"
         },
         "description": {
           "type": "string"

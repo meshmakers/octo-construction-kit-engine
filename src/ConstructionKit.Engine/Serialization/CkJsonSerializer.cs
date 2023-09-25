@@ -2,7 +2,6 @@
 using System.Text.Json.Serialization;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
@@ -54,98 +53,98 @@ internal class CkJsonSerializer : ICkJsonSerializer
     }
 
     /// <inheritdoc />
-    public async Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, OperationResult operationResult)
+    public async Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
             var ckMetaDto = await JsonSerializer.DeserializeAsync<CkMetaRootDto>(stream, _options);
-            return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel();
+            return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
         {
-            CheckException(operationResult, e);
-            throw ModelParseException.CannotDeserializeModel();
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
         }
     }
 
     /// <inheritdoc />
-    public async Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, OperationResult operationResult)
+    public async Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
             var ckElementsDto = await JsonSerializer.DeserializeAsync<CkElementsRootDto>(stream, _options);
-            return ckElementsDto ?? throw ModelParseException.CannotDeserializeModel();
+            return ckElementsDto ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
         {
-            CheckException(operationResult, e);
-            throw ModelParseException.CannotDeserializeModel();
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
         }
     }
 
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult) 
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult) 
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, operationResult);
+        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult)
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return DeserializeCompiledModelRoot(memStream, operationResult);
+        return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
     }
 
-    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, OperationResult operationResult)
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
             var ckModelRoot = JsonSerializer.Deserialize<CkCompiledModelRoot>(stream, _options);
-            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel();
+            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
         {
-            CheckException(operationResult, e);
-            throw ModelParseException.CannotDeserializeModel();
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
         }
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
             var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options);
-            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel();
+            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
         {
-            CheckException(operationResult, e);
-            throw ModelParseException.CannotDeserializeModel();
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
         }
     }
     
     
-    private static void CheckException(OperationResult operationResult, JsonException e)
+    private static void CheckException(string locationReference, OperationResult operationResult, JsonException e)
     {
         if (e.Data.Contains(Validation))
         {
             var evaluationResults = (EvaluationResults?)e.Data[Validation];
             if (evaluationResults != null)
             {
-                if (!ValidateEvaluationResults(operationResult, evaluationResults))
+                if (!ValidateEvaluationResults(locationReference, operationResult, evaluationResults))
                 {
-                    throw ModelParseException.SchemaValidationFailed();
+                    throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);
                 }
             }
         }
     }
     
-    private static bool ValidateEvaluationResults(OperationResult operationResult, EvaluationResults evaluationResults)
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
     {
         if (!evaluationResults.IsValid)
         {
@@ -153,7 +152,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
             {
                 var path = evaluationResult.InstanceLocation.ToString();
                 var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
-                operationResult.AddMessage(MessageCodes.SchemaValidationError($"{path}: {errorMessages}"));
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
             }
         }
 

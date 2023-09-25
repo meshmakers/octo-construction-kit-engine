@@ -18,9 +18,10 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/types-ok.yaml");
+        var filePath = "sampleData/files/types-ok.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -32,9 +33,10 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/attributes-ok.yaml");
+        var filePath = "sampleData/files/attributes-ok.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -46,9 +48,10 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/associations-ok.yaml");
+        var filePath = "sampleData/files/associations-ok.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -60,9 +63,10 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/noSchema.yaml");
+        var filePath = "sampleData/files/noSchema.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckYamlSerializer);
         Assert.Equal(4, ckElementsDto.Types?.Count);
         Assert.Empty(operationResult.Messages);
@@ -75,9 +79,11 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/noSchema_malformed.yaml");
+        var filePath = "sampleData/files/noSchema_malformed.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream,
+            filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
@@ -89,9 +95,11 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/malformedAttribute.yaml");
+        var filePath = "sampleData/files/malformedAttribute.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, 
+            filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
@@ -103,9 +111,11 @@ public class YamlSerializerTests
     {
         var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
 
-        var stream = File.OpenRead("sampleData/files/malformedAttributeValue.yaml");
+        var filePath = "sampleData/files/malformedAttributeValue.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, 
+            operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);

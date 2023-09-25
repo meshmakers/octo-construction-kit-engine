@@ -48,12 +48,6 @@ public class CkAttributeDto
     public ICollection<object>? DefaultValues { get; set; }
     
     /// <summary>
-    /// If true, the attribute is optional, that means it can be null
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public bool IsOptional { get; set; }
-    
-    /// <summary>
     /// An optional description of the attribute
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]

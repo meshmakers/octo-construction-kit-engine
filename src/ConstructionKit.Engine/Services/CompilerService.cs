@@ -1,6 +1,5 @@
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -216,7 +215,7 @@ public class CompilerService : ICompilerService
 #else
         await using var stream = File.OpenRead(modelPath);
 #endif
-        var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, operationResult);
+        var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, modelPath, operationResult);
 
         var types = new List<CkTypeDto>();
         if (Directory.Exists(typesDirectory))
@@ -230,7 +229,7 @@ public class CompilerService : ICompilerService
 #else
                     await using var streamType = File.OpenRead(typeFile);
 #endif
-                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, operationResult);
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, typeFile, operationResult);
                     if (elementsRootDto.Types != null)
                     {
                         types.AddRange(elementsRootDto.Types);
@@ -256,7 +255,7 @@ public class CompilerService : ICompilerService
 #else
                     await using var streamRecord = File.OpenRead(recordFile);
 #endif
-                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamRecord, operationResult);
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamRecord, recordFile, operationResult);
                     if (elementsRootDto.Records != null)
                     {
                         records.AddRange(elementsRootDto.Records);
@@ -282,7 +281,7 @@ public class CompilerService : ICompilerService
 #else
                     await using var streamEnum = File.OpenRead(enumFile);
 #endif
-                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamEnum, operationResult);
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamEnum, enumFile, operationResult);
                     if (elementsRootDto.Enums != null)
                     {
                         enums.AddRange(elementsRootDto.Enums);
@@ -308,7 +307,7 @@ public class CompilerService : ICompilerService
 #else
                     await using var streamAttribute = File.OpenRead(attributeFile);
 #endif
-                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAttribute, operationResult);
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAttribute, attributeFile, operationResult);
                     if (elementsRootDto.Attributes != null)
                     {
                         attributes.AddRange(elementsRootDto.Attributes);
@@ -334,7 +333,7 @@ public class CompilerService : ICompilerService
 #else
                     await using var streamAssociation = File.OpenRead(associationFile);
 #endif
-                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAssociation, operationResult);
+                    var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamAssociation, associationFile, operationResult);
                     if (elementsRootDto.AssociationRoles != null)
                     {
                         associationRoles.AddRange(elementsRootDto.AssociationRoles);

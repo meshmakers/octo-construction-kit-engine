@@ -26,7 +26,7 @@ public class CkTypeAttributeGraph
         ValueCkRecordId = ckAttributeGraph.ValueCkRecordId;
         ValueCkEnumId = ckAttributeGraph.ValueCkEnumId;
         DefaultValues = ckAttributeGraph.DefaultValues;
-        IsOptional = ckAttributeGraph.IsOptional;
+        IsOptional = ckTypeAttributeDto.IsOptional;
         Description = ckAttributeGraph.Description;
     }
 

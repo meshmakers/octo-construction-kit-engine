@@ -32,7 +32,7 @@ internal class CompileCommand : Command<OctoToolOptions>
 
         var rootPath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
         var createCacheFile = CommandArgumentValue.IsArgumentUsed(_cacheArg);
-        Logger.LogInformation("Path of root directory: {Path}", rootPath);
+        Logger.LogInformation("Path of root directory: {Path}", Path.GetFullPath(rootPath));
 
         await _compilerService.CompileAsync(rootPath, createCacheFile);
         

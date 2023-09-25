@@ -11,9 +11,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/types-ok.json");
+        string filePath = "sampleData/files/types-ok.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        bool isValid = schemaValidator.ValidateElementsInJson(stream, operationResult);
+        bool isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
         Assert.True(isValid);
         Assert.False(operationResult.Messages.Any());
         Assert.False(operationResult.HasErrors);
@@ -25,9 +26,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/malformedAttribute.json");
+        string filePath = "sampleData/files/malformedAttribute.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var isValid = schemaValidator.ValidateElementsInJson(stream, operationResult);
+        var isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
@@ -40,9 +42,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/malformedAttributeValue.json");
+        string filePath = "sampleData/files/malformedAttributeValue.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var isValid = schemaValidator.ValidateElementsInJson(stream, operationResult);
+        var isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
@@ -56,9 +59,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/types-ok.yaml");
+        string filePath = "sampleData/files/types-ok.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var isValid = schemaValidator.ValidateElementsInYaml(stream, operationResult);
+        var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
         Assert.True(isValid);
         Assert.False(operationResult.Messages.Any());
         Assert.False(operationResult.HasErrors);
@@ -70,9 +74,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/malformedAttribute.yaml");
+        string filePath = "sampleData/files/malformedAttribute.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var isValid = schemaValidator.ValidateElementsInYaml(stream, operationResult);
+        var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
@@ -85,9 +90,10 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        var stream = File.OpenRead("sampleData/files/malformedAttributeValue.yaml");
+        string filePath = "sampleData/files/malformedAttributeValue.yaml";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var isValid = schemaValidator.ValidateElementsInYaml(stream, operationResult);
+        var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);

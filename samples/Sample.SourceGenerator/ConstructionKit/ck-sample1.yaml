@@ -15,6 +15,7 @@ types:
   attributes:
   - id: Sample1/SampleAttribute
     name: MyAttribute
+    isOptional: true
   - id: Sample1/DateTimeAttribute
     name: DateTimeAttribute
   - id: Sample1/Type
@@ -33,7 +34,6 @@ associationRoles:
 attributes:
 - id: SampleAttribute
   valueType: String
-  isOptional: true
 - id: DateTimeAttribute
   valueType: DateTime
 - id: TestEnum
@@ -47,6 +47,7 @@ records:
   attributes:
   - id: Sample1/SampleAttribute
     name: MyAttribute
+    isOptional: true
   - id: Sample1/DateTimeAttribute
     name: DateTimeAttribute
 enums:

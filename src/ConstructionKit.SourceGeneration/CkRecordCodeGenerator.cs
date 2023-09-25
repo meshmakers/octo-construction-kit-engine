@@ -65,7 +65,7 @@ public class CkRecordCodeGenerator
                     sb.AppendLine("  /// </summary>");
                 }
                 
-                if (ckAttributeGraph.IsOptional)
+                if (ckTypeAttributeDto.IsOptional)
                 {
                     AttributeCodeGenerator.GenerateNullableProperty(ckTypeAttributeDto, sb, ckAttributeGraph);
                 }

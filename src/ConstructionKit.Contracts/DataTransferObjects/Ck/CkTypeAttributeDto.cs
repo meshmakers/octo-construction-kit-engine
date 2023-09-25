@@ -42,4 +42,10 @@ public class CkTypeAttributeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? AutoIncrementReference { get; set; }
+    
+    /// <summary>
+    /// If true, the attribute is optional, that means it can be null
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsOptional { get; set; }
 }

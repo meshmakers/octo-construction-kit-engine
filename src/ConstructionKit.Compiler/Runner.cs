@@ -34,14 +34,22 @@ internal class Runner
             _logger.LogError("{Message}", ex.Message);
 
             ex.OperationResult.WriteMessagesToLogger(_logger);
+
+            return -5;
+        }
+        catch (ModelParseException ex)
+        {
+            _logger.LogError("{Message}", ex.Message);
             
-            return -3;
+            ex.OperationResult.WriteMessagesToLogger(_logger);
+
+            return -4; 
         }
         catch (CkModelException ex)
         {
             _logger.LogError("{Message}", ex.Message);
             
-            return -2; 
+            return -3; 
         }
         catch (ArgumentValueMissingException ex)
         {

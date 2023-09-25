@@ -85,7 +85,7 @@ public class CkSourceGenerator : IIncrementalGenerator
         }
         
         var operationResult = new OperationResult();
-        var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), operationResult);
+        var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), mainFile.Path, operationResult);
         if (operationResult.Messages.Any())
         {
             ReportOperationResults(context, operationResult);

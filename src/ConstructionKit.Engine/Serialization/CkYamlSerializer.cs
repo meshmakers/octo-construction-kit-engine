@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using YamlDotNet.Serialization;
@@ -84,12 +83,12 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, OperationResult operationResult)
+    public Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
-        _ckSchemaValidator.ValidateMetaInYaml(stream, operationResult);
+        _ckSchemaValidator.ValidateMetaInYaml(stream, locationReference, operationResult);
         if (operationResult.HasErrors)
         {
-            throw ModelParseException.SchemaValidationFailed();
+            throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }
 
         using var streamReader = new StreamReader(stream);
@@ -98,12 +97,12 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, OperationResult operationResult)
+    public Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
-        _ckSchemaValidator.ValidateElementsInYaml(stream, operationResult);
+        _ckSchemaValidator.ValidateElementsInYaml(stream, locationReference, operationResult);
         if (operationResult.HasErrors)
         {
-            throw ModelParseException.SchemaValidationFailed();
+            throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }
 
         using var streamReader = new StreamReader(stream);
@@ -112,33 +111,33 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, operationResult);
+        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult)
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return DeserializeCompiledModelRoot(memStream, operationResult);
+        return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult)
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return Task.FromResult(DeserializeCompiledModelRoot(stream, operationResult));
+        return Task.FromResult(DeserializeCompiledModelRoot(stream, locationReference, operationResult));
     }
     
-    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, OperationResult operationResult)
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
     {
-        _ckSchemaValidator.ValidateCompiledModelInYaml(stream, operationResult);
+        _ckSchemaValidator.ValidateCompiledModelInYaml(stream, locationReference, operationResult);
         if (operationResult.HasErrors)
         {
-            throw ModelParseException.SchemaValidationFailed();
+            throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }
 
         using var streamReader = new StreamReader(stream);

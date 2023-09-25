@@ -49,7 +49,7 @@ internal class PublishCommand : Command<OctoToolOptions>
         await using var streamReader = File.OpenRead(filePath);
         try
         {
-            var ckCompiledModelRoot = await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, operationResult);
+            var ckCompiledModelRoot = await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error loading model \'{FilePath}\'", filePath);

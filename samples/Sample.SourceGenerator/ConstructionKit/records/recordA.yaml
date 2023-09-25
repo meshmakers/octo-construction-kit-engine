@@ -4,6 +4,7 @@ records:
   attributes:
     - id: Sample1/SampleAttribute
       name: MyAttribute
+      isOptional: true
     - id: Sample1/DateTimeAttribute
       name: DateTimeAttribute
 

@@ -15,50 +15,50 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 internal class CkSchemaValidator : ICkSchemaValidator
 {
     /// <inheritdoc />
-    public bool ValidateElementsInJson(Stream stream, OperationResult operationResult)
+    public bool ValidateElementsInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.ElementsSchema, operationResult);
+        return ValidateModelJson(stream, CkSchema.ElementsSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public bool ValidateMetaInJson(Stream stream, OperationResult operationResult)
+    public bool ValidateMetaInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.MetaSchema, operationResult);
+        return ValidateModelJson(stream, CkSchema.MetaSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public bool ValidateCompiledModelInJson(Stream stream, OperationResult operationResult)
+    public bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.CompiledModelSchema, operationResult);
+        return ValidateModelJson(stream, CkSchema.CompiledModelSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public bool ValidateElementsInYaml(Stream stream, OperationResult operationResult)
+    public bool ValidateElementsInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.ElementsSchema, operationResult);
+        return ValidateModelYaml(stream, CkSchema.ElementsSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public bool ValidateMetaInYaml(Stream stream, OperationResult operationResult)
+    public bool ValidateMetaInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.MetaSchema, operationResult);
+        return ValidateModelYaml(stream, CkSchema.MetaSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public bool ValidateCompiledModelInYaml(Stream stream, OperationResult operationResult)
+    public bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.CompiledModelSchema, operationResult);
+        return ValidateModelYaml(stream, CkSchema.CompiledModelSchema, locationReference, operationResult);
     }
 
-    private static bool ValidateModelJson(Stream stream, JsonSchema schema, OperationResult operationResult)
+    private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
     {
         var json = JsonNode.Parse(stream);
 
         var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List});
-        return ValidateEvaluationResults(operationResult, evaluationResults);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
-    private static bool ValidateModelYaml(Stream stream, JsonSchema schema, OperationResult operationResult)
+    private static bool ValidateModelYaml(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
     {
         using var memoryStream = new MemoryStream();
         stream.CopyTo(memoryStream);
@@ -71,10 +71,10 @@ internal class CkSchemaValidator : ICkSchemaValidator
         var singleNode = yamlStream.Documents[0].ToJsonNode();
 
         var evaluationResults = schema.Evaluate(singleNode, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(operationResult, evaluationResults);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
-    private static bool ValidateEvaluationResults(OperationResult operationResult, EvaluationResults evaluationResults)
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
     {
         if (!evaluationResults.IsValid)
         {
@@ -82,7 +82,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
             {
                 var path = evaluationResult.InstanceLocation.ToString();
                 var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
-                operationResult.AddMessage(MessageCodes.SchemaValidationError($"{path}: {errorMessages}"));
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
             }
         }
 

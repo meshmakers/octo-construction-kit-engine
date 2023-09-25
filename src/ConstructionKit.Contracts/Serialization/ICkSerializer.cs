@@ -1,4 +1,3 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -36,39 +35,44 @@ public interface ICkSerializer
     /// Deserializes the meta data from the stream.
     /// </summary>
     /// <param name="stream">The stream to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, OperationResult operationResult);
+    Task<CkMetaRootDto> DeserializeMetaAsync(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Deserializes the elements from the stream.
     /// </summary>
     /// <param name="stream">The stream to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, OperationResult operationResult);
+    Task<CkElementsRootDto> DeserializeElementsAsync(Stream stream, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Deserializes the compiled model from a string.
     /// </summary>
     /// <param name="s">The text containing the construction kit to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, OperationResult operationResult);
+    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult);
     
     /// <summary>
     /// Deserializes the compiled model from a string.
     /// </summary>
     /// <param name="s">The text containing the construction kit to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    CkCompiledModelRoot DeserializeCompiledModelRoot(string s, OperationResult operationResult);
-    
+    CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult);
+
     /// <summary>
     /// Deserializes the compiled model from the stream.
     /// </summary>
     /// <param name="stream">The stream to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, OperationResult operationResult);
+    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult);
 }

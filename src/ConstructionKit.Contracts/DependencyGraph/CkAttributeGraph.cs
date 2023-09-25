@@ -25,7 +25,6 @@ public class  CkAttributeGraph
         ValueCkRecordId = attributeDto.ValueCkRecordId;
         ValueCkEnumId = attributeDto.ValueCkEnumId;
         DefaultValues = attributeDto.DefaultValues;
-        IsOptional = attributeDto.IsOptional;
         Description = attributeDto.Description;
     }
 
@@ -37,18 +36,16 @@ public class  CkAttributeGraph
     /// <param name="valueCkRecordId"></param>
     /// <param name="valueCkEnumId"></param>
     /// <param name="defaultValues"></param>
-    /// <param name="isOptional">When true, the attribute value is optional, that means the value can be null.</param>
     /// <param name="description">A optional description to the attribute</param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, bool isOptional, string? description)
+        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
         ValueCkRecordId = valueCkRecordId;
         ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
-        IsOptional = isOptional;
         Description = description;
     }
     
@@ -76,11 +73,6 @@ public class  CkAttributeGraph
     /// Returns the default values of the attribute.
     /// </summary>
     public ICollection<object>? DefaultValues { get; }
-    
-    /// <summary>
-    /// If true, the attribute is optional, that means it can be null
-    /// </summary>
-    public bool IsOptional { get; }
     
     /// <summary>
     /// A optional description of the attribute

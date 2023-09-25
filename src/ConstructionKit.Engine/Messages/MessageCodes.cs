@@ -109,8 +109,8 @@ internal static class MessageCodes
     internal static CompilerMessage CkAssociationIdContainsInvalidCharacters(object ckAssociationId) =>
         GetMessage("CkAssociationIdContainsInvalidCharacters", ckAssociationId);
 
-    internal static CompilerMessage SchemaValidationError(object errorMessage) =>
-        GetMessage("SchemaValidationError", errorMessage);
+    internal static CompilerMessage SchemaValidationError(object locationReference, object errorMessage) =>
+        GetMessage("SchemaValidationError", locationReference, errorMessage);
 
     internal static CompilerMessage DirectoryDoesNotExist(object directoryPath) =>
         GetMessage("DirectoryDoesNotExist", directoryPath);
@@ -342,8 +342,8 @@ internal static class MessageCodes
         {
             "SchemaValidationError",
              new CompilerMessageTemplate(MessageLevel.Error,
-                 27, "Schema validation failed: '{errorMessage}'",
-                 new [] {"errorMessage"})
+                 27, "{locationReference}: Schema validation failed: '{errorMessage}'",
+                 new [] {"locationReference", "errorMessage"})
         },
         {
             "DirectoryDoesNotExist",

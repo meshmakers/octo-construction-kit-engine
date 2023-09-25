@@ -17,10 +17,11 @@ public class JsonSerializerTests
     public async Task DeserializeElementsAsync_types_ok()
     {
         var ckJsonSerializer = new CkJsonSerializer();
-    
-        var stream = File.OpenRead("sampleData/files/types-ok.json");
+
+        var filePath = "sampleData/files/types-ok.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -32,9 +33,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/attributes-ok.json");
+        var filePath = "sampleData/files/attributes-ok.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -46,9 +48,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/associations-ok.json");
+        var filePath = "sampleData/files/associations-ok.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult);
+        var ckElementsDto = await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.NotNull(ckElementsDto);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -60,9 +63,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/noSchema.json");
+        var filePath = "sampleData/files/noSchema.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult);
+        await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult);
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
@@ -73,9 +77,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/noSchema_malformed.json");
+        var filePath = "sampleData/files/noSchema_malformed.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
@@ -87,9 +92,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/malformedAttribute.json");
+        var filePath = "sampleData/files/noSchema_malformed.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
@@ -101,9 +107,10 @@ public class JsonSerializerTests
     {
         var ckJsonSerializer = new CkJsonSerializer();
     
-        var stream = File.OpenRead("sampleData/files/malformedAttributeValue.json");
+        var filePath = "sampleData/files/malformedAttributeValue.json";
+        var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, operationResult));
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckJsonSerializer.DeserializeElementsAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);

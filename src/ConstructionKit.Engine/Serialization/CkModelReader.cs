@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -49,16 +48,16 @@ internal class CkModelReader
 #else
             await using var stream = File.OpenRead(filePath);
 #endif
-            model = await _ckSerializer.DeserializeCompiledModelRootAsync(stream, operationResult);
+            model = await _ckSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult);
 
             if (model == null)
             {
-                throw ModelParseException.CannotDeserializeModel(filePath);
+                throw ModelParseException.CannotDeserializeModel(filePath, operationResult);
             }
         }
         catch (Exception e)
         {
-            throw ModelParseException.CommonErrorReadCkModel(filePath, e);
+            throw ModelParseException.CommonErrorReadCkModel(filePath, e, operationResult);
         }
 
         _logger.LogInformation("Validating CK model...");

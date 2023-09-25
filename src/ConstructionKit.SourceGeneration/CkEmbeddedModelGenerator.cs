@@ -50,7 +50,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine("             {");
         sb.AppendLine("                  throw new KeyNotFoundException($\"'{resourceName}' not found in resources.\");");
         sb.AppendLine("             }");
-        sb.AppendLine("             return await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, operationResult);");
+        sb.AppendLine("             return await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, resourceName, operationResult);");
         sb.AppendLine("         }");
         sb.AppendLine("");
         sb.AppendLine("    }");

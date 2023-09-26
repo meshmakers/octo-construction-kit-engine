@@ -19,6 +19,7 @@ internal class TenantRepository : ITenantRepositoryInternal
     }
     
     public string TenantId { get; }
+    
     public Task<IEnumerable<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction)
     {
         throw new NotImplementedException();
@@ -34,9 +35,16 @@ internal class TenantRepository : ITenantRepositoryInternal
         throw new NotImplementedException();
     }
 
-    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetEntityId)
+    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetRtEntityId)
     {
-        throw new NotImplementedException();
+        return new RtAssociation
+        {
+            AssociationRoleId = ckRoleId,
+            OriginCkTypeId = originRtEntityId.CkTypeId,
+            OriginRtId = originRtEntityId.RtId,
+            TargetCkTypeId = targetRtEntityId.CkTypeId,
+            TargetRtId = targetRtEntityId.RtId
+        };
     }
 
     public Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId)

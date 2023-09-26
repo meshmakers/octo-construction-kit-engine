@@ -1,0 +1,29 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/runtime-elements-association.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "RtAssociation": {
+      "type": "object",
+      "properties": {
+        "roleId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "targetRtId": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{24}$"
+        },
+        "targetCkTypeId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "roleId",
+        "targetRtId",
+        "targetCkTypeId"
+      ]
+    }
+  }
+}

@@ -1,4 +1,4 @@
-﻿namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+﻿namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// The type of an attribute value.

@@ -48,9 +48,9 @@ public interface ITenantRepositoryInternal
     /// </summary>
     /// <param name="originRtEntityId">Runtime id of the origin entity</param>
     /// <param name="ckRoleId">Construction kit role id of the association</param>
-    /// <param name="targetEntityId">Runtime id of the target entity</param>
+    /// <param name="targetRtEntityId">Runtime id of the target entity</param>
     /// <returns>A transient version of a role, need to be stored.</returns>
-    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetEntityId);
+    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetRtEntityId);
     
     /// <summary>
     /// Gets an entity by its runtime id.

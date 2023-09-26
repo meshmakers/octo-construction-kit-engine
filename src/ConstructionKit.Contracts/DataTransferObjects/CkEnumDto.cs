@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Describes a construction kit enum that is used as enum type of an attribute

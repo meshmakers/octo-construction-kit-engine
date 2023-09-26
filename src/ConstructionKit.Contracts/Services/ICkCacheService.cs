@@ -1,4 +1,3 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;

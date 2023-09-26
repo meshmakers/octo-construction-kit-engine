@@ -1,8 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 
 /// <summary>
 /// Represents the runtime model serializer

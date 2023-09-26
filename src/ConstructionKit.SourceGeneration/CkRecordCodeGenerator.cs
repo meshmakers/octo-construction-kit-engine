@@ -1,6 +1,6 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
@@ -44,7 +44,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
-        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;");
+        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;");
         sb.AppendLine();
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();

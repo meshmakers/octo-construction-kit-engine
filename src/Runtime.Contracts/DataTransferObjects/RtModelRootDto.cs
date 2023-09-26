@@ -1,0 +1,47 @@
+﻿using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
+using YamlDotNet.Serialization;
+
+namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+
+/// <summary>
+/// Defines an entity in the runtime model
+/// </summary>
+[OctoJsonSchema(typeof(RtSchema), nameof(RtSchema.RuntimeSchema))]
+public class RtModelRootDto
+{
+    /// <summary>
+    /// The URI of the schema for the CK meta.
+    /// </summary>
+    public const string RtSchemaUri = "https://schemas.meshmakers.cloud/runtime-model.schema.json";
+    
+    /// <summary>
+    /// The URI of the schema for the CK meta used for serialization.
+    /// </summary>
+    [YamlMember(Alias = "$schema")]
+    [JsonPropertyName("$schema")]
+    public virtual string SchemaUri { get; } = RtSchemaUri;
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="RtModelRootDto"/>.
+    /// </summary>
+    public RtModelRootDto()
+    {
+        Dependencies = new List<CkModelId>();
+        RtEntities = new List<RtEntityDto>();
+    }
+    
+    /// <summary>
+    /// Gets or sets the dependencies of the model.
+    /// </summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
+    public List<CkModelId> Dependencies { get; set; }
+
+    /// <summary>
+    /// Gets a list of entities in the runtime model.
+    /// </summary>
+    [JsonPropertyName("entities")] 
+    public List<RtEntityDto> RtEntities { get; }
+}

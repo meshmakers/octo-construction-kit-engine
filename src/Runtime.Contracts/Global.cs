@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Runtime.Engine")]
+[assembly: InternalsVisibleTo("Meshmakers.Octo.Runtime.Engine")]

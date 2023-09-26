@@ -1,14 +1,43 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <Description>Engine of Octo Mesh for Runtime functionality</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageIcon>meshmakers64.png</PackageIcon>
+        <PackageId>Meshmakers.Octo.Runtime.Engine</PackageId>
+        <AssemblyName>Meshmakers.Octo.Runtime.Engine</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.Runtime.Engine</RootNamespace>
         <TargetFramework>net7.0</TargetFramework>
-        <LangVersion>latestmajor</LangVersion>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>true</ImplicitUsings>
     </PropertyGroup>
 
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+        <OutputPath>..\..\bin\Debug\</OutputPath>
+        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.Runtime.Engine.xml</DocumentationFile>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+    </PropertyGroup>
+
+    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+        <OutputPath>..\..\bin\Release\</OutputPath>
+        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.Runtime.Engine.xml</DocumentationFile>
+        <NoWarn>1701;1702;CS8002</NoWarn>
+    </PropertyGroup>
+    
     <ItemGroup>
       <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
       <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
+    </ItemGroup>
+    
 </Project>

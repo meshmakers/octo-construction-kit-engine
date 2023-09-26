@@ -1,18 +1,33 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
-namespace Meshmakers.Octo.SystematizedData.Persistence.CkModel;
+namespace Meshmakers.Octo.Runtime.Contracts;
 
+/// <summary>
+/// Exception thrown when a rule is violated.
+/// </summary>
 public class RuleViolationException : Exception
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="RuleViolationException"/>
+    /// </summary>
     public RuleViolationException()
     {
     }
 
+    /// <summary>
+    /// Creates a new instance of <see cref="RuleViolationException"/>
+    /// </summary>
+    /// <param name="message"></param>
     public RuleViolationException(string message) : base(message)
     {
     }
 
+    /// <summary>
+    /// Creates a new instance of <see cref="RuleViolationException"/>
+    /// </summary>
+    /// <param name="message"></param>
+    /// <param name="inner"></param>
     public RuleViolationException(string message, Exception inner) : base(message, inner)
     {
     }
@@ -62,10 +77,21 @@ public class RuleViolationException : Exception
         return new RuleViolationException(
             $"CkTypeId '{originRtEntityId.CkTypeId}'->RtId '{originRtEntityId.RtId}': Outbound association '{roleId}' to CkTypeId '{ckTypeId}' is not allowed.");
     }
-    internal static Exception CkAssociationRoleNotFound(CkId<CkAssociationRoleId> associationId)
+
+    internal static Exception AssociationDoesNotExist(CkId<CkAssociationRoleId> dRoleId, RtEntityId origin, RtEntityId target)
     {
-        return new RuleViolationException($"Association role '{associationId}' not found.");
+        return new RuleViolationException(
+            $"Association '{dRoleId}' from '{origin}' to '{target}' does not exist.");
     }
 
+    internal static Exception EntityNotFound(RtEntityId rtEntityId)
+    {
+        return new RuleViolationException($"Entity '{rtEntityId}' does not exist.");
+    }
 
+    internal static Exception AssociationAlreadyExists(CkId<CkAssociationRoleId> roleId, RtEntityId origin, RtEntityId target)
+    {
+        return new RuleViolationException(
+            $"Association '{roleId}' from '{origin}' to '{target}' already exists.");
+    }
 }

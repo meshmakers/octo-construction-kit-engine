@@ -1,22 +1,26 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.SystematizedData.Persistence.DataAccess;
+using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
-namespace Meshmakers.Octo.SystematizedData.Persistence.CkModel.CkRuleEngine;
+namespace Meshmakers.Octo.Runtime.Engine.CkRuleEngine;
 
-public class CkEntityRuleEngine : ICkEntityRuleEngine
+/// <summary>
+/// Implementation of the runtime entity validation engine
+/// </summary>
+internal class EntityRuleEngine : IEntityRuleEngine
 {
     private readonly ICkCacheService _ckCache;
     private readonly ITenantRepositoryInternal _tenantRepository;
 
-    public CkEntityRuleEngine(ICkCacheService ckCache, ITenantRepositoryInternal tenantRepository)
+    public EntityRuleEngine(ICkCacheService ckCache, ITenantRepositoryInternal tenantRepository)
     {
         _ckCache = ckCache;
         _tenantRepository = tenantRepository;
     }
 
-    public Task<CkEntityRuleEngineResult> ValidateAsync(IReadOnlyList<EntityUpdateInfo> entityUpdateInfos)
+    public Task<EntityRuleEngineResult> ValidateAsync(IReadOnlyList<EntityUpdateInfo> entityUpdateInfos)
     {
-        var entityValidatorResult = new CkEntityRuleEngineResult();
+        var entityValidatorResult = new EntityRuleEngineResult();
         
         entityValidatorResult.RtEntitiesToCreate.AddRange(entityUpdateInfos
             .Where(e => e.ModOption == EntityModOptions.Create).Select(e => e.RtEntity));

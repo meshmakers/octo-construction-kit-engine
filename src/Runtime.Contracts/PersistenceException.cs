@@ -1,33 +1,35 @@
-﻿using System;
-using System.Runtime.Serialization;
+﻿namespace Meshmakers.Octo.Runtime.Contracts;
 
-namespace Meshmakers.Octo.SystematizedData.Persistence;
-
+/// <summary>
+/// Exception thrown when a persistence error occurs.
+/// </summary>
 [Serializable]
 public class PersistenceException : Exception
 {
-    //
-    // For guidelines regarding the creation of new exception types, see
-    //    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/cpgenref/html/cpconerrorraisinghandlingguidelines.asp
-    // and
-    //    http://msdn.microsoft.com/library/default.asp?url=/library/en-us/dncscol/html/csharp07192001.asp
-    //
-
-    public PersistenceException()
+    /// <summary>
+    /// Creates a new instance of <see cref="PersistenceException"/>.
+    /// </summary>
+    protected PersistenceException()
     {
     }
 
-    public PersistenceException(string message) : base(message)
+    /// <summary>
+    /// Creates a new instance of <see cref="PersistenceException"/>.
+    /// </summary>
+    protected PersistenceException(string message) : base(message)
     {
     }
 
-    public PersistenceException(string message, Exception inner) : base(message, inner)
+    /// <summary>
+    /// Creates a new instance of <see cref="PersistenceException"/>.
+    /// </summary>
+    protected PersistenceException(string message, Exception inner) : base(message, inner)
     {
     }
 
-    protected PersistenceException(
-        SerializationInfo info,
-        StreamingContext context) : base(info, context)
+
+    internal static Exception CkIdAttributeNotSet(Type type)
     {
+        throw new PersistenceException($"CkIdAttribute not set on type {type.FullName}");
     }
 }

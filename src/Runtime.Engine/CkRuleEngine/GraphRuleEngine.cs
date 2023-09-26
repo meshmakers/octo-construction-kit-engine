@@ -1,18 +1,21 @@
-using Meshmakers.Octo.Common.Shared.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.SystematizedData.Persistence.DataAccess;
-using Meshmakers.Octo.SystematizedData.Persistence.DatabaseEntities;
+using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
-namespace Meshmakers.Octo.SystematizedData.Persistence.CkModel.CkRuleEngine;
+namespace Meshmakers.Octo.Runtime.Engine.CkRuleEngine;
 
-public class CkGraphRuleEngine : ICkGraphRuleEngine
+/// <summary>
+/// Implementation of the runtime graph validation engine
+/// </summary>
+internal class GraphRuleEngine : IGraphRuleEngine
 {
     private readonly ICkCacheService _ckCache;
     private readonly ITenantRepositoryInternal _tenantRepository;
 
-    public CkGraphRuleEngine(ICkCacheService ckCache, ITenantRepositoryInternal tenantRepository)
+    public GraphRuleEngine(ICkCacheService ckCache, ITenantRepositoryInternal tenantRepository)
     {
         _ckCache = ckCache;
         _tenantRepository = tenantRepository;
@@ -84,7 +87,7 @@ public class CkGraphRuleEngine : ICkGraphRuleEngine
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete))
         {
             var result = await _tenantRepository.GetRtAssociationsAsync(session,
-                entityUpdateInfo.RtEntity.RtId.ToString(), GraphDirections.Any);
+                entityUpdateInfo.RtEntity.RtId, GraphDirections.Any);
             graphRuleEngineResult.RtAssociationsToDelete.AddRange(result);
         }
     }
@@ -241,8 +244,7 @@ public class CkGraphRuleEngine : ICkGraphRuleEngine
                 d.RoleId);
             if (rtAssociation == null)
             {
-                throw new OperationFailedException(
-                    $"Association from '{origin}' to '{target}' in role '{d.RoleId}' does not exist");
+                throw RuleViolationException.AssociationDoesNotExist(d.RoleId, origin, target);
             }
 
             graphRuleEngineResult.RtAssociationsToDelete.Add(rtAssociation);
@@ -263,8 +265,7 @@ public class CkGraphRuleEngine : ICkGraphRuleEngine
                 associationUpdateInfo.RoleId);
             if (rtAssociation != null)
             {
-                throw new OperationFailedException(
-                    $"Association from '{origin}' to '{target}' in role '{associationUpdateInfo.RoleId}' already exits.");
+                throw RuleViolationException.AssociationAlreadyExists(associationUpdateInfo.RoleId, origin, target);
             }
 
             graphRuleEngineResult.RtAssociationsToCreate.Add(_tenantRepository.CreateTransientRtAssociation(
@@ -297,8 +298,7 @@ public class CkGraphRuleEngine : ICkGraphRuleEngine
 
         if (rtEntity == null)
         {
-            throw new OperationFailedException(
-                $"Entity '{rtEntityId}' does not exist");
+            throw RuleViolationException.EntityNotFound(rtEntityId);
         }
 
         return rtEntity;

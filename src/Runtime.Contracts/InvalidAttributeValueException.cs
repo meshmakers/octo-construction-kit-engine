@@ -1,23 +1,33 @@
-using Meshmakers.Octo.ConstructionKit.Contracts;
+namespace Meshmakers.Octo.Runtime.Contracts;
 
-namespace Meshmakers.Octo.SystematizedData.Persistence.DatabaseEntities;
-
-public class InvalidAttributeValueException : Exception
+/// <summary>
+/// Throws when an invalid attribute value is set.
+/// </summary>
+public class InvalidAttributeValueException : PersistenceException
 {
-    public InvalidAttributeValueException()
+    /// <summary>
+    /// Creates a new instance of <see cref="InvalidAttributeValueException"/>.
+    /// </summary>
+    private InvalidAttributeValueException()
     {
     }
 
-    public InvalidAttributeValueException(string message) : base(message)
+    /// <summary>
+    /// Creates a new instance of <see cref="InvalidAttributeValueException"/>.
+    /// </summary>
+    private InvalidAttributeValueException(string message) : base(message)
     {
     }
 
-    public InvalidAttributeValueException(string message, Exception inner) : base(message, inner)
+    /// <summary>
+    /// Creates a new instance of <see cref="InvalidAttributeValueException"/>.
+    /// </summary>
+    private InvalidAttributeValueException(string message, Exception inner) : base(message, inner)
     {
     }
 
-    public static Exception CannotBeNull(OctoObjectId rtId, CkId<CkTypeId> ckTypeId, string attributeName)
+    internal static Exception CannotBeNull(string location, string attributeName)
     {
-        return new InvalidAttributeValueException($"Attribute value cannot be null for {ckTypeId}.{rtId} at attribute with name {attributeName}");
+        return new InvalidAttributeValueException($"Attribute value cannot be null for '{location}' at attribute with name '{attributeName}'");
     }
 }

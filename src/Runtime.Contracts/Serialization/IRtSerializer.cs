@@ -26,8 +26,8 @@ public interface IRtSerializer
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
     Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult);
-  
-    
+
+
     /// <summary>
     /// Deserializes the runtime model from a string.
     /// </summary>
@@ -35,5 +35,5 @@ public interface IRtSerializer
     /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">A operation result object that lists all validation issues. In case of exceptions this object contains the validation errors too.</param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    RtModelRootDto Deserialize(string s, string locationReference, OperationResult operationResult);
+    Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult);
 }

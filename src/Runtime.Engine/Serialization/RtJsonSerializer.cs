@@ -1,0 +1,98 @@
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using Json.Schema;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
+
+namespace Meshmakers.Octo.Runtime.Engine.Serialization;
+
+/// <summary>
+/// Implements a serializer for the runtime in JSON format.
+/// </summary>
+internal class RtJsonSerializer : IRtJsonSerializer
+{
+    private const string Validation = "validation";
+    private readonly JsonSerializerOptions _options;
+
+    // ReSharper disable once ConvertConstructorToMemberInitializers
+    /// <summary>
+    /// Creates a new instance of the <see cref="RtJsonSerializer"/> class.
+    /// </summary>
+    public RtJsonSerializer()
+    {
+        _options = new JsonSerializerOptions 
+        { 
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            Converters =
+            {
+                new OctoValidatingJsonConverterFactory {RequireFormatValidation = true, OutputFormat = OutputFormat.List}
+            }
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto)
+    {
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, modelRootDto, _options);
+    }
+   
+
+    /// <inheritdoc />
+    public async Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        try
+        {
+            var ckMetaDto = await JsonSerializer.DeserializeAsync<RtModelRootDto>(stream, _options);
+            return ckMetaDto ?? throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
+        }
+        catch (JsonException e)
+        {
+            CheckException(locationReference, operationResult, e);
+            throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult) 
+    {
+        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        using var memStream = new MemoryStream(byteArray);
+        return await DeserializeAsync(memStream, locationReference, operationResult);
+    }
+
+    private static void CheckException(string locationReference, OperationResult operationResult, JsonException e)
+    {
+        if (e.Data.Contains(Validation))
+        {
+            var evaluationResults = (EvaluationResults?)e.Data[Validation];
+            if (evaluationResults != null)
+            {
+                if (!ValidateEvaluationResults(locationReference, operationResult, evaluationResults))
+                {
+                    throw RuntimeModelParseException.SchemaValidationFailed(locationReference, operationResult);
+                }
+            }
+        }
+    }
+    
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
+    {
+        if (!evaluationResults.IsValid)
+        {
+            foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
+            {
+                var path = evaluationResult.InstanceLocation.ToString();
+                var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
+            }
+        }
+
+        return evaluationResults.IsValid;
+    }
+}

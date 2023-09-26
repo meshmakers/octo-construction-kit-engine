@@ -1,0 +1,95 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using YamlDotNet.Serialization;
+using YamlDotNet.Serialization.NamingConventions;
+
+namespace Meshmakers.Octo.Runtime.Engine.Serialization;
+
+/// <summary>
+/// Implements a serializer for the runtime model in YAML format.
+/// </summary>
+/// <remarks>
+/// Currently there is no YAML serializer that supports JSON schema validation
+/// out of the box. Therefore we use the YamlDotNet library and implement the validation
+/// using the <see cref="IRtSchemaValidator"/> interface. That results that the stream
+/// is used twice: for validation and for deserialization. This is not optimal.
+/// </remarks>
+internal class RtYamlSerializer : IRtYamlSerializer
+{
+    private readonly IRtSchemaValidator _rtSchemaValidator;
+    private readonly ISerializer _serializer;
+    private readonly IDeserializer _deserializer;
+
+    // ReSharper disable once ConvertConstructorToMemberInitializers
+    /// <summary>
+    /// Creates a new instance of the <see cref="RtYamlSerializer"/> class.
+    /// </summary>
+    /// <param name="rtSchemaValidator"></param>
+    public RtYamlSerializer(IRtSchemaValidator rtSchemaValidator)
+    {
+        _rtSchemaValidator = rtSchemaValidator;
+
+        _serializer = new SerializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .WithTypeConverter(new CkModelIdConverter())
+            .WithTypeConverter(new CkTypeIdConverter())
+            .WithTypeConverter(new CkRecordIdConverter())
+            .WithTypeConverter(new CkEnumIdConverter())
+            .WithTypeConverter(new CkAttributeIdConverter())
+            .WithTypeConverter(new CkAssociationIdConverter())
+            .WithTypeConverter(new CkIdAttributeIdConverter())
+            .WithTypeConverter(new CkIdTypeIdConverter())
+            .WithTypeConverter(new CkIdRecordIdConverter())
+            .WithTypeConverter(new CkIdEnumIdConverter())
+            .WithTypeConverter(new CkIdAssociationIdConverter())
+            .Build();
+        _deserializer = new DeserializerBuilder()
+            .WithNamingConvention(CamelCaseNamingConvention.Instance)
+            .WithTypeConverter(new CkModelIdConverter())
+            .WithTypeConverter(new CkTypeIdConverter())
+            .WithTypeConverter(new CkRecordIdConverter())
+            .WithTypeConverter(new CkEnumIdConverter())
+            .WithTypeConverter(new CkAttributeIdConverter())
+            .WithTypeConverter(new CkAssociationIdConverter())
+            .WithTypeConverter(new CkIdAttributeIdConverter())
+            .WithTypeConverter(new CkIdTypeIdConverter())
+            .WithTypeConverter(new CkIdRecordIdConverter())
+            .WithTypeConverter(new CkIdEnumIdConverter())
+            .WithTypeConverter(new CkIdAssociationIdConverter())
+            .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
+            .Build();
+    }
+
+    /// <inheritdoc />
+    public Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto)
+    {
+        _serializer.Serialize(streamWriter, modelRootDto);
+        return Task.CompletedTask;
+    }
+
+
+    /// <inheritdoc />
+    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
+    {
+        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        using var memStream = new MemoryStream(byteArray);
+        return await DeserializeAsync(memStream, locationReference, operationResult);
+    }
+
+    /// <inheritdoc />
+    public Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        _rtSchemaValidator.ValidateModelInYaml(stream, locationReference, operationResult);
+        if (operationResult.HasErrors)
+        {
+            throw RuntimeModelParseException.SchemaValidationFailed(locationReference, operationResult);
+        }
+
+        using var streamReader = new StreamReader(stream);
+        var rtModelRootDto = _deserializer.Deserialize<RtModelRootDto>(streamReader);
+        return Task.FromResult(rtModelRootDto);
+    }
+}

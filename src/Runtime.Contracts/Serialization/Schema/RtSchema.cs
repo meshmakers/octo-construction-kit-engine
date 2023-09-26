@@ -30,7 +30,7 @@ public static class RtSchema
 
     private static JsonSchema GetSchema(string resourcesStreamPath)
     {
-        var assembly = typeof(ICkSerializer).Assembly;
+        var assembly = typeof(IRtSerializer).Assembly;
         var resourcesStream = assembly.GetManifestResourceStream(resourcesStreamPath);
         if (resourcesStream == null)
         {

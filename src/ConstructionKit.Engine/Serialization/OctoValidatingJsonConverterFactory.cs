@@ -7,7 +7,10 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
-internal class OctoValidatingJsonConverterFactory : JsonConverterFactory
+/// <summary>
+/// Represents a JSON converter factory that creates <see cref="T:System.Text.Json.Serialization.JsonConverter`1" /> instances that use JSON Schema to validate the JSON.
+/// </summary>
+public class OctoValidatingJsonConverterFactory : JsonConverterFactory
 {
     private readonly ConcurrentDictionary<Type, JsonConverter?> _cache = new();
 

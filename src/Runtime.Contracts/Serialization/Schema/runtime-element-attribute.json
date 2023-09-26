@@ -2,7 +2,7 @@
   "$id": "https://schemas.meshmakers.cloud/runtime-elements-attribute.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "CkTypeAttribute":{
+    "RtAttribute":{
       "type": "object",
       "title": "RtAttribute",
       "properties": {
@@ -11,7 +11,12 @@
           "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
         },
         "value": {
-          "type": "object"
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "object",
+            "array"]
         }
       },
       "additionalProperties": false,

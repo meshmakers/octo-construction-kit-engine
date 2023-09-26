@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/runtime-model.schema.json",
+  "dependencies": ["System", "Sample1"],
+  "entities": [
+    { "rtId": "6512b932eec8b8e3b83e86ce",
+      "ckTypeId": "Sample1/SampleType1",
+      "attributes": [
+        { "id": "Sample1/SampleAttribute", "value": "demo" },
+        { "id": "Sample1/DateTimeAttribute", "value": "demo" },
+        { "id": "Sample1/Type", "value": "demo" },
+        { "id": "Sample1/TestEnum", "value": "demo" }
+      ]
+    }
+    
+  ]
+}

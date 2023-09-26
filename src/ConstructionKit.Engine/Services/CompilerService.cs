@@ -183,7 +183,7 @@ public class CompilerService : ICompilerService
     }
 
     /// <inheritdoc />
-    public async Task CompileAsync(string rootPath, bool createCacheFile)
+    public async Task<string> CompileAsync(string rootPath, bool createCacheFile)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
 
@@ -367,10 +367,11 @@ public class CompilerService : ICompilerService
         }
 
         string compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
+        var compiledModelFilePath = Path.Combine(rootPath, compiledModelFile);
 #if NETSTANDARD2_0
-        using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
+        using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else
-        await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelFile));
+        await using var streamWriter = new StreamWriter(compiledModelFilePath);
 #endif
         await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot);
 
@@ -378,6 +379,8 @@ public class CompilerService : ICompilerService
         {
             await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, rootPath);
         }
+
+        return compiledModelFilePath;
     }
 
     private async Task CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string rootPath)

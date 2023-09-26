@@ -9,7 +9,6 @@
         <PackageTags>dotnet-new templates OctoMesh ConstructionKit SDK</PackageTags>
         <PackageDescription>dotnet new templates for Octo Mesh Construction Kits.</PackageDescription>
         <PackageIcon>meshmakers64.png</PackageIcon>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         
         <TargetFramework>netstandard2.0</TargetFramework>
 

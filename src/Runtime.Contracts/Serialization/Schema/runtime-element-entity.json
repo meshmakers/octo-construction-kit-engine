@@ -2,7 +2,7 @@
   "$id": "https://schemas.meshmakers.cloud/runtime-elements-entity.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "CkType": {
+    "RtEntity": {
       "type": "object",
       "title": "RtEntity",
       "description": "A runtime entity",

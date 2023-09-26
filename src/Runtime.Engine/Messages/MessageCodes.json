@@ -1,0 +1,10 @@
+{
+  "validationMessages": [
+    {
+      "key": "SchemaValidationError",
+      "number": 1,
+      "level": "ERROR",
+      "text": "{locationReference}: Schema validation failed: '{errorMessage}'"
+    }
+  ]
+}

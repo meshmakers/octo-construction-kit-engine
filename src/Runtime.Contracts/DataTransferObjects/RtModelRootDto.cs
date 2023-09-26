@@ -3,6 +3,8 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 using YamlDotNet.Serialization;
+// ReSharper disable CollectionNeverQueried.Global
+// ReSharper disable CollectionNeverUpdated.Global
 
 namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
@@ -30,7 +32,7 @@ public class RtModelRootDto
     public RtModelRootDto()
     {
         Dependencies = new List<CkModelId>();
-        RtEntities = new List<RtEntityDto>();
+        Entities = new List<RtEntityDto>();
     }
     
     /// <summary>
@@ -42,6 +44,5 @@ public class RtModelRootDto
     /// <summary>
     /// Gets a list of entities in the runtime model.
     /// </summary>
-    [JsonPropertyName("entities")] 
-    public List<RtEntityDto> RtEntities { get; }
+    public List<RtEntityDto> Entities { get; set; }
 }

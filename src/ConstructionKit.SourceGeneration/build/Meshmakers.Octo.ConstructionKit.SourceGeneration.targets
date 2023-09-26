@@ -14,7 +14,7 @@
         </PropertyGroup>
     </Target>
 
-    <Target Name="RestoreCompiler" DependsOnTargets="BaseConfig">
+    <Target Name="RestoreCompiler" DependsOnTargets="BaseConfig" Condition="!Exists('$(OctoDotNetTools)install.lock')">
         <Exec Command="dotnet tool list --global" StandardOutputImportance="Low" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput"/>
         </Exec>
@@ -24,20 +24,19 @@
             <IsOctoCompilerCorrectVersionInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoTextValidation)))</IsOctoCompilerCorrectVersionInstalled>
         </PropertyGroup>
 
-        <Exec Command="echo . 2> $(OctoDotNetTools)install.lock" Condition="!Exists('$(OctoDotNetTools)install.lock')"/>
-        <Message Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler in version $(OctoCompilerToolVersion)"/>
-        <Exec Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --global --version $(OctoCompilerToolVersion)" EchoOff="true">
-        </Exec>
+        <Exec Command="echo . 2> $(OctoDotNetTools)install.lock" Condition="!Exists('$(OctoDotNetTools)install.lock')" EchoOff="true" />
+        <Message Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler in version $(OctoCompilerToolVersion)"/>
+        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --global --version $(OctoCompilerToolVersion)" EchoOff="true" />
 
-        <Exec Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool list --global" StandardOutputImportance="Low" EchoOff="true" ConsoleToMSBuild="true">
+        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool list --global" StandardOutputImportance="Low" EchoOff="true" ConsoleToMSBuild="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput"/>
         </Exec>
-        <PropertyGroup Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'">
+        <PropertyGroup Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'">
             <IsOctoCompilerInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoCompilerToolName)))</IsOctoCompilerInstalled>
             <IsOctoCompilerCorrectVersionInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoTextValidation)))</IsOctoCompilerCorrectVersionInstalled>
         </PropertyGroup>
-        <Error Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is not installed and cannot be installed."/>
-        <Error Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is installed but with a wrong version. It was not possible to update to version $(OctoCompilerToolVersion)."/>
+        <Error Condition="'$(IsOctoCompilerInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is not installed and cannot be installed."/>
+        <Error Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is installed but with a wrong version. It was not possible to update to version $(OctoCompilerToolVersion)."/>
         <Exec Command="del $(OctoDotNetTools)install.lock" Condition="'$(OS)'=='Windows_NT' And Exists('$(OctoDotNetTools)install.lock')" />
         <Exec Command="rm -f $(OctoDotNetTools)install.lock" Condition="'$(OS)'!='Windows_NT' And Exists('$(OctoDotNetTools)install.lock')" />
     </Target>

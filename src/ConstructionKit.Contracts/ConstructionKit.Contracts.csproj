@@ -4,7 +4,6 @@
         <Description>Contracts of Octo Mesh Construction Kit Compiler functionality</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageIcon>meshmakers64.png</PackageIcon>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageId>Meshmakers.Octo.ConstructionKit.Contracts</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Contracts</RootNamespace>

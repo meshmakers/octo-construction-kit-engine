@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net7.0</TargetFramework>
+        <LangVersion>latestmajor</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>true</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
+      <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
+    </ItemGroup>
+</Project>

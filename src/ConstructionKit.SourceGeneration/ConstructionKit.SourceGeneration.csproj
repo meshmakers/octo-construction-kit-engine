@@ -2,7 +2,6 @@
 
     <PropertyGroup>
         <TargetFramework>net7.0</TargetFramework>
-        <LangVersion>latestmajor</LangVersion>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
@@ -13,7 +12,6 @@
         <PackageTags>Source generators of OctoMesh ConstructionKit SDK</PackageTags>
         <PackageDescription>Contains source generators for Octo Mesh Construction Kits.</PackageDescription>
         <PackageIcon>meshmakers64.png</PackageIcon>
-        <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.SourceGeneration</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.SourceGeneration</RootNamespace>
         <IsRoslynComponent>true</IsRoslynComponent>

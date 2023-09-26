@@ -1,0 +1,30 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/runtime-model.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "$schema":{
+      "type": "string",
+      "format": "uri"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-zA-Z0-9-.]+$"
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "$ref": "https://schemas.meshmakers.cloud/runtime-elements-entity.schema.json#/definitions/RtEntity"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "dependencies",
+    "entities"
+  ]
+}

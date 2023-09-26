@@ -1,0 +1,23 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/runtime-elements-attribute.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "CkTypeAttribute":{
+      "type": "object",
+      "title": "RtAttribute",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "value": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ]
+    }
+  }
+}

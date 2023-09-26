@@ -4,7 +4,7 @@ using YamlDotNet.Serialization;
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Defines index fields in the database for a ck type.

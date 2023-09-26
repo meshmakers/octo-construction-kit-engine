@@ -6,7 +6,7 @@ using YamlDotNet.Serialization;
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Defines an assignment of a CK type to a CK attribute.

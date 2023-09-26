@@ -17,7 +17,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine("#nullable enable");
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
-        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;");
+        sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;");
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;");
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;");
         sb.AppendLine();

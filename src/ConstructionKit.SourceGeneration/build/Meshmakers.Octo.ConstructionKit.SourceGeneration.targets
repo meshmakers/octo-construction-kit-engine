@@ -24,7 +24,7 @@
             <IsOctoCompilerCorrectVersionInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoTextValidation)))</IsOctoCompilerCorrectVersionInstalled>
         </PropertyGroup>
 
-        <Exec Command="echo. 2> $(OctoDotNetTools)install.lock" Condition="!Exists('$(OctoDotNetTools)install.lock')"/>
+        <Exec Command="echo . 2> $(OctoDotNetTools)install.lock" Condition="!Exists('$(OctoDotNetTools)install.lock')"/>
         <Message Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler in version $(OctoCompilerToolVersion)"/>
         <Exec Condition="!Exists('$(OctoDotNetTools)install.lock') And '$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --global --version $(OctoCompilerToolVersion)" EchoOff="true">
         </Exec>

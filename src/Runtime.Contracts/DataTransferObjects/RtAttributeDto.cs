@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Defines an attribute of an entity

@@ -1,5 +1,6 @@
 using System.Text.Json.Serialization;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;

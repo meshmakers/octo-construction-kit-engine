@@ -2,7 +2,7 @@
 using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Represents a role of an association between two CkEntityTypes

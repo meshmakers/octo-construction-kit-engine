@@ -1,4 +1,4 @@
-﻿namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
+﻿namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Defines multiplicities for ck associations.

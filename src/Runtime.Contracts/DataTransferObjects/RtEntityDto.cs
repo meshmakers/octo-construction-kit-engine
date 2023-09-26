@@ -1,7 +1,9 @@
 ﻿using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
 /// <summary>
 /// Defines an entity

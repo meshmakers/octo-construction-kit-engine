@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects.Ck;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.sample_attributes_sameId_fail;
 

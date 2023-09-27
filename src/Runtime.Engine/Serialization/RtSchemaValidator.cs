@@ -1,9 +1,9 @@
 using System.Text.Json.Nodes;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 using Yaml2JsonNode;
 using YamlDotNet.RepresentationModel;
 
@@ -17,13 +17,13 @@ internal class RtSchemaValidator : IRtSchemaValidator
     /// <inheritdoc />
     public bool ValidateModelInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.ElementsSchema, locationReference, operationResult);
+        return ValidateModelJson(stream, RtSchema.RuntimeSchema, locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.ElementsSchema, locationReference, operationResult);
+        return ValidateModelYaml(stream, RtSchema.RuntimeSchema, locationReference, operationResult);
     }
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)

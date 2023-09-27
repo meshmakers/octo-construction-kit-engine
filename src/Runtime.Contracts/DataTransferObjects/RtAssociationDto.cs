@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+// ReSharper disable UnusedMember.Global
 
 namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
@@ -14,7 +15,7 @@ public class RtAssociationDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdAssociationIdConverter))]
-    public CkId<CkAssociationRoleId> RoleId { get; set; } = null!;
+    public CkId<CkAssociationRoleId> RoleId { get; set; }
 
     /// <summary>
     /// Gets or sets the target rt id.

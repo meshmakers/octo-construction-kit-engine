@@ -1,5 +1,4 @@
 {
-  "$schema": "https://schemas.meshmakers.cloud/runtime-model.schema.json",
   "dependencies": ["System", "Sample1"],
   "entities": [
     {

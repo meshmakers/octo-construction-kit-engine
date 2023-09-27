@@ -3,12 +3,23 @@
   <component name="JsonSchemaMappingsProjectConfiguration">
     <state>
       <map>
+        <entry key="runtime-element-association">
+          <value>
+            <SchemaInfo>
+              <option name="generatedName" value="New Schema" />
+              <option name="name" value="runtime-element-association" />
+              <option name="relativePathToSchema" value="src/Runtime.Contracts/Serialization/Schema/runtime-element-association.json" />
+              <option name="schemaVersion" value="JSON Schema version 7" />
+            </SchemaInfo>
+          </value>
+        </entry>
         <entry key="runtime-element-attribute">
           <value>
             <SchemaInfo>
               <option name="generatedName" value="New Schema" />
               <option name="name" value="runtime-element-attribute" />
               <option name="relativePathToSchema" value="src/Runtime.Contracts/Serialization/Schema/runtime-element-attribute.json" />
+              <option name="schemaVersion" value="JSON Schema version 7" />
             </SchemaInfo>
           </value>
         </entry>

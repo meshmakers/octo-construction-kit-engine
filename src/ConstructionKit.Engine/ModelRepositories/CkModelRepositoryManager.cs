@@ -31,10 +31,10 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 continue;
             }
             
-            var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId, sourceIdentifier);
+            var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
             if (hasBeenFound)
             {
-                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier);
+                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier).ConfigureAwait(false);
             }
         }
 
@@ -76,7 +76,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
             throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
 
-        await ckModelRepository.PublishModelAsync(ckCompiledModel, isForced, sourceIdentifier);
+        await ckModelRepository.PublishModelAsync(ckCompiledModel, isForced, sourceIdentifier).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -100,6 +100,6 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
             throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
         
-        await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier);
+        await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier).ConfigureAwait(false);
     }
 }

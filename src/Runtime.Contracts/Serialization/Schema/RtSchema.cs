@@ -27,7 +27,7 @@ public static class RtSchema
     /// Returns the runtime schema
     /// </summary>
     public static JsonSchema RuntimeSchema => RuntimeSchemaInternal.Bundle();
-
+    
     private static JsonSchema GetSchema(string resourcesStreamPath)
     {
         var assembly = typeof(IRtSerializer).Assembly;

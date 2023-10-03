@@ -2,11 +2,13 @@
 using System.Text.Json.Serialization;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Engine.Messages;
+using JsonException = System.Text.Json.JsonException;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 
@@ -24,14 +26,15 @@ internal class RtJsonSerializer : IRtJsonSerializer
     /// </summary>
     public RtJsonSerializer()
     {
-        _options = new JsonSerializerOptions 
-        { 
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
+
+
+        _options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true,
             Converters =
             {
-                new OctoValidatingJsonConverterFactory {RequireFormatValidation = true, OutputFormat = OutputFormat.List}
+                new OctoValidatingJsonConverterFactory { RequireFormatValidation = true, OutputFormat = OutputFormat.List }
             }
         };
     }
@@ -39,16 +42,25 @@ internal class RtJsonSerializer : IRtJsonSerializer
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto)
     {
-        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, modelRootDto, _options);
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, modelRootDto, _options).ConfigureAwait(false);
     }
-   
+
+    /// <inheritdoc />
+    public async Task<IRtDeserializeStream> DeserializeStreamAsync(Stream stream, CancellationToken? cancellationToken = null)
+    {
+        RtDeserializeStream deserializeStream = new(stream, 5000);
+
+        await deserializeStream.InitializeAsync(cancellationToken).ConfigureAwait(false);
+        
+        return deserializeStream;
+    }
 
     /// <inheritdoc />
     public async Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
-            var ckMetaDto = await JsonSerializer.DeserializeAsync<RtModelRootDto>(stream, _options);
+            var ckMetaDto = await JsonSerializer.DeserializeAsync<RtModelRootDto>(stream, _options).ConfigureAwait(false);
             return ckMetaDto ?? throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
@@ -59,11 +71,11 @@ internal class RtJsonSerializer : IRtJsonSerializer
     }
 
     /// <inheritdoc />
-    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult) 
+    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeAsync(memStream, locationReference, operationResult);
+        return await DeserializeAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
 
     private static void CheckException(string locationReference, OperationResult operationResult, JsonException e)
@@ -80,8 +92,9 @@ internal class RtJsonSerializer : IRtJsonSerializer
             }
         }
     }
-    
-    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
+
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
+        EvaluationResults evaluationResults)
     {
         if (!evaluationResults.IsValid)
         {

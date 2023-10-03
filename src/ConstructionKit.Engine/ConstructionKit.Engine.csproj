@@ -21,10 +21,6 @@
         <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.ConstructionKit.Engine.xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
-    
-    <ItemGroup>
-      <Folder Include="Engineering\" />
-    </ItemGroup>
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="7.0.0" />
       <PackageReference Include="Microsoft.Extensions.Options" Version="7.0.1" />

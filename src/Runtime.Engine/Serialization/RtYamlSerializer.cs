@@ -70,13 +70,18 @@ internal class RtYamlSerializer : IRtYamlSerializer
         return Task.CompletedTask;
     }
 
+    public Task<IRtDeserializeStream> DeserializeStreamAsync(Stream stream, 
+        CancellationToken? cancellationToken = null)
+    {
+        throw new NotImplementedException();
+    }
 
     /// <inheritdoc />
     public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeAsync(memStream, locationReference, operationResult);
+        return await DeserializeAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -87,6 +92,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
         {
             throw RuntimeModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }
+        
 
         using var streamReader = new StreamReader(stream);
         var rtModelRootDto = _deserializer.Deserialize<RtModelRootDto>(streamReader);

@@ -39,5 +39,25 @@ public class RuntimeModelParseException : PersistenceException
     {
         return new RuntimeModelParseException($"{locationReference}: Stream contains invalid runtime model so that the schema validation failed.", operationResult);
     }
+
+    internal static Exception InvalidStructure()
+    {
+        throw new RuntimeModelParseException( "Missing structure of JSON file format. Ensure that file begins with { \"entities\" : [ {");
+    }
+
+    internal static Exception CannotDeserializeEntity(int readerLineNumber)
+    {
+        throw new RuntimeModelParseException($"Cannot deserialize entity at line {readerLineNumber}.");
+    }
+
+    internal static Exception InvalidPosition()
+    {
+        throw new RuntimeModelParseException("Invalid position, the stream is not positioned on the 'entities' array.");
+    }
+
+    internal static Exception DuplicateEntity(OctoObjectId rtId)
+    {
+        throw new RuntimeModelParseException($"Duplicate entity with RtId {rtId}.");
+    }
 }   
 

@@ -22,6 +22,7 @@ public class RtAssociationDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(OctoObjectIdConverter))]
+    [Newtonsoft.Json.JsonConverter(typeof(NewtonOctoObjectIdConverter))]
     public OctoObjectId TargetRtId { get; set; }
     
     /// <summary>

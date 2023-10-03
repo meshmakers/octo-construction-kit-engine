@@ -1,8 +1,9 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
-namespace Meshmakers.Octo.Runtime.Engine.CkRuleEngine;
+namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 
 /// <summary>
 /// Implementation of the runtime entity validation engine
@@ -10,12 +11,12 @@ namespace Meshmakers.Octo.Runtime.Engine.CkRuleEngine;
 internal class EntityRuleEngine : IEntityRuleEngine
 {
     private readonly ICkCacheService _ckCache;
-    private readonly ITenantRepositoryInternal _tenantRepository;
+    private readonly IRuntimeRepository _runtimeRepository;
 
-    public EntityRuleEngine(ICkCacheService ckCache, ITenantRepositoryInternal tenantRepository)
+    public EntityRuleEngine(ICkCacheService ckCache, IRuntimeRepository runtimeRepository)
     {
         _ckCache = ckCache;
-        _tenantRepository = tenantRepository;
+        _runtimeRepository = runtimeRepository;
     }
 
     public Task<EntityRuleEngineResult> ValidateAsync(IReadOnlyList<EntityUpdateInfo> entityUpdateInfos)

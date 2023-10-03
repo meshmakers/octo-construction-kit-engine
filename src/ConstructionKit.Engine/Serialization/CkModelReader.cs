@@ -48,7 +48,7 @@ internal class CkModelReader
 #else
             await using var stream = File.OpenRead(filePath);
 #endif
-            model = await _ckSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult);
+            model = await _ckSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult).ConfigureAwait(false);
 
             if (model == null)
             {
@@ -61,6 +61,6 @@ internal class CkModelReader
         }
 
         _logger.LogInformation("Validating CK model...");
-        await _ckValidationService.ValidateAsync(model, operationResult);
+        await _ckValidationService.ValidateAsync(model, operationResult).ConfigureAwait(false);
     }
 }

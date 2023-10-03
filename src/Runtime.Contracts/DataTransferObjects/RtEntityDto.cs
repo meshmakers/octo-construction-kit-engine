@@ -19,7 +19,6 @@ public class RtEntityDto
     public RtEntityDto()
     {
         Attributes = new List<RtAttributeDto>();
-        Associations = new List<RtAssociationDto>();
     }
 
     /// <summary>
@@ -27,12 +26,14 @@ public class RtEntityDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(OctoObjectIdConverter))]
+    [Newtonsoft.Json.JsonConverter(typeof(NewtonOctoObjectIdConverter))]
     public OctoObjectId RtId { get; set; }
 
     /// <summary>
     ///     Returns the creation date time
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public DateTime? RtCreationDateTime { get; set; }
 
@@ -40,6 +41,7 @@ public class RtEntityDto
     ///     Returns the last change date time
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public DateTime? RtChangedDateTime { get; set; }
 
@@ -54,6 +56,7 @@ public class RtEntityDto
     /// Gets or sets the well known name of the entity
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? RtWellKnownName { get; set; }
 
@@ -66,6 +69,7 @@ public class RtEntityDto
     /// Gets or sets the associations of the entity
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<RtAssociationDto>? Associations { get; set; }
 }

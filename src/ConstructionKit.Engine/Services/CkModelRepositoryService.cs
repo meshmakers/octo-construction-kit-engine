@@ -24,7 +24,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        return await _ckModelRepositoryManager.LookupCkModelAsync(ckModelId, operationResult, sourceIdentifier, cancellationToken);
+        return await _ckModelRepositoryManager.LookupCkModelAsync(ckModelId, operationResult, sourceIdentifier, cancellationToken).ConfigureAwait(false);
     }
 
     public IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null)
@@ -35,12 +35,12 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken);
+        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken);
+        await _ckModelRepositoryManager.UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken).ConfigureAwait(false);
     }
 }

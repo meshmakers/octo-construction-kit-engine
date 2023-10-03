@@ -7,9 +7,10 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
-namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
+namespace Meshmakers.Octo.Runtime.Engine.Messages;
 
 /// <summary>
 /// Defines possible messages for:

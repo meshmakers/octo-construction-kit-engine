@@ -20,7 +20,7 @@ internal class DependencyResolver : IDependencyResolver
     public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, OperationResult operationResult)
     {
         _logger.LogInformation("Starting resolving dependencies");
-        await Resolve(dependencies, ckModelGraph, operationResult);
+        await Resolve(dependencies, ckModelGraph, operationResult).ConfigureAwait(false);
         _logger.LogInformation("Resolving dependencies completed");
 
         return ckModelGraph;
@@ -35,7 +35,7 @@ internal class DependencyResolver : IDependencyResolver
             var ckDependency = dependencies[i];
             
             _logger.LogInformation("Resolving dependency '{CkTypeId}'", ckDependency);
-            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult);
+            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult).ConfigureAwait(false);
             if (ckDependencyRootModel == null)
             {
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(ckDependency));

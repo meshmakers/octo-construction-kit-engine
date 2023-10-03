@@ -1,17 +1,37 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
-namespace  Meshmakers.Octo.Runtime.Contracts;
+namespace  Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 /// <summary>
 /// Interface of runtime repository, a repository that is used to access runtime entities.
 /// </summary>
-public interface ITenantRepositoryInternal
+public interface IRuntimeRepository
 {
     /// <summary>
     /// Returns the tenant id
     /// </summary>
     string TenantId { get; }
+    
+    #region Transaction Handling
+
+    /// <summary>
+    /// Gets a new session
+    /// </summary>
+    /// <returns>The session object to handle a transaction</returns>
+    Task<IOctoSession> GetSessionAsync();
+
+    #endregion Transaction Handling
+    
+    #region Data query (simple)
+    
+    /// <summary>
+    /// Gets an entity by its runtime id.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtEntityId">The runtime id</param>
+    /// <returns></returns>
+    Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId);
     
     /// <summary>
     /// Gets associations for a runtime entity.
@@ -42,6 +62,9 @@ public interface ITenantRepositoryInternal
     /// <returns></returns>
     Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId);
     
+    #endregion Data query (simple)
+    
+    #region Transient data handling
     
     /// <summary>
     /// Creates an instance of a runtime association
@@ -53,10 +76,18 @@ public interface ITenantRepositoryInternal
     RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetRtEntityId);
     
     /// <summary>
-    /// Gets an entity by its runtime id.
+    /// Creates an instance of a runtime entity
     /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtEntityId">The runtime id</param>
-    /// <returns></returns>
-    Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId);
+    /// <param name="ckTypeId"></param>
+    /// <returns>Instance of the given construction kit type</returns>
+    RtEntity CreateTransientRtEntity(CkId<CkTypeId> ckTypeId);
+
+    /// <summary>
+    /// Creates a typed version of a runtime entity
+    /// </summary>
+    /// <typeparam name="TEntity">Type derived from RtEntity</typeparam>
+    /// <returns>Instance of the given construction kit type</returns>
+    TEntity CreateTransientRtEntity<TEntity>() where TEntity : RtEntity, new();
+    
+    #endregion
 }

@@ -115,7 +115,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult);
+        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

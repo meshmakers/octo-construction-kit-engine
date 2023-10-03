@@ -37,19 +37,19 @@ internal class CkJsonSerializer : ICkJsonSerializer
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel)
     {
-        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, compiledModel, _options);
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, compiledModel, _options).ConfigureAwait(false);
     }
     
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkMetaRootDto metaRootDto)
     {
-        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, metaRootDto, _options);
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, metaRootDto, _options).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkElementsRootDto elementsRootDto)
     {
-        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, elementsRootDto, _options);
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, elementsRootDto, _options).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -57,7 +57,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         try
         {
-            var ckMetaDto = await JsonSerializer.DeserializeAsync<CkMetaRootDto>(stream, _options);
+            var ckMetaDto = await JsonSerializer.DeserializeAsync<CkMetaRootDto>(stream, _options).ConfigureAwait(false);
             return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
@@ -72,7 +72,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         try
         {
-            var ckElementsDto = await JsonSerializer.DeserializeAsync<CkElementsRootDto>(stream, _options);
+            var ckElementsDto = await JsonSerializer.DeserializeAsync<CkElementsRootDto>(stream, _options).ConfigureAwait(false);
             return ckElementsDto ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
@@ -88,7 +88,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult);
+        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -118,7 +118,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         try
         {
-            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options);
+            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options).ConfigureAwait(false);
             return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)

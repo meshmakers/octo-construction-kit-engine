@@ -172,7 +172,7 @@ public class CkCacheService : ICkCacheService
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
         
-        await ckCache.SaveCacheAsync(stream);
+        await ckCache.SaveCacheAsync(stream).ConfigureAwait(false);
     }
     
     /// <summary>
@@ -188,7 +188,7 @@ public class CkCacheService : ICkCacheService
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
         
-        await ckCache.RestoreCacheAsync(stream);
+        await ckCache.RestoreCacheAsync(stream).ConfigureAwait(false);
     }
 
     /// <summary>

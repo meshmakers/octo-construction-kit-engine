@@ -132,14 +132,14 @@ internal class CkCache : IDisposable
 
         var options = GetJsonSerializerOptions();
 
-        await JsonSerializer.SerializeAsync(stream, _modelGraph.ToCkCacheRoot(), options);
+        await JsonSerializer.SerializeAsync(stream, _modelGraph.ToCkCacheRoot(), options).ConfigureAwait(false);
     }
 
     public async Task RestoreCacheAsync(Stream stream)
     {
         var options = GetJsonSerializerOptions();
 
-        var ckCacheRoot = await JsonSerializer.DeserializeAsync<CkCacheRoot>(stream, options);
+        var ckCacheRoot = await JsonSerializer.DeserializeAsync<CkCacheRoot>(stream, options).ConfigureAwait(false);
         if (ckCacheRoot == null)
         {
             throw CkCacheException.CannotDeserializeCache(TenantId);

@@ -25,6 +25,6 @@ public class CkValidationService : ICkValidationService
     /// <inheritdoc />
     public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
-        return await _modelResolver.ResolveAsync(compiledModel, operationResult);
+        return await _modelResolver.ResolveAsync(compiledModel, operationResult).ConfigureAwait(false);
     }
 }

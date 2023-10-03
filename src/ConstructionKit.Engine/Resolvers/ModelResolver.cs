@@ -35,7 +35,7 @@ internal class ModelResolver : IModelResolver
     public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
     {
         CkModelGraph modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, operationResult);
+        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, operationResult).ConfigureAwait(false);
 
         _referenceResolver.Resolve(modelGraph, operationResult);
         _inheritanceResolver.Resolve(modelGraph, operationResult);
@@ -64,7 +64,7 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult);
+            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult).ConfigureAwait(false);
         }
         
         // We suppose that the dependent models are already validated and we can use them.

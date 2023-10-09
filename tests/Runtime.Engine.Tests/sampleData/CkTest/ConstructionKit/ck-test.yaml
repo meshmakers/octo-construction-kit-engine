@@ -1,0 +1,78 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
+types:
+- typeId: Location
+  derivedFromCkTypeId: System/Entity
+  isAbstract: true
+  attributes:
+  - id: Test/Designation
+    name: Designation
+- typeId: LocationWithSensor
+  derivedFromCkTypeId: Test/Location
+  isAbstract: true
+- typeId: Continent
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+- typeId: Country
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/Continent
+- typeId: Region
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/Country
+- typeId: City
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/Region
+- typeId: District
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/City
+- typeId: Zone
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/District
+- typeId: Sensor
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  attributes:
+  - id: Test/Designation
+    name: Designation
+  - id: Test/ConnectionState
+    name: ConnectionState
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/LocationWithSensor
+associationRoles: []
+attributes:
+- id: Designation
+  valueType: String
+- id: Location
+  valueType: String
+- id: ConnectionState
+  valueType: Enum
+  valueCkEnumId: Test/ConnectionState
+records: []
+enums:
+- enumId: ConnectionState
+  useFlags: false
+  values:
+  - key: 0
+    name: Not connected
+  - key: 1
+    name: Connecting
+  - key: 2
+    name: Connected
+modelId: Test
+dependencies:
+- System

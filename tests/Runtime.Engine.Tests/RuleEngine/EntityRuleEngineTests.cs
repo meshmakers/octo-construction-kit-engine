@@ -1,45 +1,65 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.Runtime.Engine.Repositories;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
-using Microsoft.Extensions.DependencyInjection;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RuleEngine;
 
-public class EntityRuleEngineTests: IClassFixture<TemporaryDirectoryFixture>
+public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
 {
-    private readonly TemporaryDirectoryFixture _fixture;
-    private readonly ITestOutputHelper _testOutputHelper;
+    private readonly CacheServiceFixture _fixture;
 
-    public EntityRuleEngineTests(TemporaryDirectoryFixture fixture, ITestOutputHelper testOutputHelper)
+    public EntityRuleEngineTests(CacheServiceFixture fixture)
     {
         _fixture = fixture;
-        _testOutputHelper = testOutputHelper;
     }
-    
+
     [Fact]
-    public async Task Test1()
+    public async Task ValidateAsync_NonExistingTypeId_Fail()
     {
-        await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+
+        var operationResult = new OperationResult();
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            var temporaryDirectory = _fixture.CreateTempDirectory();
-            
-            var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
-            var localRepository = new LocalDirectoryRepository("test", temporaryDirectory);
-            
-            
-            var ruleEngine = new EntityRuleEngine(ckCacheService, localRepository);
-            
-            // var r = await ruleEngine.ValidateAsync(new[]
-            // {
-            //     // new EntityUpdateInfo(new RtEntity()
-            //     // {
-            //     //     CkTypeId = "Test/test",
-            //     //     Attributes = { }
-            //     //
-            //     // })
-            // });
-        }
+            new EntityUpdateInfo(new RtEntity
+            {
+                CkTypeId = "Sample1/SampleType35",
+            }, EntityModOptions.Create)
+        }, operationResult);
+
+        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
+        Assert.Single(operationResult.Messages);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
+        Assert.Equal(3, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_MandatoryAttributeWithoutDefaultMissing_Fail()
+    {
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+
+        var operationResult = new OperationResult();
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
+        {
+            new EntityUpdateInfo(new RtEntity
+            {
+                CkTypeId = "Test/City"
+            }, EntityModOptions.Create)
+        }, operationResult);
+        
+        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
+        Assert.Single(operationResult.Messages);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
+        Assert.Equal(2, operationResult.Messages[0].MessageNumber);
     }
 }

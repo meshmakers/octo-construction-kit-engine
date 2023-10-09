@@ -7,7 +7,6 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 namespace Meshmakers.Octo.Runtime.Engine.Messages;
@@ -23,7 +22,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Messages;
 internal static class MessageCodes
 {
     // ReSharper disable once MemberCanBePrivate.Global
-    internal static CompilerMessage GetMessage(string messageKey, params object[] args)
+    internal static OperationMessage GetMessage(string messageKey, params object[] args)
     {
         if (!Templates.ContainsKey(messageKey))
         {
@@ -32,16 +31,34 @@ internal static class MessageCodes
         return Templates[messageKey].CreateMessage(args);
     }
 
-    internal static CompilerMessage SchemaValidationError(object locationReference, object errorMessage) =>
+    internal static OperationMessage SchemaValidationError(object locationReference, object errorMessage) =>
         GetMessage("SchemaValidationError", locationReference, errorMessage);
 
-    private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
+    internal static OperationMessage MandatoryAttributeMissing(object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("MandatoryAttributeMissing", tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
+
+    internal static OperationMessage CkTypeIdNotFound(object tenantId, object rtEntityCkTypeId) =>
+        GetMessage("CkTypeIdNotFound", tenantId, rtEntityCkTypeId);
+
+    private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
             "SchemaValidationError",
-             new CompilerMessageTemplate(MessageLevel.Error,
+             new OperationMessageTemplate(MessageLevel.FatalError,
                  1, "{locationReference}: Schema validation failed: '{errorMessage}'",
                  new [] {"locationReference", "errorMessage"})
+        },
+        {
+            "MandatoryAttributeMissing",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' defines no default value and is missing.",
+                 new [] {"tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"})
+        },
+        {
+            "CkTypeIdNotFound",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 3, "{tenantId}: CkTypeId '{rtEntityCkTypeId}' not found.",
+                 new [] {"tenantId", "rtEntityCkTypeId"})
         },
     };
 }

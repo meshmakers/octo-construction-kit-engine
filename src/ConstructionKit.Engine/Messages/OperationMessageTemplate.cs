@@ -1,11 +1,11 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
-namespace Meshmakers.Octo.Runtime.Engine.Messages;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
 /// <summary>
 /// Represents a message template
 /// </summary>
-internal class CompilerMessageTemplate
+internal class OperationMessageTemplate
 {
     /// <summary>
     /// Returns the level
@@ -34,7 +34,7 @@ internal class CompilerMessageTemplate
     /// <param name="messageNumber">Message number</param>
     /// <param name="messageText">Message text</param>
     /// <param name="placeholders">Placeholders of the message text</param>
-    public CompilerMessageTemplate(MessageLevel messageLevel, int messageNumber, string messageText, string[] placeholders)
+    public OperationMessageTemplate(MessageLevel messageLevel, int messageNumber, string messageText, string[] placeholders)
     {
         MessageLevel = messageLevel;
         MessageNumber = messageNumber;
@@ -47,7 +47,7 @@ internal class CompilerMessageTemplate
     /// </summary>
     /// <param name="args">A list of arguments for string f</param>
     /// <returns>The formatted message</returns>
-    public CompilerMessage CreateMessage(params object[] args)
+    public OperationMessage CreateMessage(params object[] args)
     {
         var text = MessageText;
         for (int i = 0; i < Placeholders.Length; i++)
@@ -55,6 +55,6 @@ internal class CompilerMessageTemplate
             text = text.Replace($"{{{Placeholders[i]}}}", $"{{{i}}}");
         }
 
-        return new CompilerMessage(MessageLevel, MessageNumber, string.Format(text, args));
+        return new OperationMessage(MessageLevel, MessageNumber, string.Format(text, args));
     }
 }

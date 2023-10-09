@@ -3,7 +3,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 /// <summary>
 /// Contains a concrete message
 /// </summary>
-public class CompilerMessage
+public class OperationMessage
 {
     /// <summary>
     /// Constructor
@@ -11,7 +11,7 @@ public class CompilerMessage
     /// <param name="messageLevel">Message level</param>
     /// <param name="messageNumber">Message number</param>
     /// <param name="messageText">Message text</param>
-    public CompilerMessage(MessageLevel messageLevel, int messageNumber, string messageText)
+    public OperationMessage(MessageLevel messageLevel, int messageNumber, string messageText)
     {
         CreateDateTime = DateTime.Now;
         MessageLevel = messageLevel;

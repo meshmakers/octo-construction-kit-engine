@@ -1,0 +1,74 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+- typeId: Location
+  derivedFromCkTypeId: System/Entity
+  isFinal: false
+  isAbstract: true
+  attributes:
+  - id: Test/Designation
+    name: Designation
+    
+- typeId: LocationWithSensor
+  derivedFromCkTypeId: Test/Location
+  isFinal: false
+  isAbstract: true
+    
+- typeId: Continent
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+  isAbstract: false
+  
+- typeId: Country
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+  isAbstract: false
+  associations:
+    - id: System/ParentChild
+      targetCkTypeId: Test/Continent
+      
+- typeId: Region
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  isAbstract: false
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/Country
+  
+- typeId: City
+  derivedFromCkTypeId: Test/Location
+  isFinal: true
+  isAbstract: false
+  associations:
+    - id: System/ParentChild
+      targetCkTypeId: Test/Region  
+
+- typeId: District
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  isAbstract: false
+  associations:
+    - id: System/ParentChild
+      targetCkTypeId: Test/City
+      
+- typeId: Zone
+  derivedFromCkTypeId: Test/LocationWithSensor
+  isFinal: true
+  isAbstract: false
+  associations:
+    - id: System/ParentChild
+      targetCkTypeId: Test/District
+
+- typeId: Sensor
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  isAbstract: false
+  attributes:
+  - id: Test/Designation
+    name: Designation
+    isOptional: false
+  - id: Test/ConnectionState
+    name: ConnectionState
+    isOptional: false
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/LocationWithSensor

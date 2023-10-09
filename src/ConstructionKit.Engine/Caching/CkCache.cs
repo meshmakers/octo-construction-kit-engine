@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -43,6 +44,25 @@ internal class CkCache : IDisposable
         }
 
         return ckTypeGraph;
+    }
+    
+#if NETSTANDARD2_0
+    public bool TryGetCkType(CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph)
+#else
+    public bool TryGetCkType(CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
+#endif    
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.Types.TryGetValue(ckTypeId, out ckTypeGraph))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     public CkAttributeGraph GetCkAttribute(CkId<CkAttributeId> ckAttributeId)

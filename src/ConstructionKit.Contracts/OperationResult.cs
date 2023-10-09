@@ -20,7 +20,7 @@ public class OperationResult
     /// <summary>
     /// Returns the messages of the operation
     /// </summary>
-    public List<CompilerMessage> Messages { get; }
+    public List<OperationMessage> Messages { get; }
 
     /// <summary>
     /// Returns true if the operation has errors
@@ -35,7 +35,7 @@ public class OperationResult
     /// Adds a message to the operation result
     /// </summary>
     /// <param name="message"></param>
-    public void AddMessage(CompilerMessage message)
+    public void AddMessage(OperationMessage message)
     {
         Messages.Add(message);
     }

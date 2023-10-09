@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -42,6 +43,20 @@ public interface ICkCacheService
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
     CkTypeGraph GetCkType(string tenantId, CkId<CkTypeId> ckTypeId);
+
+    /// <summary>
+    /// Returns a <see cref="CkTypeGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckTypeId">Construction Kit type id.</param>
+    /// <param name="ckTypeGraph">Returns the ck type graph</param>
+    /// <returns>True, when the given ck type id exists</returns>
+    /// <exception cref="Exception"></exception>
+#if NETSTANDARD2_0
+    bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph);
+#else
+    bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph);
+#endif
 
     /// <summary>
     /// Returns a <see cref="CkAttributeGraph"/> from the cache.

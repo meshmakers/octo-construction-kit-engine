@@ -7,7 +7,12 @@
         <TargetFramework>net7.0</TargetFramework>
     </PropertyGroup>
 
+    <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"  />
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
+    
     <ItemGroup>
+        <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2"/>
@@ -23,16 +28,16 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ConstructionKitFolder Include="sampleData\CkTest\ConstructionKit" />
+    </ItemGroup>
+
+    <ItemGroup>
       <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" />
     </ItemGroup>
 
 
 
     <ItemGroup>
-      <EmbeddedResource Include="sampleData\files\ck-sample1.yaml">
-        <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </EmbeddedResource>
       <None Update="sampleData\files\entity-ok.json">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
@@ -63,13 +68,13 @@
       <None Update="sampleData\files\malformedAttribute.yaml">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </None>
+      <None Update="sampleData\CkTest\ConstructionKit\ck-test.yaml">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="sampleData\CkTest\ConstructionKit\ck-test.cache.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
 
     </ItemGroup>
-
-
-
-
-
-
 
 </Project>

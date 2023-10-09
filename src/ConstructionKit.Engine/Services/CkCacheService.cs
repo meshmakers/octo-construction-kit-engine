@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -90,7 +91,23 @@ public class CkCacheService : ICkCacheService
         
         return ckCache.GetCkType(ckTypeId);
     }
-    
+
+    /// <inheritdoc />
+#if NETSTANDARD2_0
+    public bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph)
+#else
+    public bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
+#endif     
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckTypeGraph = null;
+            return false;
+        }
+        
+        return ckCache.TryGetCkType(ckTypeId, out ckTypeGraph);
+    }
+
     /// <summary>
     /// Returns a <see cref="CkAttributeGraph"/> from the cache.
     /// </summary>

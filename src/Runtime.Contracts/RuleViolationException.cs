@@ -94,4 +94,6 @@ public class RuleViolationException : Exception
         return new RuleViolationException(
             $"Association '{roleId}' from '{origin}' to '{target}' already exists.");
     }
+
+
 }

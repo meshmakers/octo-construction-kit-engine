@@ -1,0 +1,10 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: ConnectionState
+  values:
+  - key: 0
+    name: Not connected
+  - key: 1
+    name: Connecting
+  - key: 2
+    name: Connected

@@ -16,7 +16,7 @@
     CreateHeader();
 
     // Check the usage of message numbers
-    var groupedLevels = rootElement.CompilerMessages.GroupBy(x => x.Level);
+    var groupedLevels = rootElement.OperationMessages.GroupBy(x => x.Level);
     foreach (var groupedLevel in groupedLevels)
     {
         var groupedLevelAndNumber = groupedLevel.GroupBy(x => x.Number);
@@ -54,7 +54,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
 internal static class MessageCodes
 {
     // ReSharper disable once MemberCanBePrivate.Global
-    internal static CompilerMessage GetMessage(string messageKey, params object[] args)
+    internal static OperationMessage GetMessage(string messageKey, params object[] args)
     {
         if (!Templates.ContainsKey(messageKey))
         {
@@ -64,13 +64,13 @@ internal static class MessageCodes
     }
 
 <#
-    foreach (var messageElement in rootElement.CompilerMessages)
+    foreach (var messageElement in rootElement.OperationMessages)
     {
         var extractPlaceholders = ExtractPlaceholders(messageElement.Text).ToList();
         if (extractPlaceholders.Any())
         {
 #>
-    internal static CompilerMessage <#= messageElement.Key #>(<#=
+    internal static OperationMessage <#= messageElement.Key #>(<#=
             string.Join(", ", extractPlaceholders.Select(x => "object " + x)) #>) =>
         GetMessage("<#= messageElement.Key #>", <#= string.Join(", ", extractPlaceholders) #>);
 
@@ -79,16 +79,16 @@ internal static class MessageCodes
         else
         {
 #>
-    internal static CompilerMessage <#= messageElement.Key #>() #>) =>
+    internal static OperationMessage <#= messageElement.Key #>() #>) =>
         GetMessage("<#= messageElement.Key #>");
 <#
         }
     }
 #>
-    private static readonly Dictionary<string, CompilerMessageTemplate> Templates = new()
+    private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
 <#
-    foreach (var messageElement in rootElement.CompilerMessages)
+    foreach (var messageElement in rootElement.OperationMessages)
     {
         var extractPlaceholders = ExtractPlaceholders(messageElement.Text).ToList();
         if (extractPlaceholders.Any())
@@ -96,7 +96,7 @@ internal static class MessageCodes
 #>
         {
             "<#= messageElement.Key #>",
-             new CompilerMessageTemplate(MessageLevel.<#= messageElement.Level #>,
+             new OperationMessageTemplate(MessageLevel.<#= messageElement.Level #>,
                  <#= messageElement.Number #>, "<#= messageElement.Text #>",
                  new [] {<#=
                     string.Join(", ", extractPlaceholders.Select(x => $"\"{x}\"")) #>})
@@ -108,7 +108,7 @@ internal static class MessageCodes
 #>
         {
             "<#= messageElement.Key #>",
-             new CompilerMessageTemplate(MessageLevel.<#= messageElement.Level #>,
+             new OperationMessageTemplate(MessageLevel.<#= messageElement.Level #>,
                  <#= messageElement.Number #>, "<#= messageElement.Text #>",
                  new string[] {})
         },
@@ -139,6 +139,6 @@ internal static class MessageCodes
 
     public record RootElement
     {
-        public ICollection<Message> CompilerMessages { get; set; }
+        public ICollection<Message> OperationMessages { get; set; }
     }
 #>

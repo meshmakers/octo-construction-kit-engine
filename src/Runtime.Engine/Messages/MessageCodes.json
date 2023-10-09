@@ -1,10 +1,22 @@
 {
-  "validationMessages": [
+  "operationMessages": [
     {
       "key": "SchemaValidationError",
       "number": 1,
-      "level": "ERROR",
+      "level": "FATALERROR",
       "text": "{locationReference}: Schema validation failed: '{errorMessage}'"
+    },
+    {
+      "key": "MandatoryAttributeMissing",
+      "number": 2,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' defines no default value and is missing."
+    },
+    {
+      "key": "CkTypeIdNotFound",
+      "number": 3,
+      "level": "FATALERROR",
+      "text": "{tenantId}: CkTypeId '{rtEntityCkTypeId}' not found."
     }
   ]
 }

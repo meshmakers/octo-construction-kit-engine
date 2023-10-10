@@ -1,4 +1,5 @@
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Services;
 

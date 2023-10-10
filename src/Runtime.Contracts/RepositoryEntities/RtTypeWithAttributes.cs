@@ -17,6 +17,14 @@ public abstract class RtTypeWithAttributes
     {
         _attributes = new Dictionary<string, object?>();
     }
+    
+    /// <summary>
+    ///     Constructor
+    /// </summary>
+    protected RtTypeWithAttributes(IDictionary<string, object?> attributes)
+    {
+        _attributes = new Dictionary<string, object?>(attributes);
+    }
 
     /// <summary>
     /// Returns a string that represents a location information for error messages

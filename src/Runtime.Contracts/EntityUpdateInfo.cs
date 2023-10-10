@@ -3,6 +3,23 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
+/// 
+/// </summary>
+/// <typeparam name="TEntity"></typeparam>
+public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
+{
+    /// <summary>
+    /// Entity for modification.
+    /// </summary>
+    public TEntity RtEntity { get; }
+    
+    /// <summary>
+    /// MOD option.
+    /// </summary>
+    public EntityModOptions ModOption { get; }
+}
+
+/// <summary>
 /// Generic version of a entity update info
 /// </summary>
 public class EntityUpdateInfo : EntityUpdateInfo<RtEntity>
@@ -22,7 +39,7 @@ public class EntityUpdateInfo : EntityUpdateInfo<RtEntity>
 /// Represents a entity update info.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
-public class EntityUpdateInfo<TEntity> 
+public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     where TEntity : RtEntity
 {
     /// <summary>

@@ -88,7 +88,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
     public Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         _rtSchemaValidator.ValidateModelInYaml(stream, locationReference, operationResult);
-        if (operationResult.HasErrors)
+        if (operationResult.HasFatalErrors)
         {
             throw RuntimeModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }

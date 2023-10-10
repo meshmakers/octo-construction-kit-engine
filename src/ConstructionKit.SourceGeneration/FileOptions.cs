@@ -18,9 +18,11 @@ internal readonly record struct FileOptions
 		GlobalOptions globalOptions
 	)
 	{
+		var outputPath = Path.Combine(Path.GetDirectoryName(globalOptions.ProjectFullPath) ?? string.Empty, globalOptions.OutputPath);
+		
 		GroupedFile = groupedFile;
 		var resxFilePath = groupedFile.MainFile.File.Path;
-
+		
 		var classNameFromFileName = Utilities.GetClassNameFromPath(resxFilePath);
 
 		var detectedNamespace = Utilities.GetLocalNamespace(
@@ -34,7 +36,7 @@ internal readonly record struct FileOptions
 			globalOptions.RootNamespace);
 		 
 		EmbeddedFilename = string.IsNullOrEmpty(detectedNamespace) ? classNameFromFileName : $"{detectedNamespace}.{classNameFromFileName}";
-
+		
 		LocalNamespace =
 			options.TryGetValue("build_metadata.EmbeddedResource.TargetPath", out var targetPath) &&
 			targetPath is { Length: > 0 }
@@ -70,8 +72,10 @@ internal readonly record struct FileOptions
 			GenerateCkModelServiceClass = generate;
 		}
 
-
-		IsValid = globalOptions.IsValid;
+		if (!resxFilePath.StartsWith(outputPath, StringComparison.OrdinalIgnoreCase))
+		{
+			IsValid = globalOptions.IsValid;
+		}
 	}
 
 	public static FileOptions Select(

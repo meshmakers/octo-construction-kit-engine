@@ -40,6 +40,12 @@ internal static class MessageCodes
     internal static OperationMessage CkTypeIdNotFound(object tenantId, object rtEntityCkTypeId) =>
         GetMessage("CkTypeIdNotFound", tenantId, rtEntityCkTypeId);
 
+    internal static OperationMessage CkTypeIdIsAbstract(object tenantId, object ckTypeId) =>
+        GetMessage("CkTypeIdIsAbstract", tenantId, ckTypeId);
+
+    internal static OperationMessage MandatoryAttributeMissingAtUpdate(object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("MandatoryAttributeMissingAtUpdate", tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -59,6 +65,18 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.FatalError,
                  3, "{tenantId}: CkTypeId '{rtEntityCkTypeId}' not found.",
                  new [] {"tenantId", "rtEntityCkTypeId"})
+        },
+        {
+            "CkTypeIdIsAbstract",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 4, "{tenantId}: CkTypeId '{ckTypeId}' is abstract.",
+                 new [] {"tenantId", "ckTypeId"})
+        },
+        {
+            "MandatoryAttributeMissingAtUpdate",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 5, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is missing.",
+                 new [] {"tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"})
         },
     };
 }

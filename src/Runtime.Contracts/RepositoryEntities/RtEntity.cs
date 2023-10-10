@@ -11,6 +11,27 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 public class RtEntity : RtTypeWithAttributes
 {
     /// <summary>
+    /// Creates a new instance of <see cref="RtEntity"/>
+    /// </summary>
+    public RtEntity()
+    {
+        
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="RtEntity"/>
+    /// </summary>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtId">Object id</param>
+    /// <param name="attributes">List of attributes</param>
+    public RtEntity(CkId<CkTypeId> ckTypeId, OctoObjectId rtId, IDictionary<string, object?> attributes)
+    : base(attributes)
+    {
+        CkTypeId = ckTypeId;
+        RtId = rtId;
+    }
+    
+    /// <summary>
     ///     Gets or sets the runtime id
     /// </summary>
     public OctoObjectId RtId { get; set; }

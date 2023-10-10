@@ -32,8 +32,8 @@ public class RtSchemaValidatorTests
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Equal(2, operationResult.Messages.Count);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
     }
@@ -49,8 +49,8 @@ public class RtSchemaValidatorTests
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
     }
     
@@ -81,8 +81,8 @@ public class RtSchemaValidatorTests
         var isValid = schemaValidator.ValidateModelInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Equal(2, operationResult.Messages.Count);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
     }
@@ -98,8 +98,8 @@ public class RtSchemaValidatorTests
         var isValid = schemaValidator.ValidateModelInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
     }
 }

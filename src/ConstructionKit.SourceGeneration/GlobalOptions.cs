@@ -7,6 +7,7 @@ internal record GlobalOptions
     public string? RootNamespace { get; }
     public string ProjectFullPath { get; }
     public string ProjectName { get; }
+    public string OutputPath { get; }
     public bool IsValid { get; }
     
     public GlobalOptions(AnalyzerConfigOptions options)
@@ -27,6 +28,12 @@ internal record GlobalOptions
             IsValid = false;
         }
         ProjectName = projectName!;
+        
+        if (!options.TryGetValue("build_property.OutputPath", out var outputPath))
+        {
+            IsValid = false;
+        }
+        OutputPath = outputPath!;
     }
     
     public static GlobalOptions Select(AnalyzerConfigOptionsProvider provider, CancellationToken token)

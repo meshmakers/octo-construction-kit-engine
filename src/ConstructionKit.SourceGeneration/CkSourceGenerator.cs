@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -35,7 +36,11 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var fileName = Path.GetFileName(x.Path).ToLower();
                 return fileName.StartsWith("ck-") && (fileName.EndsWith(".cache.json") || fileName.EndsWith(".yaml"));
             })
-            .Select(static (f, _) => new AdditionalTextWithHash(f, Guid.NewGuid()));
+            .Select(static (f, _) =>
+            {
+                var checksum = f.GetText()?.GetChecksum() ?? new ImmutableArray<byte>();
+                return new AdditionalTextWithHash(f, BitConverter.ToString(checksum.ToArray()));
+            });
         
         var monitor = ckModelCandidates.Collect().SelectMany(static (x, _) => GroupCkModelFiles.Group(x));
         
@@ -57,7 +62,7 @@ public class CkSourceGenerator : IIncrementalGenerator
         var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
         var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
         
-        var tenantId = fileOptions.GroupedFile.MainFile.Hash.ToString();
+        var tenantId = fileOptions.GroupedFile.MainFile.Hash;
         
         ckCacheService.CreateTenant(tenantId);
         fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);

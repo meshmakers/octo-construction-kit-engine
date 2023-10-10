@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
@@ -14,6 +15,6 @@ public interface IEntityRuleEngine
     /// <param name="entityUpdateInfos">A list of entity transactions that should be applied to the existing repository.</param>
     /// <param name="operationResult">Represents the operation result with validation messages</param>
     /// <returns></returns>
-    Task<EntityRuleEngineResult> ValidateAsync(string tenantId, IReadOnlyList<EntityUpdateInfo> entityUpdateInfos,
-        OperationResult operationResult);
+    Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId, IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos,
+        OperationResult operationResult) where TEntity : RtEntity;
 }

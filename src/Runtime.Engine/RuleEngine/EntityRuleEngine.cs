@@ -21,13 +21,13 @@ internal class EntityRuleEngine : IEntityRuleEngine
         _ckCache = ckCache;
     }
 
-    public async Task<EntityRuleEngineResult> ValidateAsync(string tenantId, IReadOnlyList<EntityUpdateInfo> entityUpdateInfos,
-        OperationResult operationResult)
+    public async Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId, 
+        IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, OperationResult operationResult) where TEntity : RtEntity
     {
 
-        var entitiesToCreate = new ConcurrentBag<RtEntity>();
-        var entitiesToUpdate = new ConcurrentBag<RtEntity>();
-        var entitiesToDelete = new ConcurrentBag<RtEntity>();
+        var entitiesToCreate = new ConcurrentBag<TEntity>();
+        var entitiesToUpdate = new ConcurrentBag<TEntity>();
+        var entitiesToDelete = new ConcurrentBag<TEntity>();
 
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
         {
@@ -36,26 +36,47 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(tenantId, info.RtEntity.CkTypeId));
                 return ValueTask.CompletedTask;
             }
+
+            if (ckTypeGraph.IsAbstract)
+            {
+                operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(tenantId, info.RtEntity.CkTypeId));
+                return ValueTask.CompletedTask;
+            }
             
             // check if all attributes are applied that are mandatory. If there is a mandatory attribute missing and no default value is set, throw an exception
             bool isInError = false;
-            foreach (var attribute in ckTypeGraph.AllAttributes.Values)
+            if (info.ModOption == EntityModOptions.Create)
             {
-                if (!attribute.IsOptional && !info.RtEntity.Attributes.ContainsKey(attribute.AttributeName))
+                foreach (var attribute in ckTypeGraph.AllAttributes.Values)
                 {
-                    if (attribute.DefaultValues != null)
+                    if (!attribute.IsOptional && (!info.RtEntity.Attributes.ContainsKey(attribute.AttributeName) || info.RtEntity.Attributes[attribute.AttributeName] == null))
                     {
-                        info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                        if (attribute.DefaultValues != null)
+                        {
+                            info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                        }
+                        else
+                        {
+                            operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(tenantId,
+                                attribute.CkAttributeId, info.RtEntity.CkTypeId, info.RtEntity.RtId));
+                            isInError = true;
+                        }
                     }
-                    else
+                }
+            }
+            else if (info.ModOption == EntityModOptions.Update)
+            {
+                foreach (var attribute in ckTypeGraph.AllAttributes.Values)
+                {
+                    if (!attribute.IsOptional && (!info.RtEntity.Attributes.ContainsKey(attribute.AttributeName) || info.RtEntity.Attributes[attribute.AttributeName] == null))
                     {
-                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(tenantId,
+                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(tenantId,
                             attribute.CkAttributeId, info.RtEntity.CkTypeId, info.RtEntity.RtId));
                         isInError = true;
                     }
                 }
             }
-            
+
             token.ThrowIfCancellationRequested();
 
             if (isInError)
@@ -81,11 +102,12 @@ internal class EntityRuleEngine : IEntityRuleEngine
             return ValueTask.CompletedTask;
         }).ConfigureAwait(false);
         
-        var entityValidatorResult = new EntityRuleEngineResult();
+        var entityValidatorResult = new EntityRuleEngineResult<TEntity>();
         entityValidatorResult.RtEntitiesToCreate.AddRange(entitiesToCreate);
         entityValidatorResult.RtEntitiesToUpdate.AddRange(entitiesToUpdate);
         entityValidatorResult.RtEntitiesToDelete.AddRange(entitiesToDelete);
 
         return entityValidatorResult;
     }
+
 }

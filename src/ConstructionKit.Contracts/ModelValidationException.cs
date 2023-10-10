@@ -21,12 +21,6 @@ public class ModelValidationException : CkModelException
     public ModelValidationException(string message, Exception inner) : base(message, inner)
     {
     }
-    
-    internal static Exception DuplicateAttributeIds(IEnumerable<CkId<CkAttributeId>> duplicateAttributes)
-    {
-        var attributeIds = string.Join(", ", duplicateAttributes);
-        return new ModelValidationException($"Following attribute ids are duplicates: '{attributeIds}'");
-    }
 
     internal static Exception UnknownCkTypeIdForInheritance(CkId<CkTypeId> ckTypeId)
     {
@@ -42,42 +36,7 @@ public class ModelValidationException : CkModelException
     {
         return new ModelValidationException($"CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.");
     }
-    
-    internal static Exception CkTypeIdAlreadyExistsInDatabase(CkId<CkTypeId> ckTypeId)
-    {
-        return new ModelValidationException($"CkTypeId '{ckTypeId}' already exists in database.");
-    }
 
-    internal static Exception UnknownAttributeOfCkTypeIdInSource(CkId<CkTypeId> ckTypeId, CkId<CkAttributeId> attributeId)
-    {
-        return new ModelValidationException($"Attribute Id '{attributeId}' of CkTypeId '{ckTypeId}' does not exist.");
-    }
-
-    internal static Exception CommonValidationFailed(string error)
-    {
-        return new ModelValidationException($"Validation of Construction Kit Model failed:" + Environment.NewLine + error);
-    }
-
-
-    internal static Exception CkTypeIdUsingSystemReservedAttributeNames(CkId<CkTypeId> ckTypeId, IEnumerable<string> systemReservedAttributeNames)
-    {
-        var attributeNames = string.Join(", ", systemReservedAttributeNames);
-        return new ModelValidationException(
-            $"CkTypeId '{ckTypeId}' using attribute names that are system reserved: '{attributeNames}'");
-    }
-
-    internal static Exception CkAssociationRoleNotFound(CkId<CkAssociationRoleId> associationId)
-    {
-        return new ModelValidationException($"Association role '{associationId}' not found.");
-    }
-
-    internal static Exception UnknownCkModel(CkModelId modelDependency)
-    {
-       return new ModelValidationException($"Repository does not contain construction kit model '{modelDependency}'.");
-    }
-
-
-    
 
     internal static Exception UnknownCkTypeIdForAssociationTarget(CkId<CkTypeId> originCkTypeId, CkId<CkAssociationRoleId> entityAssociationRoleId, CkId<CkTypeId> typeAssociationTargetCkTypeId)
     {

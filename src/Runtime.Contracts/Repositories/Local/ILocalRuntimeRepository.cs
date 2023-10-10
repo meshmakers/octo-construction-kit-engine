@@ -1,4 +1,4 @@
-namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
+namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 
 /// <summary>
 /// Represents a repository that is located on the local hard disk

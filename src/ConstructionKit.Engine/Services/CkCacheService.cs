@@ -50,7 +50,18 @@ public class CkCacheService : ICkCacheService
         
         ckCache.LoadCkModelGraph(modelGraph);
     }
-    
+
+    /// <inheritdoc />
+    public ICollection<CkModelId> GetCkDependencies(string tenantId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetCkDependencies();
+    }
+
     /// <summary>
     /// Unload a tenant cache.
     /// </summary>

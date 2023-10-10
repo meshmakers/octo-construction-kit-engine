@@ -37,18 +37,20 @@ internal class CkIdsCodeGenerator
 
             foreach (var ckTypeDto in ckTypes.OrderBy(x=> x.TypeId.TypeId))
             {
-                sb.AppendLine($"    public const string {ckTypeDto.TypeId.TypeId.MakeClassName()} = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
+                sb.AppendLine($"    public const string {ckTypeDto.TypeId.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
             }
         }
         
         if (ckAttributes != null)
         {
+            sb.AppendLine();
+            sb.AppendLine("    // Attributes");
+            
             foreach (var ckAttributeDto in ckAttributes.OrderBy(x=> x.AttributeId.AttributeId))
             {
-                sb.AppendLine();
-                sb.AppendLine("    // Attributes");
+
                 
-                sb.AppendLine($"    public const string {ckAttributeDto.AttributeId.AttributeId.MakeClassName()} = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
+                sb.AppendLine($"    public const string {ckAttributeDto.AttributeId.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
             }
         }
                 

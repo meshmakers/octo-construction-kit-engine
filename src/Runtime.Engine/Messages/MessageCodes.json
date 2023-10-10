@@ -17,6 +17,18 @@
       "number": 3,
       "level": "FATALERROR",
       "text": "{tenantId}: CkTypeId '{rtEntityCkTypeId}' not found."
+    },
+    {
+      "key": "CkTypeIdIsAbstract",
+      "number": 4,
+      "level": "FATALERROR",
+      "text": "{tenantId}: CkTypeId '{ckTypeId}' is abstract."
+    },
+    {
+      "key": "MandatoryAttributeMissingAtUpdate",
+      "number": 5,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is missing."
     }
   ]
 }

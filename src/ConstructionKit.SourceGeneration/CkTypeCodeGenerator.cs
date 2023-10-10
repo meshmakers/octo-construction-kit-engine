@@ -57,7 +57,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit type {ckType.TypeId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"[CkId({modelId.ModelId.MakeClassName()}CkIds.ModelId, {modelId.ModelId.MakeClassName()}CkIds.{ckType.TypeId.TypeId.MakeClassName()})]");
+        sb.AppendLine($"[CkId({modelId.ModelId.MakeClassName()}CkIds.ModelId, {modelId.ModelId.MakeClassName()}CkIds.{ckType.TypeId.TypeId.MakeClassName()}TypeId)]");
         sb.AppendLine($"public partial class Rt{ckType.TypeId.TypeId.MakeClassName()}{ckBaseType}");
         sb.AppendLine("{");
         if (ckType.Attributes != null)

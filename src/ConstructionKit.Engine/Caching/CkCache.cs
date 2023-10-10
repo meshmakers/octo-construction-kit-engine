@@ -199,4 +199,14 @@ internal class CkCache : IDisposable
         options.Converters.Add(new CkModelIdConverter());
         return options;
     }
+
+    public ICollection<CkModelId> GetCkDependencies()
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.Dependencies.SelectMany(x => x.Value).Distinct().ToList();
+    }
 }

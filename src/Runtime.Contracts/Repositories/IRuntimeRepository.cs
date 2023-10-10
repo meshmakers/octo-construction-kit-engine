@@ -90,4 +90,26 @@ public interface IRuntimeRepository
     TEntity CreateTransientRtEntity<TEntity>() where TEntity : RtEntity, new();
     
     #endregion
+    
+    #region Modification (simple)
+
+    /// <summary>
+    /// Inserts a single runtime entity
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtEntity">Object to insert</param>
+    /// <returns></returns>
+    Task InsertOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, RtEntity rtEntity);
+
+    /// <summary>
+    /// Inserts a single runtime entity
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtEntity">Object to insert</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns></returns>
+    Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity) where TEntity : RtEntity, new();
+
+    #endregion Modification (simple)
 }

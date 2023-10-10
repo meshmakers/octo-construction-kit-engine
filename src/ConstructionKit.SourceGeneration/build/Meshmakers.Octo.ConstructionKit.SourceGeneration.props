@@ -8,6 +8,7 @@
         <CompilerVisibleProperty Include="MSBuildProjectFullPath" />
         <CompilerVisibleProperty Include="MSBuildProjectName" />
         <CompilerVisibleProperty Include="RootNamespace" />
+        <CompilerVisibleProperty Include="OutputPath" />
         <CompilerVisibleItemMetadata Include="EmbeddedResource" MetadataName="GenerateCkModelServiceClass" />
     </ItemGroup>
 

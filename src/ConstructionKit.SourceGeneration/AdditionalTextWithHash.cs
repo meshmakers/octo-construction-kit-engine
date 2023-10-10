@@ -2,7 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
-public readonly record struct AdditionalTextWithHash(AdditionalText File, Guid Hash)
+public readonly record struct AdditionalTextWithHash(AdditionalText File, string Hash)
 {
     public bool Equals(AdditionalTextWithHash other)
     {

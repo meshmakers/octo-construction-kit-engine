@@ -7,17 +7,17 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 public class ModelRepositoryException : CkModelException
 {
     /// <inheritdoc />
-    public ModelRepositoryException()
+    private ModelRepositoryException()
     {
     }
 
     /// <inheritdoc />
-    public ModelRepositoryException(string message) : base(message)
+    private ModelRepositoryException(string message) : base(message)
     {
     }
 
     /// <inheritdoc />
-    public ModelRepositoryException(string message, Exception inner) : base(message, inner)
+    private ModelRepositoryException(string message, Exception inner) : base(message, inner)
     {
     }
 

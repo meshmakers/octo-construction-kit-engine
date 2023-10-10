@@ -56,8 +56,8 @@ public class YamlSerializerTests
         var operationResult = new OperationResult();
         await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Equal(2, operationResult.Messages.Count);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
     }
@@ -72,8 +72,8 @@ public class YamlSerializerTests
         var operationResult = new OperationResult();
         await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
-        Assert.True(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
+        Assert.False(operationResult.HasErrors);
+        Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
     }
     

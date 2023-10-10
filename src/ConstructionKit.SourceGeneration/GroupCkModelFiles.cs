@@ -5,18 +5,20 @@ internal static class GroupCkModelFiles
     public static IEnumerable<GroupedModelFile> Group(IReadOnlyList<AdditionalTextWithHash> allFilesWithHash,
         CancellationToken cancellationToken = default)
     {
-        var lookup = new Dictionary<string, AdditionalTextWithHash>();
+        var lookup = new Dictionary<Tuple<string, string>, AdditionalTextWithHash>();
+        
         var res = new Dictionary<AdditionalTextWithHash, AdditionalTextWithHash>();
         foreach (var file in allFilesWithHash)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var path = file.File.Path;
+            var directoryPath = Path.GetDirectoryName(path)?.ToLower() ?? "";
             var baseName = Path.GetFileNameWithoutExtension(path).ToLower();
             if (!baseName.Contains("cache"))
             {
                 //it should be impossible to exist already, but VS sometimes throws error about duplicate key added. Keep the original entry, not the new one
-                lookup.TryAdd(baseName, file);
+                lookup.TryAdd(new Tuple<string, string>(directoryPath, baseName), file);
             }
         }
 
@@ -27,7 +29,9 @@ internal static class GroupCkModelFiles
             var path = fileWithHash.File.Path;
             var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(path).ToLower();
             var baseName = fileNameWithoutExtension.Replace(".cache", "");
-            if (fileNameWithoutExtension.Contains("cache") && lookup.TryGetValue(baseName, out var mainFile))
+            var directoryPath = Path.GetDirectoryName(path)?.ToLower() ?? "";
+            var lookupTuple = new Tuple<string, string>(directoryPath, baseName);
+            if (fileNameWithoutExtension.Contains("cache") && lookup.TryGetValue(lookupTuple, out var mainFile))
             {
                 res.Add(mainFile, fileWithHash);
             }

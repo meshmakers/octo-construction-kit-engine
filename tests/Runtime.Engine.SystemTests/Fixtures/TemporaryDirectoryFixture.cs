@@ -17,7 +17,7 @@ public class TemporaryDirectoryFixture : ServiceCollectionFixture, IDisposable
 
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         foreach (var tempDirectoryPath in _tempDirectoryList)
         {

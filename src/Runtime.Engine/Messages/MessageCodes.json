@@ -29,6 +29,72 @@
       "number": 5,
       "level": "FATALERROR",
       "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is missing."
+    },
+    {
+      "key": "AssociationCardinalityViolationOnCreate",
+      "number": 6,
+      "level": "FATALERROR",
+      "text": "{tenantId}: CkTypeId '{ckTypeId}'->RtId '{rtId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association."
+    },
+    {
+      "key": "AssociationNotAllowed",
+      "number": 7,
+      "level": "FATALERROR",
+      "text": "{tenantId}: '{ckTypeId}'->'{rtId}': Inbound association '{roleId}' is not allowed."
+    },
+    {
+      "key": "MissingTargetEntity",
+      "number": 8,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Target entity '{ckTypeId}'->'{rtId}' does not exist."
+    },
+    {
+      "key": "EntityNotFound",
+      "number": 9,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Entity '{ckTypeId}'->'{rtId}' does not exist."
+    },
+    {
+      "key": "MissingOriginEntity",
+      "number": 10,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Origin entity '{ckTypeId}'->'{rtId}' does not exist."
+    },
+    {
+      "key": "InboundAssociationNotAllowedForCkType",
+      "number": 11,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed."
+    },
+    {
+      "key": "OutboundAssociationNotAllowedForCkType",
+      "number": 12,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Outbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed."
+    },
+    {
+      "key": "AssociationCardinalityViolationOnDelete",
+      "number": 13,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Association deletion violates the model."
+    },
+    {
+      "key": "AssociationCardinalityViolationOnModification",
+      "number": 14,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Adding another association violates the model."
+    },
+    {
+      "key": "AssociationDoesNotExist",
+      "number": 15,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}'->'{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does not exist."
+    },
+    {
+      "key": "AssociationAlreadyExists",
+      "number": 16,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}'->'{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does already exist."
     }
   ]
 }

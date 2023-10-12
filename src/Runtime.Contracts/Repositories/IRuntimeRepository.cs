@@ -32,6 +32,16 @@ public interface IRuntimeRepository
     /// <param name="rtEntityId">The runtime id</param>
     /// <returns></returns>
     Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId);
+
+    /// <summary>
+    /// Gets an entity by its runtime id.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtId">The object id</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns></returns>
+    Task<TEntity?> GetRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId)
+        where TEntity : RtEntity, new();
     
     /// <summary>
     /// Gets associations for a runtime entity.
@@ -112,4 +122,37 @@ public interface IRuntimeRepository
     Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity) where TEntity : RtEntity, new();
 
     #endregion Modification (simple)
+    
+    #region Modification (bulk)
+
+    /// <summary>
+    /// Applies changes to the runtime repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="entityUpdateInfoList">List of runtime entity updates</param>
+    /// <param name="associationUpdateInfoList">List of runtime association updates</param>
+    /// <param name="operationResult">Result of the operation</param>
+    /// <returns></returns>
+    Task ApplyChanges(IOctoSession session, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult);
+
+    /// <summary>
+    /// Applies changes to the runtime repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="associationUpdateInfoList">List of runtime association updates</param>
+    /// <param name="operationResult">Result of the operation</param>
+    /// <returns></returns>
+    Task ApplyChanges(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult);
+    
+    /// <summary>
+    /// Applies changes to the runtime repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="entityUpdateInfoList">List of runtime entity updates</param>
+    /// <param name="operationResult">Result of the operation</param>
+    /// <returns></returns>
+    Task ApplyChanges(IOctoSession session, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList, OperationResult operationResult);
+
+    #endregion Modification (bulk)
 }

@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
-using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
@@ -14,7 +14,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 /// </summary>
 public abstract class RuntimeRepositoryBase : IRuntimeRepository
 {
-    private readonly IEntityRuleEngine _entityRuleEngine;
+    private readonly IBulkRtMutation _bulkRtMutation;
 
     /// <summary>
     /// Returns the data source of the repository
@@ -32,11 +32,11 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="tenantId">The id of the tenant to request services</param>
     /// <param name="ckCacheService">Construction kit cache service</param>
     /// <param name="repositoryDataSource">The corresponding repository data source</param>
-    /// <param name="entityRuleEngine">Entity rule engine object</param>
+    /// <param name="bulkRtMutation"></param>
     protected RuntimeRepositoryBase(string tenantId, ICkCacheService ckCacheService, IRepositoryDataSource repositoryDataSource,
-        IEntityRuleEngine entityRuleEngine)
+        IBulkRtMutation bulkRtMutation)
     {
-        _entityRuleEngine = entityRuleEngine;
+        _bulkRtMutation = bulkRtMutation;
         RepositoryDataSource = repositoryDataSource;
         TenantId = tenantId;
         CkCacheService = ckCacheService;
@@ -50,7 +50,21 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public abstract Task<IOctoSession> GetSessionAsync();
 
     /// <inheritdoc />
-    public abstract Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId);
+    public virtual async Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId)
+    {
+        var rtCollection = RepositoryDataSource.GetRtCollection<RtEntity>(rtEntityId.CkTypeId);
+
+        return await rtCollection.DocumentAsync(session, rtEntityId.RtId).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public virtual async Task<TEntity?> GetRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId) where TEntity : RtEntity, new()
+    {
+        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+
+        return await rtCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public abstract Task<IEnumerable<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
@@ -61,20 +75,17 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
 
     /// <inheritdoc />
-    public abstract Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
-        RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId);
+    public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
+        RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
+    {
+        return await RepositoryDataSource.GetRtAssociationOrDefaultAsync(session, originRtEntityId, targetRtEntityId, ckRoleId)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetRtEntityId)
     {
-        return new RtAssociation
-        {
-            AssociationRoleId = ckRoleId,
-            OriginCkTypeId = originRtEntityId.CkTypeId,
-            OriginRtId = originRtEntityId.RtId,
-            TargetCkTypeId = targetRtEntityId.CkTypeId,
-            TargetRtId = targetRtEntityId.RtId
-        };
+        return RepositoryDataSource.CreateTransientRtAssociation(originRtEntityId, ckRoleId, targetRtEntityId);
     }
 
     /// <inheritdoc />
@@ -105,57 +116,36 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public virtual async Task InsertOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, RtEntity rtEntity)
     {
-        var rtCollection = RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeId);
-        PrepareEntityForModification(rtEntity);
-        OperationResult operationResult = new();
-        var ruleEngineResult = await _entityRuleEngine.ValidateAsync(
-            TenantId,
-            new[] { new EntityUpdateInfo(rtEntity, EntityModOptions.Create) },
-            operationResult).ConfigureAwait(false);
-        
-        RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
-        
-        foreach (var entity in ruleEngineResult.RtEntitiesToCreate)
-        {
-            await rtCollection.InsertAsync(session, entity).ConfigureAwait(false);
-        }
+        rtEntity.CkTypeId = ckTypeId;
+        var entitiesUpdate = new[] { new EntityUpdateInfo(rtEntity, EntityModOptions.Create) };
+        await _bulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[]{}).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity) where TEntity : RtEntity, new()
     {
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
-        PrepareEntityForModification(rtEntity);
-        
-        OperationResult operationResult = new();
-        var ruleEngineResult = await _entityRuleEngine.ValidateAsync(
-            TenantId,
-            new[] { new EntityUpdateInfo<TEntity>(rtEntity, EntityModOptions.Create) },
-            operationResult).ConfigureAwait(false);
-        
-        RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
-        
-        foreach (var entity in ruleEngineResult.RtEntitiesToCreate)
-        {
-            await rtCollection.InsertAsync(session, entity).ConfigureAwait(false);
-        }
+        rtEntity.CkTypeId = rtEntity.GetCkTypeId();
+        var entitiesUpdate = new[] { new EntityUpdateInfo(rtEntity, EntityModOptions.Create) };
+        await _bulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[]{}).ConfigureAwait(false);
     }
-    
-    /// <summary>
-    /// Prepares an runtime entity for modification
-    /// </summary>
-    /// <param name="rtEntity">Object to insert</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
-    protected void PrepareEntityForModification<TEntity>(TEntity rtEntity) where TEntity : RtEntity, new()
+
+    /// <inheritdoc />
+    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        OperationResult operationResult)
     {
-        rtEntity.RtChangedDateTime = DateTime.UtcNow;
-        if (!rtEntity.RtCreationDateTime.HasValue)
-        {
-            rtEntity.RtCreationDateTime = rtEntity.RtChangedDateTime;
-        }
-        if (string.IsNullOrWhiteSpace(rtEntity.CkTypeId.FullName)) {
-            rtEntity.CkTypeId = rtEntity.GetCkTypeId();
-        }
+        await _bulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entityUpdateInfoList, associationUpdateInfoList).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
+    {
+        await ApplyChanges(session, new List<EntityUpdateInfo>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList, OperationResult operationResult)
+    {
+        await ApplyChanges(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
     }
     
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)

@@ -45,6 +45,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationIdConverter())
+            .WithTypeConverter(new OctoObjectIdConverter())
             .Build();
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -59,6 +60,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationIdConverter())
+            .WithTypeConverter(new OctoObjectIdConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

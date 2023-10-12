@@ -1,34 +1,31 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
-using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
-using Meshmakers.Octo.Runtime.Contracts.Serialization;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
-internal class LocalDataSourceCollection<TDocument> : IDataSourceCollection<TDocument> where TDocument : RtEntity, new()
+internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCollection<TKey, TDocument> 
+    where TDocument : new() 
+    where TKey : notnull
 {
     private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
 
     private readonly string _tenantId;
-    private readonly ICkCacheService _ckCacheService;
-    public string FilePath { get; }
-    public IRtSerializer RtSerializer { get; }
+    private readonly string _filePath;
+    private readonly IDataSourceMapper<TKey, TDocument, TDto> _dataSourceMapper;
 
-    private readonly ConcurrentDictionary<OctoObjectId, RtEntity> _rtEntities;
+    private readonly ConcurrentDictionary<TKey, TDocument> _rtEntities;
     private bool _isLoaded;
 
-    public LocalDataSourceCollection(string tenantId, string filePath, ICkCacheService ckCacheService, IRtSerializer rtSerializer)
+    public LocalDataSourceCollection(string tenantId, string filePath, 
+        IDataSourceMapper<TKey, TDocument, TDto> dataSourceMapper)
     {
         _tenantId = tenantId;
-        _ckCacheService = ckCacheService;
-        FilePath = filePath;
-        RtSerializer = rtSerializer;
+        _filePath = filePath;
+        _dataSourceMapper = dataSourceMapper;
 
-        _rtEntities = new ConcurrentDictionary<OctoObjectId, RtEntity>();
+        _rtEntities = new ConcurrentDictionary<TKey, TDocument>();
         _isLoaded = false;
     }
 
@@ -37,12 +34,96 @@ internal class LocalDataSourceCollection<TDocument> : IDataSourceCollection<TDoc
     {
         await LoadAsync().ConfigureAwait(false);
 
-        if (!_rtEntities.TryAdd(document.RtId, document))
+        var key = _dataSourceMapper.GetId(document);
+        if (!_rtEntities.TryAdd(key, document))
         {
-            throw RuntimeRepositoryException.EntityAlreadyAdded(_tenantId, document.RtId);
+            throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
         }
 
         await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task InsertMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        foreach (var document in documents)
+        {
+            var key = _dataSourceMapper.GetId(document);
+            if (!_rtEntities.TryAdd(key, document))
+            {
+                throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
+            }
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task UpdateMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        foreach (var document in documents)
+        {
+            var key = _dataSourceMapper.GetId(document);
+            
+            _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+
+            if (savedDocument == null)
+            {
+                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+            }
+            
+            _dataSourceMapper.Apply(savedDocument, document);
+            
+            if (!_rtEntities.TryUpdate(_dataSourceMapper.GetId(document), document, savedDocument))
+            {
+                throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
+            }
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task DeleteOneAsync(IOctoSession session, TKey key)
+    {
+        await LoadAsync().ConfigureAwait(false);
+        
+        if (!_rtEntities.TryRemove(key, out _))
+        {
+            throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task DeleteManyAsync(IOctoSession session, IEnumerable<TKey> keys)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        foreach (var key in keys)
+        {
+            if (!_rtEntities.TryRemove(key, out _))
+            {
+                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+            }
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task<TDocument?> DocumentAsync(IOctoSession session, TKey key)
+    {
+        await LoadAsync().ConfigureAwait(false);
+        
+        _rtEntities.TryGetValue(key, out TDocument? document);
+
+        return document;
+    }
+
+    public IQueryable<TDocument> AsQueryable()
+    {
+        return _rtEntities.Values.AsQueryable();
     }
 
     private async Task SaveAsync()
@@ -55,44 +136,8 @@ internal class LocalDataSourceCollection<TDocument> : IDataSourceCollection<TDoc
                 return;
             }
 
-            var entities = new ConcurrentBag<RtEntityDto>();
-
-            Parallel.ForEach(_rtEntities.Values, (modelRtEntity, token) =>
-            {
-                var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId);
-
-                var rtEntityDto = new RtEntityDto
-                {
-                    RtId = modelRtEntity.RtId,
-                    CkTypeId = modelRtEntity.CkTypeId,
-                    RtChangedDateTime = modelRtEntity.RtChangedDateTime,
-                    RtCreationDateTime = modelRtEntity.RtCreationDateTime,
-                    RtWellKnownName = modelRtEntity.RtWellKnownName,
-                };
-                
-                foreach (var modelRtAttribute in modelRtEntity.Attributes)
-                {
-                    if (ckTypeGraph.AllAttributesByName.TryGetValue(modelRtAttribute.Key, out var ckTypeAttributeGraph))
-                    {
-                        rtEntityDto.Attributes.Add(new RtAttributeDto
-                        {
-                            Id = ckTypeAttributeGraph.CkAttributeId,
-                            Value = modelRtAttribute.Value
-                        });
-                    }
-                }
-                
-                entities.Add(rtEntityDto);
-            });
-            
-            var rtModelRoot = new RtModelRootDto
-            {
-                Dependencies = _ckCacheService.GetCkDependencies(_tenantId).ToList(),
-                Entities = entities.ToList()
-            };
-
-            await using var streamWriter = new StreamWriter(FilePath);
-            await RtSerializer.SerializeAsync(streamWriter, rtModelRoot).ConfigureAwait(false);
+            await using var streamWriter = new StreamWriter(_filePath);
+            await _dataSourceMapper.SerializeAsync(streamWriter, _rtEntities).ConfigureAwait(false);
         }
         finally
         {
@@ -111,44 +156,20 @@ internal class LocalDataSourceCollection<TDocument> : IDataSourceCollection<TDoc
                 return;
             }
 
-            if (!File.Exists(FilePath))
+            if (!File.Exists(_filePath))
             {
                 _isLoaded = true;
                 return;
             }
 
-            var operationResult = new OperationResult();
-            await using var fileStream = File.OpenRead(FilePath);
-            var existingDocuments = await RtSerializer.DeserializeAsync(fileStream, FilePath, operationResult).ConfigureAwait(false);
-            if (operationResult.HasErrors)
+            OperationResult operationResult = new();
+            await using var fileStream = File.OpenRead(_filePath);
+            
+            var rtEntities = await _dataSourceMapper.DeserializeAsync(fileStream, _filePath, operationResult).ConfigureAwait(false);
+            foreach (var keyValuePair in rtEntities)
             {
-                throw new Exception($"Error while loading file {FilePath}");
+                _rtEntities.TryAdd(keyValuePair.Key, keyValuePair.Value);
             }
-
-            Parallel.ForEach(existingDocuments.Entities, (modelRtEntity, _) =>
-            {
-                var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId);
-
-                var entity = new RtEntity
-                {
-                    RtId = modelRtEntity.RtId,
-                    CkTypeId = modelRtEntity.CkTypeId,
-                    RtChangedDateTime = modelRtEntity.RtChangedDateTime,
-                    RtCreationDateTime = modelRtEntity.RtCreationDateTime,
-                    RtWellKnownName = modelRtEntity.RtWellKnownName,
-                };
-
-                foreach (var modelRtAttribute in modelRtEntity.Attributes)
-                {
-                    if (ckTypeGraph.AllAttributes.TryGetValue(modelRtAttribute.Id, out var ckTypeAttributeGraph))
-                    {
-                        entity.SetAttributeValue(ckTypeAttributeGraph.AttributeName, ckTypeAttributeGraph.ValueType,
-                            modelRtAttribute.Value);
-                    }
-                }
-
-                _rtEntities.TryAdd(modelRtEntity.RtId, entity);
-            });
 
             _isLoaded = true;
         }

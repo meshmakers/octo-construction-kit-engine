@@ -3,7 +3,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
-using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
@@ -19,18 +18,12 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     /// <param name="directoryPath">Path to directory the runtime entities are located.</param>
     /// <param name="ckCacheService">Construction kit cache service</param>
     /// <param name="repositoryDataSource">Data source of a local repository</param>
-    /// <param name="entityRuleEngine">Rule engine that validates the model against construction kit</param>
+    /// <param name="bulkRtMutation">Bulk runtime mutation implementation</param>
     public LocalDirectoryRuntimeRepository(string tenantId, string directoryPath, ICkCacheService ckCacheService,
-        ILocalRepositoryDataSource repositoryDataSource, IEntityRuleEngine entityRuleEngine)
-    : base(tenantId, ckCacheService, repositoryDataSource, entityRuleEngine)
+        ILocalRepositoryDataSource repositoryDataSource, IBulkRtMutation bulkRtMutation)
+    : base(tenantId, ckCacheService, repositoryDataSource, bulkRtMutation)
     {
         DirectoryPath = directoryPath;
-    }
-
-
-    public override Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId)
-    {
-        throw new NotImplementedException();
     }
 
     public override Task<IEnumerable<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction)
@@ -43,14 +36,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         throw new NotImplementedException();
     }
 
-    public override Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
-    {
-        throw new NotImplementedException();
-    }
-    
     public override Task<IOctoSession> GetSessionAsync()
     {
-        throw new NotImplementedException();
+        return Task.FromResult((IOctoSession)new LocalSession());
     }
 
     public string DirectoryPath { get; }

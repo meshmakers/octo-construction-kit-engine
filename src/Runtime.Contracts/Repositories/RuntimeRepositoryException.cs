@@ -43,9 +43,9 @@ public class RuntimeRepositoryException : PersistenceException
                                               " Wrong CkTypeId used?");
     }
     
-    internal static Exception EntityAlreadyAdded(string tenantId, OctoObjectId documentRtId)
+    internal static Exception DocumentAlreadyAdded(string tenantId, object key)
     {
-        return new RuntimeRepositoryException($"Entity '{documentRtId}' already added to tenant '{tenantId}'.");
+        return new RuntimeRepositoryException($"Document '{key}' already added to tenant '{tenantId}'.");
     }
 
     internal static Exception CkTypeIdIsAbstract(string tenantId, CkId<CkTypeId> ckTypeId)
@@ -59,5 +59,10 @@ public class RuntimeRepositoryException : PersistenceException
         {
             throw new RuntimeRepositoryException("Operation result contains errors.", operationResult);
         }
+    }
+
+    internal static Exception DocumentDoesNotExist(string tenantId, object key, Type documentType)
+    {
+        throw new RuntimeRepositoryException($"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
     }
 }

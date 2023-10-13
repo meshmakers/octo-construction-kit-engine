@@ -41,12 +41,10 @@
     <ItemGroup>
         <None Remove="**\ConstructionKit\ck-*.yaml" />
         <EmbeddedResource Include="**\ConstructionKit\ck-*.yaml">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
         </EmbeddedResource>
         <None Remove="**\ConstructionKit\ck-*.cache.json" />
         <AdditionalFiles Include="**\ConstructionKit\ck-*.cache.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </AdditionalFiles>
     </ItemGroup>
 

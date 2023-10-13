@@ -29,17 +29,26 @@ public class CkSourceGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var globalOptions = context.AnalyzerConfigOptionsProvider.Select(GlobalOptions.Select);
-
+        
         var ckModelCandidates = context.AdditionalTextsProvider
+            .Combine(globalOptions)
             .Where(static x =>
             {
-                var fileName = Path.GetFileName(x.Path).ToLower();
+                var f = x.Left;
+                var options = x.Right;
+                var outputPath = Path.Combine(Path.GetDirectoryName(options.ProjectFullPath) ?? string.Empty, options.OutputPath);
+                if (f.Path.StartsWith(outputPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    return false;
+                }
+        
+                var fileName = Path.GetFileName(f.Path).ToLower();
                 return fileName.StartsWith("ck-") && (fileName.EndsWith(".cache.json") || fileName.EndsWith(".yaml"));
             })
             .Select(static (f, _) =>
             {
-                var checksum = f.GetText()?.GetChecksum() ?? new ImmutableArray<byte>();
-                return new AdditionalTextWithHash(f, BitConverter.ToString(checksum.ToArray()));
+                var checksum = f.Left.GetText()?.GetChecksum() ?? new ImmutableArray<byte>();
+                return new AdditionalTextWithHash(f.Left, BitConverter.ToString(checksum.ToArray()));
             });
         
         var monitor = ckModelCandidates.Collect().SelectMany(static (x, _) => GroupCkModelFiles.Group(x));

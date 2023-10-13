@@ -1,4 +1,4 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="GenerateAfterBuild">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <Target Name="BaseConfig">
         <ItemGroup>
             <ConstructionKitFolder Condition="'@(ConstructionKitFolder)' == ''" Include="ConstructionKit"/>
@@ -62,6 +62,7 @@
     <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig">
         <CallTarget Condition="'$(IsOctoCompilerInstalled)' == 'false'" Targets="RestoreCompiler"/>
         <CallTarget Condition="'$(OctoSkipCkCompile)' == ''" Targets="CompileConstructionKit"/>
+        
     </Target>
 
 </Project>

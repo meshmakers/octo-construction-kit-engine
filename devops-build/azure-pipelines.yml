@@ -51,7 +51,9 @@ stages:
         displayName: 'Build'
         inputs:
           command: 'build'
-          projects:  'src/**/*.csproj'
+          projects: |
+            src/**/*.csproj
+            !src/**/Generated*.csproj
           arguments: '--configuration $(buildConfiguration)'
       - task: DotNetCoreCLI@2
         displayName: 'Build'

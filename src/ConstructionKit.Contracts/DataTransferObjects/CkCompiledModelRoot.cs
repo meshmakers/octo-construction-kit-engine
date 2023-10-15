@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <summary>
 /// The root object of the compiled version of a CK model.
 /// </summary>
-[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.CompiledModelSchema))]
+[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.GetCompiledModelSchema))]
 public class CkCompiledModelRoot : CkMetaRootDto
 {
     /// <summary>

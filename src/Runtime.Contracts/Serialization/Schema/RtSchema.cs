@@ -10,14 +10,10 @@ namespace Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 /// </summary>
 public static class RtSchema
 {
-    private static readonly JsonSchema RuntimeSchemaInternal;
     private const string SchemaPath = "Meshmakers.Octo.Runtime.Contracts.Serialization.Schema.{0}.json";
 
     static RtSchema()
     {
-        RuntimeSchemaInternal = GetSchema(string.Format(SchemaPath, "runtime-model"));
-        SchemaRegistry.Global.Register(RuntimeSchemaInternal);
-        
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-attribute")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-entity")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-association")));
@@ -26,8 +22,12 @@ public static class RtSchema
     /// <summary>
     /// Returns the runtime schema
     /// </summary>
-    public static JsonSchema RuntimeSchema => RuntimeSchemaInternal.Bundle();
-    
+    public static JsonSchema GetRuntimeSchema()
+    {
+        var runtimeSchemaInternal = GetSchema(string.Format(SchemaPath, "runtime-model"));
+        return runtimeSchemaInternal.Bundle();
+    }
+
     private static JsonSchema GetSchema(string resourcesStreamPath)
     {
         var assembly = typeof(IRtSerializer).Assembly;

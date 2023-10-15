@@ -8,7 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <summary>
 /// A part of a CK model.
 /// </summary>
-[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.ElementsSchema))]
+[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.GetElementsSchema))]
 public class CkElementsRootDto
 {
     /// <summary>

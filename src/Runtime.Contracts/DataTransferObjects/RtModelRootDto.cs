@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 /// <summary>
 /// Defines an entity in the runtime model
 /// </summary>
-[OctoJsonSchema(typeof(RtSchema), nameof(RtSchema.RuntimeSchema))]
+[OctoJsonSchema(typeof(RtSchema), nameof(RtSchema.GetRuntimeSchema))]
 public class RtModelRootDto
 {
     /// <summary>

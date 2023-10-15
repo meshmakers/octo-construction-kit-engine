@@ -48,7 +48,7 @@ stages:
         submodules: true
       - template: setversion.yml
       - task: DotNetCoreCLI@2
-        displayName: 'Build'
+        displayName: 'Build src'
         inputs:
           command: 'build'
           projects: |
@@ -56,7 +56,7 @@ stages:
             !src/**/Generated*.csproj
           arguments: '--configuration $(buildConfiguration)'
       - task: DotNetCoreCLI@2
-        displayName: 'Build'
+        displayName: 'Build samples'
         inputs:
           command: 'build'
           projects:  'samples/**/*.csproj'

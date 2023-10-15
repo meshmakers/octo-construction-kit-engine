@@ -17,13 +17,13 @@ internal class RtSchemaValidator : IRtSchemaValidator
     /// <inheritdoc />
     public bool ValidateModelInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, RtSchema.RuntimeSchema, locationReference, operationResult);
+        return ValidateModelJson(stream, RtSchema.GetRuntimeSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, RtSchema.RuntimeSchema, locationReference, operationResult);
+        return ValidateModelYaml(stream, RtSchema.GetRuntimeSchema(), locationReference, operationResult);
     }
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)

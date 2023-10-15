@@ -12,7 +12,6 @@ trigger:
 
 variables:
   buildConfiguration: 'Release'
-  solutionFile: "Octo.ConstructionKit.Compiler.sln"
   isRelease: true #$[startsWith(variables['Build.SourceBranch'], 'refs/tags/r')]
   MajorVersion: 0
   MinorVersion: 0
@@ -52,8 +51,14 @@ stages:
         displayName: 'Build'
         inputs:
           command: 'build'
-          projects:  $(SolutionFile)
+          projects:  'src/**/*.csproj'
           arguments: '--configuration $(buildConfiguration)'
+      - task: DotNetCoreCLI@2
+        displayName: 'Build'
+        inputs:
+          command: 'build'
+          projects:  'samples/**/*.csproj'
+          arguments: '--configuration $(buildConfiguration)'          
       - task: DotNetCoreCLI@2
         displayName: 'Test'
         inputs:

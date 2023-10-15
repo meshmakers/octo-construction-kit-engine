@@ -17,37 +17,37 @@ internal class CkSchemaValidator : ICkSchemaValidator
     /// <inheritdoc />
     public bool ValidateElementsInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.ElementsSchema, locationReference, operationResult);
+        return ValidateModelJson(stream, CkSchema.GetElementsSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateMetaInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.MetaSchema, locationReference, operationResult);
+        return ValidateModelJson(stream, CkSchema.GetMetaSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelJson(stream, CkSchema.CompiledModelSchema, locationReference, operationResult);
+        return ValidateModelJson(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateElementsInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.ElementsSchema, locationReference, operationResult);
+        return ValidateModelYaml(stream, CkSchema.GetElementsSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateMetaInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.MetaSchema, locationReference, operationResult);
+        return ValidateModelYaml(stream, CkSchema.GetMetaSchema(), locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
-        return ValidateModelYaml(stream, CkSchema.CompiledModelSchema, locationReference, operationResult);
+        return ValidateModelYaml(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult);
     }
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)

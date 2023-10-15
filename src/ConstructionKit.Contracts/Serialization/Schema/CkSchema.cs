@@ -8,20 +8,10 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 /// </summary>
 public static class CkSchema
 {
-    private static readonly JsonSchema ElementsSchemaInternal;
-    private static readonly JsonSchema MetaSchemaInternal;
-    private static readonly JsonSchema CompiledModelSchemaInternal;
     private const string SchemaPath = "Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema.{0}.json";
 
     static CkSchema()
     {
-        ElementsSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-elements"));
-        MetaSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-meta"));
-        CompiledModelSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-compiled-model"));
-        SchemaRegistry.Global.Register(ElementsSchemaInternal);
-        SchemaRegistry.Global.Register(MetaSchemaInternal);
-        SchemaRegistry.Global.Register(CompiledModelSchemaInternal);
-        
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-attribute")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-type")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-associationRole")));
@@ -32,17 +22,29 @@ public static class CkSchema
     /// <summary>
     /// Returns the construction kit elements schema
     /// </summary>
-    public static JsonSchema ElementsSchema => ElementsSchemaInternal.Bundle();
+    public static JsonSchema GetElementsSchema() 
+    {
+        var elementsSchema = GetSchema(string.Format(SchemaPath, "ck-elements"));
+        return elementsSchema.Bundle();
+    }
 
     /// <summary>
     /// Returns the construction kit meta schema
     /// </summary>
-    public static JsonSchema MetaSchema => MetaSchemaInternal.Bundle();
+    public static JsonSchema GetMetaSchema()
+    {
+        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-meta"));
+        return metaSchemaInternal.Bundle();
+    }
 
     /// <summary>
     /// Returns the construction kit compiled model schema
     /// </summary>
-    public static JsonSchema CompiledModelSchema => CompiledModelSchemaInternal.Bundle();
+    public static JsonSchema GetCompiledModelSchema()
+    {
+        var compiledModelSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-compiled-model"));
+        return compiledModelSchemaInternal.Bundle();
+    }
 
     private static JsonSchema GetSchema(string resourcesStreamPath)
     {

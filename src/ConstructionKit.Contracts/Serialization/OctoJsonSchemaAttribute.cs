@@ -31,14 +31,18 @@ public class OctoJsonSchemaAttribute : Attribute
         MemberInfo? memberInfo = declaringType.GetProperty(memberName, BindingFlags.Static | BindingFlags.Public);
         if (memberInfo == null)
         {
-            memberInfo = declaringType.GetField(memberName, BindingFlags.Static | BindingFlags.Public);
+            memberInfo = declaringType.GetMethod(memberName, BindingFlags.Static | BindingFlags.Public);
             if (memberInfo == null)
+            {
                 throw new ArgumentException("Cannot find public static member named `" + memberName + "`");
+            }
         }
-        PropertyInfo? propertyInfo = memberInfo as PropertyInfo;
-        FieldInfo? fieldInfo = memberInfo as FieldInfo;
-        if (!((propertyInfo?.GetValue(null) ?? fieldInfo?.GetValue(null)) is JsonSchema jsonSchema))
-            throw new ArgumentException("Value of property must be `" + typeof (JsonSchema).FullName + "`");
-        this.Schema = jsonSchema;
+        MethodInfo? methodInfo = memberInfo as MethodInfo;
+        if (!(methodInfo?.Invoke(null, null) is JsonSchema jsonSchema))
+        {
+            throw new ArgumentException("Value of property must be `" + typeof(JsonSchema).FullName + "`");
+        }
+
+        Schema = jsonSchema;
     }
 }

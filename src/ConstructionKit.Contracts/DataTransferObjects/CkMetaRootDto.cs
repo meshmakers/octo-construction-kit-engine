@@ -8,7 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <summary>
 /// Represents the content of the metadata file
 /// </summary>
-[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.MetaSchema))]
+[OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.GetMetaSchema))]
 public class CkMetaRootDto
 {
     /// <summary>

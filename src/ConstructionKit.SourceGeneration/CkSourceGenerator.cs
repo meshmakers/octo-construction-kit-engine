@@ -29,7 +29,7 @@ public class CkSourceGenerator : IIncrementalGenerator
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         var globalOptions = context.AnalyzerConfigOptionsProvider.Select(GlobalOptions.Select);
-        
+
         var ckModelCandidates = context.AdditionalTextsProvider
             .Combine(globalOptions)
             .Where(static x =>
@@ -41,7 +41,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 {
                     return false;
                 }
-        
+
                 var fileName = Path.GetFileName(f.Path).ToLower();
                 return fileName.StartsWith("ck-") && (fileName.EndsWith(".cache.json") || fileName.EndsWith(".yaml"));
             })
@@ -50,9 +50,9 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var checksum = f.Left.GetText()?.GetChecksum() ?? new ImmutableArray<byte>();
                 return new AdditionalTextWithHash(f.Left, BitConverter.ToString(checksum.ToArray()));
             });
-        
+
         var monitor = ckModelCandidates.Collect().SelectMany(static (x, _) => GroupCkModelFiles.Group(x));
-        
+
         var inputs = monitor
             .Combine(globalOptions)
             .Combine(context.AnalyzerConfigOptionsProvider)
@@ -62,7 +62,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 globalOptions: x.Left.Right
             ))
             .Where(static x => x.IsValid);
-        
+
         context.RegisterSourceOutput(inputs, GenerateCode);
     }
 
@@ -70,23 +70,23 @@ public class CkSourceGenerator : IIncrementalGenerator
     {
         var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
         var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
-        
+
         var tenantId = fileOptions.GroupedFile.MainFile.Hash;
-        
+
         ckCacheService.CreateTenant(tenantId);
         fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);
         var sourceText = cacheFile.GetText();
         if (sourceText == null)
         {
-            
             var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
                 null,
                 fileOptions.GroupedFile.CacheFile.File.Path);
             context.ReportDiagnostic(error);
             return;
         }
+
         ckCacheService.RestoreCache(tenantId, sourceText.ToString());
-        
+
         fileOptions.GroupedFile.MainFile.Deconstruct(out var mainFile, out _);
         sourceText = mainFile.GetText();
         if (sourceText == null)
@@ -97,7 +97,7 @@ public class CkSourceGenerator : IIncrementalGenerator
             context.ReportDiagnostic(error);
             return;
         }
-        
+
         var operationResult = new OperationResult();
         var ckCompiledModelRoot = ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), mainFile.Path, operationResult);
         if (operationResult.Messages.Any())
@@ -106,8 +106,9 @@ public class CkSourceGenerator : IIncrementalGenerator
             return;
         }
 
-        var ns = $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
-        
+        var ns =
+            $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
+
         if (ckCompiledModelRoot.Types != null)
         {
             foreach (var ckTypeDto in ckCompiledModelRoot.Types)
@@ -116,7 +117,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 {
                     continue;
                 }
-                
+
                 var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
                 if (!String.IsNullOrWhiteSpace(code))
                 {
@@ -124,7 +125,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
             }
         }
-        
+
         if (ckCompiledModelRoot.Records != null)
         {
             foreach (var ckRecordDto in ckCompiledModelRoot.Records)
@@ -136,7 +137,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
             }
         }
-                
+
         if (ckCompiledModelRoot.Enums != null)
         {
             foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
@@ -148,8 +149,8 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
             }
         }
-        
-        var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types, 
+
+        var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types,
             ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
         context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);
 
@@ -157,7 +158,7 @@ public class CkSourceGenerator : IIncrementalGenerator
         {
             generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace, ckCompiledModelRoot.ModelId);
             context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
-            
+
             generatedCode = CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId);
             context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
         }

@@ -43,7 +43,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         await SaveAsync().ConfigureAwait(false);
     }
 
-    public async Task InsertMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    public async Task InsertManyAsync(IOctoSession session, IEnumerable<TDocument> documents)
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -59,7 +59,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         await SaveAsync().ConfigureAwait(false);
     }
 
-    public async Task UpdateMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    public async Task UpdateManyAsync(IOctoSession session, IEnumerable<TDocument> documents)
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -75,14 +75,47 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
             }
             
             _dataSourceMapper.Apply(savedDocument, document);
-            
-            if (!_rtEntities.TryUpdate(_dataSourceMapper.GetId(document), document, savedDocument))
-            {
-                throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
-            }
         }
         
         await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task ReplaceManyAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        foreach (var document in documents)
+        {
+            var key = _dataSourceMapper.GetId(document);
+            
+            _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+
+            if (savedDocument == null)
+            {
+                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+            }
+            
+            _dataSourceMapper.Apply(savedDocument, document);
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task ReplaceByIdAsync(IOctoSession session, TKey key, TDocument document)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+
+        if (savedDocument == null)
+        {
+            throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+        }
+        
+        _dataSourceMapper.Apply(savedDocument, document);
+        
+        await SaveAsync().ConfigureAwait(false);
+
     }
 
     public async Task DeleteOneAsync(IOctoSession session, TKey key)
@@ -121,8 +154,10 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return document;
     }
 
-    public IQueryable<TDocument> AsQueryable()
+    public async Task<IQueryable<TDocument>> AsQueryableAsync()
     {
+        await LoadAsync().ConfigureAwait(false);
+
         return _rtEntities.Values.AsQueryable();
     }
 

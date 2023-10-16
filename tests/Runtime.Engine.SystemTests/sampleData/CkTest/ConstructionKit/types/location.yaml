@@ -69,6 +69,12 @@ types:
   - id: Test/ConnectionState
     name: ConnectionState
     isOptional: false
+  - id: Test/DataCount
+    name: DataCount
+    isOptional: true
+  - id: Test/LocationX
+    name: LocationX
+    isOptional: true
   associations:
   - id: System/ParentChild
     targetCkTypeId: Test/LocationWithSensor

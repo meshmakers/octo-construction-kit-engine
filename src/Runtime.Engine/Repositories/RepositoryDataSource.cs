@@ -36,43 +36,45 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     public abstract IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction)
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction)
     {
         var associations = new List<RtAssociation>();
+        var queryable = await RtAssociations.AsQueryableAsync().ConfigureAwait(false);
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
         {
-            associations.AddRange(RtAssociations.AsQueryable().Where(x =>
+            associations.AddRange(queryable.Where(x =>
                 x.TargetRtId == rtId));
         }
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
         {
-            associations.AddRange(RtAssociations.AsQueryable().Where(x =>
+            associations.AddRange(queryable.Where(x =>
                 x.OriginRtId == rtId));
         }
 
-        return Task.FromResult((IReadOnlyList<RtAssociation>)associations);
+        return associations;
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {
         var associations = new List<RtAssociation>();
+        var queryable = await RtAssociations.AsQueryableAsync().ConfigureAwait(false);
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
         {
-            associations.AddRange(RtAssociations.AsQueryable().Where(x =>
+            associations.AddRange(queryable.Where(x =>
                 x.TargetRtId == rtId && x.AssociationRoleId == roleId));
         }
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
         {
-            associations.AddRange(RtAssociations.AsQueryable().Where(x =>
+            associations.AddRange(queryable.Where(x =>
                 x.OriginRtId == rtId && x.AssociationRoleId == roleId));
         }
 
-        return Task.FromResult((IReadOnlyList<RtAssociation>)associations);
+        return associations;
     }
 
     /// <inheritdoc />
@@ -80,13 +82,14 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
 
     /// <inheritdoc />
-    public Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
+    public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
     {
-        return Task.FromResult(RtAssociations.AsQueryable()
+        var queryable = await RtAssociations.AsQueryableAsync().ConfigureAwait(false);
+        return queryable
             .FirstOrDefault(a => a.OriginRtId == originRtEntityId.RtId && a.OriginCkTypeId == originRtEntityId.CkTypeId
                                                                        && a.TargetRtId == targetRtEntityId.RtId &&
                                                                        a.TargetCkTypeId == targetRtEntityId.CkTypeId
-                                                                       && a.AssociationRoleId == ckRoleId));
+                                                                       && a.AssociationRoleId == ckRoleId);
     }
 
     /// <inheritdoc />

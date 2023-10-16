@@ -19,10 +19,10 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session"></param>
     /// <param name="documents"></param>
     /// <returns></returns>
-    Task InsertMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents);
+    Task InsertManyAsync(IOctoSession session, IEnumerable<TDocument> documents);
     
     /// <summary>
-    /// Updates multiple documents into the collection
+    /// Updates multiple documents in the collection
     /// </summary>
     /// <remarks>
     /// Attention! This method updates existing attributes of a document. Not mentioned (or null) attributes are not updated.
@@ -30,8 +30,25 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <param name="documents">A list of documents to update</param>
     /// <returns></returns>
-    Task UpdateMultipleAsync(IOctoSession session, IEnumerable<TDocument> documents);
-    
+    Task UpdateManyAsync(IOctoSession session, IEnumerable<TDocument> documents);
+
+    /// <summary>
+    /// Replaces multiple documents in the collection
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="documents">A list of documents to replaced, based on the runtime object id</param>
+    /// <returns></returns>
+    Task ReplaceManyAsync(IOctoSession session, IEnumerable<TDocument> documents);
+
+    /// <summary>
+    /// Replace a document in the collection
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="key">The unique key</param>
+    /// <param name="document">The document the existing of is replaced</param>
+    /// <returns></returns>
+    Task ReplaceByIdAsync(IOctoSession session, TKey key, TDocument document);
+
     /// <summary>
     /// Deletes the document with the given key
     /// </summary>
@@ -60,5 +77,6 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// Gets a queryable interface of the given type to the data source
     /// </summary>
     /// <returns></returns>
-    IQueryable<TDocument> AsQueryable();
+    Task<IQueryable<TDocument>> AsQueryableAsync();
+
 }

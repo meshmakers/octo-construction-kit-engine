@@ -22,7 +22,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
         _ckCacheService = ckCacheService;
         _rtSerializer = rtSerializer;
         _directoryPath = directoryPath;
-        
+
         RtAssociations = new LocalDataSourceCollection<OctoObjectId, RtAssociation, RtAssociationDto>(TenantId,
             Path.Combine(_directoryPath, "associations.json"),
             new RtAssociationDataSourceMapper(TenantId, _ckCacheService, _rtSerializer));
@@ -40,31 +40,37 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
     }
 
     public override IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
-    public override Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session, RtEntityId rtEntityId, CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction)
+
+    public override async Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session, RtEntityId rtEntityId,
+        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction)
     {
         long counter = 0;
+        var queryable = await RtAssociations.AsQueryableAsync().ConfigureAwait(false);
+
         if (direction == GraphDirections.Inbound || direction == GraphDirections.Any)
         {
-            var r= RtAssociations.AsQueryable().Count(a => a.TargetRtId == rtEntityId.RtId && a.TargetCkTypeId == rtEntityId.CkTypeId && a.AssociationRoleId == ckRoleId);
+            var r = queryable.Count(a =>
+                a.TargetRtId == rtEntityId.RtId && a.TargetCkTypeId == rtEntityId.CkTypeId && a.AssociationRoleId == ckRoleId);
             counter = Math.Max(r, counter);
         }
 
         if (direction == GraphDirections.Outbound || direction == GraphDirections.Any)
         {
-            var r= RtAssociations.AsQueryable().Count(a => a.OriginRtId == rtEntityId.RtId && a.OriginCkTypeId == rtEntityId.CkTypeId && a.AssociationRoleId == ckRoleId);
+            var r = queryable.Count(a =>
+                a.OriginRtId == rtEntityId.RtId && a.OriginCkTypeId == rtEntityId.CkTypeId && a.AssociationRoleId == ckRoleId);
             counter = Math.Max(r, counter);
         }
 
         if (counter >= 2)
         {
-            return Task.FromResult(CurrentMultiplicity.Many);
+            return CurrentMultiplicity.Many;
         }
 
         if (counter == 1)
         {
-            return Task.FromResult(CurrentMultiplicity.One);
+            return CurrentMultiplicity.One;
         }
 
-        return Task.FromResult(CurrentMultiplicity.Zero);
+        return CurrentMultiplicity.Zero;
     }
 }

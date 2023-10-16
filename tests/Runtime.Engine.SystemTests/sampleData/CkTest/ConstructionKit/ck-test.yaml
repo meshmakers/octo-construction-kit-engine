@@ -50,6 +50,12 @@ types:
     name: Designation
   - id: Test/ConnectionState
     name: ConnectionState
+  - id: Test/DataCount
+    name: DataCount
+    isOptional: true
+  - id: Test/LocationX
+    name: LocationX
+    isOptional: true
   associations:
   - id: System/ParentChild
     targetCkTypeId: Test/LocationWithSensor
@@ -62,6 +68,10 @@ attributes:
 - id: ConnectionState
   valueType: Enum
   valueCkEnumId: Test/ConnectionState
+- id: DataCount
+  valueType: Int
+- id: LocationX
+  valueType: Double
 records: []
 enums:
 - enumId: ConnectionState

@@ -6,9 +6,9 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 public enum EntityModOptions
 {
     /// <summary>
-    /// Create entity
+    /// Insert entity
     /// </summary>
-    Create = 0,
+    Insert = 0,
     
     /// <summary>
     /// Delete entity
@@ -18,5 +18,10 @@ public enum EntityModOptions
     /// <summary>
     /// Update entity
     /// </summary>
-    Update = 2
+    Update = 2,
+    
+    /// <summary>
+    /// Replace entity
+    /// </summary>
+    Replace = 3
 }

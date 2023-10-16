@@ -123,7 +123,8 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            EntityUpdateInfo<RtEntity>.CreateInsert(
+            EntityUpdateInfo<RtEntity>.CreateUpdate(
+                new RtEntityId("Test/Country", OctoObjectId.GenerateNewId()),
                 new RtEntity(
                     "Test/Country",
                     OctoObjectId.GenerateNewId(),
@@ -151,7 +152,8 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            EntityUpdateInfo<RtEntity>.CreateInsert(
+            EntityUpdateInfo<RtEntity>.CreateUpdate(
+                new RtEntityId("Test/Country", OctoObjectId.GenerateNewId()),
                 new RtEntity(
                     "Test/Country",
                     OctoObjectId.GenerateNewId(),

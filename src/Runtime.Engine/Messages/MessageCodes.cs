@@ -79,6 +79,12 @@ internal static class MessageCodes
     internal static OperationMessage AssociationAlreadyExists(object tenantId, object roleId, object originCkTypeId, object originRtId, object targetCkTypeId, object targetRtId) =>
         GetMessage("AssociationAlreadyExists", tenantId, roleId, originCkTypeId, originRtId, targetCkTypeId, targetRtId);
 
+    internal static OperationMessage RtEntityNeedsToBeDefinedAtInsertUpdateReplace(object tenantId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("RtEntityNeedsToBeDefinedAtInsertUpdateReplace", tenantId, rtEntityCkTypeId, rtId);
+
+    internal static OperationMessage RtEntityIdAlreadyExistInUpdateList(object tenantId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("RtEntityIdAlreadyExistInUpdateList", tenantId, rtEntityCkTypeId, rtId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -114,68 +120,80 @@ internal static class MessageCodes
         {
             "AssociationCardinalityViolationOnCreate",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 6, "{tenantId}: CkTypeId '{ckTypeId}'->RtId '{rtId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association.",
+                 6, "{tenantId}: Entity '{ckTypeId}@{rtId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association.",
                  new [] {"tenantId", "ckTypeId", "rtId", "roleId", "multiplicity"})
         },
         {
             "AssociationNotAllowed",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 7, "{tenantId}: '{ckTypeId}'->'{rtId}': Inbound association '{roleId}' is not allowed.",
+                 7, "{tenantId}: '{ckTypeId}@{rtId}': Inbound association '{roleId}' is not allowed.",
                  new [] {"tenantId", "ckTypeId", "rtId", "roleId"})
         },
         {
             "MissingTargetEntity",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 8, "{tenantId}: Target entity '{ckTypeId}'->'{rtId}' does not exist.",
+                 8, "{tenantId}: Target entity '{ckTypeId}@{rtId}' does not exist.",
                  new [] {"tenantId", "ckTypeId", "rtId"})
         },
         {
             "EntityNotFound",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 9, "{tenantId}: Entity '{ckTypeId}'->'{rtId}' does not exist.",
+                 9, "{tenantId}: Entity '{ckTypeId}@{rtId}' does not exist.",
                  new [] {"tenantId", "ckTypeId", "rtId"})
         },
         {
             "MissingOriginEntity",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 10, "{tenantId}: Origin entity '{ckTypeId}'->'{rtId}' does not exist.",
+                 10, "{tenantId}: Origin entity '{ckTypeId}@{rtId}' does not exist.",
                  new [] {"tenantId", "ckTypeId", "rtId"})
         },
         {
             "InboundAssociationNotAllowedForCkType",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 11, "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
+                 11, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
                  new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"})
         },
         {
             "OutboundAssociationNotAllowedForCkType",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 12, "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Outbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
+                 12, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Outbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
                  new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"})
         },
         {
             "AssociationCardinalityViolationOnDelete",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 13, "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Association deletion violates the model.",
+                 13, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Association deletion violates the model.",
                  new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"})
         },
         {
             "AssociationCardinalityViolationOnModification",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 14, "{tenantId}: Entity '{originCkTypeId}'->'{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Adding another association violates the model.",
+                 14, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Adding another association violates the model.",
                  new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"})
         },
         {
             "AssociationDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 15, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}'->'{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does not exist.",
+                 15, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}@{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does not exist.",
                  new [] {"tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"})
         },
         {
             "AssociationAlreadyExists",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 16, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}'->'{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does already exist.",
+                 16, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}@{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does already exist.",
                  new [] {"tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"})
+        },
+        {
+            "RtEntityNeedsToBeDefinedAtInsertUpdateReplace",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 17, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at insert, update or replace.",
+                 new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
+        },
+        {
+            "RtEntityIdAlreadyExistInUpdateList",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 18, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' already exists in update list.",
+                 new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
         },
     };
 }

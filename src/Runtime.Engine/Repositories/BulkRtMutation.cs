@@ -31,7 +31,7 @@ internal class BulkRtMutation : IBulkRtMutation
     /// <param name="repositoryDataSource"></param>
     /// <param name="entityUpdateInfoList"></param>
     /// <param name="associationUpdateInfoList"></param>
-    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
         OperationResult operationResult = new();
@@ -59,13 +59,18 @@ internal class BulkRtMutation : IBulkRtMutation
         {
             await UpdateRtEntities(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToUpdate).ConfigureAwait(false);
         }
-
-        if (ckEntityRuleEngineResult.RtEntitiesToCreate.Any())
+        
+        if (ckEntityRuleEngineResult.RtEntitiesToReplace.Any())
         {
-            await InsertRtEntitiesAsync(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToCreate).ConfigureAwait(false);
+            await ReplaceRtEntities(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToReplace).ConfigureAwait(false);
+        }
+
+        if (ckEntityRuleEngineResult.RtEntitiesToInsert.Any())
+        {
+            await InsertRtEntitiesAsync(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToInsert).ConfigureAwait(false);
         }
     }
-    
+
     private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtEntity> rtEntityList,
         bool disablePreDocumentModifications = false)
     {
@@ -97,14 +102,27 @@ internal class BulkRtMutation : IBulkRtMutation
                 }
 
                 var rtCollection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeId);
-                await rtCollection.InsertMultipleAsync(session, rtEntityGrouping).ConfigureAwait(false);
+                await rtCollection.InsertManyAsync(session, rtEntityGrouping).ConfigureAwait(false);
             }
         }
     }
     
-    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<RtEntity> rtEntities)
+    private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
     {
-        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.GetCkTypeId()))
+        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
+        {
+            if (string.IsNullOrWhiteSpace(rtEntityGrouping.Key.FullName))
+            {
+                throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(RtEntity));
+            }
+            
+            await ReplaceRtEntitiesByCkId(session, repositoryDataSource, rtEntityGrouping.Key, rtEntityGrouping).ConfigureAwait(false);
+        }
+    }
+
+    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
+    {
+        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
         {
             if (string.IsNullOrWhiteSpace(rtEntityGrouping.Key.FullName))
             {
@@ -115,17 +133,39 @@ internal class BulkRtMutation : IBulkRtMutation
         }
     }
 
-    private async Task UpdateRtEntitiesByCkId<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource, CkId<CkTypeId> ckTypeId, IEnumerable<TEntity> rtEntityGrouping)
-        where TEntity : RtEntity, new()
+    private async Task UpdateRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
     {
-        var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+        var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeId);
 
-        await collection.UpdateMultipleAsync(session, rtEntityGrouping).ConfigureAwait(false);
+        foreach (var keyValuePair in rtEntityGrouping)
+        {
+            keyValuePair.Value.RtId = keyValuePair.Key.RtId;
+            keyValuePair.Value.CkTypeId = keyValuePair.Key.CkTypeId;
+            keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
+        }
+
+        await collection.UpdateManyAsync(session, rtEntityGrouping.Select(x=> x.Value)).ConfigureAwait(false);
     }
     
-    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<RtEntity> rtEntities)
+    private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource, 
+        CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
     {
-        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.GetCkTypeId()))
+        var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeId);
+
+        foreach (var keyValuePair in rtEntityGrouping)
+        {
+            keyValuePair.Value.RtId = keyValuePair.Key.RtId;
+            keyValuePair.Value.CkTypeId = keyValuePair.Key.CkTypeId;
+            keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
+        }
+
+        await collection.ReplaceManyAsync(session, rtEntityGrouping.Select(x=> x.Value)).ConfigureAwait(false);
+    }
+    
+    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<RtEntityId> rtEntityIds)
+    {
+        foreach (var rtEntityGrouping in rtEntityIds.GroupBy(x => x.CkTypeId))
         {
             if (string.IsNullOrWhiteSpace(rtEntityGrouping.Key.FullName))
             {
@@ -136,14 +176,14 @@ internal class BulkRtMutation : IBulkRtMutation
         }
     }
     
-    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource, CkId<CkTypeId> ckTypeId, IEnumerable<RtEntity> rtEntities)
+    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource, CkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
         where TEntity : RtEntity, new()
     {
         var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
         
-        foreach (var rtEntity in rtEntities.AsParallel())
+        foreach (var rtEntityId in rtEntityIds.AsParallel())
         {
-            await collection.DeleteOneAsync(session, rtEntity.RtId).ConfigureAwait(false);
+            await collection.DeleteOneAsync(session, rtEntityId.RtId).ConfigureAwait(false);
         }
     }
     
@@ -163,7 +203,7 @@ internal class BulkRtMutation : IBulkRtMutation
 
     private async Task InsertRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtAssociation> rtAssociations)
     {
-        await repositoryDataSource.RtAssociations.InsertMultipleAsync(session, rtAssociations).ConfigureAwait(false);
+        await repositoryDataSource.RtAssociations.InsertManyAsync(session, rtAssociations).ConfigureAwait(false);
     }
     
     private async Task DeleteRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtAssociation> rtAssociations)

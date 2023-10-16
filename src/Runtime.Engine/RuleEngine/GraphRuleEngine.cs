@@ -22,7 +22,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
     }
 
     public async Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         OperationResult operationResult)
     {
         return await ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
@@ -30,7 +30,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
 
     public async Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
@@ -54,11 +54,11 @@ internal class GraphRuleEngine : IGraphRuleEngine
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
-        return await ValidateAsync(session, repositoryDataSource, new List<EntityUpdateInfo>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
+        return await ValidateAsync(session, repositoryDataSource, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
     }
 
     private async Task ValidateCkModel(IOctoSession session, IRepositoryDataSource repositoryDataSource, GraphRuleEngineResult graphRuleEngineResult,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
@@ -67,21 +67,21 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
         // Ensure that all associations exists when creating an entity
         // Currently, the only mandatory association has multiplicity of One
-        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Create))
+        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert))
         {
-            var cacheItem = _ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.RtEntity.GetCkTypeId());
+            var ckTypeGraph = _ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.RtEntityId.CkTypeId);
 
-            var inboundAssociationCacheItems =
-                cacheItem.Associations.In.All.Where(a =>
+            var inputAssociationGraphs =
+                ckTypeGraph.Associations.In.All.Where(a =>
                     a.Multiplicity == MultiplicitiesDto.One);
-            foreach (var inboundAssociationCacheItem in inboundAssociationCacheItems)
+            foreach (var inputAssociationGraph in inputAssociationGraphs)
             {
                 if (!associationUpdateInfoList.Any(x =>
-                        x.ModOption == AssociationModOptionsDto.Create &&
-                        x.RoleId == inboundAssociationCacheItem.CkRoleId))
+                        x.ModOption == AssociationModOptionsDto.Create &&   
+                        x.RoleId == inputAssociationGraph.CkRoleId))
                 {
                     operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnCreate(repositoryDataSource.TenantId,  
-                        entityUpdateInfo.RtEntity.CkTypeId,  entityUpdateInfo.RtEntity.RtId, inboundAssociationCacheItem.CkRoleId, MultiplicitiesDto.One));
+                        entityUpdateInfo.RtEntityId.CkTypeId,  entityUpdateInfo.RtEntityId.RtId, inputAssociationGraph.CkRoleId, MultiplicitiesDto.One));
                 }
             }
         }
@@ -90,12 +90,12 @@ internal class GraphRuleEngine : IGraphRuleEngine
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete))
         {
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                entityUpdateInfo.RtEntity.RtId, GraphDirections.Any).ConfigureAwait(false);
+                entityUpdateInfo.RtEntityId.RtId, GraphDirections.Any).ConfigureAwait(false);
             graphRuleEngineResult.RtAssociationsToDelete.AddRange(result);
         }
     }
 
-    private async Task ValidateTarget(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+    private async Task ValidateTarget(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
     {
         var targetList = associationUpdateInfoList.Select(a => a.Target).Distinct();
@@ -169,7 +169,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
         }
     }
 
-    private async Task ValidateOrigin(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+    private async Task ValidateOrigin(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
     {
         var originList = associationUpdateInfoList.Select(a => a.Origin).Distinct();
@@ -297,11 +297,11 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
 
     private async Task<RtEntity?> GetEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         RtEntityId rtEntityId, OperationResult operationResult)
     {
-        var rtEntity = entityUpdateInfoList.Select(x => x.RtEntity)
-            .FirstOrDefault(x => x.RtId == rtEntityId.RtId);
+        RtEntity? rtEntity = entityUpdateInfoList.Select(x => x.RtEntity)
+            .FirstOrDefault(x => x?.RtId == rtEntityId.RtId);
         // ReSharper disable once ConvertIfStatementToNullCoalescingExpression
         if (rtEntity == null)
         {

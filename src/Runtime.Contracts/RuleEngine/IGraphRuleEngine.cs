@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
@@ -17,7 +18,7 @@ internal interface IGraphRuleEngine
     /// <param name="operationResult">Represents the operation result with validation messages</param>
     /// <returns></returns>
     Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList, OperationResult operationResult);
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList, OperationResult operationResult);
 
     /// <summary>
     /// Validates the given update records of entities and associations to the existing repository
@@ -29,7 +30,7 @@ internal interface IGraphRuleEngine
     /// <param name="operationResult">Represents the operation result with validation messages</param>
     /// <returns></returns>
     Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult);
 

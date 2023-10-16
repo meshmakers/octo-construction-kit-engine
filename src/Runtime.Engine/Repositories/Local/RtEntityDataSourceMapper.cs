@@ -66,7 +66,9 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
                     attributeToApply.Value);
             }
         }
-       
+
+        savedDocument.RtChangedDateTime = documentToApply.RtChangedDateTime;
+        savedDocument.RtWellKnownName = documentToApply.RtWellKnownName;
     }
 
     /// <inheritdoc />

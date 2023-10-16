@@ -7,4 +7,8 @@ attributes:
 - id: ConnectionState
   valueType: Enum
   valueCkEnumId: Test/ConnectionState
+- id: DataCount
+  valueType: Int
+- id: LocationX
+  valueType: Double
   

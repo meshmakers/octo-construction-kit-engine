@@ -1,5 +1,6 @@
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
@@ -15,6 +16,6 @@ public interface IBulkRtMutation
     /// <param name="repositoryDataSource"></param>
     /// <param name="entityUpdateInfoList"></param>
     /// <param name="associationUpdateInfoList"></param>
-    Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<EntityUpdateInfo> entityUpdateInfoList,
+    Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList);
 }

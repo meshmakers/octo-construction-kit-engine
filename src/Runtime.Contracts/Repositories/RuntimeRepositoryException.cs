@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
@@ -64,5 +65,30 @@ public class RuntimeRepositoryException : PersistenceException
     internal static Exception DocumentDoesNotExist(string tenantId, object key, Type documentType)
     {
         throw new RuntimeRepositoryException($"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
+    }
+
+    internal static Exception FieldFilterDidNotReturnResult(Type type, ICollection<FieldFilter> fieldFilters)
+    {
+        return new RuntimeRepositoryException($"Field filter did not return a result for type '{type.FullName}' and field filters '{string.Join(", ", fieldFilters)}'.");
+    }
+
+    internal static Exception AttributeFilterNotSupportedByDataSource(Type type)
+    {
+        return new RuntimeRepositoryException($"Attribute filter is not supported by data source for type '{type.FullName}'.");
+    }
+
+    internal static Exception TextFilterNotSupportedByDataSource(Type type)
+    {
+        return new RuntimeRepositoryException($"Text filter is not supported by data source for type '{type.FullName}'.");
+    }
+
+    internal static Exception SortOrderNotSupportedByDataSource(Type type)
+    {
+        return new RuntimeRepositoryException($"Sort order is not supported by data source for type '{type.FullName}'.");
+    }
+
+    internal static Exception AttributeWithNameDoesNotExist(CkId<CkTypeId> ckTypeId, string filterAttributeName)
+    {
+        return new RuntimeRepositoryException($"Attribute with name '{filterAttributeName}' does not exist in type '{ckTypeId}'.");
     }
 }

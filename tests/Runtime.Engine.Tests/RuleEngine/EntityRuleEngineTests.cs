@@ -24,13 +24,13 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(new RtEntity
+            EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Sample1/SampleType35",
-            }, EntityModOptions.Create)
+            })
         }, operationResult);
 
-        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.Single(operationResult.Messages);
@@ -48,13 +48,13 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(new RtEntity
+            EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Test/City"
-            }, EntityModOptions.Create)
+            })
         }, operationResult);
 
-        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.Single(operationResult.Messages);
@@ -72,13 +72,13 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(new RtEntity
+            EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Test/LocationWithSensor"
-            }, EntityModOptions.Create)
+            })
         }, operationResult);
 
-        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.Single(operationResult.Messages);
@@ -96,17 +96,17 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(
+            EntityUpdateInfo<RtEntity>.CreateInsert(
                 new RtEntity(
                     "Test/Country",
                     OctoObjectId.GenerateNewId(),
                     new Dictionary<string, object?>
                     {
                         { "Designation", "Test" }
-                    }), EntityModOptions.Create)
+                    }))
         }, operationResult);
 
-        Assert.Single(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.Empty(operationResult.Messages);
@@ -123,17 +123,17 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(
+            EntityUpdateInfo<RtEntity>.CreateInsert(
                 new RtEntity(
                     "Test/Country",
                     OctoObjectId.GenerateNewId(),
                     new Dictionary<string, object?>
                     {
                         { "Designation", null }
-                    }), EntityModOptions.Update)
+                    }))
         }, operationResult);
 
-        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.Single(operationResult.Messages);
@@ -151,18 +151,18 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
-            new EntityUpdateInfo(
+            EntityUpdateInfo<RtEntity>.CreateInsert(
                 new RtEntity(
                     "Test/Country",
                     OctoObjectId.GenerateNewId(),
                     new Dictionary<string, object?>
                     {
                         { "Designation", "Test" }
-                    }), EntityModOptions.Update)
+                    }))
         }, operationResult);
 
         Assert.Empty(operationResult.Messages);
-        Assert.Empty(ruleEngineResult.RtEntitiesToCreate);
+        Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Single(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
         Assert.False(operationResult.HasErrors);

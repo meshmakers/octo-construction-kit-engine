@@ -23,7 +23,7 @@ public class CkIdTypeIdConverter : CkIdConverter<CkTypeId>
 /// <summary>
 /// Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkAssociationRoleId}"/>
 /// </summary>
-public class CkIdAssociationIdConverter : CkIdConverter<CkAssociationRoleId>
+public class CkIdAssociationRoleIdConverter : CkIdConverter<CkAssociationRoleId>
 {
 }
 

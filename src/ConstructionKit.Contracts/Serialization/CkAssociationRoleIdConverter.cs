@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 /// <summary>
 /// Converter for System.Text.Json and YamlDotNet for <see cref="CkAssociationRoleId"/>
 /// </summary>
-public class CkAssociationIdConverter : JsonConverter<CkAssociationRoleId>, IYamlTypeConverter
+public class CkAssociationRoleIdConverter : JsonConverter<CkAssociationRoleId>, IYamlTypeConverter
 {
     /// <inheritdoc />
     public override CkAssociationRoleId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

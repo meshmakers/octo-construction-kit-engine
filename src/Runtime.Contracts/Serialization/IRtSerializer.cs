@@ -15,7 +15,7 @@ public interface IRtSerializer
     /// <param name="modelRootDto">Model to serialize</param>
     /// <returns></returns>
     Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto);
-
+    
     /// <summary>
     /// Deserializes the runtime model from the stream, optimized for huge files.
     /// </summary>

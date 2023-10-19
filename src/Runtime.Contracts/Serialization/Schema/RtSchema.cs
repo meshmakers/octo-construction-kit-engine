@@ -1,7 +1,6 @@
 using System.Text.Json;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 

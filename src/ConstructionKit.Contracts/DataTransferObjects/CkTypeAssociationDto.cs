@@ -20,7 +20,7 @@ public class CkTypeAssociationDto
     [JsonPropertyName("id")]
     [YamlMember(Alias = "id")]
     [JsonRequired]
-    [JsonConverter(typeof(CkIdAssociationIdConverter))]
+    [JsonConverter(typeof(CkIdAssociationRoleIdConverter))]
     public CkId<CkAssociationRoleId> CkRoleId { get; set; }
 
     /// <summary>

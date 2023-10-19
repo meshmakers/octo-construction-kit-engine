@@ -189,9 +189,9 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             var inAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.OutboundName,
-                ckAssociationRole.OutboundMultiplicity, typeAssociation);
+                ckAssociationRole.OutboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
             var outAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.InboundName,
-                ckAssociationRole.InboundMultiplicity, typeAssociation);
+                ckAssociationRole.InboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
             targetCkTypeGraph.Associations.In.Owned.Add(inAssociationGraph);
             originTypeGraph.Associations.Out.Owned.Add(outAssociationGraph);
         }

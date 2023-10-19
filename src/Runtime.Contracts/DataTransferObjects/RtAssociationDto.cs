@@ -14,7 +14,7 @@ public class RtAssociationDto
     /// Gets or sets the role id of the association.
     /// </summary>
     [JsonRequired]
-    [JsonConverter(typeof(CkIdAssociationIdConverter))]
+    [JsonConverter(typeof(CkIdAssociationRoleIdConverter))]
     public CkId<CkAssociationRoleId> RoleId { get; set; }
 
     /// <summary>

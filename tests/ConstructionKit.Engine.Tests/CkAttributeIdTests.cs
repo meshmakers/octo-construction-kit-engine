@@ -32,7 +32,7 @@ public class CkAttributeIdTests
     [Fact]
     public void Create_CkAttributeId_Malformed()
     {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new CkTypeId(""));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CkAttributeId(""));
     }
     
     [Fact]

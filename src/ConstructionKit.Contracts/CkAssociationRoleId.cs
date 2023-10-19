@@ -7,7 +7,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// Represents a versioned construction kit association id
 /// </summary>
 [DebuggerDisplay("{" + nameof(RoleId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkAssociationIdConverter))]
+[System.Text.Json.Serialization.JsonConverter(typeof(CkAssociationRoleIdConverter))]
 public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, IEquatable<CkAssociationRoleId>, ICkKey
 {
     /// <summary>

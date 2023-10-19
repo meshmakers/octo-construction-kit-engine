@@ -97,6 +97,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     {
         return new RtAssociation
         {
+            AssociationId = OctoObjectId.GenerateNewId(),
             AssociationRoleId = ckRoleId,
             OriginCkTypeId = originRtEntityId.CkTypeId,
             OriginRtId = originRtEntityId.RtId,

@@ -3,7 +3,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -146,19 +145,26 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public virtual async Task InsertOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, RtEntity rtEntity)
     {
-        rtEntity.CkTypeId = ckTypeId;
-        var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
-            .ConfigureAwait(false);
+        await InsertOneRtEntityAsync<RtEntity>(session, rtEntity.GetCkTypeId(), rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity) where TEntity : RtEntity, new()
     {
-        rtEntity.CkTypeId = rtEntity.GetCkTypeId();
-        var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
-            .ConfigureAwait(false);
+        await InsertOneRtEntityAsync(session, rtEntity.GetCkTypeId(), rtEntity).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task InsertManyRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<RtEntity> rtEntities)
+    {
+        await InsertManyRtEntityAsync<RtEntity>(session, ckTypeId, rtEntities).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities) where TEntity : RtEntity, new()
+    {
+        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        await InsertManyRtEntityAsync(session, ckTypeId, rtEntities).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -338,6 +344,43 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         return rtEntity;
+    }
+    
+    /// <summary>
+    /// Inserts a single runtime entity
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtEntity">Object to insert</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns></returns>
+    protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, TEntity rtEntity) where TEntity : RtEntity, new()
+    {
+        rtEntity.CkTypeId = ckTypeId;
+        var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+            .ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// Inserts multiple runtime entities
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtEntities">Objects to insert</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns></returns>
+    protected virtual async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<TEntity> rtEntities)
+        where TEntity : RtEntity, new()
+    {
+        List<EntityUpdateInfo<TEntity>> entitiesUpdate = new();
+        foreach (var rtEntity in rtEntities)
+        {
+            rtEntity.CkTypeId = ckTypeId;
+            entitiesUpdate.Add(EntityUpdateInfo<TEntity>.CreateInsert(rtEntity));
+        }
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+            .ConfigureAwait(false);
     }
 
     /// <summary>

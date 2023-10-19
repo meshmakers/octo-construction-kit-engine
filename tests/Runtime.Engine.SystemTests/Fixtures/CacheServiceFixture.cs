@@ -37,9 +37,9 @@ public class CacheServiceFixture : TemporaryDirectoryFixture
         return ckCacheService;
     }
 
-    public IRtSerializer GetRtSerializer()
+    public IRtRepositorySerializer GetRtRepositorySerializer()
     {
-        var rtSerializer = _serviceProvider.GetRequiredService<IRtSerializer>();
+        var rtSerializer = _serviceProvider.GetRequiredService<IRtRepositorySerializer>();
         return rtSerializer;
     }
 

@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// <summary>
 /// Represents a construction kit type in the dependency graph
 /// </summary>
-[DebuggerDisplay("{" + nameof(Path) + "}")]
+[DebuggerDisplay("CkTypeId = {CkTypeId}")]
 public class CkTypeGraph
 {
     private readonly List<CkGraphTypeInheritance> _baseTypes;

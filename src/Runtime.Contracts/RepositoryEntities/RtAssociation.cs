@@ -5,8 +5,29 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 /// <summary>
 /// Represents a runtime association, the instance of a connection between two runtime entities.
 /// </summary>
-public class RtAssociation
+public class RtAssociation : RtTypeWithAttributes
 {
+    /// <summary>
+    /// Creates a new instance of <see cref="RtAssociation"/>
+    /// </summary>
+    public RtAssociation()
+    {
+        
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="RtAssociation"/>
+    /// </summary>
+    /// <param name="associationRoleId">Construction kit association role id</param>
+    /// <param name="associationId">Object id</param>
+    /// <param name="attributes">List of attributes</param>
+    public RtAssociation(CkId<CkAssociationRoleId> associationRoleId, OctoObjectId associationId, IDictionary<string, object?> attributes)
+        : base(attributes)
+    {
+        AssociationRoleId = associationRoleId;
+        AssociationId = associationId;
+    }
+    
     /// <summary>
     /// Gets or sets the object id of the association
     /// </summary>
@@ -36,4 +57,10 @@ public class RtAssociation
     /// Gets or sets the association role id of the association role
     /// </summary>
     public CkId<CkAssociationRoleId> AssociationRoleId { get; set; }
+
+    /// <inheritdoc />
+    protected override string GetLocation()
+    {
+        return $"{AssociationRoleId}@{AssociationId}";
+    }
 }

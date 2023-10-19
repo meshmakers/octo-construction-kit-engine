@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 
@@ -13,7 +14,7 @@ public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAs
 {
     private readonly string _tenantId;
     private readonly ICkCacheService _ckCacheService;
-    private readonly IRtSerializer _rtSerializer;
+    private readonly IRtRepositorySerializer _rtSerializer;
 
     /// <summary>
     /// Constructor
@@ -21,7 +22,7 @@ public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAs
     /// <param name="tenantId"></param>
     /// <param name="ckCacheService"></param>
     /// <param name="rtSerializer"></param>
-    public RtAssociationDataSourceMapper(string tenantId, ICkCacheService ckCacheService, IRtSerializer rtSerializer)
+    public RtAssociationDataSourceMapper(string tenantId, ICkCacheService ckCacheService, IRtRepositorySerializer rtSerializer)
     {
         _tenantId = tenantId;
         _ckCacheService = ckCacheService;
@@ -59,14 +60,19 @@ public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAs
     }
 
     /// <inheritdoc />
-    public Task SerializeAsync(StreamWriter streamWriter, IReadOnlyDictionary<OctoObjectId, RtAssociation> dictionary)
+    public async Task SerializeAsync(StreamWriter streamWriter, IReadOnlyDictionary<OctoObjectId, RtAssociation> dictionary)
     {
-        throw new NotImplementedException();
+        await _rtSerializer.SerializeAsync(streamWriter, dictionary.Values).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyDictionary<OctoObjectId, RtAssociation>> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public async Task<IReadOnlyDictionary<OctoObjectId, RtAssociation>> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
-        throw new NotImplementedException();
+        var existingDocuments = await _rtSerializer.DeserializeAssociationsAsync(stream, locationReference, operationResult).ConfigureAwait(false);
+
+        RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
+
+        
+        return existingDocuments.ToDictionary(k => k.AssociationId, v=> v);
     }
 }

@@ -26,8 +26,6 @@ internal class RtJsonSerializer : IRtJsonSerializer
     /// </summary>
     public RtJsonSerializer()
     {
-
-
         _options = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,

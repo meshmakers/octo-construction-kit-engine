@@ -10,7 +10,8 @@ public class ServiceCollectionFixture
     public ServiceCollectionFixture()
     {
         Services = new ServiceCollection();
-        Services.AddRuntimeEngine();
+        Services.AddRuntimeEngine()
+            .AddLocalRuntimeRepository();
         Services.AddLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();

@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using System.Diagnostics;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable UnusedMember.Global
@@ -8,6 +9,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 /// <summary>
 /// Represents the runtime entity, the instance of a construction kit type.
 /// </summary>
+[DebuggerDisplay("{CkTypeId}@{RtId}")]
 public class RtEntity : RtTypeWithAttributes
 {
     /// <summary>
@@ -59,6 +61,6 @@ public class RtEntity : RtTypeWithAttributes
     /// <inheritdoc />
     protected override string GetLocation()
     {
-        return $"{CkTypeId}.{RtId}";
+        return $"{CkTypeId}@{RtId}";
     }
 }

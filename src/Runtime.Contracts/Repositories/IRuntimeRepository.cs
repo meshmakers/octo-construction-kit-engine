@@ -150,6 +150,24 @@ public interface IRuntimeRepository
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
     /// <returns></returns>
     Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity) where TEntity : RtEntity, new();
+    
+    /// <summary>
+    /// Inserts multiple runtime entities
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtEntities">Objects to insert</param>
+    /// <returns></returns>
+    Task InsertManyRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<RtEntity> rtEntities);
+
+    /// <summary>
+    /// Inserts multiple runtime entities
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtEntities">Objects to insert</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns></returns>
+    Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities) where TEntity : RtEntity, new();
 
     /// <summary>
     /// Replace a single runtime entity

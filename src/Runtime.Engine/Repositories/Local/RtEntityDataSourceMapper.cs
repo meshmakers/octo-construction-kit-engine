@@ -15,7 +15,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 {
     private readonly string _tenantId;
     private readonly ICkCacheService _ckCacheService;
-    private readonly IRtSerializer _rtSerializer;
+    private readonly IRtRepositorySerializer _rtSerializer;
 
     /// <summary>
     /// Constructor
@@ -23,7 +23,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     /// <param name="tenantId"></param>
     /// <param name="ckCacheService"></param>
     /// <param name="rtSerializer"></param>
-    public RtEntityDataSourceMapper(string tenantId, ICkCacheService ckCacheService, IRtSerializer rtSerializer)
+    public RtEntityDataSourceMapper(string tenantId, ICkCacheService ckCacheService, IRtRepositorySerializer rtSerializer)
     {
         _tenantId = tenantId;
         _ckCacheService = ckCacheService;
@@ -74,55 +74,19 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, IReadOnlyDictionary<OctoObjectId, TDocument> dictionary)
     {
-        var entities = new ConcurrentBag<RtEntityDto>();
-
-        Parallel.ForEach(dictionary.Values, (modelRtEntity, _) =>
-        {
-            var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId);
-
-            var rtEntityDto = new RtEntityDto
-            {
-                RtId = modelRtEntity.RtId,
-                CkTypeId = modelRtEntity.CkTypeId,
-                RtChangedDateTime = modelRtEntity.RtChangedDateTime,
-                RtCreationDateTime = modelRtEntity.RtCreationDateTime,
-                RtWellKnownName = modelRtEntity.RtWellKnownName,
-            };
-                
-            foreach (var modelRtAttribute in modelRtEntity.Attributes)
-            {
-                if (ckTypeGraph.AllAttributesByName.TryGetValue(modelRtAttribute.Key, out var ckTypeAttributeGraph))
-                {
-                    rtEntityDto.Attributes.Add(new RtAttributeDto
-                    {
-                        Id = ckTypeAttributeGraph.CkAttributeId,
-                        Value = modelRtAttribute.Value
-                    });
-                }
-            }
-                
-            entities.Add(rtEntityDto);
-        });
-            
-        var rtModelRoot = new RtModelRootDto
-        {
-            Dependencies = _ckCacheService.GetCkDependencies(_tenantId).ToList(),
-            Entities = entities.ToList()
-        };
-
-        await _rtSerializer.SerializeAsync(streamWriter, rtModelRoot).ConfigureAwait(false);
+        await _rtSerializer.SerializeAsync(streamWriter, dictionary.Values).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<IReadOnlyDictionary<OctoObjectId, TDocument>> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
-        var existingDocuments = await _rtSerializer.DeserializeAsync(stream, locationReference, operationResult).ConfigureAwait(false);
+        var existingDocuments = await _rtSerializer.DeserializeEntitiesAsync(stream, locationReference, operationResult).ConfigureAwait(false);
         
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
         var entities = new ConcurrentDictionary<OctoObjectId, TDocument>();
 
-        Parallel.ForEach(existingDocuments.Entities, (modelRtEntity, _) =>
+        Parallel.ForEach(existingDocuments, (modelRtEntity, _) =>
         {
             var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId);
 
@@ -137,7 +101,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 
             foreach (var modelRtAttribute in modelRtEntity.Attributes)
             {
-                if (ckTypeGraph.AllAttributes.TryGetValue(modelRtAttribute.Id, out var ckTypeAttributeGraph))
+                if (ckTypeGraph.AllAttributesByName.TryGetValue(modelRtAttribute.Key, out var ckTypeAttributeGraph))
                 {
                     entity.SetAttributeValue(ckTypeAttributeGraph.AttributeName, ckTypeAttributeGraph.ValueType,
                         modelRtAttribute.Value);

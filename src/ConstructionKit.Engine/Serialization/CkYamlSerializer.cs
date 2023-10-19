@@ -37,12 +37,12 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkRecordIdConverter())
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
-            .WithTypeConverter(new CkAssociationIdConverter())
+            .WithTypeConverter(new CkAssociationRoleIdConverter())
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
-            .WithTypeConverter(new CkIdAssociationIdConverter())
+            .WithTypeConverter(new CkIdAssociationRoleIdConverter())
             .Build();
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -51,12 +51,12 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkRecordIdConverter())
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
-            .WithTypeConverter(new CkAssociationIdConverter())
+            .WithTypeConverter(new CkAssociationRoleIdConverter())
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
-            .WithTypeConverter(new CkIdAssociationIdConverter())
+            .WithTypeConverter(new CkIdAssociationRoleIdConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

@@ -192,7 +192,7 @@ internal class CkCache : IDisposable
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
         options.Converters.Add(new CkIdAttributeIdConverter());
-        options.Converters.Add(new CkIdAssociationIdConverter());
+        options.Converters.Add(new CkIdAssociationRoleIdConverter());
         options.Converters.Add(new CkIdTypeIdConverter());
         options.Converters.Add(new CkIdRecordIdConverter());
         options.Converters.Add(new CkIdEnumIdConverter());

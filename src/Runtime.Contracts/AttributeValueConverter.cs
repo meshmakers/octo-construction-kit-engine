@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -80,9 +81,15 @@ internal static class AttributeValueConverter
 
                 break;
             case AttributeValueTypesDto.Int:
+            case AttributeValueTypesDto.Enum:
                 if (value is int)
                 {
                     return value;
+                }
+
+                if (value is JsonElement jsonElement)
+                {
+                    return jsonElement.GetInt32();
                 }
 
                 if (int.TryParse(value.ToString(), out var intResult))

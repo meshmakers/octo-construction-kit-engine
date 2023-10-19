@@ -1,11 +1,8 @@
 
-using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
-using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
-using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 
@@ -22,7 +19,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
-    public static IServiceCollection AddRuntimeEngine(
+    public static IRuntimeEngineBuilder AddRuntimeEngine(
         this IServiceCollection services)
     {
         // Runtime needs as base the construction kit
@@ -42,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();
         
 
-        return services;
+        return new RuntimeEngineBuilder(services);
     }
+
 }

@@ -8,6 +8,14 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new() where TKey : notnull
 {
     /// <summary>
+    /// Imports a list of documents into the collection
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="documents">The list of documents to import</param>
+    /// <returns>Returns the result of the import</returns>
+    Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents);
+    
+    /// <summary>
     /// Inserts a new document into the collection
     /// </summary>
     /// <param name="session">The session object</param>

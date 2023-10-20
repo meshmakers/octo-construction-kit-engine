@@ -154,7 +154,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return document;
     }
 
-    public async Task<IQueryable<TDocument>> AsQueryableAsync()
+    public async Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session)
     {
         await LoadAsync().ConfigureAwait(false);
 

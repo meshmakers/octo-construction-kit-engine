@@ -60,6 +60,14 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     Task DeleteOneAsync(IOctoSession session, TKey key);
     
     /// <summary>
+    /// Deletes the document with the given key without exceptions and with return value that indicates if the document has been deleted
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="key">The unique key</param>
+    /// <returns>True, when the document has been deleted, otherwise false</returns>
+    Task<bool> TryDeleteOneAsync(IOctoSession session, TKey key);
+    
+    /// <summary>
     /// Deletes documents with the given id
     /// </summary>
     /// <param name="session">The session object</param>

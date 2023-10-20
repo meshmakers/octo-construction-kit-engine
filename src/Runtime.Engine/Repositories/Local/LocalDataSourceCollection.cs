@@ -131,6 +131,19 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         await SaveAsync().ConfigureAwait(false);
     }
 
+    public async Task<bool> TryDeleteOneAsync(IOctoSession session, TKey key)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        if (!_rtEntities.TryRemove(key, out _))
+        {
+            return false;
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+        return true;
+    }
+
     public async Task DeleteManyAsync(IOctoSession session, IEnumerable<TKey> keys)
     {
         await LoadAsync().ConfigureAwait(false);

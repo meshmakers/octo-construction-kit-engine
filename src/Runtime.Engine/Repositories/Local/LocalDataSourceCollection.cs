@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -159,6 +160,35 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         await LoadAsync().ConfigureAwait(false);
 
         return _rtEntities.Values.AsQueryable();
+    }
+
+    public Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    {
+        return Task.FromResult(_rtEntities.Values.AsQueryable().SingleOrDefault(expression));
+    }
+
+    public Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression, int? skip = null, int? limit = null)
+    {
+        var result = _rtEntities.Values.AsQueryable().Where(expression);
+        if (skip != null)
+        {
+            result = result.Skip(skip.Value);
+        }
+        if (limit != null)
+        {
+            result = result.Take(limit.Value);
+        }
+        return Task.FromResult((ICollection<TDocument>)result.ToList());
+    }
+
+    public Task<long> GetTotalCountAsync(IOctoSession session)
+    {
+        return Task.FromResult(_rtEntities.LongCount());
+    }
+
+    public Task<long> GetTotalCountAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    {
+        return Task.FromResult(_rtEntities.Values.AsQueryable().LongCount(expression));
     }
 
     private async Task SaveAsync()

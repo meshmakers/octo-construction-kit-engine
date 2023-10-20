@@ -30,7 +30,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     }
 
 
-    public async Task InsertAsync(IOctoSession session, TDocument document)
+    public async Task InsertOneAsync(IOctoSession session, TDocument document)
     {
         await LoadAsync().ConfigureAwait(false);
 

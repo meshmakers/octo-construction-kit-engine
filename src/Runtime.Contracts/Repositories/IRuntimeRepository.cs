@@ -77,7 +77,18 @@ public interface IRuntimeRepository
     /// <param name="rtId">Object id of the runtime entity</param>
     /// <param name="direction">Direction of associations to get</param>
     /// <returns></returns>
-    Task<IEnumerable<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction);
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction);
+    
+    /// <summary>
+    /// Gets associations for a runtime entity of a specific role
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtId">Object id of the runtime entity</param>
+    /// <param name="direction">Direction of associations to get</param>
+    /// <param name="roleId">Association role</param>
+    /// <returns></returns>
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
 
     /// <summary>
     /// Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity and role
@@ -100,6 +111,14 @@ public interface IRuntimeRepository
     /// <returns></returns>
     Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId,
         CkId<CkAssociationRoleId> ckRoleId);
+    
+    /// <summary>
+    /// Returns the data source access object for the given entity type
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <returns></returns>
+    Task<IQueryable<TEntity>> AsQueryable<TEntity>(IOctoSession session)
+        where TEntity : RtEntity, new();
 
     #endregion Data query (simple)
 

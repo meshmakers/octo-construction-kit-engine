@@ -72,11 +72,12 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="key">The unique key</param>
     /// <returns></returns>
     Task<TDocument?> DocumentAsync(IOctoSession session, TKey key);
-
+    
     /// <summary>
     /// Gets a queryable interface of the given type to the data source
     /// </summary>
+    /// <param name="session">The session object</param>
     /// <returns></returns>
-    Task<IQueryable<TDocument>> AsQueryableAsync();
+    Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session);
 
 }

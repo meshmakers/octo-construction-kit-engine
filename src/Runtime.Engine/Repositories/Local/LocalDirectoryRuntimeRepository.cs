@@ -36,7 +36,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntities = queryable.Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
 
         List<EntityUpdateInfo<RtEntity>> entitiesUpdate = new();
@@ -54,7 +54,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable.FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (savedEntity == null)
         {
@@ -88,7 +88,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
 
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         if (dataQueryOperation.FieldFilters != null)
         {
             var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
@@ -115,7 +115,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (savedEntity == null)
@@ -133,7 +133,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
         var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntities = queryable
             .Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
 
@@ -152,7 +152,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
         var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
-        var queryable = await rtCollection.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (rtEntity == null)

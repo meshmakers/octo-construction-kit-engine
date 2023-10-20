@@ -45,7 +45,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
         CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction)
     {
         long counter = 0;
-        var queryable = await RtAssociations.AsQueryableAsync().ConfigureAwait(false);
+        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
 
         if (direction == GraphDirections.Inbound || direction == GraphDirections.Any)
         {

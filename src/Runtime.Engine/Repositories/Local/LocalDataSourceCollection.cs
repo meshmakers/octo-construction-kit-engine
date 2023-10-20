@@ -155,6 +155,15 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return document;
     }
 
+    public async Task<TDerived?> DocumentAsync<TDerived>(IOctoSession session, TKey key) where TDerived : TDocument, new()
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        _rtEntities.TryGetValue(key, out TDocument? document);
+        
+        return (TDerived?)document;
+    }
+
     public async Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session)
     {
         await LoadAsync().ConfigureAwait(false);
@@ -162,33 +171,58 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return _rtEntities.Values.AsQueryable();
     }
 
-    public Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    public async Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
     {
-        return Task.FromResult(_rtEntities.Values.AsQueryable().SingleOrDefault(expression));
+        await LoadAsync().ConfigureAwait(false);
+
+        return _rtEntities.Values.AsQueryable().SingleOrDefault(expression);
     }
 
-    public Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression, int? skip = null, int? limit = null)
+    public async Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression, int? skip = null, int? take = null)
     {
+        await LoadAsync().ConfigureAwait(false);
+
         var result = _rtEntities.Values.AsQueryable().Where(expression);
         if (skip != null)
         {
             result = result.Skip(skip.Value);
         }
-        if (limit != null)
+        if (take != null)
         {
-            result = result.Take(limit.Value);
+            result = result.Take(take.Value);
         }
-        return Task.FromResult((ICollection<TDocument>)result.ToList());
+        return result.ToList();
     }
 
-    public Task<long> GetTotalCountAsync(IOctoSession session)
+    public async Task<long> GetTotalCountAsync(IOctoSession session)
     {
-        return Task.FromResult(_rtEntities.LongCount());
+        await LoadAsync().ConfigureAwait(false);
+
+        return _rtEntities.LongCount();
     }
 
-    public Task<long> GetTotalCountAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    public async Task<long> GetTotalCountAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
     {
-        return Task.FromResult(_rtEntities.Values.AsQueryable().LongCount(expression));
+        await LoadAsync().ConfigureAwait(false);
+
+        return _rtEntities.Values.AsQueryable().LongCount(expression);
+    }
+
+    public async Task<IEnumerable<TDocument>> GetAsync(IOctoSession session, int? skip = null, int? take = null)
+    {
+        await LoadAsync().ConfigureAwait(false);
+        
+        var result = _rtEntities.Values.AsQueryable();
+        if (skip != null)
+        {
+            result = result.Skip(skip.Value);
+        }
+        if (take != null)
+        {
+            result = result.Take(take.Value);
+        }
+
+        return result;
     }
 
     private async Task SaveAsync()

@@ -11,7 +11,7 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <param name="document">The document to insert</param>
     /// <returns></returns>
-    Task InsertAsync(IOctoSession session, TDocument document);
+    Task InsertOneAsync(IOctoSession session, TDocument document);
     
     /// <summary>
     /// Inserts multiple documents into the collection

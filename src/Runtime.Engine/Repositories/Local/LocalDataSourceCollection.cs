@@ -55,7 +55,6 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                 else
                 {
                     hasError = true;
-                    continue;
                 }
             }
             else
@@ -216,7 +215,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return (TDerived?)document;
     }
 
-    public async Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session)
+    public async Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession? session = null)
     {
         await LoadAsync().ConfigureAwait(false);
 

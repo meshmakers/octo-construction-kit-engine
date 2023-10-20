@@ -106,7 +106,7 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// </summary>
     /// <param name="session">The session object</param>
     /// <returns></returns>
-    Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session);
+    Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession? session = null);
     
     /// <summary>
     /// Finds a document by the given expression

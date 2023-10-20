@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 /// <summary>
@@ -79,5 +81,38 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <returns></returns>
     Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession session);
+    
+    /// <summary>
+    /// Finds a document by the given expression
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="expression">Filter expression</param>
+    /// <returns>The document</returns>
+    Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression);
 
+    /// <summary>
+    /// Finds a document by the given expression
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="expression">Filter expression</param>
+    /// <param name="skip">Amount of documents to skip</param>
+    /// <param name="limit">Maximum amount of documents to return</param>
+    /// <returns>List of documents</returns>
+    Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
+        int? skip = null, int? limit = null);
+    
+    /// <summary>
+    /// Gets the total count of documents in the collection
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <returns>Total count</returns>
+    Task<long> GetTotalCountAsync(IOctoSession session);
+    
+    /// <summary>
+    /// Gets the total count of documents in the collection that match the given filter
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="expression">Filter expression</param>
+    /// <returns>Total count</returns>
+    Task<long> GetTotalCountAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression);
 }

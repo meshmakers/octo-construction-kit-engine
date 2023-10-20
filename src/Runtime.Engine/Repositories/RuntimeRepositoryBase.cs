@@ -88,10 +88,16 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
     
     /// <inheritdoc />
-    public virtual async Task<IEnumerable<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
         GraphDirections direction)
     {
         return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    {
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction, roleId).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -108,6 +114,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         return await RepositoryDataSource.GetRtAssociationOrDefaultAsync(session, originRtEntityId, targetRtEntityId, ckRoleId)
             .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IQueryable<TEntity>> AsQueryable<TEntity>(IOctoSession session) where TEntity : RtEntity, new()
+    {
+        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+
+        return await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

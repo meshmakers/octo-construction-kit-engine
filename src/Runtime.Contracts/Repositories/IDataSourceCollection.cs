@@ -76,6 +76,16 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     Task<TDocument?> DocumentAsync(IOctoSession session, TKey key);
     
     /// <summary>
+    /// Gets the document with the given key
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="key">The unique key</param>
+    /// <typeparam name="TDerived">The type of the derived document</typeparam>
+    /// <returns></returns>
+    Task<TDerived?> DocumentAsync<TDerived>(IOctoSession session, TKey key)
+        where TDerived : TDocument, new();
+    
+    /// <summary>
     /// Gets a queryable interface of the given type to the data source
     /// </summary>
     /// <param name="session">The session object</param>
@@ -96,10 +106,10 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <param name="expression">Filter expression</param>
     /// <param name="skip">Amount of documents to skip</param>
-    /// <param name="limit">Maximum amount of documents to return</param>
+    /// <param name="take">Maximum amount of documents to return</param>
     /// <returns>List of documents</returns>
     Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
-        int? skip = null, int? limit = null);
+        int? skip = null, int? take = null);
     
     /// <summary>
     /// Gets the total count of documents in the collection
@@ -115,4 +125,13 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="expression">Filter expression</param>
     /// <returns>Total count</returns>
     Task<long> GetTotalCountAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression);
+
+    /// <summary>
+    /// Gets all documents of the collection
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="skip">Amount of documents to skip</param>
+    /// <param name="take">Maximum amount of documents to return</param>
+    /// <returns>List of documents</returns>
+    Task<IEnumerable<TDocument>> GetAsync(IOctoSession session, int? skip = null, int? take = null);
 }

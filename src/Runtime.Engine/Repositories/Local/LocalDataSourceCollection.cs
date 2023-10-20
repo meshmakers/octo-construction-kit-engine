@@ -31,6 +31,45 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     }
 
 
+    public async Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        bool hasError = false;
+        long insertCount = 0;
+        long updateCount = 0;
+        foreach (var document in documents)
+        {
+            var key = _dataSourceMapper.GetId(document);
+            if (!_rtEntities.TryAdd(key, document))
+            {
+                if (_rtEntities.TryGetValue(key, out var comparisionDocument))
+                {
+                    if (!_rtEntities.TryUpdate(key, document, comparisionDocument))
+                    {
+                        hasError = true;
+                        continue;
+                    }
+                    updateCount++;
+                }
+                else
+                {
+                    hasError = true;
+                    continue;
+                }
+            }
+            else
+            {
+                insertCount++;
+            }
+        }
+        
+        await SaveAsync().ConfigureAwait(false);
+
+        var result = new LocalBulkImportResult(insertCount, 0, updateCount, hasError);
+        return result;
+    }
+
     public async Task InsertOneAsync(IOctoSession session, TDocument document)
     {
         await LoadAsync().ConfigureAwait(false);

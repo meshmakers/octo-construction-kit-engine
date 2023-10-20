@@ -128,6 +128,27 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             .ConfigureAwait(false);
     }
 
+    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        int? skip = null, int? take = null)
+    {
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+        
+        var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
+        queryable = queryable.Where(x => rtIds.Contains(x.RtId));
+        var pagedQueryable = queryable;
+        if (skip != null)
+        {
+            pagedQueryable = pagedQueryable.Skip(skip.Value);
+        }
+        if (take != null)
+        {
+            pagedQueryable = pagedQueryable.Take(take.Value);
+        }
+        
+        var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count());
+        return resultSet;
+    }
+
     protected override async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters)
     {

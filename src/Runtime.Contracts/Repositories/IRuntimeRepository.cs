@@ -49,6 +49,33 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="skip">Amount of items to skip</param>
+    /// <param name="take">Amount of items to take</param>
+    /// <returns>Returns a result set of the given type</returns>
+    Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation, int? skip = null, int? take = null);
+    
+    /// <summary>
+    /// Gets entities based on the query options.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="skip">Amount of items to skip</param>
+    /// <param name="take">Amount of items to take</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns>Returns a result set of the given type</returns>
+    Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation, int? skip = null, int? take = null)
+        where TEntity : RtEntity, new();
+    
+    /// <summary>
+    /// Gets entities based on the query options.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
     /// <param name="skip">Amount of items to skip</param>
     /// <param name="take">Amount of items to take</param>

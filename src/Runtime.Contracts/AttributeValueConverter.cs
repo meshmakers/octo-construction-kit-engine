@@ -7,9 +7,15 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 /// <summary>
 /// Converts attribute values based their construction kit type.
 /// </summary>
-internal static class AttributeValueConverter
+public static class AttributeValueConverter
 {
-    internal static Type GetDotNetType(AttributeValueTypesDto attributeValueTypes)
+    /// <summary>
+    /// Gets the .NET type for the given <see cref="AttributeValueTypesDto"/>
+    /// </summary>
+    /// <param name="attributeValueTypes">The attribute value type</param>
+    /// <returns></returns>
+    /// <exception cref="NotSupportedException"></exception>
+    public static Type GetDotNetType(AttributeValueTypesDto attributeValueTypes)
     {
         switch (attributeValueTypes)
         {
@@ -40,7 +46,13 @@ internal static class AttributeValueConverter
         }
     }
     
-    internal static object? ConvertAttributeValue(AttributeValueTypesDto attributeValueTypes, object? value)
+    /// <summary>
+    /// Converts the given value to the given <see cref="AttributeValueTypesDto"/>
+    /// </summary>
+    /// <param name="attributeValueTypes">The attribute value type</param>
+    /// <param name="value">The value to convert</param>
+    /// <returns>Converted value</returns>
+    public static object? ConvertAttributeValue(AttributeValueTypesDto attributeValueTypes, object? value)
     {
         if (value == null)
         {

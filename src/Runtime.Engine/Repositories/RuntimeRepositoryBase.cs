@@ -73,6 +73,22 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
+    public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        int? skip = null, int? take = null)
+    {
+        return await GetRtEntitiesByIdAsync<RtEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        int? skip = null, int? take = null) where TEntity : RtEntity, new()
+    {
+        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+
+        return await GetRtEntitiesByIdAsync<TEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take).ConfigureAwait(false);
+    }
+    
+    /// <inheritdoc />
     public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation, int? skip = null,
         int? take = null)
     {
@@ -360,6 +376,21 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         return rtEntity;
     }
+
+    /// <summary>
+    /// Gets entities based on the query options.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="skip">Amount of items to skip</param>
+    /// <param name="take">Amount of items to take</param>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <returns>Returns a result set of the given type</returns>
+    protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        int? skip = null, int? take = null) where TEntity : RtEntity, new();
     
     /// <summary>
     /// Inserts a single runtime entity

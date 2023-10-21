@@ -133,12 +133,21 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task<IQueryable<TEntity>> AsQueryable<TEntity>(IOctoSession session) where TEntity : RtEntity, new()
+    public async Task<IQueryable<TEntity>> AsQueryableAsync<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
 
         return await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
+    }
+    
+    /// <inheritdoc />
+    public IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
+    {
+        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+
+        return rtCollection.AsQueryable(session);
     }
 
     /// <inheritdoc />

@@ -144,7 +144,15 @@ public interface IRuntimeRepository
     /// </summary>
     /// <typeparam name="TEntity"></typeparam>
     /// <returns></returns>
-    Task<IQueryable<TEntity>> AsQueryable<TEntity>(IOctoSession session)
+    Task<IQueryable<TEntity>> AsQueryableAsync<TEntity>(IOctoSession? session = null)
+        where TEntity : RtEntity, new();
+    
+    /// <summary>
+    /// Returns the data source access object for the given entity type
+    /// </summary>
+    /// <typeparam name="TEntity"></typeparam>
+    /// <returns></returns>
+    IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null)
         where TEntity : RtEntity, new();
 
     #endregion Data query (simple)

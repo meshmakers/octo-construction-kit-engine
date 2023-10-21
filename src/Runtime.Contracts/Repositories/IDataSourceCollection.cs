@@ -107,6 +107,13 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <returns></returns>
     Task<IQueryable<TDocument>> AsQueryableAsync(IOctoSession? session = null);
+
+    /// <summary>
+    /// Gets a queryable interface of the given type to the data source
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <returns></returns>
+    IQueryable<TDocument> AsQueryable(IOctoSession? session = null);
     
     /// <summary>
     /// Finds a document by the given expression

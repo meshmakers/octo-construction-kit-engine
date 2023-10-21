@@ -108,7 +108,7 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine($"  public List<string>? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValuesOrDefault<string>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
-                sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.IntArray:

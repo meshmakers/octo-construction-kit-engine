@@ -58,7 +58,8 @@ public class RuntimeRepositoryException : PersistenceException
     {
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
-            throw new RuntimeRepositoryException("Operation result contains errors.", operationResult);
+            var messages = operationResult.GetMessages();
+            throw new RuntimeRepositoryException($"Operation result contains errors.{Environment.NewLine}{messages}", operationResult);
         }
     }
 

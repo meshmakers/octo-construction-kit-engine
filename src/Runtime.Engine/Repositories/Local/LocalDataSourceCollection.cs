@@ -221,6 +221,13 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         return _rtEntities.Values.AsQueryable();
     }
+    
+    public IQueryable<TDocument> AsQueryable(IOctoSession? session = null)
+    {
+        LoadAsync().Wait();
+
+        return _rtEntities.Values.AsQueryable();
+    }
 
     public async Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
     {

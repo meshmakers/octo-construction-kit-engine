@@ -11,4 +11,9 @@ attributes:
   valueType: Int
 - id: LocationX
   valueType: Double
+- id: IsEnabled
+  valueType: Boolean
+  defaultValues:
+  - true
+  
   

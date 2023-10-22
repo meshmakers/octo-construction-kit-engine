@@ -12,6 +12,8 @@ types:
     name: Type
   - id: Sample1/TestEnum
     name: TestEnum    
+  - id: Sample1/IsLocked
+    name: IsLocked
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity

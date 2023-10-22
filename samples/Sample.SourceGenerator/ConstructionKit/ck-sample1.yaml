@@ -22,6 +22,8 @@ types:
     name: Type
   - id: Sample1/TestEnum
     name: TestEnum
+  - id: Sample1/IsLocked
+    name: IsLocked
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity
@@ -42,6 +44,10 @@ attributes:
 - id: Type
   valueType: Record
   valueCkRecordId: Sample1/RecordA
+- id: IsLocked
+  valueType: Boolean
+  defaultValues:
+  - true
 records:
 - recordId: RecordA
   attributes:

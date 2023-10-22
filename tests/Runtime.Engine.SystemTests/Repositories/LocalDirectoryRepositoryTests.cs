@@ -33,6 +33,21 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     }
     
     [Fact]
+    public async Task CreateTransientRtEntity_OK()
+    {
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var rtSerializer = _fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = _fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var entity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        
+        Assert.True(entity.IsEnabled);
+    }
+    
+    [Fact]
     public async Task InsertOneRtEntityAsync_Abstract_Exception()
     {
         var ckCacheService = await _fixture.GetCacheServiceAsync();

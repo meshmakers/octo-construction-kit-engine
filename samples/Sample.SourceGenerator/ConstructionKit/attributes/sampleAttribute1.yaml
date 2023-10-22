@@ -10,3 +10,7 @@ attributes:
 - id: Type
   valueType: Record
   valueCkRecordId: Sample1/RecordA  
+- id: IsLocked
+  valueType: Boolean
+  defaultValues:
+  - true

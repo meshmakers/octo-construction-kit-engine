@@ -56,6 +56,8 @@ types:
   - id: Test/LocationX
     name: LocationX
     isOptional: true
+  - id: Test/IsEnabled
+    name: IsEnabled
   associations:
   - id: System/ParentChild
     targetCkTypeId: Test/LocationWithSensor
@@ -72,6 +74,10 @@ attributes:
   valueType: Int
 - id: LocationX
   valueType: Double
+- id: IsEnabled
+  valueType: Boolean
+  defaultValues:
+  - true
 records: []
 enums:
 - enumId: ConnectionState

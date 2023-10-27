@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -53,7 +54,17 @@ internal class EntityRuleEngine : IEntityRuleEngine
                     {
                         if (attribute.DefaultValues != null)
                         {
-                            info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                            switch (attribute.ValueType)
+                            {
+                                case AttributeValueTypesDto.IntArray:
+                                case AttributeValueTypesDto.RecordArray:
+                                case AttributeValueTypesDto.StringArray:
+                                    info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                                    break;
+                                default:
+                                    info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues.FirstOrDefault());
+                                    break;
+                            }
                         }
                         else
                         {
@@ -112,6 +123,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
+
                     break;
                 case EntityModOptions.Replace:
                     if (info.RtEntity == null)
@@ -127,6 +139,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
+
                     break;
                 case EntityModOptions.Delete:
                     entitiesToDelete.Add(info.RtEntityId);
@@ -139,9 +152,9 @@ internal class EntityRuleEngine : IEntityRuleEngine
         }).ConfigureAwait(false);
 
         var entityValidatorResult =
-            new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(), 
-                entitiesToUpdate.ToDictionary(k=> k.Key, v=> v.Value),
-                entitiesToReplace.ToDictionary(k=> k.Key, v=> v.Value), 
+            new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
+                entitiesToUpdate.ToDictionary(k => k.Key, v => v.Value),
+                entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToDelete.ToList());
 
         return entityValidatorResult;

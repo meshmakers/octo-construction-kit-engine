@@ -44,4 +44,13 @@ public interface ICkModelRepositoryService
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
     Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    /// Returns true if the model exists in given repository
+    /// </summary>
+    /// <param name="repositoryName">Name of Repository.</param>
+    /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <returns>The task that returns true if the model exists in given repository</returns>
+    Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null);
 }

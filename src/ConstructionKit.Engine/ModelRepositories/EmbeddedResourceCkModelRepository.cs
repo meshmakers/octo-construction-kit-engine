@@ -38,7 +38,7 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null)
+    public Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         return Task.FromResult(_embeddedModels.Any(m=> m.ModelId == modelId));
     }

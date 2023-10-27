@@ -43,7 +43,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null)
+    public Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         if (!TryGetExistingModelPath(modelId, out _))
         {

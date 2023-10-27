@@ -28,7 +28,8 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     /// <param name="rtEntitiesToUpdate">List of entities to update.</param>
     /// <param name="rtEntitiesToReplace">List of entities to replace.</param>
     /// <param name="rtEntitiesToDelete">List of entities to delete.</param>
-    public EntityRuleEngineResult(List<TEntity> rtEntitiesToInsert, Dictionary<RtEntityId, TEntity> rtEntitiesToUpdate, Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete)
+    public EntityRuleEngineResult(List<TEntity> rtEntitiesToInsert, Dictionary<RtEntityId, TEntity> rtEntitiesToUpdate,
+        Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete)
     {
         RtEntitiesToInsert = rtEntitiesToInsert;
         RtEntitiesToUpdate = rtEntitiesToUpdate;

@@ -43,4 +43,9 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     {
         await _ckModelRepositoryManager.UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken).ConfigureAwait(false);
     }
+
+    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null)
+    {
+        return await _ckModelRepositoryManager.IsCkModelExistingAsync(repositoryName, ckModelId, sourceIdentifier).ConfigureAwait(false);
+    }
 }

@@ -35,12 +35,12 @@ public interface ICkModelRepository
     bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
 
     /// <summary>
-    /// Looks up a model by its id
+    /// Checks if a model exists in this repository
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>True if the model exists in this repository, otherwise false</returns>
-    Task<bool> LookupModelIdAsync(CkModelId modelId, object? sourceIdentifier = null);
+    Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null);
 
     /// <summary>
     /// Gets a model by its id

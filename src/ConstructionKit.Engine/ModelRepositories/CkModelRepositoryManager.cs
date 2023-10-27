@@ -31,7 +31,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 continue;
             }
             
-            var hasBeenFound = await ckModelRepository.LookupModelIdAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+            var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
             if (hasBeenFound)
             {
                 return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier).ConfigureAwait(false);
@@ -101,5 +101,17 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
         }
         
         await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier).ConfigureAwait(false);
+    }
+
+    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null)
+    {
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x=> string.Compare(x.RepositoryName, 
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+        
+        return await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
     }
 }

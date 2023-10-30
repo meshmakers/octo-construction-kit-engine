@@ -99,9 +99,9 @@ public static class AttributeValueConverter
                     return value;
                 }
 
-                if (value is JsonElement jsonElement)
+                if (value is JsonElement i32Element)
                 {
-                    return jsonElement.GetInt32();
+                    return i32Element.GetInt32();
                 }
 
                 if (int.TryParse(value.ToString(), out var intResult))
@@ -110,8 +110,49 @@ public static class AttributeValueConverter
                 }
 
                 break;
+            case AttributeValueTypesDto.Int64:
+                if (value is int)
+                {
+                    return value;
+                }
+
+                if (value is JsonElement i64Element)
+                {
+                    return i64Element.GetInt64();
+                }
+
+                if (long.TryParse(value.ToString(), out var longResult))
+                {
+                    return longResult;
+                }
+
+                break;            
             case AttributeValueTypesDto.DateTime:
                 value = Convert.ToDateTime(value);
+                break;
+            case AttributeValueTypesDto.TimeSpan:
+                if (value is TimeSpan)
+                {
+                    return value;
+                }
+
+                if (TimeSpan.TryParse(value.ToString(), out var timeSpanResult))
+                {
+                    return timeSpanResult;
+                }
+
+                break;
+            case AttributeValueTypesDto.DateTimeOffset:
+                if (value is DateTimeOffset)
+                {
+                    return value;
+                }
+                
+                if (DateTimeOffset.TryParse(value.ToString(), out var dateTimeOffsetResult))
+                {
+                    return dateTimeOffsetResult;
+                }
+
                 break;
         }
 

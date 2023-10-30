@@ -123,7 +123,17 @@ public abstract class RtTypeWithAttributes
             return new List<TValue>();
         }
 
-        return new List<TValue>((IEnumerable<TValue>)Convert.ChangeType(value, typeof(IEnumerable<TValue>)));
+        if (value is List<TValue> list)
+        {
+            return list;
+        }
+        
+        if (value is TValue[] ar)
+        {
+            return new List<TValue>(ar);
+        }
+
+        throw InvalidAttributeValueException.InvalidArrayValue(attributeName);
     }
 
     /// <summary>

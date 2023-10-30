@@ -40,9 +40,6 @@ public class ObjectCollectionConverter : IYamlTypeConverter
                 list.Add(scalar.Value);
             }
         }
-        // parser.Consume<MappingEnd>();
-        // parser.Consume<SequenceEnd>();
-        // parser.Consume<MappingEnd>();
 
         return list;
     }

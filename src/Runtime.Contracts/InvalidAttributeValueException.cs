@@ -30,4 +30,9 @@ public class InvalidAttributeValueException : PersistenceException
     {
         return new InvalidAttributeValueException($"Attribute value cannot be null for '{location}' at attribute with name '{attributeName}'");
     }
+
+    internal static Exception InvalidArrayValue(string attributeName)
+    {
+        return new InvalidAttributeValueException($"Attribute value must be an array or list for attribute with name '{attributeName}'");
+    }
 }

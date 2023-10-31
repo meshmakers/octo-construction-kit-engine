@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
 
@@ -22,7 +23,7 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.String:
                 return typeof(string);
             case AttributeValueTypesDto.DateTime:
-                return typeof(DateTime); 
+                return typeof(DateTime);
             case AttributeValueTypesDto.Boolean:
                 return typeof(Boolean);
             case AttributeValueTypesDto.DateTimeOffset:
@@ -45,7 +46,7 @@ public static class AttributeValueConverter
                 throw new NotSupportedException($"AttributeValueTypesDto '{attributeValueTypes}' is not supported.");
         }
     }
-    
+
     /// <summary>
     /// Converts the given value to the given <see cref="AttributeValueTypesDto"/>
     /// </summary>
@@ -66,6 +67,7 @@ public static class AttributeValueConverter
                 {
                     return stringArray;
                 }
+
                 if (value is List<object> objectList)
                 {
                     return objectList.Select(x =>
@@ -77,8 +79,8 @@ public static class AttributeValueConverter
 
                         return Convert.ToString(x);
                     }).ToList();
-                    
                 }
+
                 break;
             case AttributeValueTypesDto.String:
                 if (value is string)
@@ -116,6 +118,7 @@ public static class AttributeValueConverter
                 {
                     return intArray;
                 }
+
                 if (value is List<object> objectListInt)
                 {
                     return objectListInt.Select(x =>
@@ -127,9 +130,9 @@ public static class AttributeValueConverter
 
                         return Convert.ToInt32(x);
                     }).ToList();
-                    
                 }
-                break;            
+
+                break;
             case AttributeValueTypesDto.Int:
             case AttributeValueTypesDto.Enum:
                 if (value is int)
@@ -164,7 +167,7 @@ public static class AttributeValueConverter
                     return longResult;
                 }
 
-                break;            
+                break;
             case AttributeValueTypesDto.DateTime:
                 value = Convert.ToDateTime(value);
                 break;
@@ -185,13 +188,35 @@ public static class AttributeValueConverter
                 {
                     return value;
                 }
-                
+
                 if (DateTimeOffset.TryParse(value.ToString(), out var dateTimeOffsetResult))
                 {
                     return dateTimeOffsetResult;
                 }
 
                 break;
+            case AttributeValueTypesDto.RecordArray:
+                if (value is RtRecord[] recordArray)
+                {
+                    return recordArray;
+                }
+
+                if (value is List<object> objectListRecord)
+                {
+                    return objectListRecord.Select(x => (RtRecord)x).ToList();
+                }
+
+                break;
+            case AttributeValueTypesDto.Record:
+                if (value.GetType() == typeof(RtRecord))
+                {
+                    return value;
+                }
+
+                RtRecord rtRecord = (RtRecord)value;
+
+                return new RtRecord(rtRecord.CkRecordId,
+                    rtRecord.Attributes.ToDictionary(k => k.Key, v => v.Value));
         }
 
         return value;

@@ -33,10 +33,21 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
       <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" />
     </ItemGroup>
 
-
+    <ItemGroup>
+        <None Remove="**\ConstructionKit\ck-*.yaml" />
+        <EmbeddedResource Include="sampleData\CkTest\ConstructionKit\ck-*.yaml">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
+        </EmbeddedResource>
+        <None Remove="**\ConstructionKit\ck-*.cache.json" />
+        <AdditionalFiles Include="sampleData\CkTest\ConstructionKit\ck-*.cache.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </AdditionalFiles>
+    </ItemGroup>
 
     <ItemGroup>
       <None Update="sampleData\files\entity-ok.json">

@@ -3,6 +3,7 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
+using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RuleEngine;
 
@@ -102,7 +103,8 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                     OctoObjectId.GenerateNewId(),
                     new Dictionary<string, object?>
                     {
-                        { "Designation", "Test" }
+                        { "Designation", "Test" },
+                        { "RecordArrayTests", new List<object>() }
                     }))
         }, operationResult);
 
@@ -182,7 +184,8 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             OctoObjectId.GenerateNewId(),
             new Dictionary<string, object?>
             {
-                { "Designation", "Test" }
+                { "Designation", "Test" },
+                { "RecordArrayTests", new List<object>() }
             });
         
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
@@ -209,7 +212,8 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             OctoObjectId.GenerateNewId(),
             new Dictionary<string, object?>
             {
-                { "Designation", "Test" }
+                { "Designation", "Test" },
+                { "RecordArrayTests", new List<object>() }
             });
         
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
@@ -224,4 +228,32 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         Assert.Single(list);
         Assert.Equal(6, list[0]);
     }
+    
+    [Fact]
+    public async Task ValidateAsync_RecordArray_Empty_OK()
+    {
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var operationResult = new OperationResult();
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+        var rtEntity = new RtEntity(
+            "Test/Country",
+            OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?>
+            {
+                { "Designation", "Test" },
+                { "RecordArrayTests", new List<object>() }
+            });
+        
+        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
+        {
+            EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
+        }, operationResult);
+        
+        var list = rtEntity.GetAttributeValues<RtTestRecordRecord>("RecordArrayTests");
+            
+        Assert.Empty(operationResult.Messages);
+        Assert.Single(ruleEngineResult.RtEntitiesToInsert);
+        Assert.Empty(list);
+    }
+ 
 }

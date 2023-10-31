@@ -10,6 +10,25 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 public class RtRecord : RtTypeWithAttributes
 {
     /// <summary>
+    /// Creates a new instance of <see cref="RtRecord"/>
+    /// </summary>
+    public RtRecord()
+    {
+        
+    }
+    
+    /// <summary>
+    /// Creates a new instance of <see cref="RtRecord"/>
+    /// </summary>
+    /// <param name="ckRecordId">Construction kit record id</param>
+    /// <param name="attributes">List of attributes</param>
+    public RtRecord(CkId<CkRecordId> ckRecordId, IDictionary<string, object?> attributes)
+        : base(attributes)
+    {
+        CkRecordId = ckRecordId;
+    }
+    
+    /// <summary>
     ///     Gets or sets the construction kit id
     /// </summary>
     public CkId<CkRecordId> CkRecordId { get; set; }

@@ -15,4 +15,6 @@ attributes:
   valueType: IntArray
   defaultValues:
     - 6
-    
+- id: RecordArrayTests
+  valueType: RecordArray
+  valueCkRecordId: Test/TestRecord

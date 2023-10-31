@@ -20,6 +20,8 @@ types:
     name: StringArrayTests
   - id: Test/IntArrayTests
     name: IntArrayTests
+  - id: Test/RecordArrayTests
+    name: RecordArrayTests
   associations:
   - id: System/ParentChild
     targetCkTypeId: Test/Continent
@@ -75,7 +77,15 @@ attributes:
   valueType: IntArray
   defaultValues:
   - 6
-records: []
+- id: RecordArrayTests
+  valueType: RecordArray
+  valueCkRecordId: Test/TestRecord
+records:
+- recordId: TestRecord
+  attributes:
+  - id: Test/Designation
+    name: Designation
+    isOptional: true
 enums:
 - enumId: ConnectionState
   useFlags: false

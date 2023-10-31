@@ -15,6 +15,11 @@ types:
 - typeId: Country
   derivedFromCkTypeId: Test/Location
   isFinal: true
+  attributes:
+  - id: Test/StringArrayTests
+    name: StringArrayTests
+  - id: Test/IntArrayTests
+    name: IntArrayTests
   associations:
   - id: System/ParentChild
     targetCkTypeId: Test/Continent
@@ -62,6 +67,14 @@ attributes:
 - id: ConnectionState
   valueType: Enum
   valueCkEnumId: Test/ConnectionState
+- id: StringArrayTests
+  valueType: StringArray
+  defaultValues:
+  - a
+- id: IntArrayTests
+  valueType: IntArray
+  defaultValues:
+  - 6
 records: []
 enums:
 - enumId: ConnectionState

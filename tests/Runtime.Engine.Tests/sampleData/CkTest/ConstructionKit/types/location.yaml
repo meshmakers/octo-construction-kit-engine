@@ -22,6 +22,11 @@ types:
   derivedFromCkTypeId: Test/Location
   isFinal: true
   isAbstract: false
+  attributes:
+    - id: Test/StringArrayTests
+      name: StringArrayTests
+    - id: Test/IntArrayTests
+      name: IntArrayTests      
   associations:
     - id: System/ParentChild
       targetCkTypeId: Test/Continent

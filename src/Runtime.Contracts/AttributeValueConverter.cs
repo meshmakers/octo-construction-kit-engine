@@ -61,6 +61,25 @@ public static class AttributeValueConverter
 
         switch (attributeValueTypes)
         {
+            case AttributeValueTypesDto.StringArray:
+                if (value is string[] stringArray)
+                {
+                    return stringArray;
+                }
+                if (value is List<object> objectList)
+                {
+                    return objectList.Select(x =>
+                    {
+                        if (x is JsonElement jsonElement)
+                        {
+                            return jsonElement.GetString();
+                        }
+
+                        return Convert.ToString(x);
+                    }).ToList();
+                    
+                }
+                break;
             case AttributeValueTypesDto.String:
                 if (value is string)
                 {
@@ -92,6 +111,25 @@ public static class AttributeValueConverter
                 }
 
                 break;
+            case AttributeValueTypesDto.IntArray:
+                if (value is int[] intArray)
+                {
+                    return intArray;
+                }
+                if (value is List<object> objectListInt)
+                {
+                    return objectListInt.Select(x =>
+                    {
+                        if (x is JsonElement jsonElement)
+                        {
+                            return Convert.ToInt32(jsonElement.GetString());
+                        }
+
+                        return Convert.ToInt32(x);
+                    }).ToList();
+                    
+                }
+                break;            
             case AttributeValueTypesDto.Int:
             case AttributeValueTypesDto.Enum:
                 if (value is int)

@@ -27,4 +27,17 @@ public class RtEntityTests
         
         Assert.Equal(TimeSpan.FromMinutes(5), test);
     }
+    
+    
+        [Fact]
+        public void GetAttributeValues_StringArray_OK()
+        {
+            RtEntity rtEntity = new RtEntity();
+            rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.StringArray,new List<object> {"test"});
+            
+            var test = rtEntity.GetAttributeValues<string>("test");
+            
+            Assert.Single(test);
+            Assert.Equal("test", test[0]);
+        }
 }

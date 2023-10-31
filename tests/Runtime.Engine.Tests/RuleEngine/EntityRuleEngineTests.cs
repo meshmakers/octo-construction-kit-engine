@@ -170,4 +170,58 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
+
+    [Fact]
+    public async Task ValidateAsync_StringArrayWithDefaultValues_OK()
+    {
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var operationResult = new OperationResult();
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+        var rtEntity = new RtEntity(
+            "Test/Country",
+            OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?>
+            {
+                { "Designation", "Test" }
+            });
+        
+        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
+        {
+            EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
+        }, operationResult);
+        
+        var list = rtEntity.GetAttributeValues<string>("StringArrayTests");
+            
+        Assert.Empty(operationResult.Messages);
+        Assert.Single(ruleEngineResult.RtEntitiesToInsert);
+        Assert.Single(list);
+        Assert.Equal("a", list[0]);
+    }
+    
+    [Fact]
+    public async Task ValidateAsync_IntArrayWithDefaultValues_OK()
+    {
+        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var operationResult = new OperationResult();
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+        var rtEntity = new RtEntity(
+            "Test/Country",
+            OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?>
+            {
+                { "Designation", "Test" }
+            });
+        
+        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
+        {
+            EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
+        }, operationResult);
+        
+        var list = rtEntity.GetAttributeValues<int>("IntArrayTests");
+            
+        Assert.Empty(operationResult.Messages);
+        Assert.Single(ruleEngineResult.RtEntitiesToInsert);
+        Assert.Single(list);
+        Assert.Equal(6, list[0]);
+    }
 }

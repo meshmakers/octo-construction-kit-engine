@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -204,6 +205,11 @@ public static class AttributeValueConverter
                 if (value is List<object> objectListRecord)
                 {
                     return objectListRecord.Select(x => (RtRecord)x).ToList();
+                }
+
+                if (value is IEnumerable recordEnum)
+                {
+                    return recordEnum.Cast<RtRecord>().ToList();
                 }
 
                 break;

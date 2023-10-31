@@ -79,7 +79,7 @@ public static class AttributeValueConverter
                         }
 
                         return Convert.ToString(x);
-                    }).ToList();
+                    }).ToArray();
                 }
 
                 break;
@@ -130,7 +130,7 @@ public static class AttributeValueConverter
                         }
 
                         return Convert.ToInt32(x);
-                    }).ToList();
+                    }).ToArray();
                 }
 
                 break;
@@ -204,12 +204,12 @@ public static class AttributeValueConverter
 
                 if (value is List<object> objectListRecord)
                 {
-                    return objectListRecord.Select(x => (RtRecord)x).ToList();
+                    return objectListRecord.Select(x => (RtRecord)x).ToArray();
                 }
 
                 if (value is IEnumerable recordEnum)
                 {
-                    return recordEnum.Cast<RtRecord>().ToList();
+                    return recordEnum.Cast<RtRecord>().ToArray();
                 }
 
                 break;

@@ -82,6 +82,11 @@ public static class AttributeValueConverter
                     }).ToArray();
                 }
 
+                if (value is List<string> stringList)
+                {
+                    return stringList.ToArray();
+                }
+
                 break;
             case AttributeValueTypesDto.String:
                 if (value is string)
@@ -131,6 +136,12 @@ public static class AttributeValueConverter
 
                         return Convert.ToInt32(x);
                     }).ToArray();
+                }
+
+                
+                if (value is List<int> intList)
+                {
+                    return intList.ToArray();
                 }
 
                 break;
@@ -202,14 +213,11 @@ public static class AttributeValueConverter
                     return recordArray;
                 }
 
-                if (value is List<object> objectListRecord)
-                {
-                    return objectListRecord.Select(x => (RtRecord)x).ToArray();
-                }
-
                 if (value is IEnumerable recordEnum)
                 {
-                    return recordEnum.Cast<RtRecord>().ToArray();
+                    return recordEnum.Cast<RtRecord>()
+                        .Select(r => new RtRecord(r.CkRecordId,
+                            r.Attributes.ToDictionary(k => k.Key, v => v.Value))).ToArray();
                 }
 
                 break;

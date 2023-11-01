@@ -210,6 +210,57 @@ public abstract class RtTypeWithAttributes
 
         return new List<TValue>((IEnumerable<TValue>)Convert.ChangeType(value, typeof(IEnumerable<TValue>)));
     }
+    
+    /// <summary>
+    /// Gets the value of an attribute when the value is a list
+    /// This method allows non nullable types
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <typeparam name="TValue"></typeparam>
+    /// <returns></returns>
+    public List<TValue>? GetRtRecordAttributeValuesOrDefault<TValue>(string attributeName)
+        where TValue : RtRecord, new()
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            return default;
+        }
+
+        if (value == null)
+        {
+            return default;
+        }
+
+        if (value is List<TValue> list)
+        {
+            return list;
+        }
+        
+        if (value is TValue[] ar)
+        {
+            return new List<TValue>(ar);
+        }
+
+        if (value is IEnumerable<object> objectList)
+        {
+            return objectList.Cast<RtRecord>().Select(r => 
+                new TValue
+                {
+                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
+                }).ToList();
+        }
+        
+        if (value is IEnumerable<RtRecord> recordList)
+        {
+            return recordList.Select(r => 
+                new TValue
+                {
+                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
+                }).ToList();
+        }
+
+        throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
+    }
 
     /// <summary>
     /// Gets the value of an attribute when the value is non nullable

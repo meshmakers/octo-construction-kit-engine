@@ -124,7 +124,7 @@ internal static class AttributeCodeGenerator
                     sb.AppendLine(
                         $"  public List<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>? {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
-                    sb.AppendLine($"      get => GetAttributeValuesOrDefault<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine($"      get => GetRtRecordAttributeValuesOrDefault<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                                   "), AttributeValueTypesDto.RecordArray, value);");
                     sb.AppendLine("  }");

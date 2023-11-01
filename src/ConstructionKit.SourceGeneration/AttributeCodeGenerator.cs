@@ -243,7 +243,7 @@ internal static class AttributeCodeGenerator
                     sb.AppendLine(
                         $"  public List<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record> {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
-                    sb.AppendLine($"      get => GetAttributeValues<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine($"      get => GetRtRecordAttributeValues<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName +
                                   "), AttributeValueTypesDto.RecordArray, value);");
                     sb.AppendLine("  }");

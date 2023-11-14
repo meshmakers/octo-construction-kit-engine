@@ -208,7 +208,7 @@ public abstract class RtTypeWithAttributes
             return default;
         }
 
-        return new List<TValue>((IEnumerable<TValue>)Convert.ChangeType(value, typeof(IEnumerable<TValue>)));
+        return new List<TValue>((IEnumerable<TValue>)value);
     }
     
     /// <summary>

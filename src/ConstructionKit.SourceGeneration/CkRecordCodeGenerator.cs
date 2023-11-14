@@ -53,6 +53,13 @@ public class CkRecordCodeGenerator
         sb.AppendLine("/// </summary>");
         sb.AppendLine($"public partial class Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
         sb.AppendLine("{");
+        sb.AppendLine();
+        sb.AppendLine($"  public Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record()");
+        sb.AppendLine("  {");
+        sb.AppendLine($"    CkRecordId = \"{ckRecord.RecordId}\";");
+        sb.AppendLine("  }");
+        sb.AppendLine();
+        
         if (ckRecord.Attributes != null)
         {
             foreach (var ckTypeAttributeDto in ckRecord.Attributes)

@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.ConstructionKit.Samples.SourceGenerator;
@@ -12,7 +13,7 @@ public enum AttributeValueTypes
 
 public class RtRecord : RtEntity
 {
-    
+    public CkId<CkRecordId> CkRecordId { get; set; }
 }
 
 public class RtEntity

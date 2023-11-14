@@ -56,7 +56,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine();
         sb.AppendLine($"  public Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record()");
         sb.AppendLine("  {");
-        sb.AppendLine($"    CkRecordId = \"{ckRecord.RecordId}\";");
+        sb.AppendLine($"    CkRecordId = \"{modelId}/{ckRecord.RecordId}\";");
         sb.AppendLine("  }");
         sb.AppendLine();
         

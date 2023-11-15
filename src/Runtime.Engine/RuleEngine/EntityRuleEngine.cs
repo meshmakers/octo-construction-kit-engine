@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -47,32 +48,10 @@ internal class EntityRuleEngine : IEntityRuleEngine
             bool isInError = false;
             if (info.ModOption == EntityModOptions.Insert || info.ModOption == EntityModOptions.Replace)
             {
-                foreach (var attribute in ckTypeGraph.AllAttributes.Values)
+                if (info.RtEntity != null)
                 {
-                    if (!attribute.IsOptional && info.RtEntity != null && (!info.RtEntity.Attributes.ContainsKey(attribute.AttributeName) ||
-                                                                           info.RtEntity.Attributes[attribute.AttributeName] == null))
-                    {
-                        if (attribute.DefaultValues != null)
-                        {
-                            switch (attribute.ValueType)
-                            {
-                                case AttributeValueTypesDto.IntArray:
-                                case AttributeValueTypesDto.RecordArray:
-                                case AttributeValueTypesDto.StringArray:
-                                    info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
-                                    break;
-                                default:
-                                    info.RtEntity.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues.FirstOrDefault());
-                                    break;
-                            }
-                        }
-                        else
-                        {
-                            operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(tenantId,
-                                attribute.CkAttributeId, info.RtEntity.CkTypeId, info.RtEntity.RtId));
-                            isInError = true;
-                        }
-                    }
+                    isInError |= SetDefaultValuesOnInsert(tenantId, ckTypeGraph.AllAttributes.Values.ToList(),
+                        info.RtEntity, operationResult, $"{info.RtEntity.CkTypeId}@{info.RtEntity.RtId}");
                 }
             }
             else if (info.ModOption == EntityModOptions.Update)
@@ -158,5 +137,79 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 entitiesToDelete.ToList());
 
         return entityValidatorResult;
+    }
+
+    private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
+        OperationResult operationResult, string reference)
+    {
+        bool isInError = false;
+        foreach (var attribute in attributeGraphs)
+        {
+            if (!attribute.IsOptional && (!rtType.Attributes.ContainsKey(attribute.AttributeName) ||
+                                          rtType.Attributes[attribute.AttributeName] == null))
+            {
+                if (attribute.DefaultValues != null)
+                {
+                    switch (attribute.ValueType)
+                    {
+                        case AttributeValueTypesDto.IntArray:
+                        case AttributeValueTypesDto.RecordArray:
+                        case AttributeValueTypesDto.StringArray:
+                            rtType.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                            break;
+                        default:
+                            rtType.SetAttributeValue(attribute.AttributeName, attribute.ValueType,
+                                attribute.DefaultValues.FirstOrDefault());
+                            break;
+                    }
+                }
+                else
+                {
+                    operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(tenantId,
+                        attribute.CkAttributeId, reference));
+                    isInError = true;
+                }
+            }
+
+            if (rtType.Attributes.ContainsKey(attribute.AttributeName))
+            {
+                if (attribute.ValueType == AttributeValueTypesDto.RecordArray)
+                {
+                    var t = (IEnumerable<object>?)rtType.Attributes[attribute.AttributeName];
+                    if (t != null)
+                    {
+                        foreach (var o in t)
+                        {
+                            var rtRecord = (RtRecord)o;
+                            if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                            {
+                                operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(tenantId, rtRecord.CkRecordId));
+                                continue;
+                            }
+
+                            isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                                operationResult, reference + $"/{attribute.AttributeName}");
+                        }
+                    }
+                }
+                else if (attribute.ValueType == AttributeValueTypesDto.Record)
+                {
+                    var rtRecord = (RtRecord?)rtType.Attributes[attribute.AttributeName];
+                    if (rtRecord != null)
+                    {
+                        if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                        {
+                            operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(tenantId, rtRecord.CkRecordId));
+                            continue;
+                        }
+
+                        isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                            operationResult, reference + $"/{attribute.AttributeName}");
+                    }
+                }
+            }
+        }
+
+        return isInError;
     }
 }

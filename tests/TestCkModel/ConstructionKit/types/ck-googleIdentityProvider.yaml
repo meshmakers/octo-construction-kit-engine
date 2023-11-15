@@ -1,0 +1,12 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: GoogleIdentityProvider
+    derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: System.TestIdentity/ClientId
+        name: ClientId
+        
+      - id: System.TestIdentity/ClientSecret
+        name: ClientSecret

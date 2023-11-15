@@ -1,0 +1,13 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+records: 
+- recordId: ClientClaim
+  isFinal: true
+  isAbstract: false
+  attributes:
+  - id: System.TestIdentity/ClaimType
+    name: ClaimType
+  - id: System.TestIdentity/ClaimValue
+    name: ClaimValue
+  - id: System.TestIdentity/ClaimValueType
+    name: ClaimValueType
+    

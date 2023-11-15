@@ -14,6 +14,7 @@ public class CkEnumValueDto
     /// <summary>
     /// Key of the enum value.
     /// </summary>
+    [JsonRequired] 
     public int Key { get; set; }
 
     /// <summary>

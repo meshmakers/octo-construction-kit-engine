@@ -35,4 +35,9 @@ public class InvalidAttributeValueException : PersistenceException
     {
         return new InvalidAttributeValueException($"Attribute value must be an array or list of type '{elementType}' for attribute with name '{attributeName}'");
     }
+
+    internal static Exception CannotActivateInstance(Type type)
+    {
+        return new InvalidAttributeValueException($"Cannot activate instance of type '{type}'");
+    }
 }

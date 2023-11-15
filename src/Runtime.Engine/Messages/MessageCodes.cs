@@ -34,8 +34,8 @@ internal static class MessageCodes
     internal static OperationMessage SchemaValidationError(object locationReference, object errorMessage) =>
         GetMessage("SchemaValidationError", locationReference, errorMessage);
 
-    internal static OperationMessage MandatoryAttributeMissing(object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
-        GetMessage("MandatoryAttributeMissing", tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
+    internal static OperationMessage MandatoryAttributeMissing(object tenantId, object attributeCkAttributeId, object reference) =>
+        GetMessage("MandatoryAttributeMissing", tenantId, attributeCkAttributeId, reference);
 
     internal static OperationMessage CkTypeIdNotFound(object tenantId, object rtEntityCkTypeId) =>
         GetMessage("CkTypeIdNotFound", tenantId, rtEntityCkTypeId);
@@ -85,6 +85,9 @@ internal static class MessageCodes
     internal static OperationMessage RtEntityIdAlreadyExistInUpdateList(object tenantId, object rtEntityCkTypeId, object rtId) =>
         GetMessage("RtEntityIdAlreadyExistInUpdateList", tenantId, rtEntityCkTypeId, rtId);
 
+    internal static OperationMessage CkRecordIdNotFound(object tenantId, object ckRecordId) =>
+        GetMessage("CkRecordIdNotFound", tenantId, ckRecordId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -96,8 +99,8 @@ internal static class MessageCodes
         {
             "MandatoryAttributeMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' defines no default value and is missing.",
-                 new [] {"tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"})
+                 2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value and is missing.",
+                 new [] {"tenantId", "attributeCkAttributeId", "reference"})
         },
         {
             "CkTypeIdNotFound",
@@ -194,6 +197,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  18, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' already exists in update list.",
                  new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
+        },
+        {
+            "CkRecordIdNotFound",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 19, "{tenantId}: CkRecordId '{ckRecordId}' not found.",
+                 new [] {"tenantId", "ckRecordId"})
         },
     };
 }

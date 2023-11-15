@@ -1,0 +1,94 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+- typeId: User
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  isAbstract: false
+  attributes:
+  - id: System.TestIdentity/UserName
+    name: UserName
+    isOptional: true
+    
+  - id: System.TestIdentity/NormalizedUserName
+    name: NormalizedUserName
+    isOptional: true
+    
+  - id: System.TestIdentity/FirstName
+    name: FirstName
+    isOptional: true
+
+  - id: System.TestIdentity/LastName
+    name: LastName
+    isOptional: true
+    
+  - id: System/Description
+    name: Description
+    isOptional: true
+    
+  - id: System.TestIdentity/Email
+    name: Email
+    isOptional: true
+    
+  - id: System.TestIdentity/NormalizedEmail
+    name: NormalizedEmail
+    isOptional: true
+    
+  - id: System.TestIdentity/EmailConfirmed
+    name: EmailConfirmed
+    
+  - id: System.TestIdentity/PasswordHash
+    name: PasswordHash
+    isOptional: true
+    
+  - id: System.TestIdentity/SecurityStamp
+    name: SecurityStamp
+    isOptional: true
+    
+  - id: System.TestIdentity/ConcurrencyStamp
+    name: ConcurrencyStamp
+    
+  - id: System.TestIdentity/PhoneNumber
+    name: PhoneNumber
+    isOptional: true
+    
+  - id: System.TestIdentity/PhoneNumberConfirmed
+    name: PhoneNumberConfirmed
+    
+  - id: System.TestIdentity/TwoFactorEnabled
+    name: TwoFactorEnabled
+    
+  - id: System.TestIdentity/LockoutEnd
+    name: LockoutEnd
+    isOptional: true
+  
+  - id: System.TestIdentity/LockoutEnabled
+    name: LockoutEnabled
+    
+  - id: System.TestIdentity/AccessFailedCount
+    name: AccessFailedCount
+    
+  - id: System.TestIdentity/ResetPasswordOnLogin
+    name: ResetPasswordOnLogin
+    
+  - id: System.TestIdentity/RoleIds
+    name: RoleIds
+    isOptional: true
+    
+  - id: System.TestIdentity/UserClaims
+    name: Claims
+    isOptional: true
+  
+  - id: System.TestIdentity/UserLogins
+    name: UserLogins
+    isOptional: true
+    
+  - id: System.TestIdentity/UserTokens
+    name: UserTokens
+    isOptional: true
+    
+  indexes:
+  - indexType: Ascending
+    fields:
+    - attributeNames:
+      - NormalizedEmail
+      - NormalizedUserName

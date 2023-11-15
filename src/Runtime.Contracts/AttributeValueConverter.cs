@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -66,7 +65,7 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.StringArray:
                 if (value is string[] stringArray)
                 {
-                    return stringArray;
+                    return stringArray.ToList();
                 }
 
                 if (value is List<object> objectList)
@@ -79,12 +78,12 @@ public static class AttributeValueConverter
                         }
 
                         return Convert.ToString(x);
-                    }).ToArray();
+                    }).ToList();
                 }
 
-                if (value is List<string> stringList)
+                if (value is AttributeValueArray<string> stringList)
                 {
-                    return stringList.ToArray();
+                    return stringList.InnerList;
                 }
 
                 break;
@@ -122,7 +121,7 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.IntArray:
                 if (value is int[] intArray)
                 {
-                    return intArray;
+                    return intArray.ToList();
                 }
 
                 if (value is List<object> objectListInt)
@@ -135,13 +134,12 @@ public static class AttributeValueConverter
                         }
 
                         return Convert.ToInt32(x);
-                    }).ToArray();
+                    }).ToList();
                 }
 
-                
-                if (value is List<int> intList)
+                if (value is AttributeValueArray<int> intList)
                 {
-                    return intList.ToArray();
+                    return intList.InnerList;
                 }
 
                 break;
@@ -154,7 +152,18 @@ public static class AttributeValueConverter
 
                 if (value is JsonElement i32Element)
                 {
-                    return i32Element.GetInt32();
+                    if (i32Element.ValueKind == JsonValueKind.Number)
+                    {
+                        return i32Element.GetInt32();
+                    }
+                    
+                    if (i32Element.ValueKind == JsonValueKind.String)
+                    {
+                        if (int.TryParse(i32Element.GetString(), out var svi32))
+                        {
+                            return svi32;
+                        }
+                    }
                 }
 
                 if (int.TryParse(value.ToString(), out var intResult))
@@ -210,14 +219,17 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.RecordArray:
                 if (value is RtRecord[] recordArray)
                 {
-                    return recordArray;
+                    return recordArray.ToList();
                 }
 
-                if (value is IEnumerable recordEnum)
+                if (value is IAttributeValueList recordList)
                 {
-                    return recordEnum.Cast<RtRecord>()
-                        .Select(r => new RtRecord(r.CkRecordId,
-                            r.Attributes.ToDictionary(k => k.Key, v => v.Value))).ToArray();
+                    return recordList.InnerList;
+                }
+
+                if (value is List<object> recordObjectList)
+                {
+                    return recordObjectList.Cast<RtRecord>().ToList();
                 }
 
                 break;

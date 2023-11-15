@@ -1,0 +1,21 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: AzureEntraIdentityProvider
+    derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: System/TenantId
+        name: TenantId
+
+      - id: System.TestIdentity/Authority
+        name: Authority
+
+      - id: System.TestIdentity/ClientId
+        name: ClientIdGroupGraphApi
+        
+      - id: System.TestIdentity/ClientIdGroupAzureAd
+        name: ClientIdGroupAzureAd
+        
+      - id: System.TestIdentity/ClientSecret
+        name: ClientSecretGroupAzureAd

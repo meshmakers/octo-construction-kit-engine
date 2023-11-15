@@ -105,14 +105,14 @@ internal static class AttributeCodeGenerator
 
                 break;            
             case AttributeValueTypesDto.StringArray:
-                sb.AppendLine($"  public List<string>? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public IAttributeValueArray<string>? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValuesOrDefault<string>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.IntArray:
-                sb.AppendLine($"  public List<long>? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public IAttributeValueArray<long>? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValuesOrDefault<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.IntArray, value);");
@@ -122,7 +122,7 @@ internal static class AttributeCodeGenerator
                 if (ckAttributeGraph.ValueCkRecordId.HasValue)
                 {
                     sb.AppendLine(
-                        $"  public List<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>? {ckTypeAttributeDto.AttributeName}");
+                        $"  public IAttributeValueArray<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>? {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
                     sb.AppendLine($"      get => GetRtRecordAttributeValuesOrDefault<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
@@ -224,14 +224,14 @@ internal static class AttributeCodeGenerator
 
                 break;              
             case AttributeValueTypesDto.StringArray:
-                sb.AppendLine($"  public List<string> {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public IAttributeValueArray<string> {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValues<string>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.StringArray, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.IntArray:
-                sb.AppendLine($"  public List<long> {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public IAttributeValueArray<long> {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
                 sb.AppendLine("      get => GetAttributeValues<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName + "), AttributeValueTypesDto.IntArray, value);");
@@ -241,7 +241,7 @@ internal static class AttributeCodeGenerator
                 if (ckAttributeGraph.ValueCkRecordId.HasValue)
                 {
                     sb.AppendLine(
-                        $"  public List<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record> {ckTypeAttributeDto.AttributeName}");
+                        $"  public IAttributeValueArray<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record> {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
                     sb.AppendLine($"      get => GetRtRecordAttributeValues<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName +

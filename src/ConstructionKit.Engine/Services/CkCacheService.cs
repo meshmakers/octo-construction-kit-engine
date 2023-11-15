@@ -119,6 +119,22 @@ public class CkCacheService : ICkCacheService
         return ckCache.TryGetCkType(ckTypeId, out ckTypeGraph);
     }
 
+    /// <inheritdoc />
+#if NETSTANDARD2_0
+    public bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, out CkRecordGraph? ckRecordGraph)
+#else
+    public bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
+#endif     
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckRecordGraph = null;
+            return false;
+        }
+        
+        return ckCache.TryGetCkRecord(ckRecordId, out ckRecordGraph);
+    }
+
     /// <summary>
     /// Returns a <see cref="CkAttributeGraph"/> from the cache.
     /// </summary>

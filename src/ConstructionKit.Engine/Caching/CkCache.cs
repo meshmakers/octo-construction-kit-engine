@@ -64,6 +64,25 @@ internal class CkCache : IDisposable
 
         return true;
     }
+    
+#if NETSTANDARD2_0
+    public bool TryGetCkRecord(CkId<CkRecordId> ckRecordId, out CkRecordGraph? ckRecordGraph)
+#else
+    public bool TryGetCkRecord(CkId<CkRecordId> ckRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
+#endif  
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.Records.TryGetValue(ckRecordId, out ckRecordGraph))
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     public CkAttributeGraph GetCkAttribute(CkId<CkAttributeId> ckAttributeId)
     {
@@ -188,7 +207,7 @@ internal class CkCache : IDisposable
     {
         var options = new JsonSerializerOptions
         {
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         };
         options.Converters.Add(new CkIdAttributeIdConverter());

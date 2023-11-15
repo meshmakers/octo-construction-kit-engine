@@ -59,6 +59,12 @@ public class CkRecordCodeGenerator
         sb.AppendLine($"    CkRecordId = \"{modelId}/{ckRecord.RecordId}\";");
         sb.AppendLine("  }");
         sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine($"  public Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record(RtRecord rtRecord)");
+        sb.AppendLine("     : base(rtRecord.CkRecordId, rtRecord.Attributes.ToDictionary(k=> k.Key, v => v.Value))");
+        sb.AppendLine("  {");
+        sb.AppendLine("  }");
+        sb.AppendLine();
         
         if (ckRecord.Attributes != null)
         {

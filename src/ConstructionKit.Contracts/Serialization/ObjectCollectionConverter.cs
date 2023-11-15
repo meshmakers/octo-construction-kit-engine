@@ -14,13 +14,9 @@ public class ObjectCollectionConverter : IYamlTypeConverter
     /// </summary>
     /// <param name="type"></param>
     /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public bool Accepts(Type type)
     {
-        System.Diagnostics.Debug.WriteLine(type);
         var r =  type.IsAssignableFrom(typeof(ICollection<object>));
-        System.Diagnostics.Debug.WriteLine($"result: {r}");
-
         return r;
     }
 

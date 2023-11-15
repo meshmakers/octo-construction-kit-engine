@@ -64,6 +64,20 @@ public interface ICkCacheService
 #else
     bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph);
 #endif
+    
+    /// <summary>
+    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckRecordId">Construction Kit record id.</param>
+    /// <param name="ckRecordGraph">Returns the ck record graph</param>
+    /// <returns>True, when the given ck record id exists</returns>
+    /// <exception cref="Exception"></exception>
+#if NETSTANDARD2_0
+    bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, out CkRecordGraph? ckRecordGraph);
+#else
+    bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph);
+#endif
 
     /// <summary>
     /// Returns a <see cref="CkAttributeGraph"/> from the cache.

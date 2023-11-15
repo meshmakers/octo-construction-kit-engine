@@ -241,7 +241,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             new Dictionary<string, object?>
             {
                 { "Designation", "Test" },
-                { "RecordArrayTests", new List<object>() }
+                { "RecordArrayTests", new List<RtRecord>() }
             });
         
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
@@ -249,7 +249,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
         }, operationResult);
         
-        var list = rtEntity.GetAttributeValues<RtTestRecordRecord>("RecordArrayTests");
+        var list = rtEntity.GetRtRecordAttributeValues<RtTestRecordRecord>("RecordArrayTests");
             
         Assert.Empty(operationResult.Messages);
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);

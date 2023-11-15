@@ -1,0 +1,148 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Client
+    derivedFromCkTypeId: System/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: System/Enabled
+        name: Enabled
+
+      - id: System.TestIdentity/ClientId
+        name: ClientId
+
+      - id: System.TestIdentity/ProtocolType
+        name: ProtocolType
+        
+      - id: System.TestIdentity/Secrets
+        name: ClientSecrets
+        
+      - id: System.TestIdentity/RequireClientSecret
+        name: RequireClientSecret
+
+      - id: System/Name
+        name: ClientName
+        isOptional: true
+        
+      - id: System/Description
+        name: Description
+        isOptional: true
+          
+      - id: System.TestIdentity/ClientUri
+        name: ClientUri
+        isOptional: true
+        
+      - id: System.TestIdentity/LogoUri
+        name: LogoUri
+        isOptional: true
+        
+      - id: System.TestIdentity/RequireConsent
+        name: RequireConsent
+        isOptional: true
+          
+      - id: System.TestIdentity/AllowRememberConsent
+        name: AllowRememberConsent
+          
+      - id: System.TestIdentity/AllowedGrantTypes
+        name: AllowedGrantTypes
+          
+      - id: System.TestIdentity/RequirePkce
+        name: RequirePkce
+        
+      - id: System.TestIdentity/AllowPlainTextPkce
+        name: AllowPlainTextPkce
+          
+      - id: System.TestIdentity/RequireRequestObject
+        name: RequireRequestObject
+        
+      - id: System.TestIdentity/AllowAccessTokensViaBrowser
+        name: AllowAccessTokensViaBrowser
+        
+      - id: System.TestIdentity/RequireDPoP
+        name: RequireDPoP
+        
+      - id: System.TestIdentity/DPoPValidationMode
+        name: DPoPValidationMode
+        
+      - id: System.TestIdentity/DPoPClockSkew
+        name: DPoPClockSkew
+      - id: System.TestIdentity/RedirectUris
+        name: RedirectUris        
+        
+      - id: System.TestIdentity/PostLogoutRedirectUris
+        name: PostLogoutRedirectUris        
+      - id: System.TestIdentity/FrontChannelLogoutUri
+        name: FrontChannelLogoutUri
+        isOptional: true
+      - id: System.TestIdentity/FrontChannelLogoutSessionRequired
+        name: FrontChannelLogoutSessionRequired
+      - id: System.TestIdentity/BackChannelLogoutUri
+        name: BackChannelLogoutUri
+        isOptional: true
+      - id: System.TestIdentity/BackChannelLogoutSessionRequired
+        name: BackChannelLogoutSessionRequired
+      - id: System.TestIdentity/AllowOfflineAccess
+        name: AllowOfflineAccess
+      - id: System.TestIdentity/AllowedScopes
+        name: AllowedScopes
+      - id: System.TestIdentity/AlwaysIncludeUserClaimsInIdToken
+        name: AlwaysIncludeUserClaimsInIdToken
+      - id: System.TestIdentity/IdentityTokenLifetime
+        name: IdentityTokenLifetime
+      - id: System.TestIdentity/AllowedIdentityTokenSigningAlgorithms
+        name: AllowedIdentityTokenSigningAlgorithms
+      - id: System.TestIdentity/AccessTokenLifetime
+        name: AccessTokenLifetime
+      - id: System.TestIdentity/AuthorizationCodeLifetime
+        name: AuthorizationCodeLifetime
+      - id: System.TestIdentity/AbsoluteRefreshTokenLifetime
+        name: AbsoluteRefreshTokenLifetime
+      - id: System.TestIdentity/SlidingRefreshTokenLifetime
+        name: SlidingRefreshTokenLifetime
+      - id: System.TestIdentity/ConsentLifetime
+        name: ConsentLifetime
+        isOptional: true        
+      - id: System.TestIdentity/UpdateAccessTokenClaimsOnRefresh
+        name: UpdateAccessTokenClaimsOnRefresh
+      - id: System.TestIdentity/RefreshTokenExpiration
+        name: RefreshTokenExpiration
+      - id: System.TestIdentity/AccessTokenType
+        name: AccessTokenType
+      - id: System.TestIdentity/EnableLocalLogin
+        name: EnableLocalLogin
+      - id: System.TestIdentity/IdentityProviderRestrictions
+        name: IdentityProviderRestrictions
+      - id: System.TestIdentity/IncludeJwtId
+        name: IncludeJwtId
+      - id: System.TestIdentity/ClientClaims
+        name: ClientClaims
+      - id: System.TestIdentity/AlwaysSendClientClaims
+        name: AlwaysSendClientClaims
+      - id: System.TestIdentity/ClientClaimsPrefix
+        name: ClientClaimsPrefix
+        isOptional: true
+      - id: System.TestIdentity/PairWiseSubjectSalt
+        name: PairWiseSubjectSalt
+        isOptional: true
+      - id: System.TestIdentity/UserSsoLifetime
+        name: UserSsoLifetime
+        isOptional: true
+      - id: System.TestIdentity/UserCodeType
+        name: UserCodeType
+        isOptional: true
+      - id: System.TestIdentity/DeviceCodeLifetime
+        name: DeviceCodeLifetime
+      - id: System.TestIdentity/CibaLifetime
+        name: CibaLifetime
+        isOptional: true
+      - id: System.TestIdentity/PollingInterval
+        name: PollingInterval
+        isOptional: true
+      - id: System.TestIdentity/CoordinateLifetimeWithUserSession
+        name: CoordinateLifetimeWithUserSession
+        isOptional: true
+      - id: System.TestIdentity/AllowedCorsOrigins
+        name: AllowedCorsOrigins
+      - id: System.TestIdentity/InitiateLoginUri
+        name: InitiateLoginUri
+        isOptional: true

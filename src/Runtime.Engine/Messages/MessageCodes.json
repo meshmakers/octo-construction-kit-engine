@@ -10,7 +10,7 @@
       "key": "MandatoryAttributeMissing",
       "number": 2,
       "level": "FATALERROR",
-      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' defines no default value and is missing."
+      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value and is missing."
     },
     {
       "key": "CkTypeIdNotFound",
@@ -107,6 +107,12 @@
       "number": 18,
       "level": "ERROR",
       "text": "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' already exists in update list."
+    },
+    {
+      "key": "CkRecordIdNotFound",
+      "number": 19,
+      "level": "ERROR",
+      "text": "{tenantId}: CkRecordId '{ckRecordId}' not found."
     }
   ]
 }

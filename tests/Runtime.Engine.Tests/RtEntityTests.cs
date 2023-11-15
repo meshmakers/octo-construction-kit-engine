@@ -70,7 +70,7 @@ public class RtEntityTests
     }
 
     [Fact]
-    public void GetAttributeValues_RecordArray_Typed_OK()
+    public void GetRtRecordAttributeValues_RecordArray_Typed_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<RtRecord>
@@ -98,7 +98,7 @@ public class RtEntityTests
             new() { Designation = "TestRecord", CkRecordId = "Test/TestRecord" }
         });
 
-        var test = rtEntity.GetRtRecordAttributeValues<RtTestRecordRecord>("test");
+        var test = rtEntity.GetAttributeValues<RtTestRecordRecord>("test");
         
         Assert.Single(test);
         Assert.Equal("TestRecord", test[0].GetAttributeStringValue("Designation"));

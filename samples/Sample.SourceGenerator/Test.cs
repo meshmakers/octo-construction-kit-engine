@@ -14,13 +14,25 @@ public enum AttributeValueTypes
 public class RtRecord : RtEntity
 {
     public CkId<CkRecordId> CkRecordId { get; set; }
+    
+    public RtRecord()
+    {
+    }
+    
+    public RtRecord(CkId<CkRecordId> ckRecordId, IDictionary<string, object?> attributes)
+    {
+    }
+    
 }
 
 public class RtEntity
 {
     public RtEntity()
     {
+        Attributes = new Dictionary<string, object?>();
     }
+    
+    public IDictionary<string, object?> Attributes { get; set; }
 
     public TValue? GetAttributeValueOrDefault<TValue>(string attributeName, TValue? defaultValue = default)
         where TValue : struct

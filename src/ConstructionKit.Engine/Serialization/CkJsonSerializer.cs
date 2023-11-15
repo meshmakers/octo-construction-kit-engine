@@ -24,7 +24,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         _options = new JsonSerializerOptions 
         { 
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault, 
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, 
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
             Converters =
@@ -151,7 +151,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
             foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
             {
                 var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
+                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
                 operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
             }
         }

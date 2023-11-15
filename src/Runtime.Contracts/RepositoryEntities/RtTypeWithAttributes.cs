@@ -108,33 +108,23 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
-    public List<TValue> GetAttributeValues<TValue>(string attributeName)
+    public IAttributeValueArray<TValue> GetAttributeValues<TValue>(string attributeName)
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
-            return new List<TValue>();
+            return new AttributeValueArray<TValue>();
         }
 
         if (value == null)
         {
-            return new List<TValue>();
+            return new AttributeValueArray<TValue>();
         }
 
         if (value is List<TValue> list)
         {
-            return list;
+            return new AttributeValueArray<TValue>(list);
         }
         
-        if (value is TValue[] ar)
-        {
-            return new List<TValue>(ar);
-        }
-
-        if (value is List<object> objectList)
-        {
-            return objectList.Cast<TValue>().ToList();
-        }
-
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
 
@@ -145,47 +135,24 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
-    public List<TValue> GetRtRecordAttributeValues<TValue>(string attributeName)
+    public IAttributeValueArray<TValue> GetRtRecordAttributeValues<TValue>(string attributeName)
         where TValue : RtRecord, new()
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
-            return new List<TValue>();
+            return new AttributeRecordValueArray<TValue>();
         }
 
         if (value == null)
         {
-            return new List<TValue>();
-        }
+            return new AttributeRecordValueArray<TValue>();
+        }   
 
-        if (value is List<TValue> list)
+        if (value is List<RtRecord> list)
         {
-            return list;
+            return new AttributeRecordValueArray<TValue>(list);
         }
         
-        if (value is TValue[] ar)
-        {
-            return new List<TValue>(ar);
-        }
-
-        if (value is IEnumerable<object> objectList)
-        {
-            return objectList.Cast<RtRecord>().Select(r => 
-                new TValue
-                {
-                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
-                }).ToList();
-        }
-        
-        if (value is IEnumerable<RtRecord> recordList)
-        {
-            return recordList.Select(r => 
-                new TValue
-                {
-                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
-                }).ToList();
-        }
-
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
 
@@ -196,7 +163,7 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
-    public List<TValue>? GetAttributeValuesOrDefault<TValue>(string attributeName)
+    public IAttributeValueArray<TValue>? GetAttributeValuesOrDefault<TValue>(string attributeName)
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
@@ -207,8 +174,13 @@ public abstract class RtTypeWithAttributes
         {
             return default;
         }
+        
+        if (value is List<TValue> list)
+        {
+            return new AttributeValueArray<TValue>(list);
+        }
 
-        return new List<TValue>((IEnumerable<TValue>)value);
+        throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
     
     /// <summary>
@@ -218,7 +190,7 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
-    public List<TValue>? GetRtRecordAttributeValuesOrDefault<TValue>(string attributeName)
+    public IAttributeValueArray<TValue>? GetRtRecordAttributeValuesOrDefault<TValue>(string attributeName)
         where TValue : RtRecord, new()
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
@@ -231,32 +203,9 @@ public abstract class RtTypeWithAttributes
             return default;
         }
 
-        if (value is List<TValue> list)
+        if (value is List<RtRecord> list)
         {
-            return list;
-        }
-        
-        if (value is TValue[] ar)
-        {
-            return new List<TValue>(ar);
-        }
-
-        if (value is IEnumerable<object> objectList)
-        {
-            return objectList.Cast<RtRecord>().Select(r => 
-                new TValue
-                {
-                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
-                }).ToList();
-        }
-        
-        if (value is IEnumerable<RtRecord> recordList)
-        {
-            return recordList.Select(r => 
-                new TValue
-                {
-                    _attributes = r.Attributes.ToDictionary(k=> k.Key, v=> v.Value)
-                }).ToList();
+            return new AttributeRecordValueArray<TValue>(list);
         }
 
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));

@@ -255,6 +255,75 @@ public abstract class RtTypeWithAttributes
 
         return value;
     }
+    
+    
+    /// <summary>
+    /// Gets the value of an RtRecord attribute when the value is non nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <typeparam name="TValue"></typeparam>
+    /// <returns></returns>
+    public TValue GetRtRecordAttributeValue<TValue>(string attributeName)
+        where TValue : RtRecord, new()
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value is TValue recordSpecialized)
+        {
+            return recordSpecialized;
+        }
+        
+        if (value is RtRecord rtRecord)
+        {
+            var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
+            if (x == null)
+            {
+                throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
+            }
+        }
+        
+        throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
+    }
+    
+    /// <summary>
+    /// Gets the value of an RtRecord attribute when the value is non nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <typeparam name="TValue"></typeparam>
+    /// <returns></returns>
+    public TValue? GetRtRecordAttributeValueOrDefault<TValue>(string attributeName)
+        where TValue : RtRecord, new()
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            return null;
+        }
+
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is TValue recordSpecialized)
+        {
+            return recordSpecialized;
+        }
+        
+        if (value is RtRecord rtRecord)
+        {
+            var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
+            if (x == null)
+            {
+                throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
+            }
+        }
+        
+        throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
+    }
+    
 
     /// <summary>
     /// Gets the value of an attribute if the value is nullable and a string

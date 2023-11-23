@@ -77,7 +77,7 @@ public class AttributeRecordValueArray<TValue> : IAttributeValueArray<TValue>, I
     {
         if (o is TValue value)
         {
-                return value;
+            return value;
         }
 
         var x = (TValue?)Activator.CreateInstance(typeof(TValue), o);

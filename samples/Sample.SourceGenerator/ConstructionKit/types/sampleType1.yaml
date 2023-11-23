@@ -14,6 +14,7 @@ types:
     name: TestEnum    
   - id: Sample1/IsLocked
     name: IsLocked
+    isOptional: false    
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity

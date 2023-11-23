@@ -97,7 +97,7 @@ internal static class AttributeCodeGenerator
                     sb.AppendLine(
                         $"  public Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record? {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
-                    sb.AppendLine($"      get => GetAttributeValueOrDefault<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine($"      get => GetRtRecordAttributeValueOrDefault<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                                   "), AttributeValueTypesDto.Record, value);");
                     sb.AppendLine("  }");
@@ -216,7 +216,7 @@ internal static class AttributeCodeGenerator
                     sb.AppendLine(
                         $"  public Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record {ckTypeAttributeDto.AttributeName}");
                     sb.AppendLine("  {");
-                    sb.AppendLine($"      get => GetAttributeValue<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                    sb.AppendLine($"      get => GetRtRecordAttributeValue<Rt{ckAttributeGraph.ValueCkRecordId.Value.Key.RecordId.MakeClassName()}Record>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                     sb.AppendLine("      set => SetAttributeValueNonNullable(nameof(" + ckTypeAttributeDto.AttributeName +
                                   "), AttributeValueTypesDto.Record, value);");
                     sb.AppendLine("  }");

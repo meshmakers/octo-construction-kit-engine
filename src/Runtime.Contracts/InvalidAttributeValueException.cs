@@ -40,4 +40,9 @@ public class InvalidAttributeValueException : PersistenceException
     {
         return new InvalidAttributeValueException($"Cannot activate instance of type '{type}'");
     }
+
+    internal static Exception InvalidRecordValue(string attributeName, Type type)
+    {
+        return new InvalidAttributeValueException($"Cannot convert to type '{type}' at attribute with name '{attributeName}'");
+    }
 }

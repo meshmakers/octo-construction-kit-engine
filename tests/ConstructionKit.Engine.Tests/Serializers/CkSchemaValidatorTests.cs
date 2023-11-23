@@ -5,22 +5,6 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Serializers;
 
 public class CkSchemaValidatorTests
 {
-        
-    [Fact]
-    public void ValidateElementsInJsonaaa_ok()
-    {
-        var schemaValidator = new CkSchemaValidator();
-
-        string filePath = "/Users/gerald/.octo-ck-models/ck-models/System.TestIdentity/1/ck-system.testidentity.json";
-        var stream = File.OpenRead(filePath);
-        var operationResult = new OperationResult();
-        bool isValid = schemaValidator.ValidateCompiledModelInJson(stream, filePath, operationResult);
-        Assert.True(isValid);
-        Assert.False(operationResult.Messages.Any());
-        Assert.False(operationResult.HasErrors);
-        Assert.False(operationResult.HasFatalErrors);
-    }
-    
     [Fact]
     public void ValidateElementsInJson_ok()
     {

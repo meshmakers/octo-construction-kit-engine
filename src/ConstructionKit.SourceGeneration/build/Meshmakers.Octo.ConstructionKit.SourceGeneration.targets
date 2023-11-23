@@ -54,7 +54,7 @@
         </Exec>
 
         <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
-        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -c -i">
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$([System.IO.Path]::Combine($(ProjectDir),$(OctoCompilerToolPath))) -c compile -p %(_ConstructionKitFolder.Identity) -c -i">
         </Exec>
         
     </Target>   

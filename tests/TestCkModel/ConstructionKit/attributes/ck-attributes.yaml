@@ -444,4 +444,26 @@ attributes:
   description: Gets or sets the base DN of the user.
 - id: UserNameAttribute
   valueType: String
-  description: Gets or sets the name of the user attribute.          
+  description: Gets or sets the name of the user attribute.
+- id: BatteryChargeLevel
+  valueType: Int
+  description: The battery charge level.
+  isDataStream: true
+  metaData:
+  - key: unit
+    value: "%"
+    description: The unit of the battery charge level.
+- id: TotalBatteryCapacity
+  valueType: Int
+  description: The total battery capacity.
+  isDataStream: false
+  metaData:
+    - key: unit
+      value: Ah
+      description: The unit of the battery capacity.
+    - key: factorToMilliAmpereHours
+      value: "1000"
+      description: The factor to convert the battery capacity to milli ampere hours.
+    - key: isStillWorking
+      value: "true"
+      description: Indicates if the battery is still working.

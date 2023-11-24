@@ -25,9 +25,12 @@ public class  CkAttributeGraph
         ValueCkEnumId = attributeDto.ValueCkEnumId;
         DefaultValues = attributeDto.DefaultValues;
         Description = attributeDto.Description;
+        MetaData = attributeDto.MetaData;
+        IsDataStream = attributeDto.IsDataStream;
     }
 
     /// <summary>
+    /// Serialization constructor
     /// Creates a new instance of <see cref="CkAttributeGraph"/>.
     /// </summary>
     /// <param name="ckAttributeId"></param>
@@ -36,9 +39,11 @@ public class  CkAttributeGraph
     /// <param name="valueCkEnumId"></param>
     /// <param name="defaultValues"></param>
     /// <param name="description">A optional description to the attribute</param>
+    /// <param name="metaData">Optional meta data of the attribute</param>
+    /// <param name="isDataStream">Optional flag that tells if an attribute is a data stream </param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description)
+        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description, ICollection<CkAttributeMetaDataDto>? metaData, bool? isDataStream)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
@@ -46,6 +51,8 @@ public class  CkAttributeGraph
         ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
         Description = description;
+        MetaData = metaData;
+        IsDataStream = isDataStream;
     }
     
     /// <summary>
@@ -77,4 +84,14 @@ public class  CkAttributeGraph
     /// A optional description of the attribute
     /// </summary>
     public string? Description { get; set; }
+    
+    /// <summary>
+    /// Optional meta data of the attribute 
+    /// </summary>
+    public ICollection<CkAttributeMetaDataDto>? MetaData { get; }
+    
+    /// <summary>
+    /// Optional flag that tells if an attribute is a data stream
+    /// </summary>
+    public bool? IsDataStream { get; }
 }

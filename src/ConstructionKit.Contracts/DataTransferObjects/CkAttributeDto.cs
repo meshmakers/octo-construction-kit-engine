@@ -52,4 +52,16 @@ public class CkAttributeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }
+
+    /// <summary>
+    /// Optional meta data of the attribute 
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public ICollection<CkAttributeMetaDataDto>? MetaData { get; set; }
+    
+    /// <summary>
+    /// Optional flag that tells if an attribute is a data stream.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool? IsDataStream { get; set; }
 }

@@ -14,3 +14,16 @@ attributes:
   valueType: Boolean
   defaultValues:
   - true
+- id: IHaveMetaData
+  valueType: String
+  metaData:
+    - key: "MetaDataKey"
+      value: "MetaDataValue"
+      description: "MetaDataDescription"
+    - key: "MetaDataKey2"
+      value: "1000"
+      description: "MetaDataDescription2"
+    - key: "MetaDataKey3"
+      value: false
+      description: "MetaDataDescription3"
+  isDataStream: true

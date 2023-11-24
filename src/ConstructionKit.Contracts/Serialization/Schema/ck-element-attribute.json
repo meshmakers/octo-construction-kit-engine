@@ -78,6 +78,34 @@
         },
         "description": {
           "type": "string"
+        },
+        "metaData": {
+          "type": "array",
+          "items":{
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "anyOf": [
+                  { "type": "string" },
+                  { "type": "boolean" },
+                  { "type": "number" }
+                ]
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "key"
+            ]
+          }
+        },
+        "isDataStream":{
+          "type": "boolean"
         }
       },
       "additionalProperties": false,

@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueList<TValue>
     where TValue : TValueBase
 {
-    private readonly IList<TValueBase> _values;
+    private readonly List<TValueBase> _values;
 
     /// <summary>
     /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
@@ -18,7 +18,7 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     /// <param name="values">The inner list</param>
     protected AttributeValueList(IList<TValueBase> values)
     {
-        _values = values;
+        _values = new List<TValueBase>(values);
     }
 
     /// <summary>
@@ -95,7 +95,13 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     public int Count => _values.Count;
 
     /// <inheritdoc />
-    public bool IsReadOnly => _values.IsReadOnly;
+    public bool IsReadOnly => false;
+
+    /// <inheritdoc />
+    public int RemoveAll(Predicate<TValue> match)
+    {
+        return _values.RemoveAll(t => match(CreateSubType(t)));
+    }
 
     /// <inheritdoc />
     public IEnumerator<TValue> GetEnumerator()

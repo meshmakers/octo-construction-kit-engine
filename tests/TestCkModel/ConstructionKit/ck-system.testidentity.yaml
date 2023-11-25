@@ -1,39 +1,13 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
-- typeId: ApiResource
-  derivedFromCkTypeId: System.TestIdentity/Resource
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/RequireResourceIndicator
-    name: RequireResourceIndicator
-  - id: System.TestIdentity/Secrets
-    name: ApiSecrets
-  - id: System.TestIdentity/Scopes
-    name: Scopes
-  - id: System.TestIdentity/AllowedAccessTokenSigningAlgorithms
-    name: AllowedAccessTokenSigningAlgorithms
-- typeId: ApiScope
-  derivedFromCkTypeId: System.TestIdentity/Resource
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/IsEmphasized
-    name: IsEmphasized
-  - id: System.TestIdentity/IsRequired
-    name: IsRequired
-- typeId: AzureEntraIdentityProvider
+- typeId: GoogleIdentityProvider
   derivedFromCkTypeId: System.TestIdentity/IdentityProvider
   isFinal: true
   attributes:
-  - id: System/TenantId
-    name: TenantId
-  - id: System.TestIdentity/Authority
-    name: Authority
   - id: System.TestIdentity/ClientId
-    name: ClientIdGroupGraphApi
-  - id: System.TestIdentity/ClientIdGroupAzureAd
-    name: ClientIdGroupAzureAd
+    name: ClientId
   - id: System.TestIdentity/ClientSecret
-    name: ClientSecretGroupAzureAd
+    name: ClientSecret
 - typeId: Client
   derivedFromCkTypeId: System/Entity
   isFinal: true
@@ -160,14 +134,18 @@ types:
   - id: System.TestIdentity/InitiateLoginUri
     name: InitiateLoginUri
     isOptional: true
-- typeId: GoogleIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+- typeId: ApiResource
+  derivedFromCkTypeId: System.TestIdentity/Resource
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClientId
-    name: ClientId
-  - id: System.TestIdentity/ClientSecret
-    name: ClientSecret
+  - id: System.TestIdentity/RequireResourceIndicator
+    name: RequireResourceIndicator
+  - id: System.TestIdentity/Secrets
+    name: ApiSecrets
+  - id: System.TestIdentity/Scopes
+    name: Scopes
+  - id: System.TestIdentity/AllowedAccessTokenSigningAlgorithms
+    name: AllowedAccessTokenSigningAlgorithms
 - typeId: IdentityProvider
   derivedFromCkTypeId: System/Entity
   isAbstract: true
@@ -183,6 +161,14 @@ types:
   - id: System/Description
     name: Description
     isOptional: true
+- typeId: ApiScope
+  derivedFromCkTypeId: System.TestIdentity/Resource
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/IsEmphasized
+    name: IsEmphasized
+  - id: System.TestIdentity/IsRequired
+    name: IsRequired
 - typeId: IdentityResource
   derivedFromCkTypeId: System.TestIdentity/Resource
   isFinal: true
@@ -191,58 +177,39 @@ types:
     name: IsEmphasized
   - id: System.TestIdentity/IsRequired
     name: IsRequired
-- typeId: MicrosoftAdIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/HostAddress
-    name: HostAddress
-  - id: System.TestIdentity/UseTls
-    name: UseTls
-  - id: System.TestIdentity/HostPort
-    name: HostPort
-- typeId: MicrosoftIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/ClientId
-    name: ClientId
-  - id: System.TestIdentity/ClientSecret
-    name: ClientSecret
-- typeId: OpenLdapIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/HostAddress
-    name: HostAddress
-  - id: System.TestIdentity/UseTls
-    name: UseTls
-  - id: System.TestIdentity/HostPort
-    name: HostPort
-  - id: System.TestIdentity/UserBaseDn
-    name: UserBaseDn
-  - id: System.TestIdentity/UserNameAttribute
-    name: UserNameAttribute
-- typeId: Permission
-  derivedFromCkTypeId: System/Entity
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/PermissionId
-    name: PermissionId
-  - id: System.TestIdentity/IdentityRoleIds
-    name: IdentityRoleIds
-- typeId: PermissionRole
+- typeId: Role
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
   - id: System/Name
     name: Name
-  - id: System.TestIdentity/RoleId
-    name: RoleId
+    isOptional: true
+  - id: System.TestIdentity/NormalizedName
+    name: NormalizedName
+    isOptional: true
+  - id: System.TestIdentity/ConcurrencyStamp
+    name: ConcurrencyStamp
   - id: System.TestIdentity/SubjectIds
     name: SubjectIds
   - id: System.TestIdentity/IdentityRoleIds
     name: IdentityRoleIds
+  - id: System.TestIdentity/RoleClaims
+    name: Claims
+    isOptional: true
+- typeId: AzureEntraIdentityProvider
+  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  isFinal: true
+  attributes:
+  - id: System/TenantId
+    name: TenantId
+  - id: System.TestIdentity/Authority
+    name: Authority
+  - id: System.TestIdentity/ClientId
+    name: ClientIdGroupGraphApi
+  - id: System.TestIdentity/ClientIdGroupAzureAd
+    name: ClientIdGroupAzureAd
+  - id: System.TestIdentity/ClientSecret
+    name: ClientSecretGroupAzureAd
 - typeId: PersistedGrant
   derivedFromCkTypeId: System/Entity
   isFinal: true
@@ -269,43 +236,48 @@ types:
     isOptional: true
   - id: System.TestIdentity/Data
     name: Data
-- typeId: Resource
-  derivedFromCkTypeId: System/Entity
-  isAbstract: true
+- typeId: OpenLdapIdentityProvider
+  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  isFinal: true
   attributes:
-  - id: System/Enabled
-    name: Enabled
-  - id: System/Name
-    name: Name
-  - id: System/DisplayName
-    name: DisplayName
-    isOptional: true
-  - id: System/Description
-    name: Description
-    isOptional: true
-  - id: System.TestIdentity/ResourceClaims
-    name: Claims
-  - id: System.TestIdentity/ShowInDiscoveryDocument
-    name: ShowInDiscoveryDocument
-- typeId: Role
+  - id: System.TestIdentity/HostAddress
+    name: HostAddress
+  - id: System.TestIdentity/UseTls
+    name: UseTls
+  - id: System.TestIdentity/HostPort
+    name: HostPort
+  - id: System.TestIdentity/UserBaseDn
+    name: UserBaseDn
+  - id: System.TestIdentity/UserNameAttribute
+    name: UserNameAttribute
+- typeId: PermissionRole
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
   - id: System/Name
     name: Name
-    isOptional: true
-  - id: System.TestIdentity/NormalizedName
-    name: NormalizedName
-    isOptional: true
-  - id: System.TestIdentity/ConcurrencyStamp
-    name: ConcurrencyStamp
+  - id: System.TestIdentity/RoleId
+    name: RoleId
   - id: System.TestIdentity/SubjectIds
     name: SubjectIds
   - id: System.TestIdentity/IdentityRoleIds
     name: IdentityRoleIds
-  - id: System.TestIdentity/RoleClaims
-    name: Claims
-    isOptional: true
+- typeId: Permission
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/PermissionId
+    name: PermissionId
+  - id: System.TestIdentity/IdentityRoleIds
+    name: IdentityRoleIds
+- typeId: MicrosoftIdentityProvider
+  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/ClientId
+    name: ClientId
+  - id: System.TestIdentity/ClientSecret
+    name: ClientSecret
 - typeId: User
   derivedFromCkTypeId: System/Entity
   isFinal: true
@@ -375,6 +347,34 @@ types:
     - attributeNames:
       - NormalizedEmail
       - NormalizedUserName
+- typeId: MicrosoftAdIdentityProvider
+  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/HostAddress
+    name: HostAddress
+  - id: System.TestIdentity/UseTls
+    name: UseTls
+  - id: System.TestIdentity/HostPort
+    name: HostPort
+- typeId: Resource
+  derivedFromCkTypeId: System/Entity
+  isAbstract: true
+  attributes:
+  - id: System/Enabled
+    name: Enabled
+  - id: System/Name
+    name: Name
+  - id: System/DisplayName
+    name: DisplayName
+    isOptional: true
+  - id: System/Description
+    name: Description
+    isOptional: true
+  - id: System.TestIdentity/ResourceClaims
+    name: Claims
+  - id: System.TestIdentity/ShowInDiscoveryDocument
+    name: ShowInDiscoveryDocument
 associationRoles: []
 attributes:
 - id: UserName
@@ -812,22 +812,6 @@ attributes:
     description: Indicates if the battery is still working.
   isDataStream: false
 records:
-- recordId: ClientClaim
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/ClaimType
-    name: ClaimType
-  - id: System.TestIdentity/ClaimValue
-    name: ClaimValue
-  - id: System.TestIdentity/ClaimValueType
-    name: ClaimValueType
-- recordId: RoleClaim
-  isFinal: true
-  attributes:
-  - id: System.TestIdentity/ClaimType
-    name: ClaimType
-  - id: System.TestIdentity/ClaimValue
-    name: ClaimValue
 - recordId: Secret
   isFinal: true
   attributes:
@@ -842,6 +826,27 @@ records:
     isOptional: true
   - id: System.TestIdentity/SecretType
     name: Type
+- recordId: ClientClaim
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/ClaimType
+    name: ClaimType
+  - id: System.TestIdentity/ClaimValue
+    name: ClaimValue
+  - id: System.TestIdentity/ClaimValueType
+    name: ClaimValueType
+- recordId: UserToken
+  isFinal: true
+  attributes:
+  - id: System.TestIdentity/LoginProvider
+    name: LoginProvider
+  - id: System/Name
+    name: Name
+  - id: System.TestIdentity/UserId
+    name: UserId
+  - id: System.TestIdentity/Value
+    name: Value
+    isOptional: true
 - recordId: UserClaim
   isFinal: true
   attributes:
@@ -863,19 +868,21 @@ records:
     isOptional: true
   - id: System.TestIdentity/UserId
     name: UserId
-- recordId: UserToken
+- recordId: RoleClaim
   isFinal: true
   attributes:
-  - id: System.TestIdentity/LoginProvider
-    name: LoginProvider
-  - id: System/Name
-    name: Name
-  - id: System.TestIdentity/UserId
-    name: UserId
-  - id: System.TestIdentity/Value
-    name: Value
-    isOptional: true
+  - id: System.TestIdentity/ClaimType
+    name: ClaimType
+  - id: System.TestIdentity/ClaimValue
+    name: ClaimValue
 enums:
+- enumId: TokenUsage
+  useFlags: false
+  values:
+  - key: 0
+    name: ReUse
+  - key: 1
+    name: OneTimeOnly
 - enumId: IdentityProviderTypes
   useFlags: false
   values:
@@ -887,13 +894,6 @@ enums:
     name: Microsoft
   - key: 3
     name: OpenLDAP
-- enumId: TokenExpiration
-  useFlags: false
-  values:
-  - key: 0
-    name: Sliding
-  - key: 1
-    name: Absolute
 - enumId: TokenType
   useFlags: false
   values:
@@ -901,13 +901,13 @@ enums:
     name: Jwt
   - key: 1
     name: Reference
-- enumId: TokenUsage
+- enumId: TokenExpiration
   useFlags: false
   values:
   - key: 0
-    name: ReUse
+    name: Sliding
   - key: 1
-    name: OneTimeOnly
+    name: Absolute
 modelId: System.TestIdentity
 dependencies:
 - System

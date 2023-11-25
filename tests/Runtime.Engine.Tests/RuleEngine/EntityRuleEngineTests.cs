@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
@@ -193,7 +192,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
         }, operationResult);
         
-        var list = rtEntity.GetAttributeValues<string>("StringArrayTests");
+        var list = rtEntity.GetAttributeStringValues("StringArrayTests");
             
         Assert.Empty(operationResult.Messages);
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);

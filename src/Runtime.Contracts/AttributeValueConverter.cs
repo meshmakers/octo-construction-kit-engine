@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -81,7 +82,7 @@ public static class AttributeValueConverter
                     }).ToList();
                 }
 
-                if (value is AttributeValueArray<string> stringList)
+                if (value is AttributeStringValueList stringList)
                 {
                     return stringList.InnerList;
                 }
@@ -137,7 +138,7 @@ public static class AttributeValueConverter
                     }).ToList();
                 }
 
-                if (value is AttributeValueArray<int> intList)
+                if (value is AttributePrimitiveValueList<int> intList)
                 {
                     return intList.InnerList;
                 }
@@ -222,12 +223,12 @@ public static class AttributeValueConverter
                     return recordArray.ToList();
                 }
 
-                if (value is IAttributeValueList recordList)
+                if (value is IAttributeRecordValueArray recordList)
                 {
-                    return recordList.InnerList;
+                    return recordList.RecordList;
                 }
 
-                if (value is List<object> recordObjectList)
+                if (value is IEnumerable recordObjectList)
                 {
                     return recordObjectList.Cast<RtRecord>().ToList();
                 }

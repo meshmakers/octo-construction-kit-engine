@@ -98,6 +98,12 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     public bool IsReadOnly => false;
 
     /// <inheritdoc />
+    public void AddRange(IEnumerable<TValue> collection)
+    {
+        _values.AddRange(collection.Cast<TValueBase>());
+    }
+
+    /// <inheritdoc />
     public int RemoveAll(Predicate<TValue> match)
     {
         return _values.RemoveAll(t => match(CreateSubType(t)));

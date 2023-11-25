@@ -110,6 +110,12 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     }
 
     /// <inheritdoc />
+    public int FindIndex(Predicate<TValue> match)
+    {
+        return _values.FindIndex(t => match(CreateSubType(t)));
+    }
+
+    /// <inheritdoc />
     public IEnumerator<TValue> GetEnumerator()
     {
         return _values.Select(CreateSubType).GetEnumerator();

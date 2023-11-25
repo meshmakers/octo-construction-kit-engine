@@ -21,4 +21,11 @@ public interface IAttributeValueList<TValue> : IList<TValue>
     /// <param name="match">The match delegate function</param>
     /// <returns>Amount of matches</returns>
     int RemoveAll(Predicate<TValue> match);
+
+    /// <summary>
+    /// Finds the index of the first item which matches the predicate.
+    /// </summary>
+    /// <param name="match">The match delegate function</param>
+    /// <returns>Index of the first element matching the predicate</returns>
+    int FindIndex(Predicate<TValue> match);
 }

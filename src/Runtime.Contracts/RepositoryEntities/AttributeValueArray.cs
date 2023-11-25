@@ -5,60 +5,89 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 /// <summary>
 /// Represents a list of attribute values
 /// </summary>
-/// <typeparam name="TValue"></typeparam>
-public class AttributeValueArray<TValue> : IAttributeValueArray<TValue>
+/// <typeparam name="TValue">An inherited type of the base type</typeparam>
+/// <typeparam name="TValueBase">The base type of the data type</typeparam>
+public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueList<TValue>
+    where TValue : TValueBase
 {
-    private readonly IList<TValue> _values;
+    private readonly IList<TValueBase> _values;
 
     /// <summary>
-    /// Creates a new instance of <see cref="AttributeValueArray{TValue}"/>
+    /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
     /// </summary>
     /// <param name="values">The inner list</param>
-    public AttributeValueArray(IList<TValue> values)
+    protected AttributeValueList(IList<TValueBase> values)
     {
         _values = values;
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="AttributeValueArray{TValue}"/>
+    /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
     /// </summary>
-    public AttributeValueArray()
+    protected AttributeValueList()
     {
-        _values = new List<TValue>();
+        _values = new List<TValueBase>();
     }
 
-    internal IList<TValue> InnerList => _values;
+    internal IList<TValueBase> InnerList => _values;
 
-    /// <summary>
-    /// Adds the given value to the list
-    /// </summary>
-    /// <param name="value"></param>
+
+    /// <inheritdoc />
     public void Add(TValue value)
     {
         _values.Add(value);
     }
 
-    /// <summary>
-    /// Removes the given value from the list
-    /// </summary>
-    /// <param name="value"></param>
-    public void Remove(TValue value)
+    /// <inheritdoc />
+    public void CopyTo(TValue[] array, int arrayIndex)
     {
-        _values.Remove(value);
+        _values.Select(CreateSubType).ToList().CopyTo(array, arrayIndex);
     }
 
-    /// <summary>
-    /// Clears the list
-    /// </summary>
+    /// <inheritdoc />
+    public bool Remove(TValue value)
+    {
+        return _values.Remove(value);
+    }
+
+    /// <inheritdoc />
     public void Clear()
     {
         _values.Clear();
     }
 
     /// <inheritdoc />
+    public bool Contains(TValue item)
+    {
+        return _values.Contains(item);
+    }
+
+    /// <inheritdoc />
+    public int IndexOf(TValue item)
+    {
+        return _values.IndexOf(item);
+    }
+
+    /// <inheritdoc />
+    public void Insert(int index, TValue item)
+    {
+        _values.Insert(index, item);
+    }
+
+    /// <inheritdoc />
+    public void RemoveAt(int index)
+    {
+        _values.RemoveAt(index);
+    }
+
+    /// <inheritdoc />
     public TValue this[int index]
     {
-        get => _values[index];
+        get
+        {
+            var o = _values[index];
+            return CreateSubType(o);
+        }
         set => _values[index] = value;
     }
 
@@ -66,13 +95,23 @@ public class AttributeValueArray<TValue> : IAttributeValueArray<TValue>
     public int Count => _values.Count;
 
     /// <inheritdoc />
+    public bool IsReadOnly => _values.IsReadOnly;
+
+    /// <inheritdoc />
     public IEnumerator<TValue> GetEnumerator()
     {
-        return _values.GetEnumerator();
+        return _values.Select(CreateSubType).GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()
     {
         return GetEnumerator();
     }
+
+    /// <summary>
+    /// Creates a new instance of <typeparamref name="TValue"/> from the given <typeparamref name="TValueBase"/>
+    /// </summary>
+    /// <param name="valueBase">The base value</param>
+    /// <returns></returns>
+    protected abstract TValue CreateSubType(TValueBase valueBase);
 }

@@ -1,5 +1,17 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
+- typeId: SampleType3
+  derivedFromCkTypeId: Sample1/SampleType2
+  attributes:
+  - id: System/Enabled
+    name: Enabled
+  - id: Sample1/IHaveMetaData
+    name: MetaDataAttribute
+- typeId: SampleType2
+  derivedFromCkTypeId: Sample1/SampleType1
+  attributes:
+  - id: System/Name
+    name: Name
 - typeId: SampleType1
   derivedFromCkTypeId: System/Entity
   attributes:
@@ -17,18 +29,6 @@ types:
   associations:
   - id: Sample1/Testing
     targetCkTypeId: System/Entity
-- typeId: SampleType2
-  derivedFromCkTypeId: Sample1/SampleType1
-  attributes:
-  - id: System/Name
-    name: Name
-- typeId: SampleType3
-  derivedFromCkTypeId: Sample1/SampleType2
-  attributes:
-  - id: System/Enabled
-    name: Enabled
-  - id: Sample1/IHaveMetaData
-    name: MetaDataAttribute
 associationRoles:
 - id: Testing
   inboundName: Tests
@@ -75,6 +75,8 @@ enums:
 - enumId: TestEnum
   useFlags: false
   values:
+  - key: 0
+    name: None
   - key: 1
     name: a
   - key: 2

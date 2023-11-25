@@ -1,6 +1,9 @@
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
-internal interface IAttributeValueList
+/// <summary>
+/// Interface for attribute value arrays
+/// </summary>
+/// <typeparam name="TValue"></typeparam>
+public interface IAttributeValueList<TValue> : IList<TValue>
 {
-    IList<RtRecord> InnerList { get; }
 }

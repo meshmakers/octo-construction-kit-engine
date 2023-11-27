@@ -112,14 +112,11 @@ public abstract class RtTypeWithAttributes
     public IAttributeValueList<TValue> GetAttributeValues<TValue>(string attributeName)
         where TValue: struct
     {
-        if (!Attributes.TryGetValue(attributeName, out var value))
+        if (!Attributes.TryGetValue(attributeName, out var value) || value == null)
         {
-            return new AttributePrimitiveValueList<TValue>();
-        }
-
-        if (value == null)
-        {
-            return new AttributePrimitiveValueList<TValue>();
+            var newList = new AttributePrimitiveValueList<TValue>();
+            _attributes[attributeName] = newList.InnerList;
+            return newList;
         }
 
         if (value is List<TValue> list)
@@ -138,14 +135,11 @@ public abstract class RtTypeWithAttributes
     /// <returns></returns>
     public IAttributeValueList<string> GetAttributeStringValues(string attributeName)
     {
-        if (!Attributes.TryGetValue(attributeName, out var value))
+        if (!Attributes.TryGetValue(attributeName, out var value) || value == null)
         {
-            return new AttributeStringValueList();
-        }
-
-        if (value == null)
-        {
-            return new AttributeStringValueList();
+            var newList = new AttributeStringValueList();
+            _attributes[attributeName] = newList.InnerList;
+            return newList;
         }
 
         if (value is List<string> list)
@@ -168,15 +162,12 @@ public abstract class RtTypeWithAttributes
     public IAttributeValueList<TValue> GetRtRecordAttributeValues<TValue>(string attributeName)
         where TValue : RtRecord, new()
     {
-        if (!Attributes.TryGetValue(attributeName, out var value))
+        if (!Attributes.TryGetValue(attributeName, out var value) || value == null)
         {
-            return new AttributeRecordValueList<TValue>();
+            var newList = new AttributeRecordValueList<TValue>();
+            _attributes[attributeName] = newList.InnerList;
+            return newList;
         }
-
-        if (value == null)
-        {
-            return new AttributeRecordValueList<TValue>();
-        }   
 
         if (value is List<RtRecord> list)
         {

@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 
-namespace Meshmakers.Octo.Runtime.Engine.Tests.Serializers;
+namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
 
 public class RtSchemaValidatorTests
 {

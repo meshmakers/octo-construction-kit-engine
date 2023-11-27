@@ -1,12 +1,12 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
 
-namespace Meshmakers.Octo.Runtime.Engine.Tests;
+namespace Meshmakers.Octo.Runtime.Engine.Tests.RepositoryEntities;
 
-public class RtEntityTests
+public class RtEntityAttributeRecordTests
 {
     [Fact]
-    public void GetAttributeValues_OK()
+    public void GetRtRecordAttributeValues_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new[] { new RtRecord() });
@@ -15,33 +15,9 @@ public class RtEntityTests
 
         Assert.NotNull(test);
     }
-
+    
     [Fact]
-    public void GetAttributeValue_OK()
-    {
-        RtEntity rtEntity = new RtEntity();
-        rtEntity.SetAttributeValue("test", AttributeValueTypesDto.TimeSpan, "00:05:00");
-
-        var test = rtEntity.GetAttributeValue<TimeSpan>("test");
-
-        Assert.Equal(TimeSpan.FromMinutes(5), test);
-    }
-
-
-    [Fact]
-    public void GetAttributeStringValues_StringArray_OK()
-    {
-        RtEntity rtEntity = new RtEntity();
-        rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.StringArray, new List<object> { "test" });
-
-        var test = rtEntity.GetAttributeStringValues("test");
-
-        Assert.Single(test);
-        Assert.Equal("test", test[0]);
-    }
-
-    [Fact]
-    public void GetRtRecordAttributeValues_RecordArray_Empty_OK()
+    public void GetRtRecordAttributeValues_EmptyList_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<object>());
@@ -50,9 +26,20 @@ public class RtEntityTests
 
         Assert.Empty(test);
     }
+    
+    [Fact]
+    public void GetRtRecordAttributeValues_Null_OK()
+    {
+        RtEntity rtEntity = new RtEntity();
+        rtEntity.SetAttributeValue("test", AttributeValueTypesDto.RecordArray, null);
+
+        var test = rtEntity.GetRtRecordAttributeValues<RtRecord>("test");
+        
+        Assert.Empty(test);
+    }
 
     [Fact]
-    public void GetRtRecordAttributeValues_RecordArray_Untyped_OK()
+    public void GetRtRecordAttributeValues_Untyped_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<RtRecord>
@@ -70,7 +57,7 @@ public class RtEntityTests
     }
 
     [Fact]
-    public void GetRtRecordAttributeValues_RecordArray_Untyped2Typed_OK()
+    public void GetRtRecordAttributeValues_Untyped2Typed_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<RtRecord>
@@ -90,7 +77,7 @@ public class RtEntityTests
     }
     
     [Fact]
-    public void GetRtRecordAttributeValues_RecordArray_Typed2Type_OK()
+    public void GetRtRecordAttributeValues_Typed2Typed_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<RtTestRecordRecord>
@@ -106,7 +93,7 @@ public class RtEntityTests
     }
     
     [Fact]
-    public void GetRtRecordAttributeValues_RecordArray_Typed_Empty_OK()
+    public void GetRtRecordAttributeValuesOrDefault_Typed_EmptyList_OK()
     {
         RtEntity rtEntity = new RtEntity();
         rtEntity.SetAttributeValueNonNullable("test", AttributeValueTypesDto.RecordArray, new List<RtTestRecordRecord>());
@@ -115,5 +102,16 @@ public class RtEntityTests
         
         Assert.NotNull(test);
         Assert.Empty(test);
+    }
+    
+    [Fact]
+    public void GetRtRecordAttributeValuesOrDefault_Null_OK()
+    {
+        RtEntity rtEntity = new RtEntity();
+        rtEntity.SetAttributeValue("test", AttributeValueTypesDto.RecordArray, null);
+
+        var test = rtEntity.GetRtRecordAttributeValuesOrDefault<RtTestRecordRecord>("test");
+        
+        Assert.Null(test);
     }
 }

@@ -1,5 +1,7 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
+using TestCkModel.ConstructionKit.Generated.System.TestIdentity.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RepositoryEntities;
 
@@ -113,5 +115,19 @@ public class RtEntityAttributeRecordTests
         var test = rtEntity.GetRtRecordAttributeValuesOrDefault<RtTestRecordRecord>("test");
         
         Assert.Null(test);
+    }
+    
+    [Fact]
+    public void GetRtRecordAttributeValuesOrDefault_testtest()
+    {
+        RtEntity rtEntity = new RtEntity("demo/demo", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
+        {
+            { nameof(RtRole.Claims), new List<object>() }
+        });
+
+        var test = rtEntity.GetRtRecordAttributeValuesOrDefault<RtRoleClaimRecord>(nameof(RtRole.Claims));
+        
+        Assert.NotNull(test);
+        Assert.Empty(test);
     }
 }

@@ -26,7 +26,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtEntity(CkId<CkTypeId> ckTypeId, OctoObjectId rtId, IDictionary<string, object?> attributes)
+    public RtEntity(CkId<CkTypeId> ckTypeId, OctoObjectId rtId, IReadOnlyDictionary<string, object?> attributes)
     : base(attributes)
     {
         CkTypeId = ckTypeId;

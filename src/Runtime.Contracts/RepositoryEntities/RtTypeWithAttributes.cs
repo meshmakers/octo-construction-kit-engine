@@ -1,3 +1,4 @@
+using System.Collections;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -21,7 +22,7 @@ public abstract class RtTypeWithAttributes
     /// <summary>
     ///     Constructor
     /// </summary>
-    protected RtTypeWithAttributes(IDictionary<string, object?> attributes)
+    protected RtTypeWithAttributes(IReadOnlyDictionary<string, object?> attributes)
     {
         _attributes = new Dictionary<string, object?>(attributes);
     }
@@ -177,9 +178,9 @@ public abstract class RtTypeWithAttributes
             return new AttributeRecordValueList<TValue>();
         }   
 
-        if (value is List<RtRecord> list)
+        if (value is IEnumerable<RtRecord> list)
         {
-            return new AttributeRecordValueList<TValue>(list);
+            return new AttributeRecordValueList<TValue>(list.ToList());
         }
         
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));

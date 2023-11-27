@@ -21,7 +21,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <param name="associationRoleId">Construction kit association role id</param>
     /// <param name="associationId">Object id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtAssociation(CkId<CkAssociationRoleId> associationRoleId, OctoObjectId associationId, IDictionary<string, object?> attributes)
+    public RtAssociation(CkId<CkAssociationRoleId> associationRoleId, OctoObjectId associationId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
         AssociationRoleId = associationRoleId;

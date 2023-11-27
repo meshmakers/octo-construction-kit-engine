@@ -118,7 +118,7 @@ public class RtEntityAttributeRecordTests
     }
     
     [Fact]
-    public void GetRtRecordAttributeValuesOrDefault_testtest()
+    public void GetRtRecordAttributeValuesOrDefault_Deserialized_OK()
     {
         RtEntity rtEntity = new RtEntity("demo/demo", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
         {

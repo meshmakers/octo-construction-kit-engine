@@ -327,6 +327,11 @@ public abstract class RtTypeWithAttributes
             return (TValue)Enum.ToObject(typeof(TValue), value);
         }
 
+        if (typeof(TValue) == typeof(TimeSpan) && value is string)
+        {
+            return (TValue)Convert.ChangeType(TimeSpan.Parse((string)value), typeof(TValue));
+        }
+
         return (TValue)Convert.ChangeType(value, typeof(TValue));
     }
 

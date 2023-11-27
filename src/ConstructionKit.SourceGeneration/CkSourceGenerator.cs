@@ -36,6 +36,10 @@ public class CkSourceGenerator : IIncrementalGenerator
             {
                 var f = x.Left;
                 var options = x.Right;
+                if (!options.IsValid) // if not valid -> the project has not loaded props file with CompilerVisibleProperty
+                {
+                    return false;
+                }
                 var outputPath = Path.Combine(Path.GetDirectoryName(options.ProjectFullPath) ?? string.Empty, options.OutputPath);
                 if (f.Path.StartsWith(outputPath, StringComparison.OrdinalIgnoreCase))
                 {

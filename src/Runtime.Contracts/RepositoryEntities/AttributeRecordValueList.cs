@@ -12,7 +12,7 @@ public class AttributeRecordValueList<TValue> : AttributeValueList<RtRecord, TVa
     /// Constructor
     /// </summary>
     /// <param name="list"></param>
-    public AttributeRecordValueList(IList<RtRecord> list)
+    public AttributeRecordValueList(List<RtRecord> list)
         : base(list)
     {
     }

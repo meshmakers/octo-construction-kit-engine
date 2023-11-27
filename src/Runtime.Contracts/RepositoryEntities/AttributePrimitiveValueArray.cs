@@ -11,7 +11,7 @@ public class AttributePrimitiveValueList<TValue> : AttributeValueList<TValue, TV
     /// Constructor
     /// </summary>
     /// <param name="list"></param>
-    public AttributePrimitiveValueList(IList<TValue> list)
+    public AttributePrimitiveValueList(List<TValue> list)
         : base(list)
     {
     }

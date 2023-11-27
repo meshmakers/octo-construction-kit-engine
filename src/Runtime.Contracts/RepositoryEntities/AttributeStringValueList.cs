@@ -9,7 +9,7 @@ public class AttributeStringValueList : AttributeValueList<string, string>
     /// Constructor
     /// </summary>
     /// <param name="list"></param>
-    public AttributeStringValueList(IList<string> list)
+    public AttributeStringValueList(List<string> list)
         : base(list)
     {
     }

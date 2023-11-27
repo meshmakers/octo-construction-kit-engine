@@ -16,9 +16,9 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
     /// </summary>
     /// <param name="values">The inner list</param>
-    protected AttributeValueList(IList<TValueBase> values)
+    protected AttributeValueList(List<TValueBase> values)
     {
-        _values = new List<TValueBase>(values);
+        _values = values;
     }
 
     /// <summary>
@@ -29,8 +29,7 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
         _values = new List<TValueBase>();
     }
 
-    internal IList<TValueBase> InnerList => _values;
-
+    internal List<TValueBase> InnerList => _values;
 
     /// <inheritdoc />
     public void Add(TValue value)

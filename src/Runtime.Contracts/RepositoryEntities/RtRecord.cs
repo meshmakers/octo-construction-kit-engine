@@ -22,7 +22,7 @@ public class RtRecord : RtTypeWithAttributes
     /// </summary>
     /// <param name="ckRecordId">Construction kit record id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtRecord(CkId<CkRecordId> ckRecordId, IDictionary<string, object?> attributes)
+    public RtRecord(CkId<CkRecordId> ckRecordId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
         CkRecordId = ckRecordId;

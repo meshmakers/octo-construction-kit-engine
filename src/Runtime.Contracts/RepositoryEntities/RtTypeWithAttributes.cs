@@ -178,9 +178,9 @@ public abstract class RtTypeWithAttributes
             return new AttributeRecordValueList<TValue>();
         }   
 
-        if (value is IEnumerable<RtRecord> list)
+        if (value is List<RtRecord> list)
         {
-            return new AttributeRecordValueList<TValue>(list.ToList());
+            return new AttributeRecordValueList<TValue>(list);
         }
         
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));

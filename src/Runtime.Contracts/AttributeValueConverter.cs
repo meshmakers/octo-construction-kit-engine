@@ -220,17 +220,17 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.RecordArray:
                 if (value is RtRecord[] recordArray)
                 {
-                    return recordArray.Select(r => new RtRecord(r.CkRecordId, r.Attributes));
+                    return recordArray.Select(r => new RtRecord(r.CkRecordId, r.Attributes)).ToList();
                 }
 
                 if (value is IAttributeRecordValueArray recordList)
                 {
-                    return recordList.RecordList.Select(r => new RtRecord(r.CkRecordId, r.Attributes));
+                    return recordList.RecordList.Select(r => new RtRecord(r.CkRecordId, r.Attributes)).ToList();
                 }
 
                 if (value is IEnumerable recordObjectList)
                 {
-                    return recordObjectList.Cast<RtRecord>().Select(r => new RtRecord(r.CkRecordId, r.Attributes));
+                    return recordObjectList.Cast<RtRecord>().Select(r => new RtRecord(r.CkRecordId, r.Attributes)).ToList();
                 }
 
                 break;

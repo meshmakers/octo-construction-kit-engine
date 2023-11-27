@@ -124,6 +124,13 @@ public abstract class RtTypeWithAttributes
             return new AttributePrimitiveValueList<TValue>(list);
         }
         
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var primitiveList = objList.Cast<TValue>().ToList();
+            _attributes[attributeName] = primitiveList;
+            return new AttributePrimitiveValueList<TValue>(primitiveList);
+        }
+        
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
     
@@ -145,6 +152,13 @@ public abstract class RtTypeWithAttributes
         if (value is List<string> list)
         {
             return new AttributeStringValueList(list);
+        }
+        
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var strings = objList.Cast<string>().ToList();
+            _attributes[attributeName] = strings;
+            return new AttributeStringValueList(strings);
         }
         
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(string));
@@ -174,6 +188,13 @@ public abstract class RtTypeWithAttributes
             return new AttributeRecordValueList<TValue>(list);
         }
         
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var rtRecords = objList.Cast<RtRecord>().ToList();
+            _attributes[attributeName] = rtRecords;
+            return new AttributeRecordValueList<TValue>(rtRecords);
+        }
+        
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
 
@@ -201,7 +222,14 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributePrimitiveValueList<TValue>(list);
         }
-
+        
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var primitiveList = objList.Cast<TValue>().ToList();
+            _attributes[attributeName] = primitiveList;
+            return new AttributePrimitiveValueList<TValue>(primitiveList);
+        }
+        
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
     
@@ -229,6 +257,13 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributeRecordValueList<TValue>(list);
         }
+        
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var rtRecords = objList.Cast<RtRecord>().ToList();
+            _attributes[attributeName] = rtRecords;
+            return new AttributeRecordValueList<TValue>(rtRecords);
+        }
 
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
@@ -254,6 +289,13 @@ public abstract class RtTypeWithAttributes
         if (value is List<string> list)
         {
             return new AttributeStringValueList(list);
+        }
+        
+        if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
+        {
+            var strings = objList.Cast<string>().ToList();
+            _attributes[attributeName] = strings;
+            return new AttributeStringValueList(strings);
         }
         
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(string));

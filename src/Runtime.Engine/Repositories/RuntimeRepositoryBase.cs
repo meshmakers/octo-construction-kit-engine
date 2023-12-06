@@ -16,6 +16,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 /// </summary>
 public abstract class RuntimeRepositoryBase : IRuntimeRepository
 {
+    private readonly ICkCacheService _ckCacheService;
+
     /// <summary>
     /// The bulk mutation implementation
     /// </summary>
@@ -29,7 +31,22 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <summary>
     /// Returns the cache service that is used to access the construction kit model
     /// </summary>
-    protected ICkCacheService CkCacheService { get; }
+    protected async Task<ICkCacheService> GetCkCacheService()
+    {
+        if (!_ckCacheService.IsTenantLoaded(TenantId))
+        {
+            await RefreshCkCacheServiceAsync(_ckCacheService).ConfigureAwait(false);
+        }
+        
+        return _ckCacheService;
+    }
+    
+    /// <summary>
+    /// Refresh the cache service
+    /// </summary>
+    /// <param name="ckCacheService"></param>
+    /// <returns></returns>
+    protected abstract Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService);
 
     /// <summary>
     /// Creates a new instance of <see cref="RuntimeRepositoryBase"/>
@@ -44,7 +61,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         BulkRtMutation = bulkRtMutation;
         RepositoryDataSource = repositoryDataSource;
         TenantId = tenantId;
-        CkCacheService = ckCacheService;
+        _ckCacheService = ckCacheService;
     }
 
     /// <inheritdoc />
@@ -158,14 +175,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public RtEntity CreateTransientRtEntity(CkId<CkTypeId> ckTypeId)
+    public async Task<RtEntity> CreateTransientRtEntityAsync(CkId<CkTypeId> ckTypeId)
     {
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         return CreateTransientRtEntity<RtEntity>(ckTypeGraph);
     }
 
     /// <inheritdoc />
-    public TEntity CreateTransientRtEntity<TEntity>() where TEntity : RtEntity, new()
+    public async Task<TEntity> CreateTransientRtEntityAsync<TEntity>() where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
         if (string.IsNullOrWhiteSpace(ckTypeId.FullName))
@@ -173,7 +191,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(TEntity));
         }
 
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         if (ckTypeGraph == null)
         {
             throw RuntimeRepositoryException.CkTypeIdDoesNotExistInCache(ckTypeId);

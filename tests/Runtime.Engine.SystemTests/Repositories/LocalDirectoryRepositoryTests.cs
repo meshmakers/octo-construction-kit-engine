@@ -29,7 +29,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        Assert.Throws<RuntimeRepositoryException>(() => localDirectoryRepository.CreateTransientRtEntity("Test/LocationWithSensor"));
+        await Assert.ThrowsAsync<RuntimeRepositoryException>(async () => await localDirectoryRepository.CreateTransientRtEntityAsync("Test/LocationWithSensor"));
     }
     
     [Fact]
@@ -42,7 +42,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var entity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var entity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         
         Assert.True(entity.IsEnabled);
     }
@@ -76,7 +76,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity("Test/Sensor");
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Sensor");
         rtEntity.SetAttributeValue(TestCkIds.DesignationAttribute, AttributeValueTypesDto.String, "TestSensor1");
         rtEntity.SetAttributeValue(TestCkIds.ConnectionStateAttribute, AttributeValueTypesDto.Enum, null);
 
@@ -94,7 +94,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity("Test/Sensor");
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Sensor");
         rtEntity.SetAttributeValue(TestCkIds.DesignationAttribute, AttributeValueTypesDto.String, "TestSensor1");
         rtEntity.SetAttributeValue(TestCkIds.ConnectionStateAttribute, AttributeValueTypesDto.Enum, 0);
 
@@ -111,7 +111,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtEntity.Designation = "TestSensor2";
         rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
 
@@ -128,7 +128,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtEntity.Designation = "TestSensor2";
         rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
 
@@ -150,7 +150,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtEntity.Designation = "TestSensor2";
         rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
         rtEntity.DataCount = 5;
@@ -158,7 +158,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
 
         await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
         
-        var rtEntity2 = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtEntity2 = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtEntity2.Designation = "TestSensor2";
         rtEntity2.ConnectionState = RtConnectionStateEnum.NotConnected;
         rtEntity2.DataCount = 6;
@@ -183,7 +183,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtEntity.Designation = "TestSensor2";
         rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
         rtEntity.DataCount = 5;
@@ -219,7 +219,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
 
         for (int i = 0; i < 20; i++)
         {
-            var rtSensor = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+            var rtSensor = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
             rtSensor.Designation = "TestSensor" + i;
             rtSensor.ConnectionState = RtConnectionStateEnum.NotConnected;
             rtSensor.DataCount = 5 + i;
@@ -228,7 +228,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtSensor);
         }
         
-        var updateEntity = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var updateEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         updateEntity.DataCount = 15;
 
         await localDirectoryRepository.UpdateManyRtEntityAsync(new LocalSession(), new List<FieldFilter>
@@ -259,11 +259,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
 
         List<EntityUpdateInfo<RtEntity>> entityUpdateInfos = new();
         List<AssociationUpdateInfo> associationUpdateInfos = new();
-        var rtZone = localDirectoryRepository.CreateTransientRtEntity<RtZone>();
+        var rtZone = await localDirectoryRepository.CreateTransientRtEntityAsync<RtZone>();
         rtZone.Designation = "MyZone";
         entityUpdateInfos.Add(EntityUpdateInfo<RtEntity>.CreateInsert(rtZone));
         
-        var rtSensor = localDirectoryRepository.CreateTransientRtEntity<RtSensor>();
+        var rtSensor = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
         rtSensor.Designation = "TestSensor";
         rtSensor.ConnectionState = RtConnectionStateEnum.NotConnected;
         rtSensor.DataCount = 5;

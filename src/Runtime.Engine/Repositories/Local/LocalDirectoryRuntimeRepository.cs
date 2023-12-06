@@ -34,8 +34,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntities = queryable.Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
 
@@ -52,8 +53,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override async Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable.FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (savedEntity == null)
@@ -91,7 +93,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         if (dataQueryOperation.FieldFilters != null)
         {
-            var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+            var cacheService = await GetCkCacheService().ConfigureAwait(false);
+            var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
             queryable = queryable.Where(
                 CombineFilterExpressions<TEntity>(dataQueryOperation.FieldFilters, ckTypeGraph, LogicalOperator.And));
         }
@@ -113,8 +116,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override async Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -152,8 +156,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters)
     {
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntities = queryable
             .Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -171,8 +176,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters)
     {
+        var cacheService = await GetCkCacheService().ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
-        var ckTypeGraph = CkCacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -184,6 +190,11 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(rtEntity.ToRtEntityId()) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
+    }
+
+    protected override Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService)
+    {
+        return Task.CompletedTask;
     }
 
     public override Task<IOctoSession> GetSessionAsync()

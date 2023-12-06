@@ -174,14 +174,14 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <returns>Instance of the given construction kit type</returns>
-    RtEntity CreateTransientRtEntity(CkId<CkTypeId> ckTypeId);
+    Task<RtEntity> CreateTransientRtEntityAsync(CkId<CkTypeId> ckTypeId);
 
     /// <summary>
     /// Creates a typed version of a runtime entity
     /// </summary>
     /// <typeparam name="TEntity">Type derived from RtEntity</typeparam>
     /// <returns>Instance of the given construction kit type</returns>
-    TEntity CreateTransientRtEntity<TEntity>() where TEntity : RtEntity, new();
+    Task<TEntity> CreateTransientRtEntityAsync<TEntity>() where TEntity : RtEntity, new();
 
     #endregion
 

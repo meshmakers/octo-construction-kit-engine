@@ -395,7 +395,7 @@ public interface IRuntimeRepository
     /// <param name="associationUpdateInfoList">List of runtime association updates</param>
     /// <param name="operationResult">Result of the operation</param>
     /// <returns></returns>
-    Task ApplyChanges(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+    Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult);
 
     /// <summary>
@@ -405,7 +405,7 @@ public interface IRuntimeRepository
     /// <param name="associationUpdateInfoList">List of runtime association updates</param>
     /// <param name="operationResult">Result of the operation</param>
     /// <returns></returns>
-    Task ApplyChanges(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+    Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult);
 
     /// <summary>
@@ -415,7 +415,7 @@ public interface IRuntimeRepository
     /// <param name="entityUpdateInfoList">List of runtime entity updates</param>
     /// <param name="operationResult">Result of the operation</param>
     /// <returns></returns>
-    Task ApplyChanges(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList, OperationResult operationResult);
+    Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList, OperationResult operationResult);
 
     #endregion Modification (bulk)
 }

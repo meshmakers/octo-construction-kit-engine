@@ -31,7 +31,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <summary>
     /// Returns the cache service that is used to access the construction kit model
     /// </summary>
-    protected async Task<ICkCacheService> GetCkCacheService()
+    protected async Task<ICkCacheService> GetCkCacheServiceAsync()
     {
         if (!_ckCacheService.IsTenantLoaded(TenantId))
         {
@@ -177,7 +177,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task<RtEntity> CreateTransientRtEntityAsync(CkId<CkTypeId> ckTypeId)
     {
-        var cacheService = await GetCkCacheService().ConfigureAwait(false);
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         return CreateTransientRtEntity<RtEntity>(ckTypeGraph);
     }
@@ -191,7 +191,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(TEntity));
         }
 
-        var cacheService = await GetCkCacheService().ConfigureAwait(false);
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         if (ckTypeGraph == null)
         {
@@ -344,7 +344,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+    public async Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
@@ -353,17 +353,17 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+    public async Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
-        await ApplyChanges(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
+        await ApplyChangesAsync(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task ApplyChanges(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+    public async Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         OperationResult operationResult)
     {
-        await ApplyChanges(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
+        await ApplyChangesAsync(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
     }
 
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)

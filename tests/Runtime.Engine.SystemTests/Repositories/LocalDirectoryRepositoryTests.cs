@@ -273,7 +273,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
         associationUpdateInfos.Add(new AssociationUpdateInfo(rtSensor.ToRtEntityId(), rtZone.ToRtEntityId(), "System/ParentChild", AssociationModOptionsDto.Create));
 
         OperationResult operationResult = new();
-        await localDirectoryRepository.ApplyChanges(new LocalSession(), entityUpdateInfos, associationUpdateInfos, operationResult);
+        await localDirectoryRepository.ApplyChangesAsync(new LocalSession(), entityUpdateInfos, associationUpdateInfos, operationResult);
 
 
         var rtAssociations = await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(), rtZone.RtId, GraphDirections.Inbound);

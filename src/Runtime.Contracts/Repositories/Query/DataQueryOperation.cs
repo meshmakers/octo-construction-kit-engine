@@ -9,7 +9,7 @@ public class DataQueryOperation
     /// Constructor
     /// </summary>
     /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
-    public DataQueryOperation(string language = "en")
+    private DataQueryOperation(string language = "en")
     {
         Language = language;
     }
@@ -43,11 +43,22 @@ public class DataQueryOperation
     /// <summary>
     /// Creates a new instance of <see cref="DataQueryOperation"/>.
     /// </summary>
-    /// <param name="language"></param>
+    /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
     /// <returns></returns>
     public static DataQueryOperation Create(string language = "en")
     {
         return new DataQueryOperation(language);
+    }
+
+    /// <summary>
+    /// Uses the given language for text search.
+    /// </summary>
+    /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
+    /// <returns></returns>
+    public DataQueryOperation UseLanguage(string language)
+    {
+        Language = language;
+        return this;
     }
 
     /// <summary>

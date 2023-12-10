@@ -30,6 +30,16 @@ internal class CkCache : IDisposable
         _modelGraph = modelGraph;
         _logger.LogInformation("Loading model graph into cache for tenant {TenantId} finished", TenantId);
     }
+    
+    public IEnumerable<CkTypeGraph> GetCkTypes()
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.Types.Values;
+    }
 
     public CkTypeGraph GetCkType(CkId<CkTypeId> ckTypeId)
     {
@@ -63,6 +73,16 @@ internal class CkCache : IDisposable
         }
 
         return true;
+    }
+    
+    public IEnumerable<CkRecordGraph> GetCkRecords()
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.Records.Values;
     }
     
 #if NETSTANDARD2_0
@@ -128,6 +148,17 @@ internal class CkCache : IDisposable
 
         return ckRecordGraph;
     }
+    
+    public IEnumerable<CkEnumGraph> GetCkEnums()
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.Enums.Values;
+    }
+
     
     public CkEnumGraph GetCkEnum(CkId<CkEnumId> ckEnumId)
     {

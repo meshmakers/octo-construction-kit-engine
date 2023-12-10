@@ -86,6 +86,18 @@ public class CkCacheService : ICkCacheService
         return _ckCaches.ContainsKey(tenantId);
     }
 
+
+    /// <inheritdoc />
+    public IEnumerable<CkTypeGraph> GetCkTypes(string tenantId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        return ckCache.GetCkTypes();
+    }
+
     /// <summary>
     /// Returns a <see cref="CkTypeGraph"/> from the cache.
     /// </summary>
@@ -117,6 +129,17 @@ public class CkCacheService : ICkCacheService
         }
         
         return ckCache.TryGetCkType(ckTypeId, out ckTypeGraph);
+    }
+
+    /// <inheritdoc />
+    public IEnumerable<CkRecordGraph> GetCkRecords(string tenantId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        return ckCache.GetCkRecords();
     }
 
     /// <inheritdoc />
@@ -185,7 +208,18 @@ public class CkCacheService : ICkCacheService
         
         return ckCache.GetCkRecord(ckRecordId);
     }
-    
+
+    /// <inheritdoc />
+    public IEnumerable<CkEnumGraph> GetCkEnums(string tenantId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+        
+        return ckCache.GetCkEnums();
+    }
+
     /// <summary>
     /// Returns a <see cref="CkRecordGraph"/> from the cache.
     /// </summary>

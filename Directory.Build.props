@@ -6,7 +6,7 @@
     <PropertyGroup>
         <Authors>meshmakers GmbH and Contributors</Authors>
         <Company>meshmakers GmbH and Contributors</Company>
-        <Copyright>(c) 2022-2023 meshmakers GmbH</Copyright>
+        <Copyright>(c) 2022-2024 meshmakers GmbH</Copyright>
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

@@ -123,10 +123,10 @@ public class DataQueryOperation
     /// </summary>
     /// <param name="attributeNames">Attribute names to group by.</param>
     /// <returns></returns>
-    public DataQueryOperation GroupBy(params string[] attributeNames)
+    public FieldGroupBy GroupBy(params string[] attributeNames)
     {
         FieldGroupBy = new FieldGroupBy(attributeNames);
         
-        return this;
+        return FieldGroupBy;
     }
 }

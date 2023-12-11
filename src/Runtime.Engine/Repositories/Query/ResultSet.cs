@@ -13,10 +13,12 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
     /// </summary>
     /// <param name="result">Items of the current page</param>
     /// <param name="totalCount">Total count of items based on query.</param>
-    public ResultSet(IEnumerable<TDocument> result, long totalCount)
+    /// <param name="groupingResults">The optional grouping results if requested.</param>
+    public ResultSet(IEnumerable<TDocument> result, long totalCount, IEnumerable<GroupingResult>? groupingResults)
     {
         Items = result;
         TotalCount = totalCount;
+        Grouping = groupingResults;
     }
 
     /// <inheritdoc />
@@ -24,4 +26,7 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
 
     /// <inheritdoc />
     public IEnumerable<TDocument> Items { get; }
+
+    /// <inheritdoc />
+    public IEnumerable<GroupingResult>? Grouping { get; }
 }

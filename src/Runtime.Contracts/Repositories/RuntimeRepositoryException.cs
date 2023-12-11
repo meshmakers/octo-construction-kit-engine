@@ -92,4 +92,9 @@ public class RuntimeRepositoryException : PersistenceException
     {
         return new RuntimeRepositoryException($"Attribute with name '{filterAttributeName}' does not exist in type '{ckTypeId}'.");
     }
+
+    internal static Exception NotComparable(object? key)
+    {
+        return new RuntimeRepositoryException($"Key '{key}' is not comparable.");
+    }
 }

@@ -36,6 +36,11 @@ public class DataQueryOperation
     public ICollection<FieldFilter>? FieldFilters { get; private set; }
 
     /// <summary>
+    /// Represents field group by for specific attributes.
+    /// </summary>
+    public FieldGroupBy? FieldGroupBy { get; private set; }
+
+    /// <summary>
     /// Represents sort order for specific attributes.
     /// </summary>
     public ICollection<SortOrderItem>? SortOrders { get; private set; }
@@ -109,6 +114,18 @@ public class DataQueryOperation
     public DataQueryOperation AttributeSearch(IEnumerable<string> attributeNames, object searchTerm)
     {
         AttributeSearchFilter = new AttributeSearchFilter(attributeNames, searchTerm);
+        
+        return this;
+    }
+    
+    /// <summary>
+    /// Groups by the given attribute names.
+    /// </summary>
+    /// <param name="attributeNames">Attribute names to group by.</param>
+    /// <returns></returns>
+    public DataQueryOperation GroupBy(params string[] attributeNames)
+    {
+        FieldGroupBy = new FieldGroupBy(attributeNames);
         
         return this;
     }

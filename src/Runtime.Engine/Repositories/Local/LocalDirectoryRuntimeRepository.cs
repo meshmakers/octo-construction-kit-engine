@@ -109,7 +109,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             queryable = queryable.Take(take.Value);
         }
 
-        var resultSet = new ResultSet<TEntity>(queryable, queryable.Count());
+        var resultSet = new ResultSet<TEntity>(queryable, queryable.Count(), null);
         return resultSet;
     }
 
@@ -149,7 +149,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             pagedQueryable = pagedQueryable.Take(take.Value);
         }
         
-        var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count());
+        var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count(), null);
         return resultSet;
     }
 
@@ -249,6 +249,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     private static Expression<Func<TEntity, bool>> FilterExpression<TEntity>(FieldFilter filter, CkTypeAttributeGraph ckTypeAttributeGraph)
         where TEntity : RtEntity
     {
+        // TODO: Implement
         //    Type valueType = AttributeValueConverter.GetDotNetType(ckTypeAttributeGraph.ValueType);
 
         //   ParameterExpression parameter = Expression.Parameter(typeof(TEntity), "x");

@@ -15,4 +15,9 @@ public interface IResultSet<out TDocument>
     /// Returns the items in the result set.
     /// </summary>
     IEnumerable<TDocument> Items { get; }
+    
+    /// <summary>
+    /// Returns the grouping result
+    /// </summary>
+    public IEnumerable<GroupingResult>? Grouping { get; }
 }

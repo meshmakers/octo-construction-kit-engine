@@ -59,9 +59,9 @@
         
     </Target>   
 
-    <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig">
+    <Target Name="GenerateAfterBuild" BeforeTargets="BeforeBuild" DependsOnTargets="BaseConfig" Condition="'$(OctoSkipCkCompile)' == '' Or '$(OctoSkipCkCompile)' == false">
         <CallTarget Condition="'$(IsOctoCompilerInstalled)' == 'false'" Targets="RestoreCompiler"/>
-        <CallTarget Condition="'$(OctoSkipCkCompile)' == ''" Targets="CompileConstructionKit"/>
+        <CallTarget Targets="CompileConstructionKit"/>
         
     </Target>
 

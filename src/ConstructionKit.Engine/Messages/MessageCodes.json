@@ -299,6 +299,12 @@
       "number": 50,
       "level": "ERROR",
       "text": "CkAssociationRole '{ckAssociationRole}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint."
+    },
+    {
+      "key": "CkAttributeIdNotFoundAtType",
+      "number": 51,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' defined at type '{ckTypeId}' not found."
     }
   ]
 }

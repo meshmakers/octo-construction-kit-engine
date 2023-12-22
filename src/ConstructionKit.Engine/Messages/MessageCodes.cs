@@ -181,6 +181,9 @@ internal static class MessageCodes
     internal static OperationMessage CkAssociationRoleAttributeIdNotUnique(object ckAssociationRole, object ckAttributeId) =>
         GetMessage("CkAssociationRoleAttributeIdNotUnique", ckAssociationRole, ckAttributeId);
 
+    internal static OperationMessage CkAttributeIdNotFoundAtType(object ckAttributeId, object ckTypeId) =>
+        GetMessage("CkAttributeIdNotFoundAtType", ckAttributeId, ckTypeId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -482,6 +485,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  50, "CkAssociationRole '{ckAssociationRole}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint.",
                  new [] {"ckAssociationRole", "ckAttributeId"})
+        },
+        {
+            "CkAttributeIdNotFoundAtType",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 51, "CkAttributeId '{ckAttributeId}' defined at type '{ckTypeId}' not found.",
+                 new [] {"ckAttributeId", "ckTypeId"})
         },
     };
 }

@@ -7,7 +7,7 @@
         <PackageId>Meshmakers.Octo.Runtime.Contracts</PackageId>
         <AssemblyName>Meshmakers.Octo.Runtime.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Contracts</RootNamespace>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
     </PropertyGroup>
 
     <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">

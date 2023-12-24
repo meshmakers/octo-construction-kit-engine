@@ -4,7 +4,7 @@
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.Runtime.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Engine.Tests</RootNamespace>
-        <TargetFramework>net7.0</TargetFramework>
+        <TargetFramework>net8.0</TargetFramework>
         <OctoCompilerToolPath>../../bin/$(Configuration)/net7.0/octo-ckc</OctoCompilerToolPath>
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
@@ -14,11 +14,11 @@
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
     
     <ItemGroup>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="7.0.0"/>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.7.2" />
-        <PackageReference Include="xunit" Version="2.5.1" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.1">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+        <PackageReference Include="xunit" Version="2.6.4" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>

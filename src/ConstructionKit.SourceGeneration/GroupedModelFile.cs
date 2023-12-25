@@ -1,7 +1,13 @@
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
-internal readonly record struct GroupedModelFile(AdditionalTextWithHash MainFile, AdditionalTextWithHash CacheFile)
+internal readonly record struct GroupedModelFile
 {
+    public GroupedModelFile(AdditionalTextWithHash mainFile, AdditionalTextWithHash cacheFile)
+    {
+        MainFile = mainFile;
+        CacheFile = cacheFile;
+    }
+
     public bool Equals(GroupedModelFile other)
     {
         return MainFile.Equals(other.MainFile) && CacheFile.Equals(other.CacheFile);
@@ -23,4 +29,7 @@ internal readonly record struct GroupedModelFile(AdditionalTextWithHash MainFile
         return
             $"{nameof(MainFile)}: {MainFile}, {nameof(CacheFile)}: {CacheFile}";
     }
+
+    public AdditionalTextWithHash MainFile { get; }
+    public AdditionalTextWithHash CacheFile { get; }
 }

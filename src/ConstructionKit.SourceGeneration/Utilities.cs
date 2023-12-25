@@ -68,7 +68,7 @@ internal static class Utilities
             }
             else
             {
-                localNamespace = (string.IsNullOrEmpty(localNamespace)
+                localNamespace = (string.IsNullOrEmpty(localNamespace) || localNamespace == null
                         ? rootNamespace
                         : $"{rootNamespace}.{SanitizeNamespace(localNamespace, false)}")
                     .Trim('.');

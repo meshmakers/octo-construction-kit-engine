@@ -18,7 +18,11 @@ internal static class GroupCkModelFiles
             if (!baseName.Contains("cache"))
             {
                 //it should be impossible to exist already, but VS sometimes throws error about duplicate key added. Keep the original entry, not the new one
-                lookup.TryAdd(new Tuple<string, string>(directoryPath, baseName), file);
+                var key = new Tuple<string, string>(directoryPath, baseName);
+                if (!lookup.ContainsKey(key))
+                {
+                    lookup.Add(key, file);
+                }
             }
         }
 

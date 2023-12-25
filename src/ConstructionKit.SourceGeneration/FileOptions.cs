@@ -4,13 +4,13 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 internal readonly record struct FileOptions
 {
-    public InnerClassVisibility InnerClassVisibility { get; init; }
-    public GroupedModelFile GroupedFile { get; init; }
-    public string? CustomToolNamespace { get; init; }
-    public string LocalNamespace { get; init; }
-    public string EmbeddedFilename { get; init; }
-    public bool GenerateCkModelServiceClass { get; init; }
-    public bool IsValid { get; init; }
+    public InnerClassVisibility InnerClassVisibility { get; }
+    public GroupedModelFile GroupedFile { get; }
+    public string? CustomToolNamespace { get;  }
+    public string LocalNamespace { get;  }
+    public string EmbeddedFilename { get; }
+    public bool GenerateCkModelServiceClass { get; }
+    public bool IsValid { get; }
 
     public FileOptions(
         GroupedModelFile groupedFile,

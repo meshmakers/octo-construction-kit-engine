@@ -14,8 +14,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2312.25001" />
-        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2312.25001" />
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2312.30001" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2312.30001" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />

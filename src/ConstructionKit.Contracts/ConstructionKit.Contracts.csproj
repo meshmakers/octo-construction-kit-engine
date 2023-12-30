@@ -24,7 +24,7 @@
 
     <ItemGroup>
       <PackageReference Include="JsonSchema.Net" Version="5.4.3" />
-      <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2312.25001" />
+      <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2312.30001" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="System.Text.Json" Version="8.0.0" />

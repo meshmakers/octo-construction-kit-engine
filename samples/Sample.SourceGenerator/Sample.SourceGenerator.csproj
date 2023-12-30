@@ -5,7 +5,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <RootNamespace>Meshmakers.ConstructionKit.Samples.SourceGenerator</RootNamespace>
-        <OctoCompilerToolPath>../../bin/$(Configuration)/net7.0/octo-ckc</OctoCompilerToolPath>
+        <OctoCompilerToolPath>../../bin/$(Configuration)/net8.0/octo-ckc</OctoCompilerToolPath>
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
     

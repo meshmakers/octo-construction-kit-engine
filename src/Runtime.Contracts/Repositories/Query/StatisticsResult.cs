@@ -1,5 +1,3 @@
-using Newtonsoft.Json;
-
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>

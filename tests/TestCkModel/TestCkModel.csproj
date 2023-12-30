@@ -3,7 +3,7 @@
         <TargetFramework>net8.0</TargetFramework>
         <AssemblyName>TestCkModel</AssemblyName>
         <RootNamespace>TestCkModel</RootNamespace>
-        <OctoCompilerToolPath>../../bin/$(Configuration)/net7.0/octo-ckc</OctoCompilerToolPath>
+        <OctoCompilerToolPath>../../bin/$(Configuration)/net8.0/octo-ckc</OctoCompilerToolPath>
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
     </PropertyGroup>
 

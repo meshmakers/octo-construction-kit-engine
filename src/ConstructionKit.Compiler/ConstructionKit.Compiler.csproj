@@ -7,7 +7,6 @@
         <Description>Octo Mesh Construction Kit Compiler</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <PackageId>Meshmakers.Octo.ConstructionKit.Compiler</PackageId>
-        <PackageIcon>meshmakers64.png</PackageIcon>
         <AssemblyName>octo-ckc</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
         <TargetFramework>net8.0</TargetFramework>

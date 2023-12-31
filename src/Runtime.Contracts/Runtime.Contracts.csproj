@@ -3,7 +3,6 @@
     <PropertyGroup>
         <Description>Contracts of Octo Mesh for Runtime functionality</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <PackageIcon>meshmakers64.png</PackageIcon>
         <PackageId>Meshmakers.Octo.Runtime.Contracts</PackageId>
         <AssemblyName>Meshmakers.Octo.Runtime.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Contracts</RootNamespace>

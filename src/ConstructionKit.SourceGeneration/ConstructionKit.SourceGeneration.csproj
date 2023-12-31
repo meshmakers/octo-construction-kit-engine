@@ -9,7 +9,6 @@
         <Title>Octo Mesh Construction Kit Source Generators</Title>
         <PackageTags>Source generators of OctoMesh ConstructionKit SDK</PackageTags>
         <PackageDescription>Contains source generators for Octo Mesh Construction Kits.</PackageDescription>
-        <PackageIcon>meshmakers64.png</PackageIcon>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.SourceGeneration</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.SourceGeneration</RootNamespace>
         <IsRoslynComponent>true</IsRoslynComponent>

@@ -3,7 +3,6 @@
     <PropertyGroup>
         <Description>Engine of Octo Mesh for Runtime functionality</Description>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <PackageIcon>meshmakers64.png</PackageIcon>
         <PackageId>Meshmakers.Octo.Runtime.Engine</PackageId>
         <AssemblyName>Meshmakers.Octo.Runtime.Engine</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Engine</RootNamespace>

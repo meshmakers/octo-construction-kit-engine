@@ -6,19 +6,13 @@
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Engine</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Engine</RootNamespace>
         <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.ConstructionKit.Engine.xml</DocumentationFile>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <DocumentationFile>..\..\bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.ConstructionKit.Engine.xml</DocumentationFile>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
     <ItemGroup>
       <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
       <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.0" />

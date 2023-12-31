@@ -7,23 +7,23 @@
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Contracts</RootNamespace>
         <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.ConstructionKit.Contracts.xml</DocumentationFile>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <DocumentationFile>..\..\bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.ConstructionKit.Contracts.xml</DocumentationFile>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
+    <ItemGroup Condition="'$(Configuration)'!='DebugL'">
+        <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2312.30002" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)'=='DebugL'">
+        <PackageReference Include="Meshmakers.Common.Shared" Version="999.0.0" />
+    </ItemGroup>
 
     <ItemGroup>
       <PackageReference Include="JsonSchema.Net" Version="5.4.3" />
-      <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2312.30002" />
       <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="System.Text.Json" Version="8.0.0" />

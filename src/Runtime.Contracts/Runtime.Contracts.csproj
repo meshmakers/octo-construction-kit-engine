@@ -7,17 +7,10 @@
         <AssemblyName>Meshmakers.Octo.Runtime.Contracts</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Contracts</RootNamespace>
         <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-        <DocumentationFile>..\..\bin\Debug\Meshmakers.Octo.Runtime.Contracts.xml</DocumentationFile>
-        <NoWarn>1701;1702;CS8002</NoWarn>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-        <DocumentationFile>..\..\bin\Release\Meshmakers.Octo.Runtime.Contracts.xml</DocumentationFile>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <DocumentationFile>..\..\bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
 

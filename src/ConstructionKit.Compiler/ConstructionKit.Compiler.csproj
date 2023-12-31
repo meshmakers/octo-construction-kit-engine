@@ -10,11 +10,22 @@
         <AssemblyName>octo-ckc</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler</RootNamespace>
         <TargetFramework>net8.0</TargetFramework>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
     </PropertyGroup>
 
-    <ItemGroup>
+    <ItemGroup Condition="'$(Configuration)'!='DebugL'">
         <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2312.30002" />
         <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2312.30002" />
+    </ItemGroup>
+
+    <ItemGroup Condition="'$(Configuration)'=='DebugL'">
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="999.0.0" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="999.0.0" />
+    </ItemGroup>
+    
+    <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
@@ -22,15 +33,6 @@
         <PackageReference Include="NLog.Extensions.Logging" Version="5.3.8" />
         <PackageReference Include="NLog.Schema" Version="5.2.8" />
     </ItemGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-    </PropertyGroup>
-
 
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">

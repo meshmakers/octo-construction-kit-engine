@@ -16,6 +16,7 @@
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
         <PackageProjectUrl>https://www.meshmakers.io</PackageProjectUrl>
         <PackageTags>Octo data mesh iot</PackageTags>
-        <PackageVersion>999.0.0</PackageVersion>
+        <PackageVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</PackageVersion>
+        <RestoreSources Condition="'$(Configuration)'=='DebugL'">/Users/gerald/RiderProjects/meshmakers/nuget</RestoreSources>
     </PropertyGroup>
 </Project>

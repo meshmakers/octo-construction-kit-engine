@@ -5,6 +5,8 @@
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler.SystemTests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler.SystemTests</RootNamespace>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

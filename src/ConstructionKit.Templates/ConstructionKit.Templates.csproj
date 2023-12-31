@@ -14,16 +14,11 @@
         <ContentTargetFolders>content</ContentTargetFolders>
         <NoWarn>$(NoWarn);NU5128</NoWarn>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Templates</RootNamespace>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
     </PropertyGroup>
 
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
-        <OutputPath>..\..\bin\Debug\</OutputPath>
-    </PropertyGroup>
-
-    <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
-        <OutputPath>..\..\bin\Release\</OutputPath>
-    </PropertyGroup>
-    
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>

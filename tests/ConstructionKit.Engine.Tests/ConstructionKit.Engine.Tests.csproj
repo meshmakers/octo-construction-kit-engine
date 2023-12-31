@@ -5,6 +5,8 @@
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Engine.Tests</RootNamespace>
         <TargetFramework>net8.0</TargetFramework>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

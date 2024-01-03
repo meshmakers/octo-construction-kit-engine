@@ -11,7 +11,7 @@ internal class CkIdsCodeGenerator
     /// </summary>
     public static readonly CkIdsCodeGenerator Instance = new();
     
-    public string Generate(string ns, CkModelId ckModelId, ICollection<CkTypeDto>? ckTypes, 
+    public string Generate(string ns, CkModelId ckModelId, ICollection<CkCompiledTypeDto>? ckTypes, 
         ICollection<CkAttributeDto>? ckAttributes, ICollection<CkAssociationRoleDto>? ckAssociationRoles)
     {
         StringBuilder sb = new();

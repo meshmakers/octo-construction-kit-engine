@@ -84,7 +84,7 @@ public class ElementResolverTests
         var ckModelRoot = sampleData.sample1.Builder.Build();
         if (ckModelRoot.Types != null)
         {
-            ckModelRoot.Types.Add(new CkTypeDto{TypeId = "Demo1"});
+            ckModelRoot.Types.Add(new CkCompiledTypeDto{TypeId = "Demo1"});
         }
 
         var resolver = new ElementResolver();

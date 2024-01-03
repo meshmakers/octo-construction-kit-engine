@@ -10,7 +10,7 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("System", "1.0.0"),
-            Types = new List<CkTypeDto>
+            Types = new List<CkCompiledTypeDto>
             {
                 new()
                 {

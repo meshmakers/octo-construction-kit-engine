@@ -217,7 +217,7 @@ public class CompilerService : ICompilerService
 #endif
         var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, modelPath, operationResult).ConfigureAwait(false);
 
-        var types = new List<CkTypeDto>();
+        var types = new List<CkCompiledTypeDto>();
         if (Directory.Exists(typesDirectory))
         {
             foreach (var typeFile in Directory.EnumerateFiles(typesDirectory, "*.yaml"))
@@ -232,7 +232,17 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, typeFile, operationResult).ConfigureAwait(false);
                     if (elementsRootDto.Types != null)
                     {
-                        types.AddRange(elementsRootDto.Types);
+                        types.AddRange(elementsRootDto.Types.Select(t => new CkCompiledTypeDto
+                        {
+                            TypeId = t.TypeId,
+                            DerivedFromCkTypeId = t.DerivedFromCkTypeId,
+                            Associations = t.Associations,
+                            Attributes = t.Attributes,
+                            Indexes = t.Indexes,
+                            IsAbstract = t.IsAbstract,
+                            IsFinal = t.IsFinal,
+                            EnableChangeStreamPreAndPostImages = t.EnableChangeStreamPreAndPostImages
+                        }));
                     }
                 }
                 catch (ModelParseException e)

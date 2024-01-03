@@ -31,7 +31,7 @@ public class CkCompiledModelRoot : CkMetaRootDto
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkTypeDto>? Types { get; set; }
+    public List<CkCompiledTypeDto>? Types { get; set; }
 
     /// <summary>
     /// Returns associations of the model

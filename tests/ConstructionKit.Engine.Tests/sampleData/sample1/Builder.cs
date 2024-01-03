@@ -69,7 +69,7 @@ public class Builder
                   ValueCkRecordId = "sample1/Record1"
               }
             },
-            Types = new List<CkTypeDto>
+            Types = new List<CkCompiledTypeDto>
             {
                 new()
                 {

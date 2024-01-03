@@ -426,4 +426,36 @@ public class InheritanceResolverTests
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(47, operationResult.Messages[0].MessageNumber);
     }
+    
+     [Fact]
+    public void Inheritance_IsCollectionRoot_OK()
+    {
+        var logger = _loggerFactory.CreateLogger<InheritanceResolver>();
+
+        CkModelGraph modelGraph = new();
+        modelGraph.AppendModel(sampleData.systemFake.Builder.Build());
+        modelGraph.AppendModel(sampleData.sample1.Builder.Build());
+
+        OperationResult operationResult = new();
+        InheritanceResolver inheritanceResolver = new(logger);
+        inheritanceResolver.Resolve(modelGraph, operationResult);
+        
+        Assert.Empty(operationResult.Messages);
+        Assert.Equal(4, modelGraph.Types.Count);
+        Assert.NotNull(modelGraph.Types["System/Entity"]);
+        Assert.NotNull(modelGraph.Types["sample1/Demo1"]);
+        Assert.NotNull(modelGraph.Types["sample1/Demo2"]);
+        Assert.NotNull(modelGraph.Types["sample1/Demo3"]);
+        Assert.False(modelGraph.Types["System/Entity"].IsCollectionRoot);
+        Assert.Null(modelGraph.Types["System/Entity"].DefiningCollectionRootCkTypeId);
+        
+        Assert.True(modelGraph.Types["sample1/Demo1"].IsCollectionRoot);
+        Assert.Equal(modelGraph.Types["sample1/Demo1"].DefiningCollectionRootCkTypeId, "sample1/Demo1");
+        
+        Assert.False(modelGraph.Types["sample1/Demo2"].IsCollectionRoot);
+        Assert.Equal(modelGraph.Types["sample1/Demo2"].DefiningCollectionRootCkTypeId, "sample1/Demo1");
+        
+        Assert.False(modelGraph.Types["sample1/Demo3"].IsCollectionRoot);
+        Assert.Equal(modelGraph.Types["sample1/Demo3"].DefiningCollectionRootCkTypeId, "sample1/Demo1");
+    }
 }

@@ -89,7 +89,7 @@ public class Builder
                     }
                 }
             },
-            Types = new List<CkTypeDto>
+            Types = new List<CkCompiledTypeDto>
             {
                 new()
                 {

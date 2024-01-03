@@ -1,0 +1,109 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
+types:
+- typeId: Entity
+  isAbstract: true
+- typeId: Tenant
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  attributes:
+  - id: System/TenantId
+    name: TenantId
+  - id: System/ParentTenantId
+    name: ParentTenantId
+    isOptional: true
+  - id: System/DatabaseName
+    name: DatabaseName
+  indexes:
+  - indexType: Ascending
+    fields:
+    - attributeNames:
+      - TenantId
+- typeId: AutoIncrement
+  derivedFromCkTypeId: System/Entity
+  attributes:
+  - id: System/AutoIncrement.Start
+    name: Start
+  - id: System/AutoIncrement.End
+    name: End
+  - id: System/AutoIncrement.CurrentValue
+    name: CurrentValue
+    isOptional: true
+- typeId: Query
+  derivedFromCkTypeId: System/Entity
+  attributes:
+  - id: System/Query.CkTypeId
+    name: QueryCkTypeId
+  - id: System/Query.Columns
+    name: Columns
+  - id: System/Query.Sorting
+    name: Sorting
+    isOptional: true
+  - id: System/Query.FieldFilter
+    name: FieldFilter
+    isOptional: true
+  - id: System/Query.TextSearchFilter
+    name: TextSearchFilter
+    isOptional: true
+  - id: System/Query.AttributeSearchFilter
+    name: AttributeSearchFilter
+    isOptional: true
+  - id: System/Name
+    name: Name
+- typeId: Configuration
+  derivedFromCkTypeId: System/Entity
+  isFinal: true
+  attributes:
+  - id: System/ConfigurationValue
+    name: ConfigurationValue
+    isOptional: true
+associationRoles:
+- id: ParentChild
+  inboundName: Parent
+  outboundName: Children
+  inboundMultiplicity: N
+  outboundMultiplicity: N
+- id: Related
+  inboundName: RelatesTo
+  outboundName: RelatesFrom
+  inboundMultiplicity: N
+  outboundMultiplicity: N
+attributes:
+- id: Name
+  valueType: String
+- id: DisplayName
+  valueType: String
+- id: Description
+  valueType: String
+  description: Further information on the item.
+- id: Enabled
+  valueType: Boolean
+- id: TenantId
+  valueType: String
+- id: ParentTenantId
+  valueType: String
+- id: DatabaseName
+  valueType: String
+- id: AutoIncrement.Start
+  valueType: Int
+- id: AutoIncrement.End
+  valueType: Int
+- id: AutoIncrement.CurrentValue
+  valueType: Int
+- id: ConfigurationValue
+  valueType: String
+- id: Query.Columns
+  valueType: String
+- id: Query.CkTypeId
+  valueType: String
+- id: Query.Sorting
+  valueType: String
+- id: Query.FieldFilter
+  valueType: String
+- id: Query.TextSearchFilter
+  valueType: String
+- id: Query.AttributeSearchFilter
+  valueType: String
+records: []
+enums: []
+modelId: System
+dependencies: []

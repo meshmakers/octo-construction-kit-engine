@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Description>Octo Mesh System contruction kit.</Description>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.System</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.System</RootNamespace>
+        <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <TargetFramework>net8.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Remove="ConstructionKit\ck-*.yaml" />
+        <EmbeddedResource Include="ConstructionKit\ck-*.yaml">
+            <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
+        </EmbeddedResource>
+        <None Remove="ConstructionKit\ck-*.cache.json" />
+        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json" />
+    </ItemGroup>
+
+    <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"  />
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
+
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+        <ProjectReference Include="..\Runtime.Engine\Runtime.Engine.csproj" />
+        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
+    </ItemGroup>
+
+</Project>

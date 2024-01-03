@@ -7,15 +7,14 @@
         <PropertyGroup>
             <IsOctoCompilerInstalled Condition="'$(OctoCompilerToolPath)' == ''">false</IsOctoCompilerInstalled>
             <IsOctoCompilerInstalled Condition="'$(OctoCompilerToolPath)' != ''">true</IsOctoCompilerInstalled>
-            <OctoDotNetTools>$([System.IO.Path]::Combine($([System.Environment]::GetFolderPath(SpecialFolder.UserProfile)), '.dotnet\tools\'))</OctoDotNetTools>
-            <OctoCompilerToolPath Condition="'$(OctoCompilerToolPath)' == ''">$([System.IO.Path]::Combine($(OctoDotNetTools), 'octo-ckc'))</OctoCompilerToolPath>
-            <OctoCompilerToolVersion Condition="'$(OctoCompilerToolVersion)' == ''">0.0.0.0</OctoCompilerToolVersion>
+            <OctoCompilerToolPath Condition="'$(OctoCompilerToolPath)' == ''">dotnet octo-ckc</OctoCompilerToolPath>
+            <OctoCompilerToolVersion Condition="'$(OctoCompilerToolVersion)' == ''">999.0.0</OctoCompilerToolVersion>
             <OctoCompilerToolName Condition="'$(OctoCompilerToolName)' == ''">meshmakers.octo.constructionkit.compiler</OctoCompilerToolName>
         </PropertyGroup>
     </Target>
 
-    <Target Name="RestoreCompiler" DependsOnTargets="BaseConfig" Condition="!Exists('$(OctoDotNetTools)install.lock')">
-        <Exec Command="dotnet tool list --global" StandardOutputImportance="Low" ConsoleToMSBuild="true" EchoOff="true">
+    <Target Name="RestoreCompiler" DependsOnTargets="BaseConfig">
+        <Exec Command="dotnet tool list --local" StandardOutputImportance="Low" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput"/>
         </Exec>
         <PropertyGroup>
@@ -24,12 +23,14 @@
             <IsOctoCompilerCorrectVersionInstalled>$([System.Text.RegularExpressions.Regex]::IsMatch($(ToolListOutput), $(OctoTextValidation)))</IsOctoCompilerCorrectVersionInstalled>
         </PropertyGroup>
 
-        <Exec Command="mkdir $(OctoDotNetTools)" Condition="!Exists('$(OctoDotNetTools)')" StandardOutputImportance="Low" EchoOff="true" />
-        <Exec Command="echo . 2> $(OctoDotNetTools)install.lock" Condition="!Exists('$(OctoDotNetTools)install.lock')" StandardOutputImportance="Low" EchoOff="true" />
-        <Message Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler in version $(OctoCompilerToolVersion)"/>
-        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --global --version $(OctoCompilerToolVersion)" EchoOff="true" />
+        <Message Condition="'$(IsOctoCompilerInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler version $(OctoCompilerToolVersion)"/>
+        <Exec Condition="'$(IsOctoCompilerInstalled)' == 'false'" Command="dotnet tool install $(OctoCompilerToolName) --local --create-manifest-if-needed --version $(OctoCompilerToolVersion) --add-source $(RestoreSources)" EchoOff="true" />
 
-        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool list --global" StandardOutputImportance="Low" EchoOff="true" ConsoleToMSBuild="true">
+        <Message Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Updating OctoMesh construction kit compiler version $(OctoCompilerToolVersion)"/>
+        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --local --version $(OctoCompilerToolVersion) --add-source $(RestoreSources)" EchoOff="true" />
+        
+        <!-- Check if the compiler is installed now -->
+        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool list --local" StandardOutputImportance="Low" EchoOff="true" ConsoleToMSBuild="true">
             <Output TaskParameter="ConsoleOutput" PropertyName="ToolListOutput"/>
         </Exec>
         <PropertyGroup Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'">
@@ -38,8 +39,6 @@
         </PropertyGroup>
         <Error Condition="'$(IsOctoCompilerInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is not installed and cannot be installed."/>
         <Error Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Text="Octo Mesh Construction Kit compiler is installed but with a wrong version. It was not possible to update to version $(OctoCompilerToolVersion)."/>
-        <Exec Command="del $(OctoDotNetTools)install.lock" Condition="'$(OS)'=='Windows_NT' And Exists('$(OctoDotNetTools)install.lock')" />
-        <Exec Command="rm -f $(OctoDotNetTools)install.lock" Condition="'$(OS)'!='Windows_NT' And Exists('$(OctoDotNetTools)install.lock')" />
     </Target>
 
     <Target Name="CompileConstructionKit" DependsOnTargets="BaseConfig">
@@ -54,7 +53,7 @@
         </Exec>
 
         <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
-        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$([System.IO.Path]::Combine($(ProjectDir),$(OctoCompilerToolPath))) -c compile -p %(_ConstructionKitFolder.Identity) -c -i">
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -c -i">
         </Exec>
         
     </Target>   

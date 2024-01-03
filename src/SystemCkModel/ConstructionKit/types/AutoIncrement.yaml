@@ -1,0 +1,14 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: AutoIncrement
+    derivedFromCkTypeId: System/Entity
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: System/AutoIncrement.Start
+        name: Start
+      - id: System/AutoIncrement.End
+        name: End
+      - id: System/AutoIncrement.CurrentValue
+        name: CurrentValue
+        isOptional: true

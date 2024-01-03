@@ -29,7 +29,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json#/definitions/CkType"
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json#/definitions/CkCompiledType"
       }
     },
     "associationRoles":{

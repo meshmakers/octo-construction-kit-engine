@@ -9,7 +9,8 @@
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
     </PropertyGroup>
 
     <ItemGroup>
@@ -40,7 +41,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\Runtime.Engine\Runtime.Engine.csproj" />
         <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
     </ItemGroup>
 

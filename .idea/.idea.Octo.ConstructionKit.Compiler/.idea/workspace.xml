@@ -8,9 +8,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="Merge index definitions to collection root.&#10;Cleanup">
-      <change beforePath="$PROJECT_DIR$/src/SystemCkModel/SystemCkModel.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/src/SystemCkModel/SystemCkModel.csproj" afterDir="false" />
-    </list>
+    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -131,7 +129,7 @@
       <workItem from="1704144405721" duration="2513000" />
       <workItem from="1704172864388" duration="4203000" />
       <workItem from="1704192944587" duration="1844000" />
-      <workItem from="1704268559616" duration="16019000" />
+      <workItem from="1704268559616" duration="16259000" />
     </task>
     <task id="LOCAL-00001" summary="Added definition to define root collections.">
       <option name="closed" value="true" />
@@ -165,7 +163,15 @@
       <option name="project" value="LOCAL" />
       <updated>1704306405176</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="Fixing output path of system construction kit and making">
+      <option name="closed" value="true" />
+      <created>1704307496849</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1704307496849</updated>
+    </task>
+    <option name="localTasksCounter" value="6" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -178,7 +184,8 @@
     <MESSAGE value="Fix schema" />
     <MESSAGE value="Enabled construction kit system model as nuget package" />
     <MESSAGE value="Merge index definitions to collection root.&#10;Cleanup" />
-    <option name="LAST_COMMIT_MESSAGE" value="Merge index definitions to collection root.&#10;Cleanup" />
+    <MESSAGE value="Fixing output path of system construction kit and making" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fixing output path of system construction kit and making" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

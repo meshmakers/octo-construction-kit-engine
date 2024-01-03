@@ -25,10 +25,10 @@
         </PropertyGroup>
 
         <Message Condition="'$(IsOctoCompilerInstalled)' == 'false'" Importance="High" Text="Installing OctoMesh construction kit compiler version $(OctoCompilerToolVersion)"/>
-        <Exec Condition="'$(IsOctoCompilerInstalled)' == 'false'" Command="dotnet tool install $(OctoCompilerToolName) --local --create-manifest-if-needed --version $(OctoCompilerToolVersion) $(OctoSourceArgument)" EchoOff="true" />
+        <Exec Condition="'$(IsOctoCompilerInstalled)' == 'false'" Command="dotnet tool install $(OctoCompilerToolName) --local --create-manifest-if-needed --version $(OctoCompilerToolVersion) --disable-parallel $(OctoSourceArgument)" EchoOff="true" />
 
         <Message Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Importance="High" Text="Updating OctoMesh construction kit compiler version $(OctoCompilerToolVersion)"/>
-        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --local --version $(OctoCompilerToolVersion) $(OctoSourceArgument)" EchoOff="true" />
+        <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool update $(OctoCompilerToolName) --local --version $(OctoCompilerToolVersion) --disable-parallel $(OctoSourceArgument)" EchoOff="true" />
         
         <!-- Check if the compiler is installed now -->
         <Exec Condition="'$(IsOctoCompilerCorrectVersionInstalled)' == 'false'" Command="dotnet tool list --local" StandardOutputImportance="Low" EchoOff="true" ConsoleToMSBuild="true">

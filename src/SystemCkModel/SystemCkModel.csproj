@@ -6,6 +6,7 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.Models.System</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Models.System</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Models.System</RootNamespace>
+        <OctoCompilerToolPath>../../bin/$(Configuration)/net8.0/octo-ckc</OctoCompilerToolPath>
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>

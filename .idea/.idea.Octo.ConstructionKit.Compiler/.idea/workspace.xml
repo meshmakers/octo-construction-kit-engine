@@ -8,38 +8,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.idea.Octo.ConstructionKit.Compiler/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Octo.ConstructionKit.Compiler/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/samples/Sample.SourceGenerator/ConstructionKit/ck-sample1.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/samples/Sample.SourceGenerator/ConstructionKit/ck-sample1.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Compiler/Commands/Implementations/CompileCommand.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Compiler/Commands/Implementations/CompileCommand.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Caching/CkCache.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Caching/CkCache.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Services/CompilerService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Services/CompilerService.cs" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/SystemCkModel/ConstructionKit/ck-system.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/src/SystemCkModel/ConstructionKit/ck-system.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/BasicRtEntityTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/attributes/attributes.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ck-test.cache.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ckModel.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/types/location.yaml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Configuration/SystemTestConfiguration.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Configuration/SystemTestOptions.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/ConstructionKitTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/ConfigurationFixture.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/ServiceCollectionFixture.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/SystemFixture.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/TenantFixture.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/NewTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Persistence.SystemTests.csproj" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/RtEntityTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/SystemTenantTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/TenantConfigurationTests.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Usings.cs" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/appsettings.test.json" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Runtime.Engine.SystemTests/sampleData/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Runtime.Engine.SystemTests/sampleData/CkTest/ConstructionKit/ck-test.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/Runtime.Engine.Tests/sampleData/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Runtime.Engine.Tests/sampleData/CkTest/ConstructionKit/ck-test.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/tests/TestCkModel/ConstructionKit/ck-system.testidentity.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/TestCkModel/ConstructionKit/ck-system.testidentity.yaml" afterDir="false" />
+    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="Merge index definitions to collection root.&#10;Cleanup">
+      <change beforePath="$PROJECT_DIR$/src/SystemCkModel/SystemCkModel.csproj" beforeDir="false" afterPath="$PROJECT_DIR$/src/SystemCkModel/SystemCkModel.csproj" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -57,6 +27,7 @@
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DataTransferObjects/CkCompiledModelRoot.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
@@ -160,7 +131,7 @@
       <workItem from="1704144405721" duration="2513000" />
       <workItem from="1704172864388" duration="4203000" />
       <workItem from="1704192944587" duration="1844000" />
-      <workItem from="1704268559616" duration="15233000" />
+      <workItem from="1704268559616" duration="16019000" />
     </task>
     <task id="LOCAL-00001" summary="Added definition to define root collections.">
       <option name="closed" value="true" />
@@ -186,7 +157,15 @@
       <option name="project" value="LOCAL" />
       <updated>1704293744392</updated>
     </task>
-    <option name="localTasksCounter" value="4" />
+    <task id="LOCAL-00004" summary="Merge index definitions to collection root.&#10;Cleanup">
+      <option name="closed" value="true" />
+      <created>1704306405176</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1704306405176</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -198,7 +177,8 @@
     <MESSAGE value="Added definition to define root collections." />
     <MESSAGE value="Fix schema" />
     <MESSAGE value="Enabled construction kit system model as nuget package" />
-    <option name="LAST_COMMIT_MESSAGE" value="Enabled construction kit system model as nuget package" />
+    <MESSAGE value="Merge index definitions to collection root.&#10;Cleanup" />
+    <option name="LAST_COMMIT_MESSAGE" value="Merge index definitions to collection root.&#10;Cleanup" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -49,17 +49,20 @@ public class CkTypeGraph
     /// <param name="ckTypeId"></param>
     /// <param name="isAbstract"></param>
     /// <param name="isFinal"></param>
+    /// <param name="isCollectionRoot"></param>
     /// <param name="baseTypes"></param>
     /// <param name="derivedFromCkTypeId"></param>
+    /// <param name="definingCollectionRootCkTypeId"></param>
     /// <param name="derivedTypes"></param>
     /// <param name="definedAttributes"></param>
     /// <param name="allAttributes"></param>
     /// <param name="indexes"></param>
     /// <param name="associations"></param>
     [JsonConstructor]
-    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal,
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
         CkId<CkTypeId>? derivedFromCkTypeId,
+        CkId<CkTypeId>? definingCollectionRootCkTypeId,
         IReadOnlyCollection<CkGraphTypeInheritance> derivedTypes,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
@@ -68,7 +71,9 @@ public class CkTypeGraph
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
+        IsCollectionRoot = isCollectionRoot;
         DerivedFromCkTypeId = derivedFromCkTypeId;
+        DefiningCollectionRootCkTypeId = definingCollectionRootCkTypeId;
 
         _baseTypes = new List<CkGraphTypeInheritance>(baseTypes);
         _derivedTypes = new List<CkGraphTypeInheritance>(derivedTypes);
@@ -107,6 +112,17 @@ public class CkTypeGraph
     public bool IsAbstract { get; }
 
     /// <summary>
+    /// Gets or sets the defining construction kit type id, which defines the collection in repository.
+    /// </summary>
+    public CkId<CkTypeId>? DefiningCollectionRootCkTypeId { get; private set; }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether this type is a collection root. When
+    /// true this type creates a collection in the database.
+    /// </summary>
+    public bool IsCollectionRoot { get; private set; }
+
+    /// <summary>
     /// Returns a list of base types of the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> BaseTypes { get; }
@@ -135,7 +151,7 @@ public class CkTypeGraph
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
     public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; }
-    
+
     /// <summary>
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
@@ -147,6 +163,24 @@ public class CkTypeGraph
     /// </summary>
     [JsonIgnore]
     public string Path => CkTypeId + ": " + string.Join("->", BaseTypes.Select(x => x.BaseCkTypeId));
+    
+    /// <summary>
+    /// Sets the defining collection rot type id
+    /// </summary>
+    /// <param name="ckTypeId">CkTypeId of the defining collection</param>
+    internal void SetDefiningCollectionCkTypeId(CkId<CkTypeId> ckTypeId)
+    {
+        DefiningCollectionRootCkTypeId = ckTypeId;
+    }
+    
+    /// <summary>
+    /// Defines if the current type is a collection 
+    /// </summary>
+    /// <param name="isCollectionRoot">Indicates if the current type is a collection root</param>
+    internal void SetIsCollectionRoot(bool isCollectionRoot)
+    {
+        IsCollectionRoot = isCollectionRoot;
+    }
 
     /// <summary>
     /// Adds a list of base types of the current type

@@ -57,7 +57,7 @@ public class Builder
                   ValueType = AttributeValueTypesDto.String,
               }
             },
-            Types = new List<CkTypeDto>
+            Types = new List<CkCompiledTypeDto>
             {
                 new()
                 {

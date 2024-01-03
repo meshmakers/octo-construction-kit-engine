@@ -75,7 +75,7 @@ public class Builder
                   ValueCkEnumId = "sample1/Enum1"
               }
             },
-            Types = new List<CkTypeDto>
+            Types = new List<CkCompiledTypeDto>
             {
                 new()
                 {

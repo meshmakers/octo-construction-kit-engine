@@ -1,0 +1,5 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Entity
+    isFinal: false
+    isAbstract: true

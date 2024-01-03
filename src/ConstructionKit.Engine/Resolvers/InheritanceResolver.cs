@@ -67,6 +67,12 @@ internal class InheritanceResolver : IInheritanceResolver
             var baseTypes = GetBaseTypes(modelGraph, ckTypeId, operationResult);
             typeGraph.AddBaseTypes(baseTypes);
 
+            if (baseTypes.Any() && baseTypes.All(t => CompilerStatics.WhiteListedCkTypeIds.Contains(t.BaseCkTypeId)))
+            {
+                typeGraph.SetIsCollectionRoot(true);
+                typeGraph.SetDefiningCollectionCkTypeId(typeGraph.CkTypeId);
+            }
+
             foreach (var ckTypeAttribute in typeGraph.DefinedAttributes)
             {
                 if (!modelGraph.Attributes.TryGetValue(ckTypeAttribute.CkAttributeId, out var attributeGraph))
@@ -117,6 +123,10 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             var ckGraphTypeInheritance = originTypeGraph.BaseTypes.ElementAt(i);
             var baseCkType = ckModelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
+            if (baseCkType.IsCollectionRoot)
+            {
+                originTypeGraph.SetDefiningCollectionCkTypeId(baseCkType.CkTypeId);
+            }
 
             foreach (var typeAttribute in baseCkType.DefinedAttributes)
             {

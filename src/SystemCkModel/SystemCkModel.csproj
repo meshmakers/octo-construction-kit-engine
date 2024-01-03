@@ -1,9 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <Description>Octo Mesh System contruction kit.</Description>
-        <AssemblyName>Meshmakers.Octo.ConstructionKit.System</AssemblyName>
-        <RootNamespace>Meshmakers.Octo.ConstructionKit.System</RootNamespace>
+        <Description>OctoMesh System contruction kit model</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Models.System</PackageId>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.Models.System</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.Models.System</RootNamespace>
         <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
@@ -17,6 +19,19 @@
         </EmbeddedResource>
         <None Remove="ConstructionKit\ck-*.cache.json" />
         <AdditionalFiles Include="ConstructionKit\ck-*.cache.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
     </ItemGroup>
 
     <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->

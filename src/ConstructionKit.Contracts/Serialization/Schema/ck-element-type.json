@@ -105,6 +105,7 @@
           "type": "boolean"
         }
       },
+      "additionalProperties": false,
       "additionalItems": false,
       "required": [
         "typeId"
@@ -112,10 +113,106 @@
     },
     "CkCompiledType":{
       "type": "object",
-      "$ref": "#/definitions/CkType",
       "title": "CkCompiledType",
       "description": "A construction kit compiled type definition",
       "properties": {
+        "typeId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+$"
+        },
+        "derivedFromCkTypeId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "isFinal": {
+          "type": "boolean"
+        },
+        "isAbstract": {
+          "type": "boolean"
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json#/definitions/CkTypeAttribute"
+          }
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "indexType": {
+                "type": "string",
+                "enum": [
+                  "None",
+                  "Ascending",
+                  "Text"
+                ]
+              },
+              "language": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "weight": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "attributeNames": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_.]+$"
+                      }
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": [
+                    "attributeNames"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "indexType"
+            ]
+          }
+        },
+        "associations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+              },
+              "targetCkTypeId": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+              },
+              "targetAttributes":{
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-zA-Z0-9_.]+/[a-zA-Z0-9_.]+$"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "targetCkTypeId"
+            ]
+          }
+        },
+        "enableChangeStreamPreAndPostImages": {
+          "type": "boolean"
+        },
         "isCollectionRoot": {
           "type": "boolean"
         }

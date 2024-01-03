@@ -16,6 +16,7 @@ public class CkTypeGraph
 {
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     private readonly List<CkGraphTypeInheritance> _derivedTypes;
+    private readonly List<CkTypeIndexDto> _indexes;
     private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
     private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
 
@@ -40,7 +41,8 @@ public class CkTypeGraph
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeDto.Attributes ?? new List<CkTypeAttributeDto>());
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
-        Indexes = new Collection<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
+        _indexes = new List<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
+        Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
     }
 
     /// <summary>
@@ -87,7 +89,8 @@ public class CkTypeGraph
         DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
-        Indexes = new List<CkTypeIndexDto>(indexes);
+        _indexes = new List<CkTypeIndexDto>(indexes);
+        Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
     }
 
 
@@ -206,6 +209,7 @@ public class CkTypeGraph
     /// <param name="ckTypeAttributeGraph"></param>
     internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
     {
+        // ReSharper disable once CanSimplifyDictionaryLookupWithTryAdd
         if (_allAttributes.ContainsKey(ckTypeAttributeGraph.CkAttributeId))
         {
             return false;
@@ -214,6 +218,36 @@ public class CkTypeGraph
         _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
         _allAttributesByName[ckTypeAttributeGraph.AttributeName] = ckTypeAttributeGraph;
         return true;
+    }
+    
+    /// <summary>
+    /// Appends a list of indexes to the current type
+    /// </summary>
+    /// <param name="indexesToMerge"></param>
+    public void MergeTextIndexes(IReadOnlyCollection<CkTypeIndexDto> indexesToMerge)
+    {
+        var textIndex = indexesToMerge.FirstOrDefault(x => x.IndexType == IndexTypeDto.Text);
+
+        foreach (var textIndexToMerge in indexesToMerge.Where(x=> x.IndexType == IndexTypeDto.Text))
+        {
+            if (textIndex == null) // Add text index if it did not exist.
+            {
+                textIndex = textIndexToMerge;
+                _indexes.Add(textIndex);
+                continue;
+            }
+            
+            textIndex.Fields = textIndex.Fields.Concat(textIndexToMerge.Fields).Distinct().ToList();
+        }
+
+        // Add ascending indexes, ensure that they are created but not duplicated.
+        foreach (var textIndexToMerge in indexesToMerge.Where(x => x.IndexType == IndexTypeDto.Ascending))
+        {
+            _indexes.Where(x=> x.IndexType == IndexTypeDto.Ascending && x.Fields.OrderBy(y => y)
+                .SequenceEqual(textIndexToMerge.Fields.OrderBy(y => y))).ToList()
+                .ForEach(x => _indexes.Remove(x));
+            _indexes.Add(textIndexToMerge);
+        }
     }
 
     /// <summary>
@@ -251,4 +285,5 @@ public class CkTypeGraph
 
         return list;
     }
+
 }

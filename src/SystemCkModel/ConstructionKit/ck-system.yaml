@@ -2,7 +2,8 @@ $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
 - typeId: Entity
   isAbstract: true
-- typeId: Tenant
+- isCollectionRoot: true
+  typeId: Tenant
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -18,7 +19,8 @@ types:
     fields:
     - attributeNames:
       - TenantId
-- typeId: AutoIncrement
+- isCollectionRoot: true
+  typeId: AutoIncrement
   derivedFromCkTypeId: System/Entity
   attributes:
   - id: System/AutoIncrement.Start
@@ -28,7 +30,8 @@ types:
   - id: System/AutoIncrement.CurrentValue
     name: CurrentValue
     isOptional: true
-- typeId: Query
+- isCollectionRoot: true
+  typeId: Query
   derivedFromCkTypeId: System/Entity
   attributes:
   - id: System/Query.CkTypeId
@@ -49,7 +52,8 @@ types:
     isOptional: true
   - id: System/Name
     name: Name
-- typeId: Configuration
+- isCollectionRoot: true
+  typeId: Configuration
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:

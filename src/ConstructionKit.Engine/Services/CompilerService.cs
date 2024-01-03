@@ -217,7 +217,7 @@ public class CompilerService : ICompilerService
 #endif
         var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, modelPath, operationResult).ConfigureAwait(false);
 
-        var types = new List<CkCompiledTypeDto>();
+        var types = new Dictionary<CkTypeId ,CkCompiledTypeDto>();
         if (Directory.Exists(typesDirectory))
         {
             foreach (var typeFile in Directory.EnumerateFiles(typesDirectory, "*.yaml"))
@@ -232,17 +232,22 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer.DeserializeElementsAsync(streamType, typeFile, operationResult).ConfigureAwait(false);
                     if (elementsRootDto.Types != null)
                     {
-                        types.AddRange(elementsRootDto.Types.Select(t => new CkCompiledTypeDto
+                        foreach (var ckTypeDto in elementsRootDto.Types)
                         {
-                            TypeId = t.TypeId,
-                            DerivedFromCkTypeId = t.DerivedFromCkTypeId,
-                            Associations = t.Associations,
-                            Attributes = t.Attributes,
-                            Indexes = t.Indexes,
-                            IsAbstract = t.IsAbstract,
-                            IsFinal = t.IsFinal,
-                            EnableChangeStreamPreAndPostImages = t.EnableChangeStreamPreAndPostImages
-                        }));
+                            var ckCompiledTypeDto = new CkCompiledTypeDto
+                            {
+                                TypeId = ckTypeDto.TypeId,
+                                DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId,
+                                Associations = ckTypeDto.Associations,
+                                Attributes = ckTypeDto.Attributes,
+                                Indexes = ckTypeDto.Indexes,
+                                IsAbstract = ckTypeDto.IsAbstract,
+                                IsFinal = ckTypeDto.IsFinal,
+                                EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages
+                            };
+
+                            types.Add(ckCompiledTypeDto.TypeId, ckCompiledTypeDto);
+                        }
                     }
                 }
                 catch (ModelParseException e)
@@ -361,7 +366,7 @@ public class CompilerService : ICompilerService
         {
             ModelId = ckMetaDto.ModelId,
             Dependencies = ckMetaDto.Dependencies,
-            Types = types,
+            Types = types.Values.ToList(),
             Attributes = attributes,
             AssociationRoles = associationRoles,
             Records = records,
@@ -370,6 +375,12 @@ public class CompilerService : ICompilerService
 
         var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult).ConfigureAwait(false);
 
+        foreach (var keyValuePair in ckModelGraph.Types.Where(s => s.Key.ModelId == ckMetaDto.ModelId 
+                                                                   && s.Value.IsCollectionRoot))
+        {
+            types[keyValuePair.Key.Key].IsCollectionRoot = keyValuePair.Value.IsCollectionRoot;
+        }
+        
         if (operationResult.HasErrors)
         {
             operationResult.WriteMessagesToLogger(_logger);

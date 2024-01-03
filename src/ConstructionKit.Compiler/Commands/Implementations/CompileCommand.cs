@@ -49,6 +49,7 @@ internal class CompileCommand : Command<OctoToolOptions>
 
         if (doPublish)
         {
+            Logger.LogInformation("Publishing construction kit model to 'LocalRepository'");
             var operationResult = new OperationResult();
             await using var streamReader = File.OpenRead(compiledModelFilePath);
             
@@ -60,8 +61,8 @@ internal class CompileCommand : Command<OctoToolOptions>
                 return;
             }
 
-            Logger.LogInformation("Publishing construction kit model to 'LocalRepository'");
             await _ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot, true);
+            Logger.LogInformation("Construction kit model published to 'LocalRepository'");
         }
         
         Logger.LogInformation("Construction kit model directory compiled");

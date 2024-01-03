@@ -12,7 +12,8 @@ types:
   attributes:
   - id: System/Name
     name: Name
-- typeId: SampleType1
+- isCollectionRoot: true
+  typeId: SampleType1
   derivedFromCkTypeId: System/Entity
   attributes:
   - id: Sample1/SampleAttribute

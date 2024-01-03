@@ -8,7 +8,8 @@ types:
     name: ClientId
   - id: System.TestIdentity/ClientSecret
     name: ClientSecret
-- typeId: Client
+- isCollectionRoot: true
+  typeId: Client
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -146,7 +147,8 @@ types:
     name: Scopes
   - id: System.TestIdentity/AllowedAccessTokenSigningAlgorithms
     name: AllowedAccessTokenSigningAlgorithms
-- typeId: IdentityProvider
+- isCollectionRoot: true
+  typeId: IdentityProvider
   derivedFromCkTypeId: System/Entity
   isAbstract: true
   attributes:
@@ -177,7 +179,8 @@ types:
     name: IsEmphasized
   - id: System.TestIdentity/IsRequired
     name: IsRequired
-- typeId: Role
+- isCollectionRoot: true
+  typeId: Role
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -210,7 +213,8 @@ types:
     name: ClientIdGroupAzureAd
   - id: System.TestIdentity/ClientSecret
     name: ClientSecretGroupAzureAd
-- typeId: PersistedGrant
+- isCollectionRoot: true
+  typeId: PersistedGrant
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -250,7 +254,8 @@ types:
     name: UserBaseDn
   - id: System.TestIdentity/UserNameAttribute
     name: UserNameAttribute
-- typeId: PermissionRole
+- isCollectionRoot: true
+  typeId: PermissionRole
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -262,7 +267,8 @@ types:
     name: SubjectIds
   - id: System.TestIdentity/IdentityRoleIds
     name: IdentityRoleIds
-- typeId: Permission
+- isCollectionRoot: true
+  typeId: Permission
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -278,7 +284,8 @@ types:
     name: ClientId
   - id: System.TestIdentity/ClientSecret
     name: ClientSecret
-- typeId: User
+- isCollectionRoot: true
+  typeId: User
   derivedFromCkTypeId: System/Entity
   isFinal: true
   attributes:
@@ -357,7 +364,8 @@ types:
     name: UseTls
   - id: System.TestIdentity/HostPort
     name: HostPort
-- typeId: Resource
+- isCollectionRoot: true
+  typeId: Resource
   derivedFromCkTypeId: System/Entity
   isAbstract: true
   attributes:

@@ -26,9 +26,9 @@ internal class CkCache : IDisposable
 
     public void LoadCkModelGraph(CkModelGraph modelGraph)
     {
-        _logger.LogInformation("Loading model graph into cache for tenant {TenantId}", TenantId);
+        _logger.LogDebug("Loading model graph into cache for tenant {TenantId}", TenantId);
         _modelGraph = modelGraph;
-        _logger.LogInformation("Loading model graph into cache for tenant {TenantId} finished", TenantId);
+        _logger.LogDebug("Loading model graph into cache for tenant {TenantId} finished", TenantId);
     }
     
     public IEnumerable<CkTypeGraph> GetCkTypes()

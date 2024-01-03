@@ -126,6 +126,8 @@ internal class InheritanceResolver : IInheritanceResolver
             if (baseCkType.IsCollectionRoot)
             {
                 originTypeGraph.SetDefiningCollectionCkTypeId(baseCkType.CkTypeId);
+
+                baseCkType.MergeTextIndexes(originTypeGraph.Indexes);
             }
 
             foreach (var typeAttribute in baseCkType.DefinedAttributes)

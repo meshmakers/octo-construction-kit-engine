@@ -8,8 +8,38 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="Added definition to define root collections.">
-      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Contracts/Serialization/Schema/ck-element-type.json" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Contracts/Serialization/Schema/ck-element-type.json" afterDir="false" />
+    <list default="true" id="47b9ff7e-69a1-4021-8178-210dcc9f65cd" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/.idea.Octo.ConstructionKit.Compiler/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/.idea.Octo.ConstructionKit.Compiler/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/samples/Sample.SourceGenerator/ConstructionKit/ck-sample1.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/samples/Sample.SourceGenerator/ConstructionKit/ck-sample1.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Compiler/Commands/Implementations/CompileCommand.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Compiler/Commands/Implementations/CompileCommand.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Caching/CkCache.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Caching/CkCache.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/ConstructionKit.Engine/Services/CompilerService.cs" beforeDir="false" afterPath="$PROJECT_DIR$/src/ConstructionKit.Engine/Services/CompilerService.cs" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/SystemCkModel/ConstructionKit/ck-system.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/src/SystemCkModel/ConstructionKit/ck-system.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/BasicRtEntityTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/attributes/attributes.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ck-test.cache.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/ckModel.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/CkTest/ConstructionKit/types/location.yaml" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Configuration/SystemTestConfiguration.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Configuration/SystemTestOptions.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/ConstructionKitTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/ConfigurationFixture.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/ServiceCollectionFixture.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/SystemFixture.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Fixtures/TenantFixture.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/NewTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Persistence.SystemTests.csproj" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/RtEntityTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/SystemTenantTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/TenantConfigurationTests.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/Usings.cs" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Persistence.SystemTests/appsettings.test.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Runtime.Engine.SystemTests/sampleData/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Runtime.Engine.SystemTests/sampleData/CkTest/ConstructionKit/ck-test.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/Runtime.Engine.Tests/sampleData/CkTest/ConstructionKit/ck-test.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/Runtime.Engine.Tests/sampleData/CkTest/ConstructionKit/ck-test.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/TestCkModel/ConstructionKit/ck-system.testidentity.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/tests/TestCkModel/ConstructionKit/ck-system.testidentity.yaml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,8 +53,12 @@
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/0be83b41d6394b4fa73be4242cc407a9c3fe00/6f/278e5666/TimeSpan.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="file://$APPLICATION_CONFIG_DIR$/resharper-host/DecompilerCache/decompiler/0be83b41d6394b4fa73be4242cc407a9c3fe00/b8/49e85c6b/TimeSpanParse.cs" root0="FORCE_HIGHLIGHTING" />
     <setting file="file://$PROJECT_DIR$/samples/Sample.SourceGenerator/Usings.cs" root0="FORCE_HIGHLIGHTING" />
+    <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Compiler/Commands/Implementations/CompileCommand.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DataTransferObjects/CkCompiledModelRoot.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Contracts/DependencyGraph/CkTypeGraph.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
+    <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Resolvers/InheritanceResolver.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.Engine/Services/CompilerService.cs" root0="SKIP_HIGHLIGHTING" />
     <setting file="mock:///Users/gerald/RiderProjects/meshmakers/octo-construction-kit-engine/src/ConstructionKit.SourceGeneration/CkIdsCodeGenerator.cs" root0="SKIP_HIGHLIGHTING" />
@@ -73,7 +107,7 @@
     ]
   }
 }]]></component>
-  <component name="RunManager" selected=".NET Launch Settings Profile.ConstructionKit.SourceGeneration: Generators">
+  <component name="RunManager" selected=".NET Project.ConstructionKit.Compiler">
     <configuration name="ConstructionKit.Compiler" type="DotNetProject" factoryName=".NET Project">
       <option name="EXE_PATH" value="$PROJECT_DIR$/bin/DebugL/net8.0/octo-ckc" />
       <option name="PROGRAM_PARAMETERS" value="-c compile -p $PROJECT_DIR$/samples/Sample.SourceGenerator/ConstructionKit -c" />
@@ -126,7 +160,7 @@
       <workItem from="1704144405721" duration="2513000" />
       <workItem from="1704172864388" duration="4203000" />
       <workItem from="1704192944587" duration="1844000" />
-      <workItem from="1704268559616" duration="8271000" />
+      <workItem from="1704268559616" duration="15233000" />
     </task>
     <task id="LOCAL-00001" summary="Added definition to define root collections.">
       <option name="closed" value="true" />
@@ -136,7 +170,23 @@
       <option name="project" value="LOCAL" />
       <updated>1704290320314</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Fix schema">
+      <option name="closed" value="true" />
+      <created>1704293496196</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1704293496196</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Enabled construction kit system model as nuget package">
+      <option name="closed" value="true" />
+      <created>1704293744392</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1704293744392</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -146,7 +196,9 @@
   <component name="VcsManagerConfiguration">
     <option name="CLEAR_INITIAL_COMMIT_MESSAGE" value="true" />
     <MESSAGE value="Added definition to define root collections." />
-    <option name="LAST_COMMIT_MESSAGE" value="Added definition to define root collections." />
+    <MESSAGE value="Fix schema" />
+    <MESSAGE value="Enabled construction kit system model as nuget package" />
+    <option name="LAST_COMMIT_MESSAGE" value="Enabled construction kit system model as nuget package" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

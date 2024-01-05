@@ -224,7 +224,7 @@ public class CkTypeGraph
     /// Appends a list of indexes to the current type
     /// </summary>
     /// <param name="indexesToMerge"></param>
-    public void MergeTextIndexes(IReadOnlyCollection<CkTypeIndexDto> indexesToMerge)
+    internal void MergeTextIndexes(IReadOnlyCollection<CkTypeIndexDto> indexesToMerge)
     {
         var textIndex = indexesToMerge.FirstOrDefault(x => x.IndexType == IndexTypeDto.Text);
 

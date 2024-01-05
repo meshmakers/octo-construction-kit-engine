@@ -5,13 +5,13 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-/// Represents a role of an association between two CkEntityTypes
+///     Represents a role of an association between two CkEntityTypes
 /// </summary>
 [DebuggerDisplay("{" + nameof(AssociationRoleId) + "}")]
 public class CkAssociationRoleDto
 {
     /// <summary>
-    /// The id of the association role
+    ///     The id of the association role
     /// </summary>
     [YamlMember(Alias = "id")]
     [JsonPropertyName("id")]

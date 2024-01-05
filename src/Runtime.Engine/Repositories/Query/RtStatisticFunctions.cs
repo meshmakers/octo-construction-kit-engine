@@ -7,7 +7,7 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 
 /// <summary>
-/// Implements the statistic functions for a result set.
+///     Implements the statistic functions for a result set.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
 public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
@@ -16,7 +16,7 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
     private readonly FieldGroupBy _groupBy;
 
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="ckTypeGraph">The type graph</param>
     /// <param name="groupBy">The grouping information</param>
@@ -27,7 +27,7 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
     }
 
     /// <summary>
-    /// Calculates the grouping result
+    ///     Calculates the grouping result
     /// </summary>
     /// <param name="resultList">Result list the grouping needs to be executed.</param>
     /// <returns></returns>
@@ -35,8 +35,8 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
     {
         var groupByPropertiesResult = resultList.GroupBy(g => new Key(_groupBy.GroupByAttributeNameList.Select(a => GetValue(a)(g))));
 
-        List<GroupingResult> calculateGrouping = new List<GroupingResult>();
-        foreach (IGrouping<Key, TEntity> entityGrouping in groupByPropertiesResult.OrderBy(x => x.Key))
+        var calculateGrouping = new List<GroupingResult>();
+        foreach (var entityGrouping in groupByPropertiesResult.OrderBy(x => x.Key))
         {
             var grouping = new GroupingResult(
                 _groupBy.GroupByAttributeNameList,
@@ -59,7 +59,7 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
 
     private static List<StatisticsResult> RunStatistics(IEnumerable<string>? attributeNames, Func<string, object?> calcFunction)
     {
-        List<StatisticsResult> list = new List<StatisticsResult>();
+        var list = new List<StatisticsResult>();
         if (attributeNames != null)
         {
             foreach (var attributeName in attributeNames)
@@ -75,8 +75,9 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
         return list;
     }
 
-    private Func<TEntity, object?> GetValue(string propertyName) =>
-        entity =>
+    private Func<TEntity, object?> GetValue(string propertyName)
+    {
+        return entity =>
         {
             if (_ckTypeGraph.AllAttributesByName.TryGetValue(propertyName, out var attributeCacheItem))
             {
@@ -85,28 +86,16 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
 
             throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(_ckTypeGraph.CkTypeId, propertyName);
         };
+    }
 
     private class Key : IComparable
     {
-        private readonly IEnumerable<object?> _keys;
-
         public Key(IEnumerable<object?> keys)
         {
-            _keys = keys;
+            Keys = keys;
         }
 
-        public IEnumerable<object?> Keys => _keys;
-
-        public override bool Equals(object? obj)
-        {
-            var t = obj is Key other && _keys.SequenceEqual(other._keys);
-            return t;
-        }
-
-        public override int GetHashCode()
-        {
-            return _keys.Aggregate(0, (current, key) => current ^ key?.GetHashCode() ?? 0);
-        }
+        public IEnumerable<object?> Keys { get; }
 
         public int CompareTo(object? obj)
         {
@@ -120,8 +109,8 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
                 return 1;
             }
 
-            var keys = _keys.ToArray();
-            var otherKeys = key1._keys.ToArray();
+            var keys = Keys.ToArray();
+            var otherKeys = key1.Keys.ToArray();
             if (keys.Length < otherKeys.Length)
             {
                 return -1;
@@ -132,7 +121,7 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
                 return 1;
             }
 
-            for (int i = 0; i < keys.Length; i++)
+            for (var i = 0; i < keys.Length; i++)
             {
                 var key = keys[i];
                 var otherKey = otherKeys[i];
@@ -157,6 +146,17 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
             }
 
             return 0;
+        }
+
+        public override bool Equals(object? obj)
+        {
+            var t = obj is Key other && Keys.SequenceEqual(other.Keys);
+            return t;
+        }
+
+        public override int GetHashCode()
+        {
+            return Keys.Aggregate(0, (current, key) => current ^ key?.GetHashCode() ?? 0);
         }
     }
 }

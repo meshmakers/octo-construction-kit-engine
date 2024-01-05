@@ -7,15 +7,15 @@ using Microsoft.Extensions.Options;
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
 /// <summary>
-/// CkModel repository that uses the local file system to store the compiled models.
+///     CkModel repository that uses the local file system to store the compiled models.
 /// </summary>
 public class LocalFileSystemCkModelRepository : ICkModelRepository
 {
-    private readonly IOptions<LocalCkModelRepositoryOptions> _options;
     private readonly ICkJsonSerializer _ckJsonSerializer;
+    private readonly IOptions<LocalCkModelRepositoryOptions> _options;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="LocalFileSystemCkModelRepository"/> class.
+    ///     Creates a new instance of the <see cref="LocalFileSystemCkModelRepository" /> class.
     /// </summary>
     /// <param name="options"></param>
     /// <param name="ckJsonSerializer"></param>
@@ -27,15 +27,16 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
     /// <inheritdoc />
     public int Order => 10;
+
     /// <inheritdoc />
-    public string RepositoryName => "LocalRepository";  
+    public string RepositoryName => "LocalRepository";
 
     /// <inheritdoc />
     public string Description => $"Local file system repository at '{_options.Value.RootPath}'";
 
     /// <inheritdoc />
     public bool CanWrite => true;
-    
+
     /// <inheritdoc />
     public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
     {
@@ -67,7 +68,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 #else
         await using var streamReader = File.OpenRead(compiledModelFilePath);
 #endif
-        var compiledModelRoot = await _ckJsonSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult).ConfigureAwait(false);
+        var compiledModelRoot = await _ckJsonSerializer
+            .DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult).ConfigureAwait(false);
         if (operationResult.HasErrors)
         {
             throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);
@@ -77,7 +79,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, 
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
@@ -93,7 +95,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else
         await using var streamWriter = new StreamWriter(compiledModelFilePath);
-#endif        
+#endif
         await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
     }
 
@@ -109,7 +111,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var rootPath = _options.Value.RootPath;
         var modelPath = Path.Combine(rootPath, "ck-models", ckModelId.ModelId);
         var modelVersionPath = Path.Combine(modelPath, ckModelId.ModelVersion.Major.ToString());
-        string compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.json";
+        var compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.json";
         var compiledModelFilePath = Path.Combine(modelVersionPath, compiledModelFile);
         return compiledModelFilePath;
     }

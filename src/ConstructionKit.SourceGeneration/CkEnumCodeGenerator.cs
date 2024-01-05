@@ -6,12 +6,12 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 /// <summary>
-/// Generates code for a CK type
+///     Generates code for a CK type
 /// </summary>
 public class CkEnumCodeGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkEnumCodeGenerator"/>
+    ///     Returns the singleton instance of <see cref="CkEnumCodeGenerator" />
     /// </summary>
     public static readonly CkEnumCodeGenerator Instance = new();
 
@@ -27,7 +27,10 @@ public class CkEnumCodeGenerator
     }
 
     /// <inheritdoc />
-    public override int GetHashCode() => GetType().GetHashCode();
+    public override int GetHashCode()
+    {
+        return GetType().GetHashCode();
+    }
 
     public string Generate(string ns, CkModelId modelId, CkEnumDto ckEnumDto, string cacheTenantId, ICkCacheService cacheService)
     {
@@ -44,23 +47,20 @@ public class CkEnumCodeGenerator
         sb.AppendLine("/// </summary>");
         sb.AppendLine($"public enum Rt{ckEnumDto.EnumId.EnumId.MakeClassName()}Enum");
         sb.AppendLine("{");
-            foreach (var ckSelectionValueDto in ckEnumDto.Values)
+        foreach (var ckSelectionValueDto in ckEnumDto.Values)
+        {
+            if (!string.IsNullOrWhiteSpace(ckSelectionValueDto.Description))
             {
-                if (!string.IsNullOrWhiteSpace(ckSelectionValueDto.Description))
-                {
-                    sb.AppendLine("    /// <summary>");
-                    sb.AppendLine($"    /// {ckSelectionValueDto.Description}");
-                    sb.AppendLine("    /// </summary>");
-                }
-
-                sb.AppendLine($"    {ckSelectionValueDto.Name} = {ckSelectionValueDto.Key},");
-
+                sb.AppendLine("    /// <summary>");
+                sb.AppendLine($"    /// {ckSelectionValueDto.Description}");
+                sb.AppendLine("    /// </summary>");
             }
+
+            sb.AppendLine($"    {ckSelectionValueDto.Name} = {ckSelectionValueDto.Key},");
+        }
 
         sb.AppendLine("}");
 
         return sb.ToString();
     }
-
-   
 }

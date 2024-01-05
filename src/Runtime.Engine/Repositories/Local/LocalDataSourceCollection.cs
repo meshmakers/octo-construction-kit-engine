@@ -6,20 +6,20 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
-internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCollection<TKey, TDocument> 
-    where TDocument : new() 
+internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCollection<TKey, TDocument>
+    where TDocument : new()
     where TKey : notnull
 {
+    private readonly IDataSourceMapper<TKey, TDocument, TDto> _dataSourceMapper;
+    private readonly string _filePath;
+
+    private readonly ConcurrentDictionary<TKey, TDocument> _rtEntities;
     private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
 
     private readonly string _tenantId;
-    private readonly string _filePath;
-    private readonly IDataSourceMapper<TKey, TDocument, TDto> _dataSourceMapper;
-
-    private readonly ConcurrentDictionary<TKey, TDocument> _rtEntities;
     private bool _isLoaded;
 
-    public LocalDataSourceCollection(string tenantId, string filePath, 
+    public LocalDataSourceCollection(string tenantId, string filePath,
         IDataSourceMapper<TKey, TDocument, TDto> dataSourceMapper)
     {
         _tenantId = tenantId;
@@ -35,7 +35,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     {
         await LoadAsync().ConfigureAwait(false);
 
-        bool hasError = false;
+        var hasError = false;
         long insertCount = 0;
         long updateCount = 0;
         foreach (var document in documents)
@@ -50,6 +50,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                         hasError = true;
                         continue;
                     }
+
                     updateCount++;
                 }
                 else
@@ -62,7 +63,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                 insertCount++;
             }
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
 
         var result = new LocalBulkImportResult(insertCount, 0, updateCount, hasError);
@@ -94,7 +95,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                 throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
             }
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -105,17 +106,17 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         foreach (var document in documents)
         {
             var key = _dataSourceMapper.GetId(document);
-            
-            _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+
+            _rtEntities.TryGetValue(key, out var savedDocument);
 
             if (savedDocument == null)
             {
                 throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
             }
-            
+
             _dataSourceMapper.Apply(savedDocument, document);
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -126,17 +127,17 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         foreach (var document in documents)
         {
             var key = _dataSourceMapper.GetId(document);
-            
-            _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+
+            _rtEntities.TryGetValue(key, out var savedDocument);
 
             if (savedDocument == null)
             {
                 throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
             }
-            
+
             _dataSourceMapper.Apply(savedDocument, document);
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -144,23 +145,22 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     {
         await LoadAsync().ConfigureAwait(false);
 
-        _rtEntities.TryGetValue(key, out TDocument? savedDocument);
+        _rtEntities.TryGetValue(key, out var savedDocument);
 
         if (savedDocument == null)
         {
             throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
         }
-        
-        _dataSourceMapper.Apply(savedDocument, document);
-        
-        await SaveAsync().ConfigureAwait(false);
 
+        _dataSourceMapper.Apply(savedDocument, document);
+
+        await SaveAsync().ConfigureAwait(false);
     }
 
     public async Task DeleteOneAsync(IOctoSession session, TKey key)
     {
         await LoadAsync().ConfigureAwait(false);
-        
+
         if (!_rtEntities.TryRemove(key, out _))
         {
             throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
@@ -177,7 +177,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         {
             return false;
         }
-        
+
         await SaveAsync().ConfigureAwait(false);
         return true;
     }
@@ -200,8 +200,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     public async Task<TDocument?> DocumentAsync(IOctoSession session, TKey key)
     {
         await LoadAsync().ConfigureAwait(false);
-        
-        _rtEntities.TryGetValue(key, out TDocument? document);
+
+        _rtEntities.TryGetValue(key, out var document);
 
         return document;
     }
@@ -210,8 +210,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     {
         await LoadAsync().ConfigureAwait(false);
 
-        _rtEntities.TryGetValue(key, out TDocument? document);
-        
+        _rtEntities.TryGetValue(key, out var document);
+
         return (TDerived?)document;
     }
 
@@ -221,7 +221,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         return _rtEntities.Values.AsQueryable();
     }
-    
+
     public IQueryable<TDocument> AsQueryable(IOctoSession? session = null)
     {
         LoadAsync().Wait();
@@ -236,7 +236,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         return _rtEntities.Values.AsQueryable().SingleOrDefault(expression);
     }
 
-    public async Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression, int? skip = null, int? take = null)
+    public async Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
+        int? skip = null, int? take = null)
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -245,10 +246,12 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         {
             result = result.Skip(skip.Value);
         }
+
         if (take != null)
         {
             result = result.Take(take.Value);
         }
+
         return result.ToList();
     }
 
@@ -269,12 +272,13 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     public async Task<IEnumerable<TDocument>> GetAsync(IOctoSession session, int? skip = null, int? take = null)
     {
         await LoadAsync().ConfigureAwait(false);
-        
+
         var result = _rtEntities.Values.AsQueryable();
         if (skip != null)
         {
             result = result.Skip(skip.Value);
         }
+
         if (take != null)
         {
             result = result.Take(take.Value);
@@ -321,7 +325,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
             OperationResult operationResult = new();
             await using var fileStream = File.OpenRead(_filePath);
-            
+
             var rtEntities = await _dataSourceMapper.DeserializeAsync(fileStream, _filePath, operationResult).ConfigureAwait(false);
             foreach (var keyValuePair in rtEntities)
             {

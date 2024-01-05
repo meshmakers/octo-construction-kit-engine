@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 public class CkEmbeddedModelGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkEmbeddedModelGenerator"/>
+    ///     Returns the singleton instance of <see cref="CkEmbeddedModelGenerator" />
     /// </summary>
     public static readonly CkEmbeddedModelGenerator Instance = new();
 
@@ -29,7 +29,7 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine($"public class {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel : ICkEmbeddedModel");
         sb.AppendLine("{");
         sb.AppendLine();
-        sb.AppendLine($"   private readonly ICkYamlSerializer _ckYamlSerializer;");
+        sb.AppendLine("   private readonly ICkYamlSerializer _ckYamlSerializer;");
         sb.AppendLine();
         sb.AppendLine($"   public {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel(ICkYamlSerializer ckYamlSerializer)");
         sb.AppendLine("    {");
@@ -44,13 +44,15 @@ public class CkEmbeddedModelGenerator
         sb.AppendLine($"        var ckModelNamespace = \"{ckModelIdNs}\";");
         sb.AppendLine("        var resourceName = $\"{ckModelNamespace}.{ckModelFileName}\";");
         sb.AppendLine();
-        sb.AppendLine($"         using (var stream = typeof({ckModelId.ModelId.MakeClassName()}CkEmbeddedModel).Assembly.GetManifestResourceStream(resourceName))");
+        sb.AppendLine(
+            $"         using (var stream = typeof({ckModelId.ModelId.MakeClassName()}CkEmbeddedModel).Assembly.GetManifestResourceStream(resourceName))");
         sb.AppendLine("         {");
         sb.AppendLine("             if (stream == null)");
         sb.AppendLine("             {");
         sb.AppendLine("                  throw new KeyNotFoundException($\"'{resourceName}' not found in resources.\");");
         sb.AppendLine("             }");
-        sb.AppendLine("             return await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, resourceName, operationResult);");
+        sb.AppendLine(
+            "             return await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, resourceName, operationResult);");
         sb.AppendLine("         }");
         sb.AppendLine("");
         sb.AppendLine("    }");

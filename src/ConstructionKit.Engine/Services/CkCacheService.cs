@@ -9,15 +9,15 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
 /// <summary>
-/// Service for managing the cache of compiled construction kit models.
+///     Service for managing the cache of compiled construction kit models.
 /// </summary>
 public class CkCacheService : ICkCacheService
 {
-    private readonly ILogger<CkCacheService> _logger;
     private readonly ConcurrentDictionary<string, CkCache> _ckCaches;
+    private readonly ILogger<CkCacheService> _logger;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="CkCacheService"/> class.
+    ///     Creates a new instance of the <see cref="CkCacheService" /> class.
     /// </summary>
     /// <param name="logger">Instance of the logger interface</param>
     public CkCacheService(ILogger<CkCacheService> logger)
@@ -27,7 +27,7 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <summary>
-    /// Create a new tenant cache.
+    ///     Create a new tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     public void CreateTenant(string tenantId)
@@ -36,7 +36,7 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <summary>
-    /// Loads a already analyzed model into a tenant cache.
+    ///     Loads a already analyzed model into a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="modelGraph">The ready analyzed graph model</param>
@@ -47,7 +47,7 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         ckCache.LoadCkModelGraph(modelGraph);
     }
 
@@ -63,7 +63,7 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <summary>
-    /// Unload a tenant cache.
+    ///     Unload a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     public void Unload(string tenantId)
@@ -72,12 +72,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         ckCache.Dispose();
     }
 
     /// <summary>
-    /// Returns true if the tenant is loaded
+    ///     Returns true if the tenant is loaded
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns></returns>
@@ -94,12 +94,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkTypes();
     }
 
     /// <summary>
-    /// Returns a <see cref="CkTypeGraph"/> from the cache.
+    ///     Returns a <see cref="CkTypeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckTypeId">Construction Kit type id.</param>
@@ -111,7 +111,7 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkType(ckTypeId);
     }
 
@@ -120,14 +120,14 @@ public class CkCacheService : ICkCacheService
     public bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph)
 #else
     public bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
-#endif     
+#endif
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             ckTypeGraph = null;
             return false;
         }
-        
+
         return ckCache.TryGetCkType(ckTypeId, out ckTypeGraph);
     }
 
@@ -138,7 +138,7 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkRecords();
     }
 
@@ -147,19 +147,19 @@ public class CkCacheService : ICkCacheService
     public bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, out CkRecordGraph? ckRecordGraph)
 #else
     public bool TryGetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
-#endif     
+#endif
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             ckRecordGraph = null;
             return false;
         }
-        
+
         return ckCache.TryGetCkRecord(ckRecordId, out ckRecordGraph);
     }
 
     /// <summary>
-    /// Returns a <see cref="CkAttributeGraph"/> from the cache.
+    ///     Returns a <see cref="CkAttributeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckAttributeId">Construction Kit attribute id.</param>
@@ -171,12 +171,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkAttribute(ckAttributeId);
     }
-    
+
     /// <summary>
-    /// Returns a <see cref="CkAssociationRoleGraph"/> from the cache.
+    ///     Returns a <see cref="CkAssociationRoleGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckAssociationRoleId">Construction Kit attribute id.</param>
@@ -188,12 +188,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkAssociationRole(ckAssociationRoleId);
     }
-    
+
     /// <summary>
-    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckRecordId">Construction Kit record id.</param>
@@ -205,7 +205,7 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkRecord(ckRecordId);
     }
 
@@ -216,12 +216,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkEnums();
     }
 
     /// <summary>
-    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckEnumId">Construction Kit record id.</param>
@@ -233,12 +233,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         return ckCache.GetCkEnum(ckEnumId);
     }
-    
+
     /// <summary>
-    /// Saves the cache to a stream.
+    ///     Saves the cache to a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="stream">Stream ready for write</param>
@@ -249,12 +249,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         await ckCache.SaveCacheAsync(stream).ConfigureAwait(false);
     }
-    
+
     /// <summary>
-    /// Restores the cache from a stream.
+    ///     Restores the cache from a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="stream">Stream ready for read</param>
@@ -265,12 +265,12 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         await ckCache.RestoreCacheAsync(stream).ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Restores the cache from a stream.
+    ///     Restores the cache from a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="jsonText">JSON formatted cache representation</param>
@@ -281,7 +281,7 @@ public class CkCacheService : ICkCacheService
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
-        
+
         ckCache.RestoreCache(jsonText);
     }
 }

@@ -1,19 +1,20 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit model id
+///     Represents a versioned construction kit model id
 /// </summary>
 [DebuggerDisplay("{" + nameof(ModelId) + "} ({" + nameof(ModelVersion) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkModelIdConverter))]
+[JsonConverter(typeof(CkModelIdConverter))]
 public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>, ICkKey
 {
     private readonly string? _modelId;
 
     /// <summary>
-    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="ckModelId"/>.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="ckModelId" />.
     /// </summary>
     /// <param name="ckModelId"></param>
     public CkModelId(string ckModelId)
@@ -32,7 +33,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="modelId"/> and <paramref name="modelVersion"/>.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="modelId" /> and <paramref name="modelVersion" />.
     /// </summary>
     /// <param name="modelId"></param>
     /// <param name="modelVersion"></param>
@@ -43,7 +44,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkModelId"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -53,17 +54,17 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <summary>
-    /// Returns the id of the model, e. g. "System"
+    ///     Returns the id of the model, e. g. "System"
     /// </summary>
     public string ModelId => _modelId ?? "";
 
     /// <summary>
-    /// Returns the version of the model, e. g. "1.0.0"
+    ///     Returns the version of the model, e. g. "1.0.0"
     /// </summary>
     public CkVersion ModelVersion { get; }
 
     /// <summary>
-    /// Returns the full name of the model, e. g. "System-1.0.0"
+    ///     Returns the full name of the model, e. g. "System-1.0.0"
     /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
     public string FullName => IsEmpty ? "" : $"{ModelId}-{ModelVersion}";
@@ -77,7 +78,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
             {
                 return "";
             }
-            
+
             var s = ModelId;
             if (ModelVersion.Major > 1)
             {
@@ -102,13 +103,13 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     {
         throw new InvalidCastException();
     }
-    
+
     /// <inheritdoc />
     public byte ToByte(IFormatProvider? provider)
     {
         throw new InvalidCastException();
     }
-    
+
     /// <inheritdoc />
     public char ToChar(IFormatProvider? provider)
     {
@@ -181,6 +182,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
                 {
                     return this;
                 }
+
                 break;
         }
 
@@ -208,7 +210,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     /// <inheritdoc />
     public int CompareTo(CkModelId other)
     {
-        var result = String.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
+        var result = string.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -243,7 +245,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     {
         unchecked
         {
-            int hash = 52;
+            var hash = 52;
             hash = hash * 12 + ModelId.GetHashCode();
             hash = hash * 12 + ModelVersion.GetHashCode();
             return hash;
@@ -251,7 +253,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <summary>
-    /// Compares two <see cref="CkModelId"/>s for equality.
+    ///     Compares two <see cref="CkModelId" />s for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -262,7 +264,7 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <summary>
-    /// Compares two <see cref="CkModelId"/> values for inequality.
+    ///     Compares two <see cref="CkModelId" /> values for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>

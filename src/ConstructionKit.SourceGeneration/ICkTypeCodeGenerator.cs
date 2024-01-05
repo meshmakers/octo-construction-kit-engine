@@ -5,12 +5,12 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 /// <summary>
-/// Interface for construction kit type code generators
+///     Interface for construction kit type code generators
 /// </summary>
 public interface ICkTypeCodeGenerator : IEquatable<ICkTypeCodeGenerator>
 {
    /// <summary>
-   /// Generates code for a construction kit type
+   ///     Generates code for a construction kit type
    /// </summary>
    /// <param name="ns">The namespace of the created code</param>
    /// <param name="ckModelId">The model id of the construction kit type</param>

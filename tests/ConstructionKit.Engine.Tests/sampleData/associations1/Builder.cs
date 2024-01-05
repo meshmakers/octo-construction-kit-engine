@@ -16,7 +16,7 @@ public class Builder
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
-                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related", 
+                    OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related",
                     Attributes = new List<CkTypeAttributeDto>
                     {
                         new() { CkAttributeId = "TestAssociations/attribute1", AttributeName = "a" },
@@ -39,42 +39,42 @@ public class Builder
             },
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attribute1",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute2",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute3",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute4",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute5",
-                  ValueType = AttributeValueTypesDto.Int,
-              },
-              new()
-              {
-                  AttributeId = "attribute6",
-                  ValueType = AttributeValueTypesDto.Double,
-              },
-              new()
-              {
-                  AttributeId = "Record1",
-                  ValueType = AttributeValueTypesDto.Record,
-                  ValueCkRecordId = "TestAssociations/Record1"
-              }
+                new()
+                {
+                    AttributeId = "attribute1",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute2",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute3",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute4",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute5",
+                    ValueType = AttributeValueTypesDto.Int
+                },
+                new()
+                {
+                    AttributeId = "attribute6",
+                    ValueType = AttributeValueTypesDto.Double
+                },
+                new()
+                {
+                    AttributeId = "Record1",
+                    ValueType = AttributeValueTypesDto.Record,
+                    ValueCkRecordId = "TestAssociations/Record1"
+                }
             },
             Records = new List<CkRecordDto>
             {

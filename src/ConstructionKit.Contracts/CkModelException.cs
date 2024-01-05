@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Used to indicate an exception in the CkModel.
+///     Used to indicate an exception in the CkModel.
 /// </summary>
 public class CkModelException : Exception
 {

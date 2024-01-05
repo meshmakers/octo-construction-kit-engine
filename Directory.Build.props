@@ -2,7 +2,7 @@
     <PropertyGroup>
         <BaseDirectoryBuildPath>$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))</BaseDirectoryBuildPath>
     </PropertyGroup>
-    <Import Condition="Exists($(BaseDirectoryBuildPath))" Project="$(BaseDirectoryBuildPath)" />
+    <Import Condition="Exists($(BaseDirectoryBuildPath))" Project="$(BaseDirectoryBuildPath)"/>
     <PropertyGroup>
         <Authors>meshmakers GmbH and Contributors</Authors>
         <Company>meshmakers GmbH and Contributors</Company>

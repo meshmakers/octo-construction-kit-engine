@@ -1,18 +1,17 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 /// <summary>
-/// Generates code for a CK type
+///     Generates code for a CK type
 /// </summary>
 public class CkRecordCodeGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkRecordCodeGenerator"/>
+    ///     Returns the singleton instance of <see cref="CkRecordCodeGenerator" />
     /// </summary>
     public static readonly CkRecordCodeGenerator Instance = new();
 
@@ -28,7 +27,10 @@ public class CkRecordCodeGenerator
     }
 
     /// <inheritdoc />
-    public override int GetHashCode() => GetType().GetHashCode();
+    public override int GetHashCode()
+    {
+        return GetType().GetHashCode();
+    }
 
     public string Generate(string ns, CkModelId modelId, CkRecordDto ckRecord, string cacheTenantId, ICkCacheService cacheService)
     {
@@ -65,19 +67,19 @@ public class CkRecordCodeGenerator
         sb.AppendLine("  {");
         sb.AppendLine("  }");
         sb.AppendLine();
-        
+
         if (ckRecord.Attributes != null)
         {
             foreach (var ckTypeAttributeDto in ckRecord.Attributes)
             {
-                CkAttributeGraph ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
+                var ckAttributeGraph = cacheService.GetCkAttribute(cacheTenantId, ckTypeAttributeDto.CkAttributeId);
                 if (!string.IsNullOrWhiteSpace(ckAttributeGraph.Description))
                 {
                     sb.AppendLine("  /// <summary>");
                     sb.AppendLine($"  /// {ckAttributeGraph.Description}");
                     sb.AppendLine("  /// </summary>");
                 }
-                
+
                 if (ckTypeAttributeDto.IsOptional)
                 {
                     AttributeCodeGenerator.GenerateNullableProperty(ckTypeAttributeDto, sb, ckAttributeGraph);
@@ -93,6 +95,4 @@ public class CkRecordCodeGenerator
 
         return sb.ToString();
     }
-
-   
 }

@@ -4,7 +4,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 internal class LocalBulkImportResult : IBulkImportResult
 {
-    private bool _hasError;
+    private readonly bool _hasError;
 
     public LocalBulkImportResult(long insertedCount, long deletedCount, long modifiedCount, bool hasError)
     {
@@ -17,6 +17,7 @@ internal class LocalBulkImportResult : IBulkImportResult
     public long InsertedCount { get; }
     public long DeletedCount { get; }
     public long ModifiedCount { get; }
+
     public bool HasError()
     {
         return _hasError;

@@ -4,30 +4,30 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 /// <summary>
-/// Throws when an error occurs in a runtime repository
+///     Throws when an error occurs in a runtime repository
 /// </summary>
 public class RuntimeRepositoryException : PersistenceException
 {
     /// <inheritdoc />
-    private RuntimeRepositoryException(string message): base(message)
+    private RuntimeRepositoryException(string message) : base(message)
     {
         OperationResult = new OperationResult();
     }
-    
+
     /// <inheritdoc />
     private RuntimeRepositoryException(string message, OperationResult operationResult) : base(message)
     {
         OperationResult = operationResult;
     }
-    
+
     /// <inheritdoc />
     private RuntimeRepositoryException(string message, Exception inner, OperationResult operationResult) : base(message, inner)
     {
         OperationResult = operationResult;
     }
-    
+
     /// <summary>
-    /// The <see cref="OperationResult"/> that caused the exception
+    ///     The <see cref="OperationResult" /> that caused the exception
     /// </summary>
     public OperationResult OperationResult { get; }
 
@@ -43,7 +43,7 @@ public class RuntimeRepositoryException : PersistenceException
         return new RuntimeRepositoryException($"Construction Kit Id '{ckTypeId}' was not found in model cache." +
                                               " Wrong CkTypeId used?");
     }
-    
+
     internal static Exception DocumentAlreadyAdded(string tenantId, object key)
     {
         return new RuntimeRepositoryException($"Document '{key}' already added to tenant '{tenantId}'.");
@@ -65,12 +65,14 @@ public class RuntimeRepositoryException : PersistenceException
 
     internal static Exception DocumentDoesNotExist(string tenantId, object key, Type documentType)
     {
-        throw new RuntimeRepositoryException($"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
+        throw new RuntimeRepositoryException(
+            $"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
     }
 
     internal static Exception FieldFilterDidNotReturnResult(Type type, ICollection<FieldFilter> fieldFilters)
     {
-        return new RuntimeRepositoryException($"Field filter did not return a result for type '{type.FullName}' and field filters '{string.Join(", ", fieldFilters)}'.");
+        return new RuntimeRepositoryException(
+            $"Field filter did not return a result for type '{type.FullName}' and field filters '{string.Join(", ", fieldFilters)}'.");
     }
 
     internal static Exception AttributeFilterNotSupportedByDataSource(Type type)

@@ -1,29 +1,29 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 attributes:
-- id: SampleAttribute
-  valueType: String
-- id: DateTimeAttribute
-  valueType: DateTime
-- id: TestEnum
-  valueType: Enum
-  valueCkEnumId: Sample1/TestEnum
-- id: Type
-  valueType: Record
-  valueCkRecordId: Sample1/RecordA  
-- id: IsLocked
-  valueType: Boolean
-  defaultValues:
-  - true
-- id: IHaveMetaData
-  valueType: String
-  metaData:
-    - key: "MetaDataKey"
-      value: "MetaDataValue"
-      description: "MetaDataDescription"
-    - key: "MetaDataKey2"
-      value: "1000"
-      description: "MetaDataDescription2"
-    - key: "MetaDataKey3"
-      value: false
-      description: "MetaDataDescription3"
-  isDataStream: true
+  - id: SampleAttribute
+    valueType: String
+  - id: DateTimeAttribute
+    valueType: DateTime
+  - id: TestEnum
+    valueType: Enum
+    valueCkEnumId: Sample1/TestEnum
+  - id: Type
+    valueType: Record
+    valueCkRecordId: Sample1/RecordA
+  - id: IsLocked
+    valueType: Boolean
+    defaultValues:
+      - true
+  - id: IHaveMetaData
+    valueType: String
+    metaData:
+      - key: "MetaDataKey"
+        value: "MetaDataValue"
+        description: "MetaDataDescription"
+      - key: "MetaDataKey2"
+        value: "1000"
+        description: "MetaDataDescription2"
+      - key: "MetaDataKey3"
+        value: false
+        description: "MetaDataDescription3"
+    isDataStream: true

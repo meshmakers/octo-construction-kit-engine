@@ -1,3 +1,4 @@
+using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts;
@@ -9,23 +10,23 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 
 /// <summary>
-/// Implements a serializer for the runtime model in YAML format.
+///     Implements a serializer for the runtime model in YAML format.
 /// </summary>
 /// <remarks>
-/// Currently there is no YAML serializer that supports JSON schema validation
-/// out of the box. Therefore we use the YamlDotNet library and implement the validation
-/// using the <see cref="IRtSchemaValidator"/> interface. That results that the stream
-/// is used twice: for validation and for deserialization. This is not optimal.
+///     Currently there is no YAML serializer that supports JSON schema validation
+///     out of the box. Therefore we use the YamlDotNet library and implement the validation
+///     using the <see cref="IRtSchemaValidator" /> interface. That results that the stream
+///     is used twice: for validation and for deserialization. This is not optimal.
 /// </remarks>
 internal class RtYamlSerializer : IRtYamlSerializer
 {
+    private readonly IDeserializer _deserializer;
     private readonly IRtSchemaValidator _rtSchemaValidator;
     private readonly ISerializer _serializer;
-    private readonly IDeserializer _deserializer;
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
     /// <summary>
-    /// Creates a new instance of the <see cref="RtYamlSerializer"/> class.
+    ///     Creates a new instance of the <see cref="RtYamlSerializer" /> class.
     /// </summary>
     /// <param name="rtSchemaValidator"></param>
     public RtYamlSerializer(IRtSchemaValidator rtSchemaValidator)
@@ -72,7 +73,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
         return Task.CompletedTask;
     }
 
-    public Task<IRtDeserializeStream> DeserializeStreamAsync(Stream stream, 
+    public Task<IRtDeserializeStream> DeserializeStreamAsync(Stream stream,
         CancellationToken? cancellationToken = null)
     {
         throw new NotImplementedException();
@@ -81,7 +82,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
     /// <inheritdoc />
     public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return await DeserializeAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
@@ -94,7 +95,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
         {
             throw RuntimeModelParseException.SchemaValidationFailed(locationReference, operationResult);
         }
-        
+
 
         using var streamReader = new StreamReader(stream);
         var rtModelRootDto = _deserializer.Deserialize<RtModelRootDto>(streamReader);

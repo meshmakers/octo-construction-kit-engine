@@ -4,7 +4,7 @@ using Json.Schema;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 
 /// <summary>
-/// Manages the construction kit schemas
+///     Manages the construction kit schemas
 /// </summary>
 public static class CkSchema
 {
@@ -20,16 +20,16 @@ public static class CkSchema
     }
 
     /// <summary>
-    /// Returns the construction kit elements schema
+    ///     Returns the construction kit elements schema
     /// </summary>
-    public static JsonSchema GetElementsSchema() 
+    public static JsonSchema GetElementsSchema()
     {
         var elementsSchema = GetSchema(string.Format(SchemaPath, "ck-elements"));
         return elementsSchema.Bundle();
     }
 
     /// <summary>
-    /// Returns the construction kit meta schema
+    ///     Returns the construction kit meta schema
     /// </summary>
     public static JsonSchema GetMetaSchema()
     {
@@ -38,7 +38,7 @@ public static class CkSchema
     }
 
     /// <summary>
-    /// Returns the construction kit compiled model schema
+    ///     Returns the construction kit compiled model schema
     /// </summary>
     public static JsonSchema GetCompiledModelSchema()
     {

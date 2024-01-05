@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -9,7 +10,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 /// <summary>
-/// Implements a serializer for the CK model in JSON format.
+///     Implements a serializer for the CK model in JSON format.
 /// </summary>
 internal class CkJsonSerializer : ICkJsonSerializer
 {
@@ -18,18 +19,18 @@ internal class CkJsonSerializer : ICkJsonSerializer
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
     /// <summary>
-    /// Creates a new instance of the <see cref="CkJsonSerializer"/> class.
+    ///     Creates a new instance of the <see cref="CkJsonSerializer" /> class.
     /// </summary>
     public CkJsonSerializer()
     {
-        _options = new JsonSerializerOptions 
-        { 
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull, 
+        _options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = true,
             Converters =
             {
-                new OctoValidatingJsonConverterFactory {RequireFormatValidation = true, OutputFormat = OutputFormat.List}
+                new OctoValidatingJsonConverterFactory { RequireFormatValidation = true, OutputFormat = OutputFormat.List }
             }
         };
     }
@@ -39,7 +40,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, compiledModel, _options).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkMetaRootDto metaRootDto)
     {
@@ -84,9 +85,10 @@ internal class CkJsonSerializer : ICkJsonSerializer
 
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult) 
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+        OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
@@ -94,9 +96,25 @@ internal class CkJsonSerializer : ICkJsonSerializer
     /// <inheritdoc />
     public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
+    }
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
+        OperationResult operationResult)
+    {
+        try
+        {
+            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options).ConfigureAwait(false);
+            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
+        }
+        catch (JsonException e)
+        {
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
+        }
     }
 
     private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
@@ -113,22 +131,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
         }
     }
 
-    /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult)
-    {
-        try
-        {
-            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options).ConfigureAwait(false);
-            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
-        }
-        catch (JsonException e)
-        {
-            CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(operationResult);
-        }
-    }
-    
-    
+
     private static void CheckException(string locationReference, OperationResult operationResult, JsonException e)
     {
         if (e.Data.Contains(Validation))
@@ -143,8 +146,9 @@ internal class CkJsonSerializer : ICkJsonSerializer
             }
         }
     }
-    
-    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
+
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
+        EvaluationResults evaluationResults)
     {
         if (!evaluationResults.IsValid)
         {

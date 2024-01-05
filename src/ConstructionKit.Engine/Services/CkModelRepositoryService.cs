@@ -6,25 +6,27 @@ using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
 
 /// <summary>
-/// Manages the CK model repositories
+///     Manages the CK model repositories
 /// </summary>
 internal class CkModelRepositoryService : ICkModelRepositoryService
 {
     private readonly ICkModelRepositoryManager _ckModelRepositoryManager;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="CkModelRepositoryService"/> class.
+    ///     Creates a new instance of the <see cref="CkModelRepositoryService" /> class.
     /// </summary>
     /// <param name="ckModelRepositoryManager"></param>
     public CkModelRepositoryService(ICkModelRepositoryManager ckModelRepositoryManager)
     {
         _ckModelRepositoryManager = ckModelRepositoryManager;
     }
-    
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult, object? sourceIdentifier = null,
+
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        return await _ckModelRepositoryManager.LookupCkModelAsync(ckModelId, operationResult, sourceIdentifier, cancellationToken).ConfigureAwait(false);
+        return await _ckModelRepositoryManager.LookupCkModelAsync(ckModelId, operationResult, sourceIdentifier, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null)
@@ -32,16 +34,19 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
         return _ckModelRepositoryManager.GetRepositoryList(sourceIdentifier);
     }
 
-    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null,
+    public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken).ConfigureAwait(false);
+        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken).ConfigureAwait(false);
+        await _ckModelRepositoryManager.UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null)

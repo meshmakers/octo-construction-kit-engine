@@ -7,16 +7,16 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-/// Implementation of <see cref="IInheritanceResolver"/> that resolves the inheritance of a compiled model.
+///     Implementation of <see cref="IInheritanceResolver" /> that resolves the inheritance of a compiled model.
 /// </summary>
 internal class InheritanceResolver : IInheritanceResolver
 {
-    private readonly ILogger<InheritanceResolver> _logger;
-    private readonly HashSet<CkId<CkTypeId>> _handledTypesHashSet;
     private readonly HashSet<CkId<CkRecordId>> _handledRecordHashSet;
+    private readonly HashSet<CkId<CkTypeId>> _handledTypesHashSet;
+    private readonly ILogger<InheritanceResolver> _logger;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="InheritanceResolver"/> class.
+    ///     Creates a new instance of the <see cref="InheritanceResolver" /> class.
     /// </summary>
     /// <param name="logger"></param>
     public InheritanceResolver(ILogger<InheritanceResolver> logger)
@@ -80,6 +80,7 @@ internal class InheritanceResolver : IInheritanceResolver
                     operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtType(ckTypeAttribute.CkAttributeId, ckTypeId));
                     continue;
                 }
+
                 typeGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
                     attributeGraph));
             }
@@ -102,13 +103,13 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             var baseTypes = GetBaseRecords(modelGraph, ckRecordId, operationResult);
             recordGraph.AddBaseRecords(baseTypes);
-            
+
             foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
             {
                 recordGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
                     modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
             }
-            
+
             _handledRecordHashSet.Add(ckRecordId);
         }
 
@@ -119,7 +120,7 @@ internal class InheritanceResolver : IInheritanceResolver
         CkTypeGraph originTypeGraph, OperationResult operationResult)
     {
         _logger.LogDebug("Resolving directed aggregations and attributes for type {CkTypeId}", originTypeGraph.CkTypeId);
-        for (int i = originTypeGraph.BaseTypes.Count - 1; i >= 0; i--)
+        for (var i = originTypeGraph.BaseTypes.Count - 1; i >= 0; i--)
         {
             var ckGraphTypeInheritance = originTypeGraph.BaseTypes.ElementAt(i);
             var baseCkType = ckModelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
@@ -132,7 +133,8 @@ internal class InheritanceResolver : IInheritanceResolver
                 if (!originTypeGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.CkTypeIdAttributeIdNotUniqueByInheritance(baseCkType.CkTypeId, typeAttribute.CkAttributeId, originTypeGraph.CkTypeId));
+                        MessageCodes.CkTypeIdAttributeIdNotUniqueByInheritance(baseCkType.CkTypeId, typeAttribute.CkAttributeId,
+                            originTypeGraph.CkTypeId));
                 }
             }
         }
@@ -207,21 +209,22 @@ internal class InheritanceResolver : IInheritanceResolver
             targetCkTypeGraph.Associations.In.Owned.Add(inAssociationGraph);
             originTypeGraph.Associations.Out.Owned.Add(outAssociationGraph);
         }
-        
+
         // Check if the attributes (=defined+inherited at type) have duplicate attribute names
         var duplicateAttributeNames = originTypeGraph.AllAttributes.Values.GroupBy(a => a.AttributeName)
             .Where(a => a.Count() > 1).ToList();
         if (duplicateAttributeNames.Count > 0)
         {
             operationResult.AddMessage(
-                MessageCodes.CkTypeIdAttributeNameNotUniqueByInheritance(originTypeGraph.CkTypeId, string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+                MessageCodes.CkTypeIdAttributeNameNotUniqueByInheritance(originTypeGraph.CkTypeId,
+                    string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
         }
     }
 
     private void GetDirectedRecordAttributes(CkModelGraph modelGraph,
         CkRecordGraph originRecordGraph, OperationResult operationResult)
     {
-        for (int i = originRecordGraph.BaseRecords.Count - 1; i >= 0; i--)
+        for (var i = originRecordGraph.BaseRecords.Count - 1; i >= 0; i--)
         {
             var ckGraphRecordInheritance = originRecordGraph.BaseRecords.ElementAt(i);
             var baseCkRecord = modelGraph.Records[ckGraphRecordInheritance.BaseCkRecordId];
@@ -233,7 +236,8 @@ internal class InheritanceResolver : IInheritanceResolver
                 if (!originRecordGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.CkRecordIdAttributeIdNotUniqueByInheritance(baseCkRecord.CkRecordId, typeAttribute.CkAttributeId, originRecordGraph.CkRecordId));
+                        MessageCodes.CkRecordIdAttributeIdNotUniqueByInheritance(baseCkRecord.CkRecordId, typeAttribute.CkAttributeId,
+                            originRecordGraph.CkRecordId));
                 }
             }
         }
@@ -244,7 +248,8 @@ internal class InheritanceResolver : IInheritanceResolver
         if (duplicateAttributeNames.Count > 0)
         {
             operationResult.AddMessage(
-                MessageCodes.CkRecordIdAttributeNameNotUniqueByInheritance(originRecordGraph.CkRecordId, string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+                MessageCodes.CkRecordIdAttributeNameNotUniqueByInheritance(originRecordGraph.CkRecordId,
+                    string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
         }
     }
 
@@ -274,7 +279,7 @@ internal class InheritanceResolver : IInheritanceResolver
                 var baseGraphType = modelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
                 var inheritedGraphType = modelGraph.Types[ckGraphTypeInheritance.InheritorCkTypeId];
                 baseList.Add(baseGraphType);
-                
+
                 // Set the defining collection type id and merge index fields.
                 if (baseGraphType.IsCollectionRoot)
                 {
@@ -331,7 +336,7 @@ internal class InheritanceResolver : IInheritanceResolver
     {
         var ckTypeIds = new List<CkGraphTypeInheritance>();
 
-        int i = 0;
+        var i = 0;
         CkId<CkTypeId>? currentCkTypeId = ckTypeId;
         CkId<CkTypeId>? lastCkTypeId = ckTypeId;
         while (currentCkTypeId != null &&
@@ -382,7 +387,7 @@ internal class InheritanceResolver : IInheritanceResolver
     {
         var ckRecordIds = new List<CkGraphRecordInheritance>();
 
-        int i = 0;
+        var i = 0;
         CkId<CkRecordId>? currentCkRecordId = ckRecordId;
         CkId<CkRecordId>? lastCkRecordId = ckRecordId;
         while (currentCkRecordId != null &&

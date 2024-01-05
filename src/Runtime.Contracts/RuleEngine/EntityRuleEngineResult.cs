@@ -6,12 +6,12 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
 /// <summary>
-/// Represents a result of a rule engine execution.
+///     Represents a result of a rule engine execution.
 /// </summary>
 public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
 {
     /// <summary>
-    /// Creates a new instance of <see cref="EntityRuleEngineResult{TEntity}"/>.
+    ///     Creates a new instance of <see cref="EntityRuleEngineResult{TEntity}" />.
     /// </summary>
     public EntityRuleEngineResult()
     {
@@ -20,9 +20,9 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
         RtEntitiesToReplace = new Dictionary<RtEntityId, TEntity>();
         RtEntitiesToDelete = new List<RtEntityId>();
     }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="EntityRuleEngineResult{TEntity}"/>.
+    ///     Creates a new instance of <see cref="EntityRuleEngineResult{TEntity}" />.
     /// </summary>
     /// <param name="rtEntitiesToInsert">List of entities to create.</param>
     /// <param name="rtEntitiesToUpdate">List of entities to update.</param>
@@ -38,22 +38,22 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     }
 
     /// <summary>
-    /// Returns a list of entities to create.
+    ///     Returns a list of entities to create.
     /// </summary>
     public List<TEntity> RtEntitiesToInsert { get; }
-    
+
     /// <summary>
-    /// Returns a list of entities to update.
+    ///     Returns a list of entities to update.
     /// </summary>
     public Dictionary<RtEntityId, TEntity> RtEntitiesToUpdate { get; }
-    
+
     /// <summary>
-    /// Returns a list of entities to replace.
+    ///     Returns a list of entities to replace.
     /// </summary>
     public Dictionary<RtEntityId, TEntity> RtEntitiesToReplace { get; }
-    
+
     /// <summary>
-    /// Returns a list of entities to delete.
+    ///     Returns a list of entities to delete.
     /// </summary>
     public List<RtEntityId> RtEntitiesToDelete { get; }
 }

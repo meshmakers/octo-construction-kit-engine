@@ -7,7 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-/// Implementation of <see cref="IElementResolver"/> that resolves the elements of a compiled model.
+///     Implementation of <see cref="IElementResolver" /> that resolves the elements of a compiled model.
 /// </summary>
 internal class ElementResolver : IElementResolver
 {
@@ -40,7 +40,7 @@ internal class ElementResolver : IElementResolver
                     operationResult.AddMessage(MessageCodes.CkRecordIdUndefined(ckAttributeId));
                     continue;
                 }
-                
+
                 if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId == null)
                 {
                     operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(ckAttributeId));
@@ -68,7 +68,7 @@ internal class ElementResolver : IElementResolver
                     operationResult.AddMessage(MessageCodes.AssociationRoleIdNotUnique(ckAssociationId));
                     continue;
                 }
-                
+
                 if (ckAssociationRole.Attributes != null)
                 {
                     // Check if the defined attributes (=defined at CkRecord) have duplicate attribute ids
@@ -77,7 +77,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(ckAssociationRole.AssociationRoleId, string.Join(", ", duplicateAttributeIds)));
+                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(ckAssociationRole.AssociationRoleId,
+                                string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
 
@@ -87,7 +88,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(ckAssociationRole.AssociationRoleId, string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(ckAssociationRole.AssociationRoleId,
+                                string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
                 }
@@ -131,7 +133,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkTypeIdAttributeNameNotUnique(ckType.TypeId, string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+                            MessageCodes.CkTypeIdAttributeNameNotUnique(ckType.TypeId,
+                                string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
                 }
@@ -156,7 +159,7 @@ internal class ElementResolver : IElementResolver
                     operationResult.AddMessage(MessageCodes.RecordIdNotUnique(ckRecordId));
                     continue;
                 }
-                
+
                 if (ckRecord.Attributes != null)
                 {
                     // Check if the defined attributes (=defined at CkRecord) have duplicate attribute ids
@@ -175,7 +178,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkRecordIdAttributeNameNotUnique(ckRecord.RecordId, string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+                            MessageCodes.CkRecordIdAttributeNameNotUnique(ckRecord.RecordId,
+                                string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
                 }
@@ -201,7 +205,7 @@ internal class ElementResolver : IElementResolver
                     continue;
                 }
 
-                bool ignoreEnum = false;
+                var ignoreEnum = false;
                 foreach (var ckSelectionValueGroup in
                          ckEnum.Values.GroupBy(x => x.Key).Where(x => x.Count() > 1))
                 {

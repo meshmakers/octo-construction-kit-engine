@@ -3,80 +3,78 @@ using System.Collections;
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 /// <summary>
-/// Represents a list of attribute values
+///     Represents a list of attribute values
 /// </summary>
 /// <typeparam name="TValue">An inherited type of the base type</typeparam>
 /// <typeparam name="TValueBase">The base type of the data type</typeparam>
 public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueList<TValue>
     where TValue : TValueBase
 {
-    private readonly List<TValueBase> _values;
-
     /// <summary>
-    /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
+    ///     Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}" />
     /// </summary>
     /// <param name="values">The inner list</param>
     protected AttributeValueList(List<TValueBase> values)
     {
-        _values = values;
+        InnerList = values;
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}"/>
+    ///     Creates a new instance of <see cref="AttributeValueList{TValueBase,TValue}" />
     /// </summary>
     protected AttributeValueList()
     {
-        _values = new List<TValueBase>();
+        InnerList = new List<TValueBase>();
     }
 
-    internal List<TValueBase> InnerList => _values;
+    internal List<TValueBase> InnerList { get; }
 
     /// <inheritdoc />
     public void Add(TValue value)
     {
-        _values.Add(value);
+        InnerList.Add(value);
     }
 
     /// <inheritdoc />
     public void CopyTo(TValue[] array, int arrayIndex)
     {
-        _values.Select(CreateSubType).ToList().CopyTo(array, arrayIndex);
+        InnerList.Select(CreateSubType).ToList().CopyTo(array, arrayIndex);
     }
 
     /// <inheritdoc />
     public bool Remove(TValue value)
     {
-        return _values.Remove(value);
+        return InnerList.Remove(value);
     }
 
     /// <inheritdoc />
     public void Clear()
     {
-        _values.Clear();
+        InnerList.Clear();
     }
 
     /// <inheritdoc />
     public bool Contains(TValue item)
     {
-        return _values.Contains(item);
+        return InnerList.Contains(item);
     }
 
     /// <inheritdoc />
     public int IndexOf(TValue item)
     {
-        return _values.IndexOf(item);
+        return InnerList.IndexOf(item);
     }
 
     /// <inheritdoc />
     public void Insert(int index, TValue item)
     {
-        _values.Insert(index, item);
+        InnerList.Insert(index, item);
     }
 
     /// <inheritdoc />
     public void RemoveAt(int index)
     {
-        _values.RemoveAt(index);
+        InnerList.RemoveAt(index);
     }
 
     /// <inheritdoc />
@@ -84,14 +82,14 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     {
         get
         {
-            var o = _values[index];
+            var o = InnerList[index];
             return CreateSubType(o);
         }
-        set => _values[index] = value;
+        set => InnerList[index] = value;
     }
 
     /// <inheritdoc />
-    public int Count => _values.Count;
+    public int Count => InnerList.Count;
 
     /// <inheritdoc />
     public bool IsReadOnly => false;
@@ -99,25 +97,25 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     /// <inheritdoc />
     public void AddRange(IEnumerable<TValue> collection)
     {
-        _values.AddRange(collection.Cast<TValueBase>());
+        InnerList.AddRange(collection.Cast<TValueBase>());
     }
 
     /// <inheritdoc />
     public int RemoveAll(Predicate<TValue> match)
     {
-        return _values.RemoveAll(t => match(CreateSubType(t)));
+        return InnerList.RemoveAll(t => match(CreateSubType(t)));
     }
 
     /// <inheritdoc />
     public int FindIndex(Predicate<TValue> match)
     {
-        return _values.FindIndex(t => match(CreateSubType(t)));
+        return InnerList.FindIndex(t => match(CreateSubType(t)));
     }
 
     /// <inheritdoc />
     public IEnumerator<TValue> GetEnumerator()
     {
-        return _values.Select(CreateSubType).GetEnumerator();
+        return InnerList.Select(CreateSubType).GetEnumerator();
     }
 
     IEnumerator IEnumerable.GetEnumerator()
@@ -126,7 +124,7 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     }
 
     /// <summary>
-    /// Creates a new instance of <typeparamref name="TValue"/> from the given <typeparamref name="TValueBase"/>
+    ///     Creates a new instance of <typeparamref name="TValue" /> from the given <typeparamref name="TValueBase" />
     /// </summary>
     /// <param name="valueBase">The base value</param>
     /// <returns></returns>

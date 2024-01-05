@@ -40,6 +40,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 {
                     return false;
                 }
+
                 var outputPath = Path.Combine(Path.GetDirectoryName(options.ProjectFullPath) ?? string.Empty, options.OutputPath);
                 if (f.Path.StartsWith(outputPath, StringComparison.OrdinalIgnoreCase))
                 {
@@ -61,9 +62,9 @@ public class CkSourceGenerator : IIncrementalGenerator
             .Combine(globalOptions)
             .Combine(context.AnalyzerConfigOptionsProvider)
             .Select(static (x, _) => FileOptions.Select(
-                file: x.Left.Left,
-                options: x.Right,
-                globalOptions: x.Left.Right
+                x.Left.Left,
+                x.Right,
+                x.Left.Right
             ))
             .Where(static x => x.IsValid);
 
@@ -123,7 +124,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
 
                 var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
-                if (!String.IsNullOrWhiteSpace(code))
+                if (!string.IsNullOrWhiteSpace(code))
                 {
                     context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);
                 }
@@ -135,7 +136,7 @@ public class CkSourceGenerator : IIncrementalGenerator
             foreach (var ckRecordDto in ckCompiledModelRoot.Records)
             {
                 var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto, tenantId, ckCacheService);
-                if (!String.IsNullOrWhiteSpace(code))
+                if (!string.IsNullOrWhiteSpace(code))
                 {
                     context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.RecordId}.g.cs", code);
                 }
@@ -147,7 +148,7 @@ public class CkSourceGenerator : IIncrementalGenerator
             foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
             {
                 var code = CkEnumCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckEnumDto, tenantId, ckCacheService);
-                if (!String.IsNullOrWhiteSpace(code))
+                if (!string.IsNullOrWhiteSpace(code))
                 {
                     context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.EnumId}.g.cs", code);
                 }

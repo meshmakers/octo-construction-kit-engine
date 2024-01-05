@@ -7,12 +7,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatingJsonConverter
 {
-    private readonly JsonSchema _schema;
     private readonly Func<JsonSerializerOptions, JsonSerializerOptions> _optionsFactory;
-
-    public OutputFormat OutputFormat { get; set; }
-
-    public bool RequireFormatValidation { get; set; }
+    private readonly JsonSchema _schema;
 
     public OctoValidatingJsonConverter(
         JsonSchema schema,
@@ -22,24 +18,28 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
         _optionsFactory = optionsFactory;
     }
 
+    public OutputFormat OutputFormat { get; set; }
+
+    public bool RequireFormatValidation { get; set; }
+
     public override T? Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
         JsonSerializerOptions options)
     {
-        Utf8JsonReader reader1 = reader;
-        EvaluationResults evaluationResults = _schema.Evaluate(JsonSerializer.Deserialize<JsonNode>(ref reader1, options), new EvaluationOptions
+        var reader1 = reader;
+        var evaluationResults = _schema.Evaluate(JsonSerializer.Deserialize<JsonNode>(ref reader1, options), new EvaluationOptions
         {
             OutputFormat = OutputFormat,
             RequireFormatValidation = RequireFormatValidation
         });
         if (evaluationResults.IsValid)
         {
-            JsonSerializerOptions options1 = _optionsFactory(options);
+            var options1 = _optionsFactory(options);
             return JsonSerializer.Deserialize<T>(ref reader, options1);
         }
 
-        JsonException jsonException = new JsonException("JSON does not meet schema requirements")
+        var jsonException = new JsonException("JSON does not meet schema requirements")
         {
             Data =
             {
@@ -51,7 +51,7 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
 
     public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)
     {
-        JsonSerializerOptions options1 = _optionsFactory(options);
+        var options1 = _optionsFactory(options);
         JsonSerializer.Serialize(writer, value, options1);
     }
 }

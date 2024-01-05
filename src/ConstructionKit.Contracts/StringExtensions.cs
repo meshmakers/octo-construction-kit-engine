@@ -1,12 +1,12 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Extensions to string
+///     Extensions to string
 /// </summary>
 public static class StringExtensions
 {
     /// <summary>
-    /// Makes from a construction kit id a valid C# class name
+    ///     Makes from a construction kit id a valid C# class name
     /// </summary>
     /// <param name="s"></param>
     /// <returns></returns>

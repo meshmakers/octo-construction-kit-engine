@@ -7,7 +7,7 @@ types:
     attributes:
       - id: System.TestIdentity/ClientId
         name: ClientId
-        
+
       - id: System.TestIdentity/ClientSecret
         name: ClientSecret
 

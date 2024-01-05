@@ -4,47 +4,47 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.elements;
 
 public class Builder
 {
-      public static CkElementsRootDto Build()
+    public static CkElementsRootDto Build()
     {
         return new CkElementsRootDto
         {
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attributeA",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeB",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeC",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeD",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeE",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeF",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeG",
-                  ValueType = AttributeValueTypesDto.String,
-              }
+                new()
+                {
+                    AttributeId = "attributeA",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeB",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeC",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeD",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeE",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeF",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeG",
+                    ValueType = AttributeValueTypesDto.String
+                }
             },
             Types = new List<CkTypeDto>
             {
@@ -70,7 +70,7 @@ public class Builder
                         new() { CkAttributeId = "sample1/attributeE", AttributeName = "f" }
                     }
                 }
-            },
+            }
         };
     }
 }

@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
 using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
@@ -13,7 +14,7 @@ public class YamlSerializerTests
     {
         _testOutputHelper = testOutputHelper;
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_types_ok()
     {
@@ -31,12 +32,12 @@ public class YamlSerializerTests
         Assert.False(operationResult.HasFatalErrors);
     }
 
-    
+
     [Fact]
     public async Task DeserializeAsync_noSchema_ok()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
-    
+
         var filePath = "sampleData/files/noSchema.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
@@ -45,49 +46,51 @@ public class YamlSerializerTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_noSchema_malFormed_fail()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
-    
+
         var filePath = "sampleData/files/noSchema_malformed.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
+        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+            await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.False(operationResult.HasErrors);
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
     }
-        
+
     [Fact]
     public async Task DeserializeAsync_MalformedAttributeValue_Fail()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
-    
+
         var filePath = "sampleData/files/malformedAttributeValue.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
+        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+            await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
     }
-    
+
     [Fact]
     public async Task SerializeAsync_ok()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
-    
+
         var stream = new MemoryStream();
         await using var streamWriter = new StreamWriter(stream);
-        var ckElementsDto = sampleData.models.Builder.Build();
+        var ckElementsDto = Builder.Build();
         await rtYamlSerializer.SerializeAsync(streamWriter, ckElementsDto);
         await streamWriter.FlushAsync();
-    
+
         stream.Position = 0;
         var streamReader = new StreamReader(stream);
         var json = await streamReader.ReadToEndAsync();

@@ -21,42 +21,42 @@ public class Builder
             },
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attribute1",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute2",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute3",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute4",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute5",
-                  ValueType = AttributeValueTypesDto.Int,
-              },
-              new()
-              {
-                  AttributeId = "attribute6",
-                  ValueType = AttributeValueTypesDto.Double,
-              },
-              new()
-              {
-                  AttributeId = "Record1",
-                  ValueType = AttributeValueTypesDto.Record,
-                  ValueCkRecordId = "TestRecords/Record1"
-              }
+                new()
+                {
+                    AttributeId = "attribute1",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute2",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute3",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute4",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute5",
+                    ValueType = AttributeValueTypesDto.Int
+                },
+                new()
+                {
+                    AttributeId = "attribute6",
+                    ValueType = AttributeValueTypesDto.Double
+                },
+                new()
+                {
+                    AttributeId = "Record1",
+                    ValueType = AttributeValueTypesDto.Record,
+                    ValueCkRecordId = "TestRecords/Record1"
+                }
             },
             Records = new List<CkRecordDto>
             {
@@ -66,7 +66,10 @@ public class Builder
                     Attributes = new List<CkTypeAttributeDto>
                     {
                         new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestRecords/attribute2NotExisting", AttributeName = "b" }, // Error here - attribute does not exist
+                        new()
+                        {
+                            CkAttributeId = "TestRecords/attribute2NotExisting", AttributeName = "b"
+                        }, // Error here - attribute does not exist
                         new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" }
                     }
                 }
@@ -83,7 +86,6 @@ public class Builder
                         new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "b" },
                         new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" },
                         new() { CkAttributeId = "TestRecords/Record1", AttributeName = "record" }
-
                     }
                 }
             }

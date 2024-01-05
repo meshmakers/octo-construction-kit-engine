@@ -1,27 +1,27 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 
 /// <summary>
-/// Defines possible message level
+///     Defines possible message level
 /// </summary>
 public enum MessageLevel
 {
     /// <summary>
-    /// Information message
+    ///     Information message
     /// </summary>
     Info = 0,
 
     /// <summary>
-    /// Warning message
+    ///     Warning message
     /// </summary>
     Warning = 1,
 
     /// <summary>
-    /// Error message
+    ///     Error message
     /// </summary>
     Error = 2,
 
     /// <summary>
-    /// Fatal error message
+    ///     Fatal error message
     /// </summary>
     FatalError = 3
 }

@@ -24,7 +24,7 @@ public class Builder
                 new()
                 {
                     AttributeId = "attribute1",
-                    ValueType = AttributeValueTypesDto.String,
+                    ValueType = AttributeValueTypesDto.String
                 }
             },
             Types = new List<CkCompiledTypeDto>
@@ -37,7 +37,7 @@ public class Builder
                         new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" }
                     }
                 }
-            },
+            }
         };
     }
 }

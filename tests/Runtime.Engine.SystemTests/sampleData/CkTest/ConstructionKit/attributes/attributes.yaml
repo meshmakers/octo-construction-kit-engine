@@ -1,19 +1,19 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
-- id: Designation
-  valueType: String
-- id: Location
-  valueType: String
-- id: ConnectionState
-  valueType: Enum
-  valueCkEnumId: Test/ConnectionState
-- id: DataCount
-  valueType: Int
-- id: LocationX
-  valueType: Double
-- id: IsEnabled
-  valueType: Boolean
-  defaultValues:
-  - true
+  - id: Designation
+    valueType: String
+  - id: Location
+    valueType: String
+  - id: ConnectionState
+    valueType: Enum
+    valueCkEnumId: Test/ConnectionState
+  - id: DataCount
+    valueType: Int
+  - id: LocationX
+    valueType: Double
+  - id: IsEnabled
+    valueType: Boolean
+    defaultValues:
+      - true
   
   

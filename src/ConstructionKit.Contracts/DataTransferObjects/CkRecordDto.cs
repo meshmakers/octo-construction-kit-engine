@@ -9,7 +9,7 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-/// Describes a construction kit record that is used as structured type of an attribute
+///     Describes a construction kit record that is used as structured type of an attribute
 /// </summary>
 [DebuggerDisplay("{" + nameof(RecordId) + "}")]
 public class CkRecordDto
@@ -21,12 +21,12 @@ public class CkRecordDto
     public CkRecordId RecordId { get; set; }
 
     /// <summary>
-    /// Defines the base record of this record. 
+    ///     Defines the base record of this record.
     /// </summary>
     [JsonConverter(typeof(CkIdRecordIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public CkId<CkRecordId>? DerivedFromCkRecordId { get; set; }
-    
+
     /// <summary>
     ///     If true, the type cannot be inherited again
     /// </summary>
@@ -38,7 +38,7 @@ public class CkRecordDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsAbstract { get; set; }
-    
+
     /// <summary>
     ///     Gets or sets a list of attributes
     /// </summary>

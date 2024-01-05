@@ -1,17 +1,18 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit association id
+///     Represents a versioned construction kit association id
 /// </summary>
 [DebuggerDisplay("{" + nameof(RoleId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkAssociationRoleIdConverter))]
+[JsonConverter(typeof(CkAssociationRoleIdConverter))]
 public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, IEquatable<CkAssociationRoleId>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="roleId"/>.
+    ///     Creates a new <see cref="CkAssociationRoleId" /> from the given <paramref name="roleId" />.
     /// </summary>
     /// <param name="roleId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
@@ -28,6 +29,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
             RoleId = roleId.Substring(0, typeIndex);
             Version = roleId.Substring(typeIndex + 1);
         }
+
         if (string.IsNullOrWhiteSpace(RoleId))
         {
             throw new ArgumentOutOfRangeException(nameof(roleId), roleId, $"{nameof(roleId)} must contain a type id");
@@ -35,18 +37,19 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="roleId"/> and <paramref name="associationRoleVersion"/>.
+    ///     Creates a new <see cref="CkAssociationRoleId" /> from the given <paramref name="roleId" /> and
+    ///     <paramref name="associationRoleVersion" />.
     /// </summary>
     /// <param name="roleId"></param>
     /// <param name="associationRoleVersion"></param>
-    public CkAssociationRoleId(string roleId, string associationRoleVersion = "1.0.0") 
+    public CkAssociationRoleId(string roleId, string associationRoleVersion = "1.0.0")
     {
         RoleId = roleId;
         Version = associationRoleVersion;
     }
-    
+
     /// <summary>
-    /// Creates a new <see cref="CkAssociationRoleId"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkAssociationRoleId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -54,19 +57,19 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     {
         return new CkAssociationRoleId(value);
     }
-    
+
     /// <summary>
-    /// Defines the name of the association, e. g. "ParentChild"
+    ///     Defines the name of the association, e. g. "ParentChild"
     /// </summary>
     public string RoleId { get; }
-    
+
     /// <summary>
-    /// Returns the version of the association role, e. g. "1.0.0"
+    ///     Returns the version of the association role, e. g. "1.0.0"
     /// </summary>
     public CkVersion Version { get; }
 
     /// <summary>
-    /// Returns the full name of the association role, e. g. "ParentChild-1.0.0"
+    ///     Returns the full name of the association role, e. g. "ParentChild-1.0.0"
     /// </summary>
     public string FullName => IsEmpty ? "" : $"{RoleId}-{Version}";
 
@@ -79,7 +82,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
             {
                 return "";
             }
-            
+
             var s = RoleId;
             if (Version.Major > 1)
             {
@@ -96,7 +99,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     /// <inheritdoc />
     public int CompareTo(CkAssociationRoleId other)
     {
-        var result = String.Compare(RoleId, other.RoleId, StringComparison.Ordinal);
+        var result = string.Compare(RoleId, other.RoleId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -225,7 +228,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     {
         throw new InvalidCastException();
     }
-    
+
     /// <summary>
     ///     Returns a string representation of the value.
     /// </summary>
@@ -242,9 +245,9 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
         {
             return false;
         }
-        
+
         var other = (CkAssociationRoleId)obj;
-        
+
         return RoleId == other.RoleId && Version == other.Version;
     }
 
@@ -253,15 +256,15 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     {
         unchecked
         {
-            int hash = 15;
+            var hash = 15;
             hash = hash * 22 + RoleId.GetHashCode();
             hash = hash * 22 + Version.GetHashCode();
             return hash;
         }
     }
-    
+
     /// <summary>
-    /// Compares two <see cref="CkAssociationRoleId"/> instances for equality.
+    ///     Compares two <see cref="CkAssociationRoleId" /> instances for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -272,7 +275,7 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     }
 
     /// <summary>
-    /// Compares two <see cref="CkAssociationRoleId"/> instances for inequality.
+    ///     Compares two <see cref="CkAssociationRoleId" /> instances for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>

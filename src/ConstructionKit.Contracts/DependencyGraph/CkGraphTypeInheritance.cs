@@ -1,14 +1,15 @@
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Defines the inheritance of a construction kit type
+///     Defines the inheritance of a construction kit type
 /// </summary>
-public class CkGraphTypeInheritance 
+public class CkGraphTypeInheritance
 {
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="inheritorCkTypeId">Origin construction kid type id</param>
     /// <param name="baseCkTypeId">Target construction kid type id</param>
@@ -19,19 +20,19 @@ public class CkGraphTypeInheritance
         BaseCkTypeId = baseCkTypeId;
         BaseTypeDepthIndex = baseTypeDepthIndex;
     }
-    
+
     /// <summary>
-    /// Returns the construction kit type id of the origin type
+    ///     Returns the construction kit type id of the origin type
     /// </summary>
     public CkId<CkTypeId> InheritorCkTypeId { get; set; }
-    
+
     /// <summary>
-    /// Returns the construction kit type id of the target type
+    ///     Returns the construction kit type id of the target type
     /// </summary>
     public CkId<CkTypeId> BaseCkTypeId { get; set; }
 
     /// <summary>
-    /// Returns a number that describes the depth of the inheritance chain
+    ///     Returns a number that describes the depth of the inheritance chain
     /// </summary>
     public int BaseTypeDepthIndex { get; set; }
 }

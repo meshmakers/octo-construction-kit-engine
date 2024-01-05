@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 /// <summary>
-/// Converter for serializing and deserializing <see cref="OctoObjectId"/> arrays
+///     Converter for serializing and deserializing <see cref="OctoObjectId" /> arrays
 /// </summary>
 public class OctoObjectIdArrayConverter : JsonConverter<OctoObjectId[]>
 {

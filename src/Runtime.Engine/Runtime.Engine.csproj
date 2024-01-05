@@ -15,36 +15,36 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
-      <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
-      <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
+        <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj"/>
+        <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj"/>
+        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>meshmakers64.png</Link>
         </None>
         <None Include="..\..\LICENSE">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>LICENSE</Link>
         </None>
         <None Update="Messages\MessageCodes.tt">
-          <Generator>TextTemplatingFileGenerator</Generator>
-          <LastGenOutput>MessageCodes.cs</LastGenOutput>
+            <Generator>TextTemplatingFileGenerator</Generator>
+            <LastGenOutput>MessageCodes.cs</LastGenOutput>
         </None>
     </ItemGroup>
 
     <ItemGroup>
-      <Compile Update="Messages\MessageCodes.cs">
-        <DependentUpon>MessageCodes.tt</DependentUpon>
-      </Compile>
+        <Compile Update="Messages\MessageCodes.cs">
+            <DependentUpon>MessageCodes.tt</DependentUpon>
+        </Compile>
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Services\" />
+        <Folder Include="Services\"/>
     </ItemGroup>
-    
+
 </Project>

@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -13,7 +14,7 @@ using JsonSerializer = System.Text.Json.JsonSerializer;
 namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 
 /// <summary>
-/// Implements a serializer for the runtime in JSON format.
+///     Implements a serializer for the runtime in JSON format.
 /// </summary>
 internal class RtJsonSerializer : IRtJsonSerializer
 {
@@ -22,7 +23,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
     /// <summary>
-    /// Creates a new instance of the <see cref="RtJsonSerializer"/> class.
+    ///     Creates a new instance of the <see cref="RtJsonSerializer" /> class.
     /// </summary>
     public RtJsonSerializer()
     {
@@ -49,7 +50,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
         RtDeserializeStream deserializeStream = new(stream, 5000);
 
         await deserializeStream.InitializeAsync(cancellationToken).ConfigureAwait(false);
-        
+
         return deserializeStream;
     }
 
@@ -71,7 +72,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
     /// <inheritdoc />
     public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return await DeserializeAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }

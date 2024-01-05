@@ -7,16 +7,16 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 /// <summary>
-/// Reads a CK model from a file.
+///     Reads a CK model from a file.
 /// </summary>
 internal class CkModelReader
 {
+    private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
     private readonly ILogger<CkModelReader> _logger;
-    private readonly ICkSerializer _ckSerializer;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="CkModelReader"/> class.
+    ///     Creates a new instance of the <see cref="CkModelReader" /> class.
     /// </summary>
     /// <param name="logger"></param>
     /// <param name="ckSerializer"></param>
@@ -29,7 +29,7 @@ internal class CkModelReader
     }
 
     /// <summary>
-    /// Reads a CK model from a file.
+    ///     Reads a CK model from a file.
     /// </summary>
     /// <param name="filePath"></param>
     /// <param name="operationResult"></param>

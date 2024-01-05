@@ -3,7 +3,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "$schema":{ 
+    "$schema": {
       "type": "string",
       "format": "uri"
     },
@@ -21,21 +21,21 @@
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-type.schema.json#/definitions/CkType"
       }
     },
-    "associationRoles":{
+    "associationRoles": {
       "type": "array",
       "items": {
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-associationRole.schema.json#/definitions/CkAssociationRole"
       }
     },
-    "records":{
+    "records": {
       "type": "array",
       "items": {
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-record.schema.json#/definitions/CkRecord"
       }
     },
-    "enums":{
+    "enums": {
       "type": "array",
       "items": {
         "type": "object",

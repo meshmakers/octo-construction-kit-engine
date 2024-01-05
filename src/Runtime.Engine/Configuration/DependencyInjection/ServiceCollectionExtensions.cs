@@ -1,4 +1,3 @@
-
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
@@ -10,12 +9,12 @@ using Meshmakers.Octo.Runtime.Engine.Serialization;
 namespace Microsoft.Extensions.DependencyInjection;
 
 /// <summary>
-/// Extension methods for adding Ck model compiler services to the DI container.
+///     Extension methods for adding Ck model compiler services to the DI container.
 /// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Adds Ck model compiler services to the DI container.
+    ///     Adds Ck model compiler services to the DI container.
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
@@ -24,22 +23,21 @@ public static class ServiceCollectionExtensions
     {
         // Runtime needs as base the construction kit
         services.AddConstructionKit();
-        
+
         // Adding serializers
         services.AddTransient<IRtSerializer, RtYamlSerializer>();
         services.AddTransient<IRtYamlSerializer, RtYamlSerializer>();
         services.AddTransient<IRtJsonSerializer, RtJsonSerializer>();
         services.AddTransient<IRtSchemaValidator, RtSchemaValidator>();
-        
+
         // Add rule engine
         services.AddTransient<IEntityRuleEngine, EntityRuleEngine>();
         services.AddTransient<IGraphRuleEngine, GraphRuleEngine>();
-        
+
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();
-        
+
 
         return new RuntimeEngineBuilder(services);
     }
-
 }

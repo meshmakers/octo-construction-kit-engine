@@ -1,17 +1,18 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit type id
+///     Represents a versioned construction kit type id
 /// </summary>
 [DebuggerDisplay("{" + nameof(EnumId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkEnumIdConverter))]
+[JsonConverter(typeof(CkEnumIdConverter))]
 public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="enumId"/>.
+    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="enumId" />.
     /// </summary>
     /// <param name="enumId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
@@ -28,6 +29,7 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
             EnumId = enumId.Substring(0, typeIndex);
             Version = enumId.Substring(typeIndex + 1);
         }
+
         if (string.IsNullOrWhiteSpace(EnumId))
         {
             throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
@@ -35,12 +37,12 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="enumId"/> and <paramref name="version"/>.
+    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="enumId" /> and <paramref name="version" />.
     /// </summary>
     /// <param name="enumId"></param>
     /// <param name="version"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkEnumId(string enumId, string version = "1.0.0") 
+    public CkEnumId(string enumId, string version = "1.0.0")
     {
         EnumId = enumId;
         Version = version;
@@ -49,9 +51,9 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
             throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
         }
     }
-    
+
     /// <summary>
-    /// Creates a new <see cref="CkEnumId"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -61,12 +63,12 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     }
 
     /// <summary>
-    /// Defines the name of the type, e. g. "Person"
+    ///     Defines the name of the type, e. g. "Person"
     /// </summary>
     public string EnumId { get; }
-    
+
     /// <summary>
-    /// Returns the version of the type, e. g. "1.0.0"
+    ///     Returns the version of the type, e. g. "1.0.0"
     /// </summary>
     public CkVersion Version { get; }
 
@@ -82,7 +84,7 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
             {
                 return "";
             }
-            
+
             var s = EnumId;
             if (Version.Major > 1)
             {
@@ -100,7 +102,7 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     /// <inheritdoc />
     public int CompareTo(CkEnumId other)
     {
-        var result = String.Compare(EnumId, other.EnumId, StringComparison.Ordinal);
+        var result = string.Compare(EnumId, other.EnumId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -229,7 +231,7 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     {
         throw new InvalidCastException();
     }
-    
+
     /// <summary>
     ///     Returns a string representation of the value.
     /// </summary>
@@ -246,9 +248,9 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
         {
             return false;
         }
-        
+
         var other = (CkEnumId)obj;
-        
+
         return EnumId == other.EnumId && Version == other.Version;
     }
 
@@ -257,15 +259,15 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     {
         unchecked
         {
-            int hash = 17;
+            var hash = 17;
             hash = hash * 23 + EnumId.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
     }
-    
+
     /// <summary>
-    /// Compares two <see cref="CkEnumId"/> instances for equality.
+    ///     Compares two <see cref="CkEnumId" /> instances for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -276,7 +278,7 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     }
 
     /// <summary>
-    /// Compares two <see cref="CkEnumId"/>s for inequality.
+    ///     Compares two <see cref="CkEnumId" />s for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>

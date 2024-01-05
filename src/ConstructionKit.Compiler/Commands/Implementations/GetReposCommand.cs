@@ -8,13 +8,12 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 internal class GetReposCommand : Command<OctoToolOptions>
 {
     private readonly ICkModelRepositoryService _ckModelRepositoryService;
-    
+
     public GetReposCommand(ILogger<GetReposCommand> logger, IOptions<OctoToolOptions> options,
         ICkModelRepositoryService ckModelRepositoryService)
         : base(logger, "GetRepos", "Gets a list of known Construction Kit Repositories", options)
     {
         _ckModelRepositoryService = ckModelRepositoryService;
-
     }
 
     public override Task Execute()

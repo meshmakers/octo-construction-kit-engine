@@ -9,19 +9,19 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents a construction kit type in the dependency graph
+///     Represents a construction kit type in the dependency graph
 /// </summary>
 [DebuggerDisplay("CkTypeId = {CkTypeId}")]
 public class CkTypeGraph
 {
+    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
+    private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     private readonly List<CkGraphTypeInheritance> _derivedTypes;
     private readonly List<CkTypeIndexDto> _indexes;
-    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
-    private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkTypeGraph"/>.
+    ///     Creates a new instance of <see cref="CkTypeGraph" />.
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
@@ -37,7 +37,7 @@ public class CkTypeGraph
         _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>();
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
-        Associations = new(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
+        Associations = new CkGraphDirectedAssociations(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
         DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeDto.Attributes ?? new List<CkTypeAttributeDto>());
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
@@ -46,7 +46,7 @@ public class CkTypeGraph
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkTypeGraph"/>.
+    ///     Creates a new instance of <see cref="CkTypeGraph" />.
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="isAbstract"></param>
@@ -95,7 +95,7 @@ public class CkTypeGraph
 
 
     /// <summary>
-    /// Defines the base type of this type. Only one type may not have a base type: System/Entity
+    ///     Defines the base type of this type. Only one type may not have a base type: System/Entity
     /// </summary>
     public CkId<CkTypeId>? DerivedFromCkTypeId { get; }
 
@@ -115,33 +115,33 @@ public class CkTypeGraph
     public bool IsAbstract { get; }
 
     /// <summary>
-    /// Gets or sets the defining construction kit type id, which defines the collection in repository.
+    ///     Gets or sets the defining construction kit type id, which defines the collection in repository.
     /// </summary>
     public CkId<CkTypeId>? DefiningCollectionRootCkTypeId { get; private set; }
 
     /// <summary>
-    /// Gets or sets a value indicating whether this type is a collection root. When
-    /// true this type creates a collection in the database.
+    ///     Gets or sets a value indicating whether this type is a collection root. When
+    ///     true this type creates a collection in the database.
     /// </summary>
     public bool IsCollectionRoot { get; private set; }
 
     /// <summary>
-    /// Returns a list of base types of the given construction kit type
+    ///     Returns a list of base types of the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> BaseTypes { get; }
 
     /// <summary>
-    /// Returns a list of derived types of the given construction kit type
+    ///     Returns a list of derived types of the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> DerivedTypes { get; }
 
     /// <summary>
-    /// Returns a list of associations including inherited ones.
+    ///     Returns a list of associations including inherited ones.
     /// </summary>
     public CkGraphDirectedAssociations Associations { get; }
 
     /// <summary>
-    /// Returns a list of indexes including inherited ones.
+    ///     Returns a list of indexes including inherited ones.
     /// </summary>
     public IReadOnlyCollection<CkTypeIndexDto> Indexes { get; set; }
 
@@ -162,22 +162,22 @@ public class CkTypeGraph
     public IReadOnlyDictionary<string, CkTypeAttributeGraph> AllAttributesByName { get; }
 
     /// <summary>
-    /// Returns a string that describes the inheritance chain
+    ///     Returns a string that describes the inheritance chain
     /// </summary>
     [JsonIgnore]
     public string Path => CkTypeId + ": " + string.Join("->", BaseTypes.Select(x => x.BaseCkTypeId));
-    
+
     /// <summary>
-    /// Sets the defining collection rot type id
+    ///     Sets the defining collection rot type id
     /// </summary>
     /// <param name="ckTypeId">CkTypeId of the defining collection</param>
     internal void SetDefiningCollectionCkTypeId(CkId<CkTypeId> ckTypeId)
     {
         DefiningCollectionRootCkTypeId = ckTypeId;
     }
-    
+
     /// <summary>
-    /// Defines if the current type is a collection 
+    ///     Defines if the current type is a collection
     /// </summary>
     /// <param name="isCollectionRoot">Indicates if the current type is a collection root</param>
     internal void SetIsCollectionRoot(bool isCollectionRoot)
@@ -186,7 +186,7 @@ public class CkTypeGraph
     }
 
     /// <summary>
-    /// Adds a list of base types of the current type
+    ///     Adds a list of base types of the current type
     /// </summary>
     /// <param name="baseTypeList"></param>
     internal void AddBaseTypes(IEnumerable<CkGraphTypeInheritance> baseTypeList)
@@ -195,7 +195,7 @@ public class CkTypeGraph
     }
 
     /// <summary>
-    /// Adds a derived types of the current type
+    ///     Adds a derived types of the current type
     /// </summary>
     /// <param name="ckGraphTypeInheritance"></param>
     internal void AddDerivedTypes(CkGraphTypeInheritance ckGraphTypeInheritance)
@@ -204,7 +204,7 @@ public class CkTypeGraph
     }
 
     /// <summary>
-    /// Adds a attribute to the current type
+    ///     Adds a attribute to the current type
     /// </summary>
     /// <param name="ckTypeAttributeGraph"></param>
     internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
@@ -219,16 +219,16 @@ public class CkTypeGraph
         _allAttributesByName[ckTypeAttributeGraph.AttributeName] = ckTypeAttributeGraph;
         return true;
     }
-    
+
     /// <summary>
-    /// Appends a list of indexes to the current type
+    ///     Appends a list of indexes to the current type
     /// </summary>
     /// <param name="indexesToMerge"></param>
     internal void MergeTextIndexes(IReadOnlyCollection<CkTypeIndexDto> indexesToMerge)
     {
         var textIndex = indexesToMerge.FirstOrDefault(x => x.IndexType == IndexTypeDto.Text);
 
-        foreach (var textIndexToMerge in indexesToMerge.Where(x=> x.IndexType == IndexTypeDto.Text))
+        foreach (var textIndexToMerge in indexesToMerge.Where(x => x.IndexType == IndexTypeDto.Text))
         {
             if (textIndex == null) // Add text index if it did not exist.
             {
@@ -236,22 +236,22 @@ public class CkTypeGraph
                 _indexes.Add(textIndex);
                 continue;
             }
-            
+
             textIndex.Fields = textIndex.Fields.Concat(textIndexToMerge.Fields).Distinct().ToList();
         }
 
         // Add ascending indexes, ensure that they are created but not duplicated.
         foreach (var textIndexToMerge in indexesToMerge.Where(x => x.IndexType == IndexTypeDto.Ascending))
         {
-            _indexes.Where(x=> x.IndexType == IndexTypeDto.Ascending && x.Fields.OrderBy(y => y)
-                .SequenceEqual(textIndexToMerge.Fields.OrderBy(y => y))).ToList()
+            _indexes.Where(x => x.IndexType == IndexTypeDto.Ascending && x.Fields.OrderBy(y => y)
+                    .SequenceEqual(textIndexToMerge.Fields.OrderBy(y => y))).ToList()
                 .ForEach(x => _indexes.Remove(x));
             _indexes.Add(textIndexToMerge);
         }
     }
 
     /// <summary>
-    /// Returns a list of derived types of the given construction kit type
+    ///     Returns a list of derived types of the given construction kit type
     /// </summary>
     /// <param name="includeSelf">When true, the current type is included to the list</param>
     /// <returns></returns>
@@ -269,7 +269,7 @@ public class CkTypeGraph
     }
 
     /// <summary>
-    /// Returns a list of base types of the given construction kit type
+    ///     Returns a list of base types of the given construction kit type
     /// </summary>
     /// <param name="includeSelf">When true, the current type is included to the list</param>
     /// <returns></returns>
@@ -285,5 +285,4 @@ public class CkTypeGraph
 
         return list;
     }
-
 }

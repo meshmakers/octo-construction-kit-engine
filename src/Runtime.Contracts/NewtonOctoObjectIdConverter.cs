@@ -4,7 +4,7 @@ using Newtonsoft.Json;
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
-/// Converter for <see cref="OctoObjectId"/> to JSON using Newtonsoft.Json
+///     Converter for <see cref="OctoObjectId" /> to JSON using Newtonsoft.Json
 /// </summary>
 public class NewtonOctoObjectIdConverter : JsonConverter
 {

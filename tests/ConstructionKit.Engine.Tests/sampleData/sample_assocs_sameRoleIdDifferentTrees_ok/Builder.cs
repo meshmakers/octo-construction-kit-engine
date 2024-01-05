@@ -21,41 +21,41 @@ public class Builder
             },
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attribute1",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute2",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute3",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute4",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute5",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute6",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute7",
-                  ValueType = AttributeValueTypesDto.String,
-              }
+                new()
+                {
+                    AttributeId = "attribute1",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute2",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute3",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute4",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute5",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute6",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute7",
+                    ValueType = AttributeValueTypesDto.String
+                }
             },
             Types = new List<CkCompiledTypeDto>
             {
@@ -87,11 +87,10 @@ public class Builder
                     DerivedFromCkTypeId = "sample1/Alpha2",
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Alpha1" }, // here
+                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Alpha1" } // here
                     }
-                    
                 },
-                
+
                 new()
                 {
                     TypeId = "Beta1",
@@ -120,11 +119,10 @@ public class Builder
                     DerivedFromCkTypeId = "sample1/Beta2",
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Beta2" }, // here
+                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Beta2" } // here
                     }
-                    
                 }
-            },
+            }
         };
     }
 }

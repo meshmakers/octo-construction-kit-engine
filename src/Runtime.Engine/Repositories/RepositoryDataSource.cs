@@ -6,24 +6,25 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
-/// Base class for a data source for a repository
+///     Base class for a data source for a repository
 /// </summary>
 public abstract class RepositoryDataSource : IRepositoryDataSource
 {
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="tenantId"></param>
     protected RepositoryDataSource(string tenantId)
     {
         TenantId = tenantId;
     }
-    
+
     /// <inheritdoc />
     public string TenantId { get; }
 
     /// <inheritdoc />
-    public abstract IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkId<CkTypeId> ckTypeId) where TEntity : RtEntity, new();
+    public abstract IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkId<CkTypeId> ckTypeId)
+        where TEntity : RtEntity, new();
 
     /// <inheritdoc />
     public IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>() where TEntity : RtEntity, new()
@@ -36,7 +37,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     public abstract IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction)
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction)
     {
         var associations = new List<RtAssociation>();
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
@@ -57,7 +59,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {
         var associations = new List<RtAssociation>();
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
@@ -82,7 +85,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
 
     /// <inheritdoc />
-    public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
+    public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
+        RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
     {
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
         return queryable
@@ -93,7 +97,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId, RtEntityId targetRtEntityId)
+    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
+        RtEntityId targetRtEntityId)
     {
         return new RtAssociation
         {

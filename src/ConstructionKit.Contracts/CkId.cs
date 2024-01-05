@@ -1,13 +1,13 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit element id
+///     Represents a versioned construction kit element id
 /// </summary>
 /// <typeparam name="TKey"></typeparam>
 public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKey>> where TKey : struct, IComparable<TKey>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkId{TKey}"/> from the given <paramref name="modelId"/> and <paramref name="key"/>.
+    ///     Creates a new <see cref="CkId{TKey}" /> from the given <paramref name="modelId" /> and <paramref name="key" />.
     /// </summary>
     /// <param name="modelId"></param>
     /// <param name="key"></param>
@@ -18,7 +18,7 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkId{TKey}"/> from the given <paramref name="ckId"/>.
+    ///     Creates a new <see cref="CkId{TKey}" /> from the given <paramref name="ckId" />.
     /// </summary>
     /// <param name="ckId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
@@ -38,7 +38,7 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
             throw new ArgumentOutOfRangeException(nameof(ckId), ckId, $"'{nameof(ckId)}' must contain a key");
         }
 
-        var value = Activator.CreateInstance(typeof(TKey), new object?[] { typeId });
+        var value = Activator.CreateInstance(typeof(TKey), typeId);
         if (value != null)
         {
             Key = (TKey)value;
@@ -50,7 +50,7 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkId{TKey}"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkId{TKey}" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -97,37 +97,36 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
 #else
         return HashCode.Combine(ModelId, Key);
 #endif
-       
     }
 
 
     /// <summary>
-    /// Returns the versioned model id, e. g. "System-1.0.0"
+    ///     Returns the versioned model id, e. g. "System-1.0.0"
     /// </summary>
     public CkModelId ModelId { get; }
 
     /// <summary>
-    /// Returns the element key
+    ///     Returns the element key
     /// </summary>
     public TKey Key { get; }
 
     /// <summary>
-    /// Returns the full name of the element, e. g. "System-1.0.0/Person-1.0.0"
+    ///     Returns the full name of the element, e. g. "System-1.0.0/Person-1.0.0"
     /// </summary>
     public string FullName => IsEmpty ? "" : $"{ModelId.FullName}/{Key}";
 
     /// <summary>
-    /// Returns the semantic versioned name of the element, e. g. "System/Person-2"
+    ///     Returns the semantic versioned name of the element, e. g. "System/Person-2"
     /// </summary>
     public string SemanticVersionedFullName => IsEmpty ? "" : $"{ModelId.SemanticVersionedFullName}/{Key.SemanticVersionedFullName}";
 
     /// <summary>
-    /// Returns true if the model id and key is empty
+    ///     Returns true if the model id and key is empty
     /// </summary>
     public bool IsEmpty => ModelId.IsEmpty && Key.IsEmpty;
 
     /// <summary>
-    /// Compares two <see cref="CkId{TKey}"/> for equality
+    ///     Compares two <see cref="CkId{TKey}" /> for equality
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -138,7 +137,7 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
     }
 
     /// <summary>
-    /// Compares two <see cref="CkId{TKey}"/> for inequality
+    ///     Compares two <see cref="CkId{TKey}" /> for inequality
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -149,7 +148,7 @@ public readonly struct CkId<TKey> : IComparable<CkId<TKey>>, IEquatable<CkId<TKe
     }
 
     /// <summary>
-    /// Returns a string representation of the value.
+    ///     Returns a string representation of the value.
     /// </summary>
     /// <returns></returns>
     public override string ToString()

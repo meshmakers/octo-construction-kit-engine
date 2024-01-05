@@ -12,8 +12,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositoryDataSource
 {
     private readonly ICkCacheService _ckCacheService;
-    private readonly IRtRepositorySerializer _rtSerializer;
     private readonly string _directoryPath;
+    private readonly IRtRepositorySerializer _rtSerializer;
 
     public LocalRepositoryDataSource(string tenantId, string directoryPath, ICkCacheService ckCacheService,
         IRtRepositorySerializer rtSerializer)

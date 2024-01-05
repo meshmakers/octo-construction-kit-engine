@@ -13,28 +13,6 @@ namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 
 internal class RtRepositorySerializer : IRtRepositorySerializer
 {
-    private record RtEntityJson
-    {
-        public CkId<CkTypeId> CkTypeId { get; set; }
-        public OctoObjectId RtId { get; set; }
-        public DateTime? RtCreationDateTime { get; set; }
-        public DateTime? RtChangedDateTime { get; set; }
-        public string? RtWellKnownName { get; set; }
-        public Dictionary<string, object?> Attributes { get; set; } = new();
-    }
-    
-    private record RtAssociationJson
-    {
-        public OctoObjectId AssociationId { get; set; }
-        public OctoObjectId OriginRtId { get; set; }
-        public CkId<CkTypeId> OriginCkTypeId { get; set; }
-        public OctoObjectId TargetRtId { get; set; }
-        public CkId<CkTypeId> TargetCkTypeId { get; set; }
-        public CkId<CkAssociationRoleId> AssociationRoleId { get; set; }
-        
-        public Dictionary<string, object?> Attributes { get; set; } = new();
-    }
-
     private const string Validation = "validation";
 
     //private readonly JsonSerializerOptions _options;
@@ -71,7 +49,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 
     public async Task SerializeAsync(StreamWriter streamWriter, IEnumerable<RtAssociation> collection)
     {
-        var associationJsons = collection.Select(e => new RtAssociationJson()
+        var associationJsons = collection.Select(e => new RtAssociationJson
         {
             AssociationId = e.AssociationId,
             OriginRtId = e.OriginRtId,
@@ -81,12 +59,12 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             AssociationRoleId = e.AssociationRoleId,
             Attributes = new Dictionary<string, object?>(e.Attributes)
         });
-        
+
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, associationJsons, _options).ConfigureAwait(false);
     }
 
     public async Task<IEnumerable<RtEntity>> DeserializeEntitiesAsync(Stream stream, string locationReference,
-        OperationResult operationResult) 
+        OperationResult operationResult)
     {
         try
         {
@@ -153,5 +131,27 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         }
 
         return evaluationResults.IsValid;
+    }
+
+    private record RtEntityJson
+    {
+        public CkId<CkTypeId> CkTypeId { get; set; }
+        public OctoObjectId RtId { get; set; }
+        public DateTime? RtCreationDateTime { get; set; }
+        public DateTime? RtChangedDateTime { get; set; }
+        public string? RtWellKnownName { get; set; }
+        public Dictionary<string, object?> Attributes { get; set; } = new();
+    }
+
+    private record RtAssociationJson
+    {
+        public OctoObjectId AssociationId { get; set; }
+        public OctoObjectId OriginRtId { get; set; }
+        public CkId<CkTypeId> OriginCkTypeId { get; set; }
+        public OctoObjectId TargetRtId { get; set; }
+        public CkId<CkTypeId> TargetCkTypeId { get; set; }
+        public CkId<CkAssociationRoleId> AssociationRoleId { get; set; }
+
+        public Dictionary<string, object?> Attributes { get; set; } = new();
     }
 }

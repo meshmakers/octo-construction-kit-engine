@@ -9,16 +9,16 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
-/// Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}"/> for <see cref="RtEntity"/>
+///     Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}" /> for <see cref="RtEntity" />
 /// </summary>
-public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectId, TDocument, RtEntityDto> where TDocument: RtEntity, new()
+public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectId, TDocument, RtEntityDto> where TDocument : RtEntity, new()
 {
-    private readonly string _tenantId;
     private readonly ICkCacheService _ckCacheService;
     private readonly IRtRepositorySerializer _rtSerializer;
+    private readonly string _tenantId;
 
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="tenantId"></param>
     /// <param name="ckCacheService"></param>
@@ -29,7 +29,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
         _ckCacheService = ckCacheService;
         _rtSerializer = rtSerializer;
     }
-    
+
     /// <inheritdoc />
     public OctoObjectId GetId(RtEntityDto dto)
     {
@@ -78,10 +78,12 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyDictionary<OctoObjectId, TDocument>> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public async Task<IReadOnlyDictionary<OctoObjectId, TDocument>> DeserializeAsync(Stream stream, string locationReference,
+        OperationResult operationResult)
     {
-        var existingDocuments = await _rtSerializer.DeserializeEntitiesAsync(stream, locationReference, operationResult).ConfigureAwait(false);
-        
+        var existingDocuments =
+            await _rtSerializer.DeserializeEntitiesAsync(stream, locationReference, operationResult).ConfigureAwait(false);
+
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
         var entities = new ConcurrentDictionary<OctoObjectId, TDocument>();
@@ -96,7 +98,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
                 CkTypeId = modelRtEntity.CkTypeId,
                 RtChangedDateTime = modelRtEntity.RtChangedDateTime,
                 RtCreationDateTime = modelRtEntity.RtCreationDateTime,
-                RtWellKnownName = modelRtEntity.RtWellKnownName,
+                RtWellKnownName = modelRtEntity.RtWellKnownName
             };
 
             foreach (var modelRtAttribute in modelRtEntity.Attributes)

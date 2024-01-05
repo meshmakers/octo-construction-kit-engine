@@ -1,8 +1,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
-
 /// <summary>
-/// Used to indicate an exception during model repository operations
+///     Used to indicate an exception during model repository operations
 /// </summary>
 public class ModelRepositoryException : CkModelException
 {
@@ -25,9 +24,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Model '{ckModelId}' not found in one of the defined model repositories.");
     }
-    
+
     /// <summary>
-    /// Creates an exception that indicates that a model was not found in a specific repository.
+    ///     Creates an exception that indicates that a model was not found in a specific repository.
     /// </summary>
     /// <param name="ckModelId"></param>
     /// <param name="repositoryName"></param>
@@ -39,9 +38,10 @@ public class ModelRepositoryException : CkModelException
 
     internal static Exception ErrorDuringModelLoad(CkModelId ckModelId, string repositoryName, OperationResult operationResult)
     {
-        return new ModelRepositoryException($"Error loading model '{ckModelId}' from repository '{repositoryName}'.{Environment.NewLine}{operationResult.GetMessages()}");
+        return new ModelRepositoryException(
+            $"Error loading model '{ckModelId}' from repository '{repositoryName}'.{Environment.NewLine}{operationResult.GetMessages()}");
     }
-    
+
     internal static Exception ModelAlreadyExists(CkModelId ckModelId, string repositoryName)
     {
         return new ModelRepositoryException($"Model '{ckModelId}' already exists in repository '{repositoryName}'.");

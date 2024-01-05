@@ -1,14 +1,14 @@
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 /// <summary>
-/// Implements <see cref="IAttributeValueList{TValue}"/> for primitive data types
+///     Implements <see cref="IAttributeValueList{TValue}" /> for primitive data types
 /// </summary>
 /// <typeparam name="TValue"></typeparam>
 public class AttributePrimitiveValueList<TValue> : AttributeValueList<TValue, TValue>
-    where TValue: struct
+    where TValue : struct
 {
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="list"></param>
     public AttributePrimitiveValueList(List<TValue> list)
@@ -17,7 +17,7 @@ public class AttributePrimitiveValueList<TValue> : AttributeValueList<TValue, TV
     }
 
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     public AttributePrimitiveValueList()
     {

@@ -1,22 +1,22 @@
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
-/// Represents a current multiplicity.
+///     Represents a current multiplicity.
 /// </summary>
 public enum CurrentMultiplicity
 {
     /// <summary>
-    /// Zero
+    ///     Zero
     /// </summary>
     Zero = 0,
-    
+
     /// <summary>
-    /// One
+    ///     One
     /// </summary>
     One = 1,
-    
+
     /// <summary>
-    /// Many
+    ///     Many
     /// </summary>
     Many = 2
 }

@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 
 /// <summary>
-/// Represents a local session
+///     Represents a local session
 /// </summary>
 public class LocalSession : IOctoSession
 {

@@ -8,11 +8,11 @@ types:
       - id: System/Name
         name: Name
         isOptional: true
-        
+
       - id: System.TestIdentity/NormalizedName
         name: NormalizedName
         isOptional: true
-        
+
       - id: System.TestIdentity/ConcurrencyStamp
         name: ConcurrencyStamp
 

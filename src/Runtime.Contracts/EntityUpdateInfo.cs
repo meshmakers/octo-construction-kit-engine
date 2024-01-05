@@ -4,29 +4,29 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
-/// Interface for a entity update info.
+///     Interface for a entity update info.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
 public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
 {
     /// <summary>
-    /// Entity for modification.
+    ///     Entity for modification.
     /// </summary>
     public TEntity? RtEntity { get; }
-    
+
     /// <summary>
-    /// Entity id for modification.
+    ///     Entity id for modification.
     /// </summary>
     public RtEntityId RtEntityId { get; }
-    
+
     /// <summary>
-    /// MOD option.
+    ///     MOD option.
     /// </summary>
     public EntityModOptions ModOption { get; }
 }
 
 /// <summary>
-/// Represents a entity update info.
+///     Represents a entity update info.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
 public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
@@ -38,30 +38,30 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         RtEntity = rtEntity;
         ModOption = modOption;
     }
-    
+
     private EntityUpdateInfo(RtEntityId rtEntityId, EntityModOptions modOption)
     {
         RtEntityId = rtEntityId;
         ModOption = modOption;
     }
-    
+
     /// <summary>
-    /// Entity for modification.
+    ///     Entity for modification.
     /// </summary>
     public TEntity? RtEntity { get; }
-    
+
     /// <summary>
-    /// Entity id for modification.
+    ///     Entity id for modification.
     /// </summary>
     public RtEntityId RtEntityId { get; }
 
     /// <summary>
-    /// MOD option.
+    ///     MOD option.
     /// </summary>
     public EntityModOptions ModOption { get; }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="EntityUpdateInfo{TEntity}"/> for insert.
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for insert.
     /// </summary>
     /// <param name="rtEntity">Runtime entity to insert</param>
     /// <returns></returns>
@@ -69,9 +69,9 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     {
         return new EntityUpdateInfo<TEntity>(rtEntity.ToRtEntityId(), rtEntity, EntityModOptions.Insert);
     }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="EntityUpdateInfo{TEntity}"/> for delete.
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for delete.
     /// </summary>
     /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
     /// <returns></returns>
@@ -79,9 +79,9 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, EntityModOptions.Delete);
     }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="EntityUpdateInfo{TEntity}"/> for update.
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for update.
     /// </summary>
     /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
     /// <param name="rtEntity">Runtime entity to update</param>
@@ -90,9 +90,9 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update);
     }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="EntityUpdateInfo{TEntity}"/> for replace.
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for replace.
     /// </summary>
     /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
     /// <param name="rtEntity">Runtime entity to replace</param>

@@ -22,18 +22,18 @@
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>meshmakers64.png</Link>
         </None>
         <None Include="..\..\LICENSE">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>LICENSE</Link>
         </None>
     </ItemGroup>
 
     <ItemGroup>
-        <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**" />
-        <Compile Remove="**\*" />
+        <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**"/>
+        <Compile Remove="**\*"/>
     </ItemGroup>
 </Project>

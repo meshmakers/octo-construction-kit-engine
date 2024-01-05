@@ -20,7 +20,11 @@ steps:
       # Replace placeholder in a file with build number
       $file = '$(Build.SourcesDirectory)/src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets'
       $fileContent = Get-Content $file
-      $fileContent = $fileContent -replace '999.0.0.0', '$(Build.BuildNumber)'
+      if ($BuildNumber -eq '0') {
+        $fileContent = $fileContent -replace '999.0.0.0', '$(MajorVersion).$(MinorVersion).$(RevisionVersion)'
+      } else {
+        $fileContent = $fileContent -replace '999.0.0.0', '$(Build.BuildNumber)'
+      }
       $fileContent | Set-Content $file
   displayName: 'Updates dotnet targets compiler version'
 - task: PowerShell@2

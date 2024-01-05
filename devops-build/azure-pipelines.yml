@@ -40,7 +40,6 @@ stages:
               Write-Host "##vso[task.setvariable variable=MajorVersion;]$major"
               Write-Host "##vso[task.setvariable variable=MinorVersion;]$minor"
               Write-Host "##vso[task.setvariable variable=RevisionVersion;]$revision"
-              Write-Host "##vso[task.setvariable variable=BuildNumber;]$buildNumber"
               Write-Host "Setting build number to $buildNumber"
               Write-Host "##vso[build.updatebuildnumber]$buildNumber"
             }

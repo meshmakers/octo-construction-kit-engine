@@ -20,7 +20,7 @@ steps:
       # Replace placeholder in a file with build number
       $file = '$(Build.SourcesDirectory)/src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets'
       $fileContent = Get-Content $file
-      if ($BuildNumber -eq '0') {
+      if ($isRelease) {
         $fileContent = $fileContent -replace '999.0.0.0', '$(MajorVersion).$(MinorVersion).$(RevisionVersion)'
       } else {
         $fileContent = $fileContent -replace '999.0.0.0', '$(Build.BuildNumber)'

@@ -41,7 +41,7 @@ stages:
               $buildNumberShort = "$major.$minor.$revision"
               Write-Host "##vso[task.setvariable variable=MajorVersion;]$major"
               Write-Host "##vso[task.setvariable variable=MinorVersion;]$minor"
-              Write-Host "##vso[task.setvariable variable=$BuildNumberShort;]$buildNumberShort"
+              Write-Host "##vso[task.setvariable variable=BuildNumberShort;]$buildNumberShort"
               Write-Host "Setting build number to $buildNumber (short: $buildNumberShort)"
               Write-Host "##vso[build.updatebuildnumber]$buildNumber"
             }

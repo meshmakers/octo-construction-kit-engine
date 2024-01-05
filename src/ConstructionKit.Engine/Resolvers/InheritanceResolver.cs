@@ -46,7 +46,7 @@ internal class InheritanceResolver : IInheritanceResolver
         }
 
         _logger.LogDebug("Resolving dependencies based on inheritance");
-        BuildInheritedAssociations(modelGraph, operationResult);
+        BuildInheritedConfiguration(modelGraph, operationResult);
 
         _logger.LogInformation("Resolving inheritance completed");
 
@@ -123,12 +123,7 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             var ckGraphTypeInheritance = originTypeGraph.BaseTypes.ElementAt(i);
             var baseCkType = ckModelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
-            if (baseCkType.IsCollectionRoot)
-            {
-                originTypeGraph.SetDefiningCollectionCkTypeId(baseCkType.CkTypeId);
 
-                baseCkType.MergeTextIndexes(originTypeGraph.Indexes);
-            }
 
             foreach (var typeAttribute in baseCkType.DefinedAttributes)
             {
@@ -268,7 +263,7 @@ internal class InheritanceResolver : IInheritanceResolver
         return targetCkTypeGraph;
     }
 
-    private void BuildInheritedAssociations(CkModelGraph modelGraph, OperationResult operationResult)
+    private void BuildInheritedConfiguration(CkModelGraph modelGraph, OperationResult operationResult)
     {
         var handledInheritanceHashSet = new HashSet<Tuple<CkId<CkTypeId>, CkId<CkTypeId>>>();
         foreach (var graphType in modelGraph.Types)
@@ -279,6 +274,14 @@ internal class InheritanceResolver : IInheritanceResolver
                 var baseGraphType = modelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
                 var inheritedGraphType = modelGraph.Types[ckGraphTypeInheritance.InheritorCkTypeId];
                 baseList.Add(baseGraphType);
+                
+                // Set the defining collection type id and merge index fields.
+                if (baseGraphType.IsCollectionRoot)
+                {
+                    graphType.Value.SetDefiningCollectionCkTypeId(baseGraphType.CkTypeId);
+
+                    baseGraphType.MergeTextIndexes(graphType.Value.Indexes);
+                }
 
                 // Ensure that we don't handle the same inheritance twice
                 var tuple = new Tuple<CkId<CkTypeId>, CkId<CkTypeId>>(baseGraphType.CkTypeId,

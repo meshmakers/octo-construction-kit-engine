@@ -11,7 +11,7 @@ public class CkTypeIdTests
         Assert.Equal("TestEntity", ckTypeId.TypeId);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
-    
+
     [Fact]
     public void Create_CkTypeId_WithoutVersion()
     {
@@ -19,7 +19,7 @@ public class CkTypeIdTests
         Assert.Equal("TestEntity", ckTypeId.TypeId);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
-    
+
     [Fact]
     public void Create_CkTypeId_FromString()
     {
@@ -27,13 +27,13 @@ public class CkTypeIdTests
         Assert.Equal("TestEntity", ckTypeId.TypeId);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
-    
+
     [Fact]
     public void Create_CkTypeId_Malformed()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new CkTypeId(""));
     }
-    
+
     [Fact]
     public void Compare_CkTypeId_Same()
     {
@@ -49,7 +49,7 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("System/TestEntity-1.0.1");
         Assert.Equal(-1, ckTypeId1.CompareTo(ckTypeId2));
     }
-    
+
     [Fact]
     public void Compare_CkTypeId_LowerVersionVersion()
     {
@@ -57,7 +57,7 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("System/TestEntity-1.0.0");
         Assert.Equal(1, ckTypeId1.CompareTo(ckTypeId2));
     }
-    
+
     [Fact]
     public void Compare_CkTypeId_DifferentTypeId()
     {
@@ -65,7 +65,7 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("TestEntity2-1.0.0");
         Assert.Equal(-1, ckTypeId1.CompareTo(ckTypeId2));
     }
-    
+
     [Fact]
     public void Equal_CkTypeId_Same()
     {
@@ -73,7 +73,7 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("TestEntity-1.0.0");
         Assert.True(ckTypeId1.Equals(ckTypeId2));
     }
-    
+
     [Fact]
     public void Equal_CkTypeId_DifferentVersion()
     {
@@ -81,7 +81,7 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("TestEntity-1.0.1");
         Assert.False(ckTypeId1.Equals(ckTypeId2));
     }
-    
+
     [Fact]
     public void Equal_CkTypeId_DifferentTypeId()
     {
@@ -89,5 +89,4 @@ public class CkTypeIdTests
         var ckTypeId2 = new CkTypeId("TestEntity2-1.0.0");
         Assert.False(ckTypeId1.Equals(ckTypeId2));
     }
-    
 }

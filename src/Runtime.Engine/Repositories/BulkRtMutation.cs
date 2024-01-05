@@ -7,7 +7,7 @@ using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
-/// Implementation of <see cref="IBulkRtMutation"/>
+///     Implementation of <see cref="IBulkRtMutation" />
 /// </summary>
 internal class BulkRtMutation : IBulkRtMutation
 {
@@ -25,29 +25,32 @@ internal class BulkRtMutation : IBulkRtMutation
     }
 
     /// <summary>
-    /// Applies the changes to the data source
+    ///     Applies the changes to the data source
     /// </summary>
     /// <param name="session"></param>
     /// <param name="repositoryDataSource"></param>
     /// <param name="entityUpdateInfoList"></param>
     /// <param name="associationUpdateInfoList"></param>
-    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
         OperationResult operationResult = new();
-        var entityValidatorResult = await _entityRuleEngine.ValidateAsync(repositoryDataSource.TenantId, 
+        var entityValidatorResult = await _entityRuleEngine.ValidateAsync(repositoryDataSource.TenantId,
             entityUpdateInfoList, operationResult).ConfigureAwait(false);
 
         var graphValidationResult =
-            await _graphRuleEngine.ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, operationResult).ConfigureAwait(false);
+            await _graphRuleEngine
+                .ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, operationResult)
+                .ConfigureAwait(false);
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
-        
+
         await ApplyRtEntityChangesAsync(session, repositoryDataSource, entityValidatorResult).ConfigureAwait(false);
         await ApplyRtAssociationChangesAsync(session, repositoryDataSource, graphValidationResult).ConfigureAwait(false);
     }
-    
-    private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, 
+
+    private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         EntityRuleEngineResult<RtEntity> ckEntityRuleEngineResult)
     {
         if (ckEntityRuleEngineResult.RtEntitiesToDelete.Any())
@@ -59,7 +62,7 @@ internal class BulkRtMutation : IBulkRtMutation
         {
             await UpdateRtEntities(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToUpdate).ConfigureAwait(false);
         }
-        
+
         if (ckEntityRuleEngineResult.RtEntitiesToReplace.Any())
         {
             await ReplaceRtEntities(session, repositoryDataSource, ckEntityRuleEngineResult.RtEntitiesToReplace).ConfigureAwait(false);
@@ -71,7 +74,8 @@ internal class BulkRtMutation : IBulkRtMutation
         }
     }
 
-    private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtEntity> rtEntityList,
+    private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IEnumerable<RtEntity> rtEntityList,
         bool disablePreDocumentModifications = false)
     {
         var rtEntities = rtEntityList.ToList();
@@ -79,7 +83,8 @@ internal class BulkRtMutation : IBulkRtMutation
         rtEntities.ForEach(x => x.RtChangedDateTime = x.RtCreationDateTime);
         rtEntities.ForEach(x =>
             {
-                if (string.IsNullOrWhiteSpace(x.CkTypeId.FullName)) {
+                if (string.IsNullOrWhiteSpace(x.CkTypeId.FullName))
+                {
                     x.CkTypeId = x.GetCkTypeId();
                 }
             }
@@ -106,8 +111,9 @@ internal class BulkRtMutation : IBulkRtMutation
             }
         }
     }
-    
-    private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
+
+    private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
         {
@@ -115,12 +121,13 @@ internal class BulkRtMutation : IBulkRtMutation
             {
                 throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(RtEntity));
             }
-            
+
             await ReplaceRtEntitiesByCkId(session, repositoryDataSource, rtEntityGrouping.Key, rtEntityGrouping).ConfigureAwait(false);
         }
     }
 
-    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
+    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
         {
@@ -145,10 +152,10 @@ internal class BulkRtMutation : IBulkRtMutation
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
         }
 
-        await collection.UpdateManyAsync(session, rtEntityGrouping.Select(x=> x.Value)).ConfigureAwait(false);
+        await collection.UpdateManyAsync(session, rtEntityGrouping.Select(x => x.Value)).ConfigureAwait(false);
     }
-    
-    private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource, 
+
+    private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
     {
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeId);
@@ -160,10 +167,11 @@ internal class BulkRtMutation : IBulkRtMutation
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
         }
 
-        await collection.ReplaceManyAsync(session, rtEntityGrouping.Select(x=> x.Value)).ConfigureAwait(false);
+        await collection.ReplaceManyAsync(session, rtEntityGrouping.Select(x => x.Value)).ConfigureAwait(false);
     }
-    
-    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IReadOnlyList<RtEntityId> rtEntityIds)
+
+    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IReadOnlyList<RtEntityId> rtEntityIds)
     {
         foreach (var rtEntityGrouping in rtEntityIds.GroupBy(x => x.CkTypeId))
         {
@@ -172,42 +180,49 @@ internal class BulkRtMutation : IBulkRtMutation
                 throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(RtEntity));
             }
 
-            await DeleteRtEntityAsync<RtEntity>(session, repositoryDataSource, rtEntityGrouping.Key, rtEntityGrouping).ConfigureAwait(false);
+            await DeleteRtEntityAsync<RtEntity>(session, repositoryDataSource, rtEntityGrouping.Key, rtEntityGrouping)
+                .ConfigureAwait(false);
         }
     }
-    
-    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource, CkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
+
+    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        CkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
         where TEntity : RtEntity, new()
     {
         var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
-        
+
         foreach (var rtEntityId in rtEntityIds.AsParallel())
         {
             await collection.DeleteOneAsync(session, rtEntityId.RtId).ConfigureAwait(false);
         }
     }
-    
+
     private async Task ApplyRtAssociationChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         GraphRuleEngineResult graphRuleEngineResult)
     {
         if (graphRuleEngineResult.RtAssociationsToDelete.Any())
         {
-            await DeleteRtAssociationsAsync(session, repositoryDataSource, graphRuleEngineResult.RtAssociationsToDelete).ConfigureAwait(false);
+            await DeleteRtAssociationsAsync(session, repositoryDataSource, graphRuleEngineResult.RtAssociationsToDelete)
+                .ConfigureAwait(false);
         }
-        
+
         if (graphRuleEngineResult.RtAssociationsToCreate.Any())
         {
-            await InsertRtAssociationsAsync(session, repositoryDataSource, graphRuleEngineResult.RtAssociationsToCreate).ConfigureAwait(false);
+            await InsertRtAssociationsAsync(session, repositoryDataSource, graphRuleEngineResult.RtAssociationsToCreate)
+                .ConfigureAwait(false);
         }
     }
 
-    private async Task InsertRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtAssociation> rtAssociations)
+    private async Task InsertRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IEnumerable<RtAssociation> rtAssociations)
     {
         await repositoryDataSource.RtAssociations.InsertManyAsync(session, rtAssociations).ConfigureAwait(false);
     }
-    
-    private async Task DeleteRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, IEnumerable<RtAssociation> rtAssociations)
+
+    private async Task DeleteRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        IEnumerable<RtAssociation> rtAssociations)
     {
-        await repositoryDataSource.RtAssociations.DeleteManyAsync(session, rtAssociations.Select(x => x.AssociationId)).ConfigureAwait(false);
+        await repositoryDataSource.RtAssociations.DeleteManyAsync(session, rtAssociations.Select(x => x.AssociationId))
+            .ConfigureAwait(false);
     }
 }

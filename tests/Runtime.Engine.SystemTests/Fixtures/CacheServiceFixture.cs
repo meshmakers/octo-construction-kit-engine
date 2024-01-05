@@ -9,15 +9,15 @@ public class CacheServiceFixture : TemporaryDirectoryFixture
 {
     private readonly ServiceProvider _serviceProvider;
 
-    public string RepositoryPath { get; }
-    public string TenantId { get; } = Guid.NewGuid().ToString();
-
     public CacheServiceFixture()
     {
         RepositoryPath = CreateTempDirectory();
 
         _serviceProvider = Services.BuildServiceProvider();
     }
+
+    public string RepositoryPath { get; }
+    public string TenantId { get; } = Guid.NewGuid().ToString();
 
     public override void Dispose()
     {

@@ -1,12 +1,12 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a unique identifier of a runtime model entity and its construction kit type.
+///     Represents a unique identifier of a runtime model entity and its construction kit type.
 /// </summary>
 public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntityId>
 {
     /// <summary>
-    /// Creates a new instance of <see cref="RtEntityId"/>.
+    ///     Creates a new instance of <see cref="RtEntityId" />.
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="rtId"></param>
@@ -15,9 +15,9 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
         CkTypeId = ckTypeId;
         RtId = rtId;
     }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="RtEntityId"/>.
+    ///     Creates a new instance of <see cref="RtEntityId" />.
     /// </summary>
     /// <param name="ckModelId"></param>
     /// <param name="ckTypeId"></param>
@@ -27,14 +27,14 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
         CkTypeId = new CkId<CkTypeId>(ckModelId, ckTypeId);
         RtId = rtId;
     }
-    
+
     /// <summary>
-    /// The construction kit type id.
+    ///     The construction kit type id.
     /// </summary>
     public CkId<CkTypeId> CkTypeId { get; }
-    
+
     /// <summary>
-    /// The runtime id.
+    ///     The runtime id.
     /// </summary>
     public OctoObjectId RtId { get; }
 
@@ -46,7 +46,7 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
         {
             return num;
         }
-        
+
         return RtId.CompareTo(other.RtId);
     }
 

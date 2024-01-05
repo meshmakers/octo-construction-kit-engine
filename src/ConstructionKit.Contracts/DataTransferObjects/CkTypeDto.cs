@@ -9,7 +9,7 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-/// Defines a CK type.
+///     Defines a CK type.
 /// </summary>
 [DebuggerDisplay("{" + nameof(TypeId) + "}")]
 public class CkTypeDto
@@ -21,7 +21,7 @@ public class CkTypeDto
     public CkTypeId TypeId { get; set; }
 
     /// <summary>
-    /// Defines the base type of this type. Only one type may not have a base type: System/Entity
+    ///     Defines the base type of this type. Only one type may not have a base type: System/Entity
     /// </summary>
     [JsonConverter(typeof(CkIdTypeIdConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
@@ -46,19 +46,19 @@ public class CkTypeDto
     public List<CkTypeAttributeDto>? Attributes { get; set; }
 
     /// <summary>
-    /// Gets or sets a list of indexes
+    ///     Gets or sets a list of indexes
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkTypeIndexDto>? Indexes { get; set; }
 
     /// <summary>
-    /// Get or sets a list of associations
+    ///     Get or sets a list of associations
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkTypeAssociationDto>? Associations { get; set; }
 
     /// <summary>
-    /// Gets or sets if the change stream should include pre and post images
+    ///     Gets or sets if the change stream should include pre and post images
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool EnableChangeStreamPreAndPostImages { get; set; }

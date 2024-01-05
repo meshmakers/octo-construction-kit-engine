@@ -13,9 +13,9 @@ types:
 
       - id: System.TestIdentity/ClientId
         name: ClientIdGroupGraphApi
-        
+
       - id: System.TestIdentity/ClientIdGroupAzureAd
         name: ClientIdGroupAzureAd
-        
+
       - id: System.TestIdentity/ClientSecret
         name: ClientSecretGroupAzureAd

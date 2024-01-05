@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Used to indicate an exception during cache operations
+///     Used to indicate an exception during cache operations
 /// </summary>
 public class CkCacheException : CkModelException
 {
@@ -44,7 +44,7 @@ public class CkCacheException : CkModelException
     {
         return new CkCacheException($"CkAssociationRole '{ckAssociationRoleId}' not found in CkCache for tenant '{tenantId}'.");
     }
-    
+
     internal static Exception CkRecordNotFound(string tenantId, CkId<CkRecordId> ckRecordId)
     {
         return new CkCacheException($"CkRecordId '{ckRecordId}' not found in CkCache for tenant '{tenantId}'.");

@@ -5,18 +5,17 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 /// <summary>
-/// Converter for System.Text.Json and YamlDotNet for <see cref="ICollection{Object}"/>/>
+///     Converter for System.Text.Json and YamlDotNet for <see cref="ICollection{Object}" />/>
 /// </summary>
 public class ObjectCollectionConverter : IYamlTypeConverter
 {
     /// <summary>
-    /// 
     /// </summary>
     /// <param name="type"></param>
     /// <returns></returns>
     public bool Accepts(Type type)
     {
-        var r =  type.IsAssignableFrom(typeof(ICollection<object>));
+        var r = type.IsAssignableFrom(typeof(ICollection<object>));
         return r;
     }
 
@@ -25,7 +24,7 @@ public class ObjectCollectionConverter : IYamlTypeConverter
     {
         var listType = typeof(List<object>);
         var list = (IList<object>)Activator.CreateInstance(listType)!;
-        
+
         parser.Consume<SequenceStart>();
 
         while (!parser.TryConsume<SequenceEnd>(out _))
@@ -56,7 +55,7 @@ public class ObjectCollectionConverter : IYamlTypeConverter
                 }
             }
         }
-        
+
         emitter.Emit(new SequenceEnd());
     }
 }

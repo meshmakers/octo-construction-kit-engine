@@ -8,6 +8,9 @@ internal readonly record struct GroupedModelFile
         CacheFile = cacheFile;
     }
 
+    public AdditionalTextWithHash MainFile { get; }
+    public AdditionalTextWithHash CacheFile { get; }
+
     public bool Equals(GroupedModelFile other)
     {
         return MainFile.Equals(other.MainFile) && CacheFile.Equals(other.CacheFile);
@@ -29,7 +32,4 @@ internal readonly record struct GroupedModelFile
         return
             $"{nameof(MainFile)}: {MainFile}, {nameof(CacheFile)}: {CacheFile}";
     }
-
-    public AdditionalTextWithHash MainFile { get; }
-    public AdditionalTextWithHash CacheFile { get; }
 }

@@ -27,53 +27,53 @@ public class Builder
             },
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attribute1",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute2",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute3",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute4",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute5",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute6",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attribute7",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "Record1",
-                  ValueType = AttributeValueTypesDto.Record,
-                  ValueCkRecordId = "sample1/Record1"
-              },
-              new()
-              {
-                  AttributeId = "Enum1",
-                  ValueType = AttributeValueTypesDto.Enum,
-                  ValueCkEnumId = "sample1/Enum1"
-              }
+                new()
+                {
+                    AttributeId = "attribute1",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute2",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute3",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute4",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute5",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute6",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attribute7",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "Record1",
+                    ValueType = AttributeValueTypesDto.Record,
+                    ValueCkRecordId = "sample1/Record1"
+                },
+                new()
+                {
+                    AttributeId = "Enum1",
+                    ValueType = AttributeValueTypesDto.Enum,
+                    ValueCkEnumId = "sample1/Enum1"
+                }
             },
             Types = new List<CkCompiledTypeDto>
             {
@@ -103,9 +103,8 @@ public class Builder
                     },
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1"},
+                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" }
                     }
-                    
                 },
                 new()
                 {
@@ -113,9 +112,8 @@ public class Builder
                     DerivedFromCkTypeId = "sample1/Demo2",
                     Associations = new List<CkTypeAssociationDto>
                     {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "System/Entity" },
+                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "System/Entity" }
                     }
-                    
                 }
             },
             Records = new List<CkRecordDto>
@@ -140,7 +138,7 @@ public class Builder
                     {
                         new() { Key = 0, Name = "Value1" },
                         new() { Key = 1, Name = "Value2" },
-                        new() { Key = 2, Name = "Value3" },
+                        new() { Key = 2, Name = "Value3" }
                     }
                 }
             }

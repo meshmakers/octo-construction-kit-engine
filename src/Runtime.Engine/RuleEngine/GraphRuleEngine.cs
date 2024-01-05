@@ -10,7 +10,7 @@ using Meshmakers.Octo.Runtime.Engine.Messages;
 namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 
 /// <summary>
-/// Implementation of the runtime graph validation engine
+///     Implementation of the runtime graph validation engine
 /// </summary>
 internal class GraphRuleEngine : IGraphRuleEngine
 {
@@ -323,7 +323,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         RtEntityId rtEntityId, OperationResult operationResult)
     {
-        RtEntity? rtEntity = entityUpdateInfoList.Select(x => x.RtEntity)
+        var rtEntity = entityUpdateInfoList.Select(x => x.RtEntity)
             .FirstOrDefault(x => x?.RtId == rtEntityId.RtId);
         // ReSharper disable once ConvertIfStatementToNullCoalescingExpression
         if (rtEntity == null)

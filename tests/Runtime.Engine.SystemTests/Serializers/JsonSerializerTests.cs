@@ -10,8 +10,8 @@ namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Serializers;
 
 public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
 {
-    private readonly ITestOutputHelper _testOutputHelper;
     private readonly TemporaryDirectoryFixture _fixture;
+    private readonly ITestOutputHelper _testOutputHelper;
 
     public JsonSerializerTests(TemporaryDirectoryFixture fixture, ITestOutputHelper testOutputHelper)
     {
@@ -42,10 +42,10 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
 
         List<RtEntityDto> globalList = new();
 
-        for (int j = 0; j < 200; j++)
+        for (var j = 0; j < 200; j++)
         {
             var entities = new ConcurrentStack<RtEntityDto>();
-            int testCount = 0;
+            var testCount = 0;
             _testOutputHelper.WriteLine($"========= next {j}");
 
             Parallel.For(0, 10_000, options, i =>
@@ -81,7 +81,7 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
 
         modelRootDto.Entities = globalList.ToList();
 
-        _testOutputHelper.WriteLine($"Serializing...");
+        _testOutputHelper.WriteLine("Serializing...");
 
         await rtJsonSerializer.SerializeAsync(streamWriter, modelRootDto);
 

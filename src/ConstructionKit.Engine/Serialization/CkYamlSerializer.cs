@@ -1,3 +1,4 @@
+using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -7,23 +8,23 @@ using YamlDotNet.Serialization.NamingConventions;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 /// <summary>
-/// Implements a serializer for the CK model in YAML format.
+///     Implements a serializer for the CK model in YAML format.
 /// </summary>
 /// <remarks>
-/// Currently there is no YAML serializer that supports JSON schema validation
-/// out of the box. Therefore we use the YamlDotNet library and implement the validation
-/// using the <see cref="ICkSchemaValidator"/> interface. That results that the stream
-/// is used twice: for validation and for deserialization. This is not optimal.
+///     Currently there is no YAML serializer that supports JSON schema validation
+///     out of the box. Therefore we use the YamlDotNet library and implement the validation
+///     using the <see cref="ICkSchemaValidator" /> interface. That results that the stream
+///     is used twice: for validation and for deserialization. This is not optimal.
 /// </remarks>
 internal class CkYamlSerializer : ICkYamlSerializer
 {
     private readonly ICkSchemaValidator _ckSchemaValidator;
-    private readonly ISerializer _serializer;
     private readonly IDeserializer _deserializer;
+    private readonly ISerializer _serializer;
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
     /// <summary>
-    /// Creates a new instance of the <see cref="CkYamlSerializer"/> class.
+    ///     Creates a new instance of the <see cref="CkYamlSerializer" /> class.
     /// </summary>
     /// <param name="ckSchemaValidator"></param>
     public CkYamlSerializer(ICkSchemaValidator ckSchemaValidator)
@@ -43,7 +44,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
-           // .WithTypeConverter(new ObjectCollectionConverter())
+            // .WithTypeConverter(new ObjectCollectionConverter())
             .Build();
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -113,9 +114,10 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult)
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+        OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
     }
@@ -123,17 +125,18 @@ internal class CkYamlSerializer : ICkYamlSerializer
     /// <inheritdoc />
     public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(s);
+        var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
     }
 
     /// <inheritdoc />
-    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
+        OperationResult operationResult)
     {
         return Task.FromResult(DeserializeCompiledModelRoot(stream, locationReference, operationResult));
     }
-    
+
     private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
     {
         _ckSchemaValidator.ValidateCompiledModelInYaml(stream, locationReference, operationResult);

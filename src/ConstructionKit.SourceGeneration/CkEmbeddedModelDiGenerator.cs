@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 public class CkEmbeddedModelDiGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkEmbeddedModelGenerator"/>
+    ///     Returns the singleton instance of <see cref="CkEmbeddedModelGenerator" />
     /// </summary>
     public static readonly CkEmbeddedModelDiGenerator Instance = new();
 
@@ -22,7 +22,8 @@ public class CkEmbeddedModelDiGenerator
         sb.AppendLine("namespace Microsoft.Extensions.DependencyInjection;");
         sb.AppendLine();
         sb.AppendLine("/// <summary>");
-        sb.AppendLine($"/// Extension methods for adding a embedded version of construction kit model {ckModelId.FullName} to the DI container.");
+        sb.AppendLine(
+            $"/// Extension methods for adding a embedded version of construction kit model {ckModelId.FullName} to the DI container.");
         sb.AppendLine("/// </summary>");
         sb.AppendLine("public static class ServiceCollectionExtensions");
         sb.AppendLine("{");

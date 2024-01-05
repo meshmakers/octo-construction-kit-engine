@@ -7,11 +7,11 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 internal class CkIdsCodeGenerator
 {
     /// <summary>
-    /// Returns the singleton instance of <see cref="CkIdsCodeGenerator"/>
+    ///     Returns the singleton instance of <see cref="CkIdsCodeGenerator" />
     /// </summary>
     public static readonly CkIdsCodeGenerator Instance = new();
-    
-    public string Generate(string ns, CkModelId ckModelId, ICollection<CkCompiledTypeDto>? ckTypes, 
+
+    public string Generate(string ns, CkModelId ckModelId, ICollection<CkCompiledTypeDto>? ckTypes,
         ICollection<CkAttributeDto>? ckAttributes, ICollection<CkAssociationRoleDto>? ckAssociationRoles)
     {
         StringBuilder sb = new();
@@ -27,7 +27,7 @@ internal class CkIdsCodeGenerator
         sb.AppendLine("/// </summary>");
         sb.AppendLine($"public static class {ckModelId.ModelId.MakeClassName()}CkIds");
         sb.AppendLine("{");
-        
+
         sb.AppendLine($"    public const string ModelId = \"{ckModelId.SemanticVersionedFullName}\";");
 
         if (ckTypes != null)
@@ -35,38 +35,39 @@ internal class CkIdsCodeGenerator
             sb.AppendLine();
             sb.AppendLine("    // Types");
 
-            foreach (var ckTypeDto in ckTypes.OrderBy(x=> x.TypeId.TypeId))
+            foreach (var ckTypeDto in ckTypes.OrderBy(x => x.TypeId.TypeId))
             {
-                sb.AppendLine($"    public const string {ckTypeDto.TypeId.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
+                sb.AppendLine(
+                    $"    public const string {ckTypeDto.TypeId.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
             }
         }
-        
+
         if (ckAttributes != null)
         {
             sb.AppendLine();
             sb.AppendLine("    // Attributes");
-            
-            foreach (var ckAttributeDto in ckAttributes.OrderBy(x=> x.AttributeId.AttributeId))
-            {
 
-                
-                sb.AppendLine($"    public const string {ckAttributeDto.AttributeId.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
+            foreach (var ckAttributeDto in ckAttributes.OrderBy(x => x.AttributeId.AttributeId))
+            {
+                sb.AppendLine(
+                    $"    public const string {ckAttributeDto.AttributeId.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
             }
         }
-                
+
         if (ckAssociationRoles != null)
         {
-            foreach (var ckAssociationRoleDto in ckAssociationRoles.OrderBy(x=> x.AssociationRoleId.RoleId))
+            foreach (var ckAssociationRoleDto in ckAssociationRoles.OrderBy(x => x.AssociationRoleId.RoleId))
             {
                 sb.AppendLine();
                 sb.AppendLine("    // Associations");
-                
-                sb.AppendLine($"    public const string {ckAssociationRoleDto.AssociationRoleId.RoleId.MakeClassName()} = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
+
+                sb.AppendLine(
+                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.RoleId.MakeClassName()} = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
             }
         }
-        
+
         sb.AppendLine("}");
-        
+
         return sb.ToString();
     }
 }

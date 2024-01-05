@@ -10,6 +10,9 @@ public readonly record struct AdditionalTextWithHash
         Hash = hash;
     }
 
+    public AdditionalText File { get; }
+    public string Hash { get; }
+
     public bool Equals(AdditionalTextWithHash other)
     {
         return File.Path.Equals(other.File.Path) && Hash.Equals(other.Hash);
@@ -27,9 +30,6 @@ public readonly record struct AdditionalTextWithHash
     {
         return $"{nameof(File)}: {File?.Path}, {nameof(Hash)}: {Hash}";
     }
-
-    public AdditionalText File { get; }
-    public string Hash { get; }
 
     public void Deconstruct(out AdditionalText file, out string hash)
     {

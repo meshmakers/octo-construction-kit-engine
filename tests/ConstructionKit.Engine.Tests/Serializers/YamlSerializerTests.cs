@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.elements;
 using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Serializers;
@@ -42,7 +43,7 @@ public class YamlSerializerTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task DeserializeElementsAsync_associations_ok()
     {
@@ -98,7 +99,7 @@ public class YamlSerializerTests
         var filePath = "sampleData/files/malformedAttribute.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, 
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream,
             filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
@@ -114,14 +115,14 @@ public class YamlSerializerTests
         var filePath = "sampleData/files/malformedAttributeValue.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, filePath, 
+        await Assert.ThrowsAsync<ModelParseException>(async () => await ckYamlSerializer.DeserializeElementsAsync(stream, filePath,
             operationResult));
         Assert.Single(operationResult.Messages);
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
-    
+
     [Fact]
     public async Task SerializeAsync_ok()
     {
@@ -129,12 +130,12 @@ public class YamlSerializerTests
 
         var stream = new MemoryStream();
         await using var streamWriter = new StreamWriter(stream);
-        var ckElementsDto = sampleData.elements.Builder.Build();
+        var ckElementsDto = Builder.Build();
         await ckYamlSerializer.SerializeAsync(streamWriter, ckElementsDto);
         await streamWriter.FlushAsync();
-        
+
         stream.Position = 0;
-        
+
         var streamReader = new StreamReader(stream);
         var yaml = await streamReader.ReadToEndAsync();
         _testOutputHelper.WriteLine("output:");

@@ -5,12 +5,12 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
 /// <summary>
-/// Interface of the runtime graph validation engine
+///     Interface of the runtime graph validation engine
 /// </summary>
 internal interface IGraphRuleEngine
 {
     /// <summary>
-    /// Validates the given update records to the existing repository
+    ///     Validates the given update records to the existing repository
     /// </summary>
     /// <param name="session">Session object</param>
     /// <param name="repositoryDataSource">Data source repository access object</param>
@@ -21,7 +21,7 @@ internal interface IGraphRuleEngine
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList, OperationResult operationResult);
 
     /// <summary>
-    /// Validates the given update records of entities and associations to the existing repository
+    ///     Validates the given update records of entities and associations to the existing repository
     /// </summary>
     /// <param name="session">Session object</param>
     /// <param name="repositoryDataSource">Data source repository access object</param>
@@ -35,7 +35,7 @@ internal interface IGraphRuleEngine
         OperationResult operationResult);
 
     /// <summary>
-    /// Validates the given update records of associations to the existing repository
+    ///     Validates the given update records of associations to the existing repository
     /// </summary>
     /// <param name="session">Session object</param>
     /// <param name="repositoryDataSource">Data source repository access object</param>

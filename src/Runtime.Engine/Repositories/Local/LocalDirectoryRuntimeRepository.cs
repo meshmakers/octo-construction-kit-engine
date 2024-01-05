@@ -12,12 +12,13 @@ using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
-/// Implements the <see cref="ILocalRuntimeRepository"/> interface to manage runtime entities that are located in a directory on the local hard disk.
+///     Implements the <see cref="ILocalRuntimeRepository" /> interface to manage runtime entities that are located in a directory on the local
+///     hard disk.
 /// </summary>
 internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRuntimeRepository
 {
     /// <summary>
-    /// Creates a new instance of <see cref="LocalDirectoryRuntimeRepository"/>.
+    ///     Creates a new instance of <see cref="LocalDirectoryRuntimeRepository" />.
     /// </summary>
     /// <param name="tenantId">The id of the tenant to request services</param>
     /// <param name="directoryPath">Path to directory the runtime entities are located.</param>
@@ -30,6 +31,13 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     {
         DirectoryPath = directoryPath;
     }
+
+    public override Task<IOctoSession> GetSessionAsync()
+    {
+        return Task.FromResult((IOctoSession)new LocalSession());
+    }
+
+    public string DirectoryPath { get; }
 
     protected override async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
@@ -132,11 +140,12 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             .ConfigureAwait(false);
     }
 
-    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null)
     {
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
-        
+
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         queryable = queryable.Where(x => rtIds.Contains(x.RtId));
         var pagedQueryable = queryable;
@@ -144,11 +153,12 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         {
             pagedQueryable = pagedQueryable.Skip(skip.Value);
         }
+
         if (take != null)
         {
             pagedQueryable = pagedQueryable.Take(take.Value);
         }
-        
+
         var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count(), null);
         return resultSet;
     }
@@ -195,19 +205,6 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     protected override Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService)
     {
         return Task.CompletedTask;
-    }
-
-    public override Task<IOctoSession> GetSessionAsync()
-    {
-        return Task.FromResult((IOctoSession)new LocalSession());
-    }
-
-    public string DirectoryPath { get; }
-
-    private enum LogicalOperator
-    {
-        And,
-        Or
     }
 
     private static Expression<Func<TEntity, bool>> CombineFilterExpressions<TEntity>(ICollection<FieldFilter> filters,
@@ -279,5 +276,11 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             default:
                 throw new NotSupportedException("Unsupported filter operator");
         }
+    }
+
+    private enum LogicalOperator
+    {
+        And,
+        Or
     }
 }

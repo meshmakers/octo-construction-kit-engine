@@ -1,12 +1,12 @@
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
-/// Represents a data query operation.
+///     Represents a data query operation.
 /// </summary>
 public class DataQueryOperation
 {
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
     private DataQueryOperation(string language = "en")
@@ -15,38 +15,38 @@ public class DataQueryOperation
     }
 
     /// <summary>
-    /// The language to use for text search. This text has to be
-    ///  the two letter ISO language name.
+    ///     The language to use for text search. This text has to be
+    ///     the two letter ISO language name.
     /// </summary>
     public string Language { get; private set; }
 
     /// <summary>
-    /// Represents full text search function for configured attributes (dependent of data source type)
+    ///     Represents full text search function for configured attributes (dependent of data source type)
     /// </summary>
     public TextSearchFilter? TextSearchFilter { get; private set; }
 
     /// <summary>
-    /// Represents text search function for specific attributes.
+    ///     Represents text search function for specific attributes.
     /// </summary>
     public AttributeSearchFilter? AttributeSearchFilter { get; private set; }
 
     /// <summary>
-    /// Represents field filters for specific attributes with different comparison operators.
+    ///     Represents field filters for specific attributes with different comparison operators.
     /// </summary>
     public ICollection<FieldFilter>? FieldFilters { get; private set; }
 
     /// <summary>
-    /// Represents field group by for specific attributes.
+    ///     Represents field group by for specific attributes.
     /// </summary>
     public FieldGroupBy? FieldGroupBy { get; private set; }
 
     /// <summary>
-    /// Represents sort order for specific attributes.
+    ///     Represents sort order for specific attributes.
     /// </summary>
     public ICollection<SortOrderItem>? SortOrders { get; private set; }
-    
+
     /// <summary>
-    /// Creates a new instance of <see cref="DataQueryOperation"/>.
+    ///     Creates a new instance of <see cref="DataQueryOperation" />.
     /// </summary>
     /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
     /// <returns></returns>
@@ -56,7 +56,7 @@ public class DataQueryOperation
     }
 
     /// <summary>
-    /// Uses the given language for text search.
+    ///     Uses the given language for text search.
     /// </summary>
     /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
     /// <returns></returns>
@@ -67,7 +67,7 @@ public class DataQueryOperation
     }
 
     /// <summary>
-    /// Adds a field filter to the query.
+    ///     Adds a field filter to the query.
     /// </summary>
     /// <param name="attributeName">Name of attribute</param>
     /// <param name="comparisonOperator">Operator of attribute</param>
@@ -77,26 +77,26 @@ public class DataQueryOperation
         FieldFilters ??= new List<FieldFilter>();
 
         FieldFilters.Add(new FieldFilter(attributeName, comparisonOperator, comparisonValue));
-        
+
         return this;
     }
-    
+
     /// <summary>
-    /// Adds a sort order to the query.
+    ///     Adds a sort order to the query.
     /// </summary>
     /// <param name="attributeName">Attribute name</param>
     /// <param name="sortOrder">Sort order</param>
     public DataQueryOperation SortOrder(string attributeName, SortOrders sortOrder)
     {
         SortOrders ??= new List<SortOrderItem>();
-        
+
         SortOrders.Add(new SortOrderItem(attributeName, sortOrder));
 
         return this;
     }
-    
+
     /// <summary>
-    /// Sets the text search filter.
+    ///     Sets the text search filter.
     /// </summary>
     /// <param name="searchTerm">Search term for full text search.</param>
     public DataQueryOperation TextSearch(object searchTerm)
@@ -105,28 +105,28 @@ public class DataQueryOperation
 
         return this;
     }
-    
+
     /// <summary>
-    /// Sets the attribute search filter.
+    ///     Sets the attribute search filter.
     /// </summary>
     /// <param name="attributeNames">List of attribute names for full text search</param>
     /// <param name="searchTerm">Search term for full text search.</param>
     public DataQueryOperation AttributeSearch(IEnumerable<string> attributeNames, object searchTerm)
     {
         AttributeSearchFilter = new AttributeSearchFilter(attributeNames, searchTerm);
-        
+
         return this;
     }
-    
+
     /// <summary>
-    /// Groups by the given attribute names.
+    ///     Groups by the given attribute names.
     /// </summary>
     /// <param name="attributeNames">Attribute names to group by.</param>
     /// <returns></returns>
     public FieldGroupBy GroupBy(params string[] attributeNames)
     {
         FieldGroupBy = new FieldGroupBy(attributeNames);
-        
+
         return FieldGroupBy;
     }
 }

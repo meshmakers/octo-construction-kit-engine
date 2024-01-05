@@ -8,8 +8,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class ConfigCommand : Command<OctoToolOptions>
 {
-    private readonly IArgument _localCkModelRepoPath;
     private readonly IConfigWriter _configWriter;
+    private readonly IArgument _localCkModelRepoPath;
 
     public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options,
         IConfigWriter configWriter)
@@ -19,7 +19,6 @@ internal class ConfigCommand : Command<OctoToolOptions>
 
         _localCkModelRepoPath = CommandArgumentValue.AddArgument("lp", "localCkModelRepoPath",
             new[] { "Path of the local Construction Kit Model Repository" }, 1);
-      
     }
 
     public override Task Execute()

@@ -10,11 +10,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class CompileCommand : Command<OctoToolOptions>
 {
-    private readonly ICompilerService _compilerService;
-    private readonly ICkSerializer _ckSerializer;
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
-    private readonly IArgument _pathArg;
     private readonly IArgument _cacheArg;
+    private readonly ICkModelRepositoryService _ckModelRepositoryService;
+    private readonly ICkSerializer _ckSerializer;
+    private readonly ICompilerService _compilerService;
+    private readonly IArgument _pathArg;
     private readonly IArgument _publishArg;
 
     public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options,
@@ -27,11 +27,14 @@ internal class CompileCommand : Command<OctoToolOptions>
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
             new[] { "Root path of construction kit model directory" }, true, 1);
-        
+
         _cacheArg = CommandArgumentValue.AddArgument("c", "cache",
-            new[] { "If used, parallel to the compiled construction kit model a cache file is created containing " +
-                    "all dependent construction kit models." }, false);
-        
+            new[]
+            {
+                "If used, parallel to the compiled construction kit model a cache file is created containing " +
+                "all dependent construction kit models."
+            }, false);
+
         _publishArg = CommandArgumentValue.AddArgument("i", "import",
             new[] { "When set, the compiled file gets imported to the local repository." }, false);
     }
@@ -52,8 +55,9 @@ internal class CompileCommand : Command<OctoToolOptions>
             Logger.LogInformation("Publishing construction kit model to 'LocalRepository'");
             var operationResult = new OperationResult();
             await using var streamReader = File.OpenRead(compiledModelFilePath);
-            
-            var ckCompiledModelRoot = await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult);
+
+            var ckCompiledModelRoot =
+                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error loading model \'{FilePath}\'", compiledModelFilePath);
@@ -64,7 +68,7 @@ internal class CompileCommand : Command<OctoToolOptions>
             await _ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot, true);
             Logger.LogInformation("Construction kit model published to 'LocalRepository'");
         }
-        
+
         Logger.LogInformation("Construction kit model directory compiled");
     }
 }

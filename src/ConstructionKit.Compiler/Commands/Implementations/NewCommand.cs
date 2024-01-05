@@ -18,7 +18,7 @@ internal class NewCommand : Command<OctoToolOptions>
         _compilerService = compilerService;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
-            new[] { "Root path of construction kit model directory" },true,  1);
+            new[] { "Root path of construction kit model directory" }, true, 1);
     }
 
     public override async Task Execute()
@@ -29,7 +29,7 @@ internal class NewCommand : Command<OctoToolOptions>
         Logger.LogInformation("Path of root directory: {Path}", rootPath);
 
         await _compilerService.CreateNewAsync(rootPath);
-        
+
         Logger.LogInformation("Construction kit model directory created");
     }
 }

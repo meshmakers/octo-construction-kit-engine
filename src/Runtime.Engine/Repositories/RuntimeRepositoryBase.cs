@@ -12,44 +12,14 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
 /// <summary>
-/// Represents a basic implementation of <see cref="IRuntimeRepository"/>
+///     Represents a basic implementation of <see cref="IRuntimeRepository" />
 /// </summary>
 public abstract class RuntimeRepositoryBase : IRuntimeRepository
 {
     private readonly ICkCacheService _ckCacheService;
 
     /// <summary>
-    /// The bulk mutation implementation
-    /// </summary>
-    protected IBulkRtMutation BulkRtMutation { get; }
-
-    /// <summary>
-    /// Returns the data source of the repository
-    /// </summary>
-    protected IRepositoryDataSource RepositoryDataSource { get; }
-
-    /// <summary>
-    /// Returns the cache service that is used to access the construction kit model
-    /// </summary>
-    protected async Task<ICkCacheService> GetCkCacheServiceAsync()
-    {
-        if (!_ckCacheService.IsTenantLoaded(TenantId))
-        {
-            await RefreshCkCacheServiceAsync(_ckCacheService).ConfigureAwait(false);
-        }
-        
-        return _ckCacheService;
-    }
-    
-    /// <summary>
-    /// Refresh the cache service
-    /// </summary>
-    /// <param name="ckCacheService"></param>
-    /// <returns></returns>
-    protected abstract Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService);
-
-    /// <summary>
-    /// Creates a new instance of <see cref="RuntimeRepositoryBase"/>
+    ///     Creates a new instance of <see cref="RuntimeRepositoryBase" />
     /// </summary>
     /// <param name="tenantId">The id of the tenant to request services</param>
     /// <param name="ckCacheService">Construction kit cache service</param>
@@ -63,6 +33,16 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         TenantId = tenantId;
         _ckCacheService = ckCacheService;
     }
+
+    /// <summary>
+    ///     The bulk mutation implementation
+    /// </summary>
+    protected IBulkRtMutation BulkRtMutation { get; }
+
+    /// <summary>
+    ///     Returns the data source of the repository
+    /// </summary>
+    protected IRepositoryDataSource RepositoryDataSource { get; }
 
     /// <inheritdoc />
     public string TenantId { get; }
@@ -90,36 +70,40 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+    public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null)
     {
         return await GetRtEntitiesByIdAsync<RtEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+    public async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
         return await GetRtEntitiesByIdAsync<TEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
-    public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation, int? skip = null,
+    public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        DataQueryOperation dataQueryOperation, int? skip = null,
         int? take = null)
     {
         return await GetRtEntitiesByTypeAsync<RtEntity>(session, ckTypeId, dataQueryOperation, skip, take).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session, DataQueryOperation dataQueryOperation, int? skip = null, int? take = null) where TEntity : RtEntity, new()
+    public async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session, DataQueryOperation dataQueryOperation,
+        int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
         return await GetRtEntitiesByTypeAsync<TEntity>(session, ckTypeId, dataQueryOperation, skip, take).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
         GraphDirections direction)
@@ -128,7 +112,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {
         return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction, roleId).ConfigureAwait(false);
     }
@@ -157,7 +142,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         return await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
     {
@@ -220,7 +205,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities) where TEntity : RtEntity, new()
+    public async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities)
+        where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
         await InsertManyRtEntityAsync(session, ckTypeId, rtEntities).ConfigureAwait(false);
@@ -238,7 +224,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         await ReplaceOneRtEntityByIdAsync(session, rtEntity.GetCkTypeId(), rtId, rtEntity).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public async Task ReplaceOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
@@ -253,7 +239,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
     }
-    
+
 
     /// <inheritdoc />
     public async Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId, RtEntity rtEntity)
@@ -262,12 +248,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity) where TEntity : RtEntity, new()
+    public async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity)
+        where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
         await UpdateOneRtEntityByIdAsync(session, ckTypeId, rtId, rtEntity).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public async Task UpdateOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
@@ -280,7 +267,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false); 
+        await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -290,11 +277,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new()
+    public async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
+        where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false); 
+        await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -321,10 +309,11 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters) where TEntity : RtEntity, new()
+    public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters)
+        where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
-        
+
         await DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilters).ConfigureAwait(false);
     }
 
@@ -356,7 +345,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
-        await ApplyChangesAsync(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList, operationResult).ConfigureAwait(false);
+        await ApplyChangesAsync(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList, operationResult)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -365,6 +355,26 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         await ApplyChangesAsync(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
     }
+
+    /// <summary>
+    ///     Returns the cache service that is used to access the construction kit model
+    /// </summary>
+    protected async Task<ICkCacheService> GetCkCacheServiceAsync()
+    {
+        if (!_ckCacheService.IsTenantLoaded(TenantId))
+        {
+            await RefreshCkCacheServiceAsync(_ckCacheService).ConfigureAwait(false);
+        }
+
+        return _ckCacheService;
+    }
+
+    /// <summary>
+    ///     Refresh the cache service
+    /// </summary>
+    /// <param name="ckCacheService"></param>
+    /// <returns></returns>
+    protected abstract Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService);
 
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)
         where TEntity : RtEntity, new()
@@ -406,7 +416,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <summary>
-    /// Gets entities based on the query options.
+    ///     Gets entities based on the query options.
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
@@ -414,37 +424,39 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="dataQueryOperation">Query options for data query</param>
     /// <param name="skip">Amount of items to skip</param>
     /// <param name="take">Amount of items to take</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns>Returns a result set of the given type</returns>
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null) where TEntity : RtEntity, new();
-    
+
     /// <summary>
-    /// Inserts a single runtime entity
+    ///     Inserts a single runtime entity
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtEntity">Object to insert</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, TEntity rtEntity) where TEntity : RtEntity, new()
+    protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, TEntity rtEntity)
+        where TEntity : RtEntity, new()
     {
         rtEntity.CkTypeId = ckTypeId;
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
-    
+
     /// <summary>
-    /// Inserts multiple runtime entities
+    ///     Inserts multiple runtime entities
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtEntities">Objects to insert</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<TEntity> rtEntities)
+    protected virtual async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        ICollection<TEntity> rtEntities)
         where TEntity : RtEntity, new()
     {
         List<EntityUpdateInfo<TEntity>> entitiesUpdate = new();
@@ -453,52 +465,53 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             rtEntity.CkTypeId = ckTypeId;
             entitiesUpdate.Add(EntityUpdateInfo<TEntity>.CreateInsert(rtEntity));
         }
+
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
     /// <summary>
-    /// Deletes all entities with the given filter options
+    ///     Deletes all entities with the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters) where TEntity : RtEntity, new();
 
     /// <summary>
-    /// Deletes a single runtime entity by the given filter options
+    ///     Deletes a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters) where TEntity : RtEntity, new();
-    
+
     /// <summary>
-    /// Updates a single runtime entity by the given filter options
+    ///     Updates a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
-    
+
     /// <summary>
-    /// Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
+    ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected virtual async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         TEntity rtEntity)
@@ -509,41 +522,42 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
-    
+
     /// <summary>
-    /// Updates a multiple runtime entities by the given filter options
+    ///     Updates a multiple runtime entities by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
-    
+
     /// <summary>
-    /// Replace a single runtime entity by the given filter options
+    ///     Replace a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
-    
+
     /// <summary>
-    /// Replace a single runtime entity
+    ///     Replace a single runtime entity
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,  OctoObjectId rtId, TEntity rtEntity)
+    protected virtual async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
         var rtEntityId = new RtEntityId(ckTypeId, rtId);
@@ -551,16 +565,16 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
-    
+
     /// <summary>
-    /// Gets entities based on the query options.
+    ///     Gets entities based on the query options.
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
     /// <param name="skip">Amount of items to skip</param>
     /// <param name="take">Amount of items to take</param>
-    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity"/></typeparam>
-    protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, 
+    /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
+    protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null) where TEntity : RtEntity, new();
 }

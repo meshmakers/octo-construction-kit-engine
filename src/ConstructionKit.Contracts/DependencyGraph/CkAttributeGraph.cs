@@ -7,13 +7,13 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents an attribute in the dependency graph
+///     Represents an attribute in the dependency graph
 /// </summary>
 [DebuggerDisplay("{" + nameof(CkAttributeId) + "}")]
-public class  CkAttributeGraph
+public class CkAttributeGraph
 {
     /// <summary>
-    /// Creates a new instance of <see cref="CkAttributeGraph"/>.
+    ///     Creates a new instance of <see cref="CkAttributeGraph" />.
     /// </summary>
     /// <param name="ckAttributeId"></param>
     /// <param name="attributeDto"></param>
@@ -26,12 +26,12 @@ public class  CkAttributeGraph
         DefaultValues = attributeDto.DefaultValues;
         Description = attributeDto.Description;
         MetaData = attributeDto.MetaData;
-        IsDataStream = attributeDto.IsDataStream;
+        IsDataStream = attributeDto.IsDataStream ?? false;
     }
 
     /// <summary>
-    /// Serialization constructor
-    /// Creates a new instance of <see cref="CkAttributeGraph"/>.
+    ///     Serialization constructor
+    ///     Creates a new instance of <see cref="CkAttributeGraph" />.
     /// </summary>
     /// <param name="ckAttributeId"></param>
     /// <param name="valueType"></param>
@@ -43,7 +43,8 @@ public class  CkAttributeGraph
     /// <param name="isDataStream">Optional flag that tells if an attribute is a data stream </param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description, ICollection<CkAttributeMetaDataDto>? metaData, bool? isDataStream)
+        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description,
+        ICollection<CkAttributeMetaDataDto>? metaData, bool isDataStream)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
@@ -54,44 +55,44 @@ public class  CkAttributeGraph
         MetaData = metaData;
         IsDataStream = isDataStream;
     }
-    
+
     /// <summary>
-    /// Returns the ck attribute id of the attribute.
+    ///     Returns the ck attribute id of the attribute.
     /// </summary>
     public CkId<CkAttributeId> CkAttributeId { get; }
 
     /// <summary>
-    /// Returns the value type of the attribute.
+    ///     Returns the value type of the attribute.
     /// </summary>
     public AttributeValueTypesDto ValueType { get; }
-    
+
     /// <summary>
-    /// Defines the record type of the attribute if the value type is a record.
+    ///     Defines the record type of the attribute if the value type is a record.
     /// </summary>
     public CkId<CkRecordId>? ValueCkRecordId { get; set; }
-    
+
     /// <summary>
-    /// Defines the enum type of the attribute if the value type is an enum.
+    ///     Defines the enum type of the attribute if the value type is an enum.
     /// </summary>
     public CkId<CkEnumId>? ValueCkEnumId { get; set; }
 
     /// <summary>
-    /// Returns the default values of the attribute.
+    ///     Returns the default values of the attribute.
     /// </summary>
     public ICollection<object>? DefaultValues { get; }
-    
+
     /// <summary>
-    /// A optional description of the attribute
+    ///     A optional description of the attribute
     /// </summary>
     public string? Description { get; set; }
-    
+
     /// <summary>
-    /// Optional meta data of the attribute 
+    ///     Optional meta data of the attribute
     /// </summary>
     public ICollection<CkAttributeMetaDataDto>? MetaData { get; }
-    
+
     /// <summary>
-    /// Optional flag that tells if an attribute is a data stream
+    ///     Optional flag that tells if an attribute is a data stream
     /// </summary>
-    public bool? IsDataStream { get; }
+    public bool IsDataStream { get; }
 }

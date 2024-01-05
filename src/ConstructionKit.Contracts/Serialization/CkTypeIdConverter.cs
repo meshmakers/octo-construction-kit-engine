@@ -8,25 +8,10 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 /// <summary>
-/// Converter for System.Text.Json and YamlDotNet for <see cref="CkTypeId"/>
+///     Converter for System.Text.Json and YamlDotNet for <see cref="CkTypeId" />
 /// </summary>
 public class CkTypeIdConverter : JsonConverter<CkTypeId>, IYamlTypeConverter
 {
-    /// <inheritdoc />
-    public override CkTypeId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-    {
-        var str = reader.TokenType == JsonTokenType.String
-            ? reader.GetString()
-            : throw ModelParseException.UnexpectedToken(nameof(CkTypeId), reader.TokenType, nameof(JsonTokenType.String));
-        return !string.IsNullOrEmpty(str) && str != null ? new CkTypeId(str) : throw ModelParseException.ValueCannotBeEmpty(nameof(CkTypeId));
-    }
-
-    /// <inheritdoc />
-    public override void Write(Utf8JsonWriter writer, CkTypeId value, JsonSerializerOptions options)
-    {
-        writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
-    }
-
     /// <inheritdoc />
     public bool Accepts(Type type)
     {
@@ -37,7 +22,7 @@ public class CkTypeIdConverter : JsonConverter<CkTypeId>, IYamlTypeConverter
     public object ReadYaml(IParser parser, Type type)
     {
         var value = parser.Consume<Scalar>().Value;
-        return new CkTypeId(value); 
+        return new CkTypeId(value);
     }
 
     /// <inheritdoc />
@@ -45,5 +30,22 @@ public class CkTypeIdConverter : JsonConverter<CkTypeId>, IYamlTypeConverter
     {
         var ckTypeId = (CkTypeId)value!;
         emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckTypeId.SemanticVersionedFullName, ScalarStyle.Any, true, false));
+    }
+
+    /// <inheritdoc />
+    public override CkTypeId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var str = reader.TokenType == JsonTokenType.String
+            ? reader.GetString()
+            : throw ModelParseException.UnexpectedToken(nameof(CkTypeId), reader.TokenType, nameof(JsonTokenType.String));
+        return !string.IsNullOrEmpty(str) && str != null
+            ? new CkTypeId(str)
+            : throw ModelParseException.ValueCannotBeEmpty(nameof(CkTypeId));
+    }
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, CkTypeId value, JsonSerializerOptions options)
+    {
+        writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
 }

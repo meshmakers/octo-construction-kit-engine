@@ -15,7 +15,7 @@ internal static class Utilities
 
         return className;
     }
-    
+
     public static string GetLocalNamespace(
         string? resxPath,
         string? targetPath,
@@ -81,7 +81,7 @@ internal static class Utilities
             return string.Empty;
         }
     }
-    
+
     public static string SanitizeNamespace(string ns, bool sanitizeFirstChar = true)
     {
         if (string.IsNullOrEmpty(ns))

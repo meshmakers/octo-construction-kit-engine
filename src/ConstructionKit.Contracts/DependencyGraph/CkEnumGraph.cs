@@ -8,13 +8,13 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents a construction kit enum in the dependency graph
+///     Represents a construction kit enum in the dependency graph
 /// </summary>
 [DebuggerDisplay("{" + nameof(Path) + "}")]
 public class CkEnumGraph
 {
     /// <summary>
-    /// Creates a new instance of <see cref="CkEnumGraph"/>.
+    ///     Creates a new instance of <see cref="CkEnumGraph" />.
     /// </summary>
     /// <param name="ckEnumId"></param>
     /// <param name="enumDto"></param>
@@ -26,7 +26,7 @@ public class CkEnumGraph
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkEnumGraph"/>.
+    ///     Creates a new instance of <see cref="CkEnumGraph" />.
     /// </summary>
     /// <param name="ckEnumId"></param>
     /// <param name="useFlags"></param>
@@ -43,15 +43,14 @@ public class CkEnumGraph
     ///     Gets or sets the construction kit id
     /// </summary>
     public CkId<CkEnumId> CkEnumId { get; }
-    
-    /// <summary>
-    /// When true the enum is handles as flags enum
-    /// </summary>
-    public bool UseFlags {get; set; }
 
     /// <summary>
-    /// Returns the values of the enum.
+    ///     When true the enum is handles as flags enum
+    /// </summary>
+    public bool UseFlags { get; set; }
+
+    /// <summary>
+    ///     Returns the values of the enum.
     /// </summary>
     public ICollection<CkEnumValueDto> Values { get; }
-
 }

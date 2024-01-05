@@ -1,62 +1,62 @@
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
-/// Represents the operator to use for a field filter
+///     Represents the operator to use for a field filter
 /// </summary>
 public enum FieldFilterOperator
 {
     /// <summary>
-    /// Equals
+    ///     Equals
     /// </summary>
     Equals = 0,
-    
+
     /// <summary>
-    /// Not equals
+    ///     Not equals
     /// </summary>
     NotEquals = 1,
-    
+
     /// <summary>
-    /// Less than
+    ///     Less than
     /// </summary>
     LessThan = 2,
-    
+
     /// <summary>
-    /// Less or equal than
+    ///     Less or equal than
     /// </summary>
     LessEqualThan = 3,
-    
+
     /// <summary>
-    /// Greater than
+    ///     Greater than
     /// </summary>
     GreaterThan = 4,
-    
+
     /// <summary>
-    /// Greater or equal than
+    ///     Greater or equal than
     /// </summary>
     GreaterEqualThan = 5,
-    
+
     /// <summary>
-    /// In
+    ///     In
     /// </summary>
     In = 6,
-    
+
     /// <summary>
-    /// Not in
+    ///     Not in
     /// </summary>
     NotIn = 7,
-    
+
     /// <summary>
-    /// Like (string comparison)
+    ///     Like (string comparison)
     /// </summary>
     Like = 8,
-    
+
     /// <summary>
-    /// Regular expression match (string comparison)
+    ///     Regular expression match (string comparison)
     /// </summary>
     MatchRegEx = 9,
-   
+
     /// <summary>
-    /// Arrays: Any element equals
+    ///     Arrays: Any element equals
     /// </summary>
     AnyEq = 10
 }

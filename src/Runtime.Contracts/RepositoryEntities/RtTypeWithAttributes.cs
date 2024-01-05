@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 /// <summary>
-/// Represents a runtime type with attributes.
+///     Represents a runtime type with attributes.
 /// </summary>
 public abstract class RtTypeWithAttributes
 {
@@ -17,7 +17,7 @@ public abstract class RtTypeWithAttributes
     {
         _attributes = new Dictionary<string, object?>();
     }
-    
+
     /// <summary>
     ///     Constructor
     /// </summary>
@@ -25,18 +25,12 @@ public abstract class RtTypeWithAttributes
     {
 #if NETSTANDARD2_0
         _attributes = new Dictionary<string, object?>(attributes
-            .ToDictionary(k=> k.Key, v=> v.Value));
-#else 
+            .ToDictionary(k => k.Key, v => v.Value));
+#else
         _attributes = new Dictionary<string, object?>(attributes);
-#endif        
+#endif
     }
 
-    /// <summary>
-    /// Returns a string that represents a location information for error messages
-    /// </summary>
-    /// <returns></returns>
-    protected abstract string GetLocation();
-    
     /// <summary>
     ///     Returns an dictionary of attributes.
     /// </summary>
@@ -46,8 +40,14 @@ public abstract class RtTypeWithAttributes
     public IReadOnlyDictionary<string, object?> Attributes => _attributes;
 
     /// <summary>
-    /// Gets the attribute value or the standard value if the attribute is not set.
-    /// This method allows non nullable types
+    ///     Returns a string that represents a location information for error messages
+    /// </summary>
+    /// <returns></returns>
+    protected abstract string GetLocation();
+
+    /// <summary>
+    ///     Gets the attribute value or the standard value if the attribute is not set.
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="standardValue"></param>
@@ -76,8 +76,8 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Gets the attribute value or the default value if the attribute is not set.
-    /// This methods allows nullable types
+    ///     Gets the attribute value or the default value if the attribute is not set.
+    ///     This methods allows nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -107,14 +107,14 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This method allows non nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
     public IAttributeValueList<TValue> GetAttributeValues<TValue>(string attributeName)
-        where TValue: struct
+        where TValue : struct
     {
         if (!Attributes.TryGetValue(attributeName, out var value) || value == null)
         {
@@ -127,20 +127,20 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributePrimitiveValueList<TValue>(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var primitiveList = objList.Cast<TValue>().ToList();
             _attributes[attributeName] = primitiveList;
             return new AttributePrimitiveValueList<TValue>(primitiveList);
         }
-        
+
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
-    
+
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This method allows non nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <returns></returns>
@@ -157,22 +157,21 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributeStringValueList(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var strings = objList.Cast<string>().ToList();
             _attributes[attributeName] = strings;
             return new AttributeStringValueList(strings);
         }
-        
+
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(string));
     }
-    
-    
+
 
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This method allows non nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -191,26 +190,26 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributeRecordValueList<TValue>(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var rtRecords = objList.Cast<RtRecord>().ToList();
             _attributes[attributeName] = rtRecords;
             return new AttributeRecordValueList<TValue>(rtRecords);
         }
-        
+
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
 
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This methods allows nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This methods allows nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
     public IAttributeValueList<TValue>? GetAttributeValuesOrDefault<TValue>(string attributeName)
-        where TValue: struct
+        where TValue : struct
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
@@ -221,25 +220,25 @@ public abstract class RtTypeWithAttributes
         {
             return default;
         }
-        
+
         if (value is List<TValue> list)
         {
             return new AttributePrimitiveValueList<TValue>(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var primitiveList = objList.Cast<TValue>().ToList();
             _attributes[attributeName] = primitiveList;
             return new AttributePrimitiveValueList<TValue>(primitiveList);
         }
-        
+
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
-    
+
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This method allows non nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -261,7 +260,7 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributeRecordValueList<TValue>(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var rtRecords = objList.Cast<RtRecord>().ToList();
@@ -271,10 +270,10 @@ public abstract class RtTypeWithAttributes
 
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(TValue));
     }
-    
+
     /// <summary>
-    /// Gets the value of an attribute when the value is a list
-    /// This method allows non nullable types
+    ///     Gets the value of an attribute when the value is a list
+    ///     This method allows non nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <returns></returns>
@@ -294,19 +293,19 @@ public abstract class RtTypeWithAttributes
         {
             return new AttributeStringValueList(list);
         }
-        
+
         if (value is List<object> objList) // This code is needed because MongoDB is deserializing empty arrays with List<object>
         {
             var strings = objList.Cast<string>().ToList();
             _attributes[attributeName] = strings;
             return new AttributeStringValueList(strings);
         }
-        
+
         throw InvalidAttributeValueException.InvalidArrayValue(attributeName, typeof(string));
     }
 
     /// <summary>
-    /// Gets the value of an attribute when the value is non nullable
+    ///     Gets the value of an attribute when the value is non nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -340,7 +339,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Gets the value of an attribute if the value is nullable
+    ///     Gets the value of an attribute if the value is nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -354,10 +353,10 @@ public abstract class RtTypeWithAttributes
 
         return value;
     }
-    
-    
+
+
     /// <summary>
-    /// Gets the value of an RtRecord attribute when the value is non nullable
+    ///     Gets the value of an RtRecord attribute when the value is non nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -374,7 +373,7 @@ public abstract class RtTypeWithAttributes
         {
             return recordSpecialized;
         }
-        
+
         if (value is RtRecord rtRecord)
         {
             var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
@@ -383,12 +382,12 @@ public abstract class RtTypeWithAttributes
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
         }
-        
+
         throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
     }
-    
+
     /// <summary>
-    /// Gets the value of an RtRecord attribute when the value is non nullable
+    ///     Gets the value of an RtRecord attribute when the value is non nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -410,7 +409,7 @@ public abstract class RtTypeWithAttributes
         {
             return recordSpecialized;
         }
-        
+
         if (value is RtRecord rtRecord)
         {
             var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
@@ -419,13 +418,13 @@ public abstract class RtTypeWithAttributes
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
         }
-        
+
         throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
     }
-    
+
 
     /// <summary>
-    /// Gets the value of an attribute if the value is nullable and a string
+    ///     Gets the value of an attribute if the value is nullable and a string
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -441,7 +440,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Gets the value of an attribute if the value is non-nullable and a string
+    ///     Gets the value of an attribute if the value is non-nullable and a string
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <returns></returns>
@@ -457,7 +456,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Sets the value of an attribute when the value is nullable
+    ///     Sets the value of an attribute when the value is nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="attributeValueTypes">Type of attribute value</param>
@@ -469,7 +468,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    /// Sets the value of an attribute when the value is non nullable
+    ///     Sets the value of an attribute when the value is non nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="attributeValueTypes">Type of attribute value</param>

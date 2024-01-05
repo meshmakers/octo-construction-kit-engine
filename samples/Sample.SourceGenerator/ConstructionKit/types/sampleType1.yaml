@@ -1,20 +1,20 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 types:
-- typeId: SampleType1
-  derivedFromCkTypeId: System/Entity
-  attributes:
-  - id: Sample1/SampleAttribute
-    name: MyAttribute
-    isOptional: true
-  - id: Sample1/DateTimeAttribute
-    name: DateTimeAttribute
-  - id: Sample1/Type
-    name: Type
-  - id: Sample1/TestEnum
-    name: TestEnum    
-  - id: Sample1/IsLocked
-    name: IsLocked
-    isOptional: false    
-  associations:
-  - id: Sample1/Testing
-    targetCkTypeId: System/Entity
+  - typeId: SampleType1
+    derivedFromCkTypeId: System/Entity
+    attributes:
+      - id: Sample1/SampleAttribute
+        name: MyAttribute
+        isOptional: true
+      - id: Sample1/DateTimeAttribute
+        name: DateTimeAttribute
+      - id: Sample1/Type
+        name: Type
+      - id: Sample1/TestEnum
+        name: TestEnum
+      - id: Sample1/IsLocked
+        name: IsLocked
+        isOptional: false
+    associations:
+      - id: Sample1/Testing
+        targetCkTypeId: System/Entity

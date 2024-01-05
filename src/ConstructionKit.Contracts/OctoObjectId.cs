@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Security;
+using System.Text.Json.Serialization;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
@@ -13,7 +14,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
 [SuppressMessage("ReSharper", "MemberCanBePrivate.Global")]
 [SuppressMessage("ReSharper", "UnusedMember.Global")]
-[System.Text.Json.Serialization.JsonConverter(typeof(OctoObjectIdConverter))]
+[JsonConverter(typeof(OctoObjectIdConverter))]
 public readonly struct OctoObjectId : IComparable<OctoObjectId>, IEquatable<OctoObjectId>, IConvertible
 {
     // private static fields

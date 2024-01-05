@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 namespace Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 
 /// <summary>
-/// Manages the runtime schemas
+///     Manages the runtime schemas
 /// </summary>
 public static class RtSchema
 {
@@ -19,7 +19,7 @@ public static class RtSchema
     }
 
     /// <summary>
-    /// Returns the runtime schema
+    ///     Returns the runtime schema
     /// </summary>
     public static JsonSchema GetRuntimeSchema()
     {

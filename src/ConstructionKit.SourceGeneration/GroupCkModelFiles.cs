@@ -6,7 +6,7 @@ internal static class GroupCkModelFiles
         CancellationToken cancellationToken = default)
     {
         var lookup = new Dictionary<Tuple<string, string>, AdditionalTextWithHash>();
-        
+
         var res = new Dictionary<AdditionalTextWithHash, AdditionalTextWithHash>();
         foreach (var file in allFilesWithHash)
         {

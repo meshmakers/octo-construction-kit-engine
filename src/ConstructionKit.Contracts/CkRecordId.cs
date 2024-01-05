@@ -1,17 +1,18 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit type id
+///     Represents a versioned construction kit type id
 /// </summary>
 [DebuggerDisplay("{" + nameof(RecordId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkRecordIdConverter))]
+[JsonConverter(typeof(CkRecordIdConverter))]
 public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecordId>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="recordId"/>.
+    ///     Creates a new <see cref="CkRecordId" /> from the given <paramref name="recordId" />.
     /// </summary>
     /// <param name="recordId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
@@ -28,6 +29,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             RecordId = recordId.Substring(0, typeIndex);
             Version = recordId.Substring(typeIndex + 1);
         }
+
         if (string.IsNullOrWhiteSpace(RecordId))
         {
             throw new ArgumentOutOfRangeException(nameof(recordId), recordId, $"{nameof(recordId)} must contain a record id");
@@ -35,12 +37,12 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="recordId"/> and <paramref name="version"/>.
+    ///     Creates a new <see cref="CkRecordId" /> from the given <paramref name="recordId" /> and <paramref name="version" />.
     /// </summary>
     /// <param name="recordId"></param>
     /// <param name="version"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkRecordId(string recordId, string version = "1.0.0") 
+    public CkRecordId(string recordId, string version = "1.0.0")
     {
         RecordId = recordId;
         Version = version;
@@ -49,9 +51,9 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             throw new ArgumentOutOfRangeException(nameof(recordId), recordId, $"{nameof(recordId)} must contain a record id");
         }
     }
-    
+
     /// <summary>
-    /// Creates a new <see cref="CkRecordId"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkRecordId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -61,12 +63,12 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <summary>
-    /// Defines the name of the type, e. g. "Person"
+    ///     Defines the name of the type, e. g. "Person"
     /// </summary>
     public string RecordId { get; }
-    
+
     /// <summary>
-    /// Returns the version of the type, e. g. "1.0.0"
+    ///     Returns the version of the type, e. g. "1.0.0"
     /// </summary>
     public CkVersion Version { get; }
 
@@ -82,7 +84,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             {
                 return "";
             }
-            
+
             var s = RecordId;
             if (Version.Major > 1)
             {
@@ -100,7 +102,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     /// <inheritdoc />
     public int CompareTo(CkRecordId other)
     {
-        var result = String.Compare(RecordId, other.RecordId, StringComparison.Ordinal);
+        var result = string.Compare(RecordId, other.RecordId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -229,7 +231,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     {
         throw new InvalidCastException();
     }
-    
+
     /// <summary>
     ///     Returns a string representation of the value.
     /// </summary>
@@ -246,9 +248,9 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
         {
             return false;
         }
-        
+
         var other = (CkRecordId)obj;
-        
+
         return RecordId == other.RecordId && Version == other.Version;
     }
 
@@ -257,15 +259,15 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     {
         unchecked
         {
-            int hash = 17;
+            var hash = 17;
             hash = hash * 23 + RecordId.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
     }
-    
+
     /// <summary>
-    /// Compares two <see cref="CkRecordId"/> instances for equality.
+    ///     Compares two <see cref="CkRecordId" /> instances for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -276,7 +278,7 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <summary>
-    /// Compares two <see cref="CkRecordId"/>s for inequality.
+    ///     Compares two <see cref="CkRecordId" />s for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>

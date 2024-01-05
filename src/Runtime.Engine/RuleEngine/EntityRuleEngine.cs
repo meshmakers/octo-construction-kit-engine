@@ -11,7 +11,7 @@ using Meshmakers.Octo.Runtime.Engine.Messages;
 namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 
 /// <summary>
-/// Implementation of the runtime entity validation engine
+///     Implementation of the runtime entity validation engine
 /// </summary>
 internal class EntityRuleEngine : IEntityRuleEngine
 {
@@ -45,7 +45,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
             }
 
             // check if all attributes are applied that are mandatory. If there is a mandatory attribute missing and no default value is set, throw an exception
-            bool isInError = false;
+            var isInError = false;
             if (info.ModOption == EntityModOptions.Insert || info.ModOption == EntityModOptions.Replace)
             {
                 if (info.RtEntity != null)
@@ -142,7 +142,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
     private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
         OperationResult operationResult, string reference)
     {
-        bool isInError = false;
+        var isInError = false;
         foreach (var attribute in attributeGraphs)
         {
             if (!attribute.IsOptional && (!rtType.Attributes.ContainsKey(attribute.AttributeName) ||

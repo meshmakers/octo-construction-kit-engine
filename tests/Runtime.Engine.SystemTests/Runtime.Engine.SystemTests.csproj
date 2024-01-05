@@ -12,16 +12,16 @@
     </PropertyGroup>
 
     <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
-    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"  />
-    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"/>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-        <PackageReference Include="RandomFriendlyNameGenerator" Version="1.0.7" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
-        <PackageReference Include="xunit" Version="2.6.4" />
+        <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0"/>
+        <PackageReference Include="RandomFriendlyNameGenerator" Version="1.0.7"/>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0"/>
+        <PackageReference Include="xunit" Version="2.6.4"/>
         <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
@@ -33,20 +33,20 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" />
+        <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ConstructionKitFolder Include="sampleData\CkTest\ConstructionKit" />
+        <ConstructionKitFolder Include="sampleData\CkTest\ConstructionKit"/>
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="**\ConstructionKit\ck-*.yaml" />
+        <None Remove="**\ConstructionKit\ck-*.yaml"/>
         <EmbeddedResource Include="sampleData\CkTest\ConstructionKit\ck-*.yaml">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
         </EmbeddedResource>
-        <None Remove="**\ConstructionKit\ck-*.cache.json" />
+        <None Remove="**\ConstructionKit\ck-*.cache.json"/>
         <AdditionalFiles Include="sampleData\CkTest\ConstructionKit\ck-*.cache.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </AdditionalFiles>

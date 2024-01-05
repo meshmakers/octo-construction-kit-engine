@@ -6,16 +6,16 @@
         <Nullable>enable</Nullable>
         <ImplicitUsings>true</ImplicitUsings>
     </PropertyGroup>
-    
+
     <ItemGroup>
         <PackageReference Include="Meshmakers.Octo.ConstructionKit.Contracts" Version="999.0.0.0"/>
         <PackageReference Include="Meshmakers.Octo.ConstructionKit.SourceGeneration" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Version="999.0.0.0"/>
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="ConstructionKit\ck-*.yaml" />
-        <AdditionalFiles Include="ConstructionKit\ck-*.yaml" />
-        <None Remove="ConstructionKit\ck-*.cache.json" />
-        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json" />
+        <None Remove="ConstructionKit\ck-*.yaml"/>
+        <AdditionalFiles Include="ConstructionKit\ck-*.yaml"/>
+        <None Remove="ConstructionKit\ck-*.cache.json"/>
+        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json"/>
     </ItemGroup>
 </Project>

@@ -4,14 +4,6 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 internal readonly record struct FileOptions
 {
-    public InnerClassVisibility InnerClassVisibility { get; }
-    public GroupedModelFile GroupedFile { get; }
-    public string? CustomToolNamespace { get;  }
-    public string LocalNamespace { get;  }
-    public string EmbeddedFilename { get; }
-    public bool GenerateCkModelServiceClass { get; }
-    public bool IsValid { get; }
-
     public FileOptions(
         GroupedModelFile groupedFile,
         AnalyzerConfigOptions options,
@@ -73,6 +65,14 @@ internal readonly record struct FileOptions
         IsValid = globalOptions.IsValid;
     }
 
+    public InnerClassVisibility InnerClassVisibility { get; }
+    public GroupedModelFile GroupedFile { get; }
+    public string? CustomToolNamespace { get; }
+    public string LocalNamespace { get; }
+    public string EmbeddedFilename { get; }
+    public bool GenerateCkModelServiceClass { get; }
+    public bool IsValid { get; }
+
     public static FileOptions Select(
         GroupedModelFile file,
         AnalyzerConfigOptionsProvider options,
@@ -80,9 +80,9 @@ internal readonly record struct FileOptions
     )
     {
         return new FileOptions(
-            groupedFile: file,
-            options: options.GetOptions(file.MainFile.File),
-            globalOptions: globalOptions
+            file,
+            options.GetOptions(file.MainFile.File),
+            globalOptions
         );
     }
 }

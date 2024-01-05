@@ -6,12 +6,12 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-/// Resolves and checks references of the model. E. g. derived types, records or cross references
+///     Resolves and checks references of the model. E. g. derived types, records or cross references
 /// </summary>
 internal class ReferenceResolver : IReferenceResolver
 {
     /// <summary>
-    /// Resolves and checks cross reference within the model graph.
+    ///     Resolves and checks cross reference within the model graph.
     /// </summary>
     /// <param name="modelGraph"></param>
     /// <param name="operationResult"></param>
@@ -19,14 +19,14 @@ internal class ReferenceResolver : IReferenceResolver
         OperationResult operationResult)
     {
         CheckCkAssociationRoles(modelGraph, operationResult);
-        
+
         CheckCkAttributes(modelGraph, operationResult);
 
         CheckCkRecords(modelGraph, operationResult);
 
         CheckCkTypes(modelGraph, operationResult);
     }
-    
+
     private static void CheckCkAssociationRoles(CkModelGraph modelGraph,
         OperationResult operationResult)
     {

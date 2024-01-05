@@ -13,64 +13,64 @@ types:
 
       - id: System.TestIdentity/ProtocolType
         name: ProtocolType
-        
+
       - id: System.TestIdentity/Secrets
         name: ClientSecrets
-        
+
       - id: System.TestIdentity/RequireClientSecret
         name: RequireClientSecret
 
       - id: System/Name
         name: ClientName
         isOptional: true
-        
+
       - id: System/Description
         name: Description
         isOptional: true
-          
+
       - id: System.TestIdentity/ClientUri
         name: ClientUri
         isOptional: true
-        
+
       - id: System.TestIdentity/LogoUri
         name: LogoUri
         isOptional: true
-        
+
       - id: System.TestIdentity/RequireConsent
         name: RequireConsent
         isOptional: true
-          
+
       - id: System.TestIdentity/AllowRememberConsent
         name: AllowRememberConsent
-          
+
       - id: System.TestIdentity/AllowedGrantTypes
         name: AllowedGrantTypes
-          
+
       - id: System.TestIdentity/RequirePkce
         name: RequirePkce
-        
+
       - id: System.TestIdentity/AllowPlainTextPkce
         name: AllowPlainTextPkce
-          
+
       - id: System.TestIdentity/RequireRequestObject
         name: RequireRequestObject
-        
+
       - id: System.TestIdentity/AllowAccessTokensViaBrowser
         name: AllowAccessTokensViaBrowser
-        
+
       - id: System.TestIdentity/RequireDPoP
         name: RequireDPoP
-        
+
       - id: System.TestIdentity/DPoPValidationMode
         name: DPoPValidationMode
-        
+
       - id: System.TestIdentity/DPoPClockSkew
         name: DPoPClockSkew
       - id: System.TestIdentity/RedirectUris
-        name: RedirectUris        
-        
+        name: RedirectUris
+
       - id: System.TestIdentity/PostLogoutRedirectUris
-        name: PostLogoutRedirectUris        
+        name: PostLogoutRedirectUris
       - id: System.TestIdentity/FrontChannelLogoutUri
         name: FrontChannelLogoutUri
         isOptional: true
@@ -101,7 +101,7 @@ types:
         name: SlidingRefreshTokenLifetime
       - id: System.TestIdentity/ConsentLifetime
         name: ConsentLifetime
-        isOptional: true        
+        isOptional: true
       - id: System.TestIdentity/UpdateAccessTokenClaimsOnRefresh
         name: UpdateAccessTokenClaimsOnRefresh
       - id: System.TestIdentity/RefreshTokenExpiration

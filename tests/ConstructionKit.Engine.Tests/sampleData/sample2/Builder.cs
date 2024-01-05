@@ -10,44 +10,44 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("sample2", "1.0.0"),
-            Dependencies = new List<CkModelId> { new("System", "1.0.0"), new ("sample1", "1.0.0") },
+            Dependencies = new List<CkModelId> { new("System", "1.0.0"), new("sample1", "1.0.0") },
             Attributes = new List<CkAttributeDto>
             {
-              new()
-              {
-                  AttributeId = "attributeA",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeB",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeC",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeD",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeE",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeF",
-                  ValueType = AttributeValueTypesDto.String,
-              },
-              new()
-              {
-                  AttributeId = "attributeG",
-                  ValueType = AttributeValueTypesDto.String,
-              }
+                new()
+                {
+                    AttributeId = "attributeA",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeB",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeC",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeD",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeE",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeF",
+                    ValueType = AttributeValueTypesDto.String
+                },
+                new()
+                {
+                    AttributeId = "attributeG",
+                    ValueType = AttributeValueTypesDto.String
+                }
             },
             Types = new List<CkCompiledTypeDto>
             {
@@ -73,7 +73,7 @@ public class Builder
                         new() { CkAttributeId = "sample1/attributeE", AttributeName = "f" }
                     }
                 }
-            },
+            }
         };
     }
 }

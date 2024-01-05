@@ -15,34 +15,34 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <None Remove="ConstructionKit\ck-*.yaml" />
+        <None Remove="ConstructionKit\ck-*.yaml"/>
         <EmbeddedResource Include="ConstructionKit\ck-*.yaml">
             <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
         </EmbeddedResource>
-        <None Remove="ConstructionKit\ck-*.cache.json" />
-        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json" />
+        <None Remove="ConstructionKit\ck-*.cache.json"/>
+        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json"/>
     </ItemGroup>
 
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>meshmakers64.png</Link>
         </None>
         <None Include="..\..\LICENSE">
             <Pack>True</Pack>
-            <PackagePath />
+            <PackagePath/>
             <Link>LICENSE</Link>
         </None>
     </ItemGroup>
 
     <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
-    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"  />
-    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"  />
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"/>
 
     <ItemGroup>
-        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj" />
+        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
     </ItemGroup>
 
 </Project>

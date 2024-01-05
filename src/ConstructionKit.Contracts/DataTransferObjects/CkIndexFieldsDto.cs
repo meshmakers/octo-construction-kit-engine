@@ -7,19 +7,19 @@ using YamlDotNet.Serialization;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-/// Defines index fields in the database for a ck type.
+///     Defines index fields in the database for a ck type.
 /// </summary>
 public class CkIndexFieldsDto
 {
     /// <summary>
-    /// The weight of the index. The higher the weight, the more important the index is.
+    ///     The weight of the index. The higher the weight, the more important the index is.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public int? Weight { get; set; }
 
     /// <summary>
-    /// A list of attribute names that are indexed.
+    ///     A list of attribute names that are indexed.
     /// </summary>
-    [JsonRequired] 
+    [JsonRequired]
     public List<string> AttributeNames { get; set; } = null!;
 }

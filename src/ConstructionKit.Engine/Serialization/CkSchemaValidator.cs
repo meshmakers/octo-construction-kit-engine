@@ -10,7 +10,7 @@ using YamlDotNet.RepresentationModel;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 /// <summary>
-/// Implements a validator for the CK model in JSON or YAML format.
+///     Implements a validator for the CK model in JSON or YAML format.
 /// </summary>
 internal class CkSchemaValidator : ICkSchemaValidator
 {
@@ -54,7 +54,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
     {
         var json = JsonNode.Parse(stream);
 
-        var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List});
+        var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
@@ -64,7 +64,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
         stream.CopyTo(memoryStream);
         stream.Position = 0;
         memoryStream.Seek(0, SeekOrigin.Begin);
-        
+
         using var streamReader = new StreamReader(memoryStream);
         var yamlStream = new YamlStream();
         yamlStream.Load(streamReader);
@@ -74,7 +74,8 @@ internal class CkSchemaValidator : ICkSchemaValidator
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
-    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult, EvaluationResults evaluationResults)
+    private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
+        EvaluationResults evaluationResults)
     {
         if (!evaluationResults.IsValid)
         {

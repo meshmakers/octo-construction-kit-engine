@@ -40,22 +40,22 @@ internal class Runner
         catch (ModelParseException ex)
         {
             _logger.LogError("{Message}", ex.Message);
-            
+
             ex.OperationResult.WriteMessagesToLogger(_logger);
 
-            return -4; 
+            return -4;
         }
         catch (CkModelException ex)
         {
             _logger.LogError("{Message}", ex.Message);
-            
-            return -3; 
+
+            return -3;
         }
         catch (ArgumentValueMissingException ex)
         {
             _logger.LogError("{Message}", ex.Message);
             _parser.ShowUsageInformation(Constants.OctoExeName);
-            return -1; 
+            return -1;
         }
         catch (MandatoryArgumentsMissingException ex)
         {

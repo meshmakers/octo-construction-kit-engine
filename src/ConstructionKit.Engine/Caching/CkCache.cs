@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -24,13 +25,22 @@ internal class CkCache : IDisposable
 
     public string TenantId { get; }
 
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
+    public bool IsDisposed { get; private set; }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
     public void LoadCkModelGraph(CkModelGraph modelGraph)
     {
         _logger.LogDebug("Loading model graph into cache for tenant {TenantId}", TenantId);
         _modelGraph = modelGraph;
         _logger.LogDebug("Loading model graph into cache for tenant {TenantId} finished", TenantId);
     }
-    
+
     public IEnumerable<CkTypeGraph> GetCkTypes()
     {
         if (_modelGraph == null)
@@ -55,12 +65,12 @@ internal class CkCache : IDisposable
 
         return ckTypeGraph;
     }
-    
+
 #if NETSTANDARD2_0
     public bool TryGetCkType(CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph)
 #else
     public bool TryGetCkType(CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
-#endif    
+#endif
     {
         if (_modelGraph == null)
         {
@@ -74,7 +84,7 @@ internal class CkCache : IDisposable
 
         return true;
     }
-    
+
     public IEnumerable<CkRecordGraph> GetCkRecords()
     {
         if (_modelGraph == null)
@@ -84,12 +94,12 @@ internal class CkCache : IDisposable
 
         return _modelGraph.Records.Values;
     }
-    
+
 #if NETSTANDARD2_0
     public bool TryGetCkRecord(CkId<CkRecordId> ckRecordId, out CkRecordGraph? ckRecordGraph)
 #else
     public bool TryGetCkRecord(CkId<CkRecordId> ckRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
-#endif  
+#endif
     {
         if (_modelGraph == null)
         {
@@ -133,7 +143,7 @@ internal class CkCache : IDisposable
 
         return ckAssociationRoleGraph;
     }
-    
+
     public CkRecordGraph GetCkRecord(CkId<CkRecordId> ckRecordId)
     {
         if (_modelGraph == null)
@@ -148,7 +158,7 @@ internal class CkCache : IDisposable
 
         return ckRecordGraph;
     }
-    
+
     public IEnumerable<CkEnumGraph> GetCkEnums()
     {
         if (_modelGraph == null)
@@ -159,7 +169,7 @@ internal class CkCache : IDisposable
         return _modelGraph.Enums.Values;
     }
 
-    
+
     public CkEnumGraph GetCkEnum(CkId<CkEnumId> ckEnumId)
     {
         if (_modelGraph == null)
@@ -182,15 +192,6 @@ internal class CkCache : IDisposable
             _modelGraph = null;
             IsDisposed = true;
         }
-    }
-
-    // ReSharper disable once UnusedAutoPropertyAccessor.Global
-    public bool IsDisposed { get; private set; }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 
     public async Task SaveCacheAsync(Stream stream)
@@ -220,7 +221,7 @@ internal class CkCache : IDisposable
 
     public void RestoreCache(string jsonText)
     {
-        byte[] byteArray = System.Text.Encoding.UTF8.GetBytes(jsonText);
+        var byteArray = Encoding.UTF8.GetBytes(jsonText);
         using var memStream = new MemoryStream(byteArray);
 
         var options = GetJsonSerializerOptions();

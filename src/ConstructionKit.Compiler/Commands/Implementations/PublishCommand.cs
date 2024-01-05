@@ -13,9 +13,9 @@ internal class PublishCommand : Command<OctoToolOptions>
     private readonly ICkModelRepositoryService _ckModelRepositoryService;
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
+    private readonly IArgument _forceArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _repositoryArg;
-    private readonly IArgument _forceArg;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
         ICkModelRepositoryService ckModelRepositoryService, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
@@ -27,10 +27,10 @@ internal class PublishCommand : Command<OctoToolOptions>
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             new[] { "Path of compiled construction kit model file" }, true, 1);
-        
+
         _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
             new[] { "Name of the construction kit repository. By default 'LocalRepository' is used." }, 1);
-        
+
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
             new[] { "Replaces construction kits models that may exists in repo." }, 0);
     }
@@ -44,7 +44,7 @@ internal class PublishCommand : Command<OctoToolOptions>
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
         Logger.LogInformation("Repository '{Repository}'", repositoryName);
-        
+
         var operationResult = new OperationResult();
         await using var streamReader = File.OpenRead(filePath);
         try
@@ -56,7 +56,7 @@ internal class PublishCommand : Command<OctoToolOptions>
                 operationResult.WriteMessagesToLogger(Logger);
                 return;
             }
-            
+
             await _ckValidationService.ValidateAsync(ckCompiledModelRoot, operationResult);
             if (operationResult.HasErrors)
             {
@@ -64,9 +64,9 @@ internal class PublishCommand : Command<OctoToolOptions>
                 operationResult.WriteMessagesToLogger(Logger);
                 return;
             }
-        
+
             await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced);
-        
+
             Logger.LogInformation("Construction kit model published");
         }
         catch (ModelParseException)

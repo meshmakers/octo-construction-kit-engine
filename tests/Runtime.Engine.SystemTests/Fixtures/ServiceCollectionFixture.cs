@@ -5,8 +5,6 @@ namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 
 public class ServiceCollectionFixture
 {
-    public ServiceCollection Services { get; }
-
     public ServiceCollectionFixture()
     {
         Services = new ServiceCollection();
@@ -19,6 +17,5 @@ public class ServiceCollectionFixture
         });
     }
 
-    
-
+    public ServiceCollection Services { get; }
 }

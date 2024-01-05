@@ -7,12 +7,12 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
-/// Converts attribute values based their construction kit type.
+///     Converts attribute values based their construction kit type.
 /// </summary>
 public static class AttributeValueConverter
 {
     /// <summary>
-    /// Gets the .NET type for the given <see cref="AttributeValueTypesDto"/>
+    ///     Gets the .NET type for the given <see cref="AttributeValueTypesDto" />
     /// </summary>
     /// <param name="attributeValueTypes">The attribute value type</param>
     /// <returns></returns>
@@ -26,19 +26,19 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.DateTime:
                 return typeof(DateTime);
             case AttributeValueTypesDto.Boolean:
-                return typeof(Boolean);
+                return typeof(bool);
             case AttributeValueTypesDto.DateTimeOffset:
                 return typeof(DateTimeOffset);
             case AttributeValueTypesDto.Double:
-                return typeof(Double);
+                return typeof(double);
             case AttributeValueTypesDto.Enum:
                 return typeof(Enum);
             case AttributeValueTypesDto.Int:
-                return typeof(Int32);
+                return typeof(int);
             case AttributeValueTypesDto.Int64:
-                return typeof(Int64);
+                return typeof(long);
             case AttributeValueTypesDto.IntArray:
-                return typeof(Int32[]);
+                return typeof(int[]);
             case AttributeValueTypesDto.StringArray:
                 return typeof(string[]);
             case AttributeValueTypesDto.TimeSpan:
@@ -49,7 +49,7 @@ public static class AttributeValueConverter
     }
 
     /// <summary>
-    /// Converts the given value to the given <see cref="AttributeValueTypesDto"/>
+    ///     Converts the given value to the given <see cref="AttributeValueTypesDto" />
     /// </summary>
     /// <param name="attributeValueTypes">The attribute value type</param>
     /// <param name="value">The value to convert</param>
@@ -157,7 +157,7 @@ public static class AttributeValueConverter
                     {
                         return i32Element.GetInt32();
                     }
-                    
+
                     if (i32Element.ValueKind == JsonValueKind.String)
                     {
                         if (int.TryParse(i32Element.GetString(), out var svi32))
@@ -240,7 +240,7 @@ public static class AttributeValueConverter
                     return value;
                 }
 
-                RtRecord rtRecord = (RtRecord)value;
+                var rtRecord = (RtRecord)value;
 
                 return new RtRecord(rtRecord.CkRecordId, rtRecord.Attributes);
         }

@@ -1,7 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 types:
-- typeId: SampleType2
-  derivedFromCkTypeId: Sample1/SampleType1
-  attributes:
-  - id: System/Name
-    name: Name
+  - typeId: SampleType2
+    derivedFromCkTypeId: Sample1/SampleType1
+    attributes:
+      - id: System/Name
+        name: Name

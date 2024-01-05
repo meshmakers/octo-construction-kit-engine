@@ -1,10 +1,10 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
-- recordId: RecordA
-  attributes:
-    - id: Sample1/SampleAttribute
-      name: MyAttribute
-      isOptional: true
-    - id: Sample1/DateTimeAttribute
-      name: DateTimeAttribute
+  - recordId: RecordA
+    attributes:
+      - id: Sample1/SampleAttribute
+        name: MyAttribute
+        isOptional: true
+      - id: Sample1/DateTimeAttribute
+        name: DateTimeAttribute
 

@@ -4,53 +4,53 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 /// <summary>
-/// Service for managing the cache of compiled construction kit models.
+///     Service for managing the cache of compiled construction kit models.
 /// </summary>
 public interface ICkCacheService
 {
     /// <summary>
-    /// Create a new tenant cache.
+    ///     Create a new tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     void CreateTenant(string tenantId);
 
     /// <summary>
-    /// Loads a already analyzed model into a tenant cache.
+    ///     Loads a already analyzed model into a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="modelGraph">The ready analyzed graph model</param>
     /// <exception cref="Exception"></exception>
     void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph);
-    
+
     /// <summary>
-    /// Returns the construction kit model dependencies for a tenant. 
+    ///     Returns the construction kit model dependencies for a tenant.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns>A list of dependencies</returns>
     ICollection<CkModelId> GetCkDependencies(string tenantId);
 
     /// <summary>
-    /// Unload a tenant cache.
+    ///     Unload a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     void Unload(string tenantId);
 
     /// <summary>
-    /// Returns true if the tenant is loaded
+    ///     Returns true if the tenant is loaded
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns></returns>
     bool IsTenantLoaded(string tenantId);
 
     /// <summary>
-    /// Returns all available <see cref="CkTypeGraph"/> from the cache.
+    ///     Returns all available <see cref="CkTypeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns></returns>
     public IEnumerable<CkTypeGraph> GetCkTypes(string tenantId);
 
     /// <summary>
-    /// Returns a <see cref="CkTypeGraph"/> from the cache.
+    ///     Returns a <see cref="CkTypeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckTypeId">Construction Kit type id.</param>
@@ -58,7 +58,7 @@ public interface ICkCacheService
     CkTypeGraph GetCkType(string tenantId, CkId<CkTypeId> ckTypeId);
 
     /// <summary>
-    /// Returns a <see cref="CkTypeGraph"/> from the cache.
+    ///     Returns a <see cref="CkTypeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckTypeId">Construction Kit type id.</param>
@@ -70,16 +70,16 @@ public interface ICkCacheService
 #else
     bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph);
 #endif
-    
+
     /// <summary>
-    /// Returns all available <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns all available <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns></returns>
     public IEnumerable<CkRecordGraph> GetCkRecords(string tenantId);
-    
+
     /// <summary>
-    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckRecordId">Construction Kit record id.</param>
@@ -93,7 +93,7 @@ public interface ICkCacheService
 #endif
 
     /// <summary>
-    /// Returns a <see cref="CkAttributeGraph"/> from the cache.
+    ///     Returns a <see cref="CkAttributeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckAttributeId">Construction Kit attribute id.</param>
@@ -101,7 +101,7 @@ public interface ICkCacheService
     CkAttributeGraph GetCkAttribute(string tenantId, CkId<CkAttributeId> ckAttributeId);
 
     /// <summary>
-    /// Returns a <see cref="CkAssociationRoleGraph"/> from the cache.
+    ///     Returns a <see cref="CkAssociationRoleGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckAssociationRoleId">Construction Kit attribute id.</param>
@@ -110,7 +110,7 @@ public interface ICkCacheService
     CkAssociationRoleGraph GetCkAssociationRole(string tenantId, CkId<CkAssociationRoleId> ckAssociationRoleId);
 
     /// <summary>
-    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckRecordId">Construction Kit record id.</param>
@@ -119,14 +119,14 @@ public interface ICkCacheService
     CkRecordGraph GetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId);
 
     /// <summary>
-    /// Returns all available <see cref="CkEnumGraph"/> from the cache.
+    ///     Returns all available <see cref="CkEnumGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns></returns>
     public IEnumerable<CkEnumGraph> GetCkEnums(string tenantId);
-    
+
     /// <summary>
-    /// Returns a <see cref="CkRecordGraph"/> from the cache.
+    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="ckEnumId">Construction Kit record id.</param>
@@ -135,7 +135,7 @@ public interface ICkCacheService
     CkEnumGraph GetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId);
 
     /// <summary>
-    /// Saves the cache to a stream.
+    ///     Saves the cache to a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="stream">Stream ready for write</param>
@@ -143,15 +143,15 @@ public interface ICkCacheService
     Task SaveCacheAsync(string tenantId, Stream stream);
 
     /// <summary>
-    /// Restores the cache from a stream.
+    ///     Restores the cache from a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="stream">Stream ready for read</param>
     /// <exception cref="Exception"></exception>
     Task RestoreCacheAsync(string tenantId, Stream stream);
-    
+
     /// <summary>
-    /// Restores the cache from a stream.
+    ///     Restores the cache from a stream.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="jsonText">JSON formatted cache representation</param>

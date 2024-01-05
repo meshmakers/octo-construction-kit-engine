@@ -23,7 +23,7 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
     {
         await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
         {
-            string rootPath = _fixture.CreateTempDirectory();
+            var rootPath = _fixture.CreateTempDirectory();
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
             await compilerService.CreateNewAsync(rootPath);
 
@@ -40,7 +40,7 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
     {
         await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
         {
-            string rootPath = _fixture.CreateTempDirectory();
+            var rootPath = _fixture.CreateTempDirectory();
             Directory.CreateDirectory(rootPath);
             File.Create(Path.Combine(rootPath, "test.txt")).Close();
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
@@ -54,7 +54,7 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
     {
         await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
         {
-            string rootPath = _fixture.CreateTempDirectory();
+            var rootPath = _fixture.CreateTempDirectory();
             _testOutputHelper.WriteLine($"Directory: {rootPath}");
 
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
@@ -64,16 +64,15 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
             Assert.True(Directory.Exists(rootPath));
             Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.yaml")));
             Assert.False(File.Exists(Path.Combine(rootPath, "ck-sample1.cache.json")));
-
         }
     }
-    
+
     [Fact]
     public async Task Compile_WithCache_ok()
     {
         await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
         {
-            string rootPath = _fixture.CreateTempDirectory();
+            var rootPath = _fixture.CreateTempDirectory();
             _testOutputHelper.WriteLine($"Directory: {rootPath}");
 
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();

@@ -8,16 +8,16 @@ using Meshmakers.Octo.Runtime.Contracts.Serialization;
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
-/// Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}"/> for <see cref="RtAssociation"/>
+///     Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}" /> for <see cref="RtAssociation" />
 /// </summary>
-public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAssociation, RtAssociationDto>
+public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtAssociation, RtAssociationDto>
 {
-    private readonly string _tenantId;
     private readonly ICkCacheService _ckCacheService;
     private readonly IRtRepositorySerializer _rtSerializer;
+    private readonly string _tenantId;
 
     /// <summary>
-    /// Constructor
+    ///     Constructor
     /// </summary>
     /// <param name="tenantId"></param>
     /// <param name="ckCacheService"></param>
@@ -28,7 +28,7 @@ public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAs
         _ckCacheService = ckCacheService;
         _rtSerializer = rtSerializer;
     }
-    
+
     /// <inheritdoc />
     public OctoObjectId GetId(RtAssociationDto dto)
     {
@@ -66,13 +66,15 @@ public class RtAssociationDataSourceMapper: IDataSourceMapper<OctoObjectId, RtAs
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyDictionary<OctoObjectId, RtAssociation>> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public async Task<IReadOnlyDictionary<OctoObjectId, RtAssociation>> DeserializeAsync(Stream stream, string locationReference,
+        OperationResult operationResult)
     {
-        var existingDocuments = await _rtSerializer.DeserializeAssociationsAsync(stream, locationReference, operationResult).ConfigureAwait(false);
+        var existingDocuments = await _rtSerializer.DeserializeAssociationsAsync(stream, locationReference, operationResult)
+            .ConfigureAwait(false);
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
-        
-        return existingDocuments.ToDictionary(k => k.AssociationId, v=> v);
+
+        return existingDocuments.ToDictionary(k => k.AssociationId, v => v);
     }
 }

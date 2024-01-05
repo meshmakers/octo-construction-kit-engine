@@ -7,17 +7,17 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-/// Resolver that resolves the elements of a compiled model.
+///     Resolver that resolves the elements of a compiled model.
 /// </summary>
 internal class ModelResolver : IModelResolver
 {
     private readonly IDependencyResolver _dependencyResolver;
-    private readonly IInheritanceResolver _inheritanceResolver;
     private readonly IElementResolver _elementResolver;
+    private readonly IInheritanceResolver _inheritanceResolver;
     private readonly IReferenceResolver _referenceResolver;
 
     /// <summary>
-    /// Creates a new instance of <see cref="ModelResolver"/>.
+    ///     Creates a new instance of <see cref="ModelResolver" />.
     /// </summary>
     /// <param name="dependencyResolver"></param>
     /// <param name="inheritanceResolver"></param>
@@ -31,10 +31,10 @@ internal class ModelResolver : IModelResolver
         _elementResolver = elementResolver;
         _referenceResolver = referenceResolver;
     }
-    
+
     public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
     {
-        CkModelGraph modelGraph = new CkModelGraph();
+        var modelGraph = new CkModelGraph();
         await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, operationResult).ConfigureAwait(false);
 
         _referenceResolver.Resolve(modelGraph, operationResult);
@@ -44,7 +44,7 @@ internal class ModelResolver : IModelResolver
     }
 
     /// <summary>
-    /// Loads the compiled model into the resolver.
+    ///     Loads the compiled model into the resolver.
     /// </summary>
     /// <param name="compiledModel"></param>
     /// <param name="operationResult"></param>
@@ -52,7 +52,7 @@ internal class ModelResolver : IModelResolver
     {
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
         var modelGraph = _elementResolver.Resolve(compiledModel, operationResult);
-        
+
         if (!Regex.IsMatch(compiledModel.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
         {
             operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(compiledModel.ModelId.ModelId));
@@ -64,9 +64,10 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult).ConfigureAwait(false);
+            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult)
+                .ConfigureAwait(false);
         }
-        
+
         // We suppose that the dependent models are already validated and we can use them.
         // So we check the current to be validated model against the dependent models.
 
@@ -92,7 +93,7 @@ internal class ModelResolver : IModelResolver
         // 3. entities.attributes -> It is not possible that a type has an attribute name, that is defined in a base type.
         // 4. entities.associations -> It is not possible that a type has an association, which is defined in a base type too.
         // 5. entities.isFinal -> It is not possible that a type is final, but has a derived type.
-        
+
         // Check 1-5 is done by inheritance resolver.
         _inheritanceResolver.Resolve(modelGraph, operationResult);
 

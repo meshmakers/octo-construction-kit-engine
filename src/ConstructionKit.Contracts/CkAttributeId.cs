@@ -1,17 +1,18 @@
 using System.Diagnostics;
+using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Represents a versioned construction kit attribute id
+///     Represents a versioned construction kit attribute id
 /// </summary>
 [DebuggerDisplay("{" + nameof(AttributeId) + "} ({" + nameof(Version) + "})")]
-[System.Text.Json.Serialization.JsonConverter(typeof(CkAttributeIdConverter))]
+[JsonConverter(typeof(CkAttributeIdConverter))]
 public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<CkAttributeId>, ICkKey
 {
     /// <summary>
-    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="attributeId"/>.
+    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="attributeId" />.
     /// </summary>
     /// <param name="attributeId"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
@@ -36,7 +37,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="attributeId"/> and <paramref name="attributeVersion"/>.
+    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="attributeId" /> and <paramref name="attributeVersion" />.
     /// </summary>
     /// <param name="attributeId"></param>
     /// <param name="attributeVersion"></param>
@@ -47,7 +48,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <summary>
-    /// Creates a new <see cref="CkAttributeId"/> from the given <paramref name="value"/>.
+    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
@@ -57,17 +58,17 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <summary>
-    /// Defines the name of the attribute, e. g. "Designation"
+    ///     Defines the name of the attribute, e. g. "Designation"
     /// </summary>
     public string AttributeId { get; }
 
     /// <summary>
-    /// Returns the version of the attribute, e. g. "1.0.0"
+    ///     Returns the version of the attribute, e. g. "1.0.0"
     /// </summary>
     public CkVersion Version { get; }
 
     /// <summary>
-    /// Returns the full name of the attribute, e. g. "Designation-1.0.0"
+    ///     Returns the full name of the attribute, e. g. "Designation-1.0.0"
     /// </summary>
     public string FullName => IsEmpty ? "" : $"{AttributeId}-{Version}";
 
@@ -97,7 +98,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     /// <inheritdoc />
     public int CompareTo(CkAttributeId other)
     {
-        var result = String.Compare(AttributeId, other.AttributeId, StringComparison.Ordinal);
+        var result = string.Compare(AttributeId, other.AttributeId, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -255,7 +256,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
             return hash;
         }
 #else
-            return HashCode.Combine(AttributeId, Version);
+        return HashCode.Combine(AttributeId, Version);
 #endif
     }
 
@@ -266,7 +267,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <summary>
-    /// Compares two <see cref="CkAttributeId"/> instances for equality.
+    ///     Compares two <see cref="CkAttributeId" /> instances for equality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>
@@ -277,7 +278,7 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <summary>
-    /// Compares two <see cref="CkAttributeId"/> instances for inequality.
+    ///     Compares two <see cref="CkAttributeId" /> instances for inequality.
     /// </summary>
     /// <param name="p1"></param>
     /// <param name="p2"></param>

@@ -1,14 +1,14 @@
-<#+ 
+<#+
     public static IEnumerable<string> ExtractPlaceholders(string input)
     {
-        var matches = System.Text.RegularExpressions.Regex.Matches(input, @"\{(.*?)\}");
-        foreach (System.Text.RegularExpressions.Match match in matches)
+        var matches = Regex.Matches(input, @"\{(.*?)\}");
+        foreach (Match match in matches)
         {
             yield return match.Groups[1].Value;
         }
     }
 
-    void CreateHeader()
+    private void CreateHeader()
     {
 #>
 //------------------------------------------------------------------------------

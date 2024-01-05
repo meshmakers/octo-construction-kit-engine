@@ -2,6 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
 using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
@@ -32,7 +33,7 @@ public class JsonSerializerTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_Stream_ok()
     {
@@ -42,7 +43,7 @@ public class JsonSerializerTests
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var entities = new List<RtEntityDto>();
-        
+
         var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream);
         rtDeserializeStream.BulkDeserialized += (sender, args) =>
         {
@@ -50,7 +51,7 @@ public class JsonSerializerTests
             args.IsHandled = true;
         };
         await rtDeserializeStream.ReadAsync();
-        
+
         Assert.NotNull(rtDeserializeStream);
         Assert.Equal(2, rtDeserializeStream.Dependencies.Count);
         Assert.Equal(2, entities.Count);
@@ -63,7 +64,7 @@ public class JsonSerializerTests
     public async Task DeserializeAsync_noSchema_ok()
     {
         var rtJsonSerializer = new RtJsonSerializer();
-    
+
         var filePath = "sampleData/files/noSchema.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
@@ -72,32 +73,34 @@ public class JsonSerializerTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_noSchema_malFormed_fail()
     {
         var rtJsonSerializer = new RtJsonSerializer();
-    
+
         var filePath = "sampleData/files/noSchema_malformed.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));
+        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+            await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.False(operationResult.HasErrors);
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
     }
-        
+
     [Fact]
     public async Task DeserializeAsync_MalformedAttributeValue_Fail()
     {
         var rtJsonSerializer = new RtJsonSerializer();
-    
+
         var filePath = "sampleData/files/malformedAttributeValue.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () => await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));
+        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+            await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Single(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.True(operationResult.HasFatalErrors);
@@ -111,7 +114,7 @@ public class JsonSerializerTests
 
         var stream = new MemoryStream();
         await using var streamWriter = new StreamWriter(stream);
-        var ckElementsDto = sampleData.models.Builder.Build();
+        var ckElementsDto = Builder.Build();
         await rtJsonSerializer.SerializeAsync(streamWriter, ckElementsDto);
         await streamWriter.FlushAsync();
 
@@ -123,5 +126,4 @@ public class JsonSerializerTests
         Assert.NotNull(json);
         Assert.Contains("$schema", json);
     }
-
 }

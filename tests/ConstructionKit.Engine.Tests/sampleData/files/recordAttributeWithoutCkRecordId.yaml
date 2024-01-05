@@ -5,14 +5,14 @@ records:
     isFinal: true
     attributes:
       - id: Designation
-        valueType: String    
+        valueType: String
 attributes:
   - id: RecordA
-    valueType: Record    
+    valueType: Record
     ckRecordId: RecordA
 types:
   - typeId: Location
-    derivedFromCkTypeId: System/Entity 
+    derivedFromCkTypeId: System/Entity
     isFinal: true
     isAbstract: true
     attributes:

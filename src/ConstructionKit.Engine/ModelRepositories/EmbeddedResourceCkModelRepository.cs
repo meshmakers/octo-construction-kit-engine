@@ -5,20 +5,20 @@ using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
 /// <summary>
-/// Embedded Resource construction kit model repository
+///     Embedded Resource construction kit model repository
 /// </summary>
-public class EmbeddedResourceCkModelRepository: ICkModelRepository
+public class EmbeddedResourceCkModelRepository : ICkModelRepository
 {
     private readonly IEnumerable<ICkEmbeddedModel> _embeddedModels;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="EmbeddedResourceCkModelRepository"/> class.
+    ///     Creates a new instance of the <see cref="EmbeddedResourceCkModelRepository" /> class.
     /// </summary>
     public EmbeddedResourceCkModelRepository(IEnumerable<ICkEmbeddedModel> embeddedModels)
     {
         _embeddedModels = embeddedModels;
     }
-    
+
     /// <inheritdoc />
     public int Order => 0;
 
@@ -40,11 +40,11 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
     /// <inheritdoc />
     public Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
-        return Task.FromResult(_embeddedModels.Any(m=> m.ModelId == modelId));
+        return Task.FromResult(_embeddedModels.Any(m => m.ModelId == modelId));
     }
 
     /// <inheritdoc />
-    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null, 
+    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         var embeddedModel = _embeddedModels.FirstOrDefault(m => m.ModelId == modelId);
@@ -52,7 +52,7 @@ public class EmbeddedResourceCkModelRepository: ICkModelRepository
         {
             throw ModelRepositoryException.ModelNotFound(modelId, RepositoryName);
         }
-        
+
         return embeddedModel.GetCompiledModelRootAsync(operationResult);
     }
 

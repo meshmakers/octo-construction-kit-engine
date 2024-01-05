@@ -2,7 +2,7 @@
   "$id": "https://schemas.meshmakers.cloud/runtime-elements-attribute.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "definitions": {
-    "RtAttribute":{
+    "RtAttribute": {
       "type": "object",
       "title": "RtAttribute",
       "properties": {
@@ -16,7 +16,8 @@
             "number",
             "boolean",
             "object",
-            "array"]
+            "array"
+          ]
         }
       },
       "additionalProperties": false,

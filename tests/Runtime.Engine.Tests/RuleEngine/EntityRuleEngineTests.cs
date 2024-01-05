@@ -26,7 +26,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
-                CkTypeId = "Sample1/SampleType35",
+                CkTypeId = "Sample1/SampleType35"
             })
         }, operationResult);
 
@@ -114,7 +114,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task ValidateAsync_Update_MissingMandatoryAttribute_Fail()
     {
@@ -143,7 +143,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(5, operationResult.Messages[0].MessageNumber);
     }
-    
+
     [Fact]
     public async Task ValidateAsync_Update_OK()
     {
@@ -186,20 +186,20 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "Designation", "Test" },
                 { "RecordArrayTests", new List<object>() }
             });
-        
+
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
         }, operationResult);
-        
+
         var list = rtEntity.GetAttributeStringValues("StringArrayTests");
-            
+
         Assert.Empty(operationResult.Messages);
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Single(list);
         Assert.Equal("a", list[0]);
     }
-    
+
     [Fact]
     public async Task ValidateAsync_IntArrayWithDefaultValues_OK()
     {
@@ -214,20 +214,20 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "Designation", "Test" },
                 { "RecordArrayTests", new List<object>() }
             });
-        
+
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
         }, operationResult);
-        
+
         var list = rtEntity.GetAttributeValues<int>("IntArrayTests");
-            
+
         Assert.Empty(operationResult.Messages);
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Single(list);
         Assert.Equal(6, list[0]);
     }
-    
+
     [Fact]
     public async Task ValidateAsync_RecordArray_Empty_OK()
     {
@@ -242,17 +242,16 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "Designation", "Test" },
                 { "RecordArrayTests", new List<RtRecord>() }
             });
-        
+
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
         }, operationResult);
-        
+
         var list = rtEntity.GetRtRecordAttributeValues<RtTestRecordRecord>("RecordArrayTests");
-            
+
         Assert.Empty(operationResult.Messages);
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(list);
     }
- 
 }

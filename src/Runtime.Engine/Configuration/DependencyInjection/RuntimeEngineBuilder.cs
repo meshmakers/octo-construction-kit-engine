@@ -29,18 +29,19 @@ public class RuntimeEngineBuilder : IRuntimeEngineBuilder
 
 
     /// <summary>
-    /// Adds a local runtime repository to the DI container
+    ///     Adds a local runtime repository to the DI container
     /// </summary>
     /// <param name="setupRepositoryConfigurationAction"></param>
-    public IRuntimeEngineBuilder AddLocalRuntimeRepository(Action<LocalRuntimeRepositoryConfiguration>? setupRepositoryConfigurationAction = null)
+    public IRuntimeEngineBuilder AddLocalRuntimeRepository(
+        Action<LocalRuntimeRepositoryConfiguration>? setupRepositoryConfigurationAction = null)
     {
         if (setupRepositoryConfigurationAction != null)
         {
             Services.Configure(setupRepositoryConfigurationAction);
         }
-        
+
         Services.AddTransient<IRtRepositorySerializer, RtRepositorySerializer>();
- //       Services.AddSingleton<ILocalRepositoryDataSource>(()=> return new LocalRepositoryDataSource())
+        //       Services.AddSingleton<ILocalRepositoryDataSource>(()=> return new LocalRepositoryDataSource())
 
         return this;
     }

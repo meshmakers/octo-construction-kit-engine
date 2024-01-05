@@ -1,22 +1,22 @@
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
-/// Used to indicate an exception during compiler operations
+///     Used to indicate an exception during compiler operations
 /// </summary>
 public class CompilerException : Exception
 {
     /// <summary>
-    /// Creates a new instance of <see cref="CompilerException"/>
+    ///     Creates a new instance of <see cref="CompilerException" />
     /// </summary>
     /// <param name="operationResult"></param>
-    public CompilerException(OperationResult operationResult) 
+    public CompilerException(OperationResult operationResult)
         : base("Compiler result contains errors")
     {
         OperationResult = operationResult;
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CompilerException"/>
+    ///     Creates a new instance of <see cref="CompilerException" />
     /// </summary>
     /// <param name="message"></param>
     /// <param name="operationResult"></param>
@@ -26,7 +26,7 @@ public class CompilerException : Exception
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CompilerException"/>
+    ///     Creates a new instance of <see cref="CompilerException" />
     /// </summary>
     /// <param name="message"></param>
     /// <param name="inner"></param>
@@ -37,7 +37,7 @@ public class CompilerException : Exception
     }
 
     /// <summary>
-    /// The <see cref="OperationResult"/> that caused the exception
+    ///     The <see cref="OperationResult" /> that caused the exception
     /// </summary>
     public OperationResult OperationResult { get; }
 
@@ -45,7 +45,7 @@ public class CompilerException : Exception
     {
         return new CompilerException(operationResult);
     }
-    
+
     internal static Exception DirectoryMustBeEmpty(string rootPath, OperationResult operationResult)
     {
         return new CompilerException($"Directory '{rootPath}' must be empty", operationResult);

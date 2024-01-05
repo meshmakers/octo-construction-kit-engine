@@ -9,18 +9,18 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 /// <summary>
-/// Represents a construction kit record in the dependency graph
+///     Represents a construction kit record in the dependency graph
 /// </summary>
 [DebuggerDisplay("{" + nameof(Path) + "}")]
 public class CkRecordGraph
 {
-    private readonly List<CkGraphRecordInheritance> _baseRecords;
-    private readonly List<CkGraphRecordInheritance> _derivedRecords;
     private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
     private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
+    private readonly List<CkGraphRecordInheritance> _baseRecords;
+    private readonly List<CkGraphRecordInheritance> _derivedRecords;
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkRecordGraph"/>.
+    ///     Creates a new instance of <see cref="CkRecordGraph" />.
     /// </summary>
     /// <param name="ckRecordId"></param>
     /// <param name="ckRecordDto"></param>
@@ -42,7 +42,7 @@ public class CkRecordGraph
     }
 
     /// <summary>
-    /// Creates a new instance of <see cref="CkRecordGraph"/>.
+    ///     Creates a new instance of <see cref="CkRecordGraph" />.
     /// </summary>
     /// <param name="ckRecordId"></param>
     /// <param name="isAbstract"></param>
@@ -53,8 +53,8 @@ public class CkRecordGraph
     /// <param name="definedAttributes"></param>
     /// <param name="allAttributes"></param>
     [JsonConstructor]
-    public CkRecordGraph(CkId<CkRecordId> ckRecordId, bool isAbstract, bool isFinal, 
-        IReadOnlyCollection<CkGraphRecordInheritance> baseRecords, 
+    public CkRecordGraph(CkId<CkRecordId> ckRecordId, bool isAbstract, bool isFinal,
+        IReadOnlyCollection<CkGraphRecordInheritance> baseRecords,
         CkId<CkRecordId>? derivedFromCkRecordId,
         IReadOnlyCollection<CkGraphRecordInheritance> derivedRecords,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
@@ -64,11 +64,11 @@ public class CkRecordGraph
         IsAbstract = isAbstract;
         IsFinal = isFinal;
         DerivedFromCkRecordId = derivedFromCkRecordId;
-        
+
         _baseRecords = new List<CkGraphRecordInheritance>(baseRecords);
         _derivedRecords = new List<CkGraphRecordInheritance>(derivedRecords);
         _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(allAttributes
-            .ToDictionary(k=> k.Key, v=> v.Value));
+            .ToDictionary(k => k.Key, v => v.Value));
         _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>(allAttributes
             .ToDictionary(k => k.Value.AttributeName, v => v.Value));
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
@@ -79,7 +79,7 @@ public class CkRecordGraph
     }
 
     /// <summary>
-    /// Defines the base record of this record. 
+    ///     Defines the base record of this record.
     /// </summary>
     public CkId<CkRecordId>? DerivedFromCkRecordId { get; }
 
@@ -99,25 +99,25 @@ public class CkRecordGraph
     public bool IsAbstract { get; }
 
     /// <summary>
-    /// Returns a list of base records of the give construction kit record
+    ///     Returns a list of base records of the give construction kit record
     /// </summary>
     public IReadOnlyCollection<CkGraphRecordInheritance> BaseRecords { get; }
-    
+
     /// <summary>
-    /// Returns a list of derived records of the given construction kit record
+    ///     Returns a list of derived records of the given construction kit record
     /// </summary>
     public IReadOnlyCollection<CkGraphRecordInheritance> DerivedRecords { get; }
 
     /// <summary>
     ///     Gets or sets a list of attributes that are defined by the current record
     /// </summary>
-    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; } 
-    
+    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; }
+
     /// <summary>
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; } 
-    
+    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; }
+
     /// <summary>
     ///     Gets or sets a list of attributes including inherited ones.
     /// </summary>
@@ -125,31 +125,31 @@ public class CkRecordGraph
     public IReadOnlyDictionary<string, CkTypeAttributeGraph> AllAttributesByName { get; }
 
     /// <summary>
-    /// Returns a string that describes the inheritance chain
+    ///     Returns a string that describes the inheritance chain
     /// </summary>
     [JsonIgnore]
     public string Path => CkRecordId + ": " + string.Join("->", BaseRecords.Select(x => x.BaseCkRecordId));
 
     /// <summary>
-    /// Adds a list of base records of the current record
+    ///     Adds a list of base records of the current record
     /// </summary>
     /// <param name="baseRecordList"></param>
     internal void AddBaseRecords(IEnumerable<CkGraphRecordInheritance> baseRecordList)
     {
         _baseRecords.AddRange(baseRecordList);
     }
-    
+
     /// <summary>
-    /// Adds a list of derived records of the current record
+    ///     Adds a list of derived records of the current record
     /// </summary>
     /// <param name="ckGraphRecordInheritance"></param>
     internal void AddDerivedRecords(CkGraphRecordInheritance ckGraphRecordInheritance)
     {
         _derivedRecords.Add(ckGraphRecordInheritance);
     }
-    
+
     /// <summary>
-    /// Adds a attribute to the current record
+    ///     Adds a attribute to the current record
     /// </summary>
     /// <param name="ckTypeAttributeGraph"></param>
     internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
@@ -158,14 +158,15 @@ public class CkRecordGraph
         {
             return false;
         }
+
         _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
         _allAttributesByName[ckTypeAttributeGraph.AttributeName] = ckTypeAttributeGraph;
 
         return true;
     }
-    
+
     /// <summary>
-    /// Returns a list of derived records of the given construction kit record
+    ///     Returns a list of derived records of the given construction kit record
     /// </summary>
     /// <param name="includeSelf">When true, the current record is included to the list</param>
     /// <returns></returns>
@@ -176,13 +177,14 @@ public class CkRecordGraph
         {
             list.Add(CkRecordId);
         }
-        list.AddRange(_derivedRecords.Select(x=> x.InheritorCkRecordId));
+
+        list.AddRange(_derivedRecords.Select(x => x.InheritorCkRecordId));
 
         return list;
     }
 
     /// <summary>
-    /// Returns a list of base records of the given construction kit record
+    ///     Returns a list of base records of the given construction kit record
     /// </summary>
     /// <param name="includeSelf">When true, the current record is included to the list</param>
     /// <returns></returns>
@@ -193,7 +195,8 @@ public class CkRecordGraph
         {
             list.Add(CkRecordId);
         }
-        list.AddRange(_derivedRecords.Select(x=> x.BaseCkRecordId));
+
+        list.AddRange(_derivedRecords.Select(x => x.BaseCkRecordId));
 
         return list;
     }

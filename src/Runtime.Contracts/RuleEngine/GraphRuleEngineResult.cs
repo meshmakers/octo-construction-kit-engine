@@ -5,12 +5,12 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 namespace Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 
 /// <summary>
-/// Represents a graph rule engine result.
+///     Represents a graph rule engine result.
 /// </summary>
 public record GraphRuleEngineResult
 {
     /// <summary>
-    /// Creates a new instance of <see cref="GraphRuleEngineResult"/>.
+    ///     Creates a new instance of <see cref="GraphRuleEngineResult" />.
     /// </summary>
     public GraphRuleEngineResult()
     {
@@ -19,12 +19,12 @@ public record GraphRuleEngineResult
     }
 
     /// <summary>
-    /// Returns a list of associations to create.
+    ///     Returns a list of associations to create.
     /// </summary>
     public List<RtAssociation> RtAssociationsToCreate { get; }
-    
+
     /// <summary>
-    /// Returns a list of associations to delete.
+    ///     Returns a list of associations to delete.
     /// </summary>
     public List<RtAssociation> RtAssociationsToDelete { get; }
 }

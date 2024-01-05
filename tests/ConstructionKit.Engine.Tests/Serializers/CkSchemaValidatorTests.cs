@@ -10,22 +10,22 @@ public class CkSchemaValidatorTests
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/types-ok.json";
+        var filePath = "sampleData/files/types-ok.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        bool isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
+        var isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
         Assert.True(isValid);
         Assert.False(operationResult.Messages.Any());
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public void ValidateElementsInJson_MalformedAttribute_Fail()
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/malformedAttribute.json";
+        var filePath = "sampleData/files/malformedAttribute.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
@@ -35,13 +35,13 @@ public class CkSchemaValidatorTests
         Assert.False(operationResult.HasFatalErrors);
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
-    
+
     [Fact]
     public void ValidateElementsInJson_MalformedAttributeValue_Fail()
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/malformedAttributeValue.json";
+        var filePath = "sampleData/files/malformedAttributeValue.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateElementsInJson(stream, filePath, operationResult);
@@ -51,14 +51,14 @@ public class CkSchemaValidatorTests
         Assert.False(operationResult.HasFatalErrors);
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
-    
-    
+
+
     [Fact]
     public void ValidateElementsInYaml_ok()
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/types-ok.yaml";
+        var filePath = "sampleData/files/types-ok.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
@@ -67,13 +67,13 @@ public class CkSchemaValidatorTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public void ValidateElementsInYaml_MalformedAttribute_Fail()
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/malformedAttribute.yaml";
+        var filePath = "sampleData/files/malformedAttribute.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
@@ -83,13 +83,13 @@ public class CkSchemaValidatorTests
         Assert.False(operationResult.HasFatalErrors);
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
-    
+
     [Fact]
     public void ValidateElementsInYaml_MalformedAttributeValue_Fail()
     {
         var schemaValidator = new CkSchemaValidator();
 
-        string filePath = "sampleData/files/malformedAttributeValue.yaml";
+        var filePath = "sampleData/files/malformedAttributeValue.yaml";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);

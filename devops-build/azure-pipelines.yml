@@ -42,9 +42,11 @@ stages:
               Write-Host "##vso[task.setvariable variable=MajorVersion;]$major"
               Write-Host "##vso[task.setvariable variable=MinorVersion;]$minor"
               Write-Host "##vso[task.setvariable variable=BuildNumberShort;]$buildNumberShort"
-              Write-Host "Setting build number to $buildNumber (short: $buildNumberShort)"
+              Write-Host "Setting build number to $buildNumber"
               Write-Host "##vso[build.updatebuildnumber]$buildNumber"
             }
+            Write-Host "Setting build number shot to $buildNumberShort"
+            Write-Host "##vso[task.setvariable variable=BuildNumberShort;]$buildNumberShort"
         displayName: 'Set build number'
       - checkout: self
         clean: true

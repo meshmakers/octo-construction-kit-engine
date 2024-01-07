@@ -58,7 +58,7 @@ internal class CompileCommand : Command<OctoToolOptions>
 
             var ckCompiledModelRoot =
                 await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult);
-            if (operationResult.HasErrors)
+            if (operationResult.HasErrors || operationResult.HasFatalErrors)
             {
                 Logger.LogError("Error loading model \'{FilePath}\'", compiledModelFilePath);
                 operationResult.WriteMessagesToLogger(Logger);

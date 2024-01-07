@@ -124,7 +124,7 @@ public class CkModelGraph
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
     /// <returns></returns>
-    public CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
+    public CkTypeGraph GetOrCreateType(CkId<CkTypeId> ckTypeId, CkCompiledTypeDto ckTypeDto)
     {
         if (_types.TryGetValue(ckTypeId, out var ckTypeGraph))
         {

@@ -25,11 +25,12 @@ public class CkTypeGraph
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
-    public CkTypeGraph(CkId<CkTypeId> ckTypeId, CkTypeDto ckTypeDto)
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, CkCompiledTypeDto ckTypeDto)
     {
         CkTypeId = ckTypeId;
         IsAbstract = ckTypeDto.IsAbstract;
         IsFinal = ckTypeDto.IsFinal;
+        IsCollectionRoot = ckTypeDto.IsCollectionRoot;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         _baseTypes = new List<CkGraphTypeInheritance>();
         _derivedTypes = new List<CkGraphTypeInheritance>();

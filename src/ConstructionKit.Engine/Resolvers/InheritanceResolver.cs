@@ -11,8 +11,6 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// </summary>
 internal class InheritanceResolver : IInheritanceResolver
 {
-    private readonly HashSet<CkId<CkRecordId>> _handledRecordHashSet;
-    private readonly HashSet<CkId<CkTypeId>> _handledTypesHashSet;
     private readonly ILogger<InheritanceResolver> _logger;
 
     /// <summary>
@@ -21,8 +19,6 @@ internal class InheritanceResolver : IInheritanceResolver
     /// <param name="logger"></param>
     public InheritanceResolver(ILogger<InheritanceResolver> logger)
     {
-        _handledTypesHashSet = new HashSet<CkId<CkTypeId>>();
-        _handledRecordHashSet = new HashSet<CkId<CkRecordId>>();
         _logger = logger;
     }
 
@@ -31,17 +27,20 @@ internal class InheritanceResolver : IInheritanceResolver
     {
         _logger.LogInformation("Starting resolving inheritance");
 
+        HashSet<CkId<CkRecordId>> handledRecordHashSet = new();
+        HashSet<CkId<CkTypeId>> handledTypesHashSet = new();
+
         foreach (var ckTypeKeyValue in modelGraph.Types)
         {
             _logger.LogDebug("Resolving inheritance for type {CkTypeId}", ckTypeKeyValue.Key);
-            GetAndUpdateTypeGraph(modelGraph, ckTypeKeyValue.Key, operationResult);
-            GetDirectedAggregationsAndAttributes(modelGraph, ckTypeKeyValue.Value, operationResult);
+            GetAndUpdateTypeGraph(handledTypesHashSet, modelGraph, ckTypeKeyValue.Key, operationResult);
+            GetDirectedAggregationsAndAttributes(handledTypesHashSet, modelGraph, ckTypeKeyValue.Value, operationResult);
         }
 
         foreach (var ckRecordKeyValue in modelGraph.Records)
         {
             _logger.LogDebug("Resolving inheritance for record {CkRecordId}", ckRecordKeyValue.Key);
-            var recordGraph = GetAndUpdateRecordGraph(modelGraph, ckRecordKeyValue.Key, operationResult);
+            var recordGraph = GetAndUpdateRecordGraph(handledRecordHashSet, modelGraph, ckRecordKeyValue.Key, operationResult);
             GetDirectedRecordAttributes(modelGraph, recordGraph, operationResult);
         }
 
@@ -53,7 +52,7 @@ internal class InheritanceResolver : IInheritanceResolver
         return modelGraph;
     }
 
-    private CkTypeGraph GetAndUpdateTypeGraph(CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId, OperationResult operationResult)
+    private CkTypeGraph GetAndUpdateTypeGraph(HashSet<CkId<CkTypeId>> handledTypesHashSet, CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId, OperationResult operationResult)
     {
         if (!modelGraph.Types.TryGetValue(ckTypeId, out var typeGraph))
         {
@@ -62,7 +61,7 @@ internal class InheritanceResolver : IInheritanceResolver
         }
 
 
-        if (!_handledTypesHashSet.Contains(ckTypeId))
+        if (!handledTypesHashSet.Contains(ckTypeId))
         {
             var baseTypes = GetBaseTypes(modelGraph, ckTypeId, operationResult);
             typeGraph.AddBaseTypes(baseTypes);
@@ -85,13 +84,13 @@ internal class InheritanceResolver : IInheritanceResolver
                     attributeGraph));
             }
 
-            _handledTypesHashSet.Add(ckTypeId);
+            handledTypesHashSet.Add(ckTypeId);
         }
 
         return typeGraph;
     }
 
-    private CkRecordGraph GetAndUpdateRecordGraph(CkModelGraph modelGraph, CkId<CkRecordId> ckRecordId, OperationResult operationResult)
+    private CkRecordGraph GetAndUpdateRecordGraph(HashSet<CkId<CkRecordId>> handledRecordHashSet, CkModelGraph modelGraph, CkId<CkRecordId> ckRecordId, OperationResult operationResult)
     {
         if (!modelGraph.Records.TryGetValue(ckRecordId, out var recordGraph))
         {
@@ -99,7 +98,7 @@ internal class InheritanceResolver : IInheritanceResolver
             throw ModelValidationException.UnknownCkRecordId(ckRecordId);
         }
 
-        if (!_handledRecordHashSet.Contains(ckRecordId))
+        if (!handledRecordHashSet.Contains(ckRecordId))
         {
             var baseTypes = GetBaseRecords(modelGraph, ckRecordId, operationResult);
             recordGraph.AddBaseRecords(baseTypes);
@@ -110,13 +109,13 @@ internal class InheritanceResolver : IInheritanceResolver
                     modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
             }
 
-            _handledRecordHashSet.Add(ckRecordId);
+            handledRecordHashSet.Add(ckRecordId);
         }
 
         return recordGraph;
     }
 
-    private void GetDirectedAggregationsAndAttributes(CkModelGraph ckModelGraph,
+    private void GetDirectedAggregationsAndAttributes(HashSet<CkId<CkTypeId>> handledTypesHashSet, CkModelGraph ckModelGraph,
         CkTypeGraph originTypeGraph, OperationResult operationResult)
     {
         _logger.LogDebug("Resolving directed aggregations and attributes for type {CkTypeId}", originTypeGraph.CkTypeId);
@@ -150,7 +149,7 @@ internal class InheritanceResolver : IInheritanceResolver
                 continue;
             }
 
-            var targetCkTypeGraph = GetAndUpdateTargetCkTypeGraph(ckModelGraph, originTypeGraph, typeAssociation, operationResult);
+            var targetCkTypeGraph = GetAndUpdateTargetCkTypeGraph(handledTypesHashSet, ckModelGraph, originTypeGraph, typeAssociation, operationResult);
 
             // Check if there is a duplicate association defined at the same type.
             if (originTypeGraph.Associations.Out.Owned.Any(x =>
@@ -164,7 +163,7 @@ internal class InheritanceResolver : IInheritanceResolver
             // Check if there is the same association role defined in a base type with a target to the same target type inheritance chain
             var duplicateTypeAssociations = originTypeGraph.BaseTypes.SelectMany(i =>
             {
-                var baseCkTypeGraph = GetAndUpdateTypeGraph(ckModelGraph, i.BaseCkTypeId, operationResult);
+                var baseCkTypeGraph = GetAndUpdateTypeGraph(handledTypesHashSet, ckModelGraph, i.BaseCkTypeId, operationResult);
 
                 return baseCkTypeGraph.Associations.Out.Owned.Where(x =>
                     x.CkRoleId == typeAssociation.CkRoleId && originTypeGraph.BaseTypes.Any(y =>
@@ -253,7 +252,7 @@ internal class InheritanceResolver : IInheritanceResolver
         }
     }
 
-    private CkTypeGraph GetAndUpdateTargetCkTypeGraph(CkModelGraph ckModelGraph, CkTypeGraph typeGraph,
+    private CkTypeGraph GetAndUpdateTargetCkTypeGraph(HashSet<CkId<CkTypeId>> handledTypesHashSet, CkModelGraph ckModelGraph, CkTypeGraph typeGraph,
         CkTypeAssociationDto typeAssociation, OperationResult operationResult)
     {
         if (!ckModelGraph.Types.ContainsKey(typeAssociation.TargetCkTypeId))
@@ -264,7 +263,7 @@ internal class InheritanceResolver : IInheritanceResolver
                 typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId);
         }
 
-        var targetCkTypeGraph = GetAndUpdateTypeGraph(ckModelGraph, typeAssociation.TargetCkTypeId, operationResult);
+        var targetCkTypeGraph = GetAndUpdateTypeGraph(handledTypesHashSet, ckModelGraph, typeAssociation.TargetCkTypeId, operationResult);
         return targetCkTypeGraph;
     }
 

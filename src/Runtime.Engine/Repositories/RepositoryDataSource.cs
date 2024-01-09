@@ -59,6 +59,27 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds, GraphDirections direction)
+    {
+        var associations = new List<RtAssociation>();
+        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
+
+        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
+        {
+            associations.AddRange(queryable.Where(x =>
+                rtIds.Contains(x.TargetRtId)));
+        }
+
+        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
+        {
+            associations.AddRange(queryable.Where(x =>
+                rtIds.Contains(x.OriginRtId)));
+        }
+
+        return associations;
+    }
+
+    /// <inheritdoc />
     public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
         GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {

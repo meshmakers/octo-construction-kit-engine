@@ -41,6 +41,15 @@ public interface IRepositoryDataSource
     /// <param name="direction">Direction of associations to get</param>
     /// <returns></returns>
     Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction);
+    
+    /// <summary>
+    ///     Gets associations for multiple runtime entities.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtIds">Object id of runtime entities</param>
+    /// <param name="direction">Direction of associations to get</param>
+    /// <returns></returns>
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds, GraphDirections direction);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role

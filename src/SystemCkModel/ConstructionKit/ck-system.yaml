@@ -65,7 +65,7 @@ associationRoles:
   inboundName: Parent
   outboundName: Children
   inboundMultiplicity: N
-  outboundMultiplicity: N
+  outboundMultiplicity: One
 - id: Related
   inboundName: RelatesTo
   outboundName: RelatesFrom

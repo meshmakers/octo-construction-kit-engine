@@ -305,6 +305,12 @@
       "number": 51,
       "level": "ERROR",
       "text": "CkAttributeId '{ckAttributeId}' defined at type '{ckTypeId}' not found."
+    },
+    {
+      "key": "CkAttributeIdNotFoundAtRecord",
+      "number": 52,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' defined at record '{ckRecordId}' not found."
     }
   ]
 }

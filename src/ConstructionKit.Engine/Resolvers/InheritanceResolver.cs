@@ -105,8 +105,13 @@ internal class InheritanceResolver : IInheritanceResolver
 
             foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
             {
+                if (!modelGraph.Attributes.TryGetValue(ckTypeAttribute.CkAttributeId, out var attributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtRecord(ckTypeAttribute.CkAttributeId, ckRecordId));
+                    continue;
+                }
                 recordGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
-                    modelGraph.Attributes[ckTypeAttribute.CkAttributeId]));
+                    attributeGraph));
             }
 
             handledRecordHashSet.Add(ckRecordId);

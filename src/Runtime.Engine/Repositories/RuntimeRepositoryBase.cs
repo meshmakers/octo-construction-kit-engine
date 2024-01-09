@@ -110,6 +110,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction).ConfigureAwait(false);
     }
+    
+    /// <inheritdoc />
+    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    {
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtIds, direction).ConfigureAwait(false);
+    }
+
 
     /// <inheritdoc />
     public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,

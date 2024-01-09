@@ -117,6 +117,17 @@ public interface IRuntimeRepository
         GraphDirections direction, CkId<CkAssociationRoleId> roleId);
 
     /// <summary>
+    /// Gets associations for multiple runtime entities of a specific role
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="direction">Direction of associations to get</param>
+    /// <param name="roleId">Association role</param>
+    /// <returns></returns>
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
+
+    /// <summary>
     ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity
     ///     and role
     /// </summary>

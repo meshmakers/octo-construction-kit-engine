@@ -169,7 +169,7 @@ public class CompilerService : ICompilerService
         await _ckSerializer.SerializeAsync(streamWriterAssociations,
             new CkElementsRootDto { AssociationRoles = new List<CkAssociationRoleDto> { ckAssociationRoleDto } }).ConfigureAwait(false);
 
-        if (operationResult.HasErrors)
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
@@ -379,9 +379,8 @@ public class CompilerService : ICompilerService
             types[keyValuePair.Key.Key].IsCollectionRoot = keyValuePair.Value.IsCollectionRoot;
         }
 
-        if (operationResult.HasErrors)
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
-            operationResult.WriteMessagesToLogger(_logger);
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
 

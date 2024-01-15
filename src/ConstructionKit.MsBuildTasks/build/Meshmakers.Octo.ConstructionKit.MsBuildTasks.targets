@@ -34,10 +34,6 @@
             <None Remove="$(CacheFiles)" />
             <AdditionalFiles Include="$(CacheFiles)" />
         </ItemGroup>
-        <Message Importance="High" Text="done ($(ProjectDir))" />
-        <Message Importance="High" Text="done ($(CompiledModelFiles))" />
-        <Message Importance="High" Text="done ($(CacheFiles))" />
-        <Message Importance="High" Text="done ($(OctoCopyCkModelToOuputDirectory))" />
         
         <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="$(CompiledModelFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
         <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="$(CacheFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />

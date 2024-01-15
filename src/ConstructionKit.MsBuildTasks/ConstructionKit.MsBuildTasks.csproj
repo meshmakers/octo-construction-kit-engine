@@ -19,6 +19,8 @@
         <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
         <DebugType>embedded</DebugType>
         <IsPackable>true</IsPackable>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
     <ItemGroup>

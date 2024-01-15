@@ -15,35 +15,35 @@
     </PropertyGroup>
 
     <ItemGroup Condition="'$(Configuration)'!='DebugL'">
-        <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2312.30002"/>
+        <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2401.15001" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(Configuration)'=='DebugL'">
-        <PackageReference Include="Meshmakers.Common.Shared" Version="999.0.0"/>
+        <PackageReference Include="Meshmakers.Common.Shared" Version="999.0.0" />
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="JsonSchema.Net" Version="5.4.3"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0"/>
-        <PackageReference Include="Newtonsoft.Json" Version="13.0.3"/>
-        <PackageReference Include="System.Text.Json" Version="8.0.0"/>
-        <PackageReference Include="YamlDotNet" Version="13.7.1"/>
+        <PackageReference Include="JsonSchema.Net" Version="5.5.0" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+        <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+        <PackageReference Include="System.Text.Json" Version="8.0.1" />
+        <PackageReference Include="YamlDotNet" Version="13.7.1" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="Serialization\Schema\ck-compiled-model.json"/>
+        <None Remove="Serialization\Schema\ck-compiled-model.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-compiled-model.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-associationRole.json"/>
+        <None Remove="Serialization\Schema\ck-element-associationRole.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-element-associationRole.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-attribute.json"/>
+        <None Remove="Serialization\Schema\ck-element-attribute.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-element-attribute.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-type.json"/>
+        <None Remove="Serialization\Schema\ck-element-type.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-element-enum.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
@@ -53,11 +53,11 @@
         <EmbeddedResource Include="Serialization\Schema\ck-element-type.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-elements.json"/>
+        <None Remove="Serialization\Schema\ck-elements.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-elements.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-meta.json"/>
+        <None Remove="Serialization\Schema\ck-meta.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-meta.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
@@ -66,12 +66,12 @@
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>
-            <PackagePath/>
+            <PackagePath />
             <Link>meshmakers64.png</Link>
         </None>
         <None Include="..\..\LICENSE">
             <Pack>True</Pack>
-            <PackagePath/>
+            <PackagePath />
             <Link>LICENSE</Link>
         </None>
     </ItemGroup>

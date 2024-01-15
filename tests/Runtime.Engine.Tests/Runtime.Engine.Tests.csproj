@@ -5,15 +5,20 @@
         <AssemblyName>Meshmakers.Octo.Runtime.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Engine.Tests</RootNamespace>
         <TargetFramework>net8.0</TargetFramework>
-        <OctoCompilerToolPath>../../bin/$(Configuration)/net8.0/octo-ckc</OctoCompilerToolPath>
-        <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
+        <OctoCkCompileTasksFolder>$(MSBuildThisFileDirectory)../../bin/$(Configuration)/tasks/net8.0</OctoCkCompileTasksFolder>
+        <OctoCopyCkModelToOuputDirectory>true</OctoCopyCkModelToOuputDirectory>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
-    <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
+    <ItemGroup>
+        <ConstructionKitFolder Include="sampleData\CkTest\ConstructionKit"/>
+    </ItemGroup>
+
+    <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
-    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"/>
+    <Import Project="../../src/ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.props" />
+    <Import Project="../../src/ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets" />
 
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
@@ -29,27 +34,11 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
     </ItemGroup>
-
-    <ItemGroup>
-        <ConstructionKitFolder Include="sampleData\CkTest\ConstructionKit"/>
-    </ItemGroup>
-
+    
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj"/>
         <ProjectReference Include="..\TestCkModel\TestCkModel.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Remove="**\ConstructionKit\ck-*.yaml"/>
-        <EmbeddedResource Include="sampleData\CkTest\ConstructionKit\ck-*.yaml">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-            <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
-        </EmbeddedResource>
-        <None Remove="**\ConstructionKit\ck-*.cache.json"/>
-        <AdditionalFiles Include="sampleData\CkTest\ConstructionKit\ck-*.cache.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </AdditionalFiles>
     </ItemGroup>
 
     <ItemGroup>

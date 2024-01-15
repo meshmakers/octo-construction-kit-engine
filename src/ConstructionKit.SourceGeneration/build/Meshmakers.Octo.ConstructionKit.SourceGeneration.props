@@ -11,5 +11,4 @@
         <CompilerVisibleProperty Include="OutputPath"/>
         <CompilerVisibleItemMetadata Include="EmbeddedResource" MetadataName="GenerateCkModelServiceClass"/>
     </ItemGroup>
-
 </Project>

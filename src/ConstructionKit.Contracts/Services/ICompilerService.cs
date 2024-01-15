@@ -20,6 +20,6 @@ public interface ICompilerService
     ///     When true, a cache file is created parallel to the compiled construction kit model containing all
     ///     dependencies
     /// </param>
-    /// <returns>The full path of the compiled model file.</returns>
-    Task<string> CompileAsync(string rootPath, bool createCacheFile);
+    /// <returns>An object with files created by compiler.</returns>
+    Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile);
 }

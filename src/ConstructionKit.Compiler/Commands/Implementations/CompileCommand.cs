@@ -48,19 +48,19 @@ internal class CompileCommand : Command<OctoToolOptions>
         var doPublish = CommandArgumentValue.IsArgumentUsed(_publishArg);
         Logger.LogInformation("Path of root directory: {Path}", Path.GetFullPath(rootPath));
 
-        var compiledModelFilePath = await _compilerService.CompileAsync(rootPath, createCacheFile);
+        var compileResult = await _compilerService.CompileAsync(rootPath, createCacheFile);
 
         if (doPublish)
         {
             Logger.LogInformation("Publishing construction kit model to 'LocalRepository'");
             var operationResult = new OperationResult();
-            await using var streamReader = File.OpenRead(compiledModelFilePath);
+            await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 
             var ckCompiledModelRoot =
-                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult);
+                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compileResult.CompiledModelFile, operationResult);
             if (operationResult.HasErrors || operationResult.HasFatalErrors)
             {
-                Logger.LogError("Error loading model \'{FilePath}\'", compiledModelFilePath);
+                Logger.LogError("Error loading model \'{FilePath}\'", compileResult.CompiledModelFile);
                 operationResult.WriteMessagesToLogger(Logger);
                 return;
             }

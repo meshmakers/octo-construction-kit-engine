@@ -176,7 +176,7 @@ public class CompilerService : ICompilerService
     }
 
     /// <inheritdoc />
-    public async Task<string> CompileAsync(string rootPath, bool createCacheFile)
+    public async Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
 
@@ -240,6 +240,12 @@ public class CompilerService : ICompilerService
                                 EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages
                             };
 
+                            if (types.ContainsKey(ckCompiledTypeDto.TypeId))
+                            {
+                                operationResult.AddMessage(MessageCodes.TypeIdNotUnique(ckCompiledTypeDto.TypeId));
+                                operationResult.WriteMessagesToLogger(_logger);
+                                throw new CompilerException(operationResult);
+                            }
                             types.Add(ckCompiledTypeDto.TypeId, ckCompiledTypeDto);
                         }
                     }
@@ -395,10 +401,11 @@ public class CompilerService : ICompilerService
 
         if (createCacheFile)
         {
-            await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, rootPath).ConfigureAwait(false);
+            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, rootPath).ConfigureAwait(false);
+            return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
         }
 
-        return compiledModelFilePath;
+        return new CompileResult(compiledModelFilePath);
     }
 
     private async Task WriteAttributeAsync(string attributesDirectory, string attributeFileName, CkAttributeDto ckAttributeDto)
@@ -412,18 +419,21 @@ public class CompilerService : ICompilerService
             new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } }).ConfigureAwait(false);
     }
 
-    private async Task CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string rootPath)
+    private async Task<string> CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string rootPath)
     {
         var tempTenantId = Guid.NewGuid().ToString();
         _ckCacheService.CreateTenant(tempTenantId);
         _ckCacheService.LoadCkModelGraph(tempTenantId, ckModelGraph);
 
         var compiledModelCacheFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.cache.json";
+        var compiledModelCacheFilePath = Path.Combine(rootPath, compiledModelCacheFile);
 #if NETSTANDARD2_0
-        using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
+        using var streamWriter = new StreamWriter(compiledModelCacheFilePath);
 #else
-        await using var streamWriter = new StreamWriter(Path.Combine(rootPath, compiledModelCacheFile));
+        await using var streamWriter = new StreamWriter(compiledModelCacheFilePath);
 #endif
         await _ckCacheService.SaveCacheAsync(tempTenantId, streamWriter.BaseStream).ConfigureAwait(false);
+
+        return compiledModelCacheFilePath;
     }
 }

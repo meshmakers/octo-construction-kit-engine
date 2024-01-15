@@ -24,4 +24,12 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
     </ItemGroup>
+   
+    <ItemGroup>
+      <None Remove="bin3\ck-sample1.yaml" />
+    </ItemGroup>
+   
+    <ItemGroup>
+      <Folder Include="bin3\" />
+    </ItemGroup>
 </Project>

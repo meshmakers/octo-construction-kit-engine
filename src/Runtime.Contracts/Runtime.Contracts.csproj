@@ -37,4 +37,16 @@
     </ItemGroup>
 
 
+    <ItemGroup>
+      <None Remove="Serialization\Schema\runtime-element-association.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-element-association.json" />
+      <None Remove="Serialization\Schema\runtime-element-attribute.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-element-attribute.json" />
+      <None Remove="Serialization\Schema\runtime-element-entity.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-element-entity.json" />
+      <None Remove="Serialization\Schema\runtime-model.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-model.json" />
+    </ItemGroup>
+
+
 </Project>

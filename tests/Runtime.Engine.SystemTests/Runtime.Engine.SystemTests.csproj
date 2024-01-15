@@ -6,7 +6,7 @@
         <RootNamespace>Meshmakers.Octo.Runtime.Engine.SystemTests</RootNamespace>
         <IsPackable>false</IsPackable>
         <OctoCkCompileTasksFolder>$(MSBuildThisFileDirectory)../../bin/$(Configuration)/tasks/net8.0</OctoCkCompileTasksFolder>
-        <OctoCopyCkModelToOuputDirectory>false</OctoCopyCkModelToOuputDirectory>
+        <OctoCopyCkModelToOuputDirectory>true</OctoCopyCkModelToOuputDirectory>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>

@@ -24,17 +24,23 @@
         </CkCompile>
         
         <ItemGroup>
+            <None Remove="$(CompiledModelFiles)" />
             <EmbeddedResource Include="$(CompiledModelFiles)">
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
         </ItemGroup>
 
         <ItemGroup>
+            <None Remove="$(CacheFiles)" />
             <AdditionalFiles Include="$(CacheFiles)" />
         </ItemGroup>
+        <Message Importance="High" Text="done ($(ProjectDir))" />
+        <Message Importance="High" Text="done ($(CompiledModelFiles))" />
+        <Message Importance="High" Text="done ($(CacheFiles))" />
+        <Message Importance="High" Text="done ($(OctoCopyCkModelToOuputDirectory))" />
         
-        <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="@(CompiledModelFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
-        <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="@(CacheFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+        <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="$(CompiledModelFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+        <Copy Condition="$(OctoCopyCkModelToOuputDirectory)" SourceFiles="$(CacheFiles)" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
     </Target>
 
     <!--The generated file is deleted after a general clean. It will force the regeneration on rebuild-->

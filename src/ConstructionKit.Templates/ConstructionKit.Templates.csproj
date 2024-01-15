@@ -33,6 +33,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Compile Include="Templates\ConstructionKit.CSharp\GlobalUsings.cs" />
         <Content Include="Templates\**\*" Exclude="Templates\**\bin\**;Templates\**\obj\**"/>
         <Compile Remove="**\*"/>
     </ItemGroup>

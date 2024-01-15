@@ -16,5 +16,13 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj"/>
+    </ItemGroup>    
+
+    <ItemGroup>
+      <Folder Include="bin3\" />
+    </ItemGroup>    
+
+    <ItemGroup>
+      <None Remove="bin3\ck-system.testidentity.cache.json" />
     </ItemGroup>
 </Project>

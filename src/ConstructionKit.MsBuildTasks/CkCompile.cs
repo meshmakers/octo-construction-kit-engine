@@ -67,11 +67,18 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                     {
                         var constructionKitFolderPath = constructionKitFolder.GetMetadata("FullPath");
 
-                        var file = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile);
-                        compiledModelFiles.Add(file.CompiledModelFile);
-                        if (file.CompiledModelCacheFilePath != null)
+                        if (!Directory.Exists(constructionKitFolderPath))
                         {
-                            cacheFiles.Add(file.CompiledModelCacheFilePath);
+                            await compilerService.CreateNewAsync(constructionKitFolderPath);
+                        }
+                        else
+                        {
+                            var file = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile);
+                            compiledModelFiles.Add(file.CompiledModelFile);
+                            if (file.CompiledModelCacheFilePath != null)
+                            {
+                                cacheFiles.Add(file.CompiledModelCacheFilePath);
+                            }  
                         }
                     }
 

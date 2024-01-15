@@ -1,0 +1,22 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+    <!--defining properties interesting for my task-->
+    <PropertyGroup>
+        <!--The folder where the custom task will be present. It points to inside the NuGet package. -->
+<!--        <OctoCkCompileTasksFolder Condition="'$(Configuration)' == 'Debug'">$(MSBuildThisFileDirectory)..\bin\Debug\net8.0</OctoCkCompileTasksFolder>-->
+        <OctoCkCompileTasksFolder Condition="'$(OctoCkCompileTasksFolder)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0</OctoCkCompileTasksFolder>
+        <!--Reference to the assembly which contains the MSBuild Task-->
+        <OctoCkCompileTasksAssembly>$(OctoCkCompileTasksFolder)\$(MSBuildThisFileName).dll</OctoCkCompileTasksAssembly>
+    </PropertyGroup>
+
+    <!--Register our custom task-->
+    <UsingTask TaskName="$(MSBuildThisFileName).CkCompile" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
+
+    <!--Task parameters default values, this can be overridden-->
+    <PropertyGroup>
+        <OctoSkipCkCompile Condition="'$(OctoSkipCkCompile)' == ''">false</OctoSkipCkCompile>
+        <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
+        <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
+        <OctoCopyCkModelToOuputDirectory Condition="'$(OctoCopyCkModelToOuputDirectory)' == ''">false</OctoCopyCkModelToOuputDirectory>
+    </PropertyGroup>
+</Project>

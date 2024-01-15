@@ -24,6 +24,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sample.SourceGenerator", "s
 	ProjectSection(ProjectDependencies) = postProject
 		{36ABE0A9-6063-4FEC-A815-29763BC98003} = {36ABE0A9-6063-4FEC-A815-29763BC98003}
 		{33867532-FEE1-4C19-9E2B-3929B9C78624} = {33867532-FEE1-4C19-9E2B-3929B9C78624}
+		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B} = {26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine", "src\Runtime.Engine\Runtime.Engine.csproj", "{4E8C4C30-8159-4E0C-A7F9-C98DCCACDDEC}"
@@ -33,10 +34,21 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine.Tests", "tests\Runtime.Engine.Tests\Runtime.Engine.Tests.csproj", "{743BA1D9-05CB-437E-8875-81F9B558912F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine.SystemTests", "tests\Runtime.Engine.SystemTests\Runtime.Engine.SystemTests.csproj", "{38685911-32E7-43F0-A224-812773868E7F}"
+	ProjectSection(ProjectDependencies) = postProject
+		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B} = {26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestCkModel", "tests\TestCkModel\TestCkModel.csproj", "{216D03C8-D927-4B22-A844-004D8FA78D2D}"
+	ProjectSection(ProjectDependencies) = postProject
+		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B} = {26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemCkModel", "src\SystemCkModel\SystemCkModel.csproj", "{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}"
+	ProjectSection(ProjectDependencies) = postProject
+		{36ABE0A9-6063-4FEC-A815-29763BC98003} = {36ABE0A9-6063-4FEC-A815-29763BC98003}
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.MsBuildTasks", "src\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj", "{85951102-406E-47A9-9E38-37E4B7E66BA8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -129,6 +141,12 @@ Global
 		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}.DebugL|Any CPU.ActiveCfg = DebugL|Any CPU
 		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B}.DebugL|Any CPU.Build.0 = DebugL|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.DebugL|Any CPU.ActiveCfg = Debug|Any CPU
+		{85951102-406E-47A9-9E38-37E4B7E66BA8}.DebugL|Any CPU.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{E4B6B8A8-01FD-43AB-8127-93D4EF599746} = {EDFCC05C-B86D-435F-9593-21846D5530D0}
@@ -145,5 +163,6 @@ Global
 		{38685911-32E7-43F0-A224-812773868E7F} = {8BC26415-C7AE-4140-AB3A-3B4AB3EE60E3}
 		{216D03C8-D927-4B22-A844-004D8FA78D2D} = {8BC26415-C7AE-4140-AB3A-3B4AB3EE60E3}
 		{26E2E81C-2BFE-4AEF-9F1B-D56B25C6E04B} = {EDFCC05C-B86D-435F-9593-21846D5530D0}
+		{85951102-406E-47A9-9E38-37E4B7E66BA8} = {EDFCC05C-B86D-435F-9593-21846D5530D0}
 	EndGlobalSection
 EndGlobal

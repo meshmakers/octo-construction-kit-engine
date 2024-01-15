@@ -42,10 +42,6 @@
             <PackagePath/>
             <Link>LICENSE</Link>
         </None>
-        <None Include="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.targets">
-            <Pack>true</Pack>
-            <PackagePath>build</PackagePath>
-        </None>
         <None Include="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.props">
             <Pack>true</Pack>
             <PackagePath>build</PackagePath>

@@ -3,27 +3,18 @@
         <TargetFramework>net8.0</TargetFramework>
         <AssemblyName>TestCkModel</AssemblyName>
         <RootNamespace>TestCkModel</RootNamespace>
-        <OctoCompilerToolPath>../../bin/$(Configuration)/net8.0/octo-ckc</OctoCompilerToolPath>
-        <OctoSkipCkCompile Condition="'$(Configuration)'=='Release'">true</OctoSkipCkCompile>
+        <OctoCkCompileTasksFolder>$(MSBuildThisFileDirectory)../../bin/$(Configuration)/tasks/net8.0</OctoCkCompileTasksFolder>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
 
-    <!-- Import the ConstructionKit.SourceGeneration props and targets only because the package is not used as nuget package -->
+    <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
-    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.targets"/>
+    <Import Project="../../src/ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.props" />
+    <Import Project="../../src/ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets" />    
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj"/>
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Remove="ConstructionKit\ck-*.yaml"/>
-        <EmbeddedResource Include="ConstructionKit\ck-*.yaml">
-            <GenerateCkModelServiceClass>true</GenerateCkModelServiceClass>
-        </EmbeddedResource>
-        <None Remove="ConstructionKit\ck-*.cache.json"/>
-        <AdditionalFiles Include="ConstructionKit\ck-*.cache.json"/>
     </ItemGroup>
 </Project>

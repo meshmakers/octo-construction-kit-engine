@@ -17,5 +17,6 @@
         <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoCopyCkModelToOuputDirectory Condition="'$(OctoCopyCkModelToOuputDirectory)' == ''">false</OctoCopyCkModelToOuputDirectory>
+        <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">true</OctoPublishCkModel>
     </PropertyGroup>
 </Project>

@@ -13,7 +13,7 @@
 
     <!--Task parameters default values, this can be overridden-->
     <PropertyGroup>
-        <OctoSkipCkCompile Condition="'$(OctoSkipCkCompile)' == ''">false</OctoSkipCkCompile>
+        <OctoCompileCkModel Condition="'$(OctoCompileCkModel)' == ''">true</OctoCompileCkModel>
         <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoCopyCkModelToOuputDirectory Condition="'$(OctoCopyCkModelToOuputDirectory)' == ''">false</OctoCopyCkModelToOuputDirectory>

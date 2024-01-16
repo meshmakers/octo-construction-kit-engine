@@ -5,6 +5,9 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+// ReSharper disable UnusedAutoPropertyAccessor.Global
+// ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
+// ReSharper disable MemberCanBePrivate.Global
 
 namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 
@@ -33,6 +36,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public ITaskItem[] ConstructionKitFolders { get; set; } = null!;
+    
+    /// <summary>
+    /// When true, the construction kit folder is compiled
+    /// </summary>
+    [Required]
+    public bool Compile { get; set; } = false;
 
     /// <summary>
     /// When true, a cache file is created parallel to the compiled construction kit model containing all dependencies
@@ -78,16 +87,32 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                         if (!Directory.Exists(constructionKitFolderPath))
                         {
+                            Log.LogMessage(MessageImportance.High, "Creating new construction kit model in '{0}'", constructionKitFolderPath);
                             await compilerService.CreateNewAsync(constructionKitFolderPath);
                         }
                         else
                         {
-                            var compileResult = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile);
-                            compiledModelFiles.Add(compileResult.CompiledModelFile);
-                            if (compileResult.CompiledModelCacheFilePath != null)
+                            CompileResult? compileResult;
+                            if (Compile)
                             {
-                                cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
+                                Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'", constructionKitFolderPath);
+                                compileResult = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile);
+                                compiledModelFiles.Add(compileResult.CompiledModelFile);
+                                if (compileResult.CompiledModelCacheFilePath != null)
+                                {
+                                    cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
+                                }
                             }
+                            else 
+                            {
+                                Log.LogMessage(MessageImportance.High, "Getting information about construction kit model in '{0}'", constructionKitFolderPath);
+                                compileResult = await compilerService.GetConstructionKitFolderInfoAsync(constructionKitFolderPath, CreateCacheFile);
+                                compiledModelFiles.Add(compileResult.CompiledModelFile);
+                                if (compileResult.CompiledModelCacheFilePath != null)
+                                {
+                                    cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
+                                }
+                            }  
                             
                             if (PublishCkModel)
                             {
@@ -106,7 +131,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                                 await ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot, true);
                                 Log.LogMessage(MessageImportance.High,"Construction kit model published to 'LocalRepository'");
-                            }
+                            } 
                         }
                     }
 

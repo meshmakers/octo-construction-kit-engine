@@ -8,17 +8,20 @@
     <Target Name="GatherConstructionKitFiles">
         <ItemGroup>
             <ConstructionKitFolderInputFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" Exclude="@(ConstructionKitFolder->'%(Identity)/**/ckModel.yaml')" />
-            <ConstructionKitFolderOutFiles Include="@(ConstructionKitFolder->'%(Identity)/*.yaml');@(ConstructionKitFolder->'%(Identity)/*.json')" Exclude="@(ConstructionKitFolder->'%(Identity)/ckModel.yaml')" />
+            <ConstructionKitFolderOutFiles Include="@(ConstructionKitFolder->'%(Identity)/*.yaml');@(ConstructionKitFolder->'%(Identity)/*.cache.json')" Exclude="@(ConstructionKitFolder->'%(Identity)/ckModel.yaml')" />
         </ItemGroup>
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
     <Target Name="CkBeforeCompile" BeforeTargets="BeforeCompile" Inputs="@(ConstructionKitFolderInputFiles)" Outputs="@(ConstructionKitFolderOutFiles)"
-            DependsOnTargets="GatherConstructionKitFiles" Condition="'$(OctoSkipCkCompile)' != 'true'">
+            DependsOnTargets="GatherConstructionKitFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
         <!--Calling our custom task-->
-        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" CreateCacheFile="$(OctoCreateCacheFile)" PublishCkModel="$(OctoPublishCkModel)">
+        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" 
+                   CreateCacheFile="$(OctoCreateCacheFile)"
+                   Compile="$(OctoCompileCkModel)"
+                   PublishCkModel="$(OctoPublishCkModel)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
         </CkCompile>

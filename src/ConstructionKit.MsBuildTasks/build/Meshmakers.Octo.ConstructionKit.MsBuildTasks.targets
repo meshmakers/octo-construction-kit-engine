@@ -18,7 +18,7 @@
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
         <!--Calling our custom task-->
-        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" CreateCacheFile="$(OctoCreateCacheFile)">
+        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" CreateCacheFile="$(OctoCreateCacheFile)" PublishCkModel="$(OctoPublishCkModel)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
         </CkCompile>

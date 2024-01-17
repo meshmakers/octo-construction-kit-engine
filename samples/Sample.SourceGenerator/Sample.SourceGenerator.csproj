@@ -28,8 +28,4 @@
     <ItemGroup>
       <None Remove="bin3\ck-sample1.yaml" />
     </ItemGroup>
-   
-    <ItemGroup>
-      <Folder Include="bin3\" />
-    </ItemGroup>
 </Project>

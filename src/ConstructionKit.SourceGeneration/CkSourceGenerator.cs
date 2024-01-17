@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 [Generator]
-public class CkSourceGenerator : IIncrementalGeneratorCkYamlSerializer
+public class CkSourceGenerator : IIncrementalGenerator
 {
     private readonly ServiceProvider _serviceProvider;
 

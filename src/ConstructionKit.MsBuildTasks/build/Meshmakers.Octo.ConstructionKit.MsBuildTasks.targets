@@ -13,7 +13,7 @@
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
-    <Target Name="CkBeforeCompile" BeforeTargets="BeforeCompile" Inputs="@(ConstructionKitFolderInputFiles)" Outputs="@(ConstructionKitFolderOutFiles)"
+    <Target Name="CkBeforeCompile" BeforeTargets="ResolveReferences" Inputs="@(ConstructionKitFolderInputFiles)" Outputs="@(ConstructionKitFolderOutFiles)"
             DependsOnTargets="GatherConstructionKitFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />

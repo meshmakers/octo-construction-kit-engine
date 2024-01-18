@@ -16,8 +16,8 @@
     </PropertyGroup>
 
     <ItemGroup Condition="'$(Configuration)'!='DebugL'">
-        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2401.15001" />
-        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2401.15001" />
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="4.0.2401.17001" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="4.0.2401.17001" />
     </ItemGroup>
 
     <ItemGroup Condition="'$(Configuration)'=='DebugL'">

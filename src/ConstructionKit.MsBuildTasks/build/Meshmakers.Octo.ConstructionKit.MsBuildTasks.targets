@@ -2,10 +2,13 @@
     
     <!--Defining all the text files input parameters-->
     <ItemGroup>
-        <ConstructionKitFolder Condition="Exists(ConstructionKit)" Include="ConstructionKit"/>
+        <ConstructionKitFolder Condition="Exists(ConstructionKit) And !Exists('@(ConstructionKitFolder)')" Include="ConstructionKit"/>
     </ItemGroup>
 
     <Target Name="GatherConstructionKitFiles">
+        <ItemGroup>
+            <ConstructionKitFolder Condition="!Exists('@(ConstructionKitFolder)')" Include="ConstructionKit" />
+        </ItemGroup>
         <ItemGroup>
             <ConstructionKitFolderInputFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" Exclude="@(ConstructionKitFolder->'%(Identity)/**/ckModel.yaml')" />
             <ConstructionKitFolderOutFiles Include="@(ConstructionKitFolder->'%(Identity)/*.yaml');@(ConstructionKitFolder->'%(Identity)/*.cache.json')" Exclude="@(ConstructionKitFolder->'%(Identity)/ckModel.yaml')" />

@@ -58,5 +58,10 @@ public enum FieldFilterOperator
     /// <summary>
     ///     Arrays: Any element equals
     /// </summary>
-    AnyEq = 10
+    AnyEq = 10,
+    
+    /// <summary>
+    /// Matches documents that contain an array field with at least one element that matches all the specified query criteria.
+    /// </summary>
+    Match = 11
 }

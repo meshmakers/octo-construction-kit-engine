@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     Describes a construction kit record that is used as structured type of an attribute
 /// </summary>
 [DebuggerDisplay("{" + nameof(RecordId) + "}")]
-public class CkRecordDto
+public class CkRecordDto : CkTypeWithAttributesDto
 {
     /// <summary>
     ///     Gets or sets the construction kit id
@@ -38,10 +38,4 @@ public class CkRecordDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsAbstract { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a list of attributes
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkTypeAttributeDto>? Attributes { get; set; }
 }

@@ -6,17 +6,17 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 public class CkModelException : Exception
 {
     /// <inheritdoc />
-    public CkModelException()
+    protected CkModelException()
     {
     }
 
     /// <inheritdoc />
-    public CkModelException(string message) : base(message)
+    protected CkModelException(string message) : base(message)
     {
     }
 
     /// <inheritdoc />
-    public CkModelException(string message, Exception inner) : base(message, inner)
+    protected CkModelException(string message, Exception inner) : base(message, inner)
     {
     }
 }

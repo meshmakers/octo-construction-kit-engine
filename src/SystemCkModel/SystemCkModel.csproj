@@ -9,7 +9,7 @@
         <OctoCkCompileTasksFolder>$(MSBuildThisFileDirectory)../../bin/$(Configuration)/tasks/net8.0</OctoCkCompileTasksFolder>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
         <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
     </PropertyGroup>
 

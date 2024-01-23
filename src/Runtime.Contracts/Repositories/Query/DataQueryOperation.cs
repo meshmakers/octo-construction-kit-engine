@@ -3,7 +3,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 /// <summary>
 ///     Represents a data query operation.
 /// </summary>
-public class DataQueryOperation
+public class DataQueryOperation : FieldFilterCriteria
 {
     /// <summary>
     ///     Constructor
@@ -29,11 +29,6 @@ public class DataQueryOperation
     ///     Represents text search function for specific attributes.
     /// </summary>
     public AttributeSearchFilter? AttributeSearchFilter { get; private set; }
-
-    /// <summary>
-    ///     Represents field filters for specific attributes with different comparison operators.
-    /// </summary>
-    public ICollection<FieldFilter>? FieldFilters { get; private set; }
 
     /// <summary>
     ///     Represents field group by for specific attributes.
@@ -63,21 +58,6 @@ public class DataQueryOperation
     public DataQueryOperation UseLanguage(string language)
     {
         Language = language;
-        return this;
-    }
-
-    /// <summary>
-    ///     Adds a field filter to the query.
-    /// </summary>
-    /// <param name="attributeName">Name of attribute</param>
-    /// <param name="comparisonOperator">Operator of attribute</param>
-    /// <param name="comparisonValue">Comparison value of the field filter</param>
-    public DataQueryOperation FieldFilter(string attributeName, FieldFilterOperator comparisonOperator, object? comparisonValue)
-    {
-        FieldFilters ??= new List<FieldFilter>();
-
-        FieldFilters.Add(new FieldFilter(attributeName, comparisonOperator, comparisonValue));
-
         return this;
     }
 

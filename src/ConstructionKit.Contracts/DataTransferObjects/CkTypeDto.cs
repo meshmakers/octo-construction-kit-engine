@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     Defines a CK type.
 /// </summary>
 [DebuggerDisplay("{" + nameof(TypeId) + "}")]
-public class CkTypeDto
+public class CkTypeDto : CkTypeWithAttributesDto
 {
     /// <summary>
     ///     Gets or sets the construction kit id
@@ -38,12 +38,6 @@ public class CkTypeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsAbstract { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a list of attributes
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkTypeAttributeDto>? Attributes { get; set; }
 
     /// <summary>
     ///     Gets or sets a list of indexes

@@ -83,11 +83,11 @@ stages:
           PublishSymbols: false
           SymbolServerType: TeamServices
       - task: CopyFiles@2
-        displayName: 'Copy Files from $(Build.SourcesDirectory)/bin/$(BuildConfiguration)/**/*.nupkg to $(build.artifactstagingdirectory)'
+        displayName: 'Copy Files from **/*.nupkg to $(build.artifactstagingdirectory)'
         inputs:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
-            bin/$(BuildConfiguration)/**/*.nupkg
+            **/*.nupkg
           TargetFolder: $(build.artifactstagingdirectory)
       - task: PowerShell@2
         displayName: 'Create versioninfo file'

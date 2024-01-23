@@ -162,8 +162,11 @@ public class CkSourceGenerator : IIncrementalGenerator
         generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace, ckCompiledModelRoot.ModelId);
         context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
 
-        generatedCode = CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId);
+        generatedCode = CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Types != null);
         context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
+
+        generatedCode = CkClassMapGenerator.Instance.Generate(ns, ckCompiledModelRoot.Types, ckCompiledModelRoot.Records, ckCompiledModelRoot.ModelId);
+        context.AddSource($"{ns}.Common.CkTypeMap.g.cs", generatedCode);
     }
 
     private static void ReportOperationResults(SourceProductionContext context, OperationResult operationResult)

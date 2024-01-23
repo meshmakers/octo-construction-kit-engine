@@ -12,24 +12,23 @@
         <AssemblyName>Meshmakers.Octo.ConstructionKit.SourceGeneration</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.SourceGeneration</RootNamespace>
         <IsRoslynComponent>true</IsRoslynComponent>
-        <NoWarn>NU5128</NoWarn>
+        <NoWarn>$(NoWarn);NU5100;NU5128</NoWarn>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" PrivateAssets="all"/>
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" PrivateAssets="all"/>
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all"/>
 
         <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
         <None Include="$(OutputPath)\Meshmakers.Octo.ConstructionKit.Engine.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
         <None Include="$(OutputPath)\Meshmakers.Octo.ConstructionKit.Contracts.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false"/>
     </ItemGroup>
-
 
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
@@ -48,6 +47,50 @@
         </None>
     </ItemGroup>
 
+<!--    <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">-->
+<!--        <ItemGroup>-->
+<!--            &lt;!&ndash; The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences &ndash;&gt;-->
+<!--            <BuildOutputInPackage-->
+<!--                    Include="@(ReferenceCopyLocalPaths)"-->
+<!--                    TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />-->
+<!--        </ItemGroup>-->
+<!--    </Target>-->
+
+<!--    &lt;!&ndash; This target adds the generated deps.json file to our package output &ndash;&gt;-->
+<!--    <Target Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"-->
+<!--            BeforeTargets="BuiltProjectOutputGroup"-->
+<!--            Condition=" '$(GenerateDependencyFile)' == 'true'">-->
+
+<!--        <ItemGroup>-->
+<!--            <BuiltProjectOutputGroupOutput-->
+<!--                    Include="$(ProjectDepsFilePath)"-->
+<!--                    TargetPath="$(ProjectDepsFileName)"-->
+<!--                    FinalOutputPath="$(ProjectDepsFilePath)" />-->
+<!--        </ItemGroup>-->
+<!--    </Target>-->
+<!--    -->
+
+    <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
+        <ItemGroup>
+            <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->
+            <BuildOutputInPackage
+                    Include="@(ReferenceCopyLocalPaths)"
+                    TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />
+        </ItemGroup>
+    </Target>
+
+    <!-- This target adds the generated deps.json file to our package output -->
+    <Target Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"
+            BeforeTargets="BuiltProjectOutputGroup"
+            Condition=" '$(GenerateDependencyFile)' == 'true'">
+        <ItemGroup>
+            <BuiltProjectOutputGroupOutput
+                    Include="$(ProjectDepsFilePath)"
+                    TargetPath="$(ProjectDepsFileName)"
+                    FinalOutputPath="$(ProjectDepsFilePath)" />
+        </ItemGroup>
+    </Target>
+
     <PropertyGroup>
         <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
     </PropertyGroup>
@@ -56,8 +99,7 @@
         <ItemGroup>
             <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false"/>
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false"/>
-            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" PackagePath="analyzers/dotnet/cs"/>
+            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" CopyToOutputDirectory="PreserveNewest" PackagePath="analyzers/dotnet/cs" />
         </ItemGroup>
     </Target>
-
 </Project>

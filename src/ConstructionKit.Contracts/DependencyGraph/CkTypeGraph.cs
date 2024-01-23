@@ -12,10 +12,8 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 ///     Represents a construction kit type in the dependency graph
 /// </summary>
 [DebuggerDisplay("CkTypeId = {CkTypeId}")]
-public class CkTypeGraph
+public class CkTypeGraph : CkTypeWithAttributesGraph
 {
-    private readonly Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> _allAttributes;
-    private readonly Dictionary<string, CkTypeAttributeGraph> _allAttributesByName;
     private readonly List<CkGraphTypeInheritance> _baseTypes;
     private readonly List<CkGraphTypeInheritance> _derivedTypes;
     private readonly List<CkTypeIndexDto> _indexes;
@@ -26,6 +24,7 @@ public class CkTypeGraph
     /// <param name="ckTypeId"></param>
     /// <param name="ckTypeDto"></param>
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, CkCompiledTypeDto ckTypeDto)
+        : base(ckTypeDto)
     {
         CkTypeId = ckTypeId;
         IsAbstract = ckTypeDto.IsAbstract;
@@ -34,14 +33,9 @@ public class CkTypeGraph
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         _baseTypes = new List<CkGraphTypeInheritance>();
         _derivedTypes = new List<CkGraphTypeInheritance>();
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
-        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>();
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = new CkGraphDirectedAssociations(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
-        DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeDto.Attributes ?? new List<CkTypeAttributeDto>());
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
-        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
         _indexes = new List<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
         Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
     }
@@ -70,6 +64,7 @@ public class CkTypeGraph
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
         IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations)
+        : base(definedAttributes, allAttributes)
     {
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
@@ -80,16 +75,9 @@ public class CkTypeGraph
 
         _baseTypes = new List<CkGraphTypeInheritance>(baseTypes);
         _derivedTypes = new List<CkGraphTypeInheritance>(derivedTypes);
-        _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(allAttributes
-            .ToDictionary(k => k.Key, v => v.Value));
-        _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>(allAttributes
-            .ToDictionary(k => k.Value.AttributeName, v => v.Value));
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
         Associations = associations;
-        DefinedAttributes = new List<CkTypeAttributeDto>(definedAttributes);
-        AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
-        AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
         _indexes = new List<CkTypeIndexDto>(indexes);
         Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
     }
@@ -147,22 +135,6 @@ public class CkTypeGraph
     public IReadOnlyCollection<CkTypeIndexDto> Indexes { get; set; }
 
     /// <summary>
-    ///     Gets or sets a list of attributes that are defined by the current type
-    /// </summary>
-    public IReadOnlyCollection<CkTypeAttributeDto> DefinedAttributes { get; }
-
-    /// <summary>
-    ///     Gets or sets a list of attributes including inherited ones.
-    /// </summary>
-    public IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> AllAttributes { get; }
-
-    /// <summary>
-    ///     Gets or sets a list of attributes including inherited ones.
-    /// </summary>
-    [JsonIgnore]
-    public IReadOnlyDictionary<string, CkTypeAttributeGraph> AllAttributesByName { get; }
-
-    /// <summary>
     ///     Returns a string that describes the inheritance chain
     /// </summary>
     [JsonIgnore]
@@ -202,23 +174,6 @@ public class CkTypeGraph
     internal void AddDerivedTypes(CkGraphTypeInheritance ckGraphTypeInheritance)
     {
         _derivedTypes.Add(ckGraphTypeInheritance);
-    }
-
-    /// <summary>
-    ///     Adds a attribute to the current type
-    /// </summary>
-    /// <param name="ckTypeAttributeGraph"></param>
-    internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)
-    {
-        // ReSharper disable once CanSimplifyDictionaryLookupWithTryAdd
-        if (_allAttributes.ContainsKey(ckTypeAttributeGraph.CkAttributeId))
-        {
-            return false;
-        }
-
-        _allAttributes.Add(ckTypeAttributeGraph.CkAttributeId, ckTypeAttributeGraph);
-        _allAttributesByName[ckTypeAttributeGraph.AttributeName] = ckTypeAttributeGraph;
-        return true;
     }
 
     /// <summary>

@@ -85,6 +85,7 @@ internal static class Program
         services.AddTransient<ICommand, CompileCommand>();
         services.AddTransient<ICommand, GetReposCommand>();
         services.AddTransient<ICommand, PublishCommand>();
+        services.AddTransient<ICommand, FindCommand>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

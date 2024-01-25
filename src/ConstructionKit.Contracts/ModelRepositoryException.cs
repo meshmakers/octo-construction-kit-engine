@@ -61,4 +61,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Model repository '{repositoryName}' does not support source identifier.");
     }
+
+    internal static Exception DownloadError(CkModelId modelId, string repositoryName)
+    {
+        return new ModelRepositoryException($"Error downloading model '{modelId}' from repository '{repositoryName}'.");
+    }
 }

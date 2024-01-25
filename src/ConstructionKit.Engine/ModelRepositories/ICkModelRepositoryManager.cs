@@ -23,7 +23,7 @@ internal interface ICkModelRepositoryManager
     ///     Returns a list of known construction kit model repositories
     /// </summary>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
-    /// <returns></returns>
+    /// <returns>Returns a tuple with name and description of repository</returns>
     IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null);
 
     /// <summary>

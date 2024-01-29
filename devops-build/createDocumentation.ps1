@@ -1,5 +1,7 @@
 param ($configuration = "DebugL")
 
+dotnet tool install --global MMXMLDoc2Markdown --version 3.1.4
+
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $baseBinPath = Resolve-Path(Join-Path $modulePath "../bin/$configuration/net8.0")
 $baseDocsPath = Resolve-Path(Join-Path $modulePath "../docs")

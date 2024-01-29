@@ -295,6 +295,7 @@ internal class InheritanceResolver : IInheritanceResolver
                 // Ensure that we don't handle the same inheritance twice
                 var tuple = new Tuple<CkId<CkTypeId>, CkId<CkTypeId>>(baseGraphType.CkTypeId,
                     inheritedGraphType.CkTypeId);
+                // ReSharper disable once CanSimplifySetAddingWithSingleCall
                 if (handledInheritanceHashSet.Contains(tuple))
                 {
                     continue;
@@ -342,9 +343,9 @@ internal class InheritanceResolver : IInheritanceResolver
 
         var i = 0;
         CkId<CkTypeId>? currentCkTypeId = ckTypeId;
-        CkId<CkTypeId>? lastCkTypeId = ckTypeId;
+        CkId<CkTypeId> lastCkTypeId = ckTypeId;
         while (currentCkTypeId != null &&
-               modelGraph.Types.TryGetValue(currentCkTypeId.Value, out var currentCkType))
+               modelGraph.Types.TryGetValue(currentCkTypeId, out var currentCkType))
         {
             var baseCkTypeId = currentCkType.DerivedFromCkTypeId;
 
@@ -352,14 +353,14 @@ internal class InheritanceResolver : IInheritanceResolver
             {
                 if (currentCkType.IsFinal)
                 {
-                    operationResult.AddMessage(MessageCodes.DerivedFromCkTypeIdThatIsFinal(currentCkTypeId.Value, lastCkTypeId.Value));
-                    throw ModelValidationException.DerivedFromCkTypeIdThatIsFinal(currentCkTypeId.Value, lastCkTypeId.Value);
+                    operationResult.AddMessage(MessageCodes.DerivedFromCkTypeIdThatIsFinal(currentCkTypeId, lastCkTypeId));
+                    throw ModelValidationException.DerivedFromCkTypeIdThatIsFinal(currentCkTypeId, lastCkTypeId);
                 }
             }
 
-            if (baseCkTypeId.HasValue)
+            if (baseCkTypeId != null)
             {
-                ckTypeIds.Add(new CkGraphTypeInheritance(currentCkTypeId.Value, baseCkTypeId.Value, i++));
+                ckTypeIds.Add(new CkGraphTypeInheritance(currentCkTypeId, baseCkTypeId, i++));
             }
 
             lastCkTypeId = currentCkTypeId;
@@ -368,8 +369,8 @@ internal class InheritanceResolver : IInheritanceResolver
 
         if (currentCkTypeId != null)
         {
-            operationResult.AddMessage(MessageCodes.UnknownCkTypeIdForInheritance(currentCkTypeId.Value));
-            throw ModelValidationException.UnknownCkTypeIdForInheritance(currentCkTypeId.Value);
+            operationResult.AddMessage(MessageCodes.UnknownCkTypeIdForInheritance(currentCkTypeId));
+            throw ModelValidationException.UnknownCkTypeIdForInheritance(currentCkTypeId);
         }
 
         if (!ckTypeIds.Any())
@@ -393,9 +394,9 @@ internal class InheritanceResolver : IInheritanceResolver
 
         var i = 0;
         CkId<CkRecordId>? currentCkRecordId = ckRecordId;
-        CkId<CkRecordId>? lastCkRecordId = ckRecordId;
+        CkId<CkRecordId> lastCkRecordId = ckRecordId;
         while (currentCkRecordId != null &&
-               modelGraph.Records.TryGetValue(currentCkRecordId.Value, out var currentCkType))
+               modelGraph.Records.TryGetValue(currentCkRecordId, out var currentCkType))
         {
             var baseCkRecordId = currentCkType.DerivedFromCkRecordId;
 
@@ -404,14 +405,14 @@ internal class InheritanceResolver : IInheritanceResolver
                 if (currentCkType.IsFinal)
                 {
                     operationResult.AddMessage(
-                        MessageCodes.DerivedFromCkRecordIdThatIsFinal(currentCkRecordId.Value, lastCkRecordId.Value));
-                    throw ModelValidationException.DerivedFromCkRecordIdThatIsFinal(currentCkRecordId.Value, lastCkRecordId.Value);
+                        MessageCodes.DerivedFromCkRecordIdThatIsFinal(currentCkRecordId, lastCkRecordId));
+                    throw ModelValidationException.DerivedFromCkRecordIdThatIsFinal(currentCkRecordId, lastCkRecordId);
                 }
             }
 
-            if (baseCkRecordId.HasValue)
+            if (baseCkRecordId != null)
             {
-                ckRecordIds.Add(new CkGraphRecordInheritance(currentCkRecordId.Value, baseCkRecordId.Value, i++));
+                ckRecordIds.Add(new CkGraphRecordInheritance(currentCkRecordId, baseCkRecordId, i++));
             }
 
             lastCkRecordId = currentCkRecordId;
@@ -420,8 +421,8 @@ internal class InheritanceResolver : IInheritanceResolver
 
         if (currentCkRecordId != null)
         {
-            operationResult.AddMessage(MessageCodes.UnknownCkRecordIdForInheritance(currentCkRecordId.Value));
-            throw ModelValidationException.UnknownCkRecordIdForInheritance(currentCkRecordId.Value);
+            operationResult.AddMessage(MessageCodes.UnknownCkRecordIdForInheritance(currentCkRecordId));
+            throw ModelValidationException.UnknownCkRecordIdForInheritance(currentCkRecordId);
         }
 
         return ckRecordIds;

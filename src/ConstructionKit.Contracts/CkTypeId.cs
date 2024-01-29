@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(TypeId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkTypeIdConverter))]
-public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, ICkKey
+public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
 {
     /// <summary>
     ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="typeId" />.
@@ -27,7 +27,7 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
         else
         {
             TypeId = typeId.Substring(0, typeIndex);
-            Version = typeId.Substring(typeIndex + 1);
+            Version = new CkVersion(typeId.Substring(typeIndex + 1));
         }
 
         if (string.IsNullOrWhiteSpace(TypeId))
@@ -35,23 +35,7 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
             throw new ArgumentOutOfRangeException(nameof(typeId), typeId, $"{nameof(typeId)} must contain a type id");
         }
     }
-
-    /// <summary>
-    ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="typeId" /> and <paramref name="version" />.
-    /// </summary>
-    /// <param name="typeId"></param>
-    /// <param name="version"></param>
-    /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkTypeId(string typeId, string version = "1.0.0")
-    {
-        TypeId = typeId;
-        Version = version;
-        if (string.IsNullOrWhiteSpace(TypeId))
-        {
-            throw new ArgumentOutOfRangeException(nameof(typeId), typeId, $"{nameof(typeId)} must contain a type id");
-        }
-    }
-
+    
     /// <summary>
     ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="value" />.
     /// </summary>
@@ -100,8 +84,13 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
 
 
     /// <inheritdoc />
-    public int CompareTo(CkTypeId other)
+    public int CompareTo(CkTypeId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
+        
         var result = string.Compare(TypeId, other.TypeId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -112,9 +101,9 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
     }
 
     /// <inheritdoc />
-    public bool Equals(CkTypeId other)
+    public bool Equals(CkTypeId? other)
     {
-        return TypeId == other.TypeId && Equals(Version, other.Version);
+        return other is not null && TypeId == other.TypeId && Version.IsCompatible(other.Version);
     }
 
     /// <inheritdoc />
@@ -242,19 +231,6 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-    {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkTypeId)obj;
-
-        return TypeId == other.TypeId && Version == other.Version;
-    }
-
-    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -264,27 +240,5 @@ public readonly struct CkTypeId : IComparable<CkTypeId>, IEquatable<CkTypeId>, I
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkTypeId" /> instances for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkTypeId p1, CkTypeId p2)
-    {
-        return p1.Equals(p2);
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkTypeId" />s for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkTypeId p1, CkTypeId p2)
-    {
-        return !p1.Equals(p2);
     }
 }

@@ -8,11 +8,11 @@ types:
       - id: System/Name
         name: Name
 
-      - id: System.TestIdentity/RoleId
+      - id: ${{ thisModel }}/RoleId
         name: RoleId
 
-      - id: System.TestIdentity/SubjectIds
+      - id: ${{ thisModel }}/SubjectIds
         name: SubjectIds
 
-      - id: System.TestIdentity/IdentityRoleIds
+      - id: ${{ thisModel }}/IdentityRoleIds
         name: IdentityRoleIds

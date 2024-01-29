@@ -73,6 +73,26 @@ public readonly struct CkVersion : IComparable<CkVersion>, IEquatable<CkVersion>
 
         return 0;
     }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public bool IsCompatible(CkVersion other)
+    {
+        if (Major != other.Major)
+        {
+            return false;
+        }
+        
+        if (Minor < other.Minor)
+        {
+            return false;
+        }
+        
+        return Revision >= other.Revision;
+    }
 
     /// <inheritdoc />
     public bool Equals(CkVersion other)
@@ -92,14 +112,7 @@ public readonly struct CkVersion : IComparable<CkVersion>, IEquatable<CkVersion>
     /// <inheritdoc />
     public override bool Equals(object? obj)
     {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkVersion)obj;
-
-        return Major == other.Major && Minor == other.Minor && Revision == other.Revision;
+        return obj is CkVersion other && Equals(other);
     }
 
     /// <inheritdoc />

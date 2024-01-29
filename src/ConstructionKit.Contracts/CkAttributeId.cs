@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(AttributeId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkAttributeIdConverter))]
-public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<CkAttributeId>, ICkKey
+public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
 {
     /// <summary>
     ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="attributeId" />.
@@ -96,8 +96,13 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     public bool IsEmpty => string.IsNullOrWhiteSpace(AttributeId);
 
     /// <inheritdoc />
-    public int CompareTo(CkAttributeId other)
+    public int CompareTo(CkAttributeId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
+        
         var result = string.Compare(AttributeId, other.AttributeId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -232,19 +237,6 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-    {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkAttributeId)obj;
-
-        return AttributeId == other.AttributeId && Version == other.Version;
-    }
-
-    /// <inheritdoc />
     public override int GetHashCode()
     {
 #if NETSTANDARD2_0
@@ -261,30 +253,10 @@ public readonly struct CkAttributeId : IComparable<CkAttributeId>, IEquatable<Ck
     }
 
     /// <inheritdoc />
-    public bool Equals(CkAttributeId other)
+    public bool Equals(CkAttributeId? other)
     {
-        return AttributeId == other.AttributeId && Version.Equals(other.Version);
+        return other is not null && AttributeId == other.AttributeId && Version.Equals(other.Version);
     }
 
-    /// <summary>
-    ///     Compares two <see cref="CkAttributeId" /> instances for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkAttributeId p1, CkAttributeId p2)
-    {
-        return p1.Equals(p2);
-    }
 
-    /// <summary>
-    ///     Compares two <see cref="CkAttributeId" /> instances for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkAttributeId p1, CkAttributeId p2)
-    {
-        return !p1.Equals(p2);
-    }
 }

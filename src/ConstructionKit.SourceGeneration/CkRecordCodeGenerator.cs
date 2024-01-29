@@ -21,11 +21,6 @@ public class CkRecordCodeGenerator
         return obj is CkRecordCodeGenerator;
     }
 
-    public bool Equals(CkRecordCodeGenerator? other)
-    {
-        return other is CkRecordCodeGenerator;
-    }
-
     /// <inheritdoc />
     public override int GetHashCode()
     {
@@ -38,7 +33,7 @@ public class CkRecordCodeGenerator
         if (ckRecord.DerivedFromCkRecordId != null)
         {
             ckBaseType = $" : Rt" +
-                         $"{ckRecord.DerivedFromCkRecordId.Value.Key.RecordId.MakeClassName()}Record";
+                         $"{ckRecord.DerivedFromCkRecordId.Key.RecordId.MakeClassName()}Record";
         }
 
         StringBuilder sb = new();

@@ -18,7 +18,7 @@ public class CkRecordDto : CkTypeWithAttributesDto
     ///     Gets or sets the construction kit id
     /// </summary>
     [JsonRequired]
-    public CkRecordId RecordId { get; set; }
+    public CkRecordId RecordId { get; set; } = null!;
 
     /// <summary>
     ///     Defines the base record of this record.

@@ -15,6 +15,7 @@ internal class ModelResolver : IModelResolver
     private readonly IElementResolver _elementResolver;
     private readonly IInheritanceResolver _inheritanceResolver;
     private readonly IReferenceResolver _referenceResolver;
+    private readonly IVariableResolver _variableResolver;
 
     /// <summary>
     ///     Creates a new instance of <see cref="ModelResolver" />.
@@ -23,13 +24,15 @@ internal class ModelResolver : IModelResolver
     /// <param name="inheritanceResolver"></param>
     /// <param name="elementResolver"></param>
     /// <param name="referenceResolver"></param>
+    /// <param name="variableResolver"></param>
     public ModelResolver(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
-        IElementResolver elementResolver, IReferenceResolver referenceResolver)
+        IElementResolver elementResolver, IReferenceResolver referenceResolver, IVariableResolver variableResolver)
     {
         _dependencyResolver = dependencyResolver;
         _inheritanceResolver = inheritanceResolver;
         _elementResolver = elementResolver;
         _referenceResolver = referenceResolver;
+        _variableResolver = variableResolver;
     }
 
     public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
@@ -50,8 +53,10 @@ internal class ModelResolver : IModelResolver
     /// <param name="operationResult"></param>
     public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
     {
+        _variableResolver.SetVariable("thisModel", compiledModel.ModelId.FullName);
+        
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
-        var modelGraph = _elementResolver.Resolve(compiledModel, operationResult);
+        var modelGraph = _elementResolver.Resolve(compiledModel, _variableResolver, operationResult);
 
         if (!Regex.IsMatch(compiledModel.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
         {

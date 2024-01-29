@@ -75,6 +75,11 @@ stages:
             **/*Tests.csproj
             !**/*SystemTests.csproj
           testRunTitle: 'CI'
+      - task: PowerShell@2
+        inputs:
+          filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'
+          arguments: '-configuration $(buildConfiguration)'
+        displayName: 'Create documentation'          
       - task: PublishSymbols@2
         displayName: Publish symbols path
         continueOnError: True
@@ -88,6 +93,7 @@ stages:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
             **/*.nupkg
+            bin/**/documentation/**/*.*
           TargetFolder: $(build.artifactstagingdirectory)
       - task: PowerShell@2
         displayName: 'Create versioninfo file'

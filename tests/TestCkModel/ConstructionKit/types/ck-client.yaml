@@ -8,16 +8,16 @@ types:
       - id: System/Enabled
         name: Enabled
 
-      - id: System.TestIdentity/ClientId
+      - id: ${{ thisModel }}/ClientId
         name: ClientId
 
-      - id: System.TestIdentity/ProtocolType
+      - id: ${{ thisModel }}/ProtocolType
         name: ProtocolType
 
-      - id: System.TestIdentity/Secrets
+      - id: ${{ thisModel }}/Secrets
         name: ClientSecrets
 
-      - id: System.TestIdentity/RequireClientSecret
+      - id: ${{ thisModel }}/RequireClientSecret
         name: RequireClientSecret
 
       - id: System/Name
@@ -28,121 +28,121 @@ types:
         name: Description
         isOptional: true
 
-      - id: System.TestIdentity/ClientUri
+      - id: ${{ thisModel }}/ClientUri
         name: ClientUri
         isOptional: true
 
-      - id: System.TestIdentity/LogoUri
+      - id: ${{ thisModel }}/LogoUri
         name: LogoUri
         isOptional: true
 
-      - id: System.TestIdentity/RequireConsent
+      - id: ${{ thisModel }}/RequireConsent
         name: RequireConsent
         isOptional: true
 
-      - id: System.TestIdentity/AllowRememberConsent
+      - id: ${{ thisModel }}/AllowRememberConsent
         name: AllowRememberConsent
 
-      - id: System.TestIdentity/AllowedGrantTypes
+      - id: ${{ thisModel }}/AllowedGrantTypes
         name: AllowedGrantTypes
 
-      - id: System.TestIdentity/RequirePkce
+      - id: ${{ thisModel }}/RequirePkce
         name: RequirePkce
 
-      - id: System.TestIdentity/AllowPlainTextPkce
+      - id: ${{ thisModel }}/AllowPlainTextPkce
         name: AllowPlainTextPkce
 
-      - id: System.TestIdentity/RequireRequestObject
+      - id: ${{ thisModel }}/RequireRequestObject
         name: RequireRequestObject
 
-      - id: System.TestIdentity/AllowAccessTokensViaBrowser
+      - id: ${{ thisModel }}/AllowAccessTokensViaBrowser
         name: AllowAccessTokensViaBrowser
 
-      - id: System.TestIdentity/RequireDPoP
+      - id: ${{ thisModel }}/RequireDPoP
         name: RequireDPoP
 
-      - id: System.TestIdentity/DPoPValidationMode
+      - id: ${{ thisModel }}/DPoPValidationMode
         name: DPoPValidationMode
 
-      - id: System.TestIdentity/DPoPClockSkew
+      - id: ${{ thisModel }}/DPoPClockSkew
         name: DPoPClockSkew
-      - id: System.TestIdentity/RedirectUris
+      - id: ${{ thisModel }}/RedirectUris
         name: RedirectUris
 
-      - id: System.TestIdentity/PostLogoutRedirectUris
+      - id: ${{ thisModel }}/PostLogoutRedirectUris
         name: PostLogoutRedirectUris
-      - id: System.TestIdentity/FrontChannelLogoutUri
+      - id: ${{ thisModel }}/FrontChannelLogoutUri
         name: FrontChannelLogoutUri
         isOptional: true
-      - id: System.TestIdentity/FrontChannelLogoutSessionRequired
+      - id: ${{ thisModel }}/FrontChannelLogoutSessionRequired
         name: FrontChannelLogoutSessionRequired
-      - id: System.TestIdentity/BackChannelLogoutUri
+      - id: ${{ thisModel }}/BackChannelLogoutUri
         name: BackChannelLogoutUri
         isOptional: true
-      - id: System.TestIdentity/BackChannelLogoutSessionRequired
+      - id: ${{ thisModel }}/BackChannelLogoutSessionRequired
         name: BackChannelLogoutSessionRequired
-      - id: System.TestIdentity/AllowOfflineAccess
+      - id: ${{ thisModel }}/AllowOfflineAccess
         name: AllowOfflineAccess
-      - id: System.TestIdentity/AllowedScopes
+      - id: ${{ thisModel }}/AllowedScopes
         name: AllowedScopes
-      - id: System.TestIdentity/AlwaysIncludeUserClaimsInIdToken
+      - id: ${{ thisModel }}/AlwaysIncludeUserClaimsInIdToken
         name: AlwaysIncludeUserClaimsInIdToken
-      - id: System.TestIdentity/IdentityTokenLifetime
+      - id: ${{ thisModel }}/IdentityTokenLifetime
         name: IdentityTokenLifetime
-      - id: System.TestIdentity/AllowedIdentityTokenSigningAlgorithms
+      - id: ${{ thisModel }}/AllowedIdentityTokenSigningAlgorithms
         name: AllowedIdentityTokenSigningAlgorithms
-      - id: System.TestIdentity/AccessTokenLifetime
+      - id: ${{ thisModel }}/AccessTokenLifetime
         name: AccessTokenLifetime
-      - id: System.TestIdentity/AuthorizationCodeLifetime
+      - id: ${{ thisModel }}/AuthorizationCodeLifetime
         name: AuthorizationCodeLifetime
-      - id: System.TestIdentity/AbsoluteRefreshTokenLifetime
+      - id: ${{ thisModel }}/AbsoluteRefreshTokenLifetime
         name: AbsoluteRefreshTokenLifetime
-      - id: System.TestIdentity/SlidingRefreshTokenLifetime
+      - id: ${{ thisModel }}/SlidingRefreshTokenLifetime
         name: SlidingRefreshTokenLifetime
-      - id: System.TestIdentity/ConsentLifetime
+      - id: ${{ thisModel }}/ConsentLifetime
         name: ConsentLifetime
         isOptional: true
-      - id: System.TestIdentity/UpdateAccessTokenClaimsOnRefresh
+      - id: ${{ thisModel }}/UpdateAccessTokenClaimsOnRefresh
         name: UpdateAccessTokenClaimsOnRefresh
-      - id: System.TestIdentity/RefreshTokenExpiration
+      - id: ${{ thisModel }}/RefreshTokenExpiration
         name: RefreshTokenExpiration
-      - id: System.TestIdentity/AccessTokenType
+      - id: ${{ thisModel }}/AccessTokenType
         name: AccessTokenType
-      - id: System.TestIdentity/EnableLocalLogin
+      - id: ${{ thisModel }}/EnableLocalLogin
         name: EnableLocalLogin
-      - id: System.TestIdentity/IdentityProviderRestrictions
+      - id: ${{ thisModel }}/IdentityProviderRestrictions
         name: IdentityProviderRestrictions
-      - id: System.TestIdentity/IncludeJwtId
+      - id: ${{ thisModel }}/IncludeJwtId
         name: IncludeJwtId
-      - id: System.TestIdentity/ClientClaims
+      - id: ${{ thisModel }}/ClientClaims
         name: ClientClaims
-      - id: System.TestIdentity/AlwaysSendClientClaims
+      - id: ${{ thisModel }}/AlwaysSendClientClaims
         name: AlwaysSendClientClaims
-      - id: System.TestIdentity/ClientClaimsPrefix
+      - id: ${{ thisModel }}/ClientClaimsPrefix
         name: ClientClaimsPrefix
         isOptional: true
-      - id: System.TestIdentity/PairWiseSubjectSalt
+      - id: ${{ thisModel }}/PairWiseSubjectSalt
         name: PairWiseSubjectSalt
         isOptional: true
-      - id: System.TestIdentity/UserSsoLifetime
+      - id: ${{ thisModel }}/UserSsoLifetime
         name: UserSsoLifetime
         isOptional: true
-      - id: System.TestIdentity/UserCodeType
+      - id: ${{ thisModel }}/UserCodeType
         name: UserCodeType
         isOptional: true
-      - id: System.TestIdentity/DeviceCodeLifetime
+      - id: ${{ thisModel }}/DeviceCodeLifetime
         name: DeviceCodeLifetime
-      - id: System.TestIdentity/CibaLifetime
+      - id: ${{ thisModel }}/CibaLifetime
         name: CibaLifetime
         isOptional: true
-      - id: System.TestIdentity/PollingInterval
+      - id: ${{ thisModel }}/PollingInterval
         name: PollingInterval
         isOptional: true
-      - id: System.TestIdentity/CoordinateLifetimeWithUserSession
+      - id: ${{ thisModel }}/CoordinateLifetimeWithUserSession
         name: CoordinateLifetimeWithUserSession
         isOptional: true
-      - id: System.TestIdentity/AllowedCorsOrigins
+      - id: ${{ thisModel }}/AllowedCorsOrigins
         name: AllowedCorsOrigins
-      - id: System.TestIdentity/InitiateLoginUri
+      - id: ${{ thisModel }}/InitiateLoginUri
         name: InitiateLoginUri
         isOptional: true

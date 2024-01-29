@@ -4,12 +4,12 @@ records:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System.TestIdentity/LoginProvider
+      - id: ${{ thisModel }}/LoginProvider
         name: LoginProvider
       - id: System/Name
         name: Name
-      - id: System.TestIdentity/UserId
+      - id: ${{ thisModel }}/UserId
         name: UserId
-      - id: System.TestIdentity/Value
+      - id: ${{ thisModel }}/Value
         name: Value
         isOptional: true

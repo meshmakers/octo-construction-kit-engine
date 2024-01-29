@@ -1,3 +1,4 @@
+using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -15,9 +16,13 @@ public class ElementResolverTests
         var ckModelRoot = Builder.Build();
 
         var resolver = new ElementResolver();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+
         var validationResult = new OperationResult();
 
-        var result = resolver.Resolve(ckModelRoot, validationResult);
+        var result = resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
         Assert.IsType<CkModelGraph>(result);
     }
@@ -33,8 +38,10 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
-
-        resolver.Resolve(ckModelRoot, validationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -52,8 +59,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -71,8 +81,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -90,8 +103,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -110,8 +126,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -130,8 +149,10 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
-
-        resolver.Resolve(ckModelRoot, validationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -153,8 +174,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -172,8 +196,11 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
-        resolver.Resolve(ckModelRoot, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -192,8 +219,10 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var validationResult = new OperationResult();
-
-        resolver.Resolve(ckModelRoot, validationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
 
         Assert.Single(validationResult.Messages);
         Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
@@ -207,7 +236,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -219,7 +251,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -233,8 +268,11 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
-
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(15, operationResult.Messages[0].MessageNumber);
@@ -247,7 +285,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -259,7 +300,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -273,7 +317,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -287,7 +334,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -299,7 +349,10 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -313,8 +366,11 @@ public class ElementResolverTests
 
         OperationResult operationResult = new();
         var resolver = new ElementResolver();
-        resolver.Resolve(compiledModelRoot, operationResult);
-
+        var variableResolver = A.Fake<IVariableResolver>();
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
+            .ReturnsLazily((string name) => name);
+        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(49, operationResult.Messages[0].MessageNumber);

@@ -21,14 +21,14 @@ public class CkTypeAssociationDto
     [YamlMember(Alias = "id")]
     [JsonRequired]
     [JsonConverter(typeof(CkIdAssociationRoleIdConverter))]
-    public CkId<CkAssociationRoleId> CkRoleId { get; set; }
+    public CkId<CkAssociationRoleId> CkRoleId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the target CK type id.
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> TargetCkTypeId { get; set; }
+    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes

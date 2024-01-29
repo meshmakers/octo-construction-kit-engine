@@ -17,7 +17,7 @@ public class RtAttributeDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdAttributeIdConverter))]
-    public CkId<CkAttributeId> Id { get; set; }
+    public CkId<CkAttributeId> Id { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the value of the attribute.

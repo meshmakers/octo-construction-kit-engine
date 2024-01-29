@@ -18,7 +18,7 @@ public class CkTypeDto : CkTypeWithAttributesDto
     ///     Gets or sets the construction kit id
     /// </summary>
     [JsonRequired]
-    public CkTypeId TypeId { get; set; }
+    public CkTypeId TypeId { get; set; } = null!;
 
     /// <summary>
     ///     Defines the base type of this type. Only one type may not have a base type: System/Entity

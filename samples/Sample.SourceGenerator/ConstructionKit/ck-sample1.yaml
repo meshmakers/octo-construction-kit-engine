@@ -15,6 +15,9 @@ types:
 - isCollectionRoot: true
   typeId: SampleType1
   derivedFromCkTypeId: System/Entity
+  associations:
+  - id: Sample1/Testing
+    targetCkTypeId: System/Entity
   attributes:
   - id: Sample1/SampleAttribute
     name: MyAttribute
@@ -27,9 +30,6 @@ types:
     name: TestEnum
   - id: Sample1/IsLocked
     name: IsLocked
-  associations:
-  - id: Sample1/Testing
-    targetCkTypeId: System/Entity
 associationRoles:
 - id: Testing
   inboundName: Tests

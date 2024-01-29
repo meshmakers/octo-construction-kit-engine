@@ -19,7 +19,7 @@ public class CkAttributeDto
     [JsonPropertyName("id")]
     [YamlMember(Alias = "id")]
     [JsonRequired]
-    public CkAttributeId AttributeId { get; set; }
+    public CkAttributeId AttributeId { get; set; } = null!;
 
     /// <summary>
     ///     Value type of the attribute

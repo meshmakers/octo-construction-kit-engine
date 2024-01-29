@@ -16,7 +16,7 @@ public class CkAssociationRoleDto
     [YamlMember(Alias = "id")]
     [JsonPropertyName("id")]
     [JsonRequired]
-    public CkAssociationRoleId AssociationRoleId { get; set; }
+    public CkAssociationRoleId AssociationRoleId { get; set; } = null!;
 
     /// <summary>
     ///     Name of the association for inbound references (e. g. Children)

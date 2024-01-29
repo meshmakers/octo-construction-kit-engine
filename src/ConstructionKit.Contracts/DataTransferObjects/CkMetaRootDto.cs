@@ -35,7 +35,7 @@ public class CkMetaRootDto
     ///     Gets or sets the model id.
     /// </summary>
     [JsonRequired]
-    public CkModelId ModelId { get; set; }
+    public CkModelId ModelId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the dependencies of the model.

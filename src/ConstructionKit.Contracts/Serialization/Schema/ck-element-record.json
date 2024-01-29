@@ -13,7 +13,7 @@
         },
         "derivedFromCkRecordId": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\${{ thisModel }})\/[a-zA-Z0-9-_.]+$"
         },
         "isFinal": {
           "type": "boolean"

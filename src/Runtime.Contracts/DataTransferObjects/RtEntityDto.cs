@@ -52,7 +52,7 @@ public class RtEntityDto
     /// </summary>
     [System.Text.Json.Serialization.JsonRequired]
     [System.Text.Json.Serialization.JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> CkTypeId { get; set; }
+    public CkId<CkTypeId> CkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the well known name of the entity

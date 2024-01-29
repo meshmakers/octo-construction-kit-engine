@@ -1,12 +1,12 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: ApiScope
-    derivedFromCkTypeId: System.TestIdentity/Resource
+    derivedFromCkTypeId: ${{ thisModel }}/Resource
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System.TestIdentity/IsEmphasized
+      - id: ${{ thisModel }}/IsEmphasized
         name: IsEmphasized
-      - id: System.TestIdentity/IsRequired
+      - id: ${{ thisModel }}/IsRequired
         name: IsRequired
   

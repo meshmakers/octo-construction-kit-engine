@@ -28,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IReferenceResolver, ReferenceResolver>();
         services.AddTransient<IInheritanceResolver, InheritanceResolver>();
         services.AddTransient<IModelResolver, ModelResolver>();
+        services.AddTransient<IVariableResolver, VariableResolver>();
 
         // Adding serializers
         services.AddTransient<ICkSerializer, CkYamlSerializer>();

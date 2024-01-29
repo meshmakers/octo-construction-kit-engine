@@ -12,7 +12,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
-    public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, OperationResult operationResult)
+    public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver,
+        OperationResult operationResult)
     {
         var ckModelGraph = new CkModelGraph();
 
@@ -40,11 +41,22 @@ internal class ElementResolver : IElementResolver
                     operationResult.AddMessage(MessageCodes.CkRecordIdUndefined(ckAttributeId));
                     continue;
                 }
+                
+                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
+                    && ckAttribute.ValueCkRecordId != null)
+                {
+                    ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.ToString());
+                }
 
                 if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId == null)
                 {
                     operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(ckAttributeId));
                     continue;
+                }
+                
+                if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId != null)
+                {
+                    ckAttribute.ValueCkEnumId = variableResolver.Resolve(ckAttribute.ValueCkEnumId.ToString());
                 }
 
                 ckModelGraph.GetOrCreateAttribute(ckAttributeId, ckAttribute);
@@ -92,6 +104,11 @@ internal class ElementResolver : IElementResolver
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
+                    
+                    foreach (var ckTypeAttributeDto in ckAssociationRole.Attributes)
+                    {
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
+                    }
                 }
 
                 ckModelGraph.GetOrCreateAssociationRole(ckAssociationId, ckAssociationRole);
@@ -113,6 +130,11 @@ internal class ElementResolver : IElementResolver
                 {
                     operationResult.AddMessage(MessageCodes.TypeIdNotUnique(ckTypeId));
                     continue;
+                }
+
+                if (ckType.DerivedFromCkTypeId != null)
+                {
+                    ckType.DerivedFromCkTypeId = variableResolver.Resolve(ckType.DerivedFromCkTypeId.ToString());
                 }
 
                 if (ckType.Attributes != null)
@@ -137,6 +159,19 @@ internal class ElementResolver : IElementResolver
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
+
+                    foreach (var ckTypeAttributeDto in ckType.Attributes)
+                    {
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
+                    }
+                }
+
+                if (ckType.Associations != null)
+                {
+                    foreach (var ckTypeAssociationDto in ckType.Associations)
+                    {
+                        ckTypeAssociationDto.CkRoleId = variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.ToString());
+                    }
                 }
 
                 ckModelGraph.GetOrCreateType(ckTypeId, ckType);
@@ -158,6 +193,11 @@ internal class ElementResolver : IElementResolver
                 {
                     operationResult.AddMessage(MessageCodes.RecordIdNotUnique(ckRecordId));
                     continue;
+                }
+                
+                if (ckRecord.DerivedFromCkRecordId != null)
+                {
+                    ckRecord.DerivedFromCkRecordId = variableResolver.Resolve(ckRecord.DerivedFromCkRecordId.ToString());
                 }
 
                 if (ckRecord.Attributes != null)
@@ -181,6 +221,11 @@ internal class ElementResolver : IElementResolver
                             MessageCodes.CkRecordIdAttributeNameNotUnique(ckRecord.RecordId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
+                    }
+                    
+                    foreach (var ckTypeAttributeDto in ckRecord.Attributes)
+                    {
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
                     }
                 }
 

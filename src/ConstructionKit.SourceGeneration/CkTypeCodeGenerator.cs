@@ -24,11 +24,11 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
     /// <inheritdoc />
     public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId, ICkCacheService cacheService)
     {
-        var ckBaseType = "";
+        string ckBaseType;
         if (ckType.DerivedFromCkTypeId != null)
         {
             ckBaseType = $" : Rt" +
-                         $"{ckType.DerivedFromCkTypeId.Value.Key.TypeId.MakeClassName()}";
+                         $"{ckType.DerivedFromCkTypeId.Key.TypeId.MakeClassName()}";
         }
         else
         {

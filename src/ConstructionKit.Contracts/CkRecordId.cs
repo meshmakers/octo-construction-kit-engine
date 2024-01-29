@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(RecordId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkRecordIdConverter))]
-public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecordId>, ICkKey
+public sealed record CkRecordId : IComparable<CkRecordId>, ICkKey
 {
     /// <summary>
     ///     Creates a new <see cref="CkRecordId" /> from the given <paramref name="recordId" />.
@@ -100,8 +100,13 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
 
 
     /// <inheritdoc />
-    public int CompareTo(CkRecordId other)
+    public int CompareTo(CkRecordId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
+        
         var result = string.Compare(RecordId, other.RecordId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -112,9 +117,9 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <inheritdoc />
-    public bool Equals(CkRecordId other)
+    public bool Equals(CkRecordId? other)
     {
-        return RecordId == other.RecordId && Equals(Version, other.Version);
+        return other is not null && RecordId == other.RecordId && Equals(Version, other.Version);
     }
 
     /// <inheritdoc />
@@ -242,19 +247,6 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-    {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkRecordId)obj;
-
-        return RecordId == other.RecordId && Version == other.Version;
-    }
-
-    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -264,27 +256,5 @@ public readonly struct CkRecordId : IComparable<CkRecordId>, IEquatable<CkRecord
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkRecordId" /> instances for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkRecordId p1, CkRecordId p2)
-    {
-        return p1.Equals(p2);
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkRecordId" />s for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkRecordId p1, CkRecordId p2)
-    {
-        return !p1.Equals(p2);
     }
 }

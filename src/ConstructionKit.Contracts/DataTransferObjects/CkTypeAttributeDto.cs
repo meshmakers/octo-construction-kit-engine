@@ -21,7 +21,7 @@ public class CkTypeAttributeDto
     [JsonPropertyName("id")]
     [JsonRequired]
     [JsonConverter(typeof(CkIdAttributeIdConverter))]
-    public CkId<CkAttributeId> CkAttributeId { get; set; }
+    public CkId<CkAttributeId> CkAttributeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the name of the attribute.

@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(EnumId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkEnumIdConverter))]
-public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, ICkKey
+public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
 {
     /// <summary>
     ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="enumId" />.
@@ -100,8 +100,12 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
 
 
     /// <inheritdoc />
-    public int CompareTo(CkEnumId other)
+    public int CompareTo(CkEnumId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
         var result = string.Compare(EnumId, other.EnumId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -112,9 +116,9 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     }
 
     /// <inheritdoc />
-    public bool Equals(CkEnumId other)
+    public bool Equals(CkEnumId? other)
     {
-        return EnumId == other.EnumId && Equals(Version, other.Version);
+        return other is not null && EnumId == other.EnumId && Equals(Version, other.Version);
     }
 
     /// <inheritdoc />
@@ -242,19 +246,6 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-    {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkEnumId)obj;
-
-        return EnumId == other.EnumId && Version == other.Version;
-    }
-
-    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -264,27 +255,5 @@ public readonly struct CkEnumId : IComparable<CkEnumId>, IEquatable<CkEnumId>, I
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkEnumId" /> instances for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkEnumId p1, CkEnumId p2)
-    {
-        return p1.Equals(p2);
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkEnumId" />s for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkEnumId p1, CkEnumId p2)
-    {
-        return !p1.Equals(p2);
     }
 }

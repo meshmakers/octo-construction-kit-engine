@@ -9,43 +9,33 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkAttributeId}" />
 /// </summary>
-public class CkIdAttributeIdConverter : CkIdConverter<CkAttributeId>
-{
-}
+public class CkIdAttributeIdConverter : CkIdConverter<CkAttributeId>;
 
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkTypeId}" />
 /// </summary>
-public class CkIdTypeIdConverter : CkIdConverter<CkTypeId>
-{
-}
+public class CkIdTypeIdConverter : CkIdConverter<CkTypeId>;
 
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkAssociationRoleId}" />
 /// </summary>
-public class CkIdAssociationRoleIdConverter : CkIdConverter<CkAssociationRoleId>
-{
-}
+public class CkIdAssociationRoleIdConverter : CkIdConverter<CkAssociationRoleId>;
 
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkRecordId}" />
 /// </summary>
-public class CkIdRecordIdConverter : CkIdConverter<CkRecordId>
-{
-}
+public class CkIdRecordIdConverter : CkIdConverter<CkRecordId>;
 
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkEnumId}" />
 /// </summary>
-public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>
-{
-}
+public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>;
 
 /// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{TKey}" />
 /// </summary>
 /// <typeparam name="TKey"></typeparam>
-public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter where TKey : struct, IComparable<TKey>, ICkKey
+public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter where TKey : IComparable<TKey>, ICkKey
 {
     /// <inheritdoc />
     public bool Accepts(Type type)
@@ -64,7 +54,7 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
     public void WriteYaml(IEmitter emitter, object? value, Type type)
     {
         var ckId = (CkId<TKey>)value!;
-        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckId.SemanticVersionedFullName, ScalarStyle.Any, true, false));
+        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckId.FullName, ScalarStyle.Any, true, false));
     }
 
     /// <inheritdoc />
@@ -82,7 +72,7 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
     /// <inheritdoc />
     public override void WriteAsPropertyName(Utf8JsonWriter writer, CkId<TKey> value, JsonSerializerOptions options)
     {
-        writer.WritePropertyName(value.ToString());
+        writer.WritePropertyName(value.FullName);
     }
 
     /// <inheritdoc />
@@ -99,6 +89,6 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, CkId<TKey> value, JsonSerializerOptions options)
     {
-        writer.WriteStringValue(value.ToString());
+        writer.WriteStringValue(value.FullName);
     }
 }

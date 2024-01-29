@@ -29,7 +29,7 @@ internal class DependencyResolver : IDependencyResolver
 
     private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph, OperationResult operationResult)
     {
-        List<CkModelId> dependencies = new(ckRootDependencies);
+        List<CkModelId> dependencies = [..ckRootDependencies];
 
         for (var i = 0; i < dependencies.Count; i++)
         {

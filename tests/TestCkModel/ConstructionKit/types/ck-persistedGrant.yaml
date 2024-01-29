@@ -5,34 +5,34 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System.TestIdentity/GrantKey
+      - id: ${{ thisModel }}/GrantKey
         name: GrantKey
 
-      - id: System.TestIdentity/GrantType
+      - id: ${{ thisModel }}/GrantType
         name: GrantType
 
-      - id: System.TestIdentity/SubjectId
+      - id: ${{ thisModel }}/SubjectId
         name: SubjectId
 
-      - id: System.TestIdentity/SessionId
+      - id: ${{ thisModel }}/SessionId
         name: SessionId
 
-      - id: System.TestIdentity/ClientId
+      - id: ${{ thisModel }}/ClientId
         name: ClientId
 
       - id: System/Description
         name: Description
 
-      - id: System.TestIdentity/CreationDateTime
+      - id: ${{ thisModel }}/CreationDateTime
         name: CreationDateTime
 
-      - id: System.TestIdentity/ExpirationDateTime
+      - id: ${{ thisModel }}/ExpirationDateTime
         name: ExpirationDateTime
         isOptional: true
 
-      - id: System.TestIdentity/ConsumedDateTime
+      - id: ${{ thisModel }}/ConsumedDateTime
         name: ConsumedDateTime
         isOptional: true
 
-      - id: System.TestIdentity/Data
+      - id: ${{ thisModel }}/Data
         name: Data

@@ -15,7 +15,7 @@ types:
       - id: System/Description
         name: Description
         isOptional: true
-      - id: System.TestIdentity/ResourceClaims
+      - id: ${{ thisModel }}/ResourceClaims
         name: Claims
-      - id: System.TestIdentity/ShowInDiscoveryDocument
+      - id: ${{ thisModel }}/ShowInDiscoveryDocument
         name: ShowInDiscoveryDocument

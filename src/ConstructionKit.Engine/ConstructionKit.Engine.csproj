@@ -20,24 +20,12 @@
         <PackageReference Include="Yaml2JsonNode" Version="1.2.4" />
     </ItemGroup>
     <ItemGroup>
-        <None Update="Validation\Messages\MessageCode.tt">
-            <Generator>TextTemplatingFileGenerator</Generator>
-        </None>
-        <None Update="Validation\Messages\test.tt">
-            <Generator>TextTemplatingFileGenerator</Generator>
-            <LastGenOutput>test.cs</LastGenOutput>
-        </None>
         <None Update="Messages\MessageCodes.tt">
             <Generator>TextTemplatingFileGenerator</Generator>
             <LastGenOutput>MessageCodes.cs</LastGenOutput>
         </None>
     </ItemGroup>
     <ItemGroup>
-        <Compile Update="Validation\Messages\test.cs">
-            <AutoGen>True</AutoGen>
-            <DesignTime>True</DesignTime>
-            <DependentUpon>test.tt</DependentUpon>
-        </Compile>
         <Compile Update="Messages\MessageCodes.cs">
             <DependentUpon>MessageCodes.tt</DependentUpon>
         </Compile>

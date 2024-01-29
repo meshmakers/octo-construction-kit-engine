@@ -6,6 +6,11 @@ types:
   typeId: Tenant
   derivedFromCkTypeId: System/Entity
   isFinal: true
+  indexes:
+  - indexType: Ascending
+    fields:
+    - attributeNames:
+      - TenantId
   attributes:
   - id: System/TenantId
     name: TenantId
@@ -14,11 +19,6 @@ types:
     isOptional: true
   - id: System/DatabaseName
     name: DatabaseName
-  indexes:
-  - indexType: Ascending
-    fields:
-    - attributeNames:
-      - TenantId
 - isCollectionRoot: true
   typeId: AutoIncrement
   derivedFromCkTypeId: System/Entity

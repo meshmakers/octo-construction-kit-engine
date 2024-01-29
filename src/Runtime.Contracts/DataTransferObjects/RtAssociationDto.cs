@@ -16,7 +16,7 @@ public class RtAssociationDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdAssociationRoleIdConverter))]
-    public CkId<CkAssociationRoleId> RoleId { get; set; }
+    public CkId<CkAssociationRoleId> RoleId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the target rt id.
@@ -31,5 +31,5 @@ public class RtAssociationDto
     /// </summary>
     [JsonRequired]
     [JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> TargetCkTypeId { get; set; }
+    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
 }

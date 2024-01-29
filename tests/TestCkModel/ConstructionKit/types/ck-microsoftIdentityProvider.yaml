@@ -1,13 +1,13 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: MicrosoftIdentityProvider
-    derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+    derivedFromCkTypeId: ${{ thisModel }}/IdentityProvider
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System.TestIdentity/ClientId
+      - id: ${{ thisModel }}/ClientId
         name: ClientId
 
-      - id: System.TestIdentity/ClientSecret
+      - id: ${{ thisModel }}/ClientSecret
         name: ClientSecret
 

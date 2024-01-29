@@ -135,7 +135,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 
     private record RtEntityJson
     {
-        public CkId<CkTypeId> CkTypeId { get; set; }
+        public CkId<CkTypeId> CkTypeId { get; set; } = null!;
         public OctoObjectId RtId { get; set; }
         public DateTime? RtCreationDateTime { get; set; }
         public DateTime? RtChangedDateTime { get; set; }
@@ -147,10 +147,10 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
     {
         public OctoObjectId AssociationId { get; set; }
         public OctoObjectId OriginRtId { get; set; }
-        public CkId<CkTypeId> OriginCkTypeId { get; set; }
+        public CkId<CkTypeId> OriginCkTypeId { get; set; } = null!;
         public OctoObjectId TargetRtId { get; set; }
-        public CkId<CkTypeId> TargetCkTypeId { get; set; }
-        public CkId<CkAssociationRoleId> AssociationRoleId { get; set; }
+        public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
+        public CkId<CkAssociationRoleId> AssociationRoleId { get; set; } = null!;
 
         public Dictionary<string, object?> Attributes { get; set; } = new();
     }

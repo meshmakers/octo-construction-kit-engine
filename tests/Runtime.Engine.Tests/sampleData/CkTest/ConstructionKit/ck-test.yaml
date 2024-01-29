@@ -16,6 +16,9 @@ types:
 - typeId: Country
   derivedFromCkTypeId: Test/Location
   isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/Continent
   attributes:
   - id: Test/StringArrayTests
     name: StringArrayTests
@@ -23,9 +26,6 @@ types:
     name: IntArrayTests
   - id: Test/RecordArrayTests
     name: RecordArrayTests
-  associations:
-  - id: System/ParentChild
-    targetCkTypeId: Test/Continent
 - typeId: Region
   derivedFromCkTypeId: Test/LocationWithSensor
   isFinal: true
@@ -54,14 +54,14 @@ types:
   typeId: Sensor
   derivedFromCkTypeId: System/Entity
   isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/LocationWithSensor
   attributes:
   - id: Test/Designation
     name: Designation
   - id: Test/ConnectionState
     name: ConnectionState
-  associations:
-  - id: System/ParentChild
-    targetCkTypeId: Test/LocationWithSensor
 associationRoles: []
 attributes:
 - id: Designation

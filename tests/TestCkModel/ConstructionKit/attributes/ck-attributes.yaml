@@ -3,6 +3,10 @@ attributes:
   - id: UserName
     valueType: String
     description: The user name.
+    metaData:
+      - key: semanticId
+        value: "0173-1#02-AAO674#004"
+        description: Indicates if the user name is required.
 
   - id: NormalizedUserName
     valueType: String
@@ -119,22 +123,22 @@ attributes:
 
   - id: UserClaims
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/UserClaim
+    valueCkRecordId: ${{ thisModel }}/UserClaim
     description: The claims of the user.
 
   - id: RoleClaims
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/RoleClaim
+    valueCkRecordId: ${{ thisModel }}/RoleClaim
     description: The claims of a role.
 
   - id: UserLogins
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/UserLogin
+    valueCkRecordId: ${{ thisModel }}/UserLogin
     description: The existing logins of the user.
 
   - id: UserTokens
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/UserToken
+    valueCkRecordId: ${{ thisModel }}/UserToken
     description: The tokens of the user.
 
   - id: SubjectIds
@@ -186,7 +190,7 @@ attributes:
       - false
   - id: Secrets
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/Secret
+    valueCkRecordId: ${{ thisModel }}/Secret
     defaultValues: [ ]
   - id: Scopes
     valueType: StringArray
@@ -329,7 +333,7 @@ attributes:
     description: Lifetime of a user consent in seconds. Defaults to null (no expiration)
   - id: RefreshTokenUsage
     valueType: Enum
-    valueCkEnumId: System.TestIdentity/TokenUsage
+    valueCkEnumId: ${{ thisModel }}/TokenUsage
     description: Gets or sets a value indicating whether the refresh token should be updated on a refresh token request.
   - id: UpdateAccessTokenClaimsOnRefresh
     valueType: Boolean
@@ -338,13 +342,13 @@ attributes:
       - false
   - id: RefreshTokenExpiration
     valueType: Enum
-    valueCkEnumId: System.TestIdentity/TokenExpiration
+    valueCkEnumId: ${{ thisModel }}/TokenExpiration
     defaultValues:
       - 1
     description: Gets or sets a value indicating whether the access token (and its claims) should be updated on a refresh token request.
   - id: AccessTokenType
     valueType: Enum
-    valueCkEnumId: System.TestIdentity/TokenType
+    valueCkEnumId: ${{ thisModel }}/TokenType
     defaultValues:
       - 0
     description: Specifies whether the access token is a reference token or a self contained JWT token (defaults to Jwt).
@@ -364,7 +368,7 @@ attributes:
     description: Value indicating whether JWT access tokens should include an identifier. Defaults to true.
   - id: ClientClaims
     valueType: RecordArray
-    valueCkRecordId: System.TestIdentity/ClientClaim
+    valueCkRecordId: ${{ thisModel }}/ClientClaim
     description: Gets or sets the client claims to be sent to the user info endpoint.
     defaultValues: [ ]
   - id: AlwaysSendClientClaims
@@ -409,7 +413,7 @@ attributes:
     description: Gets of sets a URI that can be used to initiate login from the IdentityServer host or a third party.
   - id: IdentityProviderType
     valueType: Enum
-    valueCkEnumId: System.TestIdentity/IdentityProviderTypes
+    valueCkEnumId: ${{ thisModel }}/IdentityProviderTypes
     description: Gets or sets the type of the identity provider
   - id: Authority
     valueType: String

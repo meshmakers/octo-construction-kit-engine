@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(RoleId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkAssociationRoleIdConverter))]
-public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, IEquatable<CkAssociationRoleId>, ICkKey
+public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICkKey
 {
     /// <summary>
     ///     Creates a new <see cref="CkAssociationRoleId" /> from the given <paramref name="roleId" />.
@@ -97,8 +97,12 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     public bool IsEmpty => string.IsNullOrWhiteSpace(RoleId);
 
     /// <inheritdoc />
-    public int CompareTo(CkAssociationRoleId other)
+    public int CompareTo(CkAssociationRoleId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
         var result = string.Compare(RoleId, other.RoleId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -109,9 +113,9 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     }
 
     /// <inheritdoc />
-    public bool Equals(CkAssociationRoleId other)
+    public bool Equals(CkAssociationRoleId? other)
     {
-        return RoleId == other.RoleId && Equals(Version, other.Version);
+        return other is not null && RoleId == other.RoleId && Equals(Version, other.Version);
     }
 
     /// <inheritdoc />
@@ -239,19 +243,6 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
-    {
-        if (obj == null)
-        {
-            return false;
-        }
-
-        var other = (CkAssociationRoleId)obj;
-
-        return RoleId == other.RoleId && Version == other.Version;
-    }
-
-    /// <inheritdoc />
     public override int GetHashCode()
     {
         unchecked
@@ -261,27 +252,5 @@ public readonly struct CkAssociationRoleId : IComparable<CkAssociationRoleId>, I
             hash = hash * 22 + Version.GetHashCode();
             return hash;
         }
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkAssociationRoleId" /> instances for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkAssociationRoleId p1, CkAssociationRoleId p2)
-    {
-        return p1.Equals(p2);
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkAssociationRoleId" /> instances for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkAssociationRoleId p1, CkAssociationRoleId p2)
-    {
-        return !p1.Equals(p2);
     }
 }

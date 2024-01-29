@@ -5,19 +5,19 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System.TestIdentity/UserName
+      - id: ${{ thisModel }}/UserName
         name: UserName
         isOptional: true
 
-      - id: System.TestIdentity/NormalizedUserName
+      - id: ${{ thisModel }}/NormalizedUserName
         name: NormalizedUserName
         isOptional: true
 
-      - id: System.TestIdentity/FirstName
+      - id: ${{ thisModel }}/FirstName
         name: FirstName
         isOptional: true
 
-      - id: System.TestIdentity/LastName
+      - id: ${{ thisModel }}/LastName
         name: LastName
         isOptional: true
 
@@ -25,64 +25,64 @@ types:
         name: Description
         isOptional: true
 
-      - id: System.TestIdentity/Email
+      - id: ${{ thisModel }}/Email
         name: Email
         isOptional: true
 
-      - id: System.TestIdentity/NormalizedEmail
+      - id: ${{ thisModel }}/NormalizedEmail
         name: NormalizedEmail
         isOptional: true
 
-      - id: System.TestIdentity/EmailConfirmed
+      - id: ${{ thisModel }}/EmailConfirmed
         name: EmailConfirmed
 
-      - id: System.TestIdentity/PasswordHash
+      - id: ${{ thisModel }}/PasswordHash
         name: PasswordHash
         isOptional: true
 
-      - id: System.TestIdentity/SecurityStamp
+      - id: ${{ thisModel }}/SecurityStamp
         name: SecurityStamp
         isOptional: true
 
-      - id: System.TestIdentity/ConcurrencyStamp
+      - id: ${{ thisModel }}/ConcurrencyStamp
         name: ConcurrencyStamp
 
-      - id: System.TestIdentity/PhoneNumber
+      - id: ${{ thisModel }}/PhoneNumber
         name: PhoneNumber
         isOptional: true
 
-      - id: System.TestIdentity/PhoneNumberConfirmed
+      - id: ${{ thisModel }}/PhoneNumberConfirmed
         name: PhoneNumberConfirmed
 
-      - id: System.TestIdentity/TwoFactorEnabled
+      - id: ${{ thisModel }}/TwoFactorEnabled
         name: TwoFactorEnabled
 
-      - id: System.TestIdentity/LockoutEnd
+      - id: ${{ thisModel }}/LockoutEnd
         name: LockoutEnd
         isOptional: true
 
-      - id: System.TestIdentity/LockoutEnabled
+      - id: ${{ thisModel }}/LockoutEnabled
         name: LockoutEnabled
 
-      - id: System.TestIdentity/AccessFailedCount
+      - id: ${{ thisModel }}/AccessFailedCount
         name: AccessFailedCount
 
-      - id: System.TestIdentity/ResetPasswordOnLogin
+      - id: ${{ thisModel }}/ResetPasswordOnLogin
         name: ResetPasswordOnLogin
 
-      - id: System.TestIdentity/RoleIds
+      - id: ${{ thisModel }}/RoleIds
         name: RoleIds
         isOptional: true
 
-      - id: System.TestIdentity/UserClaims
+      - id: ${{ thisModel }}/UserClaims
         name: Claims
         isOptional: true
 
-      - id: System.TestIdentity/UserLogins
+      - id: ${{ thisModel }}/UserLogins
         name: UserLogins
         isOptional: true
 
-      - id: System.TestIdentity/UserTokens
+      - id: ${{ thisModel }}/UserTokens
         name: UserTokens
         isOptional: true
     

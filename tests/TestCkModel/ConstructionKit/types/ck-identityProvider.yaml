@@ -9,7 +9,7 @@ types:
         name: Name
       - id: System/Enabled
         name: Enabled
-      - id: System.TestIdentity/IdentityProviderType
+      - id: ${{ thisModel }}/IdentityProviderType
         name: Type
       - id: System/DisplayName
         name: DisplayName

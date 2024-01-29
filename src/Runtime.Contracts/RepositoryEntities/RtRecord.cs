@@ -30,7 +30,7 @@ public class RtRecord : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the construction kit id
     /// </summary>
-    public CkId<CkRecordId> CkRecordId { get; set; }
+    public CkId<CkRecordId> CkRecordId { get; set; } = null!;
 
     /// <inheritdoc />
     protected override string GetLocation()

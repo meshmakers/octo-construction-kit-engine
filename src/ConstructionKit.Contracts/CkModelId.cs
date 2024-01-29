@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(ModelId) + "} ({" + nameof(ModelVersion) + "})")]
 [JsonConverter(typeof(CkModelIdConverter))]
-public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>, ICkKey
+public sealed record CkModelId : IComparable<CkModelId>, ICkKey
 {
     private readonly string? _modelId;
 
@@ -208,8 +208,12 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <inheritdoc />
-    public int CompareTo(CkModelId other)
+    public int CompareTo(CkModelId? other)
     {
+        if (other == null)
+        {
+            return 1;
+        }
         var result = string.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
         if (result != 0)
         {
@@ -220,15 +224,9 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
     }
 
     /// <inheritdoc />
-    public override bool Equals(object? obj)
+    public bool Equals(CkModelId? other)
     {
-        return obj is CkModelId other && Equals(other);
-    }
-
-    /// <inheritdoc />
-    public bool Equals(CkModelId other)
-    {
-        return ModelId == other.ModelId && Equals(ModelVersion, other.ModelVersion);
+        return other is not null && ModelId == other.ModelId && ModelVersion.IsCompatible(other.ModelVersion);
     }
 
     /// <summary>
@@ -251,26 +249,5 @@ public readonly struct CkModelId : IComparable<CkModelId>, IEquatable<CkModelId>
             return hash;
         }
     }
-
-    /// <summary>
-    ///     Compares two <see cref="CkModelId" />s for equality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator ==(CkModelId p1, CkModelId p2)
-    {
-        return p1.Equals(p2);
-    }
-
-    /// <summary>
-    ///     Compares two <see cref="CkModelId" /> values for inequality.
-    /// </summary>
-    /// <param name="p1"></param>
-    /// <param name="p2"></param>
-    /// <returns></returns>
-    public static bool operator !=(CkModelId p1, CkModelId p2)
-    {
-        return !p1.Equals(p2);
-    }
+    
 }

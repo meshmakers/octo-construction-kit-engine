@@ -288,6 +288,12 @@ types:
   typeId: User
   derivedFromCkTypeId: System/Entity
   isFinal: true
+  indexes:
+  - indexType: Ascending
+    fields:
+    - attributeNames:
+      - NormalizedEmail
+      - NormalizedUserName
   attributes:
   - id: System.TestIdentity/UserName
     name: UserName
@@ -348,12 +354,6 @@ types:
   - id: System.TestIdentity/UserTokens
     name: UserTokens
     isOptional: true
-  indexes:
-  - indexType: Ascending
-    fields:
-    - attributeNames:
-      - NormalizedEmail
-      - NormalizedUserName
 - typeId: MicrosoftAdIdentityProvider
   derivedFromCkTypeId: System.TestIdentity/IdentityProvider
   isFinal: true
@@ -388,6 +388,10 @@ attributes:
 - id: UserName
   valueType: String
   description: The user name.
+  metaData:
+  - key: semanticId
+    value: 0173-1#02-AAO674#004
+    description: Indicates if the user name is required.
 - id: NormalizedUserName
   valueType: String
   description: The normalized user name.

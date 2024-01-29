@@ -70,7 +70,7 @@ internal class ReferenceResolver : IReferenceResolver
             // Check 2.
             if (ckRecordKeyValue.Value.DerivedFromCkRecordId != null)
             {
-                if (!modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId.Value))
+                if (!modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId))
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownDerivedFromCkRecordIdInSource(ckRecordKeyValue.Value.DerivedFromCkRecordId,
@@ -102,7 +102,7 @@ internal class ReferenceResolver : IReferenceResolver
             // Check 2.
             if (ckTypeKeyValue.Value.DerivedFromCkTypeId != null)
             {
-                if (!modelGraph.Types.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId.Value))
+                if (!modelGraph.Types.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId))
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownCkDerivedIdOfCkTypeIdInSource(ckTypeKeyValue.Value.DerivedFromCkTypeId,
@@ -135,11 +135,11 @@ internal class ReferenceResolver : IReferenceResolver
         {
             if (ckAttribute.Value.ValueType == AttributeValueTypesDto.Record
                 && ckAttribute.Value.ValueCkRecordId != null
-                && !ckModelGraph.Records.ContainsKey(ckAttribute.Value.ValueCkRecordId.Value))
+                && !ckModelGraph.Records.ContainsKey(ckAttribute.Value.ValueCkRecordId))
             {
                 operationResult.AddMessage(
                     MessageCodes.AttributeUsesUnknownCkRecordId(ckAttribute.Key,
-                        ckAttribute.Value.ValueCkRecordId.Value));
+                        ckAttribute.Value.ValueCkRecordId));
             }
         }
     }

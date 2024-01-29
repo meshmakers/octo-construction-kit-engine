@@ -47,6 +47,9 @@ types:
   typeId: Sensor
   derivedFromCkTypeId: System/Entity
   isFinal: true
+  associations:
+  - id: System/ParentChild
+    targetCkTypeId: Test/LocationWithSensor
   attributes:
   - id: Test/Designation
     name: Designation
@@ -60,9 +63,6 @@ types:
     isOptional: true
   - id: Test/IsEnabled
     name: IsEnabled
-  associations:
-  - id: System/ParentChild
-    targetCkTypeId: Test/LocationWithSensor
 associationRoles: []
 attributes:
 - id: Designation

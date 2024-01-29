@@ -9,19 +9,19 @@ types:
         name: Name
         isOptional: true
 
-      - id: System.TestIdentity/NormalizedName
+      - id: ${{ thisModel }}/NormalizedName
         name: NormalizedName
         isOptional: true
 
-      - id: System.TestIdentity/ConcurrencyStamp
+      - id: ${{ thisModel }}/ConcurrencyStamp
         name: ConcurrencyStamp
 
-      - id: System.TestIdentity/SubjectIds
+      - id: ${{ thisModel }}/SubjectIds
         name: SubjectIds
 
-      - id: System.TestIdentity/IdentityRoleIds
+      - id: ${{ thisModel }}/IdentityRoleIds
         name: IdentityRoleIds
 
-      - id: System.TestIdentity/RoleClaims
+      - id: ${{ thisModel }}/RoleClaims
         name: Claims
         isOptional: true

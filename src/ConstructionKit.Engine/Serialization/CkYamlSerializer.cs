@@ -58,7 +58,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
-            .WithTypeConverter(new ObjectCollectionConverter())
+         //   .WithTypeConverter(new ObjectCollectionConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

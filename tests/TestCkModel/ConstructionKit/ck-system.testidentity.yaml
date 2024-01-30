@@ -1,292 +1,292 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
 - typeId: GoogleIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/IdentityProvider-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClientId
+  - id: System.TestIdentity-1.2.0/ClientId-1.0.0
     name: ClientId
-  - id: System.TestIdentity/ClientSecret
+  - id: System.TestIdentity-1.2.0/ClientSecret-1.0.0
     name: ClientSecret
 - isCollectionRoot: true
   typeId: Client
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System/Enabled
+  - id: System-1.0.0/Enabled-1.0.0
     name: Enabled
-  - id: System.TestIdentity/ClientId
+  - id: System.TestIdentity-1.2.0/ClientId-1.0.0
     name: ClientId
-  - id: System.TestIdentity/ProtocolType
+  - id: System.TestIdentity-1.2.0/ProtocolType-1.0.0
     name: ProtocolType
-  - id: System.TestIdentity/Secrets
+  - id: System.TestIdentity-1.2.0/Secrets-1.0.0
     name: ClientSecrets
-  - id: System.TestIdentity/RequireClientSecret
+  - id: System.TestIdentity-1.2.0/RequireClientSecret-1.0.0
     name: RequireClientSecret
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: ClientName
     isOptional: true
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
     isOptional: true
-  - id: System.TestIdentity/ClientUri
+  - id: System.TestIdentity-1.2.0/ClientUri-1.0.0
     name: ClientUri
     isOptional: true
-  - id: System.TestIdentity/LogoUri
+  - id: System.TestIdentity-1.2.0/LogoUri-1.0.0
     name: LogoUri
     isOptional: true
-  - id: System.TestIdentity/RequireConsent
+  - id: System.TestIdentity-1.2.0/RequireConsent-1.0.0
     name: RequireConsent
     isOptional: true
-  - id: System.TestIdentity/AllowRememberConsent
+  - id: System.TestIdentity-1.2.0/AllowRememberConsent-1.0.0
     name: AllowRememberConsent
-  - id: System.TestIdentity/AllowedGrantTypes
+  - id: System.TestIdentity-1.2.0/AllowedGrantTypes-1.0.0
     name: AllowedGrantTypes
-  - id: System.TestIdentity/RequirePkce
+  - id: System.TestIdentity-1.2.0/RequirePkce-1.0.0
     name: RequirePkce
-  - id: System.TestIdentity/AllowPlainTextPkce
+  - id: System.TestIdentity-1.2.0/AllowPlainTextPkce-1.0.0
     name: AllowPlainTextPkce
-  - id: System.TestIdentity/RequireRequestObject
+  - id: System.TestIdentity-1.2.0/RequireRequestObject-1.0.0
     name: RequireRequestObject
-  - id: System.TestIdentity/AllowAccessTokensViaBrowser
+  - id: System.TestIdentity-1.2.0/AllowAccessTokensViaBrowser-1.0.0
     name: AllowAccessTokensViaBrowser
-  - id: System.TestIdentity/RequireDPoP
+  - id: System.TestIdentity-1.2.0/RequireDPoP-1.0.0
     name: RequireDPoP
-  - id: System.TestIdentity/DPoPValidationMode
+  - id: System.TestIdentity-1.2.0/DPoPValidationMode-1.0.0
     name: DPoPValidationMode
-  - id: System.TestIdentity/DPoPClockSkew
+  - id: System.TestIdentity-1.2.0/DPoPClockSkew-1.0.0
     name: DPoPClockSkew
-  - id: System.TestIdentity/RedirectUris
+  - id: System.TestIdentity-1.2.0/RedirectUris-1.0.0
     name: RedirectUris
-  - id: System.TestIdentity/PostLogoutRedirectUris
+  - id: System.TestIdentity-1.2.0/PostLogoutRedirectUris-1.0.0
     name: PostLogoutRedirectUris
-  - id: System.TestIdentity/FrontChannelLogoutUri
+  - id: System.TestIdentity-1.2.0/FrontChannelLogoutUri-1.0.0
     name: FrontChannelLogoutUri
     isOptional: true
-  - id: System.TestIdentity/FrontChannelLogoutSessionRequired
+  - id: System.TestIdentity-1.2.0/FrontChannelLogoutSessionRequired-1.0.0
     name: FrontChannelLogoutSessionRequired
-  - id: System.TestIdentity/BackChannelLogoutUri
+  - id: System.TestIdentity-1.2.0/BackChannelLogoutUri-1.0.0
     name: BackChannelLogoutUri
     isOptional: true
-  - id: System.TestIdentity/BackChannelLogoutSessionRequired
+  - id: System.TestIdentity-1.2.0/BackChannelLogoutSessionRequired-1.0.0
     name: BackChannelLogoutSessionRequired
-  - id: System.TestIdentity/AllowOfflineAccess
+  - id: System.TestIdentity-1.2.0/AllowOfflineAccess-1.0.0
     name: AllowOfflineAccess
-  - id: System.TestIdentity/AllowedScopes
+  - id: System.TestIdentity-1.2.0/AllowedScopes-1.0.0
     name: AllowedScopes
-  - id: System.TestIdentity/AlwaysIncludeUserClaimsInIdToken
+  - id: System.TestIdentity-1.2.0/AlwaysIncludeUserClaimsInIdToken-1.0.0
     name: AlwaysIncludeUserClaimsInIdToken
-  - id: System.TestIdentity/IdentityTokenLifetime
+  - id: System.TestIdentity-1.2.0/IdentityTokenLifetime-1.0.0
     name: IdentityTokenLifetime
-  - id: System.TestIdentity/AllowedIdentityTokenSigningAlgorithms
+  - id: System.TestIdentity-1.2.0/AllowedIdentityTokenSigningAlgorithms-1.0.0
     name: AllowedIdentityTokenSigningAlgorithms
-  - id: System.TestIdentity/AccessTokenLifetime
+  - id: System.TestIdentity-1.2.0/AccessTokenLifetime-1.0.0
     name: AccessTokenLifetime
-  - id: System.TestIdentity/AuthorizationCodeLifetime
+  - id: System.TestIdentity-1.2.0/AuthorizationCodeLifetime-1.0.0
     name: AuthorizationCodeLifetime
-  - id: System.TestIdentity/AbsoluteRefreshTokenLifetime
+  - id: System.TestIdentity-1.2.0/AbsoluteRefreshTokenLifetime-1.0.0
     name: AbsoluteRefreshTokenLifetime
-  - id: System.TestIdentity/SlidingRefreshTokenLifetime
+  - id: System.TestIdentity-1.2.0/SlidingRefreshTokenLifetime-1.0.0
     name: SlidingRefreshTokenLifetime
-  - id: System.TestIdentity/ConsentLifetime
+  - id: System.TestIdentity-1.2.0/ConsentLifetime-1.0.0
     name: ConsentLifetime
     isOptional: true
-  - id: System.TestIdentity/UpdateAccessTokenClaimsOnRefresh
+  - id: System.TestIdentity-1.2.0/UpdateAccessTokenClaimsOnRefresh-1.0.0
     name: UpdateAccessTokenClaimsOnRefresh
-  - id: System.TestIdentity/RefreshTokenExpiration
+  - id: System.TestIdentity-1.2.0/RefreshTokenExpiration-1.0.0
     name: RefreshTokenExpiration
-  - id: System.TestIdentity/AccessTokenType
+  - id: System.TestIdentity-1.2.0/AccessTokenType-1.0.0
     name: AccessTokenType
-  - id: System.TestIdentity/EnableLocalLogin
+  - id: System.TestIdentity-1.2.0/EnableLocalLogin-1.0.0
     name: EnableLocalLogin
-  - id: System.TestIdentity/IdentityProviderRestrictions
+  - id: System.TestIdentity-1.2.0/IdentityProviderRestrictions-1.0.0
     name: IdentityProviderRestrictions
-  - id: System.TestIdentity/IncludeJwtId
+  - id: System.TestIdentity-1.2.0/IncludeJwtId-1.0.0
     name: IncludeJwtId
-  - id: System.TestIdentity/ClientClaims
+  - id: System.TestIdentity-1.2.0/ClientClaims-1.0.0
     name: ClientClaims
-  - id: System.TestIdentity/AlwaysSendClientClaims
+  - id: System.TestIdentity-1.2.0/AlwaysSendClientClaims-1.0.0
     name: AlwaysSendClientClaims
-  - id: System.TestIdentity/ClientClaimsPrefix
+  - id: System.TestIdentity-1.2.0/ClientClaimsPrefix-1.0.0
     name: ClientClaimsPrefix
     isOptional: true
-  - id: System.TestIdentity/PairWiseSubjectSalt
+  - id: System.TestIdentity-1.2.0/PairWiseSubjectSalt-1.0.0
     name: PairWiseSubjectSalt
     isOptional: true
-  - id: System.TestIdentity/UserSsoLifetime
+  - id: System.TestIdentity-1.2.0/UserSsoLifetime-1.0.0
     name: UserSsoLifetime
     isOptional: true
-  - id: System.TestIdentity/UserCodeType
+  - id: System.TestIdentity-1.2.0/UserCodeType-1.0.0
     name: UserCodeType
     isOptional: true
-  - id: System.TestIdentity/DeviceCodeLifetime
+  - id: System.TestIdentity-1.2.0/DeviceCodeLifetime-1.0.0
     name: DeviceCodeLifetime
-  - id: System.TestIdentity/CibaLifetime
+  - id: System.TestIdentity-1.2.0/CibaLifetime-1.0.0
     name: CibaLifetime
     isOptional: true
-  - id: System.TestIdentity/PollingInterval
+  - id: System.TestIdentity-1.2.0/PollingInterval-1.0.0
     name: PollingInterval
     isOptional: true
-  - id: System.TestIdentity/CoordinateLifetimeWithUserSession
+  - id: System.TestIdentity-1.2.0/CoordinateLifetimeWithUserSession-1.0.0
     name: CoordinateLifetimeWithUserSession
     isOptional: true
-  - id: System.TestIdentity/AllowedCorsOrigins
+  - id: System.TestIdentity-1.2.0/AllowedCorsOrigins-1.0.0
     name: AllowedCorsOrigins
-  - id: System.TestIdentity/InitiateLoginUri
+  - id: System.TestIdentity-1.2.0/InitiateLoginUri-1.0.0
     name: InitiateLoginUri
     isOptional: true
 - typeId: ApiResource
-  derivedFromCkTypeId: System.TestIdentity/Resource
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/Resource-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/RequireResourceIndicator
+  - id: System.TestIdentity-1.2.0/RequireResourceIndicator-1.0.0
     name: RequireResourceIndicator
-  - id: System.TestIdentity/Secrets
+  - id: System.TestIdentity-1.2.0/Secrets-1.0.0
     name: ApiSecrets
-  - id: System.TestIdentity/Scopes
+  - id: System.TestIdentity-1.2.0/Scopes-1.0.0
     name: Scopes
-  - id: System.TestIdentity/AllowedAccessTokenSigningAlgorithms
+  - id: System.TestIdentity-1.2.0/AllowedAccessTokenSigningAlgorithms-1.0.0
     name: AllowedAccessTokenSigningAlgorithms
 - isCollectionRoot: true
   typeId: IdentityProvider
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isAbstract: true
   attributes:
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
-  - id: System/Enabled
+  - id: System-1.0.0/Enabled-1.0.0
     name: Enabled
-  - id: System.TestIdentity/IdentityProviderType
+  - id: System.TestIdentity-1.2.0/IdentityProviderType-1.0.0
     name: Type
-  - id: System/DisplayName
+  - id: System-1.0.0/DisplayName-1.0.0
     name: DisplayName
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
     isOptional: true
 - typeId: ApiScope
-  derivedFromCkTypeId: System.TestIdentity/Resource
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/Resource-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/IsEmphasized
+  - id: System.TestIdentity-1.2.0/IsEmphasized-1.0.0
     name: IsEmphasized
-  - id: System.TestIdentity/IsRequired
+  - id: System.TestIdentity-1.2.0/IsRequired-1.0.0
     name: IsRequired
 - typeId: IdentityResource
-  derivedFromCkTypeId: System.TestIdentity/Resource
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/Resource-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/IsEmphasized
+  - id: System.TestIdentity-1.2.0/IsEmphasized-1.0.0
     name: IsEmphasized
-  - id: System.TestIdentity/IsRequired
+  - id: System.TestIdentity-1.2.0/IsRequired-1.0.0
     name: IsRequired
 - isCollectionRoot: true
   typeId: Role
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
     isOptional: true
-  - id: System.TestIdentity/NormalizedName
+  - id: System.TestIdentity-1.2.0/NormalizedName-1.0.0
     name: NormalizedName
     isOptional: true
-  - id: System.TestIdentity/ConcurrencyStamp
+  - id: System.TestIdentity-1.2.0/ConcurrencyStamp-1.0.0
     name: ConcurrencyStamp
-  - id: System.TestIdentity/SubjectIds
+  - id: System.TestIdentity-1.2.0/SubjectIds-1.0.0
     name: SubjectIds
-  - id: System.TestIdentity/IdentityRoleIds
+  - id: System.TestIdentity-1.2.0/IdentityRoleIds-1.0.0
     name: IdentityRoleIds
-  - id: System.TestIdentity/RoleClaims
+  - id: System.TestIdentity-1.2.0/RoleClaims-1.0.0
     name: Claims
     isOptional: true
 - typeId: AzureEntraIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/IdentityProvider-1.0.0
   isFinal: true
   attributes:
-  - id: System/TenantId
+  - id: System-1.0.0/TenantId-1.0.0
     name: TenantId
-  - id: System.TestIdentity/Authority
+  - id: System.TestIdentity-1.2.0/Authority-1.0.0
     name: Authority
-  - id: System.TestIdentity/ClientId
+  - id: System.TestIdentity-1.2.0/ClientId-1.0.0
     name: ClientIdGroupGraphApi
-  - id: System.TestIdentity/ClientIdGroupAzureAd
+  - id: System.TestIdentity-1.2.0/ClientIdGroupAzureAd-1.0.0
     name: ClientIdGroupAzureAd
-  - id: System.TestIdentity/ClientSecret
+  - id: System.TestIdentity-1.2.0/ClientSecret-1.0.0
     name: ClientSecretGroupAzureAd
 - isCollectionRoot: true
   typeId: PersistedGrant
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/GrantKey
+  - id: System.TestIdentity-1.2.0/GrantKey-1.0.0
     name: GrantKey
-  - id: System.TestIdentity/GrantType
+  - id: System.TestIdentity-1.2.0/GrantType-1.0.0
     name: GrantType
-  - id: System.TestIdentity/SubjectId
+  - id: System.TestIdentity-1.2.0/SubjectId-1.0.0
     name: SubjectId
-  - id: System.TestIdentity/SessionId
+  - id: System.TestIdentity-1.2.0/SessionId-1.0.0
     name: SessionId
-  - id: System.TestIdentity/ClientId
+  - id: System.TestIdentity-1.2.0/ClientId-1.0.0
     name: ClientId
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
-  - id: System.TestIdentity/CreationDateTime
+  - id: System.TestIdentity-1.2.0/CreationDateTime-1.0.0
     name: CreationDateTime
-  - id: System.TestIdentity/ExpirationDateTime
+  - id: System.TestIdentity-1.2.0/ExpirationDateTime-1.0.0
     name: ExpirationDateTime
     isOptional: true
-  - id: System.TestIdentity/ConsumedDateTime
+  - id: System.TestIdentity-1.2.0/ConsumedDateTime-1.0.0
     name: ConsumedDateTime
     isOptional: true
-  - id: System.TestIdentity/Data
+  - id: System.TestIdentity-1.2.0/Data-1.0.0
     name: Data
 - typeId: OpenLdapIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/IdentityProvider-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/HostAddress
+  - id: System.TestIdentity-1.2.0/HostAddress-1.0.0
     name: HostAddress
-  - id: System.TestIdentity/UseTls
+  - id: System.TestIdentity-1.2.0/UseTls-1.0.0
     name: UseTls
-  - id: System.TestIdentity/HostPort
+  - id: System.TestIdentity-1.2.0/HostPort-1.0.0
     name: HostPort
-  - id: System.TestIdentity/UserBaseDn
+  - id: System.TestIdentity-1.2.0/UserBaseDn-1.0.0
     name: UserBaseDn
-  - id: System.TestIdentity/UserNameAttribute
+  - id: System.TestIdentity-1.2.0/UserNameAttribute-1.0.0
     name: UserNameAttribute
 - isCollectionRoot: true
   typeId: PermissionRole
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
-  - id: System.TestIdentity/RoleId
+  - id: System.TestIdentity-1.2.0/RoleId-1.0.0
     name: RoleId
-  - id: System.TestIdentity/SubjectIds
+  - id: System.TestIdentity-1.2.0/SubjectIds-1.0.0
     name: SubjectIds
-  - id: System.TestIdentity/IdentityRoleIds
+  - id: System.TestIdentity-1.2.0/IdentityRoleIds-1.0.0
     name: IdentityRoleIds
 - isCollectionRoot: true
   typeId: Permission
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/PermissionId
+  - id: System.TestIdentity-1.2.0/PermissionId-1.0.0
     name: PermissionId
-  - id: System.TestIdentity/IdentityRoleIds
+  - id: System.TestIdentity-1.2.0/IdentityRoleIds-1.0.0
     name: IdentityRoleIds
 - typeId: MicrosoftIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/IdentityProvider-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClientId
+  - id: System.TestIdentity-1.2.0/ClientId-1.0.0
     name: ClientId
-  - id: System.TestIdentity/ClientSecret
+  - id: System.TestIdentity-1.2.0/ClientSecret-1.0.0
     name: ClientSecret
 - isCollectionRoot: true
   typeId: User
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   indexes:
   - indexType: Ascending
@@ -295,93 +295,93 @@ types:
       - NormalizedEmail
       - NormalizedUserName
   attributes:
-  - id: System.TestIdentity/UserName
+  - id: System.TestIdentity-1.2.0/UserName-1.0.0
     name: UserName
     isOptional: true
-  - id: System.TestIdentity/NormalizedUserName
+  - id: System.TestIdentity-1.2.0/NormalizedUserName-1.0.0
     name: NormalizedUserName
     isOptional: true
-  - id: System.TestIdentity/FirstName
+  - id: System.TestIdentity-1.2.0/FirstName-1.0.0
     name: FirstName
     isOptional: true
-  - id: System.TestIdentity/LastName
+  - id: System.TestIdentity-1.2.0/LastName-1.0.0
     name: LastName
     isOptional: true
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
     isOptional: true
-  - id: System.TestIdentity/Email
+  - id: System.TestIdentity-1.2.0/Email-1.0.0
     name: Email
     isOptional: true
-  - id: System.TestIdentity/NormalizedEmail
+  - id: System.TestIdentity-1.2.0/NormalizedEmail-1.0.0
     name: NormalizedEmail
     isOptional: true
-  - id: System.TestIdentity/EmailConfirmed
+  - id: System.TestIdentity-1.2.0/EmailConfirmed-1.0.0
     name: EmailConfirmed
-  - id: System.TestIdentity/PasswordHash
+  - id: System.TestIdentity-1.2.0/PasswordHash-1.0.0
     name: PasswordHash
     isOptional: true
-  - id: System.TestIdentity/SecurityStamp
+  - id: System.TestIdentity-1.2.0/SecurityStamp-1.0.0
     name: SecurityStamp
     isOptional: true
-  - id: System.TestIdentity/ConcurrencyStamp
+  - id: System.TestIdentity-1.2.0/ConcurrencyStamp-1.0.0
     name: ConcurrencyStamp
-  - id: System.TestIdentity/PhoneNumber
+  - id: System.TestIdentity-1.2.0/PhoneNumber-1.0.0
     name: PhoneNumber
     isOptional: true
-  - id: System.TestIdentity/PhoneNumberConfirmed
+  - id: System.TestIdentity-1.2.0/PhoneNumberConfirmed-1.0.0
     name: PhoneNumberConfirmed
-  - id: System.TestIdentity/TwoFactorEnabled
+  - id: System.TestIdentity-1.2.0/TwoFactorEnabled-1.0.0
     name: TwoFactorEnabled
-  - id: System.TestIdentity/LockoutEnd
+  - id: System.TestIdentity-1.2.0/LockoutEnd-1.0.0
     name: LockoutEnd
     isOptional: true
-  - id: System.TestIdentity/LockoutEnabled
+  - id: System.TestIdentity-1.2.0/LockoutEnabled-1.0.0
     name: LockoutEnabled
-  - id: System.TestIdentity/AccessFailedCount
+  - id: System.TestIdentity-1.2.0/AccessFailedCount-1.0.0
     name: AccessFailedCount
-  - id: System.TestIdentity/ResetPasswordOnLogin
+  - id: System.TestIdentity-1.2.0/ResetPasswordOnLogin-1.0.0
     name: ResetPasswordOnLogin
-  - id: System.TestIdentity/RoleIds
+  - id: System.TestIdentity-1.2.0/RoleIds-1.0.0
     name: RoleIds
     isOptional: true
-  - id: System.TestIdentity/UserClaims
+  - id: System.TestIdentity-1.2.0/UserClaims-1.0.0
     name: Claims
     isOptional: true
-  - id: System.TestIdentity/UserLogins
+  - id: System.TestIdentity-1.2.0/UserLogins-1.0.0
     name: UserLogins
     isOptional: true
-  - id: System.TestIdentity/UserTokens
+  - id: System.TestIdentity-1.2.0/UserTokens-1.0.0
     name: UserTokens
     isOptional: true
 - typeId: MicrosoftAdIdentityProvider
-  derivedFromCkTypeId: System.TestIdentity/IdentityProvider
+  derivedFromCkTypeId: System.TestIdentity-1.2.0/IdentityProvider-1.0.0
   isFinal: true
   attributes:
-  - id: System.TestIdentity/HostAddress
+  - id: System.TestIdentity-1.2.0/HostAddress-1.0.0
     name: HostAddress
-  - id: System.TestIdentity/UseTls
+  - id: System.TestIdentity-1.2.0/UseTls-1.0.0
     name: UseTls
-  - id: System.TestIdentity/HostPort
+  - id: System.TestIdentity-1.2.0/HostPort-1.0.0
     name: HostPort
 - isCollectionRoot: true
   typeId: Resource
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isAbstract: true
   attributes:
-  - id: System/Enabled
+  - id: System-1.0.0/Enabled-1.0.0
     name: Enabled
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
-  - id: System/DisplayName
+  - id: System-1.0.0/DisplayName-1.0.0
     name: DisplayName
     isOptional: true
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
     isOptional: true
-  - id: System.TestIdentity/ResourceClaims
+  - id: System.TestIdentity-1.2.0/ResourceClaims-1.0.0
     name: Claims
-  - id: System.TestIdentity/ShowInDiscoveryDocument
+  - id: System.TestIdentity-1.2.0/ShowInDiscoveryDocument-1.0.0
     name: ShowInDiscoveryDocument
 associationRoles: []
 attributes:
@@ -481,19 +481,19 @@ attributes:
   valueType: String
 - id: UserClaims
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/UserClaim
+  valueCkRecordId: System.TestIdentity-1.2.0/UserClaim-1.0.0
   description: The claims of the user.
 - id: RoleClaims
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/RoleClaim
+  valueCkRecordId: System.TestIdentity-1.2.0/RoleClaim-1.0.0
   description: The claims of a role.
 - id: UserLogins
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/UserLogin
+  valueCkRecordId: System.TestIdentity-1.2.0/UserLogin-1.0.0
   description: The existing logins of the user.
 - id: UserTokens
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/UserToken
+  valueCkRecordId: System.TestIdentity-1.2.0/UserToken-1.0.0
   description: The tokens of the user.
 - id: SubjectIds
   valueType: StringArray
@@ -542,7 +542,7 @@ attributes:
   - false
 - id: Secrets
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/Secret
+  valueCkRecordId: System.TestIdentity-1.2.0/Secret-1.0.0
   defaultValues: []
 - id: Scopes
   valueType: StringArray
@@ -685,7 +685,7 @@ attributes:
   description: Lifetime of a user consent in seconds. Defaults to null (no expiration)
 - id: RefreshTokenUsage
   valueType: Enum
-  valueCkEnumId: System.TestIdentity/TokenUsage
+  valueCkEnumId: System.TestIdentity-1.2.0/TokenUsage-1.0.0
   description: Gets or sets a value indicating whether the refresh token should be updated on a refresh token request.
 - id: UpdateAccessTokenClaimsOnRefresh
   valueType: Boolean
@@ -694,13 +694,13 @@ attributes:
   description: Indicates whether the access token (and its claims) should be updated on a refresh token request.
 - id: RefreshTokenExpiration
   valueType: Enum
-  valueCkEnumId: System.TestIdentity/TokenExpiration
+  valueCkEnumId: System.TestIdentity-1.2.0/TokenExpiration-1.0.0
   defaultValues:
   - 1
   description: Gets or sets a value indicating whether the access token (and its claims) should be updated on a refresh token request.
 - id: AccessTokenType
   valueType: Enum
-  valueCkEnumId: System.TestIdentity/TokenType
+  valueCkEnumId: System.TestIdentity-1.2.0/TokenType-1.0.0
   defaultValues:
   - 0
   description: Specifies whether the access token is a reference token or a self contained JWT token (defaults to Jwt).
@@ -720,7 +720,7 @@ attributes:
   description: Value indicating whether JWT access tokens should include an identifier. Defaults to true.
 - id: ClientClaims
   valueType: RecordArray
-  valueCkRecordId: System.TestIdentity/ClientClaim
+  valueCkRecordId: System.TestIdentity-1.2.0/ClientClaim-1.0.0
   defaultValues: []
   description: Gets or sets the client claims to be sent to the user info endpoint.
 - id: AlwaysSendClientClaims
@@ -765,7 +765,7 @@ attributes:
   description: Gets of sets a URI that can be used to initiate login from the IdentityServer host or a third party.
 - id: IdentityProviderType
   valueType: Enum
-  valueCkEnumId: System.TestIdentity/IdentityProviderTypes
+  valueCkEnumId: System.TestIdentity-1.2.0/IdentityProviderTypes-1.0.0
   description: Gets or sets the type of the identity provider
 - id: Authority
   valueType: String
@@ -827,65 +827,65 @@ records:
 - recordId: Secret
   isFinal: true
   attributes:
-  - id: System/Description
+  - id: System-1.0.0/Description-1.0.0
     name: Description
     isOptional: true
-  - id: System.TestIdentity/ExpirationDateTime
+  - id: System.TestIdentity-1.2.0/ExpirationDateTime-1.0.0
     name: ExpirationDateTime
     isOptional: true
-  - id: System.TestIdentity/Value
+  - id: System.TestIdentity-1.2.0/Value-1.0.0
     name: Value
     isOptional: true
-  - id: System.TestIdentity/SecretType
+  - id: System.TestIdentity-1.2.0/SecretType-1.0.0
     name: Type
 - recordId: ClientClaim
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClaimType
+  - id: System.TestIdentity-1.2.0/ClaimType-1.0.0
     name: ClaimType
-  - id: System.TestIdentity/ClaimValue
+  - id: System.TestIdentity-1.2.0/ClaimValue-1.0.0
     name: ClaimValue
-  - id: System.TestIdentity/ClaimValueType
+  - id: System.TestIdentity-1.2.0/ClaimValueType-1.0.0
     name: ClaimValueType
 - recordId: UserToken
   isFinal: true
   attributes:
-  - id: System.TestIdentity/LoginProvider
+  - id: System.TestIdentity-1.2.0/LoginProvider-1.0.0
     name: LoginProvider
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
-  - id: System.TestIdentity/UserId
+  - id: System.TestIdentity-1.2.0/UserId-1.0.0
     name: UserId
-  - id: System.TestIdentity/Value
+  - id: System.TestIdentity-1.2.0/Value-1.0.0
     name: Value
     isOptional: true
 - recordId: UserClaim
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClaimType
+  - id: System.TestIdentity-1.2.0/ClaimType-1.0.0
     name: ClaimType
-  - id: System.TestIdentity/ClaimValue
+  - id: System.TestIdentity-1.2.0/ClaimValue-1.0.0
     name: ClaimValue
-  - id: System.TestIdentity/UserId
+  - id: System.TestIdentity-1.2.0/UserId-1.0.0
     name: UserId
 - recordId: UserLogin
   isFinal: true
   attributes:
-  - id: System.TestIdentity/LoginProvider
+  - id: System.TestIdentity-1.2.0/LoginProvider-1.0.0
     name: LoginProvider
-  - id: System.TestIdentity/ProviderKey
+  - id: System.TestIdentity-1.2.0/ProviderKey-1.0.0
     name: ProviderKey
-  - id: System.TestIdentity/ProviderDisplayName
+  - id: System.TestIdentity-1.2.0/ProviderDisplayName-1.0.0
     name: ProviderDisplayName
     isOptional: true
-  - id: System.TestIdentity/UserId
+  - id: System.TestIdentity-1.2.0/UserId-1.0.0
     name: UserId
 - recordId: RoleClaim
   isFinal: true
   attributes:
-  - id: System.TestIdentity/ClaimType
+  - id: System.TestIdentity-1.2.0/ClaimType-1.0.0
     name: ClaimType
-  - id: System.TestIdentity/ClaimValue
+  - id: System.TestIdentity-1.2.0/ClaimValue-1.0.0
     name: ClaimValue
 enums:
 - enumId: TokenUsage

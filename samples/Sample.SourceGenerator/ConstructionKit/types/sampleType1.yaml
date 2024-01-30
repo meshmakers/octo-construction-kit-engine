@@ -6,6 +6,9 @@ types:
       - id: Sample1/SampleAttribute
         name: MyAttribute
         isOptional: true
+        autoCompleteValues:
+          - "Value1"
+          - "Value2"
       - id: Sample1/DateTimeAttribute
         name: DateTimeAttribute
       - id: Sample1/Type

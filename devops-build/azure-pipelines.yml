@@ -6,7 +6,10 @@ trigger:
     include:
       - dev/*
       - main
-
+  tags:
+    exclude:
+      - '*'
+  
 variables:
   buildConfiguration: 'Release'
   isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/r')]

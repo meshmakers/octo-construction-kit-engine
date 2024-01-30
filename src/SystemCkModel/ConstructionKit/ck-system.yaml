@@ -4,7 +4,7 @@ types:
   isAbstract: true
 - isCollectionRoot: true
   typeId: Tenant
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   indexes:
   - indexType: Ascending
@@ -12,52 +12,52 @@ types:
     - attributeNames:
       - TenantId
   attributes:
-  - id: System/TenantId
+  - id: System-1.0.0/TenantId-1.0.0
     name: TenantId
-  - id: System/ParentTenantId
+  - id: System-1.0.0/ParentTenantId-1.0.0
     name: ParentTenantId
     isOptional: true
-  - id: System/DatabaseName
+  - id: System-1.0.0/DatabaseName-1.0.0
     name: DatabaseName
 - isCollectionRoot: true
   typeId: AutoIncrement
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   attributes:
-  - id: System/AutoIncrement.Start
+  - id: System-1.0.0/AutoIncrement.Start-1.0.0
     name: Start
-  - id: System/AutoIncrement.End
+  - id: System-1.0.0/AutoIncrement.End-1.0.0
     name: End
-  - id: System/AutoIncrement.CurrentValue
+  - id: System-1.0.0/AutoIncrement.CurrentValue-1.0.0
     name: CurrentValue
     isOptional: true
 - isCollectionRoot: true
   typeId: Query
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   attributes:
-  - id: System/Query.CkTypeId
+  - id: System-1.0.0/Query.CkTypeId-1.0.0
     name: QueryCkTypeId
-  - id: System/Query.Columns
+  - id: System-1.0.0/Query.Columns-1.0.0
     name: Columns
-  - id: System/Query.Sorting
+  - id: System-1.0.0/Query.Sorting-1.0.0
     name: Sorting
     isOptional: true
-  - id: System/Query.FieldFilter
+  - id: System-1.0.0/Query.FieldFilter-1.0.0
     name: FieldFilter
     isOptional: true
-  - id: System/Query.TextSearchFilter
+  - id: System-1.0.0/Query.TextSearchFilter-1.0.0
     name: TextSearchFilter
     isOptional: true
-  - id: System/Query.AttributeSearchFilter
+  - id: System-1.0.0/Query.AttributeSearchFilter-1.0.0
     name: AttributeSearchFilter
     isOptional: true
-  - id: System/Name
+  - id: System-1.0.0/Name-1.0.0
     name: Name
 - isCollectionRoot: true
   typeId: Configuration
-  derivedFromCkTypeId: System/Entity
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
   isFinal: true
   attributes:
-  - id: System/ConfigurationValue
+  - id: System-1.0.0/ConfigurationValue-1.0.0
     name: ConfigurationValue
     isOptional: true
 associationRoles:

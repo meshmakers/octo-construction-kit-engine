@@ -5,8 +5,8 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${{ thisModel }}/PermissionId
+      - id: ${thisModel}/PermissionId
         name: PermissionId
 
-      - id: ${{ thisModel }}/IdentityRoleIds
+      - id: ${thisModel}/IdentityRoleIds
         name: IdentityRoleIds

@@ -41,7 +41,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the origin ck type id.
     /// </summary>
-    public CkId<CkTypeId> OriginCkTypeId { get; set; } = null!;
+    public CkId<CkTypeId>? OriginCkTypeId { get; set; }
 
     /// <summary>
     ///     Gets or sets the object id of the target runtime entity
@@ -51,12 +51,12 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the target ck type id.
     /// </summary>
-    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
+    public CkId<CkTypeId>? TargetCkTypeId { get; set; }
 
     /// <summary>
     ///     Gets or sets the association role id of the association role
     /// </summary>
-    public CkId<CkAssociationRoleId> AssociationRoleId { get; set; } = null!;
+    public CkId<CkAssociationRoleId>? AssociationRoleId { get; set; }
 
     /// <inheritdoc />
     protected override string GetLocation()

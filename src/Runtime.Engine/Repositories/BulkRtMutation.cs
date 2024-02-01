@@ -81,14 +81,7 @@ internal class BulkRtMutation : IBulkRtMutation
         var rtEntities = rtEntityList.ToList();
         rtEntities.ForEach(x => x.RtCreationDateTime = DateTime.Now);
         rtEntities.ForEach(x => x.RtChangedDateTime = x.RtCreationDateTime);
-        rtEntities.ForEach(x =>
-            {
-                if (string.IsNullOrWhiteSpace(x.CkTypeId.FullName))
-                {
-                    x.CkTypeId = x.GetCkTypeId();
-                }
-            }
-        );
+        rtEntities.ForEach(x => { x.CkTypeId ??= x.GetCkTypeId(); });
 
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.GetCkTypeId()))
         {

@@ -236,7 +236,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task ReplaceOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -266,7 +266,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task UpdateOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -281,7 +281,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task UpdateManyRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />

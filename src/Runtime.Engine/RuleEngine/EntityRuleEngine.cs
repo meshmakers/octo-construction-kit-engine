@@ -63,7 +63,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                         info.RtEntity.Attributes[attribute.AttributeName] == null)
                     {
                         operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(tenantId,
-                            attribute.CkAttributeId, info.RtEntity.CkTypeId, info.RtEntity.RtId));
+                            attribute.CkAttributeId, info.RtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), info.RtEntity.RtId));
                         isInError = true;
                     }
                 }

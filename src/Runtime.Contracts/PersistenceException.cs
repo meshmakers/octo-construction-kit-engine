@@ -30,6 +30,16 @@ public class PersistenceException : Exception
 
     internal static Exception CkIdAttributeNotSet(Type type)
     {
-        throw new PersistenceException($"CkIdAttribute not set on type {type.FullName}");
+        return new PersistenceException($"CkIdAttribute not set on type {type.FullName}");
+    }
+
+    internal static Exception CkTypeIdNotSet()
+    {
+        return new PersistenceException("CkTypeId not set");
+    }
+
+    internal static Exception AssociationRoleIdNotSet()
+    {
+        return new PersistenceException("AssociationRoleId not set");
     }
 }

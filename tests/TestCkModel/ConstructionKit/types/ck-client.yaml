@@ -8,16 +8,16 @@ types:
       - id: System/Enabled
         name: Enabled
 
-      - id: ${{ thisModel }}/ClientId
+      - id: ${thisModel}/ClientId
         name: ClientId
 
-      - id: ${{ thisModel }}/ProtocolType
+      - id: ${thisModel}/ProtocolType
         name: ProtocolType
 
-      - id: ${{ thisModel }}/Secrets
+      - id: ${thisModel}/Secrets
         name: ClientSecrets
 
-      - id: ${{ thisModel }}/RequireClientSecret
+      - id: ${thisModel}/RequireClientSecret
         name: RequireClientSecret
 
       - id: System/Name
@@ -28,121 +28,121 @@ types:
         name: Description
         isOptional: true
 
-      - id: ${{ thisModel }}/ClientUri
+      - id: ${thisModel}/ClientUri
         name: ClientUri
         isOptional: true
 
-      - id: ${{ thisModel }}/LogoUri
+      - id: ${thisModel}/LogoUri
         name: LogoUri
         isOptional: true
 
-      - id: ${{ thisModel }}/RequireConsent
+      - id: ${thisModel}/RequireConsent
         name: RequireConsent
         isOptional: true
 
-      - id: ${{ thisModel }}/AllowRememberConsent
+      - id: ${thisModel}/AllowRememberConsent
         name: AllowRememberConsent
 
-      - id: ${{ thisModel }}/AllowedGrantTypes
+      - id: ${thisModel}/AllowedGrantTypes
         name: AllowedGrantTypes
 
-      - id: ${{ thisModel }}/RequirePkce
+      - id: ${thisModel}/RequirePkce
         name: RequirePkce
 
-      - id: ${{ thisModel }}/AllowPlainTextPkce
+      - id: ${thisModel}/AllowPlainTextPkce
         name: AllowPlainTextPkce
 
-      - id: ${{ thisModel }}/RequireRequestObject
+      - id: ${thisModel}/RequireRequestObject
         name: RequireRequestObject
 
-      - id: ${{ thisModel }}/AllowAccessTokensViaBrowser
+      - id: ${thisModel}/AllowAccessTokensViaBrowser
         name: AllowAccessTokensViaBrowser
 
-      - id: ${{ thisModel }}/RequireDPoP
+      - id: ${thisModel}/RequireDPoP
         name: RequireDPoP
 
-      - id: ${{ thisModel }}/DPoPValidationMode
+      - id: ${thisModel}/DPoPValidationMode
         name: DPoPValidationMode
 
-      - id: ${{ thisModel }}/DPoPClockSkew
+      - id: ${thisModel}/DPoPClockSkew
         name: DPoPClockSkew
-      - id: ${{ thisModel }}/RedirectUris
+      - id: ${thisModel}/RedirectUris
         name: RedirectUris
 
-      - id: ${{ thisModel }}/PostLogoutRedirectUris
+      - id: ${thisModel}/PostLogoutRedirectUris
         name: PostLogoutRedirectUris
-      - id: ${{ thisModel }}/FrontChannelLogoutUri
+      - id: ${thisModel}/FrontChannelLogoutUri
         name: FrontChannelLogoutUri
         isOptional: true
-      - id: ${{ thisModel }}/FrontChannelLogoutSessionRequired
+      - id: ${thisModel}/FrontChannelLogoutSessionRequired
         name: FrontChannelLogoutSessionRequired
-      - id: ${{ thisModel }}/BackChannelLogoutUri
+      - id: ${thisModel}/BackChannelLogoutUri
         name: BackChannelLogoutUri
         isOptional: true
-      - id: ${{ thisModel }}/BackChannelLogoutSessionRequired
+      - id: ${thisModel}/BackChannelLogoutSessionRequired
         name: BackChannelLogoutSessionRequired
-      - id: ${{ thisModel }}/AllowOfflineAccess
+      - id: ${thisModel}/AllowOfflineAccess
         name: AllowOfflineAccess
-      - id: ${{ thisModel }}/AllowedScopes
+      - id: ${thisModel}/AllowedScopes
         name: AllowedScopes
-      - id: ${{ thisModel }}/AlwaysIncludeUserClaimsInIdToken
+      - id: ${thisModel}/AlwaysIncludeUserClaimsInIdToken
         name: AlwaysIncludeUserClaimsInIdToken
-      - id: ${{ thisModel }}/IdentityTokenLifetime
+      - id: ${thisModel}/IdentityTokenLifetime
         name: IdentityTokenLifetime
-      - id: ${{ thisModel }}/AllowedIdentityTokenSigningAlgorithms
+      - id: ${thisModel}/AllowedIdentityTokenSigningAlgorithms
         name: AllowedIdentityTokenSigningAlgorithms
-      - id: ${{ thisModel }}/AccessTokenLifetime
+      - id: ${thisModel}/AccessTokenLifetime
         name: AccessTokenLifetime
-      - id: ${{ thisModel }}/AuthorizationCodeLifetime
+      - id: ${thisModel}/AuthorizationCodeLifetime
         name: AuthorizationCodeLifetime
-      - id: ${{ thisModel }}/AbsoluteRefreshTokenLifetime
+      - id: ${thisModel}/AbsoluteRefreshTokenLifetime
         name: AbsoluteRefreshTokenLifetime
-      - id: ${{ thisModel }}/SlidingRefreshTokenLifetime
+      - id: ${thisModel}/SlidingRefreshTokenLifetime
         name: SlidingRefreshTokenLifetime
-      - id: ${{ thisModel }}/ConsentLifetime
+      - id: ${thisModel}/ConsentLifetime
         name: ConsentLifetime
         isOptional: true
-      - id: ${{ thisModel }}/UpdateAccessTokenClaimsOnRefresh
+      - id: ${thisModel}/UpdateAccessTokenClaimsOnRefresh
         name: UpdateAccessTokenClaimsOnRefresh
-      - id: ${{ thisModel }}/RefreshTokenExpiration
+      - id: ${thisModel}/RefreshTokenExpiration
         name: RefreshTokenExpiration
-      - id: ${{ thisModel }}/AccessTokenType
+      - id: ${thisModel}/AccessTokenType
         name: AccessTokenType
-      - id: ${{ thisModel }}/EnableLocalLogin
+      - id: ${thisModel}/EnableLocalLogin
         name: EnableLocalLogin
-      - id: ${{ thisModel }}/IdentityProviderRestrictions
+      - id: ${thisModel}/IdentityProviderRestrictions
         name: IdentityProviderRestrictions
-      - id: ${{ thisModel }}/IncludeJwtId
+      - id: ${thisModel}/IncludeJwtId
         name: IncludeJwtId
-      - id: ${{ thisModel }}/ClientClaims
+      - id: ${thisModel}/ClientClaims
         name: ClientClaims
-      - id: ${{ thisModel }}/AlwaysSendClientClaims
+      - id: ${thisModel}/AlwaysSendClientClaims
         name: AlwaysSendClientClaims
-      - id: ${{ thisModel }}/ClientClaimsPrefix
+      - id: ${thisModel}/ClientClaimsPrefix
         name: ClientClaimsPrefix
         isOptional: true
-      - id: ${{ thisModel }}/PairWiseSubjectSalt
+      - id: ${thisModel}/PairWiseSubjectSalt
         name: PairWiseSubjectSalt
         isOptional: true
-      - id: ${{ thisModel }}/UserSsoLifetime
+      - id: ${thisModel}/UserSsoLifetime
         name: UserSsoLifetime
         isOptional: true
-      - id: ${{ thisModel }}/UserCodeType
+      - id: ${thisModel}/UserCodeType
         name: UserCodeType
         isOptional: true
-      - id: ${{ thisModel }}/DeviceCodeLifetime
+      - id: ${thisModel}/DeviceCodeLifetime
         name: DeviceCodeLifetime
-      - id: ${{ thisModel }}/CibaLifetime
+      - id: ${thisModel}/CibaLifetime
         name: CibaLifetime
         isOptional: true
-      - id: ${{ thisModel }}/PollingInterval
+      - id: ${thisModel}/PollingInterval
         name: PollingInterval
         isOptional: true
-      - id: ${{ thisModel }}/CoordinateLifetimeWithUserSession
+      - id: ${thisModel}/CoordinateLifetimeWithUserSession
         name: CoordinateLifetimeWithUserSession
         isOptional: true
-      - id: ${{ thisModel }}/AllowedCorsOrigins
+      - id: ${thisModel}/AllowedCorsOrigins
         name: AllowedCorsOrigins
-      - id: ${{ thisModel }}/InitiateLoginUri
+      - id: ${thisModel}/InitiateLoginUri
         name: InitiateLoginUri
         isOptional: true

@@ -136,7 +136,7 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
         await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
 
         var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync(new LocalSession(),
-            new RtEntityId(rtEntity.CkTypeId, rtEntity.RtId));
+            new RtEntityId(rtEntity.CkTypeId ?? throw new Exception(), rtEntity.RtId));
 
         Assert.NotNull(copy);
         Assert.Equal(copy.RtId, rtEntity.RtId);

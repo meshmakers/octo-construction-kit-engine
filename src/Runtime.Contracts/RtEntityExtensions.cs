@@ -15,6 +15,10 @@ public static class RtEntityExtensions
     /// <returns></returns>
     public static RtEntityId ToRtEntityId(this RtEntity rtEntity)
     {
+        if (rtEntity.CkTypeId == null)
+        {
+            throw PersistenceException.CkTypeIdNotSet();
+        }
         return new RtEntityId(rtEntity.CkTypeId, rtEntity.RtId);
     }
 
@@ -27,7 +31,7 @@ public static class RtEntityExtensions
     public static CkId<CkTypeId> GetCkTypeId<TEntity>(this TEntity rtEntity)
         where TEntity : RtEntity
     {
-        if (!string.IsNullOrWhiteSpace(rtEntity.CkTypeId.Key.TypeId))
+        if (rtEntity.CkTypeId != null)
         {
             return rtEntity.CkTypeId;
         }

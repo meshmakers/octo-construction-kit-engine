@@ -79,11 +79,11 @@ public class CompilerService : ICompilerService
             Attributes =
                 new List<CkTypeAttributeDto>
                 {
-                    new() { CkAttributeId = "${{ thisModel }}/SampleAttribute1", AttributeName = "MyAttribute" },
-                    new() { CkAttributeId = "${{ thisModel }}/SampleAttribute2", AttributeName = "MyRecord" },
-                    new() { CkAttributeId = "${{ thisModel }}/SampleAttribute3", AttributeName = "MyEnum" }
+                    new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" },
+                    new() { CkAttributeId = "${thisModel}/SampleAttribute2", AttributeName = "MyRecord" },
+                    new() { CkAttributeId = "${thisModel}/SampleAttribute3", AttributeName = "MyEnum" }
                 },
-            Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "${{ thisModel }}/Testing", TargetCkTypeId = "System/Entity" } }
+            Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "${thisModel}/Testing", TargetCkTypeId = "System/Entity" } }
         };
 #if NETSTANDARD2_0
         using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
@@ -103,14 +103,14 @@ public class CompilerService : ICompilerService
         {
             AttributeId = "SampleAttribute2",
             ValueType = AttributeValueTypesDto.Record,
-            ValueCkRecordId = "${{ thisModel }}/SampleRecord"
+            ValueCkRecordId = "${thisModel}/SampleRecord"
         };
         await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute2, ckAttributeDto).ConfigureAwait(false);
         ckAttributeDto = new CkAttributeDto
         {
             AttributeId = "SampleAttribute3",
             ValueType = AttributeValueTypesDto.Enum,
-            ValueCkEnumId = "${{ thisModel }}/SampleEnum"
+            ValueCkEnumId = "${thisModel}/SampleEnum"
         };
         await WriteAttributeAsync(attributesDirectory, CompilerStatics.Sample1Attribute3, ckAttributeDto).ConfigureAwait(false);
 
@@ -119,7 +119,7 @@ public class CompilerService : ICompilerService
         {
             RecordId = "SampleRecord",
             Attributes =
-                new List<CkTypeAttributeDto> { new() { CkAttributeId = "${{ thisModel }}/SampleAttribute1", AttributeName = "MyAttribute" } }
+                new List<CkTypeAttributeDto> { new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" } }
         };
 #if NETSTANDARD2_0
         using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));

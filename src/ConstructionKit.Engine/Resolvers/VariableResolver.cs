@@ -4,7 +4,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 internal class VariableResolver : IVariableResolver
 {
-    private const string Pattern = @"\${{ \s*([\w\d]+) \s*}}";
+    private const string Pattern = @"\${\s*([\w\d]+)\s*}";
     private readonly Dictionary<string, string> _variables = new();
 
     public string Resolve(string value)

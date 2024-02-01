@@ -61,7 +61,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the construction kit id
     /// </summary>
-    public CkId<CkTypeId> CkTypeId { get; set; } = null!;
+    public CkId<CkTypeId>? CkTypeId { get; set; }
 
     /// <summary>
     ///     Returns the well known name to access well known entities in a faster way

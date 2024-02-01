@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -57,7 +58,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     /// <inheritdoc />
     public void Apply(TDocument savedDocument, TDocument documentToApply)
     {
-        var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, savedDocument.CkTypeId);
+        var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, savedDocument.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
         foreach (var attributeToApply in documentToApply.Attributes)
         {
             if (ckTypeGraph.AllAttributesByName.TryGetValue(attributeToApply.Key, out var ckTypeAttributeGraph))
@@ -90,7 +91,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 
         Parallel.ForEach(existingDocuments, (modelRtEntity, _) =>
         {
-            var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId);
+            var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
 
             var entity = new TDocument
             {

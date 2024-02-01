@@ -37,7 +37,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         var rtEntityJsons = collection.Select(e => new RtEntityJson
         {
             RtId = e.RtId,
-            CkTypeId = e.CkTypeId,
+            CkTypeId = e.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
             RtCreationDateTime = e.RtCreationDateTime,
             RtChangedDateTime = e.RtChangedDateTime,
             RtWellKnownName = e.RtWellKnownName,
@@ -53,10 +53,10 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         {
             AssociationId = e.AssociationId,
             OriginRtId = e.OriginRtId,
-            OriginCkTypeId = e.OriginCkTypeId,
+            OriginCkTypeId = e.OriginCkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
             TargetRtId = e.TargetRtId,
-            TargetCkTypeId = e.TargetCkTypeId,
-            AssociationRoleId = e.AssociationRoleId,
+            TargetCkTypeId = e.TargetCkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+            AssociationRoleId = e.AssociationRoleId ?? throw PersistenceException.AssociationRoleIdNotSet(),
             Attributes = new Dictionary<string, object?>(e.Attributes)
         });
 
@@ -76,7 +76,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 
             return rtEntities.Select(e =>
             {
-                var entity = new RtEntity(e.CkTypeId, e.RtId, e.Attributes.ToDictionary(k => k.Key.ToPascalCase(), v => v.Value));
+                var entity = new RtEntity(e.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), e.RtId, e.Attributes.ToDictionary(k => k.Key.ToPascalCase(), v => v.Value));
                 return entity;
             });
         }
@@ -135,7 +135,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 
     private record RtEntityJson
     {
-        public CkId<CkTypeId> CkTypeId { get; set; } = null!;
+        public CkId<CkTypeId>? CkTypeId { get; set; }
         public OctoObjectId RtId { get; set; }
         public DateTime? RtCreationDateTime { get; set; }
         public DateTime? RtChangedDateTime { get; set; }

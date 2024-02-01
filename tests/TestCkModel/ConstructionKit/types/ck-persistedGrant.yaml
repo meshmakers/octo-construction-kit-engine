@@ -5,34 +5,34 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${{ thisModel }}/GrantKey
+      - id: ${thisModel}/GrantKey
         name: GrantKey
 
-      - id: ${{ thisModel }}/GrantType
+      - id: ${thisModel}/GrantType
         name: GrantType
 
-      - id: ${{ thisModel }}/SubjectId
+      - id: ${thisModel}/SubjectId
         name: SubjectId
 
-      - id: ${{ thisModel }}/SessionId
+      - id: ${thisModel}/SessionId
         name: SessionId
 
-      - id: ${{ thisModel }}/ClientId
+      - id: ${thisModel}/ClientId
         name: ClientId
 
       - id: System/Description
         name: Description
 
-      - id: ${{ thisModel }}/CreationDateTime
+      - id: ${thisModel}/CreationDateTime
         name: CreationDateTime
 
-      - id: ${{ thisModel }}/ExpirationDateTime
+      - id: ${thisModel}/ExpirationDateTime
         name: ExpirationDateTime
         isOptional: true
 
-      - id: ${{ thisModel }}/ConsumedDateTime
+      - id: ${thisModel}/ConsumedDateTime
         name: ConsumedDateTime
         isOptional: true
 
-      - id: ${{ thisModel }}/Data
+      - id: ${thisModel}/Data
         name: Data

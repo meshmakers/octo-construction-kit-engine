@@ -67,7 +67,7 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     ///     Returns the full name of the model, e. g. "System-1.0.0"
     /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
-    public string FullName => IsEmpty ? "" : $"{ModelId}-{ModelVersion}";
+    public string FullName => IsEmpty ? "" : ModelId.StartsWith("$") ? ModelId : $"{ModelId}-{ModelVersion}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName

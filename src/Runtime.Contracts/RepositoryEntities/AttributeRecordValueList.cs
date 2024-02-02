@@ -4,7 +4,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 ///     Implements <see cref="IAttributeValueList{TValue}" /> for record data types
 /// </summary>
 /// <typeparam name="TValue"></typeparam>
-public class AttributeRecordValueList<TValue> : AttributeValueList<RtRecord, TValue>, IAttributeRecordValueArray
+public class AttributeRecordValueList<TValue> : AttributeValueList<RtRecord, TValue>, IAttributeRecordValueList
     where TValue : RtRecord, new()
 {
     /// <summary>

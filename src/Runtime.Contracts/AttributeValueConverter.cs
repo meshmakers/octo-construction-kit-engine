@@ -223,7 +223,7 @@ public static class AttributeValueConverter
                     return recordArray.Select(r => new RtRecord(r.CkRecordId, r.Attributes)).ToList();
                 }
 
-                if (value is IAttributeRecordValueArray recordList)
+                if (value is IAttributeRecordValueList recordList)
                 {
                     return recordList.RecordList.Select(r => new RtRecord(r.CkRecordId, r.Attributes)).ToList();
                 }

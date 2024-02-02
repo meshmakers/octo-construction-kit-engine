@@ -3,7 +3,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit element id
 /// </summary>
-/// <typeparam name="TKey"></typeparam>
+/// <typeparam name="TKey">The key type that is managed with a model id</typeparam>
 public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparable<TKey>, ICkKey
 {
     /// <summary>

@@ -14,12 +14,8 @@
         <NoWarn>1701;1702;CS8002</NoWarn>
     </PropertyGroup>
 
-    <ItemGroup Condition="'$(Configuration)'!='DebugL'">
-        <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2401.17001" />
-    </ItemGroup>
-
-    <ItemGroup Condition="'$(Configuration)'=='DebugL'">
-        <PackageReference Include="Meshmakers.Common.Shared" Version="999.0.0" />
+    <ItemGroup>
+        <PackageReference Include="Meshmakers.Common.Shared" Version="$(MeshmakerVersion)" />
     </ItemGroup>
 
     <ItemGroup>

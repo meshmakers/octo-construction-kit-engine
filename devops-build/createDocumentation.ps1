@@ -1,9 +1,9 @@
 param ($configuration = "Release")
 
-dotnet tool update --global MMXMLDoc2Markdown --version 3.1.7
+dotnet tool update --global MMXMLDoc2Markdown --version 3.1.14
 
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$baseBinPath = Join-Path $modulePath "../bin/$configuration/net8.0/publish"
+$baseBinPath = Join-Path $modulePath "../bin/$configuration/net8.0"
 if (-not (Test-Path -Path $baseBinPath)) {
     throw "Bin path '$baseBinPath' does not exist"
 }
@@ -26,9 +26,9 @@ Copy-Item -Path "$baseDocsPath/developerGuide" -Destination "$outputPath" -Recur
 $outputPath = "$baseOutputPath/apiReference/ConstructionKit.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
-mmxmldoc2md $sourcePath $outputPath
+mmxmldoc2md $sourcePath $outputPath --github-pages --back-button
 
 $outputPath = "$baseOutputPath/apiReference/Runtime.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
-mmxmldoc2md $sourcePath $outputPath
+mmxmldoc2md $sourcePath $outputPath --github-pages --back-button

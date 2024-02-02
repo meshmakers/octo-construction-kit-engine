@@ -1,7 +1,7 @@
 Octo Mesh is a powerful tool designed to seamlessly transform raw data into meaningful information, all while ensuring that the data is imbued with the context it needs to be truly insightful. Whether you're working with structured data, unstructured data, or anything in between, Octo Mesh empowers you to harness the full potential of your data.
 
 # Getting started
-Have a look to the [docs area](docs/intro.md) to get started with Octo Mesh.
+Have a look to the [docs area](docs/developerGuide/intro.md) to get started with Octo Mesh.
 
 The complete documentation of OctoMesh is available at https://docs.meshmakers.cloud.
 

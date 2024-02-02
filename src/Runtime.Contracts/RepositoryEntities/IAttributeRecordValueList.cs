@@ -1,6 +1,6 @@
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
-internal interface IAttributeRecordValueArray
+internal interface IAttributeRecordValueList
 {
     IList<RtRecord> RecordList { get; }
 }

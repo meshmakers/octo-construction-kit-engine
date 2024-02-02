@@ -1,6 +1,6 @@
 param ($configuration = "Release")
 
-dotnet tool update --global MMXMLDoc2Markdown --version 3.1.14
+dotnet tool update --global MMXMLDoc2Markdown
 
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $baseBinPath = Join-Path $modulePath "../bin/$configuration/net8.0"

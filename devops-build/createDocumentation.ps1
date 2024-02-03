@@ -8,7 +8,6 @@ if (-not (Test-Path -Path $baseBinPath)) {
     throw "Bin path '$baseBinPath' does not exist"
 }
 
-$baseDocsPath = Resolve-Path(Join-Path $modulePath "../docs")
 $baseOutputPath = Join-Path $baseBinPath "documentation"
 
 # Clean directory

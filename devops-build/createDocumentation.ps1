@@ -17,11 +17,6 @@ if (Test-Path -Path $baseOutputPath) {
     Remove-Item -Path $baseOutputPath -Recurse -Force
 }
 
-# Copy all developer guide articles to output
-$outputPath = "$baseOutputPath/developerGuide/ConstructionKitEngine"
-Write-Host "Copy articles from '$baseDocsPath', doc is generated at '$outputPath'"
-Copy-Item -Path "$baseDocsPath/developerGuide" -Destination "$outputPath" -Recurse
-
 # Create XML documentation for Libraries
 $outputPath = "$baseOutputPath/apiReference/ConstructionKit.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Contracts.dll"

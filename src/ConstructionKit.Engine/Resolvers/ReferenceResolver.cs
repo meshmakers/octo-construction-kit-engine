@@ -33,7 +33,7 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckTypeAttribute.CkAttributeId),
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckAssociationRoleKeyValue.Key),
                             ckTypeAttribute.CkAttributeId, ckAssociationRoleKeyValue.Key));
                     continue;
                 }
@@ -55,7 +55,7 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckTypeAttribute.CkAttributeId),
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckRecordKeyValue.Key),
                             ckTypeAttribute.CkAttributeId, ckRecordKeyValue.Key));
                     continue;
                 }
@@ -70,7 +70,7 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownDerivedFromCkRecordIdInSource(originFileResolver.Resolve(ckRecordKeyValue.Value.CkRecordId),
+                        MessageCodes.UnknownDerivedFromCkRecordIdInSource(originFileResolver.Resolve(ckRecordKeyValue.Key),
                             ckRecordKeyValue.Value.DerivedFromCkRecordId,
                             ckRecordKeyValue.Key));
                 }

@@ -11,11 +11,11 @@
         },
         "inboundName": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_.]+$"
+          "pattern": "^[a-zA-Z0-9_]+$"
         },
         "outboundName": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_.]+$"
+          "pattern": "^[a-zA-Z0-9_]+$"
         },
         "inboundMultiplicity": {
           "type": "string",

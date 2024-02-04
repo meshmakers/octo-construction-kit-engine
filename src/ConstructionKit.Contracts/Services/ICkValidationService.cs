@@ -16,4 +16,12 @@ public interface ICkValidationService
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
     Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver, OperationResult operationResult);
+    
+    /// <summary>
+    ///     Checks the logical consistency of the compiled model.
+    /// </summary>
+    /// <param name="compiledModel">Compiled construction kit model</param>
+    /// <param name="operationResult">The result object that contains after call validation messages.</param>
+    /// <returns></returns>
+    Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult);
 }

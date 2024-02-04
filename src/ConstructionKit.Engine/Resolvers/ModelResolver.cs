@@ -35,6 +35,12 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
+    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
+    {
+        var originFileResolver = new OriginFileResolver("-");
+        return ResolveAsync(ckModelIds, originFileResolver, operationResult);
+    }
+
     public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {

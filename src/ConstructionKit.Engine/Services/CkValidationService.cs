@@ -27,4 +27,11 @@ public class CkValidationService : ICkValidationService
     {
         return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult).ConfigureAwait(false);
     }
+
+    /// <inheritdoc />
+    public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
+    {
+        var originFileResolver = new OriginFileResolver("-");
+        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult).ConfigureAwait(false);
+    }
 }

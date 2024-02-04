@@ -13,6 +13,14 @@ public interface IModelResolver
     ///     Resolves a list of model ids
     /// </summary>
     /// <param name="ckModelIds">List of model ids</param>
+    /// <param name="operationResult">Operation result</param>
+    /// <returns></returns>
+    Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult);
+
+    /// <summary>
+    ///     Resolves a list of model ids
+    /// </summary>
+    /// <param name="ckModelIds">List of model ids</param>
     /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
     /// <returns></returns>

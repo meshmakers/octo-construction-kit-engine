@@ -69,7 +69,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             });
             services.AddConstructionKit();
             var serviceProvider = services.BuildServiceProvider();
-            
+
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
             var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
             var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
@@ -80,9 +80,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             {
                 var task = Task.Run(async () =>
                 {
-                    try
+                    foreach (var constructionKitFolder in ConstructionKitFolders)
                     {
-                        foreach (var constructionKitFolder in ConstructionKitFolders)
+                        var operationResult = new OperationResult();
+                        try
                         {
                             var constructionKitFolderPath = constructionKitFolder.GetMetadata("FullPath");
 
@@ -99,7 +100,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 {
                                     Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                         constructionKitFolderPath);
-                                    compileResult = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile);
+                                    compileResult = await compilerService.CompileAsync(constructionKitFolderPath, CreateCacheFile, operationResult);
                                     compiledModelFiles.Add(compileResult.CompiledModelFile);
                                     if (compileResult.CompiledModelCacheFilePath != null)
                                     {
@@ -108,10 +109,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 }
                                 else
                                 {
-                                    Log.LogMessage(MessageImportance.High, "Getting information about construction kit model in '{0}'",
+                                    Log.LogMessage(MessageImportance.Normal, "Getting information about construction kit model in '{0}'",
                                         constructionKitFolderPath);
                                     compileResult =
-                                        await compilerService.GetConstructionKitFolderInfoAsync(constructionKitFolderPath, CreateCacheFile);
+                                        await compilerService.GetConstructionKitFolderInfoAsync(constructionKitFolderPath, CreateCacheFile, operationResult);
                                     compiledModelFiles.Add(compileResult.CompiledModelFile);
                                     if (compileResult.CompiledModelCacheFilePath != null)
                                     {
@@ -122,7 +123,6 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 if (PublishCkModel)
                                 {
                                     Log.LogMessage(MessageImportance.High, "Publishing construction kit model to 'LocalRepository'");
-                                    var operationResult = new OperationResult();
                                     await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 
                                     var ckCompiledModelRoot =
@@ -139,13 +139,17 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     Log.LogMessage(MessageImportance.High, "Construction kit model published to 'LocalRepository'");
                                 }
                             }
-                        }
 
-                        Log.LogMessage(MessageImportance.High, "Finished");
-                    }
-                    catch (CompilerException ex)
-                    {
-                        LogOperationResults(ex.OperationResult);
+                            Log.LogMessage(MessageImportance.Normal, "Finished");
+                        }
+                        catch (CompilerException)
+                        {
+                            // Left blank intentionally
+                        }
+                        finally
+                        {
+                            LogOperationResults(operationResult);
+                        }
                     }
                 });
                 task.Wait();
@@ -171,21 +175,23 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
     private void LogOperationResults(OperationResult operationResult)
     {
+        Log.LogMessage(MessageImportance.High, $"Logging messages from operation result {operationResult.Messages.Count}");
         foreach (var operationResultMessage in operationResult.Messages)
         {
             switch (operationResultMessage.MessageLevel)
             {
                 case MessageLevel.FatalError:
                 case MessageLevel.Error:
-                    Log.LogError(null, operationResultMessage.MessageNumber.ToString(), null, null, 0, 0, 0, 0,
+                    Log.LogError(null, operationResultMessage.MessageNumber.ToString(), null, operationResultMessage.Location, 0, 0, 0, 0,
                         operationResultMessage.MessageText);
                     break;
                 case MessageLevel.Warning:
-                    Log.LogWarning(null, operationResultMessage.MessageNumber.ToString(), null, null, 0, 0, 0, 0,
+                    Log.LogWarning(null, operationResultMessage.MessageNumber.ToString(), null, operationResultMessage.Location, 0, 0, 0, 0,
                         operationResultMessage.MessageText);
                     break;
                 default:
-                    Log.LogMessage(null, operationResultMessage.MessageNumber.ToString(), null, null, 0, 0, 0, 0, MessageImportance.High,
+                    Log.LogMessage(null, operationResultMessage.MessageNumber.ToString(), null, operationResultMessage.Location, 0, 0, 0, 0,
+                        MessageImportance.High,
                         operationResultMessage.MessageText, null);
                     break;
             }

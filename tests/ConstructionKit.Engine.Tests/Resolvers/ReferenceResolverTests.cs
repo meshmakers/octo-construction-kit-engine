@@ -16,8 +16,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -30,8 +31,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.records1.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -44,8 +46,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.records1_recordIdDoesNotExist.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -60,8 +63,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.records1_attributeIdDoesNotExist.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -77,8 +81,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.records1_derivedFromDoesNotExist.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -93,8 +98,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.sample_types_unknownTypeId.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -109,8 +115,9 @@ public class ReferenceResolverTests
         modelGraph.AppendModel(sampleData.sample_types_unkownAttributeId.Builder.Build());
 
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
         ReferenceResolver modelResolver = new();
-        modelResolver.Resolve(modelGraph, operationResult);
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);

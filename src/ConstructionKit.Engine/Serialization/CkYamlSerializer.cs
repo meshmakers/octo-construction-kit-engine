@@ -95,7 +95,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckMetaDto = _deserializer.Deserialize<CkMetaRootDto>(streamReader);
-        return Task.FromResult(ckMetaDto);
+        return Task.FromResult(ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(operationResult));
     }
 
     /// <inheritdoc />
@@ -109,7 +109,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckElementsDto = _deserializer.Deserialize<CkElementsRootDto>(streamReader);
-        return Task.FromResult(ckElementsDto);
+        return Task.FromResult(ckElementsDto ?? throw ModelParseException.CannotDeserializeModel(operationResult));
     }
 
     /// <inheritdoc />
@@ -118,7 +118,8 @@ internal class CkYamlSerializer : ICkYamlSerializer
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
+        var ckCompiledModelRoot = await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
+        return ckCompiledModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
     }
 
     /// <inheritdoc />
@@ -126,7 +127,8 @@ internal class CkYamlSerializer : ICkYamlSerializer
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
+        var ckCompiledModelRoot =  DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
+        return ckCompiledModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
     }
 
     /// <inheritdoc />
@@ -146,6 +148,6 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckModelRoot = _deserializer.Deserialize<CkCompiledModelRoot>(streamReader);
-        return ckModelRoot;
+        return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(operationResult);
     }
 }

@@ -11,8 +11,9 @@ internal interface IReferenceResolver
     /// <summary>
     ///     Resolves and checks cross reference within the model graph.
     /// </summary>
-    /// <param name="modelGraph"></param>
-    /// <param name="operationResult"></param>
-    void Resolve(CkModelGraph modelGraph,
+    /// <param name="modelGraph">Model graph to resolve</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
+    /// <param name="operationResult">Operation result</param>
+    void Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
         OperationResult operationResult);
 }

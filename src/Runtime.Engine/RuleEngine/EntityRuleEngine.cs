@@ -23,7 +23,8 @@ internal class EntityRuleEngine : IEntityRuleEngine
     }
 
     public async Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
-        IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, OperationResult operationResult) where TEntity : RtEntity
+        IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, IOriginFileResolver originFileResolver,
+        OperationResult operationResult) where TEntity : RtEntity
     {
         var entitiesToCreate = new ConcurrentBag<TEntity>();
         var entitiesToUpdate = new ConcurrentDictionary<RtEntityId, TEntity>();
@@ -34,13 +35,15 @@ internal class EntityRuleEngine : IEntityRuleEngine
         {
             if (!_ckCache.TryGetCkType(tenantId, info.RtEntityId.CkTypeId, out var ckTypeGraph))
             {
-                operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(tenantId, info.RtEntityId.CkTypeId));
+                operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
+                    info.RtEntityId.CkTypeId));
                 return ValueTask.CompletedTask;
             }
 
             if (ckTypeGraph.IsAbstract)
             {
-                operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(tenantId, info.RtEntityId.CkTypeId));
+                operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId), tenantId,
+                    info.RtEntityId.CkTypeId));
                 return ValueTask.CompletedTask;
             }
 
@@ -51,7 +54,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 if (info.RtEntity != null)
                 {
                     isInError |= SetDefaultValuesOnInsert(tenantId, ckTypeGraph.AllAttributes.Values.ToList(),
-                        info.RtEntity, operationResult, $"{info.RtEntity.CkTypeId}@{info.RtEntity.RtId}");
+                        info.RtEntity, originFileResolver, operationResult, $"{info.RtEntity.CkTypeId}@{info.RtEntity.RtId}");
                 }
             }
             else if (info.ModOption == EntityModOptions.Update)
@@ -62,8 +65,10 @@ internal class EntityRuleEngine : IEntityRuleEngine
                         info.RtEntity.Attributes.ContainsKey(attribute.AttributeName) &&
                         info.RtEntity.Attributes[attribute.AttributeName] == null)
                     {
-                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(tenantId,
-                            attribute.CkAttributeId, info.RtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), info.RtEntity.RtId));
+                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(originFileResolver.Resolve(tenantId),
+                            tenantId,
+                            attribute.CkAttributeId, info.RtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+                            info.RtEntity.RtId));
                         isInError = true;
                     }
                 }
@@ -81,7 +86,8 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 case EntityModOptions.Insert:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(tenantId,
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                            originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
@@ -91,14 +97,16 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 case EntityModOptions.Update:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(tenantId,
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                            originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
 
                     if (!entitiesToUpdate.TryAdd(info.RtEntityId, info.RtEntity))
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(tenantId,
+                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
+                            originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
@@ -107,14 +115,16 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 case EntityModOptions.Replace:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(tenantId,
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                            originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
 
                     if (!entitiesToReplace.TryAdd(info.RtEntityId, info.RtEntity))
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(tenantId,
+                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(originFileResolver.Resolve(tenantId),
+                            tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
                         return ValueTask.CompletedTask;
                     }
@@ -140,7 +150,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
     }
 
     private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
-        OperationResult operationResult, string reference)
+        IOriginFileResolver originFileResolver, OperationResult operationResult, string reference)
     {
         var isInError = false;
         foreach (var attribute in attributeGraphs)
@@ -165,7 +175,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                 }
                 else
                 {
-                    operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(tenantId,
+                    operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(originFileResolver.Resolve(tenantId), tenantId,
                         attribute.CkAttributeId, reference));
                     isInError = true;
                 }
@@ -183,11 +193,13 @@ internal class EntityRuleEngine : IEntityRuleEngine
                             var rtRecord = (RtRecord)o;
                             if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
                             {
-                                operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(tenantId, rtRecord.CkRecordId));
+                                operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
+                                    rtRecord.CkRecordId));
                                 continue;
                             }
 
                             isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                                originFileResolver,
                                 operationResult, reference + $"/{attribute.AttributeName}");
                         }
                     }
@@ -199,11 +211,13 @@ internal class EntityRuleEngine : IEntityRuleEngine
                     {
                         if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
                         {
-                            operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(tenantId, rtRecord.CkRecordId));
+                            operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
+                                rtRecord.CkRecordId));
                             continue;
                         }
 
                         isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                            originFileResolver,
                             operationResult, reference + $"/{attribute.AttributeName}");
                     }
                 }

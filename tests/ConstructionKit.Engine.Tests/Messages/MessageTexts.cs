@@ -9,7 +9,7 @@ public class MessageTexts
     public void CreateMessageWithArgument()
     {
         var template = new OperationMessageTemplate(MessageLevel.Error, 1, "Test '{demo}'", new[] { "demo" });
-        var message = template.CreateMessage("Test");
+        var message = template.CreateMessage("location", "Test");
         Assert.Equal("Test 'Test'", message.MessageText);
     }
 
@@ -17,7 +17,7 @@ public class MessageTexts
     public void CreateMessageWithOutArgument()
     {
         var template = new OperationMessageTemplate(MessageLevel.Error, 1, "Test", new string[] { });
-        var message = template.CreateMessage("Test");
+        var message = template.CreateMessage("location", "Test");
         Assert.Equal("Test", message.MessageText);
     }
 }

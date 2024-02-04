@@ -21,171 +21,170 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
 internal static class MessageCodes
 {
     // ReSharper disable once MemberCanBePrivate.Global
-    internal static OperationMessage GetMessage(string messageKey, params object[] args)
+    internal static OperationMessage GetMessage(string messageKey, string? location, params object[] args)
     {
         if (!Templates.ContainsKey(messageKey))
         {
             throw new ArgumentOutOfRangeException($"Message with key '{messageKey}' does not exist.");
         }
-        return Templates[messageKey].CreateMessage(args);
+        return Templates[messageKey].CreateMessage(location, args);
     }
 
-    internal static OperationMessage UnknownCkModel(object modelId) =>
-        GetMessage("UnknownCkModel", modelId);
+    internal static OperationMessage UnknownCkModel(string? location, object modelId) =>
+        GetMessage("UnknownCkModel", location, modelId);
 
-    internal static OperationMessage UnknownAttributeOfCkTypeIdInSource(object ckAttributeId, object ckTypeId) =>
-        GetMessage("UnknownAttributeOfCkTypeIdInSource", ckAttributeId, ckTypeId);
+    internal static OperationMessage UnknownAttributeOfCkTypeIdInSource(string? location, object ckAttributeId, object ckTypeId) =>
+        GetMessage("UnknownAttributeOfCkTypeIdInSource", location, ckAttributeId, ckTypeId);
 
-    internal static OperationMessage UnknownCkDerivedIdOfCkTypeIdInSource(object derivedCkTypeId, object ckTypeId) =>
-        GetMessage("UnknownCkDerivedIdOfCkTypeIdInSource", derivedCkTypeId, ckTypeId);
+    internal static OperationMessage UnknownCkDerivedIdOfCkTypeIdInSource(string? location, object derivedCkTypeId, object ckTypeId) =>
+        GetMessage("UnknownCkDerivedIdOfCkTypeIdInSource", location, derivedCkTypeId, ckTypeId);
 
-    internal static OperationMessage UnknownAssociationRoleOfCkTypeIdInSource(object ckTypeId, object roleId) =>
-        GetMessage("UnknownAssociationRoleOfCkTypeIdInSource", ckTypeId, roleId);
+    internal static OperationMessage UnknownAssociationRoleOfCkTypeIdInSource(string? location, object ckTypeId, object roleId) =>
+        GetMessage("UnknownAssociationRoleOfCkTypeIdInSource", location, ckTypeId, roleId);
 
-    internal static OperationMessage UnknownTargetCkTypeIdOfCkTypeIdInSource(object ckTypeId, object targetCkTypeId) =>
-        GetMessage("UnknownTargetCkTypeIdOfCkTypeIdInSource", ckTypeId, targetCkTypeId);
+    internal static OperationMessage UnknownTargetCkTypeIdOfCkTypeIdInSource(string? location, object ckTypeId, object targetCkTypeId) =>
+        GetMessage("UnknownTargetCkTypeIdOfCkTypeIdInSource", location, ckTypeId, targetCkTypeId);
 
-    internal static OperationMessage AttributeIdNotUnique(object ckAttributeId) =>
-        GetMessage("AttributeIdNotUnique", ckAttributeId);
+    internal static OperationMessage AttributeIdNotUnique(string? location, object ckAttributeId) =>
+        GetMessage("AttributeIdNotUnique", location, ckAttributeId);
 
-    internal static OperationMessage AssociationRoleIdNotUnique(object ckAssociationId) =>
-        GetMessage("AssociationRoleIdNotUnique", ckAssociationId);
+    internal static OperationMessage AssociationRoleIdNotUnique(string? location, object ckAssociationId) =>
+        GetMessage("AssociationRoleIdNotUnique", location, ckAssociationId);
 
-    internal static OperationMessage TypeIdNotUnique(object ckTypeId) =>
-        GetMessage("TypeIdNotUnique", ckTypeId);
+    internal static OperationMessage TypeIdNotUnique(string? location, object ckTypeId) =>
+        GetMessage("TypeIdNotUnique", location, ckTypeId);
 
-    internal static OperationMessage InheritanceMissing(object ckTypeId) =>
-        GetMessage("InheritanceMissing", ckTypeId);
+    internal static OperationMessage InheritanceMissing(string? location, object ckTypeId) =>
+        GetMessage("InheritanceMissing", location, ckTypeId);
 
-    internal static OperationMessage CircularDependency(object modelId, object dependentModelId) =>
-        GetMessage("CircularDependency", modelId, dependentModelId);
+    internal static OperationMessage CircularDependency(string? location, object modelId, object dependentModelId) =>
+        GetMessage("CircularDependency", location, modelId, dependentModelId);
 
-    internal static OperationMessage UnknownCkTypeIdForInheritance(object ckTypeId) =>
-        GetMessage("UnknownCkTypeIdForInheritance", ckTypeId);
+    internal static OperationMessage UnknownCkTypeIdForInheritance(string? location, object ckTypeId) =>
+        GetMessage("UnknownCkTypeIdForInheritance", location, ckTypeId);
 
-    internal static OperationMessage CkTypeIdAttributeIdNotUniqueByInheritance(object ckTypeId, object ckAttributeId, object derivedCkTypeId) =>
-        GetMessage("CkTypeIdAttributeIdNotUniqueByInheritance", ckTypeId, ckAttributeId, derivedCkTypeId);
+    internal static OperationMessage CkTypeIdAttributeIdNotUniqueByInheritance(string? location, object ckTypeId, object ckAttributeId, object derivedCkTypeId) =>
+        GetMessage("CkTypeIdAttributeIdNotUniqueByInheritance", location, ckTypeId, ckAttributeId, derivedCkTypeId);
 
-    internal static OperationMessage CkTypeIdAttributeNameNotUniqueByInheritance(object ckTypeId, object attributeNames) =>
-        GetMessage("CkTypeIdAttributeNameNotUniqueByInheritance", ckTypeId, attributeNames);
+    internal static OperationMessage CkTypeIdAttributeNameNotUniqueByInheritance(string? location, object ckTypeId, object attributeNames) =>
+        GetMessage("CkTypeIdAttributeNameNotUniqueByInheritance", location, ckTypeId, attributeNames);
 
-    internal static OperationMessage CkTypeIdAssociationNotUnique(object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
-        GetMessage("CkTypeIdAssociationNotUnique", ckTypeId, ckAssociationId, targetCkTypeId);
+    internal static OperationMessage CkTypeIdAssociationNotUnique(string? location, object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
+        GetMessage("CkTypeIdAssociationNotUnique", location, ckTypeId, ckAssociationId, targetCkTypeId);
 
-    internal static OperationMessage CkTypeIdAttributeNameNotUnique(object ckTypeId, object attributeName) =>
-        GetMessage("CkTypeIdAttributeNameNotUnique", ckTypeId, attributeName);
+    internal static OperationMessage CkTypeIdAttributeNameNotUnique(string? location, object ckTypeId, object attributeName) =>
+        GetMessage("CkTypeIdAttributeNameNotUnique", location, ckTypeId, attributeName);
 
-    internal static OperationMessage CkTypeIdAttributeIdNotUnique(object ckTypeId, object ckAttributeId) =>
-        GetMessage("CkTypeIdAttributeIdNotUnique", ckTypeId, ckAttributeId);
+    internal static OperationMessage CkTypeIdAttributeIdNotUnique(string? location, object ckTypeId, object ckAttributeId) =>
+        GetMessage("CkTypeIdAttributeIdNotUnique", location, ckTypeId, ckAttributeId);
 
-    internal static OperationMessage CkTypeIdOutAssociationNotUniqueByInheritance(object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
-        GetMessage("CkTypeIdOutAssociationNotUniqueByInheritance", ckTypeId, ckAssociationId, targetCkTypeId);
+    internal static OperationMessage CkTypeIdOutAssociationNotUniqueByInheritance(string? location, object ckTypeId, object ckAssociationId, object targetCkTypeId) =>
+        GetMessage("CkTypeIdOutAssociationNotUniqueByInheritance", location, ckTypeId, ckAssociationId, targetCkTypeId);
 
-    internal static OperationMessage CkTypeIdUnknownTargetCkTypeIdForAssociation(object originCkTypeId, object targetCkTypeId, object roleId) =>
-        GetMessage("CkTypeIdUnknownTargetCkTypeIdForAssociation", originCkTypeId, targetCkTypeId, roleId);
+    internal static OperationMessage CkTypeIdUnknownTargetCkTypeIdForAssociation(string? location, object originCkTypeId, object targetCkTypeId, object roleId) =>
+        GetMessage("CkTypeIdUnknownTargetCkTypeIdForAssociation", location, originCkTypeId, targetCkTypeId, roleId);
 
-    internal static OperationMessage CkTypeIdUnknown(object ckTypeId) =>
-        GetMessage("CkTypeIdUnknown", ckTypeId);
+    internal static OperationMessage CkTypeIdUnknown(string? location, object ckTypeId) =>
+        GetMessage("CkTypeIdUnknown", location, ckTypeId);
 
-    internal static OperationMessage CkTypeIdMultipleOutgoingAssociationRepresentingSameRole(object ckTypeId, object ckAssociationId, object targetCkTypeId, object otherCkTypeId, object otherTargetCkTypeId) =>
-        GetMessage("CkTypeIdMultipleOutgoingAssociationRepresentingSameRole", ckTypeId, ckAssociationId, targetCkTypeId, otherCkTypeId, otherTargetCkTypeId);
+    internal static OperationMessage CkTypeIdMultipleOutgoingAssociationRepresentingSameRole(string? location, object ckTypeId, object ckAssociationId, object targetCkTypeId, object otherCkTypeId, object otherTargetCkTypeId) =>
+        GetMessage("CkTypeIdMultipleOutgoingAssociationRepresentingSameRole", location, ckTypeId, ckAssociationId, targetCkTypeId, otherCkTypeId, otherTargetCkTypeId);
 
-    internal static OperationMessage DerivedFromCkTypeIdThatIsFinal(object baseCkTypeId, object derivedTypeId) =>
-        GetMessage("DerivedFromCkTypeIdThatIsFinal", baseCkTypeId, derivedTypeId);
+    internal static OperationMessage DerivedFromCkTypeIdThatIsFinal(string? location, object baseCkTypeId, object derivedTypeId) =>
+        GetMessage("DerivedFromCkTypeIdThatIsFinal", location, baseCkTypeId, derivedTypeId);
 
-    internal static OperationMessage DirectoryMustBeEmpty(object directory) =>
-        GetMessage("DirectoryMustBeEmpty", directory);
+    internal static OperationMessage DirectoryMustBeEmpty(string? location) =>
+        GetMessage("DirectoryMustBeEmpty", location);
+    internal static OperationMessage ModelIdContainsInvalidCharacters(string? location, object modelId) =>
+        GetMessage("ModelIdContainsInvalidCharacters", location, modelId);
 
-    internal static OperationMessage ModelIdContainsInvalidCharacters(object modelId) =>
-        GetMessage("ModelIdContainsInvalidCharacters", modelId);
+    internal static OperationMessage CkTypeIdContainsInvalidCharacters(string? location, object ckTypeId) =>
+        GetMessage("CkTypeIdContainsInvalidCharacters", location, ckTypeId);
 
-    internal static OperationMessage CkTypeIdContainsInvalidCharacters(object ckTypeId) =>
-        GetMessage("CkTypeIdContainsInvalidCharacters", ckTypeId);
+    internal static OperationMessage CkAttributeIdContainsInvalidCharacters(string? location, object ckAttributeId) =>
+        GetMessage("CkAttributeIdContainsInvalidCharacters", location, ckAttributeId);
 
-    internal static OperationMessage CkAttributeIdContainsInvalidCharacters(object ckAttributeId) =>
-        GetMessage("CkAttributeIdContainsInvalidCharacters", ckAttributeId);
+    internal static OperationMessage CkAssociationIdContainsInvalidCharacters(string? location, object ckAssociationId) =>
+        GetMessage("CkAssociationIdContainsInvalidCharacters", location, ckAssociationId);
 
-    internal static OperationMessage CkAssociationIdContainsInvalidCharacters(object ckAssociationId) =>
-        GetMessage("CkAssociationIdContainsInvalidCharacters", ckAssociationId);
+    internal static OperationMessage SchemaValidationError(string? location, object path, object errorMessage) =>
+        GetMessage("SchemaValidationError", location, path, errorMessage);
 
-    internal static OperationMessage SchemaValidationError(object locationReference, object errorMessage) =>
-        GetMessage("SchemaValidationError", locationReference, errorMessage);
+    internal static OperationMessage DirectoryDoesNotExist(string? location) =>
+        GetMessage("DirectoryDoesNotExist", location);
+    internal static OperationMessage FileDoesNotExist(string? location) =>
+        GetMessage("FileDoesNotExist", location);
+    internal static OperationMessage SelectionValueNotUnique(string? location, object ckEnumId, object key) =>
+        GetMessage("SelectionValueNotUnique", location, ckEnumId, key);
 
-    internal static OperationMessage DirectoryDoesNotExist(object directoryPath) =>
-        GetMessage("DirectoryDoesNotExist", directoryPath);
+    internal static OperationMessage CkRecordIdUndefined(string? location, object ckAttributeId) =>
+        GetMessage("CkRecordIdUndefined", location, ckAttributeId);
 
-    internal static OperationMessage FileDoesNotExist(object filePath) =>
-        GetMessage("FileDoesNotExist", filePath);
+    internal static OperationMessage CkRecordIdContainsInvalidCharacters(string? location, object ckRecordId) =>
+        GetMessage("CkRecordIdContainsInvalidCharacters", location, ckRecordId);
 
-    internal static OperationMessage SelectionValueNotUnique(object ckEnumId, object key) =>
-        GetMessage("SelectionValueNotUnique", ckEnumId, key);
+    internal static OperationMessage RecordIdNotUnique(string? location, object ckRecordId) =>
+        GetMessage("RecordIdNotUnique", location, ckRecordId);
 
-    internal static OperationMessage CkRecordIdUndefined(object ckAttributeId) =>
-        GetMessage("CkRecordIdUndefined", ckAttributeId);
+    internal static OperationMessage CkRecordIdUnknown(string? location, object ckRecordId) =>
+        GetMessage("CkRecordIdUnknown", location, ckRecordId);
 
-    internal static OperationMessage CkRecordIdContainsInvalidCharacters(object ckRecordId) =>
-        GetMessage("CkRecordIdContainsInvalidCharacters", ckRecordId);
+    internal static OperationMessage UnknownCkRecordIdForInheritance(string? location, object ckRecordId) =>
+        GetMessage("UnknownCkRecordIdForInheritance", location, ckRecordId);
 
-    internal static OperationMessage RecordIdNotUnique(object ckRecordId) =>
-        GetMessage("RecordIdNotUnique", ckRecordId);
+    internal static OperationMessage DerivedFromCkRecordIdThatIsFinal(string? location, object baseCkRecordId, object derivedCkRecordId) =>
+        GetMessage("DerivedFromCkRecordIdThatIsFinal", location, baseCkRecordId, derivedCkRecordId);
 
-    internal static OperationMessage CkRecordIdUnknown(object ckRecordId) =>
-        GetMessage("CkRecordIdUnknown", ckRecordId);
+    internal static OperationMessage CkRecordIdAttributeNameNotUnique(string? location, object ckRecordId, object attributeName) =>
+        GetMessage("CkRecordIdAttributeNameNotUnique", location, ckRecordId, attributeName);
 
-    internal static OperationMessage UnknownCkRecordIdForInheritance(object ckRecordId) =>
-        GetMessage("UnknownCkRecordIdForInheritance", ckRecordId);
+    internal static OperationMessage CkRecordIdAttributeIdNotUniqueByInheritance(string? location, object ckRecordId, object ckAttributeId, object derivedCkRecordId) =>
+        GetMessage("CkRecordIdAttributeIdNotUniqueByInheritance", location, ckRecordId, ckAttributeId, derivedCkRecordId);
 
-    internal static OperationMessage DerivedFromCkRecordIdThatIsFinal(object baseCkRecordId, object derivedCkRecordId) =>
-        GetMessage("DerivedFromCkRecordIdThatIsFinal", baseCkRecordId, derivedCkRecordId);
+    internal static OperationMessage CkRecordIdAttributeIdNotUnique(string? location, object ckRecordId, object ckAttributeId) =>
+        GetMessage("CkRecordIdAttributeIdNotUnique", location, ckRecordId, ckAttributeId);
 
-    internal static OperationMessage CkRecordIdAttributeNameNotUnique(object ckRecordId, object attributeName) =>
-        GetMessage("CkRecordIdAttributeNameNotUnique", ckRecordId, attributeName);
+    internal static OperationMessage CkRecordIdAttributeNameNotUniqueByInheritance(string? location, object ckRecordId, object attributeNames) =>
+        GetMessage("CkRecordIdAttributeNameNotUniqueByInheritance", location, ckRecordId, attributeNames);
 
-    internal static OperationMessage CkRecordIdAttributeIdNotUniqueByInheritance(object ckRecordId, object ckAttributeId, object derivedCkRecordId) =>
-        GetMessage("CkRecordIdAttributeIdNotUniqueByInheritance", ckRecordId, ckAttributeId, derivedCkRecordId);
+    internal static OperationMessage AttributeUsesUnknownCkRecordId(string? location, object ckAttributeId, object ckRecordId) =>
+        GetMessage("AttributeUsesUnknownCkRecordId", location, ckAttributeId, ckRecordId);
 
-    internal static OperationMessage CkRecordIdAttributeIdNotUnique(object ckRecordId, object ckAttributeId) =>
-        GetMessage("CkRecordIdAttributeIdNotUnique", ckRecordId, ckAttributeId);
+    internal static OperationMessage UnknownAttributeOfCkRecordIdInSource(string? location, object ckAttributeId, object ckRecordId) =>
+        GetMessage("UnknownAttributeOfCkRecordIdInSource", location, ckAttributeId, ckRecordId);
 
-    internal static OperationMessage CkRecordIdAttributeNameNotUniqueByInheritance(object ckRecordId, object attributeNames) =>
-        GetMessage("CkRecordIdAttributeNameNotUniqueByInheritance", ckRecordId, attributeNames);
+    internal static OperationMessage UnknownDerivedFromCkRecordIdInSource(string? location, object derivedCkRecordId, object ckRecordId) =>
+        GetMessage("UnknownDerivedFromCkRecordIdInSource", location, derivedCkRecordId, ckRecordId);
 
-    internal static OperationMessage AttributeUsesUnknownCkRecordId(object ckAttributeId, object ckRecordId) =>
-        GetMessage("AttributeUsesUnknownCkRecordId", ckAttributeId, ckRecordId);
+    internal static OperationMessage CkEnumIdContainsInvalidCharacters(string? location, object ckEnumId) =>
+        GetMessage("CkEnumIdContainsInvalidCharacters", location, ckEnumId);
 
-    internal static OperationMessage UnknownAttributeOfCkRecordIdInSource(object ckAttributeId, object ckRecordId) =>
-        GetMessage("UnknownAttributeOfCkRecordIdInSource", ckAttributeId, ckRecordId);
+    internal static OperationMessage EnumIdNotUnique(string? location, object ckEnumId) =>
+        GetMessage("EnumIdNotUnique", location, ckEnumId);
 
-    internal static OperationMessage UnknownDerivedFromCkRecordIdInSource(object derivedCkRecordId, object ckRecordId) =>
-        GetMessage("UnknownDerivedFromCkRecordIdInSource", derivedCkRecordId, ckRecordId);
+    internal static OperationMessage CkEnumIdUndefined(string? location, object ckAttributeId) =>
+        GetMessage("CkEnumIdUndefined", location, ckAttributeId);
 
-    internal static OperationMessage CkEnumIdContainsInvalidCharacters(object ckEnumId) =>
-        GetMessage("CkEnumIdContainsInvalidCharacters", ckEnumId);
+    internal static OperationMessage CkTypeIdUnknownTargetAttributeIdForAssociation(string? location, object originCkTypeId, object roleId, object targetCkAttributeId, object targetCkTypeId) =>
+        GetMessage("CkTypeIdUnknownTargetAttributeIdForAssociation", location, originCkTypeId, roleId, targetCkAttributeId, targetCkTypeId);
 
-    internal static OperationMessage EnumIdNotUnique(object ckEnumId) =>
-        GetMessage("EnumIdNotUnique", ckEnumId);
+    internal static OperationMessage CkTypeIdAssociationRoleIdUnknown(string? location, object ckTypeId, object ckAssociationId) =>
+        GetMessage("CkTypeIdAssociationRoleIdUnknown", location, ckTypeId, ckAssociationId);
 
-    internal static OperationMessage CkEnumIdUndefined(object ckAttributeId) =>
-        GetMessage("CkEnumIdUndefined", ckAttributeId);
+    internal static OperationMessage CkAssociationRoleAttributeNameNotUnique(string? location, object ckAssociationRole, object attributeName) =>
+        GetMessage("CkAssociationRoleAttributeNameNotUnique", location, ckAssociationRole, attributeName);
 
-    internal static OperationMessage CkTypeIdUnknownTargetAttributeIdForAssociation(object originCkTypeId, object roleId, object targetCkAttributeId, object targetCkTypeId) =>
-        GetMessage("CkTypeIdUnknownTargetAttributeIdForAssociation", originCkTypeId, roleId, targetCkAttributeId, targetCkTypeId);
+    internal static OperationMessage CkAssociationRoleAttributeIdNotUnique(string? location, object ckAssociationRole, object ckAttributeId) =>
+        GetMessage("CkAssociationRoleAttributeIdNotUnique", location, ckAssociationRole, ckAttributeId);
 
-    internal static OperationMessage CkTypeIdAssociationRoleIdUnknown(object ckTypeId, object ckAssociationId) =>
-        GetMessage("CkTypeIdAssociationRoleIdUnknown", ckTypeId, ckAssociationId);
+    internal static OperationMessage CkAttributeIdNotFoundAtType(string? location, object ckAttributeId, object ckTypeId) =>
+        GetMessage("CkAttributeIdNotFoundAtType", location, ckAttributeId, ckTypeId);
 
-    internal static OperationMessage CkAssociationRoleAttributeNameNotUnique(object ckAssociationRole, object attributeName) =>
-        GetMessage("CkAssociationRoleAttributeNameNotUnique", ckAssociationRole, attributeName);
+    internal static OperationMessage CkAttributeIdNotFoundAtRecord(string? location, object ckAttributeId, object ckRecordId) =>
+        GetMessage("CkAttributeIdNotFoundAtRecord", location, ckAttributeId, ckRecordId);
 
-    internal static OperationMessage CkAssociationRoleAttributeIdNotUnique(object ckAssociationRole, object ckAttributeId) =>
-        GetMessage("CkAssociationRoleAttributeIdNotUnique", ckAssociationRole, ckAttributeId);
-
-    internal static OperationMessage CkAttributeIdNotFoundAtType(object ckAttributeId, object ckTypeId) =>
-        GetMessage("CkAttributeIdNotFoundAtType", ckAttributeId, ckTypeId);
-
-    internal static OperationMessage CkAttributeIdNotFoundAtRecord(object ckAttributeId, object ckRecordId) =>
-        GetMessage("CkAttributeIdNotFoundAtRecord", ckAttributeId, ckRecordId);
-
+    internal static OperationMessage FileContainsNoModel(string? location) =>
+        GetMessage("FileContainsNoModel", location);
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -197,7 +196,7 @@ internal static class MessageCodes
         {
             "UnknownAttributeOfCkTypeIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
-                 2, "Attribute Id '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
+                 2, "CkAttributeId '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
                  new [] {"ckAttributeId", "ckTypeId"})
         },
         {
@@ -221,31 +220,31 @@ internal static class MessageCodes
         {
             "AttributeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
-                 6, "AttributeId '{ckAttributeId}' is not unique.",
+                 6, "CkAttributeId '{ckAttributeId}' is not unique.",
                  new [] {"ckAttributeId"})
         },
         {
             "AssociationRoleIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
-                 7, "AssociationRoleId '{ckAssociationId}' is not unique.",
+                 7, "CkAssociationRoleId '{ckAssociationId}' is not unique.",
                  new [] {"ckAssociationId"})
         },
         {
             "TypeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
-                 8, "TypeId '{ckTypeId}' is not unique.",
+                 8, "CkTypeId '{ckTypeId}' is not unique.",
                  new [] {"ckTypeId"})
         },
         {
             "InheritanceMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 9, "TypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set.",
+                 9, "CkTypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set.",
                  new [] {"ckTypeId"})
         },
         {
             "CircularDependency",
              new OperationMessageTemplate(MessageLevel.Error,
-                 10, "ModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies.",
+                 10, "CkModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies.",
                  new [] {"modelId", "dependentModelId"})
         },
         {
@@ -317,13 +316,13 @@ internal static class MessageCodes
         {
             "DirectoryMustBeEmpty",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 22, "Directory '{directory}' must be empty.",
-                 new [] {"directory"})
+                 22, "Directory must be empty.",
+                 new string[] {})
         },
         {
             "ModelIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 23, "ModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
+                 23, "CkModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
                  new [] {"modelId"})
         },
         {
@@ -347,20 +346,20 @@ internal static class MessageCodes
         {
             "SchemaValidationError",
              new OperationMessageTemplate(MessageLevel.Error,
-                 27, "{locationReference}: Schema validation failed: '{errorMessage}'",
-                 new [] {"locationReference", "errorMessage"})
+                 27, "Schema validation failed at '{path}'->'{errorMessage}'",
+                 new [] {"path", "errorMessage"})
         },
         {
             "DirectoryDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 28, "Directory '{directoryPath}' does not exist.",
-                 new [] {"directoryPath"})
+                 28, "Directory does not exist.",
+                 new string[] {})
         },
         {
             "FileDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 29, "File '{filePath}' does not exist.",
-                 new [] {"filePath"})
+                 29, "File does not exist.",
+                 new string[] {})
         },
         {
             "SelectionValueNotUnique",
@@ -499,6 +498,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  52, "CkAttributeId '{ckAttributeId}' defined at record '{ckRecordId}' not found.",
                  new [] {"ckAttributeId", "ckRecordId"})
+        },
+        {
+            "FileContainsNoModel",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 53, "File does not contain a model. It will be ignored.",
+                 new string[] {})
         },
     };
 }

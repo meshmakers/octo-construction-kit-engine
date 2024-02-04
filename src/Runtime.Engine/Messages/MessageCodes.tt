@@ -6,35 +6,36 @@
 <#@ assembly name="$(NuGetPackageRoot)/newtonsoft.json/13.0.3/lib/net45/Newtonsoft.Json.dll" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Collections.Generic" #>
-<#@ include file="CodeGenerationGeneric.ttinclude" #><#@ impovarespace="System.IO" #><#@ impo
-    space="System.Te    xt.RegularExpressions" #><#@ import namespace="Newtonsoft.Json"     #>
+<#@ include file="CodeGenerationGeneric.ttinclude" #><#@ import namespace="System.Text.RegularExpressions" #>
 <#
-    string jsonFilePath = Host.ResolvePath("MessageCodes.var;
+    string jsonFilePath = Host.ResolvePath("MessageCodes.json");
 
-    //var rootElement = GetDocument<RootElement>(jsonFileP                                                     ath);
-    string 
-        sonContent = File.ReadAllText(jsonFilePath);
-    var rootElement = JsonConver                                                                                                           t.DeserializeObject<R                                                                                                                                       ootElement>(jsonContent);
-    CreateHeader                                                                                                                                       ();
-        
+    //var rootElement = GetDocument<RootElement>(jsonFilePath);
+    string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
+    var rootElement = Newtonsoft.Json.JsonConvert.DeserializeObject<RootElement>(jsonContent);
+    CreateHeader();
+
     // Check the usage of message numbers
-    var groupedLevels = rootEl                                                                                                                                                   ement.O
-        erationMessages.GroupBy(x => x.Level);
-    fore (var groupedLevel in groupedLevels)
+    var groupedLevels = rootElement.OperationMessages.GroupBy(x => x.Level);
+    foreach (var groupedLevel in groupedLevels)
     {
         var groupedLevelAndNumber = groupedLevel.GroupBy(x => x.Number);
-        var usedMoreThanOnce = groupedLevelAnd                      Number.Where(x => x.Count() > 1).ToList();
-       varsedMoreThanOnce.Any())    {
+        var usedMoreThanOnce = groupedLevelAndNumber.Where(x => x.Count() > 1).ToList();
+        if (usedMoreThanOnce.Any())
+        {
             string numbers = "";
-         reach (var numbin usedMoreThanOnce)
+            foreach (var number in usedMoreThanOnce)
             {
-          f (!string.IsNulty(numbers))
-                                nu        mbers += ", ";
-                }                                    numbers += number.Key;
-            
-                    }
+                if (!string.IsNullOrEmpty(numbers))
+                {
+                    numbers += ", ";
+                }
 
-            throw new InvalidOperationException($"Message number(s) '{numbers}' has been used more thance at level '{groupedLevel.Key}'");
+
+                numbers += number.Key;
+            }
+
+            throw new InvalidOperationException($"Message number(s) '{numbers}' has been used more than once at level '{groupedLevel.Key}'");
         }
     }
 #>
@@ -53,50 +54,50 @@ namespace Meshmakers.Octo.Runtime.Engine.Messages;
 internal static class MessageCodes
 {
     // ReSharper disable once MemberCanBePrivate.Global
-    internal static OperationMessage GetMessage(string messageKey, params object[] args)
+    internal static OperationMessage GetMessage(string messageKey, string? location, params object[] args)
     {
         if (!Templates.ContainsKey(messageKey))
         {
             throw new ArgumentOutOfRangeException($"Message with key '{messageKey}' does not exist.");
         }
-        return Templa    tes[messageKey].CreateMessage(args);
+        return Templates[messageKey].CreateMessage(location, args);
     }
 
 <#
-    foreach (var me    ssageElement in rootElement.OperationMessages)
+    foreach (var messageElement in rootElement.OperationMessages)
     {
-        var extractPlaceholders = ExtractP                         laceholders(messageElement.Text).ToList();
+        var extractPlaceholders = ExtractPlaceholders(messageElement.Text).ToList();
         if (extractPlaceholders.Any())
         {
 #>
-    internal static Operatio    nMessage <#= messageElement.Key #>(<#=
+    internal static OperationMessage <#= messageElement.Key #>(string? location, <#=
             string.Join(", ", extractPlaceholders.Select(x => "object " + x)) #>) =>
-        GetMessage("<#= messageElement. ey #>", <#= string.Join(", ", extractPlaceholders) #>);
+        GetMessage("<#= messageElement.Key #>", location, <#= string.Join(", ", extractPlaceholders) #>);
 
 <#
         }
         else
         {
 #>
-    internal static OperationMessage <#= messageElement.Key #>() #>) =>
-        G                                            etMessage("<#= messageElement.Key #>");
+    internal static OperationMessage <#= messageElement.Key #>(string? location) =>
+        GetMessage("<#= messageElement.Key #>", location);
 <#
         }
     }
 #>
-    private static readonly Dictionary<string, Operat    ionMessageTemplate> Templates = new()
+    private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
 <#
-    foreach (var me    ssageElement in rootElement.OperationMessages)
+    foreach (var messageElement in rootElement.OperationMessages)
     {
-        var extractPlaceholders = ExtractP                         laceholders(messageElement.Text).ToList();
+        var extractPlaceholders = ExtractPlaceholders(messageElement.Text).ToList();
         if (extractPlaceholders.Any())
         {
 #>
         {
             "<#= messageElement.Key #>",
              new OperationMessageTemplate(MessageLevel.<#= messageElement.Level #>,
-                 <#= messageElement.Number #>, "<#= messageElement.Text,
+                 <#= messageElement.Number #>, "<#= messageElement.Text #>",
                  new [] {<#=
                     string.Join(", ", extractPlaceholders.Select(x => $"\"{x}\"")) #>})
         },
@@ -107,13 +108,13 @@ internal static class MessageCodes
 #>
         {
             "<#= messageElement.Key #>",
-             new OperationMe
-sageTemplate(MessageLevel.<#= messageElement.L vel #>,
-                 <#= messageElement.Number #>, "<#= messageElement.Text #                     new string[] {})
+             new OperationMessageTemplate(MessageLevel.<#= messageElement.Level #>,
+                 <#= messageElement.Number #>, "<#= messageElement.Text #>",
+                 new string[] {})
         },
 <#            
         }
- 
+    }
 #>
     };
 }
@@ -122,7 +123,7 @@ sageTemplate(MessageLevel.<#= messageElement.L vel #>,
     public enum MessageLevel
     {
     Info = 0,
- Warning = 1,
+    Warning = 1,
     Error = 2,
     FatalError = 3
     }

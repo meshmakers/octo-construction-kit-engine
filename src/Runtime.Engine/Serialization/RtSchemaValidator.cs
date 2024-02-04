@@ -59,7 +59,7 @@ internal class RtSchemaValidator : IRtSchemaValidator
             {
                 var path = evaluationResult.InstanceLocation.ToString();
                 var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
             }
         }
 

@@ -36,12 +36,14 @@ internal class BulkRtMutation : IBulkRtMutation
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
         OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("Unknown");
         var entityValidatorResult = await _entityRuleEngine.ValidateAsync(repositoryDataSource.TenantId,
-            entityUpdateInfoList, operationResult).ConfigureAwait(false);
+            entityUpdateInfoList, originFileResolver, operationResult).ConfigureAwait(false);
 
         var graphValidationResult =
             await _graphRuleEngine
-                .ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, operationResult)
+                .ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, originFileResolver,
+                    operationResult)
                 .ConfigureAwait(false);
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);

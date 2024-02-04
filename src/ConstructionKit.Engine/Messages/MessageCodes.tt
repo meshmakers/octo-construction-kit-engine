@@ -54,13 +54,13 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Messages;
 internal static class MessageCodes
 {
     // ReSharper disable once MemberCanBePrivate.Global
-    internal static OperationMessage GetMessage(string messageKey, params object[] args)
+    internal static OperationMessage GetMessage(string messageKey, string? location, params object[] args)
     {
         if (!Templates.ContainsKey(messageKey))
         {
             throw new ArgumentOutOfRangeException($"Message with key '{messageKey}' does not exist.");
         }
-        return Templates[messageKey].CreateMessage(args);
+        return Templates[messageKey].CreateMessage(location, args);
     }
 
 <#
@@ -70,17 +70,17 @@ internal static class MessageCodes
         if (extractPlaceholders.Any())
         {
 #>
-    internal static OperationMessage <#= messageElement.Key #>(<#=
+    internal static OperationMessage <#= messageElement.Key #>(string? location, <#=
             string.Join(", ", extractPlaceholders.Select(x => "object " + x)) #>) =>
-        GetMessage("<#= messageElement.Key #>", <#= string.Join(", ", extractPlaceholders) #>);
+        GetMessage("<#= messageElement.Key #>", location, <#= string.Join(", ", extractPlaceholders) #>);
 
 <#
         }
         else
         {
 #>
-    internal static OperationMessage <#= messageElement.Key #>() #>) =>
-        GetMessage("<#= messageElement.Key #>");
+    internal static OperationMessage <#= messageElement.Key #>(string? location) =>
+        GetMessage("<#= messageElement.Key #>", location);
 <#
         }
     }

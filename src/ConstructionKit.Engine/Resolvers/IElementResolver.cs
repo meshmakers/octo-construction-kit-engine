@@ -14,7 +14,9 @@ internal interface IElementResolver
     /// </summary>
     /// <param name="ckCompiledModelRoot">The construction kit model root to resolve</param>
     /// <param name="variableResolver">Service for resolving variables</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
     /// <returns></returns>
-    CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver, OperationResult operationResult);
+    CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver, IOriginFileResolver originFileResolver, 
+        OperationResult operationResult);
 }

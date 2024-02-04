@@ -12,7 +12,8 @@ public interface ICkValidationService
     ///     Checks the logical consistency of the compiled model.
     /// </summary>
     /// <param name="compiledModel">Compiled construction kit model</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
-    Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult);
+    Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver, OperationResult operationResult);
 }

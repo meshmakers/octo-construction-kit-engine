@@ -20,9 +20,10 @@ public class ElementResolverTests
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
 
-        var validationResult = new OperationResult();
-
-        var result = resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
+        
+        var result = resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.IsType<CkModelGraph>(result);
     }
@@ -37,15 +38,16 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(25, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(25, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -58,16 +60,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(26, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(26, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -80,16 +83,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(24, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(24, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -102,16 +106,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(8, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(8, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -125,16 +130,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(6, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(6, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -148,15 +154,16 @@ public class ElementResolverTests
         };
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(7, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(7, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -173,16 +180,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(31, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(31, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -195,16 +203,17 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(32, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(32, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -218,15 +227,16 @@ public class ElementResolverTests
         }
 
         var resolver = new ElementResolver();
-        var validationResult = new OperationResult();
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("TEST");
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(ckModelRoot, variableResolver, validationResult);
+        resolver.Resolve(ckModelRoot, variableResolver, originFileResolver, operationResult);
 
-        Assert.Single(validationResult.Messages);
-        Assert.Equal(MessageLevel.Error, validationResult.Messages[0].MessageLevel);
-        Assert.Equal(33, validationResult.Messages[0].MessageNumber);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(33, operationResult.Messages[0].MessageNumber);
     }
 
     [Fact]
@@ -235,11 +245,12 @@ public class ElementResolverTests
         var compiledModelRoot = Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -250,11 +261,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.sample_attributes_sameId_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -267,11 +279,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.sample_attributes_sameName_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
         
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -284,11 +297,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.records1.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -299,11 +313,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.records1_attributes_sameId_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -316,11 +331,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.records1_attributes_sameName_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -333,11 +349,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.associations1.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -348,11 +365,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.associations1_attributes_sameId_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -365,11 +383,12 @@ public class ElementResolverTests
         var compiledModelRoot = sampleData.associations1_attributes_sameName_fail.Builder.Build();
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
         A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
             .ReturnsLazily((string name) => name);
-        resolver.Resolve(compiledModelRoot, variableResolver, operationResult);
+        resolver.Resolve(compiledModelRoot, variableResolver, originFileResolver, operationResult);
         
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);

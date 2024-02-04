@@ -4,7 +4,7 @@
       "key": "SchemaValidationError",
       "number": 1,
       "level": "FATALERROR",
-      "text": "{locationReference}: Schema validation failed: '{errorMessage}'"
+      "text": "Schema validation failed at '{path}'->'{errorMessage}'"
     },
     {
       "key": "MandatoryAttributeMissing",

@@ -62,21 +62,21 @@ public class OperationResult
     /// <param name="logger"></param>
     public void WriteMessagesToLogger(ILogger logger)
     {
-        foreach (var compilerMessage in Messages)
+        foreach (var operationMessage in Messages)
         {
-            switch (compilerMessage.MessageLevel)
+            switch (operationMessage.MessageLevel)
             {
                 case MessageLevel.Info:
-                    logger.LogInformation("{Message}", compilerMessage.ToString());
+                    logger.LogInformation("{Message}", operationMessage.ToString());
                     break;
                 case MessageLevel.Warning:
-                    logger.LogWarning("{Message}", compilerMessage.ToString());
+                    logger.LogWarning("{Message}", operationMessage.ToString());
                     break;
                 case MessageLevel.Error:
-                    logger.LogError("{Message}", compilerMessage.ToString());
+                    logger.LogError("{Message}", operationMessage.ToString());
                     break;
                 case MessageLevel.FatalError:
-                    logger.LogCritical("{Message}", compilerMessage.ToString());
+                    logger.LogCritical("{Message}", operationMessage.ToString());
                     break;
             }
         }

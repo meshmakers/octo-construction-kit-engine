@@ -46,6 +46,7 @@ internal class PublishCommand : Command<OctoToolOptions>
         Logger.LogInformation("Repository '{Repository}'", repositoryName);
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver(filePath);
         await using var streamReader = File.OpenRead(filePath);
         try
         {
@@ -57,7 +58,7 @@ internal class PublishCommand : Command<OctoToolOptions>
                 return;
             }
 
-            await _ckValidationService.ValidateAsync(ckCompiledModelRoot, operationResult);
+            await _ckValidationService.ValidateAsync(ckCompiledModelRoot, originFileResolver, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error validating model \'{FilePath}\'", filePath);

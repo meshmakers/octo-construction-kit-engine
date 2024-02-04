@@ -12,7 +12,7 @@
         },
         "name": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_.]+$"
+          "pattern": "^[a-zA-Z0-9_]+$"
         },
         "autoCompleteValues": {
           "type": "array",
@@ -55,7 +55,9 @@
             "TimeSpan",
             "Enum",
             "Int64",
-            "DateTimeOffset"
+            "DateTimeOffset",
+            "Binary",
+            "BinaryLinked"
           ]
         },
         "valueCkRecordId": {

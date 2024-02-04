@@ -11,8 +11,9 @@ internal interface IInheritanceResolver
     /// <summary>
     ///     Resolves the inheritance of the given model elements
     /// </summary>
-    /// <param name="modelGraph"></param>
-    /// <param name="operationResult"></param>
+    /// <param name="modelGraph">Model graph to resolve</param>
+    /// <param name="originFileResolver">Origin file resolver</param>
+    /// <param name="operationResult">Operation result</param>
     /// <returns></returns>
-    CkModelGraph Resolve(CkModelGraph modelGraph, OperationResult operationResult);
+    CkModelGraph Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult);
 }

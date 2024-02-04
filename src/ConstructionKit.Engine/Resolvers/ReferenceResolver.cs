@@ -10,24 +10,19 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// </summary>
 internal class ReferenceResolver : IReferenceResolver
 {
-    /// <summary>
-    ///     Resolves and checks cross reference within the model graph.
-    /// </summary>
-    /// <param name="modelGraph"></param>
-    /// <param name="operationResult"></param>
-    public void Resolve(CkModelGraph modelGraph,
+    public void Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
-        CheckCkAssociationRoles(modelGraph, operationResult);
+        CheckCkAssociationRoles(modelGraph, originFileResolver, operationResult);
 
-        CheckCkAttributes(modelGraph, operationResult);
+        CheckCkAttributes(modelGraph, originFileResolver, operationResult);
 
-        CheckCkRecords(modelGraph, operationResult);
+        CheckCkRecords(modelGraph, originFileResolver, operationResult);
 
-        CheckCkTypes(modelGraph, operationResult);
+        CheckCkTypes(modelGraph, originFileResolver, operationResult);
     }
 
-    private static void CheckCkAssociationRoles(CkModelGraph modelGraph,
+    private static void CheckCkAssociationRoles(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
         foreach (var ckAssociationRoleKeyValue in modelGraph.AssociationRoles)
@@ -38,7 +33,8 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckTypeAttribute.CkAttributeId, ckAssociationRoleKeyValue.Key));
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckTypeAttribute.CkAttributeId),
+                            ckTypeAttribute.CkAttributeId, ckAssociationRoleKeyValue.Key));
                     continue;
                 }
 
@@ -48,7 +44,7 @@ internal class ReferenceResolver : IReferenceResolver
         }
     }
 
-    private static void CheckCkRecords(CkModelGraph modelGraph,
+    private static void CheckCkRecords(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
         foreach (var ckRecordKeyValue in modelGraph.Records)
@@ -59,7 +55,8 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(ckTypeAttribute.CkAttributeId, ckRecordKeyValue.Key));
+                        MessageCodes.UnknownAttributeOfCkRecordIdInSource(originFileResolver.Resolve(ckTypeAttribute.CkAttributeId),
+                            ckTypeAttribute.CkAttributeId, ckRecordKeyValue.Key));
                     continue;
                 }
 
@@ -73,14 +70,15 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Records.ContainsKey(ckRecordKeyValue.Value.DerivedFromCkRecordId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownDerivedFromCkRecordIdInSource(ckRecordKeyValue.Value.DerivedFromCkRecordId,
+                        MessageCodes.UnknownDerivedFromCkRecordIdInSource(originFileResolver.Resolve(ckRecordKeyValue.Value.CkRecordId),
+                            ckRecordKeyValue.Value.DerivedFromCkRecordId,
                             ckRecordKeyValue.Key));
                 }
             }
         }
     }
 
-    private static void CheckCkTypes(CkModelGraph modelGraph,
+    private static void CheckCkTypes(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
         foreach (var ckTypeKeyValue in modelGraph.Types)
@@ -91,7 +89,8 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Attributes.ContainsKey(ckTypeAttribute.CkAttributeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAttributeOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
+                        MessageCodes.UnknownAttributeOfCkTypeIdInSource(originFileResolver.Resolve(ckTypeKeyValue.Key),
+                            ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
                     continue;
                 }
 
@@ -105,8 +104,8 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.Types.ContainsKey(ckTypeKeyValue.Value.DerivedFromCkTypeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownCkDerivedIdOfCkTypeIdInSource(ckTypeKeyValue.Value.DerivedFromCkTypeId,
-                            ckTypeKeyValue.Key));
+                        MessageCodes.UnknownCkDerivedIdOfCkTypeIdInSource(originFileResolver.Resolve(ckTypeKeyValue.Key),
+                            ckTypeKeyValue.Value.DerivedFromCkTypeId, ckTypeKeyValue.Key));
                 }
             }
 
@@ -116,29 +115,32 @@ internal class ReferenceResolver : IReferenceResolver
                 if (!modelGraph.AssociationRoles.ContainsKey(ckTypeAssociation.CkRoleId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownAssociationRoleOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.CkRoleId));
+                        MessageCodes.UnknownAssociationRoleOfCkTypeIdInSource(originFileResolver.Resolve(ckTypeKeyValue.Key),
+                            ckTypeKeyValue.Key, ckTypeAssociation.CkRoleId));
                 }
 
                 // Check 4.
                 if (!modelGraph.Types.ContainsKey(ckTypeAssociation.TargetCkTypeId))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.UnknownTargetCkTypeIdOfCkTypeIdInSource(ckTypeKeyValue.Key, ckTypeAssociation.TargetCkTypeId));
+                        MessageCodes.UnknownTargetCkTypeIdOfCkTypeIdInSource(originFileResolver.Resolve(ckTypeKeyValue.Key),
+                            ckTypeKeyValue.Key, ckTypeAssociation.TargetCkTypeId));
                 }
             }
         }
     }
 
-    private static void CheckCkAttributes(CkModelGraph ckModelGraph, OperationResult operationResult)
+    private static void CheckCkAttributes(CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         foreach (var ckAttribute in ckModelGraph.Attributes)
         {
-            if (ckAttribute.Value.ValueType == AttributeValueTypesDto.Record
+            if ((ckAttribute.Value.ValueType == AttributeValueTypesDto.Record ||
+                 ckAttribute.Value.ValueType == AttributeValueTypesDto.RecordArray)
                 && ckAttribute.Value.ValueCkRecordId != null
                 && !ckModelGraph.Records.ContainsKey(ckAttribute.Value.ValueCkRecordId))
             {
                 operationResult.AddMessage(
-                    MessageCodes.AttributeUsesUnknownCkRecordId(ckAttribute.Key,
+                    MessageCodes.AttributeUsesUnknownCkRecordId(originFileResolver.Resolve(ckAttribute.Value.CkAttributeId), ckAttribute.Key,
                         ckAttribute.Value.ValueCkRecordId));
             }
         }

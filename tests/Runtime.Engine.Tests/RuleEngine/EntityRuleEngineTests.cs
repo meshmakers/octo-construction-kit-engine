@@ -21,6 +21,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -28,7 +29,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             {
                 CkTypeId = "Sample1/SampleType35"
             })
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -45,6 +46,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -52,7 +54,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             {
                 CkTypeId = "Test/City"
             })
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -69,6 +71,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -76,7 +79,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
             {
                 CkTypeId = "Test/LocationWithSensor"
             })
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -93,6 +96,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -105,7 +109,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                         { "Designation", "Test" },
                         { "RecordArrayTests", new List<object>() }
                     }))
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -121,6 +125,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -133,7 +138,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                     {
                         { "Designation", null }
                     }))
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -150,6 +155,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ckCacheService = await _fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
@@ -162,7 +168,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                     {
                         { "Designation", "Test" }
                     }))
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
@@ -177,6 +183,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     {
         var ckCacheService = await _fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var rtEntity = new RtEntity(
             "Test/Country",
@@ -190,7 +197,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         var list = rtEntity.GetAttributeStringValues("StringArrayTests");
 
@@ -205,6 +212,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     {
         var ckCacheService = await _fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var rtEntity = new RtEntity(
             "Test/Country",
@@ -218,7 +226,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         var list = rtEntity.GetAttributeValues<int>("IntArrayTests");
 
@@ -233,6 +241,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     {
         var ckCacheService = await _fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
         var rtEntity = new RtEntity(
             "Test/Country",
@@ -246,7 +255,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
         var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
         {
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, operationResult);
+        }, originFileResolver, operationResult);
 
         var list = rtEntity.GetRtRecordAttributeValues<RtTestRecordRecord>("RecordArrayTests");
 

@@ -31,8 +31,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Equal(4, modelGraph.Types.Count);
@@ -74,8 +75,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Equal(4, modelGraph.Types.Count);
@@ -97,8 +99,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Equal(4, modelGraph.Types.Count);
@@ -132,8 +135,9 @@ public class InheritanceResolverTests
         ckModelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(ckModelGraph, operationResult);
+        inheritanceResolver.Resolve(ckModelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
 
@@ -157,8 +161,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
 
@@ -182,8 +187,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_attributes_sameNameAtInheritance_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -204,8 +210,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_attributes_sameIdAtInheritance_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -228,8 +235,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_assocs_sameIdAndTarget_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -246,8 +254,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_assocs_unknownRoleId_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -264,8 +273,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_assocs_sameIdAndTargetAtInheritance_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -282,8 +292,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_assocs_sameIdAndBaseTargetAtInheritance_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -300,8 +311,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_assocs_sameRoleIdDifferentTrees_ok.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -315,8 +327,9 @@ public class InheritanceResolverTests
         ckAggregatedModelElements.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(ckAggregatedModelElements, operationResult));
+        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(ckAggregatedModelElements, originFileResolver, operationResult));
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.FatalError, operationResult.Messages[0].MessageLevel);
@@ -333,8 +346,9 @@ public class InheritanceResolverTests
         ckAggregatedModelElements.AppendModel(sampleData.sample_assocs_invalidTarget_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(ckAggregatedModelElements, operationResult));
+        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(ckAggregatedModelElements, originFileResolver, operationResult));
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.FatalError, operationResult.Messages[0].MessageLevel);
@@ -351,8 +365,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_final_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(modelGraph, operationResult));
+        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult));
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.FatalError, operationResult.Messages[0].MessageLevel);
@@ -369,8 +384,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_final.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -385,8 +401,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_TypeNotDerivedFromSystemEntity_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(modelGraph, operationResult));
+        Assert.Throws<ModelValidationException>(() => inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult));
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.FatalError, operationResult.Messages[0].MessageLevel);
@@ -403,8 +420,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_associationWithAttributes.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
     }
@@ -419,8 +437,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample_associationWithAttributes_NotFound_fail.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
@@ -437,8 +456,9 @@ public class InheritanceResolverTests
         modelGraph.AppendModel(sampleData.sample1.Builder.Build());
 
         OperationResult operationResult = new();
+        var originFileResolver = new OriginFileResolver("TEST");
         InheritanceResolver inheritanceResolver = new(logger);
-        inheritanceResolver.Resolve(modelGraph, operationResult);
+        inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Equal(4, modelGraph.Types.Count);

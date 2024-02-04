@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
-    public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver,
+    public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
         var ckModelGraph = new CkModelGraph();
@@ -25,20 +25,21 @@ internal class ElementResolver : IElementResolver
 
                 if (!Regex.IsMatch(ckAttribute.AttributeId.AttributeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(ckAttribute.AttributeId.AttributeId));
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(originFileResolver.Resolve(ckAttributeId),
+                        ckAttribute.AttributeId.AttributeId));
                     continue;
                 }
 
                 if (ckModelGraph.Attributes.ContainsKey(ckAttributeId))
                 {
-                    operationResult.AddMessage(MessageCodes.AttributeIdNotUnique(ckAttributeId));
+                    operationResult.AddMessage(MessageCodes.AttributeIdNotUnique(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
 
                 if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
                     && ckAttribute.ValueCkRecordId == null)
                 {
-                    operationResult.AddMessage(MessageCodes.CkRecordIdUndefined(ckAttributeId));
+                    operationResult.AddMessage(MessageCodes.CkRecordIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
                 
@@ -50,7 +51,7 @@ internal class ElementResolver : IElementResolver
 
                 if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId == null)
                 {
-                    operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(ckAttributeId));
+                    operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
                 
@@ -71,13 +72,14 @@ internal class ElementResolver : IElementResolver
                 if (!Regex.IsMatch(ckAssociationRole.AssociationRoleId.RoleId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.CkAssociationIdContainsInvalidCharacters(ckAssociationRole.AssociationRoleId.RoleId));
+                        MessageCodes.CkAssociationIdContainsInvalidCharacters(originFileResolver.Resolve(ckAssociationId),
+                            ckAssociationRole.AssociationRoleId.RoleId));
                     continue;
                 }
 
                 if (ckModelGraph.AssociationRoles.ContainsKey(ckAssociationId))
                 {
-                    operationResult.AddMessage(MessageCodes.AssociationRoleIdNotUnique(ckAssociationId));
+                    operationResult.AddMessage(MessageCodes.AssociationRoleIdNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationId));
                     continue;
                 }
 
@@ -89,7 +91,7 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(ckAssociationRole.AssociationRoleId,
+                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
                                 string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
@@ -100,7 +102,7 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(ckAssociationRole.AssociationRoleId,
+                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
@@ -122,13 +124,13 @@ internal class ElementResolver : IElementResolver
                 var ckTypeId = new CkId<CkTypeId>(ckCompiledModelRoot.ModelId, ckType.TypeId);
                 if (!Regex.IsMatch(ckType.TypeId.TypeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkTypeIdContainsInvalidCharacters(ckType.TypeId.TypeId));
+                    operationResult.AddMessage(MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId), ckType.TypeId.TypeId));
                     continue;
                 }
 
                 if (ckModelGraph.Types.ContainsKey(ckTypeId))
                 {
-                    operationResult.AddMessage(MessageCodes.TypeIdNotUnique(ckTypeId));
+                    operationResult.AddMessage(MessageCodes.TypeIdNotUnique(originFileResolver.Resolve(ckTypeId), ckTypeId));
                     continue;
                 }
 
@@ -145,7 +147,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkTypeIdAttributeIdNotUnique(ckType.TypeId, string.Join(", ", duplicateAttributeIds)));
+                            MessageCodes.CkTypeIdAttributeIdNotUnique(originFileResolver.Resolve(ckTypeId), ckType.TypeId, 
+                                string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
 
@@ -155,7 +158,7 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkTypeIdAttributeNameNotUnique(ckType.TypeId,
+                            MessageCodes.CkTypeIdAttributeNameNotUnique(originFileResolver.Resolve(ckTypeId), ckType.TypeId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
@@ -185,13 +188,14 @@ internal class ElementResolver : IElementResolver
                 var ckRecordId = new CkId<CkRecordId>(ckCompiledModelRoot.ModelId, ckRecord.RecordId);
                 if (!Regex.IsMatch(ckRecord.RecordId.RecordId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(ckRecord.RecordId.RecordId));
+                    operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(originFileResolver.Resolve(ckRecordId),  
+                        ckRecord.RecordId.RecordId));
                     continue;
                 }
 
                 if (ckModelGraph.Records.ContainsKey(ckRecordId))
                 {
-                    operationResult.AddMessage(MessageCodes.RecordIdNotUnique(ckRecordId));
+                    operationResult.AddMessage(MessageCodes.RecordIdNotUnique(originFileResolver.Resolve(ckRecordId), ckRecordId));
                     continue;
                 }
                 
@@ -208,7 +212,7 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkRecordIdAttributeIdNotUnique(ckRecord.RecordId, string.Join(", ", duplicateAttributeIds)));
+                            MessageCodes.CkRecordIdAttributeIdNotUnique(originFileResolver.Resolve(ckRecordId), ckRecord.RecordId, string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
 
@@ -218,7 +222,7 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkRecordIdAttributeNameNotUnique(ckRecord.RecordId,
+                            MessageCodes.CkRecordIdAttributeNameNotUnique(originFileResolver.Resolve(ckRecordId), ckRecord.RecordId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
@@ -240,13 +244,13 @@ internal class ElementResolver : IElementResolver
                 var ckEnumId = new CkId<CkEnumId>(ckCompiledModelRoot.ModelId, ckEnum.EnumId);
                 if (!Regex.IsMatch(ckEnum.EnumId.EnumId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkEnumIdContainsInvalidCharacters(ckEnum.EnumId.EnumId));
+                    operationResult.AddMessage(MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId), ckEnum.EnumId.EnumId));
                     continue;
                 }
 
                 if (ckModelGraph.Enums.ContainsKey(ckEnumId))
                 {
-                    operationResult.AddMessage(MessageCodes.EnumIdNotUnique(ckEnumId));
+                    operationResult.AddMessage(MessageCodes.EnumIdNotUnique(originFileResolver.Resolve(ckEnumId), ckEnumId));
                     continue;
                 }
 
@@ -254,7 +258,7 @@ internal class ElementResolver : IElementResolver
                 foreach (var ckSelectionValueGroup in
                          ckEnum.Values.GroupBy(x => x.Key).Where(x => x.Count() > 1))
                 {
-                    operationResult.AddMessage(MessageCodes.SelectionValueNotUnique(ckEnumId, ckSelectionValueGroup.Key));
+                    operationResult.AddMessage(MessageCodes.SelectionValueNotUnique(originFileResolver.Resolve(ckEnumId), ckEnumId, ckSelectionValueGroup.Key));
                     ignoreEnum = true;
                 }
 

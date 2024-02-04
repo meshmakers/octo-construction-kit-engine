@@ -23,9 +23,10 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
     public async Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        OperationResult operationResult)
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
-        return await ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult)
+        return await ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, new List<AssociationUpdateInfo>(),
+                originFileResolver, operationResult)
             .ConfigureAwait(false);
     }
 
@@ -33,7 +34,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
     public async Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        OperationResult operationResult)
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         var graphValidationResult = new GraphRuleEngineResult();
 
@@ -41,14 +42,16 @@ internal class GraphRuleEngine : IGraphRuleEngine
         var createAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
         var deleteAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
 
-        await ValidateAssociationsToCreate(session, repositoryDataSource, createAssociations, graphValidationResult, operationResult)
+        await ValidateAssociationsToCreate(session, repositoryDataSource, createAssociations, graphValidationResult, originFileResolver,
+                operationResult)
             .ConfigureAwait(false);
-        await ValidateAssociationsToDelete(session, repositoryDataSource, deleteAssociations, graphValidationResult, operationResult)
+        await ValidateAssociationsToDelete(session, repositoryDataSource, deleteAssociations, graphValidationResult, originFileResolver,
+                operationResult)
             .ConfigureAwait(false);
 
         // Validate the consistency of the construction kit model
         await ValidateCkModel(session, repositoryDataSource, graphValidationResult, entityUpdateInfoList, associationUpdateInfoList,
-            operationResult).ConfigureAwait(false);
+            originFileResolver, operationResult).ConfigureAwait(false);
 
         return graphValidationResult;
     }
@@ -56,21 +59,23 @@ internal class GraphRuleEngine : IGraphRuleEngine
     // ReSharper disable once UnusedMember.Global
     public async Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        OperationResult operationResult)
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         return await ValidateAsync(session, repositoryDataSource, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList,
-            operationResult).ConfigureAwait(false);
+            originFileResolver, operationResult).ConfigureAwait(false);
     }
 
     private async Task ValidateCkModel(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         GraphRuleEngineResult graphRuleEngineResult,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
-        OperationResult operationResult)
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
-        await ValidateOrigin(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, operationResult)
+        await ValidateOrigin(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, originFileResolver,
+                operationResult)
             .ConfigureAwait(false);
-        await ValidateTarget(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, operationResult)
+        await ValidateTarget(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, originFileResolver,
+                operationResult)
             .ConfigureAwait(false);
 
         // Ensure that all associations exists when creating an entity
@@ -88,7 +93,9 @@ internal class GraphRuleEngine : IGraphRuleEngine
                         x.ModOption == AssociationModOptionsDto.Create &&
                         x.RoleId == inputAssociationGraph.CkRoleId))
                 {
-                    operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnCreate(repositoryDataSource.TenantId,
+                    operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnCreate(
+                        originFileResolver.Resolve(repositoryDataSource.TenantId),
+                        repositoryDataSource.TenantId,
                         entityUpdateInfo.RtEntityId.CkTypeId, entityUpdateInfo.RtEntityId.RtId, inputAssociationGraph.CkRoleId,
                         MultiplicitiesDto.One));
                 }
@@ -106,16 +113,19 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
     private async Task ValidateTarget(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
     {
         var targetList = associationUpdateInfoList.Select(a => a.Target).Distinct();
         foreach (var targetRtId in targetList)
         {
-            var targetEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList, targetRtId, operationResult)
+            var targetEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList, targetRtId, originFileResolver,
+                    operationResult)
                 .ConfigureAwait(false);
             if (targetEntity == null)
             {
-                operationResult.AddMessage(MessageCodes.MissingTargetEntity(repositoryDataSource.TenantId, targetRtId.CkTypeId,
+                operationResult.AddMessage(MessageCodes.MissingTargetEntity(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                    repositoryDataSource.TenantId, targetRtId.CkTypeId,
                     targetRtId.RtId));
                 continue;
             }
@@ -129,7 +139,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                     targetCacheItem.Associations.In.All.FirstOrDefault(a => a.CkRoleId == associationUpdateInfosByRoleId.Key);
                 if (inboundAssociationCacheItem == null)
                 {
-                    operationResult.AddMessage(MessageCodes.AssociationNotAllowed(repositoryDataSource.TenantId, targetRtId.CkTypeId,
+                    operationResult.AddMessage(MessageCodes.AssociationNotAllowed(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                        repositoryDataSource.TenantId, targetRtId.CkTypeId,
                         targetRtId.RtId, associationUpdateInfosByRoleId.Key));
                     continue;
                 }
@@ -139,7 +150,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
                 foreach (var associationUpdateInfo in associationUpdateInfosByRoleId)
                 {
                     var originEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList,
-                        associationUpdateInfo.Origin, operationResult).ConfigureAwait(false);
+                        associationUpdateInfo.Origin, originFileResolver, operationResult).ConfigureAwait(false);
                     if (originEntity != null)
                     {
                         var originCacheItem = _ckCache.GetCkType(repositoryDataSource.TenantId, originEntity.GetCkTypeId());
@@ -147,7 +158,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                         if (originCkTypeGraph.CkTypeId != originCacheItem.CkTypeId &&
                             originCkTypeGraph.DerivedTypes.All(x => x.InheritorCkTypeId != originCacheItem.CkTypeId))
                         {
-                            operationResult.AddMessage(MessageCodes.AssociationNotAllowed(repositoryDataSource.TenantId,
+                            operationResult.AddMessage(MessageCodes.AssociationNotAllowed(
+                                originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                                 targetRtId.CkTypeId, targetRtId.RtId, associationUpdateInfosByRoleId.Key));
                         }
                     }
@@ -167,7 +179,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                     if (storedTargetAssociations == CurrentMultiplicity.One &&
                         inboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.One)
                     {
-                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(repositoryDataSource.TenantId,
+                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(
+                            originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                             targetRtId.CkTypeId, targetRtId.RtId, associationUpdateInfosByRoleId.Key, MultiplicitiesDto.One));
                     }
                 }
@@ -178,7 +191,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                         (inboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.One ||
                          inboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.ZeroOrOne))
                     {
-                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(repositoryDataSource.TenantId,
+                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(
+                            originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                             targetRtId.CkTypeId, targetRtId.RtId, associationUpdateInfosByRoleId.Key, MultiplicitiesDto.One));
                     }
                 }
@@ -188,16 +202,19 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
     private async Task ValidateOrigin(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, OperationResult operationResult)
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
     {
         var originList = associationUpdateInfoList.Select(a => a.Origin).Distinct();
         foreach (var originRtId in originList)
         {
-            var originEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList, originRtId, operationResult)
+            var originEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList, originRtId, originFileResolver,
+                    operationResult)
                 .ConfigureAwait(false);
             if (originEntity == null)
             {
-                operationResult.AddMessage(MessageCodes.MissingOriginEntity(repositoryDataSource.TenantId,
+                operationResult.AddMessage(MessageCodes.MissingOriginEntity(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                    repositoryDataSource.TenantId,
                     originRtId.CkTypeId, originRtId.RtId));
                 continue;
             }
@@ -211,7 +228,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                     originCacheItem.Associations.Out.All.FirstOrDefault(a => a.CkRoleId == associationUpdateInfosByRoleId.Key);
                 if (outboundAssociationCacheItem == null)
                 {
-                    operationResult.AddMessage(MessageCodes.InboundAssociationNotAllowedForCkType(repositoryDataSource.TenantId,
+                    operationResult.AddMessage(MessageCodes.InboundAssociationNotAllowedForCkType(
+                        originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                         originRtId.CkTypeId, originRtId.RtId, associationUpdateInfosByRoleId.Key, originCacheItem.CkTypeId));
                     continue;
                 }
@@ -221,7 +239,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
                 foreach (var associationUpdateInfo in associationUpdateInfosByRoleId)
                 {
                     var targetEntity = await GetEntityAsync(session, repositoryDataSource, entityUpdateInfoList,
-                        associationUpdateInfo.Target, operationResult).ConfigureAwait(false);
+                        associationUpdateInfo.Target, originFileResolver, operationResult).ConfigureAwait(false);
                     if (targetEntity != null)
                     {
                         var targetCacheItem = _ckCache.GetCkType(repositoryDataSource.TenantId, targetEntity.GetCkTypeId());
@@ -229,7 +247,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                         if (targetCkTypeGraph.CkTypeId != targetCacheItem.CkTypeId &&
                             targetCkTypeGraph.DerivedTypes.All(x => x.InheritorCkTypeId != targetCacheItem.CkTypeId))
                         {
-                            operationResult.AddMessage(MessageCodes.OutboundAssociationNotAllowedForCkType(repositoryDataSource.TenantId,
+                            operationResult.AddMessage(MessageCodes.OutboundAssociationNotAllowedForCkType(
+                                originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                                 originRtId.CkTypeId, originRtId.RtId, associationUpdateInfosByRoleId.Key, targetCacheItem.CkTypeId));
                         }
                     }
@@ -249,7 +268,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                     if (storedOriginAssociations == CurrentMultiplicity.One &&
                         outboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.One)
                     {
-                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(repositoryDataSource.TenantId,
+                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(
+                            originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                             originRtId.CkTypeId, originRtId.RtId, associationUpdateInfosByRoleId.Key, MultiplicitiesDto.One));
                     }
                 }
@@ -260,7 +280,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                         (outboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.One ||
                          outboundAssociationCacheItem.Multiplicity == MultiplicitiesDto.ZeroOrOne))
                     {
-                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(repositoryDataSource.TenantId,
+                        operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(
+                            originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
                             originRtId.CkTypeId, originRtId.RtId, associationUpdateInfosByRoleId.Key, MultiplicitiesDto.One));
                     }
                 }
@@ -269,7 +290,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
     }
 
     private async Task ValidateAssociationsToDelete(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IEnumerable<AssociationUpdateInfo> deleteAssociations, GraphRuleEngineResult graphRuleEngineResult, OperationResult operationResult)
+        IEnumerable<AssociationUpdateInfo> deleteAssociations, GraphRuleEngineResult graphRuleEngineResult,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         foreach (var d in deleteAssociations)
         {
@@ -282,7 +304,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                 d.RoleId).ConfigureAwait(false);
             if (rtAssociation == null)
             {
-                operationResult.AddMessage(MessageCodes.AssociationDoesNotExist(repositoryDataSource.TenantId, d.RoleId,
+                operationResult.AddMessage(MessageCodes.AssociationDoesNotExist(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                    repositoryDataSource.TenantId, d.RoleId,
                     origin.CkTypeId, origin.RtId, target.CkTypeId, target.RtId));
                 continue;
             }
@@ -292,7 +315,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
     }
 
     private async Task ValidateAssociationsToCreate(IOctoSession session, IRepositoryDataSource repositoryDataSource,
-        IEnumerable<AssociationUpdateInfo> createAssociations, GraphRuleEngineResult graphRuleEngineResult, OperationResult operationResult)
+        IEnumerable<AssociationUpdateInfo> createAssociations, GraphRuleEngineResult graphRuleEngineResult,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         foreach (var associationUpdateInfo in createAssociations)
         {
@@ -305,7 +329,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
                 associationUpdateInfo.RoleId).ConfigureAwait(false);
             if (rtAssociation != null)
             {
-                operationResult.AddMessage(MessageCodes.AssociationAlreadyExists(repositoryDataSource.TenantId,
+                operationResult.AddMessage(MessageCodes.AssociationAlreadyExists(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                    repositoryDataSource.TenantId,
                     associationUpdateInfo.RoleId,
                     origin.CkTypeId, origin.RtId, target.CkTypeId, target.RtId));
                 continue;
@@ -321,7 +346,7 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
     private async Task<RtEntity?> GetEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        RtEntityId rtEntityId, OperationResult operationResult)
+        RtEntityId rtEntityId, IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         var rtEntity = entityUpdateInfoList.Select(x => x.RtEntity)
             .FirstOrDefault(x => x?.RtId == rtEntityId.RtId);
@@ -334,7 +359,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
 
         if (rtEntity == null)
         {
-            operationResult.AddMessage(MessageCodes.EntityNotFound(repositoryDataSource.TenantId,
+            operationResult.AddMessage(MessageCodes.EntityNotFound(originFileResolver.Resolve(repositoryDataSource.TenantId),
+                repositoryDataSource.TenantId,
                 rtEntityId.CkTypeId, rtEntityId.RtId));
         }
 

@@ -178,10 +178,17 @@ public class CompilerService : ICompilerService
     /// <inheritdoc />
     public async Task<CompileResult> GetConstructionKitFolderInfoAsync(string rootPath, bool createCacheFile)
     {
+        var operationResult = new OperationResult();
+        return await GetConstructionKitFolderInfoAsync(rootPath, createCacheFile, operationResult).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<CompileResult> GetConstructionKitFolderInfoAsync(string rootPath, bool createCacheFile, OperationResult operationResult)
+    {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
 
-        var operationResult = new OperationResult();
-        
+        var originFileResolver = new OriginFileResolver(rootPath);
+
         if (!Directory.Exists(rootPath))
         {
             operationResult.AddMessage(MessageCodes.DirectoryDoesNotExist(rootPath));
@@ -189,7 +196,7 @@ public class CompilerService : ICompilerService
             throw CompilerException.DirectoryDoesNotExist(rootPath, operationResult);
         }
         
-        var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, operationResult).ConfigureAwait(false);
+        var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, originFileResolver, operationResult).ConfigureAwait(false);
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
@@ -211,9 +218,16 @@ public class CompilerService : ICompilerService
     /// <inheritdoc />
     public async Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile)
     {
+        var operationResult = new OperationResult();
+        return await CompileAsync(rootPath, createCacheFile, operationResult).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile, OperationResult operationResult)
+    {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
 
-        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver(rootPath);
 
         if (!Directory.Exists(rootPath))
         {
@@ -228,7 +242,7 @@ public class CompilerService : ICompilerService
         var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
         var enumsDirectory = Path.Combine(rootPath, CompilerStatics.EnumsDirectoryName);
 
-        var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, operationResult).ConfigureAwait(false);
+        var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, originFileResolver, operationResult).ConfigureAwait(false);
 
         var types = new Dictionary<CkTypeId, CkCompiledTypeDto>();
         if (Directory.Exists(typesDirectory))
@@ -248,6 +262,8 @@ public class CompilerService : ICompilerService
                     {
                         foreach (var ckTypeDto in elementsRootDto.Types)
                         {
+                            originFileResolver.Add(new CkId<CkTypeId>(ckMetaDto.ModelId, ckTypeDto.TypeId), typeFile);
+                            
                             var ckCompiledTypeDto = new CkCompiledTypeDto
                             {
                                 TypeId = ckTypeDto.TypeId,
@@ -262,7 +278,7 @@ public class CompilerService : ICompilerService
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))
                             {
-                                operationResult.AddMessage(MessageCodes.TypeIdNotUnique(ckCompiledTypeDto.TypeId));
+                                operationResult.AddMessage(MessageCodes.TypeIdNotUnique(typeFile, ckCompiledTypeDto.TypeId));
                                 operationResult.WriteMessagesToLogger(_logger);
                                 throw new CompilerException(operationResult);
                             }
@@ -273,7 +289,10 @@ public class CompilerService : ICompilerService
                 catch (ModelParseException e)
                 {
                     operationResult.WriteMessagesToLogger(_logger);
-                    throw CompilerException.ModelParseFailed(typeFile, e, operationResult);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(typeFile, e, operationResult);
+                    }
                 }
             }
         }
@@ -294,13 +313,21 @@ public class CompilerService : ICompilerService
                         .ConfigureAwait(false);
                     if (elementsRootDto.Records != null)
                     {
+                        foreach (var ckRecordDto in elementsRootDto.Records)
+                        {
+                            originFileResolver.Add(new CkId<CkRecordId>(ckMetaDto.ModelId, ckRecordDto.RecordId), recordFile);
+                        }
+                        
                         records.AddRange(elementsRootDto.Records);
                     }
                 }
                 catch (ModelParseException e)
                 {
                     operationResult.WriteMessagesToLogger(_logger);
-                    throw CompilerException.ModelParseFailed(recordFile, e, operationResult);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(recordFile, e, operationResult);
+                    }
                 }
             }
         }
@@ -321,13 +348,21 @@ public class CompilerService : ICompilerService
                         .ConfigureAwait(false);
                     if (elementsRootDto.Enums != null)
                     {
+                        foreach (var ckEnumDto in elementsRootDto.Enums)
+                        {
+                            originFileResolver.Add(new CkId<CkEnumId>(ckMetaDto.ModelId, ckEnumDto.EnumId), enumFile);
+                        }
+                        
                         enums.AddRange(elementsRootDto.Enums);
                     }
                 }
                 catch (ModelParseException e)
                 {
                     operationResult.WriteMessagesToLogger(_logger);
-                    throw CompilerException.ModelParseFailed(enumFile, e, operationResult);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(enumFile, e, operationResult);
+                    }
                 }
             }
         }
@@ -348,13 +383,21 @@ public class CompilerService : ICompilerService
                         .ConfigureAwait(false);
                     if (elementsRootDto.Attributes != null)
                     {
+                        foreach (var ckAttributeDto in elementsRootDto.Attributes)
+                        {
+                            originFileResolver.Add(new CkId<CkAttributeId>(ckMetaDto.ModelId, ckAttributeDto.AttributeId), attributeFile);
+                        }
+                        
                         attributes.AddRange(elementsRootDto.Attributes);
                     }
                 }
                 catch (ModelParseException e)
                 {
                     operationResult.WriteMessagesToLogger(_logger);
-                    throw CompilerException.ModelParseFailed(attributeFile, e, operationResult);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(attributeFile, e, operationResult);
+                    }
                 }
             }
         }
@@ -375,13 +418,22 @@ public class CompilerService : ICompilerService
                         .ConfigureAwait(false);
                     if (elementsRootDto.AssociationRoles != null)
                     {
+                        foreach (var ckAssociationRoleDto in elementsRootDto.AssociationRoles)
+                        {
+                            originFileResolver.Add(new CkId<CkAssociationRoleId>(ckMetaDto.ModelId,
+                                ckAssociationRoleDto.AssociationRoleId), associationFile);
+                        }
+                        
                         associationRoles.AddRange(elementsRootDto.AssociationRoles);
                     }
                 }
                 catch (ModelParseException e)
                 {
                     operationResult.WriteMessagesToLogger(_logger);
-                    throw CompilerException.ModelParseFailed(associationFile, e, operationResult);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(associationFile, e, operationResult);
+                    }
                 }
             }
         }
@@ -397,7 +449,7 @@ public class CompilerService : ICompilerService
             Enums = enums
         };
 
-        var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, operationResult).ConfigureAwait(false);
+        var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
 
         foreach (var keyValuePair in ckModelGraph.Types.Where(s => s.Key.ModelId == ckMetaDto.ModelId
                                                                    && s.Value.IsCollectionRoot))
@@ -428,7 +480,7 @@ public class CompilerService : ICompilerService
         return new CompileResult(compiledModelFilePath);
     }
 
-    private async Task<CkMetaRootDto> GetCkMetaRootDtoAsync(string rootPath, OperationResult operationResult)
+    private async Task<CkMetaRootDto> GetCkMetaRootDtoAsync(string rootPath, OriginFileResolver originFileResolver, OperationResult operationResult)
     {
         var modelPath = Path.Combine(rootPath, CompilerStatics.MetadataFile);
         if (!File.Exists(modelPath))
@@ -444,6 +496,7 @@ public class CompilerService : ICompilerService
         using var stream = File.OpenRead(modelPath);
 #endif
         var ckMetaDto = await _ckSerializer.DeserializeMetaAsync(stream, modelPath, operationResult).ConfigureAwait(false);
+        originFileResolver.Add(ckMetaDto.ModelId, modelPath);
         return ckMetaDto;
     }
 

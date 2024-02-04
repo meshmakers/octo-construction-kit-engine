@@ -10,7 +10,7 @@
       "key": "UnknownAttributeOfCkTypeIdInSource",
       "number": 2,
       "level": "ERROR",
-      "text": "Attribute Id '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model."
+      "text": "CkAttributeId '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model."
     },
     {
       "key": "UnknownCkDerivedIdOfCkTypeIdInSource",
@@ -34,31 +34,31 @@
       "key": "AttributeIdNotUnique",
       "number": 6,
       "level": "ERROR",
-      "text": "AttributeId '{ckAttributeId}' is not unique."
+      "text": "CkAttributeId '{ckAttributeId}' is not unique."
     },
     {
       "key": "AssociationRoleIdNotUnique",
       "number": 7,
       "level": "ERROR",
-      "text": "AssociationRoleId '{ckAssociationId}' is not unique."
+      "text": "CkAssociationRoleId '{ckAssociationId}' is not unique."
     },
     {
       "key": "TypeIdNotUnique",
       "number": 8,
       "level": "ERROR",
-      "text": "TypeId '{ckTypeId}' is not unique."
+      "text": "CkTypeId '{ckTypeId}' is not unique."
     },
     {
       "key": "InheritanceMissing",
       "number": 9,
       "level": "FATALERROR",
-      "text": "TypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set."
+      "text": "CkTypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set."
     },
     {
       "key": "CircularDependency",
       "number": 10,
       "level": "ERROR",
-      "text": "ModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies."
+      "text": "CkModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies."
     },
     {
       "key": "UnknownCkTypeIdForInheritance",
@@ -130,13 +130,13 @@
       "key": "DirectoryMustBeEmpty",
       "number": 22,
       "level": "FATALERROR",
-      "text": "Directory '{directory}' must be empty."
+      "text": "Directory must be empty."
     },
     {
       "key": "ModelIdContainsInvalidCharacters",
       "number": 23,
       "level": "FATALERROR",
-      "text": "ModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
+      "text": "CkModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _."
     },
     {
       "key": "CkTypeIdContainsInvalidCharacters",
@@ -160,19 +160,19 @@
       "key": "SchemaValidationError",
       "number": 27,
       "level": "ERROR",
-      "text": "{locationReference}: Schema validation failed: '{errorMessage}'"
+      "text": "Schema validation failed at '{path}'->'{errorMessage}'"
     },
     {
       "key": "DirectoryDoesNotExist",
       "number": 28,
       "level": "FATALERROR",
-      "text": "Directory '{directoryPath}' does not exist."
+      "text": "Directory does not exist."
     },
     {
       "key": "FileDoesNotExist",
       "number": 29,
       "level": "FATALERROR",
-      "text": "File '{filePath}' does not exist."
+      "text": "File does not exist."
     },
     {
       "key": "SelectionValueNotUnique",
@@ -311,6 +311,12 @@
       "number": 52,
       "level": "ERROR",
       "text": "CkAttributeId '{ckAttributeId}' defined at record '{ckRecordId}' not found."
+    },
+    {
+      "key": "FileContainsNoModel",
+      "number": 53,
+      "level": "WARNING",
+      "text": "File does not contain a model. It will be ignored."
     }
   ]
 }

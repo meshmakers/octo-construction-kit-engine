@@ -45,9 +45,10 @@ internal class OperationMessageTemplate
     /// <summary>
     ///     Returns the formatted message
     /// </summary>
+    /// <param name="location">The location, if any exists</param>
     /// <param name="args">A list of arguments for string f</param>
     /// <returns>The formatted message</returns>
-    public OperationMessage CreateMessage(params object[] args)
+    public OperationMessage CreateMessage(string? location, params object[] args)
     {
         var text = MessageText;
         for (var i = 0; i < Placeholders.Length; i++)
@@ -55,6 +56,6 @@ internal class OperationMessageTemplate
             text = text.Replace($"{{{Placeholders[i]}}}", $"{{{i}}}");
         }
 
-        return new OperationMessage(MessageLevel, MessageNumber, string.Format(text, args));
+        return new OperationMessage(MessageLevel, location, MessageNumber, string.Format(text, args));
     }
 }

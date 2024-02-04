@@ -11,10 +11,11 @@ internal interface IDependencyResolver
     /// <summary>
     ///     Resolves the dependencies of the given construction kit model ids
     /// </summary>
-    /// <param name="dependencies"></param>
-    /// <param name="ckModelGraph"></param>
-    /// <param name="operationResult"></param>
+    /// <param name="dependencies">Dependencies to resolve</param>
+    /// <param name="ckModelGraph">Full model graph</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
+    /// <param name="operationResult">Operation result</param>
     /// <returns></returns>
     Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
-        OperationResult operationResult);
+        IOriginFileResolver originFileResolver, OperationResult operationResult);
 }

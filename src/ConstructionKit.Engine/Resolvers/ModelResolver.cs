@@ -35,32 +35,30 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
-    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
+    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
     {
         var modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, operationResult).ConfigureAwait(false);
+        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, originFileResolver, operationResult).ConfigureAwait(false);
 
-        _referenceResolver.Resolve(modelGraph, operationResult);
-        _inheritanceResolver.Resolve(modelGraph, operationResult);
+        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
+        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         return modelGraph;
     }
 
-    /// <summary>
-    ///     Loads the compiled model into the resolver.
-    /// </summary>
-    /// <param name="compiledModel"></param>
-    /// <param name="operationResult"></param>
-    public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
+    public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
     {
         _variableResolver.SetVariable("thisModel", compiledModel.ModelId.FullName);
         
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
-        var modelGraph = _elementResolver.Resolve(compiledModel, _variableResolver, operationResult);
+        var modelGraph = _elementResolver.Resolve(compiledModel, _variableResolver, originFileResolver, operationResult);
 
         if (!Regex.IsMatch(compiledModel.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
         {
-            operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(compiledModel.ModelId.ModelId));
+            operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(
+                originFileResolver.Resolve(compiledModel.ModelId.ModelId), compiledModel.ModelId.ModelId));
             throw ModelValidationException.ModelIdContainsInvalidCharacters(compiledModel.ModelId.ModelId);
         }
 
@@ -69,7 +67,7 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, operationResult)
+            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, originFileResolver, operationResult)
                 .ConfigureAwait(false);
         }
 
@@ -81,8 +79,8 @@ internal class ModelResolver : IModelResolver
         {
             var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == compiledModel.ModelId.ModelId);
 
-            operationResult.AddMessage(
-                MessageCodes.CircularDependency(compiledModel.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
+            operationResult.AddMessage(MessageCodes.CircularDependency(originFileResolver.Resolve(compiledModel.ModelId.ModelId),
+                compiledModel.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
         }
 
         // Check: There are only a few places, where elements of other models are used.
@@ -90,7 +88,7 @@ internal class ModelResolver : IModelResolver
         // 2. entities.ckDerivedId -> Reference to a defined type.
         // 3. entities.associations.roleId -> Reference to a defined association role.
         // 4. entities.associations.targetCkTypeId -> Reference to a defined type.
-        _referenceResolver.Resolve(modelGraph, operationResult);
+        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         // Check: Inheritance.
         // 1. entities.ckDerivedId -> Only one type cannot have a derived type: System.Entity.
@@ -100,7 +98,7 @@ internal class ModelResolver : IModelResolver
         // 5. entities.isFinal -> It is not possible that a type is final, but has a derived type.
 
         // Check 1-5 is done by inheritance resolver.
-        _inheritanceResolver.Resolve(modelGraph, operationResult);
+        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
 
         return modelGraph;
     }

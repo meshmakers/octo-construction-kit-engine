@@ -9,12 +9,14 @@ public class OperationMessage
     ///     Constructor
     /// </summary>
     /// <param name="messageLevel">Message level</param>
+    /// <param name="location">The location, if any exists</param>
     /// <param name="messageNumber">Message number</param>
     /// <param name="messageText">Message text</param>
-    public OperationMessage(MessageLevel messageLevel, int messageNumber, string messageText)
+    public OperationMessage(MessageLevel messageLevel, string? location, int messageNumber, string messageText)
     {
         CreateDateTime = DateTime.Now;
         MessageLevel = messageLevel;
+        Location = location;
         MessageNumber = messageNumber;
         MessageText = messageText;
     }
@@ -31,6 +33,11 @@ public class OperationMessage
     public MessageLevel MessageLevel { get; }
 
     /// <summary>
+    ///    Returns the location, if any exists
+    /// </summary>
+    public string? Location { get; }
+
+    /// <summary>
     ///     Returns the number
     /// </summary>
     public int MessageNumber { get; }
@@ -43,6 +50,6 @@ public class OperationMessage
     /// <inheritdoc />
     public override string ToString()
     {
-        return $"{CreateDateTime.ToShortTimeString()} {MessageLevel} {MessageNumber}: {MessageText}";
+        return $"{CreateDateTime.ToShortTimeString()} {MessageLevel} {MessageNumber} {Location}: {MessageText}";
     }
 }

@@ -68,6 +68,11 @@ internal class CkSchemaValidator : ICkSchemaValidator
         using var streamReader = new StreamReader(memoryStream);
         var yamlStream = new YamlStream();
         yamlStream.Load(streamReader);
+        if (yamlStream.Documents.Count == 0)
+        {
+            operationResult.AddMessage(MessageCodes.FileContainsNoModel(locationReference));
+            return true;
+        }
         var singleNode = yamlStream.Documents[0].ToJsonNode();
 
         var evaluationResults = schema.Evaluate(singleNode, new EvaluationOptions { OutputFormat = OutputFormat.List });
@@ -83,7 +88,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
             {
                 var path = evaluationResult.InstanceLocation.ToString();
                 var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, $"{path}: {errorMessages}"));
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
             }
         }
 

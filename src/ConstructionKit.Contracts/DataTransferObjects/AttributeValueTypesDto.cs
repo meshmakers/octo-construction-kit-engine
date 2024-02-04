@@ -15,7 +15,10 @@ public enum AttributeValueTypesDto
     /// </summary>
     String = 2,
 
-    //  Binary = 3,
+    /// <summary>
+    /// Small binary data (less than 1MB)
+    /// </summary>
+    Binary = 3,
 
     /// <summary>
     ///     Indicates that the attribute value is a boolean.

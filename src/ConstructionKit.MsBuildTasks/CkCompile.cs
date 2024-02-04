@@ -175,7 +175,6 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
     private void LogOperationResults(OperationResult operationResult)
     {
-        Log.LogMessage(MessageImportance.High, $"Logging messages from operation result {operationResult.Messages.Count}");
         foreach (var operationResultMessage in operationResult.Messages)
         {
             switch (operationResultMessage.MessageLevel)

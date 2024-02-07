@@ -17,3 +17,11 @@ entities:
                 value: CC300
               - id: Basic/NamePlate.SerialNumber
                 value: 12345
+          - ckRecordId: Basic/NamePlate
+            attributes:
+              - id: Basic/NamePlate.ManufacturerName
+                value: ENGEL Austria GmbH
+              - id: Basic/NamePlate.ManufacturerProductDesignation
+                value: CC300
+              - id: Basic/NamePlate.SerialNumber
+                value: 67890

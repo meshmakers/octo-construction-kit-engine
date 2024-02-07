@@ -100,7 +100,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
             foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
             {
                 var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResults.Errors?.Values ?? Enumerable.Empty<string>());
+                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
                 operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
             }
         }

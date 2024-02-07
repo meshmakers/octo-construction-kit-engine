@@ -1,0 +1,19 @@
+$schema: https://schemas.meshmakers.cloud/runtime-model.schema.json
+dependencies:
+  - Basic
+entities:
+  - rtId: 64a2b64c3da56d342f1c3880
+    ckTypeId: Basic/Meshmakers.Equipment.Machine
+    attributes:
+      - id: Basic/Name
+        value: Spritzguss 1
+      - id: Basic/NamePlate
+        value: 
+          - ckRecordId: Basic/NamePlate
+            attributes:
+              - id: Basic/NamePlate.ManufacturerName
+                value: ENGEL Austria GmbH
+              - id: Basic/NamePlate.ManufacturerProductDesignation
+                value: CC300
+              - id: Basic/NamePlate.SerialNumber
+                value: 12345

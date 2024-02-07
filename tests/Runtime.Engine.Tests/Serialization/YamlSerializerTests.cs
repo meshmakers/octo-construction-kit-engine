@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
 using Xunit.Abstractions;
@@ -30,6 +31,58 @@ public class YamlSerializerTests
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
+    }
+    
+    [Fact]
+    public async Task DeserializeAsync_record_ok()
+    {
+        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+
+        var filePath = "sampleData/files/rt-maintenance.yaml";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var rtModelRootDto = await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
+        Assert.NotNull(rtModelRootDto);
+        Assert.Single(rtModelRootDto.Dependencies);
+        Assert.Single(rtModelRootDto.Entities);
+        Assert.Empty(operationResult.Messages);
+        Assert.False(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        
+        Assert.Equal(2, rtModelRootDto.Entities[0].Attributes.Count);
+        Assert.Equal("Basic/Name", rtModelRootDto.Entities[0].Attributes[0].Id);
+        Assert.Equal("Spritzguss 1", rtModelRootDto.Entities[0].Attributes[0].Value);
+        Assert.Equal("Basic/NamePlate", rtModelRootDto.Entities[0].Attributes[1].Id);
+        Assert.IsType<RtRecordDto>(rtModelRootDto.Entities[0].Attributes[1].Value);
+    }
+    
+    [Fact]
+    public async Task DeserializeAsync_recordArray_ok()
+    {
+        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+
+        var filePath = "sampleData/files/rt-maintenanceArray.yaml";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var rtModelRootDto = await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
+        Assert.NotNull(rtModelRootDto);
+        Assert.Single(rtModelRootDto.Dependencies);
+        Assert.Single(rtModelRootDto.Entities);
+        Assert.Empty(operationResult.Messages);
+        Assert.False(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        
+        Assert.Equal(2, rtModelRootDto.Entities[0].Attributes.Count);
+        Assert.Equal("Basic/Name", rtModelRootDto.Entities[0].Attributes[0].Id);
+        Assert.Equal("Spritzguss 1", rtModelRootDto.Entities[0].Attributes[0].Value);
+        Assert.Equal("Basic/NamePlate", rtModelRootDto.Entities[0].Attributes[1].Id);
+        Assert.IsType<List<object>>(rtModelRootDto.Entities[0].Attributes[1].Value);
+
+        var x = (List<object>)rtModelRootDto.Entities[0].Attributes[1].Value!;
+        Assert.Equal(2, x.Count);
+        
+        Assert.IsType<RtRecordDto>(x[0]);
+        Assert.IsType<RtRecordDto>(x[1]);
     }
 
 

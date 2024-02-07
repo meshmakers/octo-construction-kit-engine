@@ -13,14 +13,13 @@ namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 /// <summary>
 ///     Defines an entity
 /// </summary>
-public class RtEntityDto
+public class RtEntityDto : RtTypeWithAttributesDto
 {
     /// <summary>
     ///     Creates a new instance of <see cref="RtEntityDto" />
     /// </summary>
     public RtEntityDto()
     {
-        Attributes = new List<RtAttributeDto>();
     }
 
     /// <summary>
@@ -62,10 +61,6 @@ public class RtEntityDto
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? RtWellKnownName { get; set; }
 
-    /// <summary>
-    ///     Gets or sets the attributes of the entity
-    /// </summary>
-    public List<RtAttributeDto> Attributes { get; set; }
 
     /// <summary>
     ///     Gets or sets the associations of the entity

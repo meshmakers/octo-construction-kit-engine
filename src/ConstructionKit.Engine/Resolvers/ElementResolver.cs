@@ -174,6 +174,7 @@ internal class ElementResolver : IElementResolver
                     foreach (var ckTypeAssociationDto in ckType.Associations)
                     {
                         ckTypeAssociationDto.CkRoleId = variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.ToString());
+                        ckTypeAssociationDto.TargetCkTypeId = variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.ToString());
                     }
                 }
 

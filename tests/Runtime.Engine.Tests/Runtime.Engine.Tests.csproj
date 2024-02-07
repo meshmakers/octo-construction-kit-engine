@@ -81,7 +81,7 @@
         <None Update="sampleData\files\rt-maintenance.yaml">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
-        <None Update="sampleData\files\rt-maintenance2.yaml">
+        <None Update="sampleData\files\rt-maintenanceArray.yaml">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
 

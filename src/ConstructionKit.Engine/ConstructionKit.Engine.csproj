@@ -17,7 +17,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.1" />
         <PackageReference Include="Octokit" Version="9.1.0" />
-        <PackageReference Include="Yaml2JsonNode" Version="1.2.4" />
+        <PackageReference Include="Yaml2JsonNode" Version="2.0.0" />
     </ItemGroup>
     <ItemGroup>
         <None Update="Messages\MessageCodes.tt">

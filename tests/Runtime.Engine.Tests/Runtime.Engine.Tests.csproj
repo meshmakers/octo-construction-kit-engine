@@ -78,6 +78,12 @@
         <None Update="sampleData\CkTest\ConstructionKit\ck-test.cache.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="sampleData\files\rt-maintenance.yaml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="sampleData\files\rt-maintenance2.yaml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
 
     </ItemGroup>
 

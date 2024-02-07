@@ -90,7 +90,7 @@ internal class ReferenceResolver : IReferenceResolver
                 {
                     operationResult.AddMessage(
                         MessageCodes.UnknownAttributeOfCkTypeIdInSource(originFileResolver.Resolve(ckTypeKeyValue.Key),
-                            ckTypeKeyValue.Key, ckTypeAttribute.CkAttributeId));
+                            ckTypeAttribute.CkAttributeId, ckTypeKeyValue.Key));
                     continue;
                 }
 
@@ -130,7 +130,8 @@ internal class ReferenceResolver : IReferenceResolver
         }
     }
 
-    private static void CheckCkAttributes(CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    private static void CheckCkAttributes(CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
     {
         foreach (var ckAttribute in ckModelGraph.Attributes)
         {
@@ -140,7 +141,8 @@ internal class ReferenceResolver : IReferenceResolver
                 && !ckModelGraph.Records.ContainsKey(ckAttribute.Value.ValueCkRecordId))
             {
                 operationResult.AddMessage(
-                    MessageCodes.AttributeUsesUnknownCkRecordId(originFileResolver.Resolve(ckAttribute.Value.CkAttributeId), ckAttribute.Key,
+                    MessageCodes.AttributeUsesUnknownCkRecordId(originFileResolver.Resolve(ckAttribute.Value.CkAttributeId),
+                        ckAttribute.Key,
                         ckAttribute.Value.ValueCkRecordId));
             }
         }

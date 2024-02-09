@@ -1,17 +1,5 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
-- typeId: SampleType3
-  derivedFromCkTypeId: Sample1-1.0.0/SampleType2-1.0.0
-  attributes:
-  - id: System-1.0.0/Enabled-1.0.0
-    name: Enabled
-  - id: Sample1-1.0.0/IHaveMetaData-1.0.0
-    name: MetaDataAttribute
-- typeId: SampleType2
-  derivedFromCkTypeId: Sample1-1.0.0/SampleType1-1.0.0
-  attributes:
-  - id: System-1.0.0/Name-1.0.0
-    name: Name
 - isCollectionRoot: true
   typeId: SampleType1
   derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
@@ -33,6 +21,18 @@ types:
     name: TestEnum
   - id: Sample1-1.0.0/IsLocked-1.0.0
     name: IsLocked
+- typeId: SampleType2
+  derivedFromCkTypeId: Sample1-1.0.0/SampleType1-1.0.0
+  attributes:
+  - id: System-1.0.0/Name-1.0.0
+    name: Name
+- typeId: SampleType3
+  derivedFromCkTypeId: Sample1-1.0.0/SampleType2-1.0.0
+  attributes:
+  - id: System-1.0.0/Enabled-1.0.0
+    name: Enabled
+  - id: Sample1-1.0.0/IHaveMetaData-1.0.0
+    name: MetaDataAttribute
 associationRoles:
 - id: Testing
   inboundName: Tests
@@ -40,20 +40,8 @@ associationRoles:
   inboundMultiplicity: N
   outboundMultiplicity: ZeroOrOne
 attributes:
-- id: SampleAttribute
-  valueType: String
 - id: DateTimeAttribute
   valueType: DateTime
-- id: TestEnum
-  valueType: Enum
-  valueCkEnumId: Sample1-1.0.0/TestEnum-1.0.0
-- id: Type
-  valueType: Record
-  valueCkRecordId: Sample1-1.0.0/RecordA-1.0.0
-- id: IsLocked
-  valueType: Boolean
-  defaultValues:
-  - true
 - id: IHaveMetaData
   valueType: String
   metaData:
@@ -67,6 +55,18 @@ attributes:
     value: false
     description: MetaDataDescription3
   isDataStream: true
+- id: IsLocked
+  valueType: Boolean
+  defaultValues:
+  - true
+- id: SampleAttribute
+  valueType: String
+- id: TestEnum
+  valueType: Enum
+  valueCkEnumId: Sample1-1.0.0/TestEnum-1.0.0
+- id: Type
+  valueType: Record
+  valueCkRecordId: Sample1-1.0.0/RecordA-1.0.0
 records:
 - recordId: RecordA
   attributes:

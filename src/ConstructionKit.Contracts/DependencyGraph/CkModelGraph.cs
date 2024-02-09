@@ -92,11 +92,11 @@ public class CkModelGraph
     {
         return new CkCacheRoot
         {
-            Types = _types.Values.ToList(),
-            Attributes = _attributes.Values.ToList(),
-            AssociationRoles = _associationRoles.Values.ToList(),
-            Records = _records.Values.ToList(),
-            Enums = _enums.Values.ToList()
+            Types = _types.Values.OrderBy(x=> x.CkTypeId).ToList(),
+            Attributes = _attributes.Values.OrderBy(x=> x.CkAttributeId).ToList(),
+            AssociationRoles = _associationRoles.Values.OrderBy(x=> x.CkRoleId).ToList(),
+            Records = _records.Values.OrderBy(x=> x.CkRecordId).ToList(),
+            Enums = _enums.Values.OrderBy(x=> x.CkEnumId).ToList()
         };
     }
 

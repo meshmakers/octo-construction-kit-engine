@@ -1,15 +1,11 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
 types:
-- isCollectionRoot: true
-  typeId: Location
-  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
-  isAbstract: true
-  attributes:
-  - id: Test-1.0.0/Designation-1.0.0
-    name: Designation
-- typeId: LocationWithSensor
+- typeId: City
   derivedFromCkTypeId: Test-1.0.0/Location-1.0.0
-  isAbstract: true
+  isFinal: true
+  associations:
+  - id: System-1.0.0/ParentChild-1.0.0
+    targetCkTypeId: Test-1.0.0/Region-1.0.0
 - typeId: Continent
   derivedFromCkTypeId: Test-1.0.0/Location-1.0.0
   isFinal: true
@@ -26,30 +22,28 @@ types:
     name: IntArrayTests
   - id: Test-1.0.0/RecordArrayTests-1.0.0
     name: RecordArrayTests
-- typeId: Region
-  derivedFromCkTypeId: Test-1.0.0/LocationWithSensor-1.0.0
-  isFinal: true
-  associations:
-  - id: System-1.0.0/ParentChild-1.0.0
-    targetCkTypeId: Test-1.0.0/Country-1.0.0
-- typeId: City
-  derivedFromCkTypeId: Test-1.0.0/Location-1.0.0
-  isFinal: true
-  associations:
-  - id: System-1.0.0/ParentChild-1.0.0
-    targetCkTypeId: Test-1.0.0/Region-1.0.0
 - typeId: District
   derivedFromCkTypeId: Test-1.0.0/LocationWithSensor-1.0.0
   isFinal: true
   associations:
   - id: System-1.0.0/ParentChild-1.0.0
     targetCkTypeId: Test-1.0.0/City-1.0.0
-- typeId: Zone
+- isCollectionRoot: true
+  typeId: Location
+  derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
+  isAbstract: true
+  attributes:
+  - id: Test-1.0.0/Designation-1.0.0
+    name: Designation
+- typeId: LocationWithSensor
+  derivedFromCkTypeId: Test-1.0.0/Location-1.0.0
+  isAbstract: true
+- typeId: Region
   derivedFromCkTypeId: Test-1.0.0/LocationWithSensor-1.0.0
   isFinal: true
   associations:
   - id: System-1.0.0/ParentChild-1.0.0
-    targetCkTypeId: Test-1.0.0/District-1.0.0
+    targetCkTypeId: Test-1.0.0/Country-1.0.0
 - isCollectionRoot: true
   typeId: Sensor
   derivedFromCkTypeId: System-1.0.0/Entity-1.0.0
@@ -62,26 +56,32 @@ types:
     name: Designation
   - id: Test-1.0.0/ConnectionState-1.0.0
     name: ConnectionState
+- typeId: Zone
+  derivedFromCkTypeId: Test-1.0.0/LocationWithSensor-1.0.0
+  isFinal: true
+  associations:
+  - id: System-1.0.0/ParentChild-1.0.0
+    targetCkTypeId: Test-1.0.0/District-1.0.0
 associationRoles: []
 attributes:
-- id: Designation
-  valueType: String
-- id: Location
-  valueType: String
 - id: ConnectionState
   valueType: Enum
   valueCkEnumId: Test-1.0.0/ConnectionState-1.0.0
-- id: StringArrayTests
-  valueType: StringArray
-  defaultValues:
-  - a
+- id: Designation
+  valueType: String
 - id: IntArrayTests
   valueType: IntArray
   defaultValues:
   - 6
+- id: Location
+  valueType: String
 - id: RecordArrayTests
   valueType: RecordArray
   valueCkRecordId: Test-1.0.0/TestRecord-1.0.0
+- id: StringArrayTests
+  valueType: StringArray
+  defaultValues:
+  - a
 records:
 - recordId: TestRecord
   attributes:

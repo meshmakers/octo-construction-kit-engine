@@ -441,12 +441,12 @@ public class CompilerService : ICompilerService
         var compiledModelRoot = new CkCompiledModelRoot
         {
             ModelId = ckMetaDto.ModelId,
-            Dependencies = ckMetaDto.Dependencies,
-            Types = types.Values.ToList(),
-            Attributes = attributes,
-            AssociationRoles = associationRoles,
-            Records = records,
-            Enums = enums
+            Dependencies = ckMetaDto.Dependencies?.OrderBy(x=> x.ModelId).ToList(),
+            Types = types.Values.OrderBy(x=> x.TypeId).ToList(),
+            Attributes = attributes.OrderBy(x=> x.AttributeId).ToList(),
+            AssociationRoles = associationRoles.OrderBy(x=> x.AssociationRoleId).ToList(),
+            Records = records.OrderBy(x=> x.RecordId).ToList(),
+            Enums = enums.OrderBy(x=> x.EnumId).ToList(),
         };
 
         var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);

@@ -251,13 +251,33 @@ internal class CkCache : IDisposable
         return options;
     }
 
-    public ICollection<CkModelId> GetCkDependencies()
+    public ICollection<CkModelId> GetCkModelIds()
     {
         if (_modelGraph == null)
         {
             throw CkCacheException.CacheUnloaded(TenantId);
         }
 
-        return _modelGraph.Dependencies.SelectMany(x => x.Value).Distinct().ToList();
+        return _modelGraph.Dependencies.Select(x => x.Key).Distinct().ToList();
+    }
+
+    public ICollection<CkModelId> EnsureModelIds(IEnumerable<CkModelId> ckModelIds)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+        
+        // check if dependent ck models are existing.
+        List<CkModelId> missingModelIds = new();
+        foreach (var ckModelId in ckModelIds)
+        {
+            if (!_modelGraph.Dependencies.ContainsKey(ckModelId))
+            {
+                missingModelIds.Add(ckModelId);
+            }
+        }
+
+        return missingModelIds;
     }
 }

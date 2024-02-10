@@ -52,14 +52,25 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
-    public ICollection<CkModelId> GetCkDependencies(string tenantId)
+    public ICollection<CkModelId> GetCkModelIds(string tenantId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
 
-        return ckCache.GetCkDependencies();
+        return ckCache.GetCkModelIds();
+    }
+
+    /// <inheritdoc />
+    public ICollection<CkModelId> EnsureModelIds(string tenantId, IEnumerable<CkModelId> modelIds)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.EnsureModelIds(modelIds);
     }
 
     /// <summary>

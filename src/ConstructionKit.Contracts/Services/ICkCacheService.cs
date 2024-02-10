@@ -23,11 +23,19 @@ public interface ICkCacheService
     void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph);
 
     /// <summary>
-    ///     Returns the construction kit model dependencies for a tenant.
+    ///     Returns the construction kit model library ids for a tenant.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <returns>A list of dependencies</returns>
-    ICollection<CkModelId> GetCkDependencies(string tenantId);
+    ICollection<CkModelId> GetCkModelIds(string tenantId);
+    
+    /// <summary>
+    /// Ensures that the given model ids are available in the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="modelIds">The model ids to ensure</param>
+    /// <returns>A list of models that are not existing</returns>
+    ICollection<CkModelId> EnsureModelIds(string tenantId, IEnumerable<CkModelId> modelIds);
 
     /// <summary>
     ///     Unload a tenant cache.

@@ -35,17 +35,18 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
-    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult)
+    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult, object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
-        return ResolveAsync(ckModelIds, originFileResolver, operationResult);
+        return ResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
     }
 
     public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
-        OperationResult operationResult)
+        OperationResult operationResult, object? sourceIdentifier = null)
     {
         var modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, originFileResolver, operationResult).ConfigureAwait(false);
+        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, originFileResolver, operationResult, sourceIdentifier)
+            .ConfigureAwait(false);
 
         _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
         _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
@@ -54,7 +55,7 @@ internal class ModelResolver : IModelResolver
     }
 
     public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver,
-        OperationResult operationResult)
+        OperationResult operationResult, object? sourceIdentifier = null)
     {
         _variableResolver.SetVariable("thisModel", compiledModel.ModelId.FullName);
         
@@ -73,7 +74,8 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, originFileResolver, operationResult)
+            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph, originFileResolver, 
+                    operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
         }
 

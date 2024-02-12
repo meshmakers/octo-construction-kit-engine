@@ -80,7 +80,7 @@ public class GitHubCkModelRepository : ICkModelRepository
         }
 
         // Convert the Base64 content to byte array
-        byte[] data = Convert.FromBase64String(contents[0].Content);
+        byte[] data = Convert.FromBase64String(contents[0].EncodedContent);
 
         // Create a MemoryStream from the byte array
         using (MemoryStream memoryStream = new MemoryStream(data))

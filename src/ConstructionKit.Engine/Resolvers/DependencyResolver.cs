@@ -18,16 +18,17 @@ internal class DependencyResolver : IDependencyResolver
     }
 
     public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
-        IOriginFileResolver originFileResolver, OperationResult operationResult)
+        IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
         _logger.LogInformation("Starting resolving dependencies");
-        await Resolve(dependencies, ckModelGraph, originFileResolver, operationResult).ConfigureAwait(false);
+        await Resolve(dependencies, ckModelGraph, originFileResolver, sourceIdentifier, operationResult).ConfigureAwait(false);
         _logger.LogInformation("Resolving dependencies completed");
 
         return ckModelGraph;
     }
 
-    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver, 
+        object? sourceIdentifier, OperationResult operationResult)
     {
         List<CkModelId> dependencies = [..ckRootDependencies];
 
@@ -36,7 +37,7 @@ internal class DependencyResolver : IDependencyResolver
             var ckDependency = dependencies[i];
 
             _logger.LogInformation("Resolving dependency '{CkModelId}'", ckDependency);
-            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult)
+            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
             if (ckDependencyRootModel == null)
             {

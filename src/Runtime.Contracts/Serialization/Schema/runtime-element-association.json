@@ -16,6 +16,20 @@
         "targetCkTypeId": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+        },
+        "targetCkAttributeIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-_.]+/[a-zA-Z0-9-_.]+$"
+          }
+        },
+        "attributes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "https://schemas.meshmakers.cloud/runtime-elements-attribute.schema.json#/definitions/RtAttribute"
+          }
         }
       },
       "additionalProperties": false,

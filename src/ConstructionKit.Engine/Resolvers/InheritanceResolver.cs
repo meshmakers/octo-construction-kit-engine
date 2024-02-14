@@ -202,9 +202,9 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             // Check if there are target attributes defined and if they are valid
-            if (typeAssociation.TargetAttributes != null)
+            if (typeAssociation.TargetCkAttributeIds != null)
             {
-                var invalidCkAttributeIds = typeAssociation.TargetAttributes.Where(a =>
+                var invalidCkAttributeIds = typeAssociation.TargetCkAttributeIds.Where(a =>
                     targetCkTypeGraph.AllAttributes.All(b => b.Key != a)).ToList();
 
                 invalidCkAttributeIds.ForEach(a =>

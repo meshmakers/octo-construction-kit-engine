@@ -86,7 +86,7 @@ public class Builder
                         {
                             CkRoleId = "System/ParentChild",
                             TargetCkTypeId = "sample1/Demo1",
-                            TargetAttributes = new List<CkId<CkAttributeId>> { "sample1/attribute1" }
+                            TargetCkAttributeIds = new List<CkId<CkAttributeId>> { "sample1/attribute1" }
                         }
                     }
                 },

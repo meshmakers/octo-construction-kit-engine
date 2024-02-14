@@ -8,7 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     Represents a role of an association between two CkEntityTypes
 /// </summary>
 [DebuggerDisplay("{" + nameof(AssociationRoleId) + "}")]
-public class CkAssociationRoleDto
+public class CkAssociationRoleDto : CkTypeWithAttributesDto
 {
     /// <summary>
     ///     The id of the association role
@@ -43,10 +43,4 @@ public class CkAssociationRoleDto
     [JsonConverter(typeof(JsonStringEnumConverter))]
     [JsonRequired]
     public MultiplicitiesDto OutboundMultiplicity { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a list of attributes for the association role
-    /// </summary>
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkTypeAttributeDto>? Attributes { get; set; }
 }

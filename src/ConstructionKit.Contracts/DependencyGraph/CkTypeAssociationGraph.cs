@@ -25,7 +25,7 @@ public class CkTypeAssociationGraph
         CkRoleId = ckTypeAssociationDto.CkRoleId;
         OriginCkTypeId = originCkTypeId;
         TargetCkTypeId = ckTypeAssociationDto.TargetCkTypeId;
-        TargetAttributes = ckTypeAssociationDto.TargetAttributes;
+        TargetAttributes = ckTypeAssociationDto.TargetCkAttributeIds;
     }
 
     /// <summary>

@@ -34,5 +34,5 @@ public class CkTypeAssociationDto
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkId<CkAttributeId>>? TargetAttributes { get; set; }
+    public List<CkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
 }

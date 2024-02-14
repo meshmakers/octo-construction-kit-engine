@@ -86,7 +86,7 @@ public class Builder
                         {
                             CkRoleId = "System/ParentChild",
                             TargetCkTypeId = "sample1/Demo1",
-                            TargetAttributes = new List<CkId<CkAttributeId>>
+                            TargetCkAttributeIds = new List<CkId<CkAttributeId>>
                                 { "sample1/attribute4" } // Fail does not exist at ckid sample1/Demo1
                         }
                     }

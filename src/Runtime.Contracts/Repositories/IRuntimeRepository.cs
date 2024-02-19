@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
@@ -430,4 +431,12 @@ public interface IRuntimeRepository
         OperationResult operationResult);
 
     #endregion Modification (bulk)
+
+    /// <summary>
+    /// Gets the construction kit type graph from the cache service
+    /// </summary>
+    /// <param name="ckTypeId">The ck type id</param>
+    /// <returns></returns>
+    /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
+    Task<CkTypeGraph> GetCkTypeGraphAsync(CkId<CkTypeId> ckTypeId);
 }

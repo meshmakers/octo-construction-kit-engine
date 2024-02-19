@@ -54,7 +54,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public virtual async Task<RtEntity?> GetRtEntityByRtIdAsync(IOctoSession session, RtEntityId rtEntityId)
     {
-        var rtCollection = RepositoryDataSource.GetRtCollection<RtEntity>(rtEntityId.CkTypeId);
+        var ckTypeGraph = await GetCkTypeGraphAsync(rtEntityId.CkTypeId).ConfigureAwait(false);
+        var rtCollection = RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
 
         return await rtCollection.DocumentAsync(session, rtEntityId.RtId).ConfigureAwait(false);
     }
@@ -64,7 +65,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+        var ckTypeGraph = await GetCkTypeGraphAsync(ckTypeId).ConfigureAwait(false);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         return await rtCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
     }
@@ -110,12 +112,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction).ConfigureAwait(false);
     }
-    
+
     /// <inheritdoc />
     public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
         GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtIds, direction).ConfigureAwait(false);
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtIds, direction, roleId).ConfigureAwait(false);
     }
 
 
@@ -146,7 +148,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task<IQueryable<TEntity>> AsQueryableAsync<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+        var ckTypeGraph = await GetCkTypeGraphAsync(ckTypeId).ConfigureAwait(false);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         return await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
     }
@@ -155,7 +158,11 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+
+        var t = GetCkTypeGraphAsync(ckTypeId);
+        t.Wait();
+        var ckTypeGraph = t.Result;
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         return rtCollection.AsQueryable(session);
     }
@@ -236,7 +243,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task ReplaceOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
+        await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -266,7 +274,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task UpdateOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -281,7 +290,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task UpdateManyRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity)
     {
-        await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), fieldFilters, rtEntity)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -296,8 +306,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -305,8 +316,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -345,7 +357,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entityUpdateInfoList, associationUpdateInfoList)
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList, associationUpdateInfoList)
             .ConfigureAwait(false);
     }
 
@@ -362,6 +375,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         OperationResult operationResult)
     {
         await ApplyChangesAsync(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult).ConfigureAwait(false);
+    }
+    
+    /// <summary>
+    /// Gets the construction kit type graph from the cache service
+    /// </summary>
+    /// <param name="ckTypeId">The ck type id</param>
+    /// <returns></returns>
+    /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
+    public async Task<CkTypeGraph> GetCkTypeGraphAsync(CkId<CkTypeId> ckTypeId)
+    {
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        if (ckTypeGraph == null)
+        {
+            throw RuntimeRepositoryException.CkTypeIdDoesNotExistInCache(ckTypeId);
+        }
+
+        return ckTypeGraph;
     }
 
     /// <summary>
@@ -449,9 +480,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId, TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         rtEntity.CkTypeId = ckTypeId;
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -474,7 +506,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             entitiesUpdate.Add(EntityUpdateInfo<TEntity>.CreateInsert(rtEntity));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -527,7 +560,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var rtEntityId = new RtEntityId(ckTypeId, rtId);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(rtEntityId, rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -570,7 +604,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var rtEntityId = new RtEntityId(ckTypeId, rtId);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(rtEntityId, rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 

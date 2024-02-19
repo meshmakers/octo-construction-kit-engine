@@ -353,7 +353,8 @@ internal class GraphRuleEngine : IGraphRuleEngine
         // ReSharper disable once ConvertIfStatementToNullCoalescingExpression
         if (rtEntity == null)
         {
-            var collection = repositoryDataSource.GetRtCollection<RtEntity>(rtEntityId.CkTypeId);
+            var ckTypeGraph = _ckCache.GetCkType(repositoryDataSource.TenantId, rtEntityId.CkTypeId);
+            var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
             rtEntity = await collection.DocumentAsync(session, rtEntityId.RtId).ConfigureAwait(false);
         }
 

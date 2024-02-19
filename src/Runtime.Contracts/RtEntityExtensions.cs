@@ -15,11 +15,8 @@ public static class RtEntityExtensions
     /// <returns></returns>
     public static RtEntityId ToRtEntityId(this RtEntity rtEntity)
     {
-        if (rtEntity.CkTypeId == null)
-        {
-            throw PersistenceException.CkTypeIdNotSet();
-        }
-        return new RtEntityId(rtEntity.CkTypeId, rtEntity.RtId);
+        var ckTypeId = rtEntity.GetCkTypeId();
+        return new RtEntityId(ckTypeId, rtEntity.RtId);
     }
 
     /// <summary>
@@ -55,10 +52,21 @@ public static class RtEntityExtensions
 
     private static CkId<CkTypeId> GetCkTypeId(Type type)
     {
+        var ckTypeId = TryGetGetCkTypeId(type);
+        if (ckTypeId == null)
+        {
+            throw PersistenceException.CkIdAttributeNotSet(type);
+        }
+
+        return ckTypeId;
+    }
+    
+    private static CkId<CkTypeId>? TryGetGetCkTypeId(Type type)
+    {
         var customAttribute = Attribute.GetCustomAttribute(type, typeof(CkIdAttribute));
         if (customAttribute == null)
         {
-            throw PersistenceException.CkIdAttributeNotSet(type);
+            return null;
         }
 
         var ckIdAttribute = (CkIdAttribute)customAttribute;

@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -21,17 +22,10 @@ public interface IRepositoryDataSource
     /// <summary>
     ///     Returns the data source access object for the given entity type
     /// </summary>
-    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="ckTypeGraph">Construction kit type graph object</param>
     /// <typeparam name="TEntity">The type of entity derived from &lt;see cref="RtEntity"/&gt;</typeparam>
     /// <returns></returns>
-    IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkId<CkTypeId> ckTypeId) where TEntity : RtEntity, new();
-
-    /// <summary>
-    ///     Returns the data source access object for the given entity type
-    /// </summary>
-    /// <typeparam name="TEntity">The type of entity derived from &lt;see cref="RtEntity"/&gt;</typeparam>
-    /// <returns></returns>
-    IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>() where TEntity : RtEntity, new();
+    IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkTypeGraph ckTypeGraph) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Gets associations for a runtime entity.
@@ -60,6 +54,17 @@ public interface IRepositoryDataSource
     /// <param name="roleId">The construction kit role to get</param>
     /// <returns></returns>
     Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
+    
+    /// <summary>
+    ///     Gets associations for a runtime entity of a specific role
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtIds">Object id of runtime entities</param>
+    /// <param name="direction">Direction of associations to get</param>
+    /// <param name="roleId">The construction kit role to get</param>
+    /// <returns></returns>
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
         GraphDirections direction, CkId<CkAssociationRoleId> roleId);
 
     /// <summary>

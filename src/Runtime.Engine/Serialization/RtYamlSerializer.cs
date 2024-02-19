@@ -62,7 +62,6 @@ internal class RtYamlSerializer : IRtYamlSerializer
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
             .WithTypeConverter(new OctoObjectIdConverter())
-            .WithTypeConverter(new TestConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

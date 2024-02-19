@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
@@ -10,6 +12,7 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="rtId"></param>
+    [JsonConstructor]
     public RtEntityId(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
         CkTypeId = ckTypeId;

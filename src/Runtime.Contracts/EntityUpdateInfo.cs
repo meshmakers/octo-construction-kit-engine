@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Newtonsoft.Json;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
 
@@ -32,7 +33,8 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
 public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     where TEntity : RtEntity
 {
-    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
+    [JsonConstructor]
+    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity? rtEntity, EntityModOptions modOption)
     {
         RtEntityId = rtEntityId;
         RtEntity = rtEntity;

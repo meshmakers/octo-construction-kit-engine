@@ -43,8 +43,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntities = queryable.Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
 
@@ -54,7 +54,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -62,8 +62,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable.FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (savedEntity == null)
@@ -72,7 +72,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -80,7 +80,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         DataQueryOperation dataQueryOperation, int? skip = null,
         int? take = null)
     {
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         if (dataQueryOperation.AttributeSearchFilter != null)
         {
@@ -101,8 +103,6 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         if (dataQueryOperation.FieldFilters != null)
         {
-            var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-            var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
             queryable = queryable.Where(
                 CombineFilterExpressions<TEntity>(dataQueryOperation.FieldFilters, ckTypeGraph, LogicalOperator.And));
         }
@@ -125,8 +125,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>();
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var savedEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -136,7 +136,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -144,7 +144,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null)
     {
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         queryable = queryable.Where(x => rtIds.Contains(x.RtId));
@@ -167,8 +169,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         ICollection<FieldFilter> fieldFilters)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntities = queryable
             .Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -179,7 +181,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateDelete(rtEntity.ToRtEntityId()));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 
@@ -187,8 +189,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         ICollection<FieldFilter> fieldFilters)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeId);
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
         var rtEntity = queryable
             .FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
@@ -198,7 +200,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(rtEntity.ToRtEntityId()) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
             .ConfigureAwait(false);
     }
 

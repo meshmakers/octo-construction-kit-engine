@@ -41,7 +41,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the origin ck type id.
     /// </summary>
-    public CkId<CkTypeId>? OriginCkTypeId { get; set; }
+    public CkId<CkTypeId> OriginCkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the object id of the target runtime entity
@@ -51,7 +51,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the target ck type id.
     /// </summary>
-    public CkId<CkTypeId>? TargetCkTypeId { get; set; }
+    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
     
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes

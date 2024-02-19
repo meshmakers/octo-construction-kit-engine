@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -23,15 +24,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     public string TenantId { get; }
 
     /// <inheritdoc />
-    public abstract IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkId<CkTypeId> ckTypeId)
+    public abstract IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkTypeGraph ckTypeGraph)
         where TEntity : RtEntity, new();
-
-    /// <inheritdoc />
-    public IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>() where TEntity : RtEntity, new()
-    {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
-        return GetRtCollection<TEntity>(ckTypeId);
-    }
 
     /// <inheritdoc />
     public abstract IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
@@ -96,6 +90,28 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         {
             associations.AddRange(queryable.Where(x =>
                 x.OriginRtId == rtId && x.AssociationRoleId == roleId));
+        }
+
+        return associations;
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    {
+        var associations = new List<RtAssociation>();
+        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
+
+        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
+        {
+            associations.AddRange(queryable.Where(x =>
+                rtIds.Contains(x.TargetRtId) && x.AssociationRoleId == roleId));
+        }
+
+        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
+        {
+            associations.AddRange(queryable.Where(x =>
+                rtIds.Contains(x.OriginRtId) && x.AssociationRoleId == roleId));
         }
 
         return associations;

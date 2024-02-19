@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -14,9 +15,10 @@ public interface IBulkRtMutation
     /// </summary>
     /// <param name="session"></param>
     /// <param name="repositoryDataSource"></param>
+    /// <param name="ckCacheService"></param>
     /// <param name="entityUpdateInfoList"></param>
     /// <param name="associationUpdateInfoList"></param>
-    Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+    Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList);
 }

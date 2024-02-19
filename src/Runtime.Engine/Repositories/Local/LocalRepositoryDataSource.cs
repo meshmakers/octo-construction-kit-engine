@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
@@ -28,9 +29,9 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
             new RtAssociationDataSourceMapper(TenantId, _ckCacheService, _rtSerializer));
     }
 
-    public override IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkId<CkTypeId> ckTypeId)
+    public override IDataSourceCollection<OctoObjectId, TEntity> GetRtCollection<TEntity>(CkTypeGraph ckTypeGraph)
     {
-        var suffix = ckTypeId.SemanticVersionedFullName.Replace("/", "_");
+        var suffix = ckTypeGraph.CkTypeId.SemanticVersionedFullName.Replace("/", "_");
 
         var filePath = Path.Combine(_directoryPath, suffix + ".json");
 

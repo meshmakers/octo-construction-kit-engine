@@ -86,6 +86,7 @@ internal static class Program
         services.AddTransient<ICommand, GetReposCommand>();
         services.AddTransient<ICommand, PublishCommand>();
         services.AddTransient<ICommand, FindCommand>();
+        services.AddTransient<ICommand, GenerateDocsCommand>();
         services.AddTransient<ICommand, RestoreCommand>();
         services.AddTransient<ICommand, VersionCommand>();
 

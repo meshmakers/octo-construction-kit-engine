@@ -67,6 +67,10 @@ static class CkTypeGraphExtensions
         }
     }
 
+    public static async void StyleClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.Key.SemanticVersionedFullName} fill:#000000,color:#8bc5bb");
+    }
     private static string FormatInboundMultiplicity(CkAssociationRoleGraph item)
     {
         var InboundMultiplicity = item.InboundMultiplicity;
@@ -123,6 +127,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             type.DrawClass(outputFile);
             type.DrawInheritance(outputFile);
             type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
+            type.StyleClass(outputFile);
         }
 
         //final line to end mermaid code block

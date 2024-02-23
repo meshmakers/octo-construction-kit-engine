@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Runtime.Intrinsics.Arm;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -7,6 +8,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Octokit;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
@@ -14,9 +16,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 static class CkTypeGraphExtensions
 {
+
+    public static string GetName(this CkId<CkTypeId> ckTypeGraph) => $"{ckTypeGraph.Key.SemanticVersionedFullName}";
     public static async void DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.Key.SemanticVersionedFullName}");
+        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
 
         //for formatting check if attributes defined
         if (ckTypeGraph.DefinedAttributes.Count != 0)
@@ -41,7 +45,7 @@ static class CkTypeGraphExtensions
         //Checks for Inheritance In BaseTypes and Creates Arrows ;)
         if (ckTypeGraph.BaseTypes.Count != 0)
         {
-            await outputFile.WriteLineAsync($"{ckTypeGraph.CkTypeId.Key.SemanticVersionedFullName} --|> {ckTypeGraph.BaseTypes.First(x => x.BaseTypeDepthIndex == 0).BaseCkTypeId.Key.SemanticVersionedFullName}");
+            await outputFile.WriteLineAsync($"{ckTypeGraph.CkTypeId.GetName()} --|> {ckTypeGraph.BaseTypes.First(x => x.BaseTypeDepthIndex == 0).BaseCkTypeId.GetName()}");
         }
     }
 
@@ -58,7 +62,7 @@ static class CkTypeGraphExtensions
                     {
                         string OutboundMultiplicityConversion = FormatOutboundMultiplicity(item);
                         string InboundMultiplicityConversion = FormatInboundMultiplicity(item);
-                        await outputFile.WriteLineAsync($"{association.OriginCkTypeId.Key.SemanticVersionedFullName} \"{OutboundMultiplicityConversion}\" --> \"{InboundMultiplicityConversion}\" {association.TargetCkTypeId.Key.SemanticVersionedFullName} : {association.CkRoleId.SemanticVersionedFullName}");
+                        await outputFile.WriteLineAsync($"{association.OriginCkTypeId.GetName()} \"{OutboundMultiplicityConversion}\" --> \"{InboundMultiplicityConversion}\" {association.TargetCkTypeId.GetName()} : {association.CkRoleId.SemanticVersionedFullName}");
                     }
                 }
                
@@ -69,7 +73,15 @@ static class CkTypeGraphExtensions
 
     public static async void StyleClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.Key.SemanticVersionedFullName} fill:#000000,color:#8bc5bb");
+        if (ckTypeGraph.IsAbstract)
+        {
+            await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.GetName()} fill:#d4d8e9,color:##000000");
+        }
+        else
+        {
+            await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.GetName()} fill:#8bc5bb,color:##000000");
+        }
+        
     }
     private static string FormatInboundMultiplicity(CkAssociationRoleGraph item)
     {
@@ -117,7 +129,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath)
     {
         //StreamWriter
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "WriteTextAsync.txt"));
+        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "diagram.md"));
 
         await GenerateMermaidBoilerplate(classDiagramTitle, outputFile);
 
@@ -192,8 +204,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
 
         //Filepath in Windows Documents Folder -.-
-        string docPath = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-
+        string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
         MermaidDiagramStyle mermaidDiagramStyle = new MermaidDiagramStyle("fffff");
         
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);

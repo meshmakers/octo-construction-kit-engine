@@ -122,7 +122,13 @@ static class CkAttributeGraphExtensions
 {
     public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"|{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}| {ckAttributeGraph.ValueType} |");
+        await outputFile.WriteLineAsync($"|{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}| {ckAttributeGraph.ValueType} | {ckAttributeGraph.CkAttributeId.ModelId} |" +
+            $"{ckAttributeGraph.DefaultValues} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
+    }
+
+    private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
+    {
+        return $"<a name\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
     }
 }
 
@@ -174,23 +180,35 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath)
+    public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId)
     {
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "table.md"));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, modelGraph);
 
-        foreach (var attribute in GetAttributes(modelGraph))
+        if (ckModelId.ModelId == "System")
         {
-            attribute.DrawAttribute(outputFile);
+            await outputFile.WriteLineAsync("Type is System");
         }
+        else if (ckModelId.ModelId == "Basic")
+        {
+            foreach (var attribute in GetAttributes(modelGraph))
+            {
+                if (attribute.CkAttributeId.ModelId == "Basic")
+                {
+                    attribute.DrawAttribute(outputFile);
+                }
+                
+            }
+        }
+        
     }
     private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelGraph ckModelGraph)
     {
         await outputFile.WriteLineAsync($"### {tableTitle}");
         await outputFile.WriteLineAsync();
-        await outputFile.WriteLineAsync("| ID      | Type |");
-        await outputFile.WriteLineAsync("| ----------- | ----------- |");
+        await outputFile.WriteLineAsync($"| ID      | DataType | ModelID | Default Values | Description | CkEnumId/CRrecordId |");
+        await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |");
     }
 
     private IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
@@ -239,6 +257,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
-        GenerateMarkdownTable(test,"Attributes", docPath);
+        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

@@ -128,7 +128,7 @@ static class CkAttributeGraphExtensions
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
     {
-        return $"<a name\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
+        return $"<a name=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
     }
 }
 
@@ -186,9 +186,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, modelGraph);
 
+
+        //Add CheckmodelID function?
         if (ckModelId.ModelId == "System")
         {
-            await outputFile.WriteLineAsync("Type is System");
+            foreach (var attribute in GetAttributes(modelGraph))
+            {
+                if (attribute.CkAttributeId.ModelId == "System")
+                {
+                    attribute.DrawAttribute(outputFile);
+                }
+
+            }
         }
         else if (ckModelId.ModelId == "Basic")
         {
@@ -257,6 +266,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
-        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(0).Key.ModelId);
+        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(40).Key.ModelId);
     }
 }

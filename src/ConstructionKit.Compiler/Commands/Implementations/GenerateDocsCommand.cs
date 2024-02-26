@@ -118,6 +118,14 @@ static class CkTypeGraphExtensions
     }
 }
 
+static class CkAttributeGraphExtensions
+{
+    public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync($"|{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}| {ckAttributeGraph.ValueType} |");
+    }
+}
+
 
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
@@ -164,9 +172,31 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private IEnumerable<CkTypeGraph> GetClasses(CkModelGraph modelGraph)
     {
-        return modelGraph.Types.Select(x=>x.Value);
+        return modelGraph.Types.Select(x => x.Value);
+    }
+    public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath)
+    {
+        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "table.md"));
+
+        await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, modelGraph);
+
+        foreach (var attribute in GetAttributes(modelGraph))
+        {
+            attribute.DrawAttribute(outputFile);
+        }
+    }
+    private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelGraph ckModelGraph)
+    {
+        await outputFile.WriteLineAsync($"### {tableTitle}");
+        await outputFile.WriteLineAsync();
+        await outputFile.WriteLineAsync("| ID      | Type |");
+        await outputFile.WriteLineAsync("| ----------- | ----------- |");
     }
 
+    private IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
+    {
+        return modelGraph.Attributes.Select(x => x.Value);
+    }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -205,11 +235,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //Filepath in Windows Documents Folder -.-
         string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
-        MermaidDiagramStyle mermaidDiagramStyle = new MermaidDiagramStyle("fffff");
+        
         
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
-        //AddMermaidStyle(docPath, mermaidDiagramStyle);
-
+        GenerateMarkdownTable(test,"Attributes", docPath);
     }
 }

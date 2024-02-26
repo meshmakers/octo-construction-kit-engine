@@ -184,35 +184,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "table.md"));
 
-        await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, modelGraph);
+        await GenerateMarkdownTableBoilerplate(tableTitle, outputFile);
 
-
-        //Add CheckmodelID function?
-        if (ckModelId.ModelId == "System")
+        //Checks for If the Attributes Moddel ID is the Same as the one that was given
+        foreach (var attribute in GetAttributes(modelGraph))
         {
-            foreach (var attribute in GetAttributes(modelGraph))
+            if (attribute.CkAttributeId.ModelId == ckModelId.ModelId)
             {
-                if (attribute.CkAttributeId.ModelId == "System")
-                {
-                    attribute.DrawAttribute(outputFile);
-                }
-
+                attribute.DrawAttribute(outputFile);
             }
         }
-        else if (ckModelId.ModelId == "Basic")
-        {
-            foreach (var attribute in GetAttributes(modelGraph))
-            {
-                if (attribute.CkAttributeId.ModelId == "Basic")
-                {
-                    attribute.DrawAttribute(outputFile);
-                }
-                
-            }
-        }
-        
+
     }
-    private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelGraph ckModelGraph)
+    private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile)
     {
         await outputFile.WriteLineAsync($"### {tableTitle}");
         await outputFile.WriteLineAsync();

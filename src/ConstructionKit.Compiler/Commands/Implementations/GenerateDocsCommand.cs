@@ -203,6 +203,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
 
     }
+
+    public async void GenerateEnumMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
+    {
+        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
+
+        await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, ckModelId);
+    }
     private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelId ckModelId)
     {
         await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");

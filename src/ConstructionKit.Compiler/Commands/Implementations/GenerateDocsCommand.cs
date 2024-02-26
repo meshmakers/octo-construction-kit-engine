@@ -183,7 +183,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
     {
-        GenerateFileName();
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile);
@@ -211,6 +210,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Attributes.Select(x => x.Value);
     }
 
+    //FilePath Potentially
     private static void GenerateFileName()
     {
         string commandLineFilepath = "";

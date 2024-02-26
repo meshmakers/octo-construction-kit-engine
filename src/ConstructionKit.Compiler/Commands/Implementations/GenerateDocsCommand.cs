@@ -1,5 +1,6 @@
 ﻿using System.Globalization;
 using System.Runtime.Intrinsics.Arm;
+using System.Text;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -182,11 +183,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
     {
+        GenerateFileName();
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile);
 
-        //Checks for If the Attributes Moddel ID is the Same as the one that was given
+        //Checks for If the Attributes Model ID is the Same as the one that was given
         foreach (var attribute in GetAttributes(modelGraph))
         {
             if (attribute.CkAttributeId.ModelId == ckModelId.ModelId)
@@ -207,6 +209,44 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
     {
         return modelGraph.Attributes.Select(x => x.Value);
+    }
+
+    private static void GenerateFileName()
+    {
+        string commandLineFilepath = "";
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.Append("System");
+
+        string[] args = Environment.GetCommandLineArgs();
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].Equals("-f") && i + 1 < args.Length)
+            {
+                commandLineFilepath = args[i + 1];
+                break; 
+            }
+        }
+        Console.WriteLine($"{commandLineFilepath}");
+
+        if (commandLineFilepath.Contains("Basic"))
+        {
+            stringBuilder.Append("Basic");
+        }
+        else if (commandLineFilepath.Contains("Industry"))
+        {
+            stringBuilder.Append("BasicIndustry");
+
+            if (commandLineFilepath.Contains("Energy"))
+            {
+                stringBuilder.Append("Energy");
+            }
+            else if(commandLineFilepath.Contains("Water"))
+            {
+                stringBuilder.Append("Water");
+            }
+        }
+
+        Console.WriteLine($"{stringBuilder}");
     }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
@@ -252,5 +292,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //0 for Basic 40 for System -> Improve in the Future
         GenerateMarkdownTable(test,"Attributes", docPath, "table.md", test.Attributes.ElementAt(0).Key.ModelId);
+
+        GenerateMarkdownTable(test, "Attributes", docPath, "table2.md", test.Attributes.ElementAt(40).Key.ModelId);
     }
 }

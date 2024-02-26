@@ -180,9 +180,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId)
+    public async void GenerateMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
     {
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "table.md"));
+        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile);
 
@@ -251,6 +251,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
         //0 for Basic 40 for System -> Improve in the Future
-        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(0).Key.ModelId);
+        GenerateMarkdownTable(test,"Attributes", docPath, "table.md", test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

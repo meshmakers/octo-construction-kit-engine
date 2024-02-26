@@ -10,6 +10,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Octokit;
+using YamlDotNet.Core.Tokens;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
@@ -138,6 +139,42 @@ static class CkAttributeGraphExtensions
     }
 }
 
+static class CkEnumGraphExtensions
+{
+    public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteAsync($"| {ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
+        ckEnumGraph.DrawValues(outputFile);
+        await outputFile.WriteAsync(" |");
+        ckEnumGraph.DrawDescription(outputFile);
+        await outputFile.WriteLineAsync(" |");
+    }
+
+    private static async void DrawValues(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteAsync("<ol start=\"0\">");
+        foreach (var value in ckEnumGraph.Values)
+        {
+            await outputFile.WriteAsync("<li>");
+            await outputFile.WriteAsync($"{value.Name}");
+            await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ol>");
+    }
+
+    private static async void DrawDescription(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteAsync("<ol start=\"0\">");
+        foreach (var value in ckEnumGraph.Values)
+        {
+            await outputFile.WriteAsync("<li>");
+            await outputFile.WriteAsync($"{value.Description}");
+            await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ol>");
+    }
+}
+
 
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
@@ -209,7 +246,23 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, ckModelId);
+        await GenerateEnumMarkdownTableBoilerplate(outputFile);
+
+        foreach (var Enum in GetEnums(modelGraph))
+        {
+            if (Enum.CkEnumId.ModelId == ckModelId.ModelId)
+            {
+                Enum.DrawEnum(outputFile);
+            } 
+        }
     }
+
+    private static async Task GenerateEnumMarkdownTableBoilerplate(StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync("| ID | Values | Descriptions |");
+        await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- |");
+    }
+
     private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelId ckModelId)
     {
         await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");
@@ -218,13 +271,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task GenerateAttributesMarkdownTableBoilerplate(StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"| ID      | DataType | ModelID | Default Values | Is Data Stream? | Description | CkEnumId/CkRecordId |");
+        await outputFile.WriteLineAsync("| ID      | DataType | ModelID | Default Values | Is Data Stream? | Description | CkEnumId/CkRecordId |");
         await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |");
     }
 
     private IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
     {
         return modelGraph.Attributes.Select(x => x.Value);
+    }
+
+    private IEnumerable<CkEnumGraph> GetEnums(CkModelGraph modelGraph)
+    {
+        return modelGraph.Enums.Select(x => x.Value);
     }
 
     //FilePath Potentially
@@ -311,5 +369,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", test.Attributes.ElementAt(0).Key.ModelId);
 
         GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", test.Attributes.ElementAt(40).Key.ModelId);
+
+        GenerateEnumMarkdownTable(test, "Enums", docPath, "table3.md", test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

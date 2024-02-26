@@ -123,7 +123,7 @@ static class CkAttributeGraphExtensions
     public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
     {
         await outputFile.WriteLineAsync($"|{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}| {ckAttributeGraph.ValueType} | {ckAttributeGraph.CkAttributeId.ModelId} |" +
-            $"{ckAttributeGraph.DefaultValues} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
+            $"{ckAttributeGraph.DefaultValues} | {ckAttributeGraph.IsDataStream} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
     }
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
@@ -216,8 +216,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         await outputFile.WriteLineAsync($"### {tableTitle}");
         await outputFile.WriteLineAsync();
-        await outputFile.WriteLineAsync($"| ID      | DataType | ModelID | Default Values | Description | CkEnumId/CRrecordId |");
-        await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |");
+        await outputFile.WriteLineAsync($"| ID      | DataType | ModelID | Default Values | Is Data Stream? | Description | CkEnumId/CkRecordId |");
+        await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |");
     }
 
     private IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
@@ -266,6 +266,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
-        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(40).Key.ModelId);
+        //0 for Basic 40 for System -> Improve in the Future
+        GenerateMarkdownTable(test,"Attributes", docPath, test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

@@ -191,6 +191,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, ckModelId);
+        await GenerateAttributesMarkdownTableBoilerplate(outputFile);
 
         //Checks for If the Attributes Model ID is the Same as the one that was given
         foreach (var attribute in GetAttributes(modelGraph))
@@ -206,6 +207,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");
         await outputFile.WriteLineAsync();
+    }
+
+    private static async Task GenerateAttributesMarkdownTableBoilerplate(StreamWriter outputFile)
+    {
         await outputFile.WriteLineAsync($"| ID      | DataType | ModelID | Default Values | Is Data Stream? | Description | CkEnumId/CkRecordId |");
         await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- | ----------- | ----------- |");
     }

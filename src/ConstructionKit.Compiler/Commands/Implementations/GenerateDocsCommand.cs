@@ -178,9 +178,6 @@ static class CkRecordGraphExtensions
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.AttributeName);
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.IsOptional.ToString());
         
-        
-        //ckRecordGraph.DrawDefinedAttributes(outputFile);
-        //ckRecordGraph.DrawAttributeIsOptional(outputFile);
         await outputFile.WriteLineAsync();
     }
 

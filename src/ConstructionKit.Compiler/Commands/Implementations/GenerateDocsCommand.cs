@@ -420,13 +420,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         string[] enumHeadings = ["ID", "Values", "Descriptions"];
         string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
 
+        CkModelId ckModelIdSystem = new("System");
+        CkModelId ckModelIdBasic = new("Basic");
+
         //0 for Basic 40 for System -> Improve in the Future
-        GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", test.Attributes.ElementAt(0).Key.ModelId, attributeHeadings);
+        GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", ckModelIdBasic, attributeHeadings);
 
-        GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", test.Attributes.ElementAt(40).Key.ModelId, attributeHeadings);
+        GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", ckModelIdSystem, attributeHeadings);
 
-        GenerateEnumsMarkdownTable(test, "Enums", docPath, "table3.md", test.Attributes.ElementAt(0).Key.ModelId, enumHeadings);
+        GenerateEnumsMarkdownTable(test, "Enums", docPath, "table3.md", ckModelIdBasic, enumHeadings);
 
-        GenerateRecordsMarkdownTable(test, "Records", docPath, "table4.md", test.Attributes.ElementAt(0).Key.ModelId, recordHeadings);
+        GenerateRecordsMarkdownTable(test, "Records", docPath, "table4.md", ckModelIdBasic, recordHeadings);
     }
 }

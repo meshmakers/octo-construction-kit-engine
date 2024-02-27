@@ -177,17 +177,33 @@ static class CkRecordGraphExtensions
 
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.AttributeName);
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.IsOptional.ToString());
-        
+        ckRecordGraph.DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(outputFile, false);
+        ckRecordGraph.DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(outputFile, true);
+
+        ckRecordGraph.DrawAttributeList(outputFile, (a) => a.CkAttributeId.SemanticVersionedFullName);
         await outputFile.WriteLineAsync();
     }
 
     private static async void DrawAttributeList(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, Func<CkTypeAttributeDto, string> valueGetter)
     {
         await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
-        foreach (var attibute in ckRecordGraph.DefinedAttributes)
+        foreach (var attribute in ckRecordGraph.DefinedAttributes)
         {
             await outputFile.WriteAsync("<li>");
-            await outputFile.WriteAsync(valueGetter(attibute));
+            await outputFile.WriteAsync(valueGetter(attribute));
+            await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ul>");
+        await outputFile.WriteAsync(" |");
+    }
+
+    private static async void DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, bool drawAutoIncrementReference)
+    {
+        await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
+        foreach (var attribute in ckRecordGraph.DefinedAttributes)
+        {
+            await outputFile.WriteAsync("<li>");
+            await outputFile.WriteAsync(drawAutoIncrementReference ? $"{attribute.AutoIncrementReference}" : $"{attribute.AutoCompleteValues}");
             await outputFile.WriteAsync("</li>");
         }
         await outputFile.WriteAsync("</ul>");
@@ -402,7 +418,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         string[] attributeHeadings = ["ID", "DataType", "ModelID", "Default Values", "Is Data Stream?", "Description", "CkEnumId/CkRecordId"];
         string[] enumHeadings = ["ID", "Values", "Descriptions"];
-        string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional"];
+        string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
 
         //0 for Basic 40 for System -> Improve in the Future
         GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", test.Attributes.ElementAt(0).Key.ModelId, attributeHeadings);

@@ -217,7 +217,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IArgument _filePathArg;
-
+    private readonly IArgument _docusaurusDestinationPathArg;
 
     public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath)
     {
@@ -385,44 +385,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         return path;
     }
-    //FilePath Potentially
-    private static void GenerateFileName()
-    {
-        string commandLineFilepath = "";
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.Append("System");
-
-        string[] args = Environment.GetCommandLineArgs();
-        for (int i = 0; i < args.Length; i++)
-        {
-            if (args[i].Equals("-f") && i + 1 < args.Length)
-            {
-                commandLineFilepath = args[i + 1];
-                break; 
-            }
-        }
-        Console.WriteLine($"{commandLineFilepath}");
-
-        if (commandLineFilepath.Contains("Basic"))
-        {
-            stringBuilder.Append("Basic");
-        }
-        else if (commandLineFilepath.Contains("Industry"))
-        {
-            stringBuilder.Append("BasicIndustry");
-
-            if (commandLineFilepath.Contains("Energy"))
-            {
-                stringBuilder.Append("Energy");
-            }
-            else if(commandLineFilepath.Contains("Water"))
-            {
-                stringBuilder.Append("Water");
-            }
-        }
-
-        Console.WriteLine($"{stringBuilder}");
-    }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -432,6 +394,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         _filePathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);
+
+        _docusaurusDestinationPathArg = CommandArgumentValue.AddArgument("d", "destination", ["Path of Docusaurus Pages Directory"], true, 1);
     }
 
     public override async Task Execute()
@@ -461,9 +425,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //Filepath in Windows Documents Folder -.-
         string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
-        
-        
-        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
 
         string[] attributeHeadings = ["ID", "DataType", "ModelID", "Default Values", "Is Data Stream?", "Description", "CkEnumId/CkRecordId"];
         string[] enumHeadings = ["ID", "Values", "Descriptions"];
@@ -472,7 +433,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
 
-        string docusaurusPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
+        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
+
+        var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         BuildDirectoryStructure(docusaurusPath);
 

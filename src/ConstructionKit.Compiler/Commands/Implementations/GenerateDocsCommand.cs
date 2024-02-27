@@ -353,6 +353,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry"));
 
+            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry", "Energy"));
+
+            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry", "Fluid"));
+
         }
         catch(Exception ex)
         {
@@ -360,6 +364,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
         finally { }
     }
+
+
     //FilePath Potentially
     private static void GenerateFileName()
     {

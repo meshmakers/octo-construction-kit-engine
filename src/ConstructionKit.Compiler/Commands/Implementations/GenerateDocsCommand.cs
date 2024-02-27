@@ -219,10 +219,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
 
-    public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath)
+    public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath, CkModelId ckModelId)
     {
         //StreamWriter
-        using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
+        //using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
+
+        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Diagram.md"));
 
         await GenerateMermaidBoilerplate(classDiagramTitle, outputFile);
 
@@ -436,7 +438,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath);
+        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath, ckModelIdBasic);
 
         GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, ckModelIdBasic, attributeHeadings);
 

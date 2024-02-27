@@ -143,7 +143,7 @@ static class CkEnumGraphExtensions
 {
     public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteAsync($"| {ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
+        await outputFile.WriteAsync($"| {ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
         ckEnumGraph.DrawValuesOrDescription(outputFile, true);
         ckEnumGraph.DrawValuesOrDescription(outputFile, false);
         await outputFile.WriteLineAsync();
@@ -160,6 +160,11 @@ static class CkEnumGraphExtensions
         }
         await outputFile.WriteAsync("</ol>");
         await outputFile.WriteAsync(" |");
+    }
+
+    private static string AddAnchor(this CkEnumGraph ckEnumGraph)
+    {
+        return $"<a name=\"{ckEnumGraph.CkEnumId.SemanticVersionedFullName}\"></a>";
     }
 }
 

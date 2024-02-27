@@ -423,8 +423,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         // Test beinhaltet nun alle aufgelösten Typen (auch von abhängigen libraries)
 
 
-        //Filepath in Windows Documents Folder -.-
-        string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
+        //Old Static Filepath
+        //string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
+        var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         string[] attributeHeadings = ["ID", "DataType", "ModelID", "Default Values", "Is Data Stream?", "Description", "CkEnumId/CkRecordId"];
         string[] enumHeadings = ["ID", "Values", "Descriptions"];
@@ -433,18 +434,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
 
-        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docPath);
-
-        var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
-
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", ckModelIdBasic, attributeHeadings);
+        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath);
 
-        GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", ckModelIdSystem, attributeHeadings);
+        GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, "table.md", ckModelIdBasic, attributeHeadings);
 
-        GenerateEnumsMarkdownTable(test, "Enums", docPath, "table3.md", ckModelIdBasic, enumHeadings);
+        GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, "table2.md", ckModelIdSystem, attributeHeadings);
 
-        GenerateRecordsMarkdownTable(test, "Records", docPath, "table4.md", ckModelIdBasic, recordHeadings);
+        GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, "table3.md", ckModelIdBasic, enumHeadings);
+
+        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, "table4.md", ckModelIdBasic, recordHeadings);
     }
 }

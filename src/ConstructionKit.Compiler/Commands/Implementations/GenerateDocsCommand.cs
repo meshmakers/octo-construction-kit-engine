@@ -197,6 +197,7 @@ static class CkRecordGraphExtensions
         await outputFile.WriteAsync(" |");
     }
 
+    //!! Potentially Change especially considering AutoComplete Values May have more than 1 element
     private static async void DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, bool drawAutoIncrementReference)
     {
         await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
@@ -260,7 +261,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+
+        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Attributes.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 
@@ -277,7 +280,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+
+        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Enums.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 
@@ -292,7 +297,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
+
+        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Records.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 
@@ -305,6 +312,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
+    //Potentially Rework TableTitle Since IT should always be Clear considering which function calls this function
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, string[] headings)
     {
         await outputFile.WriteLineAsync($"### {ckModelId.FullName} {tableTitle}");
@@ -365,7 +373,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         finally { }
     }
 
+    public static string BuildFilepath(string docusaurusPagesPath, CkModelId ckModelId)
+    {
+        string path = "System";
+        path = Path.Combine(docusaurusPagesPath, path);
 
+        if (ckModelId.ModelId.Contains("Basic"))
+        {
+            path = Path.Combine(path, "Basic");
+        }
+
+        return path;
+    }
     //FilePath Potentially
     private static void GenerateFileName()
     {

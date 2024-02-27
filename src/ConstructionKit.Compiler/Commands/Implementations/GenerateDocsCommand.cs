@@ -267,7 +267,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Checks for If the Attributes Model ID is the Same as the one that was given
         foreach (var attribute in GetAttributes(modelGraph))
         {
-            if (attribute.CkAttributeId.ModelId == ckModelId.ModelId)
+            if (attribute.CkAttributeId.ModelId.FullName == ckModelId.FullName)
             {
                 attribute.DrawAttribute(outputFile);
             }
@@ -283,7 +283,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var Enum in GetEnums(modelGraph))
         {
-            if (Enum.CkEnumId.ModelId == ckModelId.ModelId)
+            if (Enum.CkEnumId.ModelId.FullName == ckModelId.FullName)
             {
                 Enum.DrawEnum(outputFile);
             } 
@@ -298,7 +298,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var record in GetRecords(modelGraph))
         {
-            if (record.CkRecordId.ModelId == ckModelId.ModelId)
+            if (record.CkRecordId.ModelId.FullName == ckModelId.FullName)
             {
                 record.DrawRecord(outputFile);
             }

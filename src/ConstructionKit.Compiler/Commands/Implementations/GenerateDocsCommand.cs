@@ -4,6 +4,7 @@ using System.Text;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
@@ -144,12 +145,12 @@ static class CkEnumGraphExtensions
     public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
     {
         await outputFile.WriteAsync($"| {ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
-        ckEnumGraph.DrawValuesOrDescription(outputFile, true);
-        ckEnumGraph.DrawValuesOrDescription(outputFile, false);
+        ckEnumGraph.DrawValuesOrDescriptions(outputFile, true);
+        ckEnumGraph.DrawValuesOrDescriptions(outputFile, false);
         await outputFile.WriteLineAsync();
     }
 
-    private static async void DrawValuesOrDescription(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, bool drawValues)
+    private static async void DrawValuesOrDescriptions(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, bool drawValues)
     {
         await outputFile.WriteAsync("<ol start=\"0\">");
         foreach (var value in ckEnumGraph.Values)
@@ -172,7 +173,28 @@ static class CkRecordGraphExtensions
 {
     public static async void DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"|{ckRecordGraph.CkRecordId.SemanticVersionedFullName} |");
+        await outputFile.WriteAsync($"|{ckRecordGraph.CkRecordId.SemanticVersionedFullName} |");
+
+        ckRecordGraph.DrawAttributeList(outputFile, (a) => a.AttributeName);
+        ckRecordGraph.DrawAttributeList(outputFile, (a) => a.IsOptional.ToString());
+        
+        
+        //ckRecordGraph.DrawDefinedAttributes(outputFile);
+        //ckRecordGraph.DrawAttributeIsOptional(outputFile);
+        await outputFile.WriteLineAsync();
+    }
+
+    private static async void DrawAttributeList(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, Func<CkTypeAttributeDto, string> valueGetter)
+    {
+        await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
+        foreach (var attibute in ckRecordGraph.DefinedAttributes)
+        {
+            await outputFile.WriteAsync("<li>");
+            await outputFile.WriteAsync(valueGetter(attibute));
+            await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ul>");
+        await outputFile.WriteAsync(" |");
     }
 }
 
@@ -281,8 +303,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task GenerateRecordsMarkdownTableBoilerplate(StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync("| ID |");
-        await outputFile.WriteLineAsync("| ----------- |");
+        await outputFile.WriteLineAsync("| ID | Defined Attributes | Is Optional |");
+        await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- |");
     }
 
     private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelId ckModelId)

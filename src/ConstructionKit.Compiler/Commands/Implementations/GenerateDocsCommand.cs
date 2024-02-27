@@ -307,7 +307,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, string[] headings)
     {
-        await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");
+        await outputFile.WriteLineAsync($"### {ckModelId.FullName} {tableTitle}");
         await outputFile.WriteLineAsync();
         foreach (var i in headings)
         {
@@ -444,8 +444,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         string[] enumHeadings = ["ID", "Values", "Descriptions"];
         string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
 
-        CkModelId ckModelIdSystem = new("System");
-        CkModelId ckModelIdBasic = new("Basic");
+        CkModelId ckModelIdSystem = new("System", "1.0.0");
+        CkModelId ckModelIdBasic = new("Basic", "1.0.0");
 
         string docusaurusPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
 

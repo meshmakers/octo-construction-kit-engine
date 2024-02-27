@@ -168,6 +168,13 @@ static class CkEnumGraphExtensions
     }
 }
 
+static class CkRecordGraphExtensions
+{
+    public static async void DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync($"|{ckRecordGraph.CkRecordId.SemanticVersionedFullName} |");
+    }
+}
 
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
@@ -234,12 +241,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public async void GenerateEnumMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
+    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
     {
         using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
 
         await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, ckModelId);
-        await GenerateEnumMarkdownTableBoilerplate(outputFile);
+        await GenerateEnumsMarkdownTableBoilerplate(outputFile);
 
         foreach (var Enum in GetEnums(modelGraph))
         {
@@ -250,10 +257,32 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    private static async Task GenerateEnumMarkdownTableBoilerplate(StreamWriter outputFile)
+    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId)
+    {
+        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
+
+        await GenerateMarkdownTableBoilerplate(tableTitle, outputFile, ckModelId);
+        await GenerateRecordsMarkdownTableBoilerplate(outputFile);
+
+        foreach (var record in GetRecords(modelGraph))
+        {
+            if (record.CkRecordId.ModelId == ckModelId.ModelId)
+            {
+                record.DrawRecord(outputFile);
+            }
+        }
+    }
+
+    private static async Task GenerateEnumsMarkdownTableBoilerplate(StreamWriter outputFile)
     {
         await outputFile.WriteLineAsync("| ID | Values | Descriptions |");
         await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- |");
+    }
+
+    private static async Task GenerateRecordsMarkdownTableBoilerplate(StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync("| ID |");
+        await outputFile.WriteLineAsync("| ----------- |");
     }
 
     private static async Task GenerateMarkdownTableBoilerplate(string tableTitle, StreamWriter outputFile, CkModelId ckModelId)
@@ -276,6 +305,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private IEnumerable<CkEnumGraph> GetEnums(CkModelGraph modelGraph)
     {
         return modelGraph.Enums.Select(x => x.Value);
+    }
+
+    private IEnumerable<CkRecordGraph> GetRecords(CkModelGraph modelGraph)
+    {
+        return modelGraph.Records.Select(x => x.Value);
     }
 
     //FilePath Potentially
@@ -363,6 +397,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", test.Attributes.ElementAt(40).Key.ModelId);
 
-        GenerateEnumMarkdownTable(test, "Enums", docPath, "table3.md", test.Attributes.ElementAt(0).Key.ModelId);
+        GenerateEnumsMarkdownTable(test, "Enums", docPath, "table3.md", test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

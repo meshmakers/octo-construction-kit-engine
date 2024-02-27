@@ -398,5 +398,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", test.Attributes.ElementAt(40).Key.ModelId);
 
         GenerateEnumsMarkdownTable(test, "Enums", docPath, "table3.md", test.Attributes.ElementAt(0).Key.ModelId);
+
+        GenerateRecordsMarkdownTable(test, "Records", docPath, "table4.md", test.Attributes.ElementAt(0).Key.ModelId);
     }
 }

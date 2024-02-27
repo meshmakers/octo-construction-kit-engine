@@ -131,7 +131,7 @@ static class CkAttributeGraphExtensions
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
     {
-        return $"<a name=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
+        return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
     }
 
     private static string AddLink(this CkAttributeGraph ckAttributeGraph)
@@ -165,7 +165,7 @@ static class CkEnumGraphExtensions
 
     private static string AddAnchor(this CkEnumGraph ckEnumGraph)
     {
-        return $"<a name=\"{ckEnumGraph.CkEnumId.SemanticVersionedFullName}\"></a>";
+        return $"<a id=\"{ckEnumGraph.CkEnumId.SemanticVersionedFullName}\"></a>";
     }
 }
 

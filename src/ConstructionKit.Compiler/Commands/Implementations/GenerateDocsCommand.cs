@@ -144,34 +144,22 @@ static class CkEnumGraphExtensions
     public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
     {
         await outputFile.WriteAsync($"| {ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
-        ckEnumGraph.DrawValues(outputFile);
+        ckEnumGraph.DrawValuesOrDescription(outputFile, true);
+        ckEnumGraph.DrawValuesOrDescription(outputFile, false);
+        await outputFile.WriteLineAsync();
+    }
+
+    private static async void DrawValuesOrDescription(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, bool drawValues)
+    {
+        await outputFile.WriteAsync("<ol start=\"0\">");
+        foreach (var value in ckEnumGraph.Values)
+        {
+            await outputFile.WriteAsync("<li>");
+            await outputFile.WriteAsync(drawValues ? $"{value.Name}" : $"{value.Description}");
+            await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ol>");
         await outputFile.WriteAsync(" |");
-        ckEnumGraph.DrawDescription(outputFile);
-        await outputFile.WriteLineAsync(" |");
-    }
-
-    private static async void DrawValues(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteAsync("<ol start=\"0\">");
-        foreach (var value in ckEnumGraph.Values)
-        {
-            await outputFile.WriteAsync("<li>");
-            await outputFile.WriteAsync($"{value.Name}");
-            await outputFile.WriteAsync("</li>");
-        }
-        await outputFile.WriteAsync("</ol>");
-    }
-
-    private static async void DrawDescription(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteAsync("<ol start=\"0\">");
-        foreach (var value in ckEnumGraph.Values)
-        {
-            await outputFile.WriteAsync("<li>");
-            await outputFile.WriteAsync($"{value.Description}");
-            await outputFile.WriteAsync("</li>");
-        }
-        await outputFile.WriteAsync("</ol>");
     }
 }
 

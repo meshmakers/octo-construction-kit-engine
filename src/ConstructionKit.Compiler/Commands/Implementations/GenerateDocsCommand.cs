@@ -259,7 +259,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
+    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
         //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
@@ -278,7 +278,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
+    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
         //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
@@ -295,7 +295,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
+    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
         //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
@@ -438,12 +438,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath);
 
-        GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, "table.md", ckModelIdBasic, attributeHeadings);
+        GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, ckModelIdBasic, attributeHeadings);
 
-        GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, "table2.md", ckModelIdSystem, attributeHeadings);
+        GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, ckModelIdSystem, attributeHeadings);
 
-        GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, "table3.md", ckModelIdBasic, enumHeadings);
+        GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, ckModelIdBasic, enumHeadings);
 
-        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, "table4.md", ckModelIdBasic, recordHeadings);
+        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, ckModelIdBasic, recordHeadings);
     }
 }

@@ -49,6 +49,11 @@ public class NewtonCkIdConverter<TKey> : JsonConverter where TKey : IComparable<
     public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue,
         JsonSerializer serializer)
     {
+        if (reader.TokenType == JsonToken.Null)
+        {
+            return null;
+        }
+
         if (reader.TokenType != JsonToken.String)
         {
             throw new Exception($"Unexpected token parsing CkId. Expected String, got {reader.TokenType}.");

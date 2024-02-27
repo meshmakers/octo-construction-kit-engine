@@ -221,7 +221,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath)
     {
         //StreamWriter
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, "diagram.md"));
+        using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
 
         await GenerateMermaidBoilerplate(classDiagramTitle, outputFile);
 
@@ -260,7 +260,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
+        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 
@@ -277,7 +277,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
+        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 
@@ -292,7 +292,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, string docName, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new StreamWriter(Path.Combine(docPath, docName));
+        using StreamWriter outputFile = new(Path.Combine(docPath, docName));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
 

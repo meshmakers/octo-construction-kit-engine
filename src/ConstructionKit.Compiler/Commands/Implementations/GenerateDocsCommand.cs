@@ -336,6 +336,30 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Records.Select(x => x.Value);
     }
 
+    private static void BuildDirectoryStructure(string docusaurusPagesPath)
+    {
+        string path = Path.Combine(docusaurusPagesPath, "System");
+       try
+       {
+            if (Directory.Exists(path))
+            {
+                Console.WriteLine("Path Exists");
+                return;
+            }
+
+            DirectoryInfo di = Directory.CreateDirectory(path);
+            
+            di = Directory.CreateDirectory(Path.Combine(path, "Basic"));
+
+            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry"));
+
+        }
+        catch(Exception ex)
+        {
+            Console.WriteLine(ex.ToString());
+        }
+        finally { }
+    }
     //FilePath Potentially
     private static void GenerateFileName()
     {
@@ -423,7 +447,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdSystem = new("System");
         CkModelId ckModelIdBasic = new("Basic");
 
-        //0 for Basic 40 for System -> Improve in the Future
+        string docusaurusPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
+
+        BuildDirectoryStructure(docusaurusPath);
+
         GenerateAttributesMarkdownTable(test,"Attributes", docPath, "table.md", ckModelIdBasic, attributeHeadings);
 
         GenerateAttributesMarkdownTable(test, "Attributes", docPath, "table2.md", ckModelIdSystem, attributeHeadings);

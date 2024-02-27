@@ -2,7 +2,7 @@
   "profiles": {
     "ConstructionKit.Compiler": {
       "commandName": "Project",
-      "commandLineArgs": "-c generateDocs -f \"C:\\Users\\pschw\\Development\\meshmakers\\octo-construction-kit\\Octo.Sdk.Packages.Basic\\ConstructionKit\\ck-basic.yaml\""
+      "commandLineArgs": "-c generateDocs -f \"C:\\Users\\pschw\\Development\\meshmakers\\octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\ConstructionKit\\ck-basic.yaml\""
     }
   }
 }

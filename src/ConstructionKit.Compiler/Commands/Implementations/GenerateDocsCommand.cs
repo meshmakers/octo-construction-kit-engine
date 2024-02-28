@@ -437,21 +437,23 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         
-
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
         CkModelId ckModelIdIndustryBasic = new("IndustryBasic", "1.0.0");
 
+        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic];
+
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);
+        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);        
 
-        GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, ckModelIdBasic, attributeHeadings);
+        foreach (var modelID in ckModelIds)
+        {
+            GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, modelID, attributeHeadings);
 
-        GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, ckModelIdSystem, attributeHeadings);
+            GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, modelID, enumHeadings);
 
-        GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, ckModelIdBasic, enumHeadings);
-
-        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, ckModelIdBasic, recordHeadings);
+            GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, modelID, recordHeadings);
+        }
     }
 }

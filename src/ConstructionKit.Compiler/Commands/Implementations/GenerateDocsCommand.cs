@@ -495,8 +495,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);
 
-        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, ckModelIdIndustryEnergy, recordHeadings);
-
         foreach (var modelID in ckModelIds)
         {
             GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, modelID, attributeHeadings);

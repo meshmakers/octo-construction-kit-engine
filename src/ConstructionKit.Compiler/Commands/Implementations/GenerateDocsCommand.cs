@@ -346,9 +346,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Records.Select(x => x.Value);
     }
 
-    private static void BuildDirectoryStructure(string docusaurusPagesPath)
+    private static void BuildDirectoryStructure(string docusaurusPath)
     {
-        string path = Path.Combine(docusaurusPagesPath, "System");
+        string path = Path.Combine(docusaurusPath, "System");
        try
        {
             if (Directory.Exists(path))
@@ -375,10 +375,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         finally { }
     }
 
-    public static string BuildFilepath(string docusaurusPagesPath, CkModelId ckModelId)
+    public static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
     {
         string path = "System";
-        path = Path.Combine(docusaurusPagesPath, path);
+        path = Path.Combine(docusaurusPath, path);
 
         if (ckModelId.ModelId.Contains("Basic"))
         {

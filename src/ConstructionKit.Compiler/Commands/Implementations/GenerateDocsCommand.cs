@@ -17,11 +17,26 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 static class CkTypeGraphExtensions
 {
+    public static string GetClassName(this CkId<CkTypeId> ckTypeGraph)
+    {
+        string fullName = ckTypeGraph.Key.SemanticVersionedFullName;
 
-    public static string GetName(this CkId<CkTypeId> ckTypeGraph) => $"{ckTypeGraph.Key.SemanticVersionedFullName}";
+        string sanitizedFullName = GetName(ckTypeGraph) + "[\"" + fullName + "\"]";
+
+        return sanitizedFullName;
+    }
+    public static string GetName(this CkId<CkTypeId> ckTypeGraph)
+    {
+        string fullName = ckTypeGraph.Key.SemanticVersionedFullName;
+
+        string sanitizedFullName = fullName.Replace(".", "");
+
+        return sanitizedFullName;
+    }
+
     public static async void DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
+        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}");
 
         //for formatting check if attributes defined
         if (ckTypeGraph.DefinedAttributes.Count != 0)

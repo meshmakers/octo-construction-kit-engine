@@ -15,16 +15,6 @@ using YamlDotNet.Core.Tokens;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
-public class GenerateDocsFacade
-{
-    
-
-    public async void CreateDocumentation()
-    {
-        Gene
-    }
-}
-
 static class CkTypeGraphExtensions
 {
 
@@ -231,14 +221,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly string[] enumHeadings = ["ID", "Values", "Descriptions"];
     private readonly string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
 
-    public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath, CkModelId ckModelId)
+    public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
         //StreamWriter
         //using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
 
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Diagram.md"));
 
-        await GenerateMermaidBoilerplate(classDiagramTitle, outputFile);
+        await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
         foreach (var type in GetClasses(modelGraph))
@@ -454,7 +444,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath, ckModelIdIndustryBasic);
+        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);
 
         GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, ckModelIdBasic, attributeHeadings);
 

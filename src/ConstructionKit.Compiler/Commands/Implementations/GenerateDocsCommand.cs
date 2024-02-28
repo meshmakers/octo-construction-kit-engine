@@ -188,8 +188,8 @@ static class CkRecordGraphExtensions
 
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.AttributeName);
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.IsOptional.ToString());
-        ckRecordGraph.DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(outputFile, false);
-        ckRecordGraph.DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(outputFile, true);
+        ckRecordGraph.DrawAttributeAutoIncrementReference(outputFile);
+        ckRecordGraph.DrawAttributeAutoCompleteValues(outputFile);
 
         ckRecordGraph.DrawAttributeList(outputFile, (a) => a.CkAttributeId.SemanticVersionedFullName);
         await outputFile.WriteLineAsync();
@@ -209,14 +209,38 @@ static class CkRecordGraphExtensions
     }
 
     //!! Potentially Change especially considering AutoComplete Values May have more than 1 element
-    private static async void DrawAttributeAutoIncrementReferenceOrAutoCompleteValues(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, bool drawAutoIncrementReference)
+    private static async void DrawAttributeAutoIncrementReference(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
     {
         await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
         foreach (var attribute in ckRecordGraph.DefinedAttributes)
         {
             await outputFile.WriteAsync("<li>");
-            await outputFile.WriteAsync(drawAutoIncrementReference ? $"{attribute.AutoIncrementReference}" : $"{attribute.AutoCompleteValues}");
+            await outputFile.WriteAsync($"{attribute.AutoIncrementReference}");
             await outputFile.WriteAsync("</li>");
+        }
+        await outputFile.WriteAsync("</ul>");
+        await outputFile.WriteAsync(" |");
+    }
+
+    //Refactor for the love of God
+    private static async void DrawAttributeAutoCompleteValues(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
+        foreach (var attribute in ckRecordGraph.DefinedAttributes)
+        {
+            if (attribute.AutoCompleteValues != null)
+            {
+                await outputFile.WriteAsync("<li>");
+                await outputFile.WriteAsync("<ul style={{ listStyleType: \"none\" }}>");
+                foreach (var autocompletevalue in attribute.AutoCompleteValues)
+                {
+                    await outputFile.WriteAsync("<li>");
+                    await outputFile.WriteAsync($"{autocompletevalue}");
+                    await outputFile.WriteAsync("</li>");
+                }
+                await outputFile.WriteAsync("</ul>");
+                await outputFile.WriteAsync("</li>");
+            }   
         }
         await outputFile.WriteAsync("</ul>");
         await outputFile.WriteAsync(" |");

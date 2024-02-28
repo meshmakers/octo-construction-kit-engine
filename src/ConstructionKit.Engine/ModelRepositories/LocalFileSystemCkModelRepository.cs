@@ -19,7 +19,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     /// </summary>
     /// <param name="options"></param>
     /// <param name="ckJsonSerializer"></param>
-    public LocalFileSystemCkModelRepository(IOptions<LocalCkModelRepositoryOptions> options, ICkJsonSerializer ckJsonSerializer)
+    public LocalFileSystemCkModelRepository(IOptions<LocalCkModelRepositoryOptions> options,
+        ICkJsonSerializer ckJsonSerializer)
     {
         _options = options;
         _ckJsonSerializer = ckJsonSerializer;
@@ -69,7 +70,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         await using var streamReader = File.OpenRead(compiledModelFilePath);
 #endif
         var compiledModelRoot = await _ckJsonSerializer
-            .DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult).ConfigureAwait(false);
+            .DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult)
+            .ConfigureAwait(false);
         if (operationResult.HasErrors)
         {
             throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);
@@ -91,12 +93,23 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
         Directory.CreateDirectory(path);
 
+        var i = 0;
+        while (i++ < 20)
+        {
+            try
+            {
 #if NETSTANDARD2_0
-        using var streamWriter = new StreamWriter(compiledModelFilePath);
+                using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else
-        await using var streamWriter = new StreamWriter(compiledModelFilePath);
+                await using var streamWriter = new StreamWriter(compiledModelFilePath);
 #endif
-        await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+                await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+            }
+            catch (Exception)
+            {
+                await Task.Delay(100).ConfigureAwait(false);
+            }
+        }
     }
 
     /// <inheritdoc />

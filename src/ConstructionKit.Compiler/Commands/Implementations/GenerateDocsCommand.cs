@@ -123,8 +123,10 @@ static class CkAttributeGraphExtensions
 {
     public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"|{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddLink()}| {ckAttributeGraph.ValueType} | {ckAttributeGraph.CkAttributeId.ModelId} |" +
-            $"{ckAttributeGraph.DefaultValues} | {ckAttributeGraph.IsDataStream} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
+        await outputFile.WriteAsync($"|{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddLink()}| {ckAttributeGraph.ValueType} | {ckAttributeGraph.CkAttributeId.ModelId} |");
+        ckAttributeGraph.DrawDefaultValues(outputFile);
+        await outputFile.WriteAsync($"| {ckAttributeGraph.IsDataStream} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
+        await outputFile.WriteLineAsync();
     }
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
@@ -135,6 +137,17 @@ static class CkAttributeGraphExtensions
     private static string AddLink(this CkAttributeGraph ckAttributeGraph)
     {
         return $"[{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}](/diagram)";
+    }
+
+    private static async void DrawDefaultValues(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
+    {
+        if (ckAttributeGraph.DefaultValues != null)
+        {
+            foreach (var value in ckAttributeGraph.DefaultValues)
+            {
+                await outputFile.WriteAsync($"{value}");
+            }
+        }
     }
 }
 
@@ -391,6 +404,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 path = Path.Combine(path, "Industry");
             }
         }
+        else if (ckModelId.ModelId.Contains("IndustryEnergy"))
+        {
+            path = Path.Combine(path, "Basic", "Industry", "Energy");
+        }
+        else if (ckModelId.ModelId.Contains("IndustryFluid"))
+        {
+            path = Path.Combine(path, "Basic", "Industry", "Fluid");
+        }
+
+
         return path;
     }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
@@ -440,12 +463,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
         CkModelId ckModelIdIndustryBasic = new("IndustryBasic", "1.0.0");
+        CkModelId ckModelIdIndustryEnergy = new("IndustryEnergy", "1.0.0");
 
-        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic];
+        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy];
 
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);        
+        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);
+
+        GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, ckModelIdIndustryEnergy, recordHeadings);
 
         foreach (var modelID in ckModelIds)
         {

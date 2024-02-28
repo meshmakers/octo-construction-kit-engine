@@ -15,7 +15,15 @@ using YamlDotNet.Core.Tokens;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
+public class GenerateDocsFacade
+{
+    
 
+    public async void CreateDocumentation()
+    {
+        Gene
+    }
+}
 
 static class CkTypeGraphExtensions
 {
@@ -219,6 +227,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
 
+    private readonly string[] attributeHeadings = ["ID", "DataType", "ModelID", "Default Values", "Is Data Stream?", "Description", "CkEnumId/CkRecordId"];
+    private readonly string[] enumHeadings = ["ID", "Values", "Descriptions"];
+    private readonly string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
+
     public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, String classDiagramTitle, string docPath, CkModelId ckModelId)
     {
         //StreamWriter
@@ -383,8 +395,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         if (ckModelId.ModelId.Contains("Basic"))
         {
             path = Path.Combine(path, "Basic");
-        }
 
+            if (ckModelId.ModelId.Contains("IndustryBasic"))
+            {
+                path = Path.Combine(path, "Industry");
+            }
+        }
         return path;
     }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
@@ -430,16 +446,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
-        string[] attributeHeadings = ["ID", "DataType", "ModelID", "Default Values", "Is Data Stream?", "Description", "CkEnumId/CkRecordId"];
-        string[] enumHeadings = ["ID", "Values", "Descriptions"];
-        string[] recordHeadings = ["ID", "Defined Attributes", "Is Optional", "Auto Complete Values", "Auto Increment Reference", "CKAttributeID"];
+        
 
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
+        CkModelId ckModelIdIndustryBasic = new("IndustryBasic", "1.0.0");
 
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath, ckModelIdBasic);
+        GenerateMermaidTextOutput(test, "Sample CK Class Diagram", docusaurusPath, ckModelIdIndustryBasic);
 
         GenerateAttributesMarkdownTable(test,"Attributes", docusaurusPath, ckModelIdBasic, attributeHeadings);
 

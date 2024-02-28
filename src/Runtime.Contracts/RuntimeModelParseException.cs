@@ -19,12 +19,6 @@ public class RuntimeModelParseException : PersistenceException
         OperationResult = operationResult;
     }
 
-    /// <inheritdoc />
-    private RuntimeModelParseException(string message, Exception inner, OperationResult operationResult) : base(message, inner)
-    {
-        OperationResult = operationResult;
-    }
-
     /// <summary>
     ///     The <see cref="OperationResult" /> that caused the exception
     /// </summary>
@@ -43,21 +37,31 @@ public class RuntimeModelParseException : PersistenceException
 
     internal static Exception InvalidStructure()
     {
-        throw new RuntimeModelParseException("Missing structure of JSON file format. Ensure that file begins with { \"entities\" : [ {");
+        return new RuntimeModelParseException("Missing structure of JSON file format. Ensure that file begins with { \"entities\" : [ {");
     }
 
     internal static Exception CannotDeserializeEntity(int readerLineNumber)
     {
-        throw new RuntimeModelParseException($"Cannot deserialize entity at line {readerLineNumber}.");
+        return new RuntimeModelParseException($"Cannot deserialize entity at line {readerLineNumber}.");
     }
 
     internal static Exception InvalidPosition()
     {
-        throw new RuntimeModelParseException("Invalid position, the stream is not positioned on the 'entities' array.");
+        return new RuntimeModelParseException("Invalid position, the stream is not positioned on the 'entities' array.");
     }
 
     internal static Exception DuplicateEntity(OctoObjectId rtId)
     {
-        throw new RuntimeModelParseException($"Duplicate entity with RtId {rtId}.");
+        return new RuntimeModelParseException($"Duplicate entity with RtId {rtId}.");
+    }
+
+    internal static Exception NotImplemented()
+    {
+        return new RuntimeModelParseException("Not implemented.");
+    }
+
+    internal static Exception KeyExpectedDuringDeserialization(string name)
+    {
+        return new RuntimeModelParseException($"'{name}' during deserialization.");
     }
 }

@@ -278,7 +278,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //StreamWriter
         //using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
 
-        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Diagram.md"));
+        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Diagram"));
 
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 

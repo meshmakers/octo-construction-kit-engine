@@ -275,9 +275,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
-        //StreamWriter
-        //using StreamWriter outputFile = new(Path.Combine(docPath, "diagram.md"));
-
         using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Diagram"));
 
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);

@@ -317,7 +317,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Attributes.md"));
+        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", headings);
 
@@ -334,7 +334,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Enums.md"));
+        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Enums", headings);
 
@@ -349,7 +349,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
-        using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Records.md"));
+        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Records"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Records", headings);
 
@@ -458,6 +458,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
 
         return path;
+    }
+
+    private static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
+    {
+        return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
     }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)

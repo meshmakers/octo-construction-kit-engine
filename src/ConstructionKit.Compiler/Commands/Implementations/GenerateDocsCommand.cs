@@ -315,11 +315,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Attributes.md"));
 
-        await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
+        await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", headings);
 
         //Checks for If the Attributes Model ID is the Same as the one that was given
         foreach (var attribute in GetAttributes(modelGraph))
@@ -332,11 +332,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Enums.md"));
 
-        await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
+        await MarkdownTableBuilder(outputFile, ckModelId, "Enums", headings);
 
         foreach (var Enum in GetEnums(modelGraph))
         {
@@ -347,11 +347,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
     {
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Records.md"));
 
-        await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
+        await MarkdownTableBuilder(outputFile, ckModelId, "Records", headings);
 
         foreach (var record in GetRecords(modelGraph))
         {
@@ -507,11 +507,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var modelID in ckModelIds)
         {
-            GenerateAttributesMarkdownTable(test, "Attributes", docusaurusPath, modelID, attributeHeadings);
+            GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, attributeHeadings);
 
-            GenerateEnumsMarkdownTable(test, "Enums", docusaurusPath, modelID, enumHeadings);
+            GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, enumHeadings);
 
-            GenerateRecordsMarkdownTable(test, "Records", docusaurusPath, modelID, recordHeadings);
+            GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, recordHeadings);
         }
     }
 }

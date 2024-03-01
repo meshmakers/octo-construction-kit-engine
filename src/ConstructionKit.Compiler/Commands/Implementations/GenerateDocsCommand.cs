@@ -317,8 +317,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
-        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
-
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Attributes.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
@@ -336,8 +334,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
-        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
-
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Enums.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
@@ -353,8 +349,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string tableTitle, string docPath, CkModelId ckModelId, string[] headings)
     {
-        //using StreamWriter outputFile = new(Path.Combine(docPath, docName));
-
         using StreamWriter outputFile = new(Path.Combine(BuildFilepath(docPath, ckModelId), ckModelId.SemanticVersionedFullName + "-Records.md"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, tableTitle, headings);
@@ -503,12 +497,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
         CkModelId ckModelIdIndustryBasic = new("IndustryBasic", "1.0.0");
         CkModelId ckModelIdIndustryEnergy = new("IndustryEnergy", "1.0.0");
+        CkModelId ckModelIdIndustryFluid = new("IndustryFluid", "1.0.0");
 
-        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy];
+        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid];
 
         BuildDirectoryStructure(docusaurusPath);
 
-        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryBasic);
+        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);
 
         foreach (var modelID in ckModelIds)
         {

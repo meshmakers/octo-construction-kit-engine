@@ -2,7 +2,7 @@
   "profiles": {
     "ConstructionKit.Compiler": {
       "commandName": "Project",
-      "commandLineArgs": "-c generateDocs -f \"C:\\Users\\pschw\\Development\\meshmakers\\octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Industry.Energy\\ConstructionKit\\ck-industryenergy.yaml\" -d \"C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\docs\""
+      "commandLineArgs": "-c generateDocs -f \"C:\\Users\\pschw\\Development\\meshmakers\\octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Industry.Fluid\\ConstructionKit\\ck-industryfluid.yaml\" -d \"C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\docs\""
     }
   }
 }

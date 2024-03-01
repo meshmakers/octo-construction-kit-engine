@@ -362,7 +362,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    //Potentially Rework TableTitle Since IT should always be Clear considering which function calls this function
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, string[] headings)
     {
         await outputFile.WriteLineAsync($"### {ckModelId.FullName} {tableTitle}");

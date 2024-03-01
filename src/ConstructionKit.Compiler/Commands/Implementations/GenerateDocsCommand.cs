@@ -324,7 +324,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Checks for If the Attributes Model ID is the Same as the one that was given
         foreach (var attribute in GetAttributes(modelGraph))
         {
-            if (attribute.CkAttributeId.ModelId.FullName == ckModelId.FullName)
+            if (MatchesModelId(attribute, ckModelId))
             {
                 attribute.DrawAttribute(outputFile);
             }
@@ -340,7 +340,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var Enum in GetEnums(modelGraph))
         {
-            if (Enum.CkEnumId.ModelId.FullName == ckModelId.FullName)
+            if (MatchesModelId(Enum, ckModelId))
             {
                 Enum.DrawEnum(outputFile);
             } 
@@ -355,13 +355,24 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var record in GetRecords(modelGraph))
         {
-            if (record.CkRecordId.ModelId.FullName == ckModelId.FullName)
+            if (MatchesModelId(record, ckModelId))
             {
                 record.DrawRecord(outputFile);
             }
         }
     }
 
+    //C# Pattern Matching insanity
+    private static bool MatchesModelId(object item, CkModelId modelId)
+    {
+        return item switch
+        {
+            CkAttributeGraph attribute => attribute.CkAttributeId.ModelId.FullName == modelId.FullName,
+            CkEnumGraph enumGraph => enumGraph.CkEnumId.ModelId.FullName == modelId.FullName,
+            CkRecordGraph recordGraph => recordGraph.CkRecordId.ModelId.FullName == modelId.FullName,
+            _ => false // Handle unsupported types or throw an exception if needed
+        };
+    }
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, string[] headings)
     {
         await outputFile.WriteLineAsync($"### {ckModelId.FullName} {tableTitle}");

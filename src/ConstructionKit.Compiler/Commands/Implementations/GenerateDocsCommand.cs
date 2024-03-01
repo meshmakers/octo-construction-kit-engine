@@ -379,7 +379,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await outputFile.WriteAsync($"| {i}");
         }
         await outputFile.WriteLineAsync(" |");
-        foreach (var i in headings)
+        foreach (var _ in headings)
         {
             await outputFile.WriteAsync($"| -----------");
         }

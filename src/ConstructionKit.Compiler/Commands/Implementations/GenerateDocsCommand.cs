@@ -15,6 +15,38 @@ using YamlDotNet.Core.Tokens;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
+public class DocumentationContext
+{
+    public List<string> AttributeHeadings { get; set; } = new List<string>
+    {
+        "ID",
+        "DataType",
+        "ModelID",
+        "Default Values",
+        "Is Data Stream?",
+        "Description",
+        "CkEnumId/CkRecordId"
+    };
+
+    public List<string> EnumHeadings { get; set; } = new List<string>
+    {
+        // Add your Enum headings here
+        "ID",
+        "Values",
+        "Descriptions"
+    };
+
+    public List<string> RecordHeadings { get; set; } = new List<string>
+    {
+        // Add your Record headings here
+        "RecordID",
+        "Defined Attributes",
+        "Is Optional",
+        "Auto Increment Reference",
+        "Auto Complete Values",
+        "CKAttributeID"
+    };
+}
 static class CkTypeGraphExtensions
 {
     public static string GetClassName(this CkId<CkTypeId> ckTypeGraph)
@@ -136,13 +168,31 @@ static class CkTypeGraphExtensions
 
 static class CkAttributeGraphExtensions
 {
-    public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
+    public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile, DocumentationContext context)
     {
-        await outputFile.WriteAsync($"|{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddLink()}| {ckAttributeGraph.ValueType} | {ckAttributeGraph.CkAttributeId.ModelId} |");
-        ckAttributeGraph.DrawDefaultValues(outputFile);
-        await outputFile.WriteAsync($"| {ckAttributeGraph.IsDataStream} | {ckAttributeGraph.Description} | {ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId} |");
-        await outputFile.WriteLineAsync();
+        foreach (var heading in context.AttributeHeadings)
+        {
+            string content = heading switch
+            {
+                "ID" => $"{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddLink()}", // Adjusted to include AddAnchor and AddLink in the ID column
+                "DataType" => ckAttributeGraph.ValueType.ToString(),
+                "ModelID" => ckAttributeGraph.CkAttributeId.ModelId.ToString(),
+                "Default Values" => ckAttributeGraph.DrawDefaultValues(),
+                "Is Data Stream?" => ckAttributeGraph.IsDataStream.ToString(),
+                "Description" => ckAttributeGraph.Description ?? "",
+                "CkEnumId/CkRecordId" => $"{ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId}",
+                _ => string.Empty
+            };
+
+            //if (!string.IsNullOrEmpty(content))
+            //{
+                await outputFile.WriteAsync($"| {content} ");
+            //}
+        }
+
+        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
     }
+
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
     {
@@ -154,21 +204,26 @@ static class CkAttributeGraphExtensions
         return $"[{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}](/diagram)";
     }
 
-    private static async void DrawDefaultValues(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile)
-    {
+    private static string DrawDefaultValues(this CkAttributeGraph ckAttributeGraph)
+    {   
+        StringBuilder stringBuilder = new();
         if (ckAttributeGraph.DefaultValues != null)
         {
             foreach (var value in ckAttributeGraph.DefaultValues)
             {
-                await outputFile.WriteAsync($"{value}");
+                //await outputFile.WriteAsync($"{value}");
+                stringBuilder.Append(value.ToString());
             }
+            return stringBuilder.ToString();
         }
+        return "";
+        
     }
 }
 
 static class CkEnumGraphExtensions
 {
-    public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
+    public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, DocumentationContext context)
     {
         await outputFile.WriteAsync($"| {ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
         ckEnumGraph.DrawValuesOrDescriptions(outputFile, true);
@@ -197,7 +252,7 @@ static class CkEnumGraphExtensions
 
 static class CkRecordGraphExtensions
 {
-    public static async void DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
+    public static async void DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, DocumentationContext context)
     {
         await outputFile.WriteAsync($"|{ckRecordGraph.CkRecordId.SemanticVersionedFullName} |");
 
@@ -312,7 +367,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings, DocumentationContext context)
     {
         using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
 
@@ -323,13 +378,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             if (MatchesModelId(attribute, ckModelId))
             {
-                attribute.DrawAttribute(outputFile);
+                attribute.DrawAttribute(outputFile, context);
             }
         }
 
     }
 
-    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings, DocumentationContext context)
     {
         using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
@@ -339,12 +394,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             if (MatchesModelId(Enum, ckModelId))
             {
-                Enum.DrawEnum(outputFile);
+                Enum.DrawEnum(outputFile, context);
             } 
         }
     }
 
-    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings)
+    public async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string[] headings, DocumentationContext context)
     {
         using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Records"));
 
@@ -354,7 +409,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             if (MatchesModelId(record, ckModelId))
             {
-                record.DrawRecord(outputFile);
+                record.DrawRecord(outputFile, context);
             }
         }
     }
@@ -517,9 +572,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);
 
+        var AH = new DocumentationContext();
+        
+
         foreach (var modelID in ckModelIds)
         {
-            GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, attributeHeadings);
+            GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, attributeHeadings, AH);
 
             GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, enumHeadings);
 

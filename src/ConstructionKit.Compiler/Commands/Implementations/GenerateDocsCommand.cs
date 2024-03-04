@@ -512,20 +512,22 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        //Use ModelId of Defined Attribute to place in appropriate File?
         using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Types"));
-
-        
 
         foreach (var type in GetClasses(modelGraph))
         {
-            await MarkdownTableBuilder(outputFile, ckModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
+            if (type.DefinedAttributes.Count != 0)
+            {
+                
+            
+            await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
             
             foreach (var attribute in type.DefinedAttributes)
             {
                
                 attribute.DrawAttribute(outputFile, context);
                 
+            }
             }
         }
     }
@@ -702,7 +704,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
-            GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+            
         }
+
+        GenerateTypesMarkdownTable(test, docusaurusPath, ckModelIdSystem, Headings.AttributeDtoHeadings);
     }
 }

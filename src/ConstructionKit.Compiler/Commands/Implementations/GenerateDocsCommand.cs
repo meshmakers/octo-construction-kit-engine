@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using Meshmakers.Common.CommandLineParser;
@@ -43,6 +44,15 @@ public class DocumentationContext
         "Auto Increment Reference",
         "Auto Complete Values",
         "CKAttributeID"
+    ];
+
+    public List<string> AttributeDtoHeadings { get; set; } =
+    [
+        "ID",
+        "Auto Complete Values",
+        "Auto Increment Reference",
+        "Is Optional"
+        //ModelID ?
     ];
 }
 static class CkTypeGraphExtensions
@@ -343,6 +353,70 @@ static class CkRecordGraphExtensions
     }
 }
 
+static class CkTypeAttributeDtoExtensions
+{
+    public static async void DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, List<string> attributeDtoHeadings)
+    {
+        foreach (var heading in attributeDtoHeadings)
+        {
+            string content = heading switch
+            {
+                "ID" => $"{ckTypeAttributeDto.AttributeName}",
+                "Auto Complete Values" => ckTypeAttributeDto.DrawAttributeAutoCompleteValues(),
+                "Auto Increment Reference" => ckTypeAttributeDto.DrawAttributeAutoIncrementReference(),
+                "Is Optional" => ckTypeAttributeDto.IsOptional.ToString(),
+                _ => string.Empty
+            };
+
+
+            await outputFile.WriteAsync($"| {content} ");
+        }
+
+        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+    }
+
+    private static string DrawAttributeAutoCompleteValues(this CkTypeAttributeDto ckTypeAttributeDto)
+    {
+        if (ckTypeAttributeDto.AutoCompleteValues != null)
+        {
+            StringBuilder stringBuilder = new();
+            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
+
+
+            foreach (var attribute in ckTypeAttributeDto.AutoCompleteValues)
+            {
+                stringBuilder.Append("<li>");
+                stringBuilder.Append($"{attribute}");
+                stringBuilder.Append("</li>");
+            }
+
+            stringBuilder.Append("</ul>");
+            return stringBuilder.ToString();
+        }
+        return "";
+    }
+
+    private static string DrawAttributeAutoIncrementReference(this CkTypeAttributeDto ckTypeAttributeDto)
+    {
+        if (ckTypeAttributeDto.AutoIncrementReference != null)
+        {
+            StringBuilder stringBuilder = new();
+            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
+            foreach (var attribute in ckTypeAttributeDto.AutoIncrementReference)
+            {
+                stringBuilder.Append("<li>");
+                stringBuilder.Append($"{attribute}");
+                stringBuilder.Append("</li>");
+            }
+            stringBuilder.Append("</ul>");
+
+            return stringBuilder.ToString();
+        }
+
+        return "";
+    }
+}
+
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
     private readonly IModelResolver _modelResolver;
@@ -432,6 +506,26 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             if (MatchesModelId(record, ckModelId))
             {
                 record.DrawRecord(outputFile, context);
+            }
+        }
+    }
+
+    public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    {
+        //Use ModelId of Defined Attribute to place in appropriate File?
+        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Types"));
+
+        
+
+        foreach (var type in GetClasses(modelGraph))
+        {
+            await MarkdownTableBuilder(outputFile, ckModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
+            
+            foreach (var attribute in type.DefinedAttributes)
+            {
+               
+                attribute.DrawAttribute(outputFile, context);
+                
             }
         }
     }
@@ -607,6 +701,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
 
             GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
+
+            GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
         }
     }
 }

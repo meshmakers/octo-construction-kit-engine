@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
@@ -178,7 +179,7 @@ static class CkTypeGraphExtensions
     {
         await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
         await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName));
-        await outputFile.WriteLineAsync("\"");
+        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
     }
 
     private static string CreateRelativeFilepath(CkModelId ckModelId)
@@ -215,6 +216,28 @@ static class CkTypeGraphExtensions
         } 
 
         return path;
+    }
+
+    private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
+    {
+        string ret = ckTypeGraph.CkTypeId.FullName;
+        ret = ret.Replace("/", "-");
+        ret = ret.Replace(".", "");
+        ret = ret.ToLower();
+
+        //Remove Last Version Number
+        int LastHyphen = ret.LastIndexOf('-');
+
+        if (LastHyphen == -1)
+        {
+            throw new Exception();
+        }
+        else
+        {
+            string res = ret[..LastHyphen];
+            return res;
+        }
+        
     }
 }
 

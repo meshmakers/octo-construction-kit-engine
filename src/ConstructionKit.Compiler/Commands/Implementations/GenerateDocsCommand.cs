@@ -221,23 +221,37 @@ static class CkEnumGraphExtensions
 {
     public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, List<string> enumHeadings)
     {
-        await outputFile.WriteAsync($"| {ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName} |");
-        ckEnumGraph.DrawValuesOrDescriptions(outputFile, true);
-        ckEnumGraph.DrawValuesOrDescriptions(outputFile, false);
-        await outputFile.WriteLineAsync();
+        foreach (var heading in enumHeadings)
+        {
+            string content = heading switch
+            {
+                "ID" => $"{ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName}",
+                "Values" => ckEnumGraph.DrawValuesOrDescriptions(true),
+                "Descriptions" => ckEnumGraph.DrawValuesOrDescriptions(false),
+                _ => string.Empty
+            };
+
+
+            await outputFile.WriteAsync($"| {content} ");
+
+        }
+
+        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
     }
 
-    private static async void DrawValuesOrDescriptions(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, bool drawValues)
+    private static string DrawValuesOrDescriptions(this CkEnumGraph ckEnumGraph, bool drawValues)
     {
-        await outputFile.WriteAsync("<ol start=\"0\">");
+        StringBuilder stringBuilder = new();
+        stringBuilder.Append("<ol start=\"0\">");
         foreach (var value in ckEnumGraph.Values)
         {
-            await outputFile.WriteAsync("<li>");
-            await outputFile.WriteAsync(drawValues ? $"{value.Name}" : $"{value.Description}");
-            await outputFile.WriteAsync("</li>");
+            stringBuilder.Append("<li>");
+            stringBuilder.Append(drawValues ? $"{value.Name}" : $"{value.Description}");
+            stringBuilder.Append("</li>");
         }
-        await outputFile.WriteAsync("</ol>");
-        await outputFile.WriteAsync(" |");
+        stringBuilder.Append("</ol>");
+        
+        return stringBuilder.ToString();
     }
 
     private static string AddAnchor(this CkEnumGraph ckEnumGraph)

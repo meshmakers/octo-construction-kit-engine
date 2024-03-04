@@ -173,6 +173,12 @@ static class CkTypeGraphExtensions
 
         return OutboundMultiplicityConversion;
     }
+
+    public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, CkModelId ckModelId)
+    {
+        await outputFile.WriteLineAsync($"link {ckTypeGraph.CkTypeId.GetClassName()} \"/");
+        
+    }
 }
 
 static class CkAttributeGraphExtensions
@@ -609,7 +615,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         finally { }
     }
 
-    public static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
+    private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
     {
         string path = "System";
         path = Path.Combine(docusaurusPath, path);
@@ -636,7 +642,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return path;
     }
 
-    private static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
+    public static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
     {
         return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
     }

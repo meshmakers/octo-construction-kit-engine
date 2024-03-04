@@ -590,8 +590,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid];
 
+
+        //Step 1
         BuildDirectoryStructure(docusaurusPath);
 
+        //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
         GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);
 
         var Headings = new DocumentationContext();

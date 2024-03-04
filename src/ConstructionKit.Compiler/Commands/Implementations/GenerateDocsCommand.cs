@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
 using System.Text;
 using Meshmakers.Common.CommandLineParser;
@@ -516,18 +517,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var type in GetClasses(modelGraph))
         {
-            if (type.DefinedAttributes.Count != 0)
+            if (type.DefinedAttributes.Count == 0)
             {
-                
-            
-            await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
-            
-            foreach (var attribute in type.DefinedAttributes)
-            {
-               
-                attribute.DrawAttribute(outputFile, context);
-                
+                await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
             }
+            else
+            {
+                await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
+
+                foreach (var attribute in type.DefinedAttributes)
+                {
+
+                    attribute.DrawAttribute(outputFile, context);
+                }
             }
         }
     }

@@ -517,18 +517,21 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var type in GetClasses(modelGraph))
         {
-            if (type.DefinedAttributes.Count == 0)
+            if (MatchesModelId(type, ckModelId))
             {
-                await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
-            }
-            else
-            {
-                await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
-
-                foreach (var attribute in type.DefinedAttributes)
+                if (type.DefinedAttributes.Count == 0)
                 {
+                    await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                }
+                else
+                {
+                    await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
 
-                    attribute.DrawAttribute(outputFile, context);
+                    foreach (var attribute in type.DefinedAttributes)
+                    {
+
+                        attribute.DrawAttribute(outputFile, context);
+                    }
                 }
             }
         }
@@ -542,6 +545,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             CkAttributeGraph attribute => attribute.CkAttributeId.ModelId.FullName == modelId.FullName,
             CkEnumGraph enumGraph => enumGraph.CkEnumId.ModelId.FullName == modelId.FullName,
             CkRecordGraph recordGraph => recordGraph.CkRecordId.ModelId.FullName == modelId.FullName,
+            CkTypeGraph ckTypeGraph => ckTypeGraph.CkTypeId.ModelId.FullName == modelId.FullName,
             _ => false // Handle unsupported types or throw an exception if needed
         };
     }
@@ -706,9 +710,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
-            
+            GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+
+
         }
 
-        GenerateTypesMarkdownTable(test, docusaurusPath, ckModelIdSystem, Headings.AttributeDtoHeadings);
+        
     }
 }

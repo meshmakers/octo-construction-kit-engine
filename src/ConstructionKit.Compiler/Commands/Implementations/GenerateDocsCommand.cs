@@ -174,10 +174,47 @@ static class CkTypeGraphExtensions
         return OutboundMultiplicityConversion;
     }
 
-    public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, CkModelId ckModelId)
+    public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"link {ckTypeGraph.CkTypeId.GetClassName()} \"/");
-        
+        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
+        await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName));
+        await outputFile.WriteLineAsync("\"");
+    }
+
+    private static string CreateRelativeFilepath(CkModelId ckModelId)
+    {
+        string path = "\\docs\\System";
+
+        if (ckModelId.ModelId.Contains("Basic"))
+        {
+            path = Path.Combine(path, "Basic");
+
+            if (ckModelId.ModelId.Contains("IndustryBasic"))
+            {
+                path = Path.Combine(path, "Industry");
+                path = Path.Combine(path, "IndustryBasic-Types");
+            }
+            else
+            {
+                path = Path.Combine(path, "Basic-Types");
+            }     
+        }
+        else if (ckModelId.ModelId.Contains("IndustryEnergy"))
+        {
+            path = Path.Combine(path, "Basic", "Industry", "Energy");
+            path = Path.Combine(path, "IndustryEnergy-Types");
+        }
+        else if (ckModelId.ModelId.Contains("IndustryFluid"))
+        {
+            path = Path.Combine(path, "Basic", "Industry", "Fluid");
+            path = Path.Combine(path, "IndustryFluid-Types");
+        }
+        else
+        {
+            path = Path.Combine(path, "System-Types");
+        } 
+
+        return path;
     }
 }
 
@@ -444,6 +481,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             type.DrawInheritance(outputFile);
             type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
             type.StyleClass(outputFile);
+            type.LinkToType(outputFile);
         }
 
         //final line to end mermaid code block

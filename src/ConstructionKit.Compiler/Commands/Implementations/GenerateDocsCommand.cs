@@ -778,8 +778,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
             GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
-
-
         }
 
         

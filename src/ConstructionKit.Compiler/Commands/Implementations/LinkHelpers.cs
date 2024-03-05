@@ -71,38 +71,9 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         private static string CreateRelativeFilepath(CkModelId ckModelId)
         {
-            string path = "\\docs\\System";
+            string path = GetCommonPathParts(ckModelId);
 
-            if (ckModelId.ModelId.Contains("Basic"))
-            {
-                path = Path.Combine(path, "Basic");
-
-                if (ckModelId.ModelId.Contains("IndustryBasic"))
-                {
-                    path = Path.Combine(path, "Industry");
-                    path = Path.Combine(path, "IndustryBasic-Types");
-                }
-                else
-                {
-                    path = Path.Combine(path, "Basic-Types");
-                }
-            }
-            else if (ckModelId.ModelId.Contains("IndustryEnergy"))
-            {
-                path = Path.Combine(path, "Basic", "Industry", "Energy");
-                path = Path.Combine(path, "IndustryEnergy-Types");
-            }
-            else if (ckModelId.ModelId.Contains("IndustryFluid"))
-            {
-                path = Path.Combine(path, "Basic", "Industry", "Fluid");
-                path = Path.Combine(path, "IndustryFluid-Types");
-            }
-            else
-            {
-                path = Path.Combine(path, "System-Types");
-            }
-
-            return path;
+            return Path.Combine("\\docs", path);
         }
 
         

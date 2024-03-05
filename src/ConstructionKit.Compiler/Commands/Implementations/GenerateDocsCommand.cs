@@ -420,7 +420,7 @@ static class CkTypeAttributeDtoExtensions
 
     private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto)
     {
-        string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId));
+        string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId, "Attributes"));
         link = "[" + ckTypeAttributeDto.AttributeName + "]" + "(" + link + ")";    
         return link;
     }

@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
     //Strategy Pattern
     public class ModelIdPrefixHandler
     {
-        public virtual string GetPathSuffix(string modelIdPrefix)
+        public virtual string GetPathSuffix(string modelIdPrefix, string suffix)
         {
             throw new NotImplementedException($"Path suffix generation not implemented for prefix: {modelIdPrefix}");
         }
@@ -17,41 +17,41 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
     public class SystemModelIdPrefixHandler : ModelIdPrefixHandler
     {
-        public override string GetPathSuffix(string modelIdPrefix)
+        public override string GetPathSuffix(string modelIdPrefix, string suffix)
         {
             if (modelIdPrefix.Equals("System"))
             {
-                return $"{modelIdPrefix}-Types";
+                return $"{modelIdPrefix}-{suffix}";
             }
             else
             {
                 //Potential To Remove System from Final Prefix
-                return $"{modelIdPrefix[6..]}-Types";
+                return $"{modelIdPrefix[6..]}-{suffix}";
             }
         }
     }
 
     public class BasicModelIdPrefixHandler : ModelIdPrefixHandler
     {
-        public override string GetPathSuffix(string modelIdPrefix)
+        public override string GetPathSuffix(string modelIdPrefix, string suffix)
         {
             if (modelIdPrefix.Contains("IndustryBasic"))
             {
-                return "IndustryBasic-Types";
+                return $"IndustryBasic-{suffix}";
             }
             else
             {
-                return "Basic-Types";
+                return $"Basic-{suffix}";
             }
         }
     }
 
     public class IndustryModelIdPrefixHandler : ModelIdPrefixHandler
     {
-        public override string GetPathSuffix(string modelIdPrefix)
+        public override string GetPathSuffix(string modelIdPrefix, string suffix)
         {
             //modelIdPrefix[8..] to remove Industry Prefix if desired
-            return $"{modelIdPrefix}-Types";
+            return $"{modelIdPrefix}-{suffix}";
         }
     }
 }

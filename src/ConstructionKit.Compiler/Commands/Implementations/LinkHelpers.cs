@@ -16,7 +16,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
         {
             await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
-            await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName));
+            await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types"));
             await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
         }
 
@@ -66,7 +66,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return Path.Combine(docusaurusPath, path);
         }
 
-        public static string CreateRelativeFilepath(CkModelId ckModelId)
+        public static string CreateRelativeFilepath(CkModelId ckModelId, string suffix)
         {
             string path = GetCommonPathParts(ckModelId);
 
@@ -84,7 +84,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             {
                 throw new ArgumentException($"Unsupported model ID prefix: {modelIdPrefix}");
             }
-            return Path.Combine("/docs", path, value.GetPathSuffix(modelIdPrefix));
+            return Path.Combine("/docs", path, value.GetPathSuffix(modelIdPrefix, suffix));
         }
 
         

@@ -19,33 +19,6 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
         }
 
-        private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
-        {
-            string path = "System";
-            path = Path.Combine(docusaurusPath, path);
-
-            if (ckModelId.ModelId.Contains("Basic"))
-            {
-                path = Path.Combine(path, "Basic");
-
-                if (ckModelId.ModelId.Contains("IndustryBasic"))
-                {
-                    path = Path.Combine(path, "Industry");
-                }
-            }
-            else if (ckModelId.ModelId.Contains("IndustryEnergy"))
-            {
-                path = Path.Combine(path, "Basic", "Industry", "Energy");
-            }
-            else if (ckModelId.ModelId.Contains("IndustryFluid"))
-            {
-                path = Path.Combine(path, "Basic", "Industry", "Fluid");
-            }
-
-
-            return path;
-        }
-
         private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
         {
             string ret = ckTypeGraph.CkTypeId.FullName;
@@ -66,6 +39,34 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
                 return res;
             }
 
+        }
+
+        private static string GetCommonPathParts(CkModelId ckModelId)
+        {
+            string path = "System";
+            if (ckModelId.ModelId.Contains("Basic"))
+            {
+                path = Path.Combine(path, "Basic");
+                if (ckModelId.ModelId.Contains("IndustryBasic"))
+                {
+                    path = Path.Combine(path, "Industry");
+                }
+            }
+            else if (ckModelId.ModelId.Contains("IndustryEnergy"))
+            {
+                path = Path.Combine(path, "Basic", "Industry", "Energy");
+            }
+            else if (ckModelId.ModelId.Contains("IndustryFluid"))
+            {
+                path = Path.Combine(path, "Basic", "Industry", "Fluid");
+            }
+            return path;
+        }
+
+        private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
+        {
+            string path = GetCommonPathParts(ckModelId);
+            return Path.Combine(docusaurusPath, path);
         }
 
         private static string CreateRelativeFilepath(CkModelId ckModelId)
@@ -103,5 +104,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
             return path;
         }
+
+        
     }
 }

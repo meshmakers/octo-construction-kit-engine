@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 {
+    //Strategy Pattern
     public class ModelIdPrefixHandler
     {
         public virtual string GetPathSuffix(string modelIdPrefix)

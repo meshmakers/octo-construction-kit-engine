@@ -73,6 +73,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         {
             string path = GetCommonPathParts(ckModelId);
 
+            //Strategy Pattern
             Dictionary<string, ModelIdPrefixHandler> prefixHandlers = new()
             {
                 { "System", new SystemModelIdPrefixHandler() },

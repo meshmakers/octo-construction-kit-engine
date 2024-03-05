@@ -174,71 +174,6 @@ static class CkTypeGraphExtensions
 
         return OutboundMultiplicityConversion;
     }
-
-    public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
-        await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName));
-        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
-    }
-
-    private static string CreateRelativeFilepath(CkModelId ckModelId)
-    {
-        string path = "\\docs\\System";
-
-        if (ckModelId.ModelId.Contains("Basic"))
-        {
-            path = Path.Combine(path, "Basic");
-
-            if (ckModelId.ModelId.Contains("IndustryBasic"))
-            {
-                path = Path.Combine(path, "Industry");
-                path = Path.Combine(path, "IndustryBasic-Types");
-            }
-            else
-            {
-                path = Path.Combine(path, "Basic-Types");
-            }     
-        }
-        else if (ckModelId.ModelId.Contains("IndustryEnergy"))
-        {
-            path = Path.Combine(path, "Basic", "Industry", "Energy");
-            path = Path.Combine(path, "IndustryEnergy-Types");
-        }
-        else if (ckModelId.ModelId.Contains("IndustryFluid"))
-        {
-            path = Path.Combine(path, "Basic", "Industry", "Fluid");
-            path = Path.Combine(path, "IndustryFluid-Types");
-        }
-        else
-        {
-            path = Path.Combine(path, "System-Types");
-        } 
-
-        return path;
-    }
-
-    private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
-    {
-        string ret = ckTypeGraph.CkTypeId.FullName;
-        ret = ret.Replace("/", "-");
-        ret = ret.Replace(".", "");
-        ret = ret.ToLower();
-
-        //Remove Last Version Number
-        int LastHyphen = ret.LastIndexOf('-');
-
-        if (LastHyphen == -1)
-        {
-            throw new Exception();
-        }
-        else
-        {
-            string res = ret[..LastHyphen];
-            return res;
-        }
-        
-    }
 }
 
 static class CkAttributeGraphExtensions
@@ -493,7 +428,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
-        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Diagram"));
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Diagram"));
 
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
@@ -504,7 +439,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             type.DrawInheritance(outputFile);
             type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
             type.StyleClass(outputFile);
-            type.LinkToType(outputFile);
+type.LinkToType(outputFile);
         }
 
         //final line to end mermaid code block
@@ -533,7 +468,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public static async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context);
 
@@ -550,7 +485,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Enums"));
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Enums", context);
 
@@ -565,7 +500,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Records"));
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Records", context);
 
@@ -580,7 +515,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        using StreamWriter outputFile = new(GetGeneratedFilePath(docPath, ckModelId, "Types"));
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
 
         foreach (var type in GetClasses(modelGraph))
         {
@@ -676,37 +611,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         finally { }
     }
 
-    private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
-    {
-        string path = "System";
-        path = Path.Combine(docusaurusPath, path);
-
-        if (ckModelId.ModelId.Contains("Basic"))
-        {
-            path = Path.Combine(path, "Basic");
-
-            if (ckModelId.ModelId.Contains("IndustryBasic"))
-            {
-                path = Path.Combine(path, "Industry");
-            }
-        }
-        else if (ckModelId.ModelId.Contains("IndustryEnergy"))
-        {
-            path = Path.Combine(path, "Basic", "Industry", "Energy");
-        }
-        else if (ckModelId.ModelId.Contains("IndustryFluid"))
-        {
-            path = Path.Combine(path, "Basic", "Industry", "Fluid");
-        }
-
-
-        return path;
-    }
-
-    public static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
-    {
-        return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
-    }
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)

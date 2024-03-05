@@ -421,7 +421,8 @@ static class CkTypeAttributeDtoExtensions
     private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto)
     {
         string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId, "Attributes"));
-        link = "[" + ckTypeAttributeDto.AttributeName + "]" + "(" + link + "#" + ckTypeAttributeDto.AttributeName + ")";    
+        //For different name use ckTypeAttributeDto.AttributeName
+        link = "[" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + "]" + "(" + link + "#" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + ")";    
         return link;
     }
 }

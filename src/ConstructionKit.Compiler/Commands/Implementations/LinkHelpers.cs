@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using System.IO;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 {
@@ -43,24 +44,20 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         private static string GetCommonPathParts(CkModelId ckModelId)
         {
-            string path = "System";
-            if (ckModelId.ModelId.Contains("Basic"))
+            Dictionary<string, IPathBuilder> pathBuilders = new()
             {
-                path = Path.Combine(path, "Basic");
-                if (ckModelId.ModelId.Contains("IndustryBasic"))
-                {
-                    path = Path.Combine(path, "Industry");
-                }
-            }
-            else if (ckModelId.ModelId.Contains("IndustryEnergy"))
+                {"System", new SystemPathBuilder() },
+                { "Basic", new BasicPathBuilder() },
+                { "IndustryBasic", new IndustryPathBuilder(new BasicPathBuilder()) },
+                { "IndustryEnergy", new IndustryPathBuilder(new BasicPathBuilder()) },
+                { "IndustryFluid", new IndustryPathBuilder(new BasicPathBuilder()) }
+            };
+            string modelIdPrefix = ckModelId.FullName[..ckModelId.FullName.IndexOf('-')];
+            if (!pathBuilders.TryGetValue(modelIdPrefix, out IPathBuilder? value))
             {
-                path = Path.Combine(path, "Basic", "Industry", "Energy");
+                throw new ArgumentException($"Unsupported model ID prefix: {modelIdPrefix}");
             }
-            else if (ckModelId.ModelId.Contains("IndustryFluid"))
-            {
-                path = Path.Combine(path, "Basic", "Industry", "Fluid");
-            }
-            return path;
+            return value.BuildPath(modelIdPrefix);
         }
 
         private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)

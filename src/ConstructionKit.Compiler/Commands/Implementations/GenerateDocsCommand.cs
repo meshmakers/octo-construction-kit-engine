@@ -363,7 +363,7 @@ static class CkTypeAttributeDtoExtensions
         {
             string content = heading switch
             {
-                "ID" => $"{ckTypeAttributeDto.AttributeName}",
+                "ID" => ckTypeAttributeDto.DrawLinkToDefinition(),
                 "Auto Complete Values" => ckTypeAttributeDto.DrawAttributeAutoCompleteValues(),
                 "Auto Increment Reference" => ckTypeAttributeDto.DrawAttributeAutoIncrementReference(),
                 "Is Optional" => ckTypeAttributeDto.IsOptional.ToString(),
@@ -416,6 +416,13 @@ static class CkTypeAttributeDtoExtensions
         }
 
         return "";
+    }
+
+    private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto)
+    {
+        string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId));
+        link = "[" + ckTypeAttributeDto.AttributeName + "]" + "(" + link + ")";    
+        return link;
     }
 }
 

@@ -20,7 +20,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
         }
 
-        private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
+        public static string CreateAnchor(this CkTypeGraph ckTypeGraph)
         {
             string ret = ckTypeGraph.CkTypeId.FullName;
             ret = ret.Replace("/", "-");
@@ -66,7 +66,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return Path.Combine(docusaurusPath, path);
         }
 
-        private static string CreateRelativeFilepath(CkModelId ckModelId)
+        public static string CreateRelativeFilepath(CkModelId ckModelId)
         {
             string path = GetCommonPathParts(ckModelId);
 

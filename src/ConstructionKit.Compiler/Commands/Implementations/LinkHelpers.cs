@@ -84,7 +84,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             {
                 throw new ArgumentException($"Unsupported model ID prefix: {modelIdPrefix}");
             }
-            return Path.Combine("\\docs", path, value.GetPathSuffix(modelIdPrefix));
+            return Path.Combine("/docs", path, value.GetPathSuffix(modelIdPrefix));
         }
 
         

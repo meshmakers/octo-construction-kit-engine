@@ -446,7 +446,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             type.DrawInheritance(outputFile);
             type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
             type.StyleClass(outputFile);
-type.LinkToType(outputFile);
+            type.LinkToType(outputFile);
         }
 
         //final line to end mermaid code block

@@ -571,6 +571,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
+
+        foreach(var associationRole in GetAssociationRoles(modelGraph))
+        {
+
+        }
     }
 
     //C# Pattern Matching insanity
@@ -616,6 +621,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Records.Select(x => x.Value);
     }
 
+    private static IEnumerable<CkAssociationRoleGraph> GetAssociationRoles(CkModelGraph modelGraph)
+    {
+        return modelGraph.AssociationRoles.Select(x => x.Value);
+    }
     private static void BuildDirectoryStructure(string docusaurusPath)
     {
         string path = Path.Combine(docusaurusPath, "System");

@@ -177,7 +177,11 @@ static class CkTypeGraphExtensions
 
     public static async void DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
+            await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId} {{");
 
+            await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
+
+            await outputFile.WriteLineAsync($"}}"); 
     }
 }
 
@@ -453,6 +457,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
             type.StyleClass(outputFile);
             type.LinkToType(outputFile);
+            type.DrawNamespaces(outputFile);
         }
 
         //final line to end mermaid code block

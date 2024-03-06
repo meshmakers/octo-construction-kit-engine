@@ -445,6 +445,31 @@ static class CkTypeAttributeDtoExtensions
     }
 }
 
+static class CkAssociationRoleGraphExtensions
+{
+    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> attributeHeadings)
+    {
+        foreach (var heading in attributeHeadings)
+        {
+            string content = heading switch
+            {
+                "ID" => $"{ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName}",
+                "Inbound Multiplicity" => $"{ckAssociationRoleGraph.InboundMultiplicity}",
+                "Inbound Name" => $"{ckAssociationRoleGraph.InboundName}",
+                "Outbound Multiplicity" => $"{ckAssociationRoleGraph.OutboundMultiplicity}",
+                "Outbound Name" => $"{ckAssociationRoleGraph.OutboundName}",
+                _ => string.Empty
+            };
+
+
+            await outputFile.WriteAsync($"| {content} ");
+
+        }
+
+        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+    }
+}
+
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
     private readonly IModelResolver _modelResolver;
@@ -574,7 +599,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach(var associationRole in GetAssociationRoles(modelGraph))
         {
-
+            associationRole.DrawAssociationRole(outputFile, context);
         }
     }
 
@@ -725,6 +750,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
             GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+
+            GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
         }
 
         

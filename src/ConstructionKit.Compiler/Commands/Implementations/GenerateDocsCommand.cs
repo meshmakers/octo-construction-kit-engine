@@ -56,6 +56,15 @@ public class DocumentationContext
         "Is Optional"
         //ModelID ?
     ];
+
+    public List<string> AssociationRolesHeadings { get; set; } =
+    [
+        "ID",
+        "Inbound Multiplicity",
+        "Inbound Name",
+        "Outbound Multiplicity",
+        "Outbound Name",
+    ];
 }
 static class CkTypeGraphExtensions
 {
@@ -555,6 +564,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 }
             }
         }
+    }
+
+    public static async void GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    {
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
+
+        await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
     }
 
     //C# Pattern Matching insanity

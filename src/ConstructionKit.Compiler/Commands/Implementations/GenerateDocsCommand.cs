@@ -174,6 +174,11 @@ static class CkTypeGraphExtensions
 
         return OutboundMultiplicityConversion;
     }
+
+    public static async void DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    {
+
+    }
 }
 
 static class CkAttributeGraphExtensions

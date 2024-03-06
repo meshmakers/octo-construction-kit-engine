@@ -599,7 +599,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach(var associationRole in GetAssociationRoles(modelGraph))
         {
-            associationRole.DrawAssociationRole(outputFile, context);
+            if(MatchesModelId(associationRole, ckModelId))
+            {
+                associationRole.DrawAssociationRole(outputFile, context);
+            }
+            
         }
     }
 
@@ -612,6 +616,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             CkEnumGraph enumGraph => enumGraph.CkEnumId.ModelId.FullName == modelId.FullName,
             CkRecordGraph recordGraph => recordGraph.CkRecordId.ModelId.FullName == modelId.FullName,
             CkTypeGraph ckTypeGraph => ckTypeGraph.CkTypeId.ModelId.FullName == modelId.FullName,
+            CkAssociationRoleGraph ckAssociationRoleGraph => ckAssociationRoleGraph.CkRoleId.ModelId.FullName == modelId.FullName,
             _ => false // Handle unsupported types or throw an exception if needed
         };
     }

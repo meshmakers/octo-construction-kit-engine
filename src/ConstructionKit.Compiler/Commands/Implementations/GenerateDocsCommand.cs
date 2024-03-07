@@ -670,11 +670,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             
             di = Directory.CreateDirectory(Path.Combine(path, "Basic"));
 
-            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry"));
+            di = Directory.CreateDirectory(Path.Combine(path, "Industry"));
 
-            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry", "Energy"));
+            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Basic"));
 
-            di = Directory.CreateDirectory(Path.Combine(path, "Basic", "Industry", "Fluid"));
+            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Energy"));
+
+            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Fluid"));
 
         }
         catch(Exception ex)

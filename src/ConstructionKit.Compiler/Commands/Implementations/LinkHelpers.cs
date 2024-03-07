@@ -48,9 +48,9 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             {
                 {"System", new SystemPathBuilder() },
                 { "Basic", new BasicPathBuilder() },
-                { "IndustryBasic", new IndustryPathBuilder(new BasicPathBuilder()) },
-                { "IndustryEnergy", new IndustryPathBuilder(new BasicPathBuilder()) },
-                { "IndustryFluid", new IndustryPathBuilder(new BasicPathBuilder()) }
+                { "IndustryBasic", new IndustryPathBuilder(new SystemPathBuilder()) },
+                { "IndustryEnergy", new IndustryPathBuilder(new SystemPathBuilder()) },
+                { "IndustryFluid", new IndustryPathBuilder(new SystemPathBuilder()) }
             };
             string modelIdPrefix = ckModelId.FullName[..ckModelId.FullName.IndexOf('-')];
             if (!pathBuilders.TryGetValue(modelIdPrefix, out IPathBuilder? value))

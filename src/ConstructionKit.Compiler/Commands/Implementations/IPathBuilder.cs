@@ -46,6 +46,10 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             {
                 basePath = Path.Combine(basePath, "Fluid");
             }
+            else if (ckModelId.ModelId.Contains("IndustryBasic"))
+            {
+                basePath = Path.Combine(basePath, "Basic");
+            }
             return basePath;
 
         }

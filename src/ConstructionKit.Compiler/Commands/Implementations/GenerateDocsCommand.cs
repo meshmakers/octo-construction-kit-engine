@@ -660,6 +660,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                        
                     }
 
+                    //For Drawing all Associations that are associated with type
                     if (type.Associations.DefinedAssociations.Count != 0)
                     {
                         bool tableBuilt = false;

@@ -35,18 +35,18 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         public string BuildPath(CkModelId ckModelId)
         {
-            string basicPath = _baseBuilder.BuildPath(ckModelId);
-            basicPath = Path.Combine(basicPath, "Industry");
+            string basePath = _baseBuilder.BuildPath(ckModelId);
+            basePath = Path.Combine(basePath, "Industry");
 
             if (ckModelId.ModelId.Contains("IndustryEnergy"))
             {
-                basicPath = Path.Combine(basicPath, "Energy");
+                basePath = Path.Combine(basePath, "Energy");
             }
             else if (ckModelId.ModelId.Contains("IndustryFluid"))
             {
-                basicPath = Path.Combine(basicPath, "Fluid");
+                basePath = Path.Combine(basePath, "Fluid");
             }
-            return basicPath;
+            return basePath;
 
         }
     }

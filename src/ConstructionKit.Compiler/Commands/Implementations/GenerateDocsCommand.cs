@@ -663,7 +663,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                 {
                                     if (!tableBuilt)
                                     {   
-                                        await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", DocContextAttrib.AssociationRolesHeadings);
+                                        await MarkdownTableBuilder(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", DocContextAttrib.AssociationRolesHeadings);
                                         tableBuilt = true;
                                     }
                                
@@ -721,9 +721,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             _ => false // Handle unsupported types or throw an exception if needed
         };
     }
-    private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, List<string> headings)
+    private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle, List<string> headings)
     {
-        await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");
+        string titlePrefix = ckModelId != null ? $"{ckModelId.ModelId} " : "";
+        await outputFile.WriteLineAsync($"### {titlePrefix}{tableTitle}");
+
         await outputFile.WriteLineAsync();
         foreach (var i in headings)
         {

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Globalization;
+using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
@@ -64,6 +65,7 @@ public class DocumentationContext
         "Inbound Name",
         "Outbound Multiplicity",
         "Outbound Name",
+        "TargetCkType ID"
     ];
 }
 static class CkTypeGraphExtensions
@@ -454,7 +456,7 @@ static class CkTypeAttributeDtoExtensions
 
 static class CkAssociationRoleGraphExtensions
 {
-    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> attributeHeadings)
+    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> attributeHeadings, CkTypeAssociationGraph? association)
     {
         foreach (var heading in attributeHeadings)
         {
@@ -465,6 +467,7 @@ static class CkAssociationRoleGraphExtensions
                 "Inbound Name" => $"{ckAssociationRoleGraph.InboundName}",
                 "Outbound Multiplicity" => $"{ckAssociationRoleGraph.OutboundMultiplicity}",
                 "Outbound Name" => $"{ckAssociationRoleGraph.OutboundName}",
+                "TargetCkType ID" => $"{association?.TargetCkTypeId.SemanticVersionedFullName}",
                 _ => string.Empty
             };
 
@@ -668,20 +671,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                         foreach (var association in type.Associations.Out.Owned)
                         {
                             
-                            //check if Id's for associations match to create adequate multiplicities
-                            foreach (var item in modelGraph.AssociationRoles.Select(x => x.Value))
+                            foreach (var item in GetAssociationRoles(modelGraph))
                             {
-                                
+
                                 var DocContextAttrib = new DocumentationContext();
                                 if (association.CkRoleId == item.CkRoleId)
                                 {
                                     if (!tableBuilt)
-                                    {   
+                                    {
                                         await MarkdownTableBuilder(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", DocContextAttrib.AssociationRolesHeadings);
                                         tableBuilt = true;
                                     }
-                               
-                                    item.DrawAssociationRole(outputFile, DocContextAttrib.AssociationRolesHeadings);
+
+                                    item.DrawAssociationRole(outputFile, DocContextAttrib.AssociationRolesHeadings, association);
                                 }
                             }
 
@@ -712,7 +714,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             foreach (var associationRole in associationRoles)
             {
-                associationRole.DrawAssociationRole(outputFile, context);
+                associationRole.DrawAssociationRole(outputFile, context, null);
             }
         }
         else

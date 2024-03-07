@@ -447,7 +447,7 @@ static class CkTypeAttributeDtoExtensions
     {
         string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId, "Attributes"));
         //For different name use ckTypeAttributeDto.AttributeName
-        link = "[" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + "]" + "(" + link + "#" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + ")";    
+        link = "[" + ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + ")";    
         return link;
     }
 }
@@ -632,7 +632,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 {
                     if (type.DefinedAttributes.Count == 0)
                     {
-                        await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        await outputFile.WriteLineAsync($"### {type.CkTypeId.SemanticVersionedFullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
                     }
                     else
                     {

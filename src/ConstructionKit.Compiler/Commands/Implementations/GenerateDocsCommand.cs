@@ -202,7 +202,7 @@ static class CkAttributeGraphExtensions
         {
             string content = heading switch
             {
-                "ID" => $"{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddLink()}", 
+                "ID" => $"{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()}", 
                 "DataType" => ckAttributeGraph.ValueType.ToString(),
                 "ModelID" => ckAttributeGraph.CkAttributeId.ModelId.ToString(),
                 "Default Values" => ckAttributeGraph.DrawDefaultValues(),
@@ -226,9 +226,9 @@ static class CkAttributeGraphExtensions
         return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
     }
 
-    private static string AddLink(this CkAttributeGraph ckAttributeGraph)
+    private static string AddName(this CkAttributeGraph ckAttributeGraph)
     {
-        return $"[{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}](/diagram)";
+        return $"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}";
     }
 
     private static string DrawDefaultValues(this CkAttributeGraph ckAttributeGraph)

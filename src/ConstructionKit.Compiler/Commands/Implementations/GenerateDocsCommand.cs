@@ -534,101 +534,148 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public static async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        BuildDirectory(docPath, ckModelId);
-
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
-
-        await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context);
-
-        //Checks for If the Attributes Model ID is the Same as the one that was given
-        foreach (var attribute in GetAttributes(modelGraph))
+        IEnumerable<CkAttributeGraph> attributes = GetAttributes(modelGraph)
+             .Where(attribute => MatchesModelId(attribute, ckModelId));
+        if (attributes.Any())
         {
-            if (MatchesModelId(attribute, ckModelId))
+            BuildDirectory(docPath, ckModelId);
+
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
+
+            await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context);
+
+            //Checks for If the Attributes Model ID is the Same as the one that was given
+            foreach (var attribute in GetAttributes(modelGraph))
             {
-                attribute.DrawAttribute(outputFile, context);
+                if (MatchesModelId(attribute, ckModelId))
+                {
+                    attribute.DrawAttribute(outputFile, context);
+                }
             }
+        }
+        else
+        {
+            Console.WriteLine($"No Attributes to draw for model ID: {ckModelId}");
         }
 
     }
 
     public static async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        BuildDirectory(docPath, ckModelId);
-
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
-
-        await MarkdownTableBuilder(outputFile, ckModelId, "Enums", context);
-
-        foreach (var Enum in GetEnums(modelGraph))
+        IEnumerable<CkEnumGraph> enums = GetEnums(modelGraph)
+            .Where(en => MatchesModelId(en, ckModelId));
+        if(enums.Any())
         {
-            if (MatchesModelId(Enum, ckModelId))
+            BuildDirectory(docPath, ckModelId);
+
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
+
+            await MarkdownTableBuilder(outputFile, ckModelId, "Enums", context);
+
+            foreach (var Enum in GetEnums(modelGraph))
             {
-                Enum.DrawEnum(outputFile, context);
-            } 
+                if (MatchesModelId(Enum, ckModelId))
+                {
+                    Enum.DrawEnum(outputFile, context);
+                }
+            }
         }
+        else
+        {
+            Console.WriteLine($"No Enums to draw for model ID: {ckModelId}");
+        }
+
     }
 
     public static async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        BuildDirectory(docPath, ckModelId);
+        IEnumerable<CkRecordGraph> records = GetRecords(modelGraph)
+            .Where(record => MatchesModelId(record, ckModelId));
 
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
-
-        await MarkdownTableBuilder(outputFile, ckModelId, "Records", context);
-
-        foreach (var record in GetRecords(modelGraph))
+        if (records.Any())
         {
-            if (MatchesModelId(record, ckModelId))
+            BuildDirectory(docPath, ckModelId);
+
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
+
+            await MarkdownTableBuilder(outputFile, ckModelId, "Records", context);
+
+            foreach (var record in GetRecords(modelGraph))
             {
-                record.DrawRecord(outputFile, context);
+                if (MatchesModelId(record, ckModelId))
+                {
+                    record.DrawRecord(outputFile, context);
+                }
             }
         }
+        else
+        {
+            Console.WriteLine($"No Records to draw for model ID: {ckModelId}");
+        }
+
     }
 
     public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        BuildDirectory(docPath, ckModelId);
+        IEnumerable<CkTypeGraph> typeGraphs = GetClasses(modelGraph)
+            .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
-
-        foreach (var type in GetClasses(modelGraph))
+        if (typeGraphs.Any())
         {
-            if (MatchesModelId(type, ckModelId))
+            BuildDirectory(docPath, ckModelId);
+
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
+
+            foreach (var type in GetClasses(modelGraph))
             {
-                if (type.DefinedAttributes.Count == 0)
+                if (MatchesModelId(type, ckModelId))
                 {
-                    await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
-                }
-                else
-                {
-                    await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
-
-                    foreach (var attribute in type.DefinedAttributes)
+                    if (type.DefinedAttributes.Count == 0)
                     {
+                        await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.FullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                    }
+                    else
+                    {
+                        await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
 
-                        attribute.DrawAttribute(outputFile, context);
+                        foreach (var attribute in type.DefinedAttributes)
+                        {
+
+                            attribute.DrawAttribute(outputFile, context);
+                        }
                     }
                 }
             }
         }
+        else
+        {
+            Console.WriteLine($"No Types to draw for model ID: {ckModelId}");
+        }
+
     }
 
     public static async void GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        BuildDirectory(docPath, ckModelId);
+        // Check if there are any association roles to draw before proceeding
+        IEnumerable<CkAssociationRoleGraph> associationRoles = GetAssociationRoles(modelGraph)
+            .Where(associationRole => MatchesModelId(associationRole, ckModelId));
 
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
-
-        await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
-
-        foreach(var associationRole in GetAssociationRoles(modelGraph))
+        if (associationRoles.Any())
         {
-            if(MatchesModelId(associationRole, ckModelId))
+            BuildDirectory(docPath, ckModelId);
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
+            await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
+
+            foreach (var associationRole in associationRoles)
             {
                 associationRole.DrawAssociationRole(outputFile, context);
             }
-            
         }
+        else
+        {
+            Console.WriteLine($"No association roles to draw for model ID: {ckModelId}");
+        }
+
     }
 
     //C# Pattern Matching insanity
@@ -740,9 +787,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var test = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
         // Test beinhaltet nun alle aufgelösten Typen (auch von abhängigen libraries)
 
-
-        //Old Static Filepath
-        //string docPath = "C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\src\\pages";
+        //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         

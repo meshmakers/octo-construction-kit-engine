@@ -632,7 +632,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 {
                     if (type.DefinedAttributes.Count == 0)
                     {
-                        await outputFile.WriteLineAsync($"### {type.CkTypeId.SemanticVersionedFullName} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.ModelId} {type.CkTypeId.Key.SemanticVersionedFullName}");
                     }
                     else
                     {
@@ -723,7 +723,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId ckModelId, string tableTitle, List<string> headings)
     {
-        await outputFile.WriteLineAsync($"### {ckModelId.FullName} {tableTitle}");
+        await outputFile.WriteLineAsync($"### {ckModelId.ModelId} {tableTitle}");
         await outputFile.WriteLineAsync();
         foreach (var i in headings)
         {

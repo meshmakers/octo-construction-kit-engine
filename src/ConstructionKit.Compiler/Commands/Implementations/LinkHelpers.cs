@@ -23,23 +23,13 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         public static string CreateAnchor(this CkTypeGraph ckTypeGraph)
         {
-            string ret = ckTypeGraph.CkTypeId.FullName;
+            string ret = ckTypeGraph.CkTypeId.ModelId.ModelId;
             ret = ret.Replace("/", "-");
             ret = ret.Replace(".", "");
             ret = ret.ToLower();
+            ret = ret + "-" + ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
 
-            //Remove Last Version Number
-            int LastHyphen = ret.LastIndexOf('-');
-
-            if (LastHyphen == -1)
-            {
-                throw new Exception();
-            }
-            else
-            {
-                string res = ret[..LastHyphen];
-                return res;
-            }
+            return ret;
 
         }
 

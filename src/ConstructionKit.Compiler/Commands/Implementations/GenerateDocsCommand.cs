@@ -460,7 +460,7 @@ static class CkAssociationRoleGraphExtensions
         {
             string content = heading switch
             {
-                "ID" => $"{ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName}",
+                "ID" => ckAssociationRoleGraph.AddAnchor()+ckAssociationRoleGraph.DrawLinkToDefinition(),
                 "Inbound Multiplicity" => $"{ckAssociationRoleGraph.InboundMultiplicity}",
                 "Inbound Name" => $"{ckAssociationRoleGraph.InboundName}",
                 "Outbound Multiplicity" => $"{ckAssociationRoleGraph.OutboundMultiplicity}",
@@ -474,6 +474,19 @@ static class CkAssociationRoleGraphExtensions
         }
 
         await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+    }
+
+    private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph)
+    {
+        string link = new(LinkHelpers.CreateRelativeFilepath(ckAssociationRoleGraph.CkRoleId.ModelId.ModelId, "AssociationRoles"));
+        
+        link = "[" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + ")";
+        return link;
+    }
+
+    private static string AddAnchor(this CkAssociationRoleGraph ckAssociationRoleGraph)
+    {
+        return $"<a id=\"{ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName}\"></a>";
     }
 }
 

@@ -235,7 +235,7 @@ static class CkAttributeGraphExtensions
 
     private static string AddName(this CkAttributeGraph ckAttributeGraph)
     {
-        return $"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}";
+        return $"{ckAttributeGraph.CkAttributeId.SemanticVersionedFullName}";
     }
 
     private static string DrawDefaultValues(this CkAttributeGraph ckAttributeGraph)
@@ -642,6 +642,27 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                         {
 
                             attribute.DrawAttribute(outputFile, context);
+                        }
+
+                       
+                    }
+
+                    if (type.Associations.DefinedAssociations.Count != 0)
+                    {
+                        foreach (var association in type.Associations.Out.Owned)
+                        {
+                            //check if Id's for associations match to create adequate multiplicities
+                            foreach (var item in modelGraph.AssociationRoles.Select(x => x.Value))
+                            {
+                                if (association.CkRoleId == item.CkRoleId)
+                                {
+                                    var DocContextAttrib = new DocumentationContext();
+                                    await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", DocContextAttrib.AssociationRolesHeadings);
+                                    item.DrawAssociationRole(outputFile, DocContextAttrib.AssociationRolesHeadings);
+                                }
+                            }
+
+
                         }
                     }
                 }

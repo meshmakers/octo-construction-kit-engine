@@ -772,8 +772,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
 
             GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
-
-            
         }
 
         

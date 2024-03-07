@@ -10,7 +10,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         public static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
         {
-            return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
+            //return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
+            return Path.Combine(BuildFilepath(docPath, modelId), $"{extension}.md");
         }
 
         public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)

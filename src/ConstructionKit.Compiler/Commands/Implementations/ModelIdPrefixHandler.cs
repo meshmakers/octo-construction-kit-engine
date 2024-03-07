@@ -21,7 +21,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         {
             if (modelIdPrefix.Equals("System"))
             {
-                return $"{modelIdPrefix}-{suffix}";
+                return $"{suffix}";
             }
             else
             {
@@ -37,11 +37,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         {
             if (modelIdPrefix.Contains("IndustryBasic"))
             {
-                return $"IndustryBasic-{suffix}";
+                return $"{suffix}";
             }
             else
             {
-                return $"Basic-{suffix}";
+                return $"{suffix}";
             }
         }
     }
@@ -51,7 +51,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         public override string GetPathSuffix(string modelIdPrefix, string suffix)
         {
             //modelIdPrefix[8..] to remove Industry Prefix if desired
-            return $"{modelIdPrefix}-{suffix}";
+            return $"{suffix}";
         }
     }
 }

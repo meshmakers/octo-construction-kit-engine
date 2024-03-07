@@ -66,21 +66,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
         {
             string path = GetCommonPathParts(ckModelId);
 
-            //Strategy Pattern
-            Dictionary<string, ModelIdPrefixHandler> prefixHandlers = new()
-            {
-                { "System", new SystemModelIdPrefixHandler() },
-                { "Basic", new BasicModelIdPrefixHandler() },
-                { "Industry.Basic", new BasicModelIdPrefixHandler() },
-                { "Industry.Energy", new IndustryModelIdPrefixHandler() },
-                { "Industry.Fluid", new IndustryModelIdPrefixHandler() }
-            };
-            string modelIdPrefix = ckModelId.FullName[..ckModelId.FullName.IndexOf('-')];
-            if (!prefixHandlers.TryGetValue(modelIdPrefix, out ModelIdPrefixHandler? value))
-            {
-                throw new ArgumentException($"Unsupported model ID prefix: {modelIdPrefix}");
-            }
-            var linkWithBackslash = Path.Combine("/docs", path, value.GetPathSuffix(modelIdPrefix, suffix));
+            var linkWithBackslash = Path.Combine("/docs", path, suffix);
+
             return linkWithBackslash.Replace("\\", "/");
         }
 

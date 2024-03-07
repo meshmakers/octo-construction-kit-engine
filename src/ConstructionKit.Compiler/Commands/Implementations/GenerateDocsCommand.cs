@@ -689,7 +689,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             if (Directory.Exists(path))
             {
-                Console.WriteLine("Path Exists");
                 return;
             }
 

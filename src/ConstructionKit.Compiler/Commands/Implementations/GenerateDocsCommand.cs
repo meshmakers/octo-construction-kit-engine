@@ -486,6 +486,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
 
 
@@ -532,6 +534,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     public static async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context);
@@ -549,6 +553,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Enums", context);
@@ -564,6 +570,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "Records", context);
@@ -579,6 +587,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
 
         foreach (var type in GetClasses(modelGraph))
@@ -605,6 +615,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
+        BuildDirectory(docPath, ckModelId);
+
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
 
         await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
@@ -667,47 +679,28 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.AssociationRoles.Select(x => x.Value);
     }
-    private static void BuildDirectoryStructure(string docusaurusPath)
+
+    private static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
-        string path = Path.Combine(docusaurusPath, "System");
-       try
-       {
+        string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
+        path = Path.Combine(docusaurusPath, path);
+
+        try
+        {
             if (Directory.Exists(path))
             {
                 Console.WriteLine("Path Exists");
                 return;
             }
 
-            DirectoryInfo di = Directory.CreateDirectory(path);
-            
-            di = Directory.CreateDirectory(Path.Combine(path, "Basic"));
-
-            di = Directory.CreateDirectory(Path.Combine(path, "Industry"));
-
-            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Basic"));
-
-            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Energy"));
-
-            di = Directory.CreateDirectory(Path.Combine(path, "Industry", "Fluid"));
-
+            Directory.CreateDirectory(path);
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             Console.WriteLine(ex.ToString());
         }
         finally { }
-    }
 
-    private static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
-    {
-        string[] modelIdparts = ckModelId.ModelId.Split(".");
-
-        for (int i = 0; i < modelIdparts.Length; i++)
-        {
-            docusaurusPath = Path.Combine(docusaurusPath, modelIdparts[i]);
-        }
-
-        Directory.CreateDirectory(docusaurusPath);
     }
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
@@ -762,13 +755,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid];
 
-
-        //Step 1
-        //BuildDirectoryStructure(docusaurusPath);
-        foreach (var modelID in ckModelIds)
-        {
-            BuildDirectory(docusaurusPath, modelID);
-        }
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
         GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);

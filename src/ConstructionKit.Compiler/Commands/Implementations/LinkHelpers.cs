@@ -45,20 +45,15 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         private static string GetCommonPathParts(CkModelId ckModelId)
         {
-            Dictionary<string, IPathBuilder> pathBuilders = new()
+            string[] modelIdparts = ckModelId.ModelId.Split(".");
+            string path = "";
+
+            for (int i = 0; i < modelIdparts.Length; i++)
             {
-                {"System", new SystemPathBuilder() },
-                { "Basic", new BasicPathBuilder() },
-                { "IndustryBasic", new IndustryPathBuilder(new SystemPathBuilder()) },
-                { "IndustryEnergy", new IndustryPathBuilder(new SystemPathBuilder()) },
-                { "IndustryFluid", new IndustryPathBuilder(new SystemPathBuilder()) }
-            };
-            string modelIdPrefix = ckModelId.FullName[..ckModelId.FullName.IndexOf('-')];
-            if (!pathBuilders.TryGetValue(modelIdPrefix, out IPathBuilder? value))
-            {
-                throw new ArgumentException($"Unsupported model ID prefix: {modelIdPrefix}");
+                path = Path.Combine(path, modelIdparts[i]);
             }
-            return value.BuildPath(modelIdPrefix);
+
+            return path;
         }
 
         private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
@@ -76,9 +71,9 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             {
                 { "System", new SystemModelIdPrefixHandler() },
                 { "Basic", new BasicModelIdPrefixHandler() },
-                { "IndustryBasic", new BasicModelIdPrefixHandler() },
-                { "IndustryEnergy", new IndustryModelIdPrefixHandler() },
-                { "IndustryFluid", new IndustryModelIdPrefixHandler() }
+                { "Industry.Basic", new BasicModelIdPrefixHandler() },
+                { "Industry.Energy", new IndustryModelIdPrefixHandler() },
+                { "Industry.Fluid", new IndustryModelIdPrefixHandler() }
             };
             string modelIdPrefix = ckModelId.FullName[..ckModelId.FullName.IndexOf('-')];
             if (!prefixHandlers.TryGetValue(modelIdPrefix, out ModelIdPrefixHandler? value))

@@ -35,7 +35,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
     {
         public override string GetPathSuffix(string modelIdPrefix, string suffix)
         {
-            if (modelIdPrefix.Contains("IndustryBasic"))
+            if (modelIdPrefix.Contains("Industry.Basic"))
             {
                 return $"{suffix}";
             }

@@ -186,11 +186,18 @@ static class CkTypeGraphExtensions
 
     public static async void DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-            await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId} {{");
+        await GetNamespaceName(ckTypeGraph, outputFile);
 
-            await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
+        await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
 
-            await outputFile.WriteLineAsync($"}}"); 
+        await outputFile.WriteLineAsync($"}}");
+    }
+
+    private static async Task GetNamespaceName(CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{");
+        //[\"{ckTypeGraph.CkTypeId.ModelId.ModelId}\"]
+        //does not work as it does with classes????
     }
 }
 
@@ -481,6 +488,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
 
+
+        string[] split = ckModelId.ModelId.Split('.');
+        await outputFile.WriteLineAsync($"# {split.Last()}");
+        await outputFile.WriteLineAsync();
+
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
@@ -686,6 +698,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         finally { }
     }
 
+    private static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
+    {
+        string[] modelIdparts = ckModelId.ModelId.Split(".");
+
+        for (int i = 0; i < modelIdparts.Length; i++)
+        {
+            docusaurusPath = Path.Combine(docusaurusPath, modelIdparts[i]);
+        }
+
+        Directory.CreateDirectory(docusaurusPath);
+    }
+
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -732,15 +756,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         
         CkModelId ckModelIdSystem = new("System", "1.0.0");
         CkModelId ckModelIdBasic = new("Basic", "1.0.0");
-        CkModelId ckModelIdIndustryBasic = new("IndustryBasic", "1.0.0");
-        CkModelId ckModelIdIndustryEnergy = new("IndustryEnergy", "1.0.0");
-        CkModelId ckModelIdIndustryFluid = new("IndustryFluid", "1.0.0");
+        CkModelId ckModelIdIndustryBasic = new("Industry.Basic", "1.0.0");
+        CkModelId ckModelIdIndustryEnergy = new("Industry.Energy", "1.0.0");
+        CkModelId ckModelIdIndustryFluid = new("Industry.Fluid", "1.0.0");
 
         CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid];
 
 
         //Step 1
-        BuildDirectoryStructure(docusaurusPath);
+        //BuildDirectoryStructure(docusaurusPath);
+        foreach (var modelID in ckModelIds)
+        {
+            BuildDirectory(docusaurusPath, modelID);
+        }
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
         GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);
@@ -759,6 +787,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
 
             GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
+
+            
         }
 
         

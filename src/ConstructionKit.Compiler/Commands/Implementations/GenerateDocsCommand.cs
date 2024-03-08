@@ -456,9 +456,9 @@ static class CkTypeAttributeDtoExtensions
 
 static class CkAssociationRoleGraphExtensions
 {
-    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> attributeHeadings, CkTypeAssociationGraph? association)
+    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> associationRoleHeadings, CkTypeAssociationGraph? association)
     {
-        foreach (var heading in attributeHeadings)
+        foreach (var heading in associationRoleHeadings)
         {
             string content = heading switch
             {
@@ -493,6 +493,36 @@ static class CkAssociationRoleGraphExtensions
     }
 }
 
+//Potential to Change CkAssociationRoleGraphExtensions to this?
+//static class CkTypeAssociationGraphExtensions
+//{
+//    public static async void DrawTypeAssociation(this CkTypeAssociationGraph ckTypeAssociationGraph, StreamWriter outputFile, List<string> associationRoleHeadings)
+//    {
+//        foreach (var heading in associationRoleHeadings)
+//        {
+//            string content = heading switch
+//            {
+//                "ID" => ckTypeAssociationGraph.DrawAttributeAutoCompleteValues(),
+//                "Inbound Multiplicity" => $"PLACEHOLDER",
+//                "Inbound Name" => $"PLACEHOLDER",
+//                "Outbound Multiplicity" => $"PLACEHOLDER",
+//                "Outbound Name" => $"PLACEHOLDER",
+//                "TargetCkType ID" => $"PLACEHOLDER",
+//                _ => string.Empty
+//            };
+
+
+//            await outputFile.WriteAsync($"| {content} ");
+
+//        }
+//        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+//    }
+
+//    private static string DrawAttributeAutoCompleteValues(this CkTypeAssociationGraph ckTypeAssociationGraph)
+//    {
+//        return ckTypeAssociationGraph.CkRoleId.SemanticVersionedFullName;
+//    }
+//}
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
     private readonly IModelResolver _modelResolver;

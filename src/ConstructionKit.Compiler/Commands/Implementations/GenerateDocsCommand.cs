@@ -468,6 +468,7 @@ static class CkAssociationRoleGraphExtensions
                 "Outbound Multiplicity" => $"{ckAssociationRoleGraph.OutboundMultiplicity}",
                 "Outbound Name" => $"{ckAssociationRoleGraph.OutboundName}",
                 "TargetCkType ID" => $"{association?.TargetCkTypeId.SemanticVersionedFullName}",
+                "Target Attributes" => $"{association?.DrawTargetAttributes()}",
                 _ => string.Empty
             };
 
@@ -490,6 +491,31 @@ static class CkAssociationRoleGraphExtensions
     private static string AddAnchor(this CkAssociationRoleGraph ckAssociationRoleGraph)
     {
         return $"<a id=\"{ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName}\"></a>";
+    }
+
+    private static string DrawTargetAttributes(this CkTypeAssociationGraph? ckTypeAssociationGraph)
+    {
+        if (ckTypeAssociationGraph == null)
+        {
+            return "";
+        }
+        if (ckTypeAssociationGraph.TargetAttributes != null)
+        {
+            StringBuilder stringBuilder = new();
+            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
+
+
+            foreach (var attribute in ckTypeAssociationGraph.TargetAttributes)
+            {
+                stringBuilder.Append("<li>");
+                stringBuilder.Append($"{attribute}");
+                stringBuilder.Append("</li>");
+            }
+
+            stringBuilder.Append("</ul>");
+            return stringBuilder.ToString();
+        }
+        return "";
     }
 }
 

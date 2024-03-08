@@ -65,7 +65,8 @@ public class DocumentationContext
         "Inbound Name",
         "Outbound Multiplicity",
         "Outbound Name",
-        "TargetCkType ID"
+        "TargetCkType ID",
+        "Target Attributes"
     ];
 }
 static class CkTypeGraphExtensions

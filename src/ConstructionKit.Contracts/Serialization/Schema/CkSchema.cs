@@ -17,6 +17,7 @@ public static class CkSchema
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-associationRole")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-record")));
         SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-enum")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-model-config")));
     }
 
     /// <summary>
@@ -37,6 +38,15 @@ public static class CkSchema
         return metaSchemaInternal.Bundle();
     }
 
+    /// <summary>
+    ///     Returns the construction kit model configuration file schema
+    /// </summary>
+    public static JsonSchema GetModelConfigSchema()
+    {
+        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-model-config"));
+        return metaSchemaInternal.Bundle();
+    }
+    
     /// <summary>
     ///     Returns the construction kit compiled model schema
     /// </summary>

@@ -1,72 +1,67 @@
 ﻿using Meshmakers.Common.CommandLineParser;
-using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
-internal class CompileCommand : Command<OctoToolOptions>
+internal class CompileCommand : CkcCommand
 {
-    private readonly IArgument _cacheArg;
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
-    private readonly ICkSerializer _ckSerializer;
+    private readonly IArgument _cachePathArg;
     private readonly ICompilerService _compilerService;
     private readonly IArgument _pathArg;
-    private readonly IArgument _publishArg;
+    private readonly IArgument _outputPathArg;
+    private readonly IArgument _compileResultArg;
 
     public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options,
-        ICompilerService compilerService, ICkSerializer ckSerializer, ICkModelRepositoryService ckModelRepositoryService)
+        ICompilerService compilerService)
         : base(logger, "Compile", "Validates and creates output files for a construction kit model directory", options)
     {
         _compilerService = compilerService;
-        _ckSerializer = ckSerializer;
-        _ckModelRepositoryService = ckModelRepositoryService;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
-            new[] { "Root path of construction kit model directory" }, true, 1);
+            ["Root path of construction kit model directory"], true, 1);
 
-        _cacheArg = CommandArgumentValue.AddArgument("c", "cache",
-            new[]
-            {
-                "If used, parallel to the compiled construction kit model a cache file is created containing " +
-                "all dependent construction kit models."
-            }, false);
+        _outputPathArg = CommandArgumentValue.AddArgument("o", "outputPath",
+            ["Output path of compiled construction kit"], true, 1);
 
-        _publishArg = CommandArgumentValue.AddArgument("i", "import",
-            new[] { "When set, the compiled file gets imported to the local repository." }, false);
+        _cachePathArg = CommandArgumentValue.AddArgument("c", "cache",
+        [
+            "If used, at the defined path a cache file is created containing " +
+            "all dependent construction kit models."
+        ], false, 1);
+
+        _compileResultArg = CommandArgumentValue.AddArgument("cr", "compileResult",
+            ["If used, the file path of compiled files is written to output"], false);
     }
 
     public override async Task Execute()
     {
+        await base.Execute();
+        
         Logger.LogInformation("Compiling construction kit model directory");
 
         var rootPath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
-        var createCacheFile = CommandArgumentValue.IsArgumentUsed(_cacheArg);
-        var doPublish = CommandArgumentValue.IsArgumentUsed(_publishArg);
-        Logger.LogInformation("Path of root directory: {Path}", Path.GetFullPath(rootPath));
-
-        var compileResult = await _compilerService.CompileAsync(rootPath, createCacheFile);
-
-        if (doPublish)
+        var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_outputPathArg);
+        string? cacheFilePath = null;
+        if (CommandArgumentValue.IsArgumentUsed(_cachePathArg))
         {
-            Logger.LogInformation("Publishing construction kit model to 'LocalRepository'");
-            var operationResult = new OperationResult();
-            await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
+            cacheFilePath = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_cachePathArg);
+        }
 
-            var ckCompiledModelRoot =
-                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, compileResult.CompiledModelFile, operationResult);
-            if (operationResult.HasErrors || operationResult.HasFatalErrors)
-            {
-                Logger.LogError("Error loading model \'{FilePath}\'", compileResult.CompiledModelFile);
-                operationResult.WriteMessagesToLogger(Logger);
-                return;
-            }
+        bool writeCompileResult = CommandArgumentValue.IsArgumentUsed(_compileResultArg);
 
-            await _ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot, true);
-            Logger.LogInformation("Construction kit model published to 'LocalRepository'");
+        Logger.LogDebug("Construction Kit directory: {Path}", Path.GetFullPath(rootPath));
+        Logger.LogDebug("Output directory: {Path}", Path.GetFullPath(outputPath));
+        if (!string.IsNullOrWhiteSpace(cacheFilePath))
+        {
+            Logger.LogDebug("Cache directory: {Path}", Path.GetFullPath(cacheFilePath));
+        }
+
+        var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath);
+        if (writeCompileResult)
+        {
+            Console.WriteLine(compileResult.CompiledModelFile);
         }
 
         Logger.LogInformation("Construction kit model directory compiled");

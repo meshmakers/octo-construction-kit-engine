@@ -64,6 +64,13 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
+    public Task SerializeAsync(StreamWriter streamWriter, CkModelConfigDto modelConfig)
+    {
+        _serializer.Serialize(streamWriter, modelConfig);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
     public Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel)
     {
         _serializer.Serialize(streamWriter, compiledModel);
@@ -82,6 +89,20 @@ internal class CkYamlSerializer : ICkYamlSerializer
     {
         _serializer.Serialize(streamWriter, elementsRootDto);
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<CkModelConfigDto> DeserializeModelConfigAsync(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        _ckSchemaValidator.ValidateModelConfigInYaml(stream, locationReference, operationResult);
+        if (operationResult.HasErrors)
+        {
+            throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);
+        }
+
+        using var streamReader = new StreamReader(stream);
+        var modelConfigDto = _deserializer.Deserialize<CkModelConfigDto>(streamReader);
+        return Task.FromResult(modelConfigDto ?? throw ModelParseException.CannotDeserializeModel(operationResult));
     }
 
     /// <inheritdoc />

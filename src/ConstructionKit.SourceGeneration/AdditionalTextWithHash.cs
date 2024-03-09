@@ -2,27 +2,21 @@ using Microsoft.CodeAnalysis;
 
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
-public readonly record struct AdditionalTextWithHash
+public readonly record struct AdditionalTextWithHash(AdditionalText File, string? Hash)
 {
-    public AdditionalTextWithHash(AdditionalText file, string hash)
-    {
-        File = file;
-        Hash = hash;
-    }
-
-    public AdditionalText File { get; }
-    public string Hash { get; }
+    public AdditionalText File { get; } = File;
+    public string? Hash { get; } = Hash;
 
     public bool Equals(AdditionalTextWithHash other)
     {
-        return File.Path.Equals(other.File.Path) && Hash.Equals(other.Hash);
+        return File.Path.Equals(other.File.Path) && Equals(Hash, other.Hash);
     }
 
     public override int GetHashCode()
     {
         unchecked
         {
-            return (File.GetHashCode() * 397) ^ Hash.GetHashCode();
+            return (File.GetHashCode() * 397) ^ Hash?.GetHashCode() ?? 0;
         }
     }
 
@@ -31,7 +25,7 @@ public readonly record struct AdditionalTextWithHash
         return $"{nameof(File)}: {File?.Path}, {nameof(Hash)}: {Hash}";
     }
 
-    public void Deconstruct(out AdditionalText file, out string hash)
+    public void Deconstruct(out AdditionalText file, out string? hash)
     {
         file = File;
         hash = Hash;

@@ -20,9 +20,9 @@ internal class DependencyResolver : IDependencyResolver
     public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
-        _logger.LogInformation("Starting resolving dependencies");
+        _logger.LogDebug("Starting resolving dependencies");
         await Resolve(dependencies, ckModelGraph, originFileResolver, sourceIdentifier, operationResult).ConfigureAwait(false);
-        _logger.LogInformation("Resolving dependencies completed");
+        _logger.LogDebug("Resolving dependencies completed");
 
         return ckModelGraph;
     }
@@ -36,7 +36,7 @@ internal class DependencyResolver : IDependencyResolver
         {
             var ckDependency = dependencies[i];
 
-            _logger.LogInformation("Resolving dependency '{CkModelId}'", ckDependency);
+            _logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
             var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
             if (ckDependencyRootModel == null)
@@ -51,13 +51,13 @@ internal class DependencyResolver : IDependencyResolver
                 {
                     if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency))
                     {
-                        _logger.LogInformation("Adding additional dependency '{CkTypeId}'", ckChildDependency);
+                        _logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
                         dependencies.Add(ckChildDependency);
                     }
                 }
             }
 
-            _logger.LogInformation("Adding resolved dependency '{CkTypeId}' to dependency graph", ckDependencyRootModel.ModelId);
+            _logger.LogDebug("Adding resolved dependency '{CkTypeId}' to dependency graph", ckDependencyRootModel.ModelId);
             ckModelGraph.AppendModel(ckDependencyRootModel);
         }
     }

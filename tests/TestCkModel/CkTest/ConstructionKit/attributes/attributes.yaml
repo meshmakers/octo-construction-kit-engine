@@ -14,6 +14,15 @@ attributes:
   - id: IsEnabled
     valueType: Boolean
     defaultValues:
-      - true
-  
-  
+      - true   
+  - id: StringArrayTests
+    valueType: StringArray
+    defaultValues:
+      - "a"
+  - id: IntArrayTests
+    valueType: IntArray
+    defaultValues:
+      - 6
+  - id: RecordArrayTests
+    valueType: RecordArray
+    valueCkRecordId: Test/TestRecord

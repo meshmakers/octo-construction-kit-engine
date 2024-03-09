@@ -22,4 +22,13 @@
         <MeshmakerVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</MeshmakerVersion>
         <RestoreSources Condition="'$(Configuration)'=='DebugL'">$(MSBuildThisFileDirectory)../nuget</RestoreSources>
     </PropertyGroup>
+    <PropertyGroup>
+        <OctoCompileCkModel Condition="'$(OctoCompileCkModel)' == ''">true</OctoCompileCkModel>
+        <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
+        <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>
+        <OctoPublishCkModelRepo Condition="'$(OctoPublishCkModelRepo)' == ''">LocalRepository</OctoPublishCkModelRepo>
+        <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
+    </PropertyGroup>
+	
+
 </Project>

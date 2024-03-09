@@ -317,6 +317,13 @@
       "number": 53,
       "level": "WARNING",
       "text": "File does not contain a model. It will be ignored."
+    },
+    {
+      "key": "NoImportsFound",
+      "number": 54,
+      "level": "WARNING",
+      "text": "No imports founds in construction kit model configuration file."
     }
+    
   ]
 }

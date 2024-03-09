@@ -36,6 +36,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
     }
 
     /// <inheritdoc />
+    public async Task SerializeAsync(StreamWriter streamWriter, CkModelConfigDto modelConfig)
+    {
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, modelConfig, _options).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, compiledModel, _options).ConfigureAwait(false);
@@ -51,6 +57,21 @@ internal class CkJsonSerializer : ICkJsonSerializer
     public async Task SerializeAsync(StreamWriter streamWriter, CkElementsRootDto elementsRootDto)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, elementsRootDto, _options).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<CkModelConfigDto> DeserializeModelConfigAsync(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        try
+        {
+            var ckMetaDto = await JsonSerializer.DeserializeAsync<CkModelConfigDto>(stream, _options).ConfigureAwait(false);
+            return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(operationResult);
+        }
+        catch (JsonException e)
+        {
+            CheckException(locationReference, operationResult, e);
+            throw ModelParseException.CannotDeserializeModel(operationResult);
+        }
     }
 
     /// <inheritdoc />

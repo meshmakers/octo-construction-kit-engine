@@ -1,6 +1,5 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
-using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,32 +12,20 @@ using Microsoft.Extensions.Logging;
 namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 
 /// <summary>
-/// Compiles a construction kit using msbuild
+/// Restores a construction kit using msbuild
 /// </summary>
-public class CkCompile : Microsoft.Build.Utilities.Task
+public class CkRestore : Microsoft.Build.Utilities.Task
 {
     /// <summary>
     /// A list of folders containing construction kits
     /// </summary>
     [Required]
-    public ITaskItem[] ConstructionKitFolders { get; set; } = null!;
-
-    /// <summary>
-    /// When true, the construction kit folder is compiled
-    /// </summary>
-    [Required]
-    public bool Compile { get; set; } = false;
+    public ITaskItem[] ConstructionKitModelConfigFiles { get; set; } = null!;
 
     /// <summary>
     /// When a directory defined, a cache files are created containing all dependencies
     /// </summary>
     public string? CacheFilePath { get; set; }
-
-    /// <summary>
-    /// When true, the compiled construction kit model is published to the local repository
-    /// </summary>
-    [Required]
-    public bool PublishCkModel { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the output path
@@ -69,9 +56,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         services.AddConstructionKit();
         var serviceProvider = services.BuildServiceProvider();
 
-        var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
         var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
-        var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
@@ -79,52 +64,33 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         {
             var task = Task.Run(async () =>
             {
-                foreach (var constructionKitFolder in ConstructionKitFolders)
+                foreach (var item in ConstructionKitModelConfigFiles)
                 {
                     var operationResult = new OperationResult();
                     try
                     {
-                        var constructionKitFolderPath = constructionKitFolder.GetMetadata("FullPath");
+                        var ckModelConfigFilePath = item.GetMetadata("FullPath");
 
-                        if (!Directory.Exists(constructionKitFolderPath))
+                        if (File.Exists(ckModelConfigFilePath))
                         {
-                            Log.LogMessage(MessageImportance.High, "Creating new construction kit model in '{0}'",
-                                constructionKitFolderPath);
-                            await compilerService.CreateNewAsync(constructionKitFolderPath);
-                        }
-                        else
-                        {
-                            Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
-                                constructionKitFolderPath);
-                            var compileResult = await compilerService.CompileAsync(constructionKitFolderPath,
+                            Log.LogMessage(MessageImportance.High, "Restoring construction kit model libraries in '{0}'",
+                                ckModelConfigFilePath);
+                            var compileResult = await ckModelRepositoryService.RestoreConstructionKitModelsAsync(ckModelConfigFilePath,
                                 OutputPath, CacheFilePath, operationResult);
-                            compiledModelFiles.Add(compileResult.CompiledModelFile);
-                            if (compileResult.CompiledModelCacheFilePath != null)
+                            if (operationResult.HasErrors || operationResult.HasFatalErrors)
                             {
-                                cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
+                                Log.LogError("Error restoring model \'{FilePath}\'", ckModelConfigFilePath);
+                                LogOperationResults(operationResult);
+                                return;
                             }
-
-                            if (PublishCkModel)
+                            
+                            foreach (var result in compileResult)
                             {
-                                Log.LogMessage(MessageImportance.High,
-                                    "Publishing construction kit model to 'LocalRepository'");
-                                await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
-
-                                var ckCompiledModelRoot =
-                                    await ckSerializer.DeserializeCompiledModelRootAsync(streamReader,
-                                        compileResult.CompiledModelFile,
-                                        operationResult);
-                                if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                                compiledModelFiles.Add(result.CompiledModelFile);
+                                if (result.CompiledModelCacheFilePath != null)
                                 {
-                                    Log.LogError("Error loading model \'{FilePath}\'", compileResult.CompiledModelFile);
-                                    LogOperationResults(operationResult);
-                                    return;
+                                    cacheFiles.Add(result.CompiledModelCacheFilePath);
                                 }
-
-                                await ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot,
-                                    true);
-                                Log.LogMessage(MessageImportance.High,
-                                    "Construction kit model published to 'LocalRepository'");
                             }
                         }
 
@@ -141,7 +107,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                 }
             });
             task.Wait();
-
+            
             CompiledModelFiles = compiledModelFiles.ToArray();
             CacheFiles = cacheFiles.ToArray();
         }

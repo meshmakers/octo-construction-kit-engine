@@ -84,6 +84,7 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
         _testOutputHelper.WriteLine("Serializing...");
 
         await rtJsonSerializer.SerializeAsync(streamWriter, modelRootDto);
+        streamWriter.Close();
 
         // Read
         var stream = File.OpenRead(filePath);

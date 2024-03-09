@@ -6,7 +6,7 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
-using Meshmakers.Octo.Runtime.Engine.SystemTests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
+using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories;
 

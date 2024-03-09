@@ -3,7 +3,7 @@
   "profiles": {
     "Generators": {
       "commandName": "DebugRoslynComponent",
-      "targetProject": "../../samples/Sample.SourceGenerator/Sample.SourceGenerator.csproj"
+      "targetProject": "../../tests/TestCkModel/TestCkModel.csproj"
     }
   }
 }

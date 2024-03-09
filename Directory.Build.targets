@@ -1,5 +1,9 @@
-<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
+        <OctoCkcToolPath>$(MSBuildThisFileDirectory)bin\$(Configuration)\net8.0\publish\octo-ckc.dll</OctoCkcToolPath>
+        <OctoCompilerToolPath>dotnet $(OctoCkcToolPath)</OctoCompilerToolPath>
+        <IsOctoCompilerFound>false</IsOctoCompilerFound>
+        <IsOctoCompilerFound>$([System.IO.File]::Exists($(OctoCkcToolPath)))</IsOctoCompilerFound>
         <OctoCkCompileOutputImportFolder Condition="'$(OctoCkCompileOutputImportFolder)' == ''">$(OutputPath)octo-ck-libraries\$(ProjectName)\imports</OctoCkCompileOutputImportFolder>
         <OctoCkCompileCacheImportFolder Condition="'$(OctoCkCompileCacheImportFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache\$(ProjectName)\imports</OctoCkCompileCacheImportFolder>
         <OctoCkCompileOutputCompilerFolder Condition="'$(OctoCkCompileOutputCompilerFolder)' == ''">$(OutputPath)octo-ck-libraries\$(ProjectName)\out</OctoCkCompileOutputCompilerFolder>
@@ -30,27 +34,34 @@
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
-        <!--Calling our custom task-->
-        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" 
-                   OutputPath="$(OctoCkCompileOutputCompilerFolder)"
-                   CacheFilePath="$(OctoCkCompileCacheCompileFolder)"
-                   Compile="$(OctoCompileCkModel)"
-                   PublishCkModel="$(OctoPublishCkModel)">
-            <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
-            <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
-        </CkCompile>
+        <ItemGroup>
+            <!-- Define a temporary item group to iterate through -->
+            <_ConstructionKitFolder Include="@(ConstructionKitFolder)"/>
+        </ItemGroup>
+
+        <Message Condition="!Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Create new construction kit library"/>
+        <Exec Condition="!Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c new -p %(_ConstructionKitFolder.Identity)">
+        </Exec>
+
+        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o  $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
+            <Output TaskParameter="ConsoleOutput" ItemName="CompiledModelFiles" />
+        </Exec>
+        
+        <ItemGroup>
+            <!-- Define a temporary item group to iterate through -->
+            <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
+        </ItemGroup>
+        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to repo $(OctoPublishCkModelRepo)"/>
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -rep $(OctoPublishCkModelRepo) -r">
+        </Exec>
     </Target>
 
     <Target Name="CkRestoreBeforeCompile" BeforeTargets="BeforeBuild" 
-            DependsOnTargets="GatherImportFiles">
-        <!--Calling our custom task-->
+            DependsOnTargets="GatherImportFiles">      
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
-        <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"
-                   OutputPath="$(OctoCkCompileOutputImportFolder)"
-                   CacheFilePath="$(OctoCkCompileCacheImportFolder)">
-            <Output TaskParameter="CompiledModelFiles" ItemName="CompiledModelFiles" />
-            <Output TaskParameter="CacheFiles" ItemName="CacheFiles" />
-        </CkRestore>
+        <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder)">
+        </Exec>
     </Target>
     
     <Target Name="CkIncludeFiles" AfterTargets="CkRestoreBeforeCompile;CkCompile" BeforeTargets="BeforeBuild" >

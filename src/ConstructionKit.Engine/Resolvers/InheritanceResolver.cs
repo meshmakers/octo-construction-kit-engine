@@ -25,7 +25,7 @@ internal class InheritanceResolver : IInheritanceResolver
     /// <inheritdoc />
     public CkModelGraph Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
-        _logger.LogInformation("Starting resolving inheritance");
+        _logger.LogDebug("Starting resolving inheritance");
 
         HashSet<CkId<CkRecordId>> handledRecordHashSet = new();
         HashSet<CkId<CkTypeId>> handledTypesHashSet = new();
@@ -49,7 +49,7 @@ internal class InheritanceResolver : IInheritanceResolver
         _logger.LogDebug("Resolving dependencies based on inheritance");
         BuildInheritedConfiguration(modelGraph, originFileResolver, operationResult);
 
-        _logger.LogInformation("Resolving inheritance completed");
+        _logger.LogDebug("Resolving inheritance completed");
 
         return modelGraph;
     }

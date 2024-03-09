@@ -6,11 +6,11 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.Models.System</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Models.System</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Models.System</RootNamespace>
-        <OctoCkCompileTasksFolder>$(MSBuildThisFileDirectory)../../bin/$(Configuration)/tasks/net8.0</OctoCkCompileTasksFolder>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <TargetFramework>netstandard2.0</TargetFramework>
+        <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
         <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net8.0'">true</OctoPublishCkModel>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,12 +28,14 @@
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
     <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
-    <Import Project="../ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.props" />
-    <Import Project="../ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets" />
 
     <ItemGroup>
         <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
         <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ConstructionKitFolder Visible="false" Include="$(MSBuildProjectDirectory)\ConstructionKit"/>
     </ItemGroup>
 
 </Project>

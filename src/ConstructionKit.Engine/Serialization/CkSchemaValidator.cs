@@ -39,6 +39,12 @@ internal class CkSchemaValidator : ICkSchemaValidator
     }
 
     /// <inheritdoc />
+    public bool ValidateModelConfigInYaml(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        return ValidateModelYaml(stream, CkSchema.GetModelConfigSchema(), locationReference, operationResult);
+    }
+
+    /// <inheritdoc />
     public bool ValidateMetaInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
         return ValidateModelYaml(stream, CkSchema.GetMetaSchema(), locationReference, operationResult);

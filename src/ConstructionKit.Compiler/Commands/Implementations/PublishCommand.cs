@@ -8,7 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
-internal class PublishCommand : Command<OctoToolOptions>
+internal class PublishCommand : CkcCommand
 {
     private readonly ICkModelRepositoryService _ckModelRepositoryService;
     private readonly ICkSerializer _ckSerializer;
@@ -37,13 +37,15 @@ internal class PublishCommand : Command<OctoToolOptions>
 
     public override async Task Execute()
     {
+        await base.Execute();
+        
         Logger.LogInformation("Publish construction kit model");
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
         var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ?? "LocalRepository";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
-        Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
-        Logger.LogInformation("Repository '{Repository}'", repositoryName);
+        Logger.LogDebug("Path of compiled construction kit file: {FilePath}", filePath);
+        Logger.LogDebug("Repository '{Repository}'", repositoryName);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver(filePath);

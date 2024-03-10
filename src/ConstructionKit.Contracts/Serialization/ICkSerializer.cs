@@ -8,6 +8,14 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 public interface ICkSerializer
 {
     /// <summary>
+    ///     Serializes the model configuration to the stream.
+    /// </summary>
+    /// <param name="streamWriter">A stream ready to write used for serialization</param>
+    /// <param name="modelConfig">Model configuration to serialize</param>
+    /// <returns></returns>
+    Task SerializeAsync(StreamWriter streamWriter, CkModelConfigDto modelConfig);
+    
+    /// <summary>
     ///     Serializes the compiled model to the stream.
     /// </summary>
     /// <param name="streamWriter">A stream ready to write used for serialization</param>
@@ -31,6 +39,18 @@ public interface ICkSerializer
     /// <returns></returns>
     Task SerializeAsync(StreamWriter streamWriter, CkElementsRootDto elementsRootDto);
 
+    /// <summary>
+    ///     Deserializes the model configuration from the stream.
+    /// </summary>
+    /// <param name="stream">The stream to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">
+    ///     A operation result object that lists all validation issues. In case of exceptions this object contains the
+    ///     validation errors too.
+    /// </param>
+    /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
+    Task<CkModelConfigDto> DeserializeModelConfigAsync(Stream stream, string locationReference, OperationResult operationResult);
+    
     /// <summary>
     ///     Deserializes the meta data from the stream.
     /// </summary>

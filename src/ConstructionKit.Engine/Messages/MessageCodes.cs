@@ -1,4 +1,4 @@
-﻿//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // <auto-generate>
 //     The code was generated from a template.
 //
@@ -185,6 +185,8 @@ internal static class MessageCodes
 
     internal static OperationMessage FileContainsNoModel(string? location) =>
         GetMessage("FileContainsNoModel", location);
+    internal static OperationMessage NoImportsFound(string? location) =>
+        GetMessage("NoImportsFound", location);
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -503,6 +505,12 @@ internal static class MessageCodes
             "FileContainsNoModel",
              new OperationMessageTemplate(MessageLevel.Warning,
                  53, "File does not contain a model. It will be ignored.",
+                 new string[] {})
+        },
+        {
+            "NoImportsFound",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 54, "No imports founds in construction kit model configuration file.",
                  new string[] {})
         },
     };

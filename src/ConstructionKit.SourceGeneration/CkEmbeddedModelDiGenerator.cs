@@ -26,7 +26,7 @@ public class CkEmbeddedModelDiGenerator
         sb.AppendLine(
             $"/// Extension methods for adding a embedded version of construction kit model {ckModelId.FullName} to the DI container.");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine("public static class ServiceCollectionExtensions");
+        sb.AppendLine($"public static class ServiceCollection{ckModelId.ModelId.MakeClassName()}Extensions");
         sb.AppendLine("{");
         sb.AppendLine();
         sb.AppendLine($"   public static IServiceCollection AddCkModel{ckModelId.ModelId.MakeClassName()}(");

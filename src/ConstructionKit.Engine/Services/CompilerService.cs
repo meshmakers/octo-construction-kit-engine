@@ -176,56 +176,17 @@ public class CompilerService : ICompilerService
     }
 
     /// <inheritdoc />
-    public async Task<CompileResult> GetConstructionKitFolderInfoAsync(string rootPath, bool createCacheFile)
+    public async Task<CompileResult> CompileAsync(string rootPath, string outputPath, string? createCacheFilePath)
     {
         var operationResult = new OperationResult();
-        return await GetConstructionKitFolderInfoAsync(rootPath, createCacheFile, operationResult).ConfigureAwait(false);
+        return await CompileAsync(rootPath, outputPath, createCacheFilePath, operationResult).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<CompileResult> GetConstructionKitFolderInfoAsync(string rootPath, bool createCacheFile, OperationResult operationResult)
+    public async Task<CompileResult> CompileAsync(string rootPath, string outputPath, string? createCacheFilePath, OperationResult operationResult)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
-
-        var originFileResolver = new OriginFileResolver(rootPath);
-
-        if (!Directory.Exists(rootPath))
-        {
-            operationResult.AddMessage(MessageCodes.DirectoryDoesNotExist(rootPath));
-            operationResult.WriteMessagesToLogger(_logger);
-            throw CompilerException.DirectoryDoesNotExist(rootPath, operationResult);
-        }
-        
-        var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, originFileResolver, operationResult).ConfigureAwait(false);
-        if (operationResult.HasErrors || operationResult.HasFatalErrors)
-        {
-            throw CompilerException.OperationResultWithErrors(operationResult);
-        }
-
-        var compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
-        var compiledModelFilePath = Path.Combine(rootPath, compiledModelFile);
-
-        if (!createCacheFile)
-        {
-            return new CompileResult(compiledModelFilePath);
-        }
-
-        var compiledModelCacheFilePath = GetCompiledModelCacheFilePath(ckMetaDto.ModelId, rootPath);
-        return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
-
-    }
-
-    /// <inheritdoc />
-    public async Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile)
-    {
-        var operationResult = new OperationResult();
-        return await CompileAsync(rootPath, createCacheFile, operationResult).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<CompileResult> CompileAsync(string rootPath, bool createCacheFile, OperationResult operationResult)
-    {
-        ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
+        ArgumentValidation.ValidateDirectoryPath(nameof(outputPath), outputPath);
 
         var originFileResolver = new OriginFileResolver(rootPath);
 
@@ -461,9 +422,14 @@ public class CompilerService : ICompilerService
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
+        
+        if (!Directory.Exists(outputPath))
+        {
+            Directory.CreateDirectory(outputPath);
+        }
 
         var compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
-        var compiledModelFilePath = Path.Combine(rootPath, compiledModelFile);
+        var compiledModelFilePath = Path.Combine(outputPath, compiledModelFile);
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else
@@ -471,9 +437,13 @@ public class CompilerService : ICompilerService
 #endif
         await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot).ConfigureAwait(false);
 
-        if (createCacheFile)
+#if NETSTANDARD2_0
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
+#else
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath))
+#endif
         {
-            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, rootPath).ConfigureAwait(false);
+            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, createCacheFilePath).ConfigureAwait(false);
             return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
         }
 
@@ -511,13 +481,18 @@ public class CompilerService : ICompilerService
             new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } }).ConfigureAwait(false);
     }
 
-    private async Task<string> CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string rootPath)
+    private async Task<string> CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)
     {
         var tempTenantId = Guid.NewGuid().ToString();
         _ckCacheService.CreateTenant(tempTenantId);
         _ckCacheService.LoadCkModelGraph(tempTenantId, ckModelGraph);
+        
+        if (!Directory.Exists(outputPath))
+        {
+            Directory.CreateDirectory(outputPath);
+        }
 
-        var compiledModelCacheFilePath = GetCompiledModelCacheFilePath(ckModelId, rootPath);
+        var compiledModelCacheFilePath = GetCompiledModelCacheFilePath(ckModelId, outputPath);
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(compiledModelCacheFilePath);
 #else
@@ -528,10 +503,10 @@ public class CompilerService : ICompilerService
         return compiledModelCacheFilePath;
     }
 
-    private string GetCompiledModelCacheFilePath(CkModelId ckModelId, string rootPath)
+    private string GetCompiledModelCacheFilePath(CkModelId ckModelId, string outputPath)
     {
         var compiledModelCacheFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.cache.json";
-        var compiledModelCacheFilePath = Path.Combine(rootPath, compiledModelCacheFile);
+        var compiledModelCacheFilePath = Path.Combine(outputPath, compiledModelCacheFile);
         return compiledModelCacheFilePath;
     }
 }

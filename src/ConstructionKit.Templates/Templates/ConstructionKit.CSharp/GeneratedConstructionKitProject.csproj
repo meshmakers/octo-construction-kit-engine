@@ -12,4 +12,8 @@
         <PackageReference Include="Meshmakers.Octo.ConstructionKit.SourceGeneration" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Version="999.0.0.0"/>
         <PackageReference Include="Meshmakers.Octo.ConstructionKit.MsBuildTasks" Version="999.0.0.0" PrivateAssets="all" />
     </ItemGroup>
+
+    <ItemGroup>
+        <ConstructionKitFolder Visible="false" Include="$(MSBuildProjectDirectory)\ConstructionKit"/>
+    </ItemGroup>
 </Project>

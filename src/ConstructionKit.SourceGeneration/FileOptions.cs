@@ -27,17 +27,7 @@ internal readonly record struct FileOptions
 
         EmbeddedFilename = string.IsNullOrEmpty(detectedNamespace) ? classNameFromFileName : $"{detectedNamespace}.{classNameFromFileName}";
 
-        LocalNamespace =
-            options.TryGetValue("build_metadata.EmbeddedResource.TargetPath", out var targetPath) &&
-            targetPath is { Length: > 0 }
-                ? Utilities.GetLocalNamespace(
-                    resxFilePath, targetPath,
-                    globalOptions.ProjectFullPath,
-                    globalOptions.ProjectName,
-                    globalOptions.RootNamespace)
-                : string.IsNullOrEmpty(detectedNamespace)
-                    ? Utilities.SanitizeNamespace(globalOptions.ProjectName)
-                    : detectedNamespace;
+        LocalNamespace = Utilities.SanitizeNamespace(globalOptions.RootNamespace ?? globalOptions.ProjectName);
 
         CustomToolNamespace =
             options.TryGetValue("build_metadata.EmbeddedResource.CustomToolNamespace", out var customToolNamespace) &&

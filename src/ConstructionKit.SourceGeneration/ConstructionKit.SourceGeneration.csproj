@@ -47,6 +47,12 @@
         </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Update="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.targets">
+        <PackagePath>build\</PackagePath>
+      </Content>
+    </ItemGroup>
+
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
             <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->

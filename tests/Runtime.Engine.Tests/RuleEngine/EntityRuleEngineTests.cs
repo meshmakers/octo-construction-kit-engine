@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
-using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
+using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RuleEngine;
 

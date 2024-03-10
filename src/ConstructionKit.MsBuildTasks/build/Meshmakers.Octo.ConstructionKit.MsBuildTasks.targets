@@ -41,7 +41,7 @@
         </CkCompile>
     </Target>
 
-    <Target Name="CkRestoreBeforeCompile" BeforeTargets="BeforeBuild" 
+    <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
             DependsOnTargets="GatherImportFiles">
         <!--Calling our custom task-->
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
@@ -53,10 +53,10 @@
         </CkRestore>
     </Target>
     
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestoreBeforeCompile;CkCompile" BeforeTargets="BeforeBuild" >
+    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild" >
         <ItemGroup>
-            <_OctoCompilerResourceFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
-            <EmbeddedResource Include="@(_OctoCompilerResourceFiles)">
+            <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
+            <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
                 <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
@@ -67,8 +67,8 @@
         </ItemGroup>
 
         <ItemGroup>
-            <_OctoImportResourceFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml" />
-            <EmbeddedResource Include="@(_OctoImportResourceFiles)">
+            <_OctoImportResourceFilesNew Include="$(OctoCkCompileOutputImportFolder)/*.yaml" Exclude="@(_OctoImportResourceFiles)" />
+            <EmbeddedResource Include="@(_OctoImportResourceFilesNew)">
                 <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
@@ -78,5 +78,29 @@
             <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
         </ItemGroup>
     </Target>
+
+    <ItemGroup>
+        <_OctoCompilerResourceFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
+        <EmbeddedResource Include="@(_OctoCompilerResourceFiles)">
+            <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+            <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
+        </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+        <AdditionalFiles Include="$(OctoCkCompileCacheCompileFolder)/*.json" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <_OctoImportResourceFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml" />
+        <EmbeddedResource Include="@(_OctoImportResourceFiles)">
+            <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+            <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
+        </EmbeddedResource>
+    </ItemGroup>
+
+    <ItemGroup>
+        <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
+    </ItemGroup>
     
 </Project>

@@ -27,6 +27,9 @@
     </ItemGroup>
 
     <ItemGroup>
+        <EmbeddedResource Include="Serialization\Schema\ck-model-config.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
         <None Remove="Serialization\Schema\ck-compiled-model.json" />
         <EmbeddedResource Include="Serialization\Schema\ck-compiled-model.json">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

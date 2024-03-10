@@ -56,4 +56,32 @@ public interface ICkModelRepositoryService
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in given repository</returns>
     Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null);
+    
+    /// <summary>
+    /// Restores construction kit models based on a construction kit model configuration file.
+    /// </summary>
+    /// <param name="modelConfigurationFilePath">Local file path where the model configuration file exists.</param>
+    /// <param name="outputPath">Output path of compiled construction kit</param>
+    /// <param name="createCacheFilePath">
+    ///     When defined, a cache file is created at the defined path containing all
+    ///     dependencies
+    /// </param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <returns></returns>
+    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath, string outputPath, string? createCacheFilePath, object? sourceIdentifier = null);
+    
+    /// <summary>
+    /// Returns information about the construction kit model folder.
+    /// </summary>
+    /// <param name="modelConfigurationFilePath">Local file path where the model configuration file exists.</param>
+    /// <param name="outputPath">Output path of compiled construction kit</param>
+    /// <param name="createCacheFilePath">
+    ///     When defined, a cache file is created at the defined path containing all
+    ///     dependencies
+    /// </param>
+    /// <param name="operationResult">Operation result</param>
+    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <returns></returns>
+    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath, string outputPath, string? createCacheFilePath, OperationResult operationResult, object? sourceIdentifier = null);
+
 }

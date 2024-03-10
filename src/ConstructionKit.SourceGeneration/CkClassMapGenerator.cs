@@ -19,6 +19,7 @@ public class CkClassMapGenerator
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.Services;");
+        sb.AppendLine("using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;");
         sb.AppendLine();
         sb.AppendLine($"namespace {ns};");
         sb.AppendLine();

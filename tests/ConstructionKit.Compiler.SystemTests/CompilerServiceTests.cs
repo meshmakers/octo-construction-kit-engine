@@ -59,7 +59,7 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
 
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
             await compilerService.CreateNewAsync(rootPath);
-            await compilerService.CompileAsync(rootPath, false);
+            await compilerService.CompileAsync(rootPath, rootPath, null);
 
             Assert.True(Directory.Exists(rootPath));
             Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.yaml")));
@@ -77,7 +77,7 @@ public class CompilerServiceTests : IClassFixture<TemporaryDirectoryFixture>
 
             var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
             await compilerService.CreateNewAsync(rootPath);
-            await compilerService.CompileAsync(rootPath, true);
+            await compilerService.CompileAsync(rootPath, rootPath, rootPath);
 
             Assert.True(Directory.Exists(rootPath));
             Assert.True(File.Exists(Path.Combine(rootPath, "ck-sample1.yaml")));

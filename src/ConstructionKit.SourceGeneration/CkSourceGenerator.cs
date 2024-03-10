@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -41,19 +40,13 @@ public class CkSourceGenerator : IIncrementalGenerator
                     return false;
                 }
 
-                var outputPath = Path.Combine(Path.GetDirectoryName(options.ProjectFullPath) ?? string.Empty, options.OutputPath);
-                if (f.Path.StartsWith(outputPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    return false;
-                }
-
                 var fileName = Path.GetFileName(f.Path).ToLower();
                 return fileName.StartsWith("ck-") && (fileName.EndsWith(".cache.json") || fileName.EndsWith(".yaml"));
             })
             .Select(static (f, _) =>
             {
-                var checksum = f.Left.GetText()?.GetChecksum() ?? new ImmutableArray<byte>();
-                return new AdditionalTextWithHash(f.Left, BitConverter.ToString(checksum.ToArray()));
+                var checksum = f.Left.GetText()?.GetChecksum();
+                return new AdditionalTextWithHash(f.Left, checksum == null ? null : BitConverter.ToString(checksum.Value.ToArray()));
             });
 
         var monitor = ckModelCandidates.Collect().SelectMany(static (x, _) => GroupCkModelFiles.Group(x));
@@ -67,7 +60,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 x.Left.Right
             ))
             .Where(static x => x.IsValid);
-
+        
         context.RegisterSourceOutput(inputs, GenerateCode);
     }
 
@@ -76,7 +69,7 @@ public class CkSourceGenerator : IIncrementalGenerator
         var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
         var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
 
-        var tenantId = fileOptions.GroupedFile.MainFile.Hash;
+        var tenantId = fileOptions.GroupedFile.MainFile.File.Path;
 
         ckCacheService.CreateTenant(tenantId);
         fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);

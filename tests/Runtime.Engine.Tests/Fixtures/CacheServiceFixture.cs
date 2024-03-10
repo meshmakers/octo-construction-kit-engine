@@ -11,7 +11,13 @@ public class CacheServiceFixture : TemporaryDirectoryFixture
     public async Task<ICkCacheService> GetCacheServiceAsync()
     {
         var serviceProvider = Services.BuildServiceProvider();
-        var ckModelFilePath = "sampleData/CkTest/ConstructionKit/ck-test.cache.json";
+#if DEBUGL
+        var ckModelFilePath = "../../../../TestCkModel/obj/DebugL/net8.0/octo-ck-cache/TestCkModel/out/ck-test.cache.json";
+#elif DEBUG        
+        var ckModelFilePath = "../../../../TestCkModel/obj/Debug/net8.0/octo-ck-cache/TestCkModel/out/ck-test.cache.json";
+#else
+        var ckModelFilePath = "../../../../TestCkModel/obj/Release/net8.0/octo-ck-cache/TestCkModel/out/ck-test.cache.json";
+#endif
 
         var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
         ckCacheService.CreateTenant(TenantId);

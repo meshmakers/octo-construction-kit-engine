@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.CkTest.ConstructionKit.Generated.Test.v1;
-using TestCkModel.ConstructionKit.Generated.System.TestIdentity.v1;
+using TestCkModel.Generated.System.TestIdentity.v1;
+using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RepositoryEntities;
 

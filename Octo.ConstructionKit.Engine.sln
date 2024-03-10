@@ -9,16 +9,31 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine", "src\Runtime.Engine\Runtime.Engine.csproj", "{71F1DDB7-4B88-4B1E-8606-899C88C0E1F4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestCkModel", "tests\TestCkModel\TestCkModel.csproj", "{FF736E90-5D29-4239-84D6-269C5E8E0955}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemCkModel", "src\SystemCkModel\SystemCkModel.csproj", "{3EB26AE3-D835-4964-8D2E-33F3E2896A49}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine.SystemTests", "tests\Runtime.Engine.SystemTests\Runtime.Engine.SystemTests.csproj", "{6CD106BF-1312-467F-82C1-621CDF8DDF15}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Runtime.Engine.Tests", "tests\Runtime.Engine.Tests\Runtime.Engine.Tests.csproj", "{2BE3B037-7612-43B5-B04E-B4AF3A7B9AD2}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{B23E5B3C-8D1F-458B-B587-6123D5144741}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sample.SourceGenerator", "samples\Sample.SourceGenerator\Sample.SourceGenerator.csproj", "{D5A7C215-2DA7-48F1-B38C-8BAD89F94F88}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Contracts", "src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj", "{A98B2917-948E-4CE9-8F1C-342A1DB9BFD0}"
 EndProject

@@ -901,12 +901,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         CkModelId ckModelIdIndustryBasic = new("Industry.Basic", "1.0.0");
         CkModelId ckModelIdIndustryEnergy = new("Industry.Energy", "1.0.0");
         CkModelId ckModelIdIndustryFluid = new("Industry.Fluid", "1.0.0");
+        CkModelId ckModelIdEnvironment = new("Environment", "1.0.0");
 
-        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid];
+        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid, ckModelIdEnvironment];
 
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
-        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryFluid);
+        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryEnergy);
 
         var Headings = new DocumentationContext();
         

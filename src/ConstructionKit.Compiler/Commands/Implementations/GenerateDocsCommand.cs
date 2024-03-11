@@ -648,6 +648,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             {
                 if (MatchesModelId(Enum, ckModelId))
                 {
+
                     Enum.DrawEnum(outputFile, context);
                 }
             }
@@ -980,5 +981,5 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
 
         
-    }
+     }
 }

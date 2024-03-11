@@ -16,6 +16,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Octokit;
 using YamlDotNet.Core.Tokens;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
@@ -854,6 +855,28 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
+    private static CkModelId BuildIdFromFilepath(string path)
+    {
+        if (string.IsNullOrEmpty(path))
+        {
+           throw new ArgumentNullException(nameof(path));
+        }
+
+        int lastIndex = path.LastIndexOf('-');
+
+        string substringAfterLastHyphen = path[(lastIndex + 1)..];
+        
+        string[] parts = substringAfterLastHyphen.Split('.');
+
+        parts = parts.Take(parts.Length - 1).ToArray();
+
+        // Capitalize the first letter of each part
+        parts = parts.Select(part => part.Length > 0 ? char.ToUpper(part[0]) + part[1..] : part).ToArray();
+
+        // Join the parts back together with dots
+        return new CkModelId(string.Join(".", parts));
+    }
+
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -907,7 +930,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
-        GenerateMermaidTextOutput(test, docusaurusPath, ckModelIdIndustryEnergy);
+        
+        GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
 
         var Headings = new DocumentationContext();
         

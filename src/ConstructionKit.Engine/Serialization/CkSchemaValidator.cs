@@ -4,7 +4,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
-using Yaml2JsonNode;
 using YamlDotNet.RepresentationModel;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;

@@ -69,6 +69,7 @@
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
                 <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+                <Visible>False</Visible>
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
         </ItemGroup>
@@ -81,6 +82,7 @@
             <_OctoImportResourceFilesNew Include="$(OctoCkCompileOutputImportFolder)/*.yaml" Exclude="@(_OctoImportResourceFiles)" />
             <EmbeddedResource Include="@(_OctoImportResourceFilesNew)">
                 <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+                <Visible>False</Visible>
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
         </ItemGroup>
@@ -94,6 +96,7 @@
         <_OctoCompilerResourceFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
         <EmbeddedResource Include="@(_OctoCompilerResourceFiles)">
             <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+            <Visible>False</Visible>
             <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
         </EmbeddedResource>
     </ItemGroup>
@@ -106,6 +109,7 @@
         <_OctoImportResourceFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml" />
         <EmbeddedResource Include="@(_OctoImportResourceFiles)">
             <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+            <Visible>False</Visible>
             <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
         </EmbeddedResource>
     </ItemGroup>

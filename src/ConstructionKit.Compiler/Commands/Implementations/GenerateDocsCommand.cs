@@ -767,8 +767,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         if (associationRoles.Any())
         {
             BuildDirectory(docPath, ckModelId);
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "AssociationRoles"));
-            await MarkdownTableBuilder(outputFile, ckModelId, "AssociationRoles", context);
+            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
+            await MarkdownTableBuilder(outputFile, ckModelId, "Associations", context);
 
             foreach (var associationRole in associationRoles)
             {
@@ -797,8 +797,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
     private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle, List<string> headings)
     {
-        string titlePrefix = ckModelId != null ? $"{ckModelId.ModelId} " : "";
-        await outputFile.WriteLineAsync($"### {titlePrefix}{tableTitle}");
+        string titlePrefix = ckModelId != null ? $" {ckModelId.ModelId} " : "# ";
+        await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
 
         await outputFile.WriteLineAsync();
         foreach (var i in headings)

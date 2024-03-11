@@ -1,10 +1,10 @@
 using System.Text.Json.Nodes;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 using Meshmakers.Octo.Runtime.Engine.Messages;
-using Yaml2JsonNode;
 using YamlDotNet.RepresentationModel;
 
 namespace Meshmakers.Octo.Runtime.Engine.Serialization;

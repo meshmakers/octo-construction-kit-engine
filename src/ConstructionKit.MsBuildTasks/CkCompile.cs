@@ -108,7 +108,11 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             {
                                 Log.LogMessage(MessageImportance.High,
                                     "Publishing construction kit model to 'LocalRepository'");
+#if NETSTANDARD2_0
+                                using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
+#else
                                 await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
+#endif
 
                                 var ckCompiledModelRoot =
                                     await ckSerializer.DeserializeCompiledModelRootAsync(streamReader,

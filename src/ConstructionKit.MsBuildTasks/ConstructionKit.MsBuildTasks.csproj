@@ -8,7 +8,7 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.MsBuildTasks</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.MsBuildTasks</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.MsBuildTasks</RootNamespace>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
         <!-- we need the assemblies bundled, so set this so we don't expose any dependencies to the outside world -->
         <GenerateDependencyFile>true</GenerateDependencyFile>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>
@@ -21,6 +21,7 @@
         <IsPackable>true</IsPackable>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     </PropertyGroup>
 
     <ItemGroup>
@@ -72,17 +73,4 @@
                     FinalOutputPath="$(ProjectDepsFilePath)" />
         </ItemGroup>
     </Target>
-
-    <PropertyGroup>
-        <GetTargetPathDependsOn>$(GetTargetPathDependsOn);GetDependencyTargetPaths</GetTargetPathDependsOn>
-    </PropertyGroup>
-
-    <Target Name="GetDependencyTargetPaths" AfterTargets="ResolvePackageDependenciesForBuild">
-        <ItemGroup>
-            <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false"/>
-            <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false"/>
-            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" CopyToOutputDirectory="PreserveNewest" PackagePath="tasks/$(TargetFramework)/" />
-        </ItemGroup>
-    </Target>
-
 </Project>

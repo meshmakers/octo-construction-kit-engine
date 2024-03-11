@@ -3,7 +3,8 @@
     <!--defining properties interesting for my task-->
     <PropertyGroup>
         <!--The folder where the custom task will be present. It points to inside the NuGet package. -->
-        <OctoCkCompileTasksFolder Condition="'$(OctoCkCompileTasksFolder)' == ''">$(MSBuildThisFileDirectory)..\tasks\net8.0</OctoCkCompileTasksFolder>
+        <OctoCkCompileTasksFolder Condition="'$(OctoCkCompileTasksFolder)' == '' And '$(MSBuildRuntimeType)'=='Core'">$(MSBuildThisFileDirectory)..\tasks\net8.0</OctoCkCompileTasksFolder>
+        <OctoCkCompileTasksFolder Condition="'$(OctoCkCompileTasksFolder)' == '' And '$(MSBuildRuntimeType)'!='Core'">$(MSBuildThisFileDirectory)..\tasks\netstandard2.0</OctoCkCompileTasksFolder>
         <!--Reference to the assembly which contains the MSBuild Task-->
         <OctoCkCompileTasksAssembly>$(OctoCkCompileTasksFolder)\$(MSBuildThisFileName).dll</OctoCkCompileTasksAssembly>
     </PropertyGroup>

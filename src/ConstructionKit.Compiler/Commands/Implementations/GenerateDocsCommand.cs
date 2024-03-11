@@ -795,10 +795,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             _ => false // Handle unsupported types or throw an exception if needed
         };
     }
-    private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle, List<string> headings)
+    private static async Task MarkdownTableBuilder(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle, List<string> headings, bool AddTiltle = true)
     {
-        string titlePrefix = ckModelId != null ? $" {ckModelId.ModelId} " : "# ";
-        await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
+        if(AddTiltle)
+        {
+            await AddTitle(outputFile, ckModelId, tableTitle);
+        }
+        
 
         await outputFile.WriteLineAsync();
         foreach (var i in headings)
@@ -811,6 +814,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await outputFile.WriteAsync($"| -----------");
         }
         await outputFile.WriteLineAsync(" |");
+    }
+
+    private static async Task AddTitle(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle)
+    {
+        string titlePrefix = ckModelId != null ? $" {ckModelId.ModelId} " : "# ";
+        await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
     }
 
     private static IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)

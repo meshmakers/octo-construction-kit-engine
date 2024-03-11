@@ -572,7 +572,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
-        foreach (var type in GetClasses(modelGraph))
+        foreach (var type in GetTypes(modelGraph))
         {
             type.DrawClass(outputFile);
             type.DrawInheritance(outputFile);
@@ -602,7 +602,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await outputFile.WriteLineAsync("direction BT"); //Diagram Direction: Options TB, BT, RL, LR
     }
 
-    private static IEnumerable<CkTypeGraph> GetClasses(CkModelGraph modelGraph)
+    private static IEnumerable<CkTypeGraph> GetTypes(CkModelGraph modelGraph)
     {
         return modelGraph.Types.Select(x => x.Value);
     }
@@ -691,7 +691,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
-        IEnumerable<CkTypeGraph> typeGraphs = GetClasses(modelGraph)
+        IEnumerable<CkTypeGraph> typeGraphs = GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
         if (typeGraphs.Any())
@@ -700,7 +700,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
 
-            foreach (var type in GetClasses(modelGraph))
+            foreach (var type in GetTypes(modelGraph))
             {
                 if (MatchesModelId(type, ckModelId))
                 {

@@ -96,8 +96,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                         {
                             Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                 constructionKitFolderPath);
-                            var compileResult = await compilerService.CompileAsync(constructionKitFolderPath,
-                                OutputPath, CacheFilePath, operationResult);
+                            var compileResult = await compilerService.CompileAsync(constructionKitFolderPath.GetOsSpecificPath(),
+                                OutputPath.GetOsSpecificPath(), CacheFilePath?.GetOsSpecificPath(), operationResult);
                             compiledModelFiles.Add(compileResult.CompiledModelFile);
                             if (compileResult.CompiledModelCacheFilePath != null)
                             {

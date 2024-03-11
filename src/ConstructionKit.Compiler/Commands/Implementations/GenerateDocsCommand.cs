@@ -676,12 +676,17 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                     if (type.DefinedAttributes.Count == 0)
                     {
                         //await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.ModelId} {type.CkTypeId.Key.SemanticVersionedFullName}");
-                        await outputFile.WriteLineAsync($"### {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        //await outputFile.WriteLineAsync($"### {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
+                        await AddHierarchy(outputFile, type);
+                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
                     }
                     else
                     {
                         //prior type.CkTypeId.ModelId
                         await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
+                        await AddHierarchy(outputFile, type);
+                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
                         await MarkdownTableBuilder(outputFile, context);
 
                         foreach (var attribute in type.DefinedAttributes)
@@ -805,11 +810,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph)
     {
-        await outputFile.WriteLineAsync($"{ckTypeGraph.BaseTypes.First()}");
+        await outputFile.WriteLineAsync($"Inheritance: {ckTypeGraph.Path}");
     }
     private static async Task AddDescription(StreamWriter outputFile, string description)
     {
-        await outputFile.WriteLineAsync($"{description}");
+        //if description
+        await outputFile.WriteLineAsync("<details>");
+        await outputFile.WriteLineAsync("<summary>Description</summary>");
+        await outputFile.WriteLineAsync($"<div>{description}</div>");
+        await outputFile.WriteLineAsync("</details>");
     }
 
     private static IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)

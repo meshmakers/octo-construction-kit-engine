@@ -859,22 +859,31 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         if (string.IsNullOrEmpty(path))
         {
-           throw new ArgumentNullException(nameof(path));
+            throw new ArgumentNullException(nameof(path));
         }
 
-        int lastIndex = path.LastIndexOf('-');
+        // Extract and process the model ID part from the filename
+        string modelIdPart = GetModelIdPartFromPath(path);
 
-        string substringAfterLastHyphen = path[(lastIndex + 1)..];
-        
-        string[] parts = substringAfterLastHyphen.Split('.');
+        return new CkModelId(modelIdPart);
+    }
 
-        parts = parts.Take(parts.Length - 1).ToArray();
+    private static string GetModelIdPartFromPath(string path)
+    {
+        int lastHyphenIndex = path.LastIndexOf('-');
+        if (lastHyphenIndex == -1)
+        {
+            throw new ArgumentException("Invalid file path format. Missing hyphen separator.");
+        }
 
-        // Capitalize the first letter of each part
-        parts = parts.Select(part => part.Length > 0 ? char.ToUpper(part[0]) + part[1..] : part).ToArray();
+        string substringAfterLastHyphen = path[(lastHyphenIndex + 1)..];
 
-        // Join the parts back together with dots
-        return new CkModelId(string.Join(".", parts));
+        string[] parts = substringAfterLastHyphen.Split('.')
+                                         .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part
+                                         .Select(part => char.ToUpper(part[0]) + part[1..])
+                                         .ToArray();
+
+        return string.Join(".", parts);
     }
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,

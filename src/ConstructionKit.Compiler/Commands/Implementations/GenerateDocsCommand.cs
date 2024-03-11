@@ -704,11 +704,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 {
                     if (type.DefinedAttributes.Count == 0)
                     {
-                        await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.ModelId} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        //await outputFile.WriteLineAsync($"### {type.CkTypeId.ModelId.ModelId} {type.CkTypeId.Key.SemanticVersionedFullName}");
+                        await outputFile.WriteLineAsync($"### {type.CkTypeId.Key.SemanticVersionedFullName}");
                     }
                     else
                     {
-                        await MarkdownTableBuilder(outputFile, type.CkTypeId.ModelId, type.CkTypeId.Key.SemanticVersionedFullName, context);
+                        //prior type.CkTypeId.ModelId
+                        await MarkdownTableBuilder(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName, context);
 
                         foreach (var attribute in type.DefinedAttributes)
                         {
@@ -818,6 +820,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         string titlePrefix = ckModelId != null ? $" {ckModelId.ModelId} " : "# ";
         await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
+    }
+
+    private static async Task AddDescription(StreamWriter outputFile, string tableTitle)
+    {
+
     }
 
     private static IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)

@@ -23,13 +23,14 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         public static string CreateAnchor(this CkTypeGraph ckTypeGraph)
         {
-            string ret = ckTypeGraph.CkTypeId.ModelId.ModelId;
-            ret = ret.Replace("/", "-");
-            ret = ret.Replace(".", "");
-            ret = ret.ToLower();
-            ret = ret + "-" + ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
+            //string ret = ckTypeGraph.CkTypeId.ModelId.ModelId;
+            //ret = ret.Replace("/", "-");
+            //ret = ret.Replace(".", "");
+            //ret = ret.ToLower();
+            //ret = ret + "-" + ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
 
-            return ret;
+            //return ret;   
+            return ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
 
         }
 

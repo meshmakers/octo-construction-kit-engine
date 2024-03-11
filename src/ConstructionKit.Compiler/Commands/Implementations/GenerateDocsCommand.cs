@@ -833,6 +833,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.AssociationRoles.Select(x => x.Value);
     }
 
+    private static IEnumerable<CkModelId> GetModelIDs(CkModelGraph modelGraph)
+    {
+        return modelGraph.Types.Select(x => x.Key.ModelId).Distinct();
+    }
+
     private static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
         string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
@@ -927,25 +932,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
-        
-        CkModelId ckModelIdSystem = new("System", "1.0.0");
-        CkModelId ckModelIdBasic = new("Basic", "1.0.0");
-        CkModelId ckModelIdIndustryBasic = new("Industry.Basic", "1.0.0");
-        CkModelId ckModelIdIndustryEnergy = new("Industry.Energy", "1.0.0");
-        CkModelId ckModelIdIndustryFluid = new("Industry.Fluid", "1.0.0");
-        CkModelId ckModelIdEnvironment = new("Environment", "1.0.0");
-
-        CkModelId[] ckModelIds = [ckModelIdSystem, ckModelIdBasic , ckModelIdIndustryBasic, ckModelIdIndustryEnergy, ckModelIdIndustryFluid, ckModelIdEnvironment];
-
-
-        //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
-        
+        //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
 
         var Headings = new DocumentationContext();
-        
+        var validModelIds = GetModelIDs(test);
 
-        foreach (var modelID in ckModelIds)
+        foreach (var modelID in validModelIds)
         {
             GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
 

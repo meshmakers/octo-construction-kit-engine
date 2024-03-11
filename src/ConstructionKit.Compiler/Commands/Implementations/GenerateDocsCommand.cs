@@ -26,7 +26,6 @@ public class DocumentationContext
     [
         "ID",
         "DataType",
-        "ModelID",
         "Default Values",
         "Is Data Stream?",
         "Description",
@@ -215,7 +214,6 @@ static class CkAttributeGraphExtensions
             {
                 "ID" => $"{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()}", 
                 "DataType" => ckAttributeGraph.ValueType.ToString(),
-                "ModelID" => ckAttributeGraph.CkAttributeId.ModelId.ToString(),
                 "Default Values" => ckAttributeGraph.DrawDefaultValues(),
                 "Is Data Stream?" => ckAttributeGraph.IsDataStream.ToString(),
                 "Description" => ckAttributeGraph.Description ?? "",
@@ -616,7 +614,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
 
-            await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context);
+            await MarkdownTableBuilder(outputFile, ckModelId, "Attributes", context, false);
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
             foreach (var attribute in GetAttributes(modelGraph))
@@ -768,7 +766,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             BuildDirectory(docPath, ckModelId);
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
-            await MarkdownTableBuilder(outputFile, ckModelId, "Associations", context);
+            await MarkdownTableBuilder(outputFile, ckModelId, "Associations", context, false);
 
             foreach (var associationRole in associationRoles)
             {

@@ -218,7 +218,7 @@ static class CkAttributeGraphExtensions
                 "Default Values" => ckAttributeGraph.DrawDefaultValues(),
                 "Is Data Stream?" => ckAttributeGraph.IsDataStream.ToString(),
                 "Description" => ckAttributeGraph.Description ?? "",
-                "CkEnumId/CkRecordId" => $"{ckAttributeGraph.ValueCkEnumId}{ckAttributeGraph.ValueCkRecordId}",
+                "CkEnumId/CkRecordId" => $"{ckAttributeGraph.LinkToRecordOrEnum()}",
                 _ => string.Empty
             };
 
@@ -254,6 +254,24 @@ static class CkAttributeGraphExtensions
         }
         return "";
         
+    }
+
+    private static string LinkToRecordOrEnum(this CkAttributeGraph ckAttributeGraph)
+    {
+        if(ckAttributeGraph.ValueCkEnumId != null)
+        {
+            string link = new(LinkHelpers.CreateRelativeFilepath(ckAttributeGraph.CkAttributeId.ModelId, "Enums"));
+            return "[" + ckAttributeGraph.ValueCkEnumId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkEnumId.Key.EnumId.ToLower() + ")";
+        }
+        else if(ckAttributeGraph.ValueCkRecordId != null)
+        {
+            string link = new(LinkHelpers.CreateRelativeFilepath(ckAttributeGraph.CkAttributeId.ModelId, "Records"));
+            return "[" + ckAttributeGraph.ValueCkEnumId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkRecordId.Key.RecordId.ToLower() + ")";
+        }
+        else
+        {
+            return "";
+        }
     }
 }
 

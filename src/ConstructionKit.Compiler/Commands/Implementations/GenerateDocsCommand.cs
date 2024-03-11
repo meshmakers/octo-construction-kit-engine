@@ -15,6 +15,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Octokit;
+using YamlDotNet.Core.Events;
 using YamlDotNet.Core.Tokens;
 using static System.Net.Mime.MediaTypeNames;
 
@@ -260,42 +261,22 @@ static class CkEnumGraphExtensions
 {
     public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, List<string> enumHeadings)
     {
-        foreach (var heading in enumHeadings)
-        {
-            string content = heading switch
-            {
-                "ID" => $"{ckEnumGraph.AddAnchor()}{ckEnumGraph.CkEnumId.SemanticVersionedFullName}",
-                "Values" => ckEnumGraph.DrawValuesOrDescriptions(true),
-                "Descriptions" => ckEnumGraph.DrawValuesOrDescriptions(false),
-                _ => string.Empty
-            };
-
-
-            await outputFile.WriteAsync($"| {content} ");
-
-        }
-
-        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
-    }
-
-    private static string DrawValuesOrDescriptions(this CkEnumGraph ckEnumGraph, bool drawValues)
-    {
-        StringBuilder stringBuilder = new();
-        stringBuilder.Append("<ol start=\"0\">");
+        int counter = 0;
         foreach (var value in ckEnumGraph.Values)
         {
-            stringBuilder.Append("<li>");
-            stringBuilder.Append(drawValues ? $"{value.Name}" : $"{value.Description}");
-            stringBuilder.Append("</li>");
+            foreach (var heading in enumHeadings)
+            {
+                string content = heading switch
+                {
+                    "ID" => $"{counter++}",
+                    "Values" => $"{value.Name}",
+                    "Descriptions" => $"{value.Description}",
+                    _ => string.Empty
+                };
+                await outputFile.WriteAsync($"| {content} ");
+            }
+            await outputFile.WriteLineAsync("|");
         }
-        stringBuilder.Append("</ol>");
-        
-        return stringBuilder.ToString();
-    }
-
-    private static string AddAnchor(this CkEnumGraph ckEnumGraph)
-    {
-        return $"<a id=\"{ckEnumGraph.CkEnumId.SemanticVersionedFullName}\"></a>";
     }
 }
 
@@ -642,13 +623,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
-            await MarkdownTableBuilder(outputFile, context);
+            
 
             foreach (var Enum in GetEnums(modelGraph))
             {
                 if (MatchesModelId(Enum, ckModelId))
                 {
-
+                    await AddTitle(outputFile, null, Enum.CkEnumId.Key.SemanticVersionedFullName);
+                    await MarkdownTableBuilder(outputFile, context);
                     Enum.DrawEnum(outputFile, context);
                 }
             }

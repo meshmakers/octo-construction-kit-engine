@@ -75,8 +75,8 @@ public class CkRestore : Microsoft.Build.Utilities.Task
                         {
                             Log.LogMessage(MessageImportance.High, "Restoring construction kit model libraries in '{0}'",
                                 ckModelConfigFilePath);
-                            var compileResult = await ckModelRepositoryService.RestoreConstructionKitModelsAsync(ckModelConfigFilePath,
-                                OutputPath, CacheFilePath, operationResult);
+                            var compileResult = await ckModelRepositoryService.RestoreConstructionKitModelsAsync(ckModelConfigFilePath.GetOsSpecificPath(),
+                                OutputPath.GetOsSpecificPath(), CacheFilePath?.GetOsSpecificPath(), operationResult);
                             if (operationResult.HasErrors || operationResult.HasFatalErrors)
                             {
                                 Log.LogError("Error restoring model \'{FilePath}\'", ckModelConfigFilePath);

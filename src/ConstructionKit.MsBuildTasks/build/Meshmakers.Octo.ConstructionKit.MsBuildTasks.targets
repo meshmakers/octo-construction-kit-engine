@@ -29,7 +29,7 @@
     <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
             DependsOnTargets="GatherCompileFiles">
 
-        <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
+        <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework)) -> $(OctoCkCompileOutputCompilerFolder)" />
         <!--Calling our custom task-->
         <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" 
                    OutputPath="$(OctoCkCompileOutputCompilerFolder)"

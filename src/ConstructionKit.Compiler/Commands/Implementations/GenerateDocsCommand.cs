@@ -817,6 +817,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
+    public static async Task GenerateVersionHistory(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    {
+        BuildDirectory(docPath, ckModelId);
+        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
+        List<string> headings = ["Version", "Description"];
+        await MarkdownTableBuilder(outputFile, headings);
+    }
+
     //C# Pattern Matching insanity
     private static bool MatchesModelId(object item, CkModelId modelId)
     {

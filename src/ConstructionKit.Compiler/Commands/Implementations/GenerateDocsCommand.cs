@@ -820,9 +820,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private static string ReconstructHierarchyFromPath(string path)
     {
         StringBuilder stringBuilder = new();
-        string[] seperators = ["->", ":"];
+        string[] separators = ["->", ":"];
 
-        string[] parts = path.Split(seperators, StringSplitOptions.TrimEntries);
+        var parts = path.Split(separators, StringSplitOptions.TrimEntries);
         var reconstructedhierachy = parts.Reverse();
 
         foreach (var obj in reconstructedhierachy)

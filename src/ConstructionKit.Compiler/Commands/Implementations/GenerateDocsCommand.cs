@@ -101,6 +101,14 @@ public class LinkItemBuilder(string itemName)
                            .Append(')');
     }
 
+    public void BuildLinkToAssociation()
+    {
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Associations"))
+                           .Append('#')
+                           .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
+                           .Append(')');
+    }
+
     public override string ToString()
     {
         return _itemStringBuilder.ToString();
@@ -533,13 +541,10 @@ static class CkAssociationRoleGraphExtensions
 
     private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph)
     {
-        //shoud be associations
-        string link = new(LinkHelpers.CreateRelativeFilepath(ckAssociationRoleGraph.CkRoleId.ModelId.ModelId, "AssociationRoles"));
-        
-        link = "[" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + ")";
-        return link;
-
-        //WIP
+        //on useful 50% of the time?
+        var builder = new LinkItemBuilder(ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName);
+        builder.BuildLinkToAssociation();
+        return builder.ToString();
     }
 
     private static string AddAnchor(this CkAssociationRoleGraph ckAssociationRoleGraph)

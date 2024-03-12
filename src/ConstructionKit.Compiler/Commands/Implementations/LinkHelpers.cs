@@ -14,8 +14,6 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return Path.Combine(BuildFilepath(docPath, modelId), $"{extension}.md");
         }
 
-        
-
         public static string FormatAnchor(string unformattedAnchor)
         {
             string anchor = unformattedAnchor.Replace(".", "").ToLower();

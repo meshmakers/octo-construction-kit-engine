@@ -286,7 +286,7 @@ static class CkAttributeGraphExtensions
         else if(ckAttributeGraph.ValueCkRecordId != null)
         {
             string link = new(LinkHelpers.CreateRelativeFilepath(ckAttributeGraph.CkAttributeId.ModelId, "Records"));
-            return "[" + ckAttributeGraph.ValueCkEnumId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkRecordId.Key.RecordId.ToLower() + ")";
+            return "[" + ckAttributeGraph.ValueCkRecordId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkRecordId.Key.RecordId.ToLower() + ")";
         }
         else
         {

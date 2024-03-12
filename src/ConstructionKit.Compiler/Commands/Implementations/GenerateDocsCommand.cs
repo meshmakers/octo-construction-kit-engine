@@ -85,6 +85,22 @@ public class LinkItemBuilder(string itemName)
                           .Append(')');
     }
 
+    public void BuildLinkToEnum()
+    {
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Enums"))
+                           .Append('#')
+                           .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
+                           .Append(')');
+    }
+
+    public void BuildLinkToRecord()
+    {
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Records"))
+                           .Append('#')
+                           .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
+                           .Append(')');
+    }
+
     public override string ToString()
     {
         return _itemStringBuilder.ToString();
@@ -280,13 +296,15 @@ static class CkAttributeGraphExtensions
     {
         if(ckAttributeGraph.ValueCkEnumId != null)
         {
-            string link = new(LinkHelpers.CreateRelativeFilepath(ckAttributeGraph.CkAttributeId.ModelId, "Enums"));
-            return "[" + ckAttributeGraph.ValueCkEnumId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkEnumId.Key.EnumId.ToLower() + ")";
+            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkEnumId.SemanticVersionedFullName);
+            builder.BuildLinkToEnum();
+            return builder.ToString();
         }
         else if(ckAttributeGraph.ValueCkRecordId != null)
         {
-            string link = new(LinkHelpers.CreateRelativeFilepath(ckAttributeGraph.CkAttributeId.ModelId, "Records"));
-            return "[" + ckAttributeGraph.ValueCkRecordId + "]" + "(" + link + "#" + ckAttributeGraph.ValueCkRecordId.Key.RecordId.ToLower() + ")";
+            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkRecordId.SemanticVersionedFullName);
+            builder.BuildLinkToRecord();
+            return builder.ToString();
         }
         else
         {

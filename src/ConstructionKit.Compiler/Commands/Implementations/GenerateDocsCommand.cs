@@ -551,12 +551,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
 
-        //Create Page Heading (could be delegated to function)
+
         string[] split = ckModelId.ModelId.Split('.');
         await outputFile.WriteLineAsync($"# {split.Last()}");
         await outputFile.WriteLineAsync();
-
-        await AddDescription(outputFile, "DIAGRAM DESCRIPTION");
 
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 

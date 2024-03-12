@@ -812,7 +812,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph)
     {
-        await outputFile.WriteLineAsync($"Inheritance: {ckTypeGraph.Path}");
+        string hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path);
+        await outputFile.WriteLineAsync($"Inheritance: {hierarchy}");
+    }
+
+    //maybe return string[]?
+    private static string ReconstructHierarchyFromPath(string path)
+    {
+        string[] seperators = ["->", ":"];
+
+        string[] parts = path.Split(seperators, StringSplitOptions.TrimEntries);
+        var reconstructedhierachy = parts.Reverse();
+        return reconstructedhierachy.ToString() ?? "";
     }
     private static async Task AddDescription(StreamWriter outputFile, string description)
     {

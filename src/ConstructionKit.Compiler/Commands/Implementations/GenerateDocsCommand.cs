@@ -699,14 +699,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                     {
                         await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
                         //await AddHierarchy(outputFile, type);
-                        //await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
                     }
                     else
                     {
                         //prior type.CkTypeId.ModelId
                         await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
                         //await AddHierarchy(outputFile, type);
-                        //await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
                         await MarkdownTableBuilder(outputFile, context);
 
                         foreach (var attribute in type.DefinedAttributes)

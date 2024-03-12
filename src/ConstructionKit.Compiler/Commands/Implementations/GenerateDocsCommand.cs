@@ -75,12 +75,13 @@ public class DocumentationContext
 public class LinkItemBuilder(string itemName)
 {
     private readonly StringBuilder _itemStringBuilder = new($"[{itemName}](");
+    private readonly string _itemName = itemName;
 
     public void BuildLinkToType()
     {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemStringBuilder.ToString().Split('/').First(), "Types"))
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Types"))
                           .Append('#')
-                          .Append(LinkHelpers.FormatAnchor(_itemStringBuilder.ToString().Split('/').Last()))
+                          .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
                           .Append(')');
     }
 
@@ -837,29 +838,37 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static string ReconstructHierarchyFromPath(string path)
     {
-        StringBuilder stringBuilder = new();
+        //StringBuilder stringBuilder = new();
         string[] separators = ["->", ":"];
 
         var parts = path.Split(separators, StringSplitOptions.TrimEntries);
         var reconstructedhierachy = parts.Reverse();
 
-        foreach (var obj in reconstructedhierachy)
+        return BuildHierarchyString(reconstructedhierachy.ToArray());
+    }
+
+    private static string BuildHierarchyString(string[] reconstructedHierarchy)
+    {
+        StringBuilder stringBuilder = new();
+
+        for (int i = 0; i < reconstructedHierarchy.Length; i++)
         {
-            stringBuilder.Append('[');
-            stringBuilder.Append(obj);
-            stringBuilder.Append(']');
-            stringBuilder.Append('(');
-            stringBuilder.Append(LinkHelpers.CreateRelativeFilepath(obj.Split('/').First(), "Types"));
-            stringBuilder.Append('#');
-            stringBuilder.Append(LinkHelpers.FormatAnchor(obj.Split('/').Last()));
-            stringBuilder.Append(')');
-            //dont add for last iteration!
-            stringBuilder.Append(' ');
-            stringBuilder.Append('\u2794');
-            stringBuilder.Append(' ');
+            var obj = reconstructedHierarchy[i];
+            var builder = new LinkItemBuilder(obj);
+            builder.BuildLinkToType();
+            stringBuilder.Append(builder.ToString());
+
+            if (i < reconstructedHierarchy.Length - 1)
+            {
+                stringBuilder.Append(' ')
+                             .Append('\u2794')
+                             .Append(' ');
+            }
         }
+
         return stringBuilder.ToString();
     }
+
     private static async Task AddDescription(StreamWriter outputFile, string description)
     {
         //if description

@@ -85,6 +85,14 @@ public class LinkItemBuilder(string itemName)
                           .Append(')');
     }
 
+    public void BuildLinkToAttribute()
+    {
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Attributes"))
+                           .Append('#')
+                           .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
+                           .Append(')');
+    }
+
     public void BuildLinkToEnum()
     {
         _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Enums"))
@@ -289,7 +297,7 @@ static class CkAttributeGraphExtensions
 
     private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
     {
-        return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName}\"></a>";
+        return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName.ToLower()}\"></a>";
     }
 
     private static string AddName(this CkAttributeGraph ckAttributeGraph)
@@ -504,12 +512,9 @@ static class CkTypeAttributeDtoExtensions
 
     private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto)
     {
-        string link = new(LinkHelpers.CreateRelativeFilepath(ckTypeAttributeDto.CkAttributeId.ModelId, "Attributes"));
-        //For different name use ckTypeAttributeDto.AttributeName
-        link = "[" + ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + ")";    
-        return link;
-
-        //WIP
+        var builder = new LinkItemBuilder(ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName);
+        builder.BuildLinkToAttribute();
+        return builder.ToString();
     }
 }
 

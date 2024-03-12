@@ -239,6 +239,18 @@ static class CkTypeGraphExtensions
         //[\"{ckTypeGraph.CkTypeId.ModelId.ModelId}\"]
         //does not work as it does with classes????
     }
+
+    public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    {
+        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
+        await outputFile.WriteAsync(LinkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types"));
+        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
+    }
+
+    public static string CreateAnchor(this CkTypeGraph ckTypeGraph)
+    {
+        return ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
+    }
 }
 
 static class CkAttributeGraphExtensions

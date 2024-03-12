@@ -79,7 +79,7 @@ public class LinkItemBuilder(string itemName)
 
     public void BuildLinkToType()
     {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Types"))
+       _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Types"))
                           .Append('#')
                           .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
                           .Append(')');
@@ -109,7 +109,7 @@ static class CkTypeGraphExtensions
         return sanitizedFullName;
     }
 
-    public static async void DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    public static async Task DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
         await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}");
 
@@ -131,7 +131,7 @@ static class CkTypeGraphExtensions
         }
     }
 
-    public static async void DrawInheritance(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    public static async Task DrawInheritance(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
         //Checks for Inheritance In BaseTypes and Creates Arrows ;)
         if (ckTypeGraph.BaseTypes.Count != 0)
@@ -140,7 +140,7 @@ static class CkTypeGraphExtensions
         }
     }
 
-    public static async void DrawAssociations(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, IEnumerable<CkAssociationRoleGraph> typeAssociations)
+    public static async Task DrawAssociations(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, IEnumerable<CkAssociationRoleGraph> typeAssociations)
     {
         if (ckTypeGraph.Associations.DefinedAssociations.Count != 0)
         {
@@ -162,7 +162,7 @@ static class CkTypeGraphExtensions
         }
     }
 
-    public static async void StyleClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    public static async Task StyleClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
         if (ckTypeGraph.IsAbstract)
         {
@@ -208,7 +208,7 @@ static class CkTypeGraphExtensions
         return OutboundMultiplicityConversion;
     }
 
-    public static async void DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+    public static async Task DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
         await GetNamespaceName(ckTypeGraph, outputFile);
 
@@ -227,7 +227,7 @@ static class CkTypeGraphExtensions
 
 static class CkAttributeGraphExtensions
 {
-    public static async void DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile, List<string> attributeHeadings)
+    public static async Task DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile, List<string> attributeHeadings)
     {
         foreach (var heading in attributeHeadings)
         {
@@ -297,7 +297,7 @@ static class CkAttributeGraphExtensions
 
 static class CkEnumGraphExtensions
 {
-    public static async void DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, List<string> enumHeadings)
+    public static async Task DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile, List<string> enumHeadings)
     {
         int counter = 0;
         foreach (var value in ckEnumGraph.Values)
@@ -320,7 +320,7 @@ static class CkEnumGraphExtensions
 
 static class CkRecordGraphExtensions
 {
-    public static async void DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, List<string> recordHeadings)
+    public static async Task DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, List<string> recordHeadings)
     {
         foreach (var heading in recordHeadings)
         {
@@ -403,7 +403,7 @@ static class CkRecordGraphExtensions
 
 static class CkTypeAttributeDtoExtensions
 {
-    public static async void DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, List<string> attributeDtoHeadings)
+    public static async Task DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, List<string> attributeDtoHeadings)
     {
         foreach (var heading in attributeDtoHeadings)
         {
@@ -475,7 +475,7 @@ static class CkTypeAttributeDtoExtensions
 
 static class CkAssociationRoleGraphExtensions
 {
-    public static async void DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> associationRoleHeadings, CkTypeAssociationGraph? association)
+    public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, List<string> associationRoleHeadings, CkTypeAssociationGraph? association)
     {
         foreach (var heading in associationRoleHeadings)
         {
@@ -563,12 +563,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Prints Class and Defined Attributes of Each Type if there is any
         foreach (var type in GetTypes(modelGraph))
         {
-            type.DrawClass(outputFile);
-            type.DrawInheritance(outputFile);
-            type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
-            type.StyleClass(outputFile);
-            type.LinkToType(outputFile);
-            type.DrawNamespaces(outputFile);
+            await type.DrawClass(outputFile);
+            await type.DrawInheritance(outputFile);
+            await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
+            await type.StyleClass(outputFile);
+            await type.LinkToType(outputFile);
+            await type.DrawNamespaces(outputFile);
         }
 
         //final line to end mermaid code block
@@ -612,7 +612,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             {
                 if (MatchesModelId(attribute, ckModelId))
                 {
-                    attribute.DrawAttribute(outputFile, context);
+                    await attribute.DrawAttribute(outputFile, context);
                 }
             }
         }
@@ -641,7 +641,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 {
                     await AddTitle(outputFile, null, Enum.CkEnumId.Key.SemanticVersionedFullName);
                     await MarkdownTableBuilder(outputFile, context);
-                    Enum.DrawEnum(outputFile, context);
+                    await Enum.DrawEnum(outputFile, context);
                 }
             }
         }
@@ -669,7 +669,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             {
                 if (MatchesModelId(record, ckModelId))
                 {
-                    record.DrawRecord(outputFile, context);
+                    await record.DrawRecord(outputFile, context);
                 }
             }
         }
@@ -695,27 +695,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             {
                 if (MatchesModelId(type, ckModelId))
                 {
-                    if (type.DefinedAttributes.Count == 0)
-                    {
-                        await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
-                        //await AddHierarchy(outputFile, type);
-                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
-                    }
-                    else
-                    {
-                        //prior type.CkTypeId.ModelId
-                        await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
-                        //await AddHierarchy(outputFile, type);
-                        await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                    await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
+                    await AddHierarchy(outputFile, type);
+                    await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+
+                    if (type.DefinedAttributes.Count != 0)
+                    {                        
                         await MarkdownTableBuilder(outputFile, context);
 
                         foreach (var attribute in type.DefinedAttributes)
                         {
 
-                            attribute.DrawAttribute(outputFile, context);
-                        }
-
-                       
+                            await attribute.DrawAttribute(outputFile, context);
+                        }                    
                     }
 
                     //For Drawing all Associations that are associated with type
@@ -739,7 +731,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                         tableBuilt = true;
                                     }
 
-                                    item.DrawAssociationRole(outputFile, DocContextAttrib.AssociationRolesHeadings, association);
+                                    await item.DrawAssociationRole(outputFile, DocContextAttrib.AssociationRolesHeadings, association);
                                 }
                             }
 
@@ -770,7 +762,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             foreach (var associationRole in associationRoles)
             {
-                associationRole.DrawAssociationRole(outputFile, context, null);
+               await associationRole.DrawAssociationRole(outputFile, context, null);
             }
         }
         else
@@ -831,12 +823,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph)
     {
         string hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path);
+        Console.WriteLine($"{hierarchy}");
         await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
     }
 
     private static string ReconstructHierarchyFromPath(string path)
     {
-        //StringBuilder stringBuilder = new();
         string[] separators = ["->", ":"];
 
         var parts = path.Split(separators, StringSplitOptions.TrimEntries);

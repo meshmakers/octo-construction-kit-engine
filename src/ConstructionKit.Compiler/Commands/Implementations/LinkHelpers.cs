@@ -14,7 +14,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return Path.Combine(BuildFilepath(docPath, modelId), $"{extension}.md");
         }
 
-        public static async void LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
+        public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
         {
             await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
             await outputFile.WriteAsync(CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types"));

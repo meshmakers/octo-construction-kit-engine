@@ -500,6 +500,8 @@ static class CkTypeAttributeDtoExtensions
         //For different name use ckTypeAttributeDto.AttributeName
         link = "[" + ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckTypeAttributeDto.CkAttributeId.Key.SemanticVersionedFullName + ")";    
         return link;
+
+        //WIP
     }
 }
 
@@ -531,10 +533,13 @@ static class CkAssociationRoleGraphExtensions
 
     private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph)
     {
+        //shoud be associations
         string link = new(LinkHelpers.CreateRelativeFilepath(ckAssociationRoleGraph.CkRoleId.ModelId.ModelId, "AssociationRoles"));
         
         link = "[" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + "]" + "(" + link + "#" + ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName + ")";
         return link;
+
+        //WIP
     }
 
     private static string AddAnchor(this CkAssociationRoleGraph ckAssociationRoleGraph)

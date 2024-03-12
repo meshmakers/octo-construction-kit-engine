@@ -70,6 +70,25 @@ public class DocumentationContext
         "Target Attributes"
     ];
 }
+
+//Expected Format for itemName Class.Name/UnformatedAnchor
+public class LinkItemBuilder(string itemName)
+{
+    private readonly StringBuilder _itemStringBuilder = new($"[{itemName}](");
+
+    public void BuildLinkToType()
+    {
+        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemStringBuilder.ToString().Split('/').First(), "Types"))
+                          .Append('#')
+                          .Append(LinkHelpers.FormatAnchor(_itemStringBuilder.ToString().Split('/').Last()))
+                          .Append(')');
+    }
+
+    public override string ToString()
+    {
+        return _itemStringBuilder.ToString();
+    }
+}
 static class CkTypeGraphExtensions
 {
     public static string GetClassName(this CkId<CkTypeId> ckTypeGraph)
@@ -813,10 +832,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph)
     {
         string hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path);
-        await outputFile.WriteLineAsync($"Inheritance: {hierarchy}");
+        await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
     }
 
-    //maybe return string[]?
     private static string ReconstructHierarchyFromPath(string path)
     {
         StringBuilder stringBuilder = new();

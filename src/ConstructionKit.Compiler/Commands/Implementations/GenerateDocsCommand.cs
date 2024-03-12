@@ -819,11 +819,25 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     //maybe return string[]?
     private static string ReconstructHierarchyFromPath(string path)
     {
+        StringBuilder stringBuilder = new();
         string[] seperators = ["->", ":"];
 
         string[] parts = path.Split(seperators, StringSplitOptions.TrimEntries);
         var reconstructedhierachy = parts.Reverse();
-        return reconstructedhierachy.ToString() ?? "";
+        foreach (var obj in reconstructedhierachy)
+        {
+            stringBuilder.Append('[');
+            stringBuilder.Append(obj);
+            stringBuilder.Append(']');
+            stringBuilder.Append('(');
+            stringBuilder.Append("link");
+            stringBuilder.Append(')');
+            //dont add for last iteration!
+            stringBuilder.Append(' ');
+            stringBuilder.Append('\u2794');
+            stringBuilder.Append(' ');
+        }
+        return stringBuilder.ToString();
     }
     private static async Task AddDescription(StreamWriter outputFile, string description)
     {

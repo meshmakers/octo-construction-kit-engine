@@ -824,13 +824,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         string[] parts = path.Split(seperators, StringSplitOptions.TrimEntries);
         var reconstructedhierachy = parts.Reverse();
+
         foreach (var obj in reconstructedhierachy)
         {
             stringBuilder.Append('[');
             stringBuilder.Append(obj);
             stringBuilder.Append(']');
             stringBuilder.Append('(');
-            stringBuilder.Append("link");
+            stringBuilder.Append(LinkHelpers.CreateRelativeFilepath(obj.Split('/').First(), "Types"));
+            stringBuilder.Append('#');
+            stringBuilder.Append(LinkHelpers.FormatAnchor(obj.Split('/').Last()));
             stringBuilder.Append(')');
             //dont add for last iteration!
             stringBuilder.Append(' ');

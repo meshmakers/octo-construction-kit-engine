@@ -34,6 +34,12 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         }
 
+        public static string FormatAnchor(string unformattedAnchor)
+        {
+            string anchor = unformattedAnchor.Replace(".", "").ToLower();
+            return anchor;
+        }
+
         public static string GetCommonPathParts(CkModelId ckModelId)
         {
             string[] modelIdparts = ckModelId.ModelId.Split(".");
@@ -62,6 +68,12 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return linkWithBackslash.Replace("\\", "/");
         }
 
-        
+        public static string CreateRelativeFilepath(string ckModelId, string suffix)
+        {
+            CkModelId modelId = new(ckModelId);
+            return CreateRelativeFilepath(modelId, suffix);
+        }
+
+
     }
 }

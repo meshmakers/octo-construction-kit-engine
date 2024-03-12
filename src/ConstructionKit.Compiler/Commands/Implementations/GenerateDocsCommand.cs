@@ -640,7 +640,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return modelGraph.Types.Select(x => x.Value);
     }
-    public static async void GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    public static async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
         IEnumerable<CkAttributeGraph> attributes = GetAttributes(modelGraph)
              .Where(attribute => MatchesModelId(attribute, ckModelId));
@@ -668,7 +668,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public static async void GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    public static async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
         IEnumerable<CkEnumGraph> enums = GetEnums(modelGraph)
             .Where(en => MatchesModelId(en, ckModelId));
@@ -697,7 +697,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public static async void GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    public static async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
         IEnumerable<CkRecordGraph> records = GetRecords(modelGraph)
             .Where(record => MatchesModelId(record, ckModelId));
@@ -725,7 +725,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public static async void GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    public static async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
         IEnumerable<CkTypeGraph> typeGraphs = GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
@@ -793,7 +793,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    public static async void GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
+    public static async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, List<string> context)
     {
         // Check if there are any association roles to draw before proceeding
         IEnumerable<CkAssociationRoleGraph> associationRoles = GetAssociationRoles(modelGraph)
@@ -1039,15 +1039,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         foreach (var modelID in validModelIds)
         {
-            GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
+            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
 
-            GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
+            await GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
 
-            GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
+            await GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
-            GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+            await GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
 
-            GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
+            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
         }
 
         

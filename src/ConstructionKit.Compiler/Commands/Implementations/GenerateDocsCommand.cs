@@ -863,7 +863,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph)
     {
         string hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path);
-        Console.WriteLine($"{hierarchy}");
         await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
     }
 

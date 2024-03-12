@@ -590,7 +590,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
 
-    public static async void GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    public static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
         BuildDirectory(docPath, ckModelId);
 
@@ -1032,7 +1032,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
-        GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
+        await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
 
         var Headings = new DocumentationContext();
         var validModelIds = GetModelIDs(test);

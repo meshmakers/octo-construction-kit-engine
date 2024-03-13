@@ -998,13 +998,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static string GetModelIdPartFromPath(string path)
     {
-        int lastHyphenIndex = path.LastIndexOf('-');
+        int lastHyphenIndex = path.LastIndexOf("ck-");
         if (lastHyphenIndex == -1)
         {
             throw new ArgumentException("Invalid file path format. Missing hyphen separator.");
         }
 
-        string substringAfterLastHyphen = path[(lastHyphenIndex + 1)..];
+        string substringAfterLastHyphen = path[(lastHyphenIndex + 3)..];
 
         string[] parts = substringAfterLastHyphen.Split('.')
                                          .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part
@@ -1055,6 +1055,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
+        var valModelID = new CkModelId("Industry.Fluid-2.0.0");
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
         

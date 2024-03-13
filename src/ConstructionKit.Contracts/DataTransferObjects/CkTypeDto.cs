@@ -56,4 +56,11 @@ public class CkTypeDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool EnableChangeStreamPreAndPostImages { get; set; }
+
+    /// <summary>
+    /// Get or sets a value indicating whether this type is a stream type.
+    /// This information is gathered from the types.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsStreamType { get; set; }
 }

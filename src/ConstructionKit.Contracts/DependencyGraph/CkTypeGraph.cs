@@ -29,6 +29,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         CkTypeId = ckTypeId;
         IsAbstract = ckTypeDto.IsAbstract;
         IsFinal = ckTypeDto.IsFinal;
+        IsStreamType = ckTypeDto.IsStreamType;
         IsCollectionRoot = ckTypeDto.IsCollectionRoot;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         _baseTypes = new List<CkGraphTypeInheritance>();
@@ -47,6 +48,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="isAbstract"></param>
     /// <param name="isFinal"></param>
     /// <param name="isCollectionRoot"></param>
+    /// <param name="isStreamType"></param>
     /// <param name="baseTypes"></param>
     /// <param name="derivedFromCkTypeId"></param>
     /// <param name="definingCollectionRootCkTypeId"></param>
@@ -56,7 +58,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="indexes"></param>
     /// <param name="associations"></param>
     [JsonConstructor]
-    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot, bool isStreamType,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
         CkId<CkTypeId>? derivedFromCkTypeId,
         CkId<CkTypeId>? definingCollectionRootCkTypeId,
@@ -69,6 +71,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
+        IsStreamType = isStreamType;
         IsCollectionRoot = isCollectionRoot;
         DerivedFromCkTypeId = derivedFromCkTypeId;
         DefiningCollectionRootCkTypeId = definingCollectionRootCkTypeId;
@@ -134,6 +137,12 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// </summary>
     public IReadOnlyCollection<CkTypeIndexDto> Indexes { get; set; }
 
+    /// <summary>
+    /// Get or sets a value indicating whether this type is a stream type.
+    /// This information is gathered from the types.
+    /// </summary>
+    public bool IsStreamType { get; set; }
+    
     /// <summary>
     ///     Returns a string that describes the inheritance chain
     /// </summary>

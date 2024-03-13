@@ -117,6 +117,12 @@ public class LinkItemBuilder(string itemName)
                            .Append(')');
     }
 
+    public void BuildLinkToVersionHistory()
+    {
+        _itemStringBuilder.Append("./VersionHistory")
+                          .Append(')')
+                          .Insert(0, "#### ");
+    }
     public override string ToString()
     {
         return _itemStringBuilder.ToString();
@@ -618,6 +624,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //final line to end mermaid code block
         await EndDiagram(outputFile);
+
+        await LinkToVersionHistory(outputFile);
     }
 
     private static async Task EndDiagram(StreamWriter outputFile)
@@ -819,10 +827,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public static async Task GenerateVersionHistory(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
+        //Should it even call Build Directory?
         BuildDirectory(docPath, ckModelId);
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
         List<string> headings = ["Version", "Description"];
         await MarkdownTableBuilder(outputFile, headings);
+    }
+
+    private static async Task LinkToVersionHistory(StreamWriter outputFile)
+    {
+        var builder = new LinkItemBuilder("VersionHistory");
+        builder.BuildLinkToVersionHistory();
+        await outputFile.WriteLineAsync(builder.ToString());
     }
 
     //C# Pattern Matching insanity
@@ -1041,6 +1057,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
+        
+        //Creates VersionHistory
+        await GenerateVersionHistory(test, docusaurusPath, BuildIdFromFilepath(filePath));
 
         var Headings = new DocumentationContext();
         var validModelIds = GetModelIDs(test);

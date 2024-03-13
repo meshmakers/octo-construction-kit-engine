@@ -29,7 +29,7 @@ public class CkModelIdConverter : JsonConverter<CkModelId>, IYamlTypeConverter
     public void WriteYaml(IEmitter emitter, object? value, Type type)
     {
         var modelId = (CkModelId)value!;
-        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, modelId.SemanticVersionedFullName, ScalarStyle.Any, true, false));
+        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, modelId.FullName, ScalarStyle.Any, true, false));
     }
 
     /// <inheritdoc />

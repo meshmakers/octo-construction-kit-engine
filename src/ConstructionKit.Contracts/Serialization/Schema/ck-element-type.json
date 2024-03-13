@@ -130,6 +130,9 @@
         "isAbstract": {
           "type": "boolean"
         },
+        "isStreamType": {
+          "type": "boolean"
+        },
         "attributes": {
           "type": "array",
           "items": {

@@ -22,7 +22,8 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 
         public static string GetCommonPathParts(CkModelId ckModelId)
         {
-            string[] modelIdparts = ckModelId.ModelId.Split(".");
+            //string[] modelIdparts = ckModelId.ModelId.Split(".");
+            string[] modelIdparts = ckModelId.SemanticVersionedFullName.Split(".");
             string path = "";
 
             for (int i = 0; i < modelIdparts.Length; i++)

@@ -1056,6 +1056,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
         var valModelID = new CkModelId("Industry.Fluid-2.0.0");
+        LinkHelpers.GetCommonPathParts(valModelID);
+
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
         

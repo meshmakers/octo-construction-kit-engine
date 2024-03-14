@@ -597,6 +597,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
 
+    //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
     public static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
         BuildDirectory(docPath, ckModelId);
@@ -1100,10 +1101,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var IdFromFilepath = BuildIdFromFilepath(filePath);
         bool DrawEntireModel = true;
 
-        //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
+        //ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath);
-
-        //Creates VersionHistory
         await GenerateVersionHistory(test, docusaurusPath, IdFromFilepath);
 
         var modelIds = DrawEntireModel ? GetModelIDs(test) : [IdFromFilepath];

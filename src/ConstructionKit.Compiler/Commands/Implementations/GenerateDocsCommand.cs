@@ -188,7 +188,7 @@ static class CkTypeGraphExtensions
                 //check if Id's for associations match to create adequate multiplicities
                 foreach (var item in typeAssociations)
                 {
-                    if (association.CkRoleId == item.CkRoleId)
+                    if (association.CkRoleId.FullName == item.CkRoleId.FullName)
                     {
                         string OutboundMultiplicityConversion = FormatOutboundMultiplicity(item);
                         string InboundMultiplicityConversion = FormatInboundMultiplicity(item);

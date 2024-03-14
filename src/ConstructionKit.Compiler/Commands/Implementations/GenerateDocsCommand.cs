@@ -1067,7 +1067,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_filePathArg);
         await using var stream = File.OpenRead(filePath);
-
+        
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
         var compiledModelRoot = await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult);
 

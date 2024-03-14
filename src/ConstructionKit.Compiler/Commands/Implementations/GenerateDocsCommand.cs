@@ -1047,6 +1047,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         };
     }
 
+    public string GetRelativeDestinationPath()
+    {
+        return CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg).Split("\\").Last();
+    }
+
+
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -1094,12 +1100,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //BuildIdFromFilepath("ck-industry.fluid-2-3.yaml");
         //BuildIdFromFilepath("ck-industry.fluid-2-3-1.yaml");
         //BuildIdFromFilepath("ck-basic.yaml");
-
+        
 
         //variables
         var Headings = new DocumentationContext();
         var IdFromFilepath = BuildIdFromFilepath(filePath);
         bool DrawEntireModel = true;
+
+        var tmpOutput = LinkHelpers.CreateRelativeFilepath(IdFromFilepath, "Test");
 
         //ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath);

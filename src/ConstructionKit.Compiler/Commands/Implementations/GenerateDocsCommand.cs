@@ -1053,7 +1053,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                                      .Split("\\")
                                                      .Last();
 
-        if (!lastPathSegment.StartsWith("/"))
+        if (!lastPathSegment.StartsWith('/'))
         {
             lastPathSegment = "/" + lastPathSegment;
         }

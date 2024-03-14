@@ -40,7 +40,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return Path.Combine(docusaurusPath, path);
         }
 
-        public static string CreateRelativeFilepath(CkModelId ckModelId, string suffix, string baseRelativePath = "/docs")
+        public static string CreateRelativeFilepath(CkModelId ckModelId, string suffix, string baseRelativePath /*= "/docs"*/)
         {
             string path = GetCommonPathParts(ckModelId);
 
@@ -49,10 +49,10 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
             return linkWithBackslash.Replace("\\", "/");
         }
 
-        public static string CreateRelativeFilepath(string ckModelId, string suffix)
+        public static string CreateRelativeFilepath(string ckModelId, string suffix, string baseRelativePath)
         {
             CkModelId modelId = new(ckModelId);
-            return CreateRelativeFilepath(modelId, suffix);
+            return CreateRelativeFilepath(modelId, suffix, baseRelativePath);
         }
 
 

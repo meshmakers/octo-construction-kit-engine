@@ -1087,34 +1087,56 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
-        BuildIdFromFilepath("ck-industry.fluid.yaml");
-        BuildIdFromFilepath("ck-industry.fluid-2.yaml");
-        BuildIdFromFilepath("ck-industry.fluid-2-3.yaml");
-        BuildIdFromFilepath("ck-industry.fluid-2-3-1.yaml");
-        BuildIdFromFilepath("ck-basic.yaml");
+        //Tests
+        //BuildIdFromFilepath("ck-industry.fluid.yaml");
+        //BuildIdFromFilepath("ck-industry.fluid-2.yaml");
+        //BuildIdFromFilepath("ck-industry.fluid-2-3.yaml");
+        //BuildIdFromFilepath("ck-industry.fluid-2-3-1.yaml");
+        //BuildIdFromFilepath("ck-basic.yaml");
+
+
+        //variables
+        var Headings = new DocumentationContext();
+        var IdFromFilepath = BuildIdFromFilepath(filePath);
+        bool DrawEntireModel = true;
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
-        await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));
-        
+        await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath);
+
         //Creates VersionHistory
-        await GenerateVersionHistory(test, docusaurusPath, BuildIdFromFilepath(filePath));
+        await GenerateVersionHistory(test, docusaurusPath, IdFromFilepath);
 
-        var Headings = new DocumentationContext();
-        var validModelIds = GetModelIDs(test);
-
-        foreach (var modelID in validModelIds)
+        if (DrawEntireModel)
         {
-            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
+            var validModelIds = GetModelIDs(test);
 
-            await GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
+            foreach (var modelID in validModelIds)
+            {
+                await GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
 
-            await GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
+                await GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
 
-            await GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+                await GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
 
-            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
+                await GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
+
+                await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
+            }
+        }
+        else
+        {
+            await GenerateAttributesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AttributeHeadings);
+
+            await GenerateEnumsMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.EnumHeadings);
+
+            await GenerateRecordsMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.RecordHeadings);
+
+            await GenerateTypesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AttributeDtoHeadings);
+
+            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AssociationRolesHeadings);
         }
 
-        
-     }
+
+    }
+
 }

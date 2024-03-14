@@ -999,21 +999,29 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static string GetModelIdPartFromPath(string path)
     {
-        int lastHyphenIndex = path.LastIndexOf("ck-");
+        const string ckSeparator = "ck-";
+
+        int lastHyphenIndex = path.LastIndexOf(ckSeparator);
         if (lastHyphenIndex == -1)
         {
             throw new ArgumentException("Invalid file path format. Missing \"ck-\" separator.");
         }
 
-        string substringAfterLastHyphen = path[(lastHyphenIndex + 3)..];
+        string substringAfterLastHyphen = path[(lastHyphenIndex + ckSeparator.Length)..];
 
         string[] parts = substringAfterLastHyphen.Split('.')
                                          .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part (.YAML)
                                          .Select(part => char.ToUpper(part[0]) + part[1..]) //Capitalize first Letters
                                          .ToArray();
+
         string versionNumber = ExtractVersionNumber(parts.Last());
 
-        return string.Join(".", parts);
+        string output = string.Join(".", parts);
+
+        int versionNumberIndex = output.IndexOf('-');
+
+        return versionNumberIndex == -1 ? output : output[..(versionNumberIndex + 1)] + versionNumber;
+
     }
 
     private static string ExtractVersionNumber(string stringWithVersionNumber) 
@@ -1026,27 +1034,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         string substringAfterFirstHyphen = stringWithVersionNumber[(firstHyphenIndex + 1)..];
 
-        string[] parts = substringAfterFirstHyphen.Split("-", StringSplitOptions.TrimEntries);
-        if (parts.Length == 0)
+        string[] versionParts = substringAfterFirstHyphen.Split('-', StringSplitOptions.TrimEntries);
+
+        return versionParts.Length switch
         {
-            return "1.0.0";
-        }
-        else if (parts.Length == 1)
-        {
-            return $"{parts[0]}.0.0";
-        }
-        else if (parts.Length == 2)
-        {
-            return $"{parts[0]}.{parts[1]}.0";
-        }
-        else if (parts.Length == 3)
-        {
-            return $"{parts[0]}.{parts[1]}.{parts[2]}";
-        }
-        else
-        {
-            throw new ArgumentException("Invalid Version Number");
-        }
+            0 => "1.0.0",
+            1 => $"{versionParts[0]}.0.0",
+            2 => $"{versionParts[0]}.{versionParts[1]}.0",
+            3 => $"{versionParts[0]}.{versionParts[1]}.{versionParts[2]}",
+            _ => throw new ArgumentException("Invalid Version Number format"),
+        };
     }
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
@@ -1090,9 +1087,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
-        var valModelID = new CkModelId("Industry.Fluid-2.0.0");
-        LinkHelpers.GetCommonPathParts(valModelID);
         BuildIdFromFilepath("ck-industry.fluid.yaml");
+        BuildIdFromFilepath("ck-industry.fluid-2.yaml");
+        BuildIdFromFilepath("ck-industry.fluid-2-3.yaml");
+        BuildIdFromFilepath("ck-industry.fluid-2-3-1.yaml");
+        BuildIdFromFilepath("ck-basic.yaml");
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));

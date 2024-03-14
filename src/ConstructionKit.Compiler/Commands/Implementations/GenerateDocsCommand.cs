@@ -4,6 +4,7 @@ using System.Reflection.Metadata;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics.Arm;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
@@ -1001,7 +1002,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         int lastHyphenIndex = path.LastIndexOf("ck-");
         if (lastHyphenIndex == -1)
         {
-            throw new ArgumentException("Invalid file path format. Missing hyphen separator.");
+            throw new ArgumentException("Invalid file path format. Missing \"ck-\" separator.");
         }
 
         string substringAfterLastHyphen = path[(lastHyphenIndex + 3)..];
@@ -1010,8 +1011,42 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                          .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part (.YAML)
                                          .Select(part => char.ToUpper(part[0]) + part[1..]) //Capitalize first Letters
                                          .ToArray();
+        string versionNumber = ExtractVersionNumber(parts.Last());
 
         return string.Join(".", parts);
+    }
+
+    private static string ExtractVersionNumber(string stringWithVersionNumber) 
+    {
+        int firstHyphenIndex = stringWithVersionNumber.IndexOf('-');
+        if (firstHyphenIndex == -1)
+        {
+            return "1.0.0";
+        }
+
+        string substringAfterFirstHyphen = stringWithVersionNumber[(firstHyphenIndex + 1)..];
+
+        string[] parts = substringAfterFirstHyphen.Split("-", StringSplitOptions.TrimEntries);
+        if (parts.Length == 0)
+        {
+            return "1.0.0";
+        }
+        else if (parts.Length == 1)
+        {
+            return $"{parts[0]}.0.0";
+        }
+        else if (parts.Length == 2)
+        {
+            return $"{parts[0]}.{parts[1]}.0";
+        }
+        else if (parts.Length == 3)
+        {
+            return $"{parts[0]}.{parts[1]}.{parts[2]}";
+        }
+        else
+        {
+            throw new ArgumentException("Invalid Version Number");
+        }
     }
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
@@ -1057,6 +1092,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         var valModelID = new CkModelId("Industry.Fluid-2.0.0");
         LinkHelpers.GetCommonPathParts(valModelID);
+        BuildIdFromFilepath("ck-industry.fluid.yaml");
 
         //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, BuildIdFromFilepath(filePath));

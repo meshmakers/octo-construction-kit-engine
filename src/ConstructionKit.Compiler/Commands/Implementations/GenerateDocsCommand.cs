@@ -1007,8 +1007,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         string substringAfterLastHyphen = path[(lastHyphenIndex + 3)..];
 
         string[] parts = substringAfterLastHyphen.Split('.')
-                                         .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part
-                                         .Select(part => char.ToUpper(part[0]) + part[1..])
+                                         .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part (.YAML)
+                                         .Select(part => char.ToUpper(part[0]) + part[1..]) //Capitalize first Letters
                                          .ToArray();
 
         return string.Join(".", parts);

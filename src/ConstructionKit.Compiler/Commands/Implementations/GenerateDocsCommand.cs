@@ -1049,7 +1049,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     public string GetRelativeDestinationPath()
     {
-        return CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg).Split("\\").Last();
+        string lastPathSegment = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg)
+                                                     .Split("\\")
+                                                     .Last();
+
+        if (!lastPathSegment.StartsWith("/"))
+        {
+            lastPathSegment = "/" + lastPathSegment;
+        }
+
+        return lastPathSegment;
     }
 
 
@@ -1107,7 +1116,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var IdFromFilepath = BuildIdFromFilepath(filePath);
         bool DrawEntireModel = true;
 
-        var tmpOutput = LinkHelpers.CreateRelativeFilepath(IdFromFilepath, "Test");
+        var tmpOutput = LinkHelpers.CreateRelativeFilepath(IdFromFilepath, "Test", GetRelativeDestinationPath());
 
         //ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath);

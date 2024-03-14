@@ -604,7 +604,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
 
         //Create Page Heading (could be delegated to function)
-        string[] split = ckModelId.ModelId.Split('.');
+        string[] split = ckModelId.SemanticVersionedFullName.Split('.');
         await outputFile.WriteLineAsync($"# {split.Last()}");
         await outputFile.WriteLineAsync();
 

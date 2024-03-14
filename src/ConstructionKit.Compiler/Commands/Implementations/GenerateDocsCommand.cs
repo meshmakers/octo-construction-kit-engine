@@ -1106,37 +1106,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Creates VersionHistory
         await GenerateVersionHistory(test, docusaurusPath, IdFromFilepath);
 
-        if (DrawEntireModel)
+        var modelIds = DrawEntireModel ? GetModelIDs(test) : [IdFromFilepath];
+
+        foreach (var modelId in modelIds)
         {
-            var validModelIds = GetModelIDs(test);
-
-            foreach (var modelID in validModelIds)
-            {
-                await GenerateAttributesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeHeadings);
-
-                await GenerateEnumsMarkdownTable(test, docusaurusPath, modelID, Headings.EnumHeadings);
-
-                await GenerateRecordsMarkdownTable(test, docusaurusPath, modelID, Headings.RecordHeadings);
-
-                await GenerateTypesMarkdownTable(test, docusaurusPath, modelID, Headings.AttributeDtoHeadings);
-
-                await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelID, Headings.AssociationRolesHeadings);
-            }
+            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeHeadings);
+            await GenerateEnumsMarkdownTable(test, docusaurusPath, modelId, Headings.EnumHeadings);
+            await GenerateRecordsMarkdownTable(test, docusaurusPath, modelId, Headings.RecordHeadings);
+            await GenerateTypesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeDtoHeadings);
+            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelId, Headings.AssociationRolesHeadings);
         }
-        else
-        {
-            await GenerateAttributesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AttributeHeadings);
-
-            await GenerateEnumsMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.EnumHeadings);
-
-            await GenerateRecordsMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.RecordHeadings);
-
-            await GenerateTypesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AttributeDtoHeadings);
-
-            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, IdFromFilepath, Headings.AssociationRolesHeadings);
-        }
-
-
     }
 
 }

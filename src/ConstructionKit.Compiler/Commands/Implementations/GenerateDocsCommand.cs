@@ -1104,34 +1104,25 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Path to Docusaurus docs folder
         var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
 
-        //Tests
-        //BuildIdFromFilepath("ck-industry.fluid.yaml");
-        //BuildIdFromFilepath("ck-industry.fluid-2.yaml");
-        //BuildIdFromFilepath("ck-industry.fluid-2-3.yaml");
-        //BuildIdFromFilepath("ck-industry.fluid-2-3-1.yaml");
-        //BuildIdFromFilepath("ck-basic.yaml");
-        
-
-        //variables
+        //Variables
         var Headings = new DocumentationContext();
         var IdFromFilepath = BuildIdFromFilepath(filePath);
+        var relativeDestinationPath = GetRelativeDestinationPath();
         bool DrawEntireModel = true;
 
-        var tmpOutput = LinkHelpers.CreateRelativeFilepath(IdFromFilepath, "Test", GetRelativeDestinationPath());
-
         //ID Determines Position in File Tree   
-        await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath, GetRelativeDestinationPath());
+        await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath, relativeDestinationPath);
         await GenerateVersionHistory(test, docusaurusPath, IdFromFilepath);
 
         var modelIds = DrawEntireModel ? GetModelIDs(test) : [IdFromFilepath];
 
         foreach (var modelId in modelIds)
         {
-            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeHeadings, GetRelativeDestinationPath());
+            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeHeadings, relativeDestinationPath);
             await GenerateEnumsMarkdownTable(test, docusaurusPath, modelId, Headings.EnumHeadings);
             await GenerateRecordsMarkdownTable(test, docusaurusPath, modelId, Headings.RecordHeadings);
-            await GenerateTypesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeDtoHeadings, GetRelativeDestinationPath());
-            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelId, Headings.AssociationRolesHeadings, GetRelativeDestinationPath());
+            await GenerateTypesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeDtoHeadings, relativeDestinationPath);
+            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelId, Headings.AssociationRolesHeadings, relativeDestinationPath);
         }
     }
 

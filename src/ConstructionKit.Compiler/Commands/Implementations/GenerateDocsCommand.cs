@@ -1045,22 +1045,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         //Variables
         var Headings = new DocumentationContext();
         var relativeDestinationPath = GetRelativeDestinationPath();
-        bool DrawEntireModel = true;
 
         //ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
         await GenerateVersionHistory(test, docusaurusPath, compiledModelRoot.ModelId);
 
-        var modelIds = DrawEntireModel ? GetModelIDs(test) : [compiledModelRoot.ModelId];
-
-        foreach (var modelId in modelIds)
-        {
-            await GenerateAttributesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeHeadings, relativeDestinationPath);
-            await GenerateEnumsMarkdownTable(test, docusaurusPath, modelId, Headings.EnumHeadings);
-            await GenerateRecordsMarkdownTable(test, docusaurusPath, modelId, Headings.RecordHeadings);
-            await GenerateTypesMarkdownTable(test, docusaurusPath, modelId, Headings.AttributeDtoHeadings, relativeDestinationPath);
-            await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, modelId, Headings.AssociationRolesHeadings, relativeDestinationPath);
-        }
+        await GenerateAttributesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId, Headings.AttributeHeadings, relativeDestinationPath);
+        await GenerateEnumsMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId, Headings.EnumHeadings);
+        await GenerateRecordsMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId, Headings.RecordHeadings);
+        await GenerateTypesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId, Headings.AttributeDtoHeadings, relativeDestinationPath);
+        await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId, Headings.AssociationRolesHeadings, relativeDestinationPath);
     }
 
 }

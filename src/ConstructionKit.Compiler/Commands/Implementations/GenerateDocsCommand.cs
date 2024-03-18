@@ -202,18 +202,6 @@ static class CkTypeGraphExtensions
         }
     }
 
-    public static async Task StyleClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        if (ckTypeGraph.IsAbstract)
-        {
-            await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.GetName()} fill:#d4d8e9,color:##000000");
-        }
-        else
-        {
-            await outputFile.WriteLineAsync($"style {ckTypeGraph.CkTypeId.GetName()} fill:#8bc5bb,color:##000000");
-        }
-        
-    }
     private static string FormatInboundMultiplicity(CkAssociationRoleGraph item)
     {
         var InboundMultiplicity = item.InboundMultiplicity;
@@ -620,7 +608,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await type.DrawClass(outputFile);
             await type.DrawInheritance(outputFile);
             await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
-            await type.StyleClass(outputFile);
             await type.LinkToType(outputFile, baseRelativePath);
             await type.DrawNamespaces(outputFile);
         }

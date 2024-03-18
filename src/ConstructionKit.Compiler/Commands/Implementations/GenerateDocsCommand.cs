@@ -849,11 +849,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         return item switch
         {
-            CkAttributeGraph attribute => attribute.CkAttributeId.ModelId.FullName == modelId.FullName,
-            CkEnumGraph enumGraph => enumGraph.CkEnumId.ModelId.FullName == modelId.FullName,
-            CkRecordGraph recordGraph => recordGraph.CkRecordId.ModelId.FullName == modelId.FullName,
-            CkTypeGraph ckTypeGraph => ckTypeGraph.CkTypeId.ModelId.FullName == modelId.FullName,
-            CkAssociationRoleGraph ckAssociationRoleGraph => ckAssociationRoleGraph.CkRoleId.ModelId.FullName == modelId.FullName,
+            CkAttributeGraph attribute => attribute.CkAttributeId.ModelId.SemanticVersionedFullName == modelId.SemanticVersionedFullName,
+            CkEnumGraph enumGraph => enumGraph.CkEnumId.ModelId.SemanticVersionedFullName == modelId.SemanticVersionedFullName,
+            CkRecordGraph recordGraph => recordGraph.CkRecordId.ModelId.SemanticVersionedFullName == modelId.SemanticVersionedFullName,
+            CkTypeGraph ckTypeGraph => ckTypeGraph.CkTypeId.ModelId.SemanticVersionedFullName == modelId.SemanticVersionedFullName,
+            CkAssociationRoleGraph ckAssociationRoleGraph => ckAssociationRoleGraph.CkRoleId.ModelId.SemanticVersionedFullName == modelId.SemanticVersionedFullName,
             _ => false // Handle unsupported types or throw an exception if needed
         };
     }

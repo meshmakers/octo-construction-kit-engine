@@ -986,68 +986,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     }
 
-    private static CkModelId BuildIdFromFilepath(string path)
-    {
-        if (string.IsNullOrEmpty(path))
-        {
-            throw new ArgumentNullException(nameof(path));
-        }
-
-        // Extract and process the model ID part from the filename
-        string modelIdPart = GetModelIdPartFromPath(path);
-
-        return new CkModelId(modelIdPart);
-    }
-
-    private static string GetModelIdPartFromPath(string path)
-    {
-        const string ckSeparator = "ck-";
-
-        int lastHyphenIndex = path.LastIndexOf(ckSeparator);
-        if (lastHyphenIndex == -1)
-        {
-            throw new ArgumentException("Invalid file path format. Missing \"ck-\" separator.");
-        }
-
-        string substringAfterLastHyphen = path[(lastHyphenIndex + ckSeparator.Length)..];
-
-        string[] parts = substringAfterLastHyphen.Split('.')
-                                         .TakeWhile((part, index) => index < substringAfterLastHyphen.Split('.').Length - 1) // Exclude last part (.YAML)
-                                         .Select(part => char.ToUpper(part[0]) + part[1..]) //Capitalize first Letters
-                                         .ToArray();
-
-        string versionNumber = ExtractVersionNumber(parts.Last());
-
-        string output = string.Join(".", parts);
-
-        int versionNumberIndex = output.IndexOf('-');
-
-        return versionNumberIndex == -1 ? output : output[..(versionNumberIndex + 1)] + versionNumber;
-
-    }
-
-    private static string ExtractVersionNumber(string stringWithVersionNumber)
-    {
-        int firstHyphenIndex = stringWithVersionNumber.IndexOf('-');
-        if (firstHyphenIndex == -1)
-        {
-            return "1.0.0";
-        }
-
-        string substringAfterFirstHyphen = stringWithVersionNumber[(firstHyphenIndex + 1)..];
-
-        string[] versionParts = substringAfterFirstHyphen.Split('-', StringSplitOptions.TrimEntries);
-
-        return versionParts.Length switch
-        {
-            0 => "1.0.0",
-            1 => $"{versionParts[0]}.0.0",
-            2 => $"{versionParts[0]}.{versionParts[1]}.0",
-            3 => $"{versionParts[0]}.{versionParts[1]}.{versionParts[2]}",
-            _ => throw new ArgumentException("Invalid Version Number format"),
-        };
-    }
-
     public string GetRelativeDestinationPath()
     {
         string lastPathSegment = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg)
@@ -1106,15 +1044,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //Variables
         var Headings = new DocumentationContext();
-        var IdFromFilepath = BuildIdFromFilepath(filePath);
         var relativeDestinationPath = GetRelativeDestinationPath();
         bool DrawEntireModel = true;
 
         //ID Determines Position in File Tree   
-        await GenerateMermaidTextOutput(test, docusaurusPath, IdFromFilepath, relativeDestinationPath);
-        await GenerateVersionHistory(test, docusaurusPath, IdFromFilepath);
+        await GenerateMermaidTextOutput(test, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
+        await GenerateVersionHistory(test, docusaurusPath, compiledModelRoot.ModelId);
 
-        var modelIds = DrawEntireModel ? GetModelIDs(test) : [IdFromFilepath];
+        var modelIds = DrawEntireModel ? GetModelIDs(test) : [compiledModelRoot.ModelId];
 
         foreach (var modelId in modelIds)
         {

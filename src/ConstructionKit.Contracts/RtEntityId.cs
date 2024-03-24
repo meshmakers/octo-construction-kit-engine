@@ -1,4 +1,5 @@
-using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -12,6 +13,7 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// </summary>
     /// <param name="ckTypeId"></param>
     /// <param name="rtId"></param>
+    [Newtonsoft.Json.JsonConstructor]
     [JsonConstructor]
     public RtEntityId(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
@@ -34,11 +36,13 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <summary>
     ///     The construction kit type id.
     /// </summary>
+    [JsonConverter(typeof(CkIdTypeIdConverter))]
     public CkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     The runtime id.
     /// </summary>
+    [JsonConverter(typeof(OctoObjectIdConverter))]
     public OctoObjectId RtId { get; }
 
     /// <inheritdoc />

@@ -3,8 +3,8 @@ associationRoles:
   - id: ParentChild
     inboundName: Parent
     outboundName: Children
-    inboundMultiplicity: N
-    outboundMultiplicity: ZeroOrOne
+    inboundMultiplicity: ZeroOrOne
+    outboundMultiplicity: N
   - id: Related
     inboundName: RelatesTo
     outboundName: RelatesFrom

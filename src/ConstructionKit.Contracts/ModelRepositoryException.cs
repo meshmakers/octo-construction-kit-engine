@@ -66,4 +66,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Error downloading model '{modelId}' from repository '{repositoryName}'.");
     }
+
+    internal static Exception PublishFailed(CkModelId modelId, string repositoryName, Exception exception)
+    {
+        return new ModelRepositoryException($"Publishing model '{modelId}' to repository '{repositoryName}' failed.", exception);
+    }
 }

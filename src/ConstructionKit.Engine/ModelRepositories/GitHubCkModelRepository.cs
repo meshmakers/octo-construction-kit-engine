@@ -46,6 +46,12 @@ public class GitHubCkModelRepository : ICkModelRepository
     /// <inheritdoc />
     public async Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
+        var contents = await GetContentAsync(modelId).ConfigureAwait(false);
+        return contents.Count > 0;
+    }
+
+    private async Task<IReadOnlyList<RepositoryContent>> GetContentAsync(CkModelId modelId)
+    {
         var gitHubClient = CreateClient();
 
         var filePath = CreatePath(modelId);
@@ -53,8 +59,7 @@ public class GitHubCkModelRepository : ICkModelRepository
         var contents =
             await gitHubClient.Repository.Content.GetAllContentsByRef(GitRepositoryOwner, GitRepositoryName, filePath, GitRepositoryBranch)
                 .ConfigureAwait(false);
-
-        return contents.Count > 0;
+        return contents;
     }
 
     /// <inheritdoc />
@@ -107,13 +112,30 @@ public class GitHubCkModelRepository : ICkModelRepository
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
             string filePath = CreatePath(ckCompiledModel.ModelId);
 
-            await gitHubClient.Repository.Content.CreateFile(
-                GitRepositoryOwner, GitRepositoryName, filePath,
-                new CreateFileRequest($"First commit for {filePath}", content, GitRepositoryBranch)).ConfigureAwait(false);
+            var contents = await GetContentAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
+            if (contents.Any())
+            {
+                if (force)
+                {
+                    await gitHubClient.Repository.Content.UpdateFile(
+                        GitRepositoryOwner, GitRepositoryName, filePath,
+                        new UpdateFileRequest($"Update to {ckCompiledModel.ModelId.FullName}", content, contents.First().Sha)).ConfigureAwait(false);
+                }
+                else
+                {
+                    throw ModelRepositoryException.ModelAlreadyExists(ckCompiledModel.ModelId, RepositoryName);
+                }
+            }
+            else
+            {
+                await gitHubClient.Repository.Content.CreateFile(
+                    GitRepositoryOwner, GitRepositoryName, filePath,
+                    new CreateFileRequest($"First commit for {ckCompiledModel.ModelId.FullName}", content, GitRepositoryBranch)).ConfigureAwait(false);
+            }
         }
-        catch (ApiValidationException)
+        catch (ApiValidationException e)
         {
-            throw ModelRepositoryException.ModelAlreadyExists(ckCompiledModel.ModelId, RepositoryName);
+            throw ModelRepositoryException.PublishFailed(ckCompiledModel.ModelId, RepositoryName, e);
         }
     }
 

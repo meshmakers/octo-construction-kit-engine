@@ -13,15 +13,8 @@ namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 /// <summary>
 ///     Implementation of the runtime entity validation engine
 /// </summary>
-internal class EntityRuleEngine : IEntityRuleEngine
+internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 {
-    private readonly ICkCacheService _ckCache;
-
-    public EntityRuleEngine(ICkCacheService ckCache)
-    {
-        _ckCache = ckCache;
-    }
-
     public async Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
         IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, IOriginFileResolver originFileResolver,
         OperationResult operationResult) where TEntity : RtEntity
@@ -33,7 +26,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
 
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
         {
-            if (!_ckCache.TryGetCkType(tenantId, info.RtEntityId.CkTypeId, out var ckTypeGraph))
+            if (!ckCache.TryGetCkType(tenantId, info.RtEntityId.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                     info.RtEntityId.CkTypeId));
@@ -191,7 +184,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                         foreach (var o in t)
                         {
                             var rtRecord = (RtRecord)o;
-                            if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                            if (!ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
                             {
                                 operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                                     rtRecord.CkRecordId));
@@ -209,7 +202,7 @@ internal class EntityRuleEngine : IEntityRuleEngine
                     var rtRecord = (RtRecord?)rtType.Attributes[attribute.AttributeName];
                     if (rtRecord != null)
                     {
-                        if (!_ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                        if (!ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
                         {
                             operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                                 rtRecord.CkRecordId));

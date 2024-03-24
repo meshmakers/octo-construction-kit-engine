@@ -6,8 +6,27 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a unique identifier of a runtime model entity and its construction kit type.
 /// </summary>
-public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntityId>
+public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntityId>, IConvertible
 {
+    /// <summary>
+    ///     Creates a new <see cref="RtEntityId" /> from the given <paramref name="rtEntityId" />.
+    /// </summary>
+    /// <param name="rtEntityId"></param>
+    public RtEntityId(string rtEntityId)
+    {
+        var rtIdIndex = rtEntityId.IndexOf("@", StringComparison.Ordinal);
+        if (rtIdIndex > 0)
+        {
+            CkTypeId = rtEntityId.Substring(0, rtIdIndex);
+            RtId = new OctoObjectId(rtEntityId.Substring(rtIdIndex + 1));
+        }
+        else
+        {
+            CkTypeId = rtEntityId;
+            RtId = OctoObjectId.Empty;
+        }
+    }
+    
     /// <summary>
     ///     Creates a new instance of <see cref="RtEntityId" />.
     /// </summary>
@@ -31,6 +50,16 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     {
         CkTypeId = new CkId<CkTypeId>(ckModelId, ckTypeId);
         RtId = rtId;
+    }
+    
+    /// <summary>
+    ///     Creates a new <see cref="RtEntityId" /> from the given <paramref name="value" />.
+    /// </summary>
+    /// <param name="value"></param>
+    /// <returns></returns>
+    public static implicit operator RtEntityId(string value)
+    {
+        return new RtEntityId(value);
     }
 
     /// <summary>
@@ -102,6 +131,121 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <inheritdoc />
     public override string ToString()
     {
-        return $"CkTypeId: '{CkTypeId}', RtId: '{RtId}'";
+        return $"{CkTypeId}@{RtId}";
+    }
+    
+        /// <inheritdoc />
+    public TypeCode GetTypeCode()
+    {
+        return TypeCode.Object;
+    }
+
+    /// <inheritdoc />
+    public bool ToBoolean(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public byte ToByte(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public char ToChar(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public DateTime ToDateTime(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public decimal ToDecimal(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public double ToDouble(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public short ToInt16(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public int ToInt32(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public long ToInt64(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public sbyte ToSByte(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public float ToSingle(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public string ToString(IFormatProvider? provider)
+    {
+        return ToString();
+    }
+
+    /// <inheritdoc />
+    public object ToType(Type conversionType, IFormatProvider? provider)
+    {
+        switch (Type.GetTypeCode(conversionType))
+        {
+            case TypeCode.String:
+                return ToString(provider);
+            case TypeCode.Object:
+                if (conversionType == typeof(object) || conversionType == typeof(CkModelId))
+                {
+                    return this;
+                }
+
+                break;
+        }
+
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public ushort ToUInt16(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public uint ToUInt32(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
+    }
+
+    /// <inheritdoc />
+    public ulong ToUInt64(IFormatProvider? provider)
+    {
+        throw new InvalidCastException();
     }
 }

@@ -13,6 +13,7 @@ public static class RtNewtonsoftSerializer
     /// </summary>
     public static readonly JsonSerializer DefaultSerializer = new()
     {
+        DefaultValueHandling = DefaultValueHandling.Ignore,
         Converters =
         {
             new NewtonOctoObjectIdConverter(),

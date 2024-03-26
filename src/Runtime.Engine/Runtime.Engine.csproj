@@ -6,12 +6,12 @@
         <PackageId>Meshmakers.Octo.Runtime.Engine</PackageId>
         <AssemblyName>Meshmakers.Octo.Runtime.Engine</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Engine</RootNamespace>
-        <TargetFramework>net8.0</TargetFramework>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
         <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
         <DocumentationFile>..\..\bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
+        <TargetFramework>net8.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>

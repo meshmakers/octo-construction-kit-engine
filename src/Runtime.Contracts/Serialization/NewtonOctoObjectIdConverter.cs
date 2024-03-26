@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Newtonsoft.Json;
 
-namespace Meshmakers.Octo.Runtime.Contracts;
+namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 
 /// <summary>
 ///     Converter for <see cref="OctoObjectId" /> to JSON using Newtonsoft.Json

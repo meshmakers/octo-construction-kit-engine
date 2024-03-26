@@ -15,7 +15,11 @@ namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 /// </summary>
 internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 {
+#if NETSTANDARD2_0
+    public Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
+#else
     public async Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
+#endif
         IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, IOriginFileResolver originFileResolver,
         OperationResult operationResult) where TEntity : RtEntity
     {
@@ -24,20 +28,40 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         var entitiesToReplace = new ConcurrentDictionary<RtEntityId, TEntity>();
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
 
+#if NETSTANDARD2_0
+        Parallel.ForEach(entityUpdateInfos, (info, _) =>
+#else
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
+#endif
         {
             if (!ckCache.TryGetCkType(tenantId, info.RtEntityId.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                     info.RtEntityId.CkTypeId));
+#if NETSTANDARD2_0
+                return;
+#else
                 return ValueTask.CompletedTask;
+#endif
             }
 
+#if NETSTANDARD2_0
+            if (ckTypeGraph == null)
+            {
+                return;
+            }
+#endif
+            
             if (ckTypeGraph.IsAbstract)
             {
-                operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId), tenantId,
+                operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId),
+                    tenantId,
                     info.RtEntityId.CkTypeId));
+#if NETSTANDARD2_0
+                return;
+#else
                 return ValueTask.CompletedTask;
+#endif
             }
 
             // check if all attributes are applied that are mandatory. If there is a mandatory attribute missing and no default value is set, throw an exception
@@ -47,7 +71,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 if (info.RtEntity != null)
                 {
                     isInError |= SetDefaultValuesOnInsert(tenantId, ckTypeGraph.AllAttributes.Values.ToList(),
-                        info.RtEntity, originFileResolver, operationResult, $"{info.RtEntity.CkTypeId}@{info.RtEntity.RtId}");
+                        info.RtEntity, originFileResolver, operationResult,
+                        $"{info.RtEntity.CkTypeId}@{info.RtEntity.RtId}");
                 }
             }
             else if (info.ModOption == EntityModOptions.Update)
@@ -58,20 +83,27 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         info.RtEntity.Attributes.ContainsKey(attribute.AttributeName) &&
                         info.RtEntity.Attributes[attribute.AttributeName] == null)
                     {
-                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(originFileResolver.Resolve(tenantId),
+                        operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(
+                            originFileResolver.Resolve(tenantId),
                             tenantId,
-                            attribute.CkAttributeId, info.RtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
+                            attribute.CkAttributeId,
+                            info.RtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
                             info.RtEntity.RtId));
                         isInError = true;
                     }
                 }
             }
 
+#if !NETSTANDARD2_0
             token.ThrowIfCancellationRequested();
-
+#endif
             if (isInError)
             {
+#if NETSTANDARD2_0
+                return;
+#else
                 return ValueTask.CompletedTask;
+#endif
             }
 
             switch (info.ModOption)
@@ -82,7 +114,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+#if NETSTANDARD2_0
+                        return;
+#else
                         return ValueTask.CompletedTask;
+#endif
                     }
 
                     entitiesToCreate.Add(info.RtEntity);
@@ -93,7 +129,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+#if NETSTANDARD2_0
+                        return;
+#else
                         return ValueTask.CompletedTask;
+#endif
                     }
 
                     if (!entitiesToUpdate.TryAdd(info.RtEntityId, info.RtEntity))
@@ -101,7 +141,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+#if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
+#endif
                     }
 
                     break;
@@ -111,15 +153,22 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+#if NETSTANDARD2_0
+                        return;
+#else
                         return ValueTask.CompletedTask;
+#endif
                     }
 
                     if (!entitiesToReplace.TryAdd(info.RtEntityId, info.RtEntity))
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(originFileResolver.Resolve(tenantId),
+                        operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
+                            originFileResolver.Resolve(tenantId),
                             tenantId,
                             info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+#if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
+#endif
                     }
 
                     break;
@@ -130,8 +179,12 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                     throw new InvalidOperationException($"Unknown mod option '{info.ModOption}'");
             }
 
+#if NETSTANDARD2_0
+        });
+#else
             return ValueTask.CompletedTask;
         }).ConfigureAwait(false);
+#endif          
 
         var entityValidatorResult =
             new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
@@ -139,7 +192,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToDelete.ToList());
 
+#if NETSTANDARD2_0
+        return Task.FromResult(entityValidatorResult);
+#else
         return entityValidatorResult;
+#endif          
     }
 
     private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
@@ -191,7 +248,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                                 continue;
                             }
 
-                            isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                            isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph!.AllAttributes.Values.ToList(), rtRecord,
                                 originFileResolver,
                                 operationResult, reference + $"/{attribute.AttributeName}");
                         }
@@ -209,7 +266,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                             continue;
                         }
 
-                        isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(), rtRecord,
+                        isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph!.AllAttributes.Values.ToList(), rtRecord,
                             originFileResolver,
                             operationResult, reference + $"/{attribute.AttributeName}");
                     }

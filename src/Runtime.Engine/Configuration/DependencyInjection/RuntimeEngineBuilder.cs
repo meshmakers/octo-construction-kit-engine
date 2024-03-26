@@ -41,7 +41,6 @@ public class RuntimeEngineBuilder : IRuntimeEngineBuilder
         }
 
         Services.AddTransient<IRtRepositorySerializer, RtRepositorySerializer>();
-        //       Services.AddSingleton<ILocalRepositoryDataSource>(()=> return new LocalRepositoryDataSource())
 
         return this;
     }

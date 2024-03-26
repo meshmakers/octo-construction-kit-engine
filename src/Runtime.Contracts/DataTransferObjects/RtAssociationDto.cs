@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedMember.Global

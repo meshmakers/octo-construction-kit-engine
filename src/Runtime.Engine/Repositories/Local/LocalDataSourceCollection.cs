@@ -297,7 +297,11 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                 return;
             }
 
+#if NETSTANDARD2_0
+            using var streamWriter = new StreamWriter(_filePath);
+#else
             await using var streamWriter = new StreamWriter(_filePath);
+#endif
             await _dataSourceMapper.SerializeAsync(streamWriter, _rtEntities).ConfigureAwait(false);
         }
         finally
@@ -324,7 +328,11 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
             }
 
             OperationResult operationResult = new();
+#if NETSTANDARD2_0
+            using var fileStream = File.OpenRead(_filePath);
+#else
             await using var fileStream = File.OpenRead(_filePath);
+#endif
 
             var rtEntities = await _dataSourceMapper.DeserializeAsync(fileStream, _filePath, operationResult).ConfigureAwait(false);
             foreach (var keyValuePair in rtEntities)

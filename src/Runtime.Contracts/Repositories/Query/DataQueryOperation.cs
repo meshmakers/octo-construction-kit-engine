@@ -1,3 +1,5 @@
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
+
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
@@ -16,7 +18,7 @@ public class DataQueryOperation : FieldFilterCriteria
 
     /// <summary>
     ///     The language to use for text search. This text has to be
-    ///     the two letter ISO language name.
+    ///     the two-letter ISO language name.
     /// </summary>
     public string Language { get; private set; }
 
@@ -39,6 +41,11 @@ public class DataQueryOperation : FieldFilterCriteria
     ///     Represents sort order for specific attributes.
     /// </summary>
     public ICollection<SortOrderItem>? SortOrders { get; private set; }
+    
+    /// <summary>
+    ///     Represents geospatial filter for specific attributes.
+    /// </summary>
+    public ICollection<GeospatialFilter>? GeospatialFilters { get; internal set; }
 
     /// <summary>
     ///     Creates a new instance of <see cref="DataQueryOperation" />.
@@ -108,5 +115,21 @@ public class DataQueryOperation : FieldFilterCriteria
         FieldGroupBy = new FieldGroupBy(attributeNames);
 
         return FieldGroupBy;
+    }
+    
+    /// <summary>
+    ///     Adds a field filter to the query.
+    /// </summary>
+    /// <param name="attributeName">Name of attribute</param>
+    /// <param name="point">Point to search for</param>
+    /// <param name="minDistance">The minimum distance from the center point that the documents can be.</param>
+    /// <param name="maxDistance">The maximum distance from the center point that the documents can be.</param>
+    public DataQueryOperation NearGeospatialFilter(string attributeName, Point point, double? minDistance, double? maxDistance)
+    {
+        GeospatialFilters ??= new List<GeospatialFilter>();
+
+        GeospatialFilters.Add(new NearGeospatialFilter(attributeName,point, minDistance, maxDistance));
+
+        return this;
     }
 }

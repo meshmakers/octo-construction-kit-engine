@@ -83,10 +83,5 @@ public enum AttributeValueTypesDto
     /// <summary>
     /// Geo spatial data according to RFC 7946
     /// </summary>
-    Geospatial = 16,
-        
-    /// <summary>
-    /// Geo spatial data according to RFC 7946
-    /// </summary>
-    GeospatialArray = 17,
+    Geospatial = 16
 }

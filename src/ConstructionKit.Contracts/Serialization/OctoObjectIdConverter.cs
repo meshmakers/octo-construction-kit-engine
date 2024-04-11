@@ -36,8 +36,7 @@ public class OctoObjectIdConverter : JsonConverter<OctoObjectId>, IYamlTypeConve
     {
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
-            : throw new Exception(
-                $"Unexpected token parsing ObjectId. Expected String, got {(object)reader.TokenType}.");
+            : throw ModelParseException.UnexpectedToken(nameof(OctoObjectId), reader.TokenType, nameof(JsonTokenType.String));
         return !string.IsNullOrEmpty(str) && str != null ? new OctoObjectId(str) : OctoObjectId.Empty;
     }
 

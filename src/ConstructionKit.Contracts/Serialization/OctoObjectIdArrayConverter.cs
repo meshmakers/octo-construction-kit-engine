@@ -13,8 +13,7 @@ public class OctoObjectIdArrayConverter : JsonConverter<OctoObjectId[]>
     {
         if (reader.TokenType != JsonTokenType.StartArray)
         {
-            throw new Exception(
-                $"Unexpected token parsing ObjectId. Expected start array, got {(object)reader.TokenType}.");
+            throw ModelParseException.UnexpectedToken(nameof(OctoObjectId), reader.TokenType, nameof(JsonTokenType.StartArray));
         }
 
         reader.Read();
@@ -24,8 +23,7 @@ public class OctoObjectIdArrayConverter : JsonConverter<OctoObjectId[]>
         {
             var str = reader.TokenType == JsonTokenType.String
                 ? reader.GetString()
-                : throw new Exception(
-                    $"Unexpected token parsing ObjectId. Expected String, got {(object)reader.TokenType}.");
+                : throw ModelParseException.UnexpectedToken(nameof(OctoObjectId), reader.TokenType, nameof(JsonTokenType.String));
             list.Add(!string.IsNullOrEmpty(str) && str != null ? new OctoObjectId(str) : OctoObjectId.Empty);
             reader.Read();
         }

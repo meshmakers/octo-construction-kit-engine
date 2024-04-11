@@ -56,7 +56,7 @@ public class NewtonCkIdConverter<TKey> : JsonConverter where TKey : IComparable<
 
         if (reader.TokenType != JsonToken.String)
         {
-            throw new Exception($"Unexpected token parsing CkId. Expected String, got {reader.TokenType}.");
+            throw ModelParseException.UnexpectedToken(nameof(CkId<TKey>), reader.TokenType, nameof(JsonToken.String));
         }
 
         if (reader.Value == null)

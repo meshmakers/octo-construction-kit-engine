@@ -32,7 +32,7 @@ public class NewtonRtEntityIdConverter : JsonConverter
 
         if (reader.TokenType != JsonToken.String)
         {
-            throw new Exception($"Unexpected token parsing RtEntityId. Expected String, got {reader.TokenType}.");
+            throw ModelParseException.UnexpectedToken(nameof(RtEntityId), reader.TokenType, nameof(JsonToken.String));
         }
 
         if (reader.Value == null)

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Newtonsoft.Json;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -36,6 +37,12 @@ public class ModelParseException : CkModelException
             $"Unexpected token parsing '{elementName}'. Expected '{expectedString}', got '{(object)readerTokenType}'.");
     }
 
+    internal static Exception UnexpectedToken(string elementName, JsonToken readerTokenType, string expectedString)
+    {
+        return new ModelParseException(
+            $"Unexpected token parsing '{elementName}'. Expected '{expectedString}', got '{(object)readerTokenType}'.");
+    }
+
     internal static Exception ValueCannotBeEmpty(string elementName)
     {
         return new ModelParseException($"Value cannot be null or empty for element '{elementName}'.");
@@ -54,7 +61,8 @@ public class ModelParseException : CkModelException
     internal static Exception SchemaValidationFailed(string locationReference, OperationResult operationResult)
     {
         return new ModelParseException(
-            $"{locationReference}: Stream contains invalid construction kit model so that the schema validation failed.", operationResult);
+            $"{locationReference}: Stream contains invalid construction kit model so that the schema validation failed.",
+            operationResult);
     }
 
     internal static Exception CannotDeserializeRtModel(string filePath, OperationResult operationResult)
@@ -64,10 +72,12 @@ public class ModelParseException : CkModelException
 
     internal static Exception CannotDeserializeModeByJsonString(string jsonString, OperationResult operationResult)
     {
-        return new ModelParseException($"JSON string '{jsonString}' contains invalid construction kit model.", operationResult);
+        return new ModelParseException($"JSON string '{jsonString}' contains invalid construction kit model.",
+            operationResult);
     }
 
-    internal static Exception CommonErrorReadCkModel(string filePath, Exception exception, OperationResult operationResult)
+    internal static Exception CommonErrorReadCkModel(string filePath, Exception exception,
+        OperationResult operationResult)
     {
         return new ModelParseException($"File '{filePath}' cannot be read.", exception, operationResult);
     }

@@ -1,0 +1,73 @@
+﻿using Meshmakers.Octo.Runtime.Contracts.Geospatial;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.CoordinateReferenceSystem;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Features;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
+
+namespace Meshmakers.Octo.Runtime.Engine.Tests.Geospatial.CoordinateReferenceSystem;
+
+public class DefaultCrsYamlTests
+{
+    [Fact]
+    public void Can_Serialize_Does_Not_Output_Crs_Property()
+    {
+        var collection = new FeatureCollection();
+
+        var serializer = new GeospatialYamlSerializer();
+
+        var yaml = serializer.Serialize(collection);
+
+        Assert.DoesNotContain("\"crs\"", yaml);
+    }
+
+    [Fact]
+    public void Can_Deserialize_When_Yaml_Does_Not_Contain_Crs_Property()
+    {
+        var yaml = "coordinates:\r\n- 90.65464646\r\n- 53.2455662\r\n- 200.4567\r\ntype: Point";
+
+        var serializer = new GeospatialYamlSerializer();
+        var point = serializer.Deserialize<Point>(yaml);
+
+        Assert.NotNull(point);
+        Assert.Null(point.CRS); 
+    }
+
+    [Fact]
+    public void Can_Deserialize_CRS_issue_89()
+    {
+        var yaml = "coordinates:\r\n- 90.65464646\r\n- 53.2455662\r\n- 200.4567\r\ntype: Point\r\ncrs:\r\n  type: name\r\n  properties:\r\n    name: urn:ogc:def:crs:OGC:1.3:CRS84";
+
+
+        var serializer = new GeospatialYamlSerializer();
+        var point = serializer.Deserialize<Point>(yaml);
+
+        Assert.NotNull(point);
+        Assert.NotNull(point.CRS);
+        Assert.Equal(CRSType.Name, point.CRS.Type);
+    }
+
+    [Fact]
+    public void Can_Serialize_CRS_issue_89()
+    {
+        var expected = "type: Point\r\ncoordinates:\r\n- 34.56\r\n- 12.34\r\ncrs:\r\n  properties:\r\n    name: TEST NAME\r\n  type: Name\r\n";
+        var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("TEST NAME") };
+
+        var serializer = new GeospatialYamlSerializer();
+        var yaml = serializer.Serialize(point);
+
+        Assert.NotNull(yaml);
+        Assert.Equal(expected, yaml);
+    }
+
+    [Fact]
+    public void Can_Serialize_DefaultCRS_issue_89()
+    {
+        var expected = "type: Point\r\ncoordinates:\r\n- 34.56\r\n- 12.34\r\ncrs:\r\n  properties:\r\n    name: urn:ogc:def:crs:OGC::CRS84\r\n  type: Name\r\n";
+        var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("urn:ogc:def:crs:OGC::CRS84") };
+
+        var serializer = new GeospatialYamlSerializer();
+        var yaml = serializer.Serialize(point);
+
+        Assert.NotNull(yaml);
+        Assert.Equal(expected, yaml);
+    }
+}

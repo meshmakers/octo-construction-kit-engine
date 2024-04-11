@@ -1,0 +1,136 @@
+﻿using System.Collections.ObjectModel;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Converters;
+
+namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
+
+ /// <summary>
+    /// Defines the MultiLineString type.
+    /// </summary>
+    /// <remarks>
+    /// See https://tools.ietf.org/html/rfc7946#section-3.1.5
+    /// </remarks>
+    public class MultiLineString : GeoJSONObject, IGeometryObject, IEqualityComparer<MultiLineString>, IEquatable<MultiLineString>
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MultiLineString" /> class.
+        /// </summary>
+        /// <param name="coordinates">The coordinates.</param>
+        public MultiLineString(IEnumerable<LineString>? coordinates)
+        {
+            Coordinates =new ReadOnlyCollection<LineString>(
+                coordinates?.ToArray() ?? Array.Empty<LineString>());
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="MultiLineString" /> from a 3-d array
+        /// of <see cref="double" />s that matches the "coordinates" field in the JSON representation.
+        /// </summary>
+        [Newtonsoft.Json.JsonConstructor]
+        [System.Text.Json.Serialization.JsonConstructor]
+        public MultiLineString(IEnumerable<IEnumerable<IEnumerable<double>>>? coordinates)
+            : this(coordinates?.Select(line => new LineString(line))
+                   ?? throw new ArgumentNullException(nameof(coordinates)))
+        {
+        }
+
+        /// <inheritdoc cref="GeoJSONObject.Type" />
+        [System.Text.Json.Serialization.JsonPropertyName("type")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter))]
+        public override GeoJSONObjectType Type => GeoJSONObjectType.MultiLineString;
+
+        /// <summary>
+        /// The collection of line strings of this <see cref="MultiLineString"/>.
+        /// </summary>
+        [Newtonsoft.Json.JsonProperty("coordinates", Required = Newtonsoft.Json.Required.Always)]
+        [Newtonsoft.Json.JsonConverter(typeof(LineStringEnumerableConverter))]
+        [System.Text.Json.Serialization.JsonPropertyName("coordinates")]
+        [System.Text.Json.Serialization.JsonConverter(typeof(PositionConverter))]
+        public ReadOnlyCollection<LineString> Coordinates { get; }
+
+        #region IEqualityComparer, IEquatable
+
+        /// <summary>
+        /// Determines whether the specified object is equal to the current object
+        /// </summary>
+        public override bool Equals(object? obj)
+        {
+            return Equals(this, obj as MultiLineString);
+        }
+
+        /// <summary>
+        /// Determines whether the specified object is equal to the current object
+        /// </summary>
+        public bool Equals(MultiLineString? other)
+        {
+            return Equals(this, other);
+        }
+
+        /// <summary>
+        /// Determines whether the specified object instances are considered equal
+        /// </summary>
+        public bool Equals(MultiLineString? left, MultiLineString? right)
+        {
+            if (ReferenceEquals(left, null))
+            {
+                return false;
+            }
+        
+            if (ReferenceEquals(null, right))
+            {
+                return false;
+            }
+            
+            if (base.Equals(left, right))
+            {
+                return left.Coordinates.SequenceEqual(right.Coordinates);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Determines whether the specified object instances are considered equal
+        /// </summary>
+        public static bool operator ==(MultiLineString? left, MultiLineString? right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+            if (ReferenceEquals(null, right))
+            {
+                return false;
+            }
+            return left != null && left.Equals(right);
+        }
+
+        /// <summary>
+        /// Determines whether the specified object instances are not considered equal
+        /// </summary>
+        public static bool operator !=(MultiLineString? left, MultiLineString? right)
+        {
+            return !(left == right);
+        }
+
+        /// <summary>
+        /// Returns the hash code for this instance
+        /// </summary>
+        public override int GetHashCode()
+        {
+            int hash = base.GetHashCode();
+            foreach (var item in Coordinates)
+            {
+                hash = (hash * 397) ^ item.GetHashCode();
+            }
+            return hash;
+        }
+
+        /// <summary>
+        /// Returns the hash code for the specified object
+        /// </summary>
+        public int GetHashCode(MultiLineString other)
+        {
+            return other.GetHashCode();
+        }
+
+        #endregion
+    }

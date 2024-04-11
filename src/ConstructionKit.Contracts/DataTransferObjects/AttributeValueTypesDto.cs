@@ -78,5 +78,15 @@ public enum AttributeValueTypesDto
     /// <summary>
     ///     Indicates that the attribute value is a date time offset.
     /// </summary>
-    DateTimeOffset = 15
+    DateTimeOffset = 15,
+    
+    /// <summary>
+    /// Geo spatial data according to RFC 7946
+    /// </summary>
+    Geospatial = 16,
+        
+    /// <summary>
+    /// Geo spatial data according to RFC 7946
+    /// </summary>
+    GeospatialArray = 17,
 }

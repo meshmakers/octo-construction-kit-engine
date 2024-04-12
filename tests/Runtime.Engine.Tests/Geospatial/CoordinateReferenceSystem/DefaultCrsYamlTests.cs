@@ -7,6 +7,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Geospatial.CoordinateReferenceSys
 
 public class DefaultCrsYamlTests
 {
+    private static readonly string Nl = Environment.NewLine;
+    
     [Fact]
     public void Can_Serialize_Does_Not_Output_Crs_Property()
     {
@@ -22,7 +24,7 @@ public class DefaultCrsYamlTests
     [Fact]
     public void Can_Deserialize_When_Yaml_Does_Not_Contain_Crs_Property()
     {
-        var yaml = "coordinates:\r\n- 90.65464646\r\n- 53.2455662\r\n- 200.4567\r\ntype: Point";
+        var yaml = $"coordinates:{Nl}- 90.65464646{Nl}- 53.2455662{Nl}- 200.4567{Nl}type: Point";
 
         var serializer = new GeospatialYamlSerializer();
         var point = serializer.Deserialize<Point>(yaml);
@@ -34,7 +36,7 @@ public class DefaultCrsYamlTests
     [Fact]
     public void Can_Deserialize_CRS_issue_89()
     {
-        var yaml = "coordinates:\r\n- 90.65464646\r\n- 53.2455662\r\n- 200.4567\r\ntype: Point\r\ncrs:\r\n  type: name\r\n  properties:\r\n    name: urn:ogc:def:crs:OGC:1.3:CRS84";
+        var yaml = $"coordinates:{Nl}- 90.65464646{Nl}- 53.2455662{Nl}- 200.4567{Nl}type: Point{Nl}crs:{Nl}  type: name{Nl}  properties:{Nl}    name: urn:ogc:def:crs:OGC:1.3:CRS84";
 
 
         var serializer = new GeospatialYamlSerializer();
@@ -48,7 +50,7 @@ public class DefaultCrsYamlTests
     [Fact]
     public void Can_Serialize_CRS_issue_89()
     {
-        var expected = "type: Point\r\ncoordinates:\r\n- 34.56\r\n- 12.34\r\ncrs:\r\n  properties:\r\n    name: TEST NAME\r\n  type: Name\r\n";
+        var expected = $"type: Point{Nl}coordinates:{Nl}- 34.56{Nl}- 12.34{Nl}crs:{Nl}  properties:{Nl}    name: TEST NAME{Nl}  type: Name{Nl}";
         var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("TEST NAME") };
 
         var serializer = new GeospatialYamlSerializer();
@@ -61,7 +63,7 @@ public class DefaultCrsYamlTests
     [Fact]
     public void Can_Serialize_DefaultCRS_issue_89()
     {
-        var expected = "type: Point\r\ncoordinates:\r\n- 34.56\r\n- 12.34\r\ncrs:\r\n  properties:\r\n    name: urn:ogc:def:crs:OGC::CRS84\r\n  type: Name\r\n";
+        var expected = $"type: Point{Nl}coordinates:{Nl}- 34.56{Nl}- 12.34{Nl}crs:{Nl}  properties:{Nl}    name: urn:ogc:def:crs:OGC::CRS84{Nl}  type: Name{Nl}";
         var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("urn:ogc:def:crs:OGC::CRS84") };
 
         var serializer = new GeospatialYamlSerializer();

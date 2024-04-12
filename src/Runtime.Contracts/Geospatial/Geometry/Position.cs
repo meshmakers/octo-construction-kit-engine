@@ -71,17 +71,17 @@ public class Position : IPosition, IEqualityComparer<Position>, IEquatable<Posit
     /// <summary>
     /// Gets the altitude.
     /// </summary>
-    public double? Altitude { get; }
+    public double? Altitude { get; set; }
 
     /// <summary>
     /// Gets the latitude or Y coordinate
     /// </summary>
-    public double Latitude { get; }
+    public double Latitude { get; set; }
 
     /// <summary>
     /// Gets the longitude or X coordinate
     /// </summary>
-    public double Longitude { get; }
+    public double Longitude { get; set; }
 
     /// <summary>
     /// Returns a <see cref="string" /> that represents this instance.

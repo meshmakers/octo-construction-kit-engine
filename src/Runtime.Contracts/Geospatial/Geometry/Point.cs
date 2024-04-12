@@ -33,7 +33,7 @@ public class Point : GeoJSONObject, IGeometryObject, IEqualityComparer<Point>, I
     [Newtonsoft.Json.JsonConverter(typeof(NewtonPositionConverter))]
     [System.Text.Json.Serialization.JsonPropertyName("coordinates")]
     [System.Text.Json.Serialization.JsonConverter(typeof(PositionConverter))]
-    public IPosition Coordinates { get; }
+    public IPosition Coordinates { get; set; }
 
     #region IEqualityComparer, IEquatable
 

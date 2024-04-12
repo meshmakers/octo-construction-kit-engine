@@ -81,7 +81,7 @@ public enum AttributeValueTypesDto
     DateTimeOffset = 15,
     
     /// <summary>
-    /// Geo spatial data according to RFC 7946
+    /// Geo spatial data according to RFC 7946 section 3.2.1
     /// </summary>
-    Geospatial = 16
+    GeospatialPoint = 16
 }

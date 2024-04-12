@@ -58,7 +58,7 @@
             "DateTimeOffset",
             "Binary",
             "BinaryLinked",
-            "Geospatial"
+            "GeospatialPoint"
           ]
         },
         "valueCkRecordId": {

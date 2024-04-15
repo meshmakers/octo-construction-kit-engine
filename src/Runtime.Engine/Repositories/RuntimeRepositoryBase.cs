@@ -431,7 +431,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         foreach (var ckTypeAttributeDto in ckTypeGraph.AllAttributes.Values)
         {
             object? value = null;
-            if (ckTypeAttributeDto.DefaultValues != null)
+            if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any())
             {
                 switch (ckTypeAttributeDto.ValueType)
                 {

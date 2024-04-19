@@ -16,23 +16,66 @@ public class PositionConverter : JsonConverter<IPosition>, IYamlTypeConverter
     /// <inheritdoc />
     public override IPosition Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
-        var coordinates = new List<double>();
 
-        while (reader.Read())
+        if (reader.TokenType == JsonTokenType.StartObject)
         {
-            if (reader.TokenType == JsonTokenType.EndArray)
+            var coordinates = new List<double> { 0, 0 };
+            while (reader.Read())
             {
-                return coordinates.ToPosition();
-            }
+                if (reader.TokenType == JsonTokenType.EndObject)
+                {
+                    return coordinates.ToPosition();
+                }
 
-            if (reader.TokenType == JsonTokenType.Number)
-            {
-                coordinates.Add(reader.GetDouble());
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    var propertyName = reader.GetString();
+                    reader.Read();
+
+                    if (propertyName == "longitude")
+                    {
+                        coordinates[0] = reader.GetDouble();
+                    }
+                    else if (propertyName == "latitude")
+                    {
+                        coordinates[1] = reader.GetDouble();
+                    }
+                    else if (propertyName == "altitude")
+                    {
+                        coordinates.Add(reader.GetDouble());
+                    }
+                    else
+                    {
+                        throw RuntimeModelParseException.UnexpectedToken(nameof(IPosition), reader.TokenType,
+                            nameof(JsonTokenType.PropertyName));
+                    }
+                }
+                else
+                {
+                    throw RuntimeModelParseException.UnexpectedToken(nameof(IPosition), reader.TokenType,
+                        nameof(JsonTokenType.PropertyName));
+                }
             }
-            else
+        }
+        else
+        {
+            List<double> coordinates = new List<double>();
+            while (reader.Read())
             {
-                throw RuntimeModelParseException.UnexpectedToken(nameof(IPosition), reader.TokenType,
-                    nameof(JsonTokenType.Number));
+                if (reader.TokenType == JsonTokenType.EndArray)
+                {
+                    return coordinates.ToPosition();
+                }
+
+                if (reader.TokenType == JsonTokenType.Number)
+                {
+                    coordinates.Add(reader.GetDouble());
+                }
+                else
+                {
+                    throw RuntimeModelParseException.UnexpectedToken(nameof(IPosition), reader.TokenType,
+                        nameof(JsonTokenType.Number));
+                }
             }
         }
 

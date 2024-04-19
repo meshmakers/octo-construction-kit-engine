@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 
@@ -71,6 +72,7 @@ public class Position : IPosition, IEqualityComparer<Position>, IEquatable<Posit
     /// <summary>
     /// Gets the altitude.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? Altitude { get; set; }
 
     /// <summary>

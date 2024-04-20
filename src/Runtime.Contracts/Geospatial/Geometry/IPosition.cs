@@ -1,4 +1,6 @@
-﻿namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
+﻿using System.Text.Json.Serialization;
+
+namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 
 /// <summary>
 /// Defines the Geographic Position type.
@@ -11,6 +13,7 @@ public interface IPosition
     /// <summary>
     /// Gets the altitude.
     /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     double? Altitude { get; }
     
     /// <summary>

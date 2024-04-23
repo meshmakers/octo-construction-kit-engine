@@ -33,7 +33,8 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
     /// <returns></returns>
     public IEnumerable<GroupingResult> Calculate(IEnumerable<TEntity> resultList)
     {
-        var groupByPropertiesResult = resultList.GroupBy(g => new Key(_groupBy.GroupByAttributeNameList.Select(a => GetValue(a)(g))));
+        var groupByPropertiesResult =
+            resultList.GroupBy(g => new Key(_groupBy.GroupByAttributeNameList.Select(a => GetValue(a)(g))));
 
         var calculateGrouping = new List<GroupingResult>();
         foreach (var entityGrouping in groupByPropertiesResult.OrderBy(x => x.Key))
@@ -57,7 +58,8 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
         return calculateGrouping;
     }
 
-    private static List<StatisticsResult> RunStatistics(IEnumerable<string>? attributeNames, Func<string, object?> calcFunction)
+    private static List<StatisticsResult> RunStatistics(IEnumerable<string>? attributeNames,
+        Func<string, object?> calcFunction)
     {
         var list = new List<StatisticsResult>();
         if (attributeNames != null)
@@ -81,7 +83,12 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
         {
             if (_ckTypeGraph.AllAttributesByName.TryGetValue(propertyName, out var attributeCacheItem))
             {
-                return AttributeValueConverter.ConvertAttributeValue(attributeCacheItem.ValueType, entity.Attributes[propertyName]);
+                if (entity.Attributes.TryGetValue(propertyName, out var value))
+                {
+                    return AttributeValueConverter.ConvertAttributeValue(attributeCacheItem.ValueType, value);
+                }
+
+                return null;
             }
 
             throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(_ckTypeGraph.CkTypeId, propertyName);

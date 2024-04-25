@@ -166,7 +166,7 @@ public class GitHubCkModelRepository : ICkModelRepository
     {
         var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"))
         {
-            Credentials = new Credentials("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")
+            Credentials = new Credentials("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")
         };
 
         return gitHubClient;

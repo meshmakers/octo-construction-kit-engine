@@ -1,7 +1,4 @@
-﻿using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
-using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
-using System.IO;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
 {

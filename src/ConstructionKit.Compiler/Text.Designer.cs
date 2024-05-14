@@ -60,11 +60,182 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Auto Complete Values.
+        /// </summary>
+        internal static string AutoCompleteValues {
+            get {
+                return ResourceManager.GetString("AutoCompleteValues", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Auto Increment Reference.
+        /// </summary>
+        internal static string AutoIncrementReference {
+            get {
+                return ResourceManager.GetString("AutoIncrementReference", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to CKAttributeID.
+        /// </summary>
+        internal static string CKAttributeID {
+            get {
+                return ResourceManager.GetString("CKAttributeID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to CkEnumId/CkRecordId.
+        /// </summary>
+        internal static string CkEnumId_CkRecordId {
+            get {
+                return ResourceManager.GetString("CkEnumId/CkRecordId", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Data Type.
+        /// </summary>
+        internal static string DataType {
+            get {
+                return ResourceManager.GetString("DataType", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Default Values.
+        /// </summary>
+        internal static string DefaultValues {
+            get {
+                return ResourceManager.GetString("DefaultValues", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Defined Attributes.
+        /// </summary>
+        internal static string DefinedAttributes {
+            get {
+                return ResourceManager.GetString("DefinedAttributes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Description.
+        /// </summary>
+        internal static string Description {
+            get {
+                return ResourceManager.GetString("Description", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Descriptions.
+        /// </summary>
+        internal static string Descriptions {
+            get {
+                return ResourceManager.GetString("Descriptions", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to ID.
         /// </summary>
         internal static string ID {
             get {
                 return ResourceManager.GetString("ID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Inbound Multiplicity.
+        /// </summary>
+        internal static string InboundMultiplicity {
+            get {
+                return ResourceManager.GetString("InboundMultiplicity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Inbound Name.
+        /// </summary>
+        internal static string InboundName {
+            get {
+                return ResourceManager.GetString("InboundName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Is Data Stream?.
+        /// </summary>
+        internal static string IsDataStream {
+            get {
+                return ResourceManager.GetString("IsDataStream", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Is Optional.
+        /// </summary>
+        internal static string IsOptional {
+            get {
+                return ResourceManager.GetString("IsOptional", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Outbound Multiplicity.
+        /// </summary>
+        internal static string OutboundMultiplicity {
+            get {
+                return ResourceManager.GetString("OutboundMultiplicity", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Outbound Name.
+        /// </summary>
+        internal static string OutboundName {
+            get {
+                return ResourceManager.GetString("OutboundName", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Target Attributes.
+        /// </summary>
+        internal static string TargetAttributes {
+            get {
+                return ResourceManager.GetString("TargetAttributes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to TargetCKType ID.
+        /// </summary>
+        internal static string TargetCKTypeID {
+            get {
+                return ResourceManager.GetString("TargetCKTypeID", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Values.
+        /// </summary>
+        internal static string Values {
+            get {
+                return ResourceManager.GetString("Values", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Version.
+        /// </summary>
+        internal static string Version {
+            get {
+                return ResourceManager.GetString("Version", resourceCulture);
             }
         }
     }

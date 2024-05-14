@@ -655,8 +655,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             BuildDirectory(docPath, ckModelId);
 
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
-
-            await MarkdownTableBuilder(outputFile, context);
+            
+            await outputFile.WriteLineAsync(
+                $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
+                $" {Text.Description} | {Text.CkEnumId_CkRecordId} |");
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |");
+            
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
             foreach (var attribute in GetAttributes(modelGraph))
@@ -689,7 +693,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 if (MatchesModelId(Enum, ckModelId))
                 {
                     await AddTitle(outputFile, null, Enum.CkEnumId.Key.SemanticVersionedFullName);
-                    await MarkdownTableBuilder(outputFile, context);
+
+                    await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |");
+                    await outputFile.WriteLineAsync("| -----------| -----------| -----------|");
+                    
                     await Enum.DrawEnum(outputFile, context);
                 }
             }
@@ -711,8 +718,11 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             BuildDirectory(docPath, ckModelId);
 
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
-
-            await MarkdownTableBuilder(outputFile, context);
+            
+            await outputFile.WriteLineAsync(
+                $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
+                $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |");
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |");
 
             foreach (var record in GetRecords(modelGraph))
             {
@@ -750,7 +760,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
                     if (type.DefinedAttributes.Count != 0)
                     {
-                        await MarkdownTableBuilder(outputFile, context);
+                        await outputFile.WriteLineAsync(
+                            $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |");
+                        await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |");
 
                         foreach (var attribute in type.DefinedAttributes)
                         {
@@ -774,7 +786,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                     {
                                         await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
                                             true);
-                                        await MarkdownTableBuilder(outputFile, DocContextAttrib.AssociationRolesHeadings);
+
+                                        await outputFile.WriteLineAsync(
+                                            $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                                            $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
+                                        await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                                                        " -----------| -----------| ----------- |");
                                         tableBuilt = true;
                                     }
 
@@ -804,7 +821,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             BuildDirectory(docPath, ckModelId);
             using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
-            await MarkdownTableBuilder(outputFile, context);
+
+            await outputFile.WriteLineAsync(
+                $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                            " -----------| -----------| ----------- |");
 
             foreach (var associationRole in associationRoles)
             {
@@ -823,7 +845,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         BuildDirectory(docPath, ckModelId);
         using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
         List<string> headings = ["Version", "Description"];
-        await MarkdownTableBuilder(outputFile, headings);
+
+        await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |");
+        await outputFile.WriteLineAsync("| -----------| -----------|");
     }
 
     private static async Task LinkToVersionHistory(StreamWriter outputFile, string baseRelativePath)
@@ -846,23 +870,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                                                              modelId.SemanticVersionedFullName,
             _ => false // Handle unsupported types or throw an exception if needed
         };
-    }
-
-    private static async Task MarkdownTableBuilder(StreamWriter outputFile, List<string> headings)
-    {
-        await outputFile.WriteLineAsync();
-        foreach (var i in headings)
-        {
-            await outputFile.WriteAsync($"| {i}");
-        }
-
-        await outputFile.WriteLineAsync(" |");
-        foreach (var _ in headings)
-        {
-            await outputFile.WriteAsync($"| -----------");
-        }
-
-        await outputFile.WriteLineAsync(" |");
     }
 
     private static async Task AddTitle(StreamWriter outputFile, CkModelId? ckModelId, string tableTitle, bool isSubtitle = false)

@@ -265,24 +265,13 @@ static class CkAttributeGraphExtensions
     public static async Task DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile, List<string> attributeHeadings,
         string baseRelativePath)
     {
-        foreach (var heading in attributeHeadings)
-        {
-            string content = heading switch
-            {
-                "ID" => $"{ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()}",
-                "DataType" => ckAttributeGraph.ValueType.ToString(),
-                "Default Values" => ckAttributeGraph.DrawDefaultValues(),
-                "Is Data Stream?" => ckAttributeGraph.IsDataStream.ToString(),
-                "Description" => ckAttributeGraph.Description ?? "",
-                "CkEnumId/CkRecordId" => $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)}",
-                _ => string.Empty
-            };
 
-
-            await outputFile.WriteAsync($"| {content} ");
-        }
-
-        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+        await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()} | " +
+                                        $"| {ckAttributeGraph.ValueType.ToString()} | " +
+                                        $"| {ckAttributeGraph.DrawDefaultValues()} | " +
+                                        $"| {ckAttributeGraph.IsDataStream.ToString()} | " +
+                                        $"| {ckAttributeGraph.Description ?? ""} | " +
+                                        $"| {ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)} | ");
     }
 
 

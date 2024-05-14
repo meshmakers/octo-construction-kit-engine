@@ -397,18 +397,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private string GetRelativeDestinationPath()
     {
-        var lastPathSegment = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg)
-            .Split("\\")
-            .Last();
-
-        if (!lastPathSegment.StartsWith('/'))
-        {
-            lastPathSegment = "/" + lastPathSegment;
-        }
-
-        return lastPathSegment;
+        var directoryPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
+        return "/" + Path.GetFileName(directoryPath);
     }
-
+    
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options)
@@ -429,6 +421,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         Logger.LogInformation("Creating documentation for construction kit model");
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_filePathArg);
+        var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
+        
         await using var stream = File.OpenRead(filePath);
 
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
@@ -445,26 +439,22 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var test = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
-        // Test contains all resolved types
-
-        //Path to Docusaurus docs folder
-        var docusaurusPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
+        var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
         //Variables
         var relativeDestinationPath = GetRelativeDestinationPath();
 
         //ID Determines Position in File Tree   
-        await GenerateMermaidTextOutput(test, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
+        await GenerateMermaidTextOutput(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
         await GenerateVersionHistory(docusaurusPath, compiledModelRoot.ModelId);
 
-        await GenerateAttributesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateAttributesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
-        await GenerateEnumsMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId);
-        await GenerateRecordsMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId);
-        await GenerateTypesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateEnumsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateRecordsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateTypesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
-        await GenerateAssociationRolesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateAssociationRolesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
     }
 }

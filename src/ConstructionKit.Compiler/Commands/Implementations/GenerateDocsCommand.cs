@@ -477,25 +477,14 @@ static class CkAssociationRoleGraphExtensions
     public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile,
         List<string> associationRoleHeadings, CkTypeAssociationGraph? association, string baseRelativePath)
     {
-        foreach (var heading in associationRoleHeadings)
-        {
-            string content = heading switch
-            {
-                "ID" => ckAssociationRoleGraph.AddAnchor() + ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath),
-                "Inbound Multiplicity" => $"{ckAssociationRoleGraph.InboundMultiplicity}",
-                "Inbound Name" => $"{ckAssociationRoleGraph.InboundName}",
-                "Outbound Multiplicity" => $"{ckAssociationRoleGraph.OutboundMultiplicity}",
-                "Outbound Name" => $"{ckAssociationRoleGraph.OutboundName}",
-                "TargetCkType ID" => $"{association?.TargetCkTypeId.SemanticVersionedFullName}",
-                "Target Attributes" => $"{association?.DrawTargetAttributes()}",
-                _ => string.Empty
-            };
-
-
-            await outputFile.WriteAsync($"| {content} ");
-        }
-
-        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+        await outputFile.WriteLineAsync($"| {ckAssociationRoleGraph.AddAnchor() +
+                                             ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath)} | " +
+                                        $"{ckAssociationRoleGraph.InboundMultiplicity} | " +
+                                        $"{ckAssociationRoleGraph.InboundName} | " +
+                                        $"{ckAssociationRoleGraph.OutboundMultiplicity} | " +
+                                        $"{ckAssociationRoleGraph.OutboundName} | " +
+                                        $"{association?.TargetCkTypeId.SemanticVersionedFullName} | " +
+                                        $"{association?.DrawTargetAttributes()} |");
     }
 
     private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath)

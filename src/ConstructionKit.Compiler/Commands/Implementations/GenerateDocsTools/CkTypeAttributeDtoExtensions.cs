@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
+namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
 internal static class CkTypeAttributeDtoExtensions
 {

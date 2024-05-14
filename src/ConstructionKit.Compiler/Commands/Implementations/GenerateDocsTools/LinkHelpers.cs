@@ -1,6 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations
+namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools
 {
     internal static class LinkHelpers
     {

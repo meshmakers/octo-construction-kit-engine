@@ -340,24 +340,12 @@ static class CkRecordGraphExtensions
 {
     public static async Task DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile, List<string> recordHeadings)
     {
-        foreach (var heading in recordHeadings)
-        {
-            string content = heading switch
-            {
-                "ID" => $"{ckRecordGraph.CkRecordId.SemanticVersionedFullName}",
-                "Defined Attributes" => ckRecordGraph.DrawAttributeList((a) => a.AttributeName),
-                "Is Optional" => ckRecordGraph.DrawAttributeList((a) => a.IsOptional.ToString()),
-                "Auto Increment Reference" => ckRecordGraph.DrawAttributeAutoIncrementReference(),
-                "Auto Complete Values" => ckRecordGraph.DrawAttributeAutoCompleteValues(),
-                "CKAttributeID" => ckRecordGraph.DrawAttributeList((a) => a.CkAttributeId.SemanticVersionedFullName),
-                _ => string.Empty
-            };
-
-
-            await outputFile.WriteAsync($"| {content} ");
-        }
-
-        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+        await outputFile.WriteLineAsync($"| {ckRecordGraph.CkRecordId.SemanticVersionedFullName} | " +
+                                        $"{ckRecordGraph.DrawAttributeList((a) => a.AttributeName)} | " +
+                                        $"{ckRecordGraph.DrawAttributeList((a) => a.IsOptional.ToString())} | " +
+                                        $"{ckRecordGraph.DrawAttributeAutoIncrementReference()} | " +
+                                        $"{ckRecordGraph.DrawAttributeAutoCompleteValues()} | " +
+                                        $"{ckRecordGraph.DrawAttributeList((a) => a.CkAttributeId.SemanticVersionedFullName)} |");
     }
 
     private static string DrawAttributeList(this CkRecordGraph ckRecordGraph, Func<CkTypeAttributeDto, string> valueGetter)

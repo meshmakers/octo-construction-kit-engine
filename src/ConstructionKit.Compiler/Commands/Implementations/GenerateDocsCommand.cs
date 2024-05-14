@@ -415,22 +415,10 @@ static class CkTypeAttributeDtoExtensions
     public static async Task DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile,
         List<string> attributeDtoHeadings, string baseRelativePath)
     {
-        foreach (var heading in attributeDtoHeadings)
-        {
-            string content = heading switch
-            {
-                "ID" => ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath),
-                "Auto Complete Values" => ckTypeAttributeDto.DrawAttributeAutoCompleteValues(),
-                "Auto Increment Reference" => ckTypeAttributeDto.DrawAttributeAutoIncrementReference(),
-                "Is Optional" => ckTypeAttributeDto.IsOptional.ToString(),
-                _ => string.Empty
-            };
-
-
-            await outputFile.WriteAsync($"| {content} ");
-        }
-
-        await outputFile.WriteLineAsync("|"); // Finish the line for one attribute entry
+        await outputFile.WriteLineAsync($"| {ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath)} | " +
+                                        $"{ckTypeAttributeDto.DrawAttributeAutoCompleteValues()} | " +
+                                        $"{ckTypeAttributeDto.DrawAttributeAutoIncrementReference()} | " +
+                                        $"{ckTypeAttributeDto.IsOptional.ToString()} |");
     }
 
     private static string DrawAttributeAutoCompleteValues(this CkTypeAttributeDto ckTypeAttributeDto)

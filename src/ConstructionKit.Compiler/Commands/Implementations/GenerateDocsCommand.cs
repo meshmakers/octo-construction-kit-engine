@@ -267,11 +267,11 @@ static class CkAttributeGraphExtensions
     {
 
         await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()} | " +
-                                        $"| {ckAttributeGraph.ValueType.ToString()} | " +
-                                        $"| {ckAttributeGraph.DrawDefaultValues()} | " +
-                                        $"| {ckAttributeGraph.IsDataStream.ToString()} | " +
-                                        $"| {ckAttributeGraph.Description ?? ""} | " +
-                                        $"| {ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)} | ");
+                                        $"{ckAttributeGraph.ValueType.ToString()} | " +
+                                        $"{ckAttributeGraph.DrawDefaultValues()} | " +
+                                        $"{ckAttributeGraph.IsDataStream.ToString()} | " +
+                                        $"{ckAttributeGraph.Description ?? ""} | " +
+                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)} |");
     }
 
 
@@ -329,19 +329,9 @@ static class CkEnumGraphExtensions
         int counter = 0;
         foreach (var value in ckEnumGraph.Values)
         {
-            foreach (var heading in enumHeadings)
-            {
-                string content = heading switch
-                {
-                    "ID" => $"{counter++}",
-                    "Values" => $"{value.Name}",
-                    "Descriptions" => $"{value.Description}",
-                    _ => string.Empty
-                };
-                await outputFile.WriteAsync($"| {content} ");
-            }
-
-            await outputFile.WriteLineAsync("|");
+            await outputFile.WriteLineAsync($"| {counter++} | " +
+                                            $"{value.Name} | " +
+                                            $"{value.Description} |");
         }
     }
 }

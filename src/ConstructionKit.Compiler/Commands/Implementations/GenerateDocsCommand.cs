@@ -3,7 +3,6 @@ using System.Text;
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
@@ -11,465 +10,6 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
-
-//Expected Format for itemName Class.Name/UnformattedAnchor
-public class LinkItemBuilder(string itemName, string baseRelativePath)
-{
-    private readonly StringBuilder _itemStringBuilder = new($"[{itemName}](");
-    private readonly string _itemName = itemName;
-    private readonly string _baseRelativePath = baseRelativePath;
-
-    public void BuildLinkToType()
-    {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Types", _baseRelativePath))
-            .Append('#')
-            .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
-            .Append(')');
-    }
-
-    public void BuildLinkToAttribute()
-    {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Attributes", _baseRelativePath))
-            .Append('#')
-            .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
-            .Append(')');
-    }
-
-    public void BuildLinkToEnum()
-    {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Enums", _baseRelativePath))
-            .Append('#')
-            .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
-            .Append(')');
-    }
-
-    public void BuildLinkToRecord()
-    {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Records", _baseRelativePath))
-            .Append('#')
-            .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
-            .Append(')');
-    }
-
-    public void BuildLinkToAssociation()
-    {
-        _itemStringBuilder.Append(LinkHelpers.CreateRelativeFilepath(_itemName.Split('/').First(), "Associations", _baseRelativePath))
-            .Append('#')
-            .Append(LinkHelpers.FormatAnchor(_itemName.Split('/').Last()))
-            .Append(')');
-    }
-
-    public void BuildLinkToVersionHistory()
-    {
-        _itemStringBuilder.Append("./VersionHistory")
-            .Append(')')
-            .Insert(0, "#### ");
-    }
-
-    public override string ToString()
-    {
-        return _itemStringBuilder.ToString();
-    }
-}
-
-static class CkTypeGraphExtensions
-{
-    public static string GetClassName(this CkId<CkTypeId> ckTypeGraph)
-    {
-        string fullName = ckTypeGraph.Key.SemanticVersionedFullName;
-
-        string sanitizedFullName = GetName(ckTypeGraph) + "[\"" + fullName + "\"]";
-
-        return sanitizedFullName;
-    }
-
-    public static string GetName(this CkId<CkTypeId> ckTypeGraph)
-    {
-        string fullName = ckTypeGraph.Key.SemanticVersionedFullName;
-
-        string sanitizedFullName = fullName.Replace(".", "");
-
-        return sanitizedFullName;
-    }
-
-    public static async Task DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}");
-
-        //for formatting check if attributes defined
-        if (ckTypeGraph.DefinedAttributes.Count != 0)
-        {
-            await outputFile.WriteLineAsync("{");
-
-            foreach (var attribute in ckTypeGraph.DefinedAttributes)
-            {
-                await outputFile.WriteLineAsync($"+{attribute.AttributeName} : {attribute.AttributeName.GetTypeCode()}");
-            }
-
-            await outputFile.WriteLineAsync("}");
-        }
-        else
-        {
-            await outputFile.WriteLineAsync();
-        }
-    }
-
-    public static async Task DrawInheritance(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        //Checks for Inheritance In BaseTypes and Creates Arrows
-        if (ckTypeGraph.BaseTypes.Count != 0)
-        {
-            await outputFile.WriteLineAsync(
-                $"{ckTypeGraph.CkTypeId.GetName()} --|> {ckTypeGraph.BaseTypes.First(x => x.BaseTypeDepthIndex == 0).BaseCkTypeId.GetName()}");
-        }
-    }
-
-    public static async Task DrawAssociations(this CkTypeGraph ckTypeGraph, StreamWriter outputFile,
-        IEnumerable<CkAssociationRoleGraph> typeAssociations)
-    {
-        if (ckTypeGraph.Associations.DefinedAssociations.Count != 0)
-        {
-            foreach (var association in ckTypeGraph.Associations.Out.Owned)
-            {
-                //check if Id's for associations match to create adequate multiplicities
-                foreach (var item in typeAssociations)
-                {
-                    if (association.CkRoleId.FullName == item.CkRoleId.FullName)
-                    {
-                        string OutboundMultiplicityConversion = FormatOutboundMultiplicity(item);
-                        string InboundMultiplicityConversion = FormatInboundMultiplicity(item);
-                        await outputFile.WriteLineAsync(
-                            $"{association.OriginCkTypeId.GetName()} \"{OutboundMultiplicityConversion}\" --> \"{InboundMultiplicityConversion}\" {association.TargetCkTypeId.GetName()} : {association.CkRoleId.SemanticVersionedFullName}");
-                    }
-                }
-            }
-        }
-    }
-
-    private static string FormatInboundMultiplicity(CkAssociationRoleGraph item)
-    {
-        var InboundMultiplicity = item.InboundMultiplicity;
-        string InboundMultiplicityConversion = "n";
-
-        if (InboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne)
-        {
-            InboundMultiplicityConversion = "0..1";
-        }
-        else if (InboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.One)
-        {
-            InboundMultiplicityConversion = "1";
-        }
-
-        return InboundMultiplicityConversion;
-    }
-
-    private static string FormatOutboundMultiplicity(CkAssociationRoleGraph item)
-    {
-        var OutboundMultiplicity = item.OutboundMultiplicity;
-        string OutboundMultiplicityConversion = "n";
-
-        if (OutboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne)
-        {
-            OutboundMultiplicityConversion = "0..1";
-        }
-        else if (OutboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.One)
-        {
-            OutboundMultiplicityConversion = "1";
-        }
-
-        return OutboundMultiplicityConversion;
-    }
-
-    public static async Task DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        await GetNamespaceName(ckTypeGraph, outputFile);
-
-        await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
-
-        await outputFile.WriteLineAsync($"}}");
-    }
-
-    private static async Task GetNamespaceName(CkTypeGraph ckTypeGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{");
-    }
-
-    public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath)
-    {
-        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
-        await outputFile.WriteAsync(LinkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types", baseRelativePath));
-        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
-    }
-
-    public static string CreateAnchor(this CkTypeGraph ckTypeGraph)
-    {
-        return ckTypeGraph.CkTypeId.Key.TypeId.ToString().ToLower();
-    }
-}
-
-static class CkAttributeGraphExtensions
-{
-    public static async Task DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile,
-        string baseRelativePath)
-    {
-
-        await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()} | " +
-                                        $"{ckAttributeGraph.ValueType.ToString()} | " +
-                                        $"{ckAttributeGraph.DrawDefaultValues()} | " +
-                                        $"{ckAttributeGraph.IsDataStream.ToString()} | " +
-                                        $"{ckAttributeGraph.Description ?? ""} | " +
-                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)} |");
-    }
-
-
-    private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
-    {
-        return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName.ToLower()}\"></a>";
-    }
-
-    private static string AddName(this CkAttributeGraph ckAttributeGraph)
-    {
-        return $"{ckAttributeGraph.CkAttributeId.SemanticVersionedFullName}";
-    }
-
-    private static string DrawDefaultValues(this CkAttributeGraph ckAttributeGraph)
-    {
-        StringBuilder stringBuilder = new();
-        if (ckAttributeGraph.DefaultValues != null)
-        {
-            foreach (var value in ckAttributeGraph.DefaultValues)
-            {
-                stringBuilder.Append(value.ToString());
-            }
-
-            return stringBuilder.ToString();
-        }
-
-        return "";
-    }
-
-    private static string LinkToRecordOrEnum(this CkAttributeGraph ckAttributeGraph, string baseRelativePath)
-    {
-        if (ckAttributeGraph.ValueCkEnumId != null)
-        {
-            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkEnumId.SemanticVersionedFullName, baseRelativePath);
-            builder.BuildLinkToEnum();
-            return builder.ToString();
-        }
-        else if (ckAttributeGraph.ValueCkRecordId != null)
-        {
-            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkRecordId.SemanticVersionedFullName, baseRelativePath);
-            builder.BuildLinkToRecord();
-            return builder.ToString();
-        }
-        else
-        {
-            return "";
-        }
-    }
-}
-
-static class CkEnumGraphExtensions
-{
-    public static async Task DrawEnum(this CkEnumGraph ckEnumGraph, StreamWriter outputFile)
-    {
-        int counter = 0;
-        foreach (var value in ckEnumGraph.Values)
-        {
-            await outputFile.WriteLineAsync($"| {counter++} | " +
-                                            $"{value.Name} | " +
-                                            $"{value.Description} |");
-        }
-    }
-}
-
-static class CkRecordGraphExtensions
-{
-    public static async Task DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
-    {
-        await outputFile.WriteLineAsync($"| {ckRecordGraph.CkRecordId.SemanticVersionedFullName} | " +
-                                        $"{ckRecordGraph.DrawAttributeList((a) => a.AttributeName)} | " +
-                                        $"{ckRecordGraph.DrawAttributeList((a) => a.IsOptional.ToString())} | " +
-                                        $"{ckRecordGraph.DrawAttributeAutoIncrementReference()} | " +
-                                        $"{ckRecordGraph.DrawAttributeAutoCompleteValues()} | " +
-                                        $"{ckRecordGraph.DrawAttributeList((a) => a.CkAttributeId.SemanticVersionedFullName)} |");
-    }
-
-    private static string DrawAttributeList(this CkRecordGraph ckRecordGraph, Func<CkTypeAttributeDto, string> valueGetter)
-    {
-        StringBuilder stringBuilder = new();
-        stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-        foreach (var attribute in ckRecordGraph.DefinedAttributes)
-        {
-            stringBuilder.Append("<li>");
-            stringBuilder.Append(valueGetter(attribute));
-            stringBuilder.Append("</li>");
-        }
-
-        stringBuilder.Append("</ul>");
-
-        return stringBuilder.ToString();
-    }
-
-
-    private static string DrawAttributeAutoIncrementReference(this CkRecordGraph ckRecordGraph)
-    {
-        StringBuilder stringBuilder = new();
-        stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-        foreach (var attribute in ckRecordGraph.DefinedAttributes)
-        {
-            stringBuilder.Append("<li>");
-            stringBuilder.Append($"{attribute.AutoIncrementReference}");
-            stringBuilder.Append("</li>");
-        }
-
-        stringBuilder.Append("</ul>");
-
-        return stringBuilder.ToString();
-    }
-    
-    private static string DrawAttributeAutoCompleteValues(this CkRecordGraph ckRecordGraph)
-    {
-        StringBuilder stringBuilder = new();
-        stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-        foreach (var attribute in ckRecordGraph.DefinedAttributes)
-        {
-            if (attribute.AutoCompleteValues != null)
-            {
-                stringBuilder.Append("<li>");
-                stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-                foreach (var autocompletevalue in attribute.AutoCompleteValues)
-                {
-                    stringBuilder.Append("<li>");
-                    stringBuilder.Append($"{autocompletevalue}");
-                    stringBuilder.Append("</li>");
-                }
-
-                stringBuilder.Append("</ul>");
-                stringBuilder.Append("</li>");
-            }
-        }
-
-        stringBuilder.Append("</ul>");
-
-        return stringBuilder.ToString();
-    }
-}
-
-static class CkTypeAttributeDtoExtensions
-{
-    public static async Task DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, string baseRelativePath)
-    {
-        await outputFile.WriteLineAsync($"| {ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath)} | " +
-                                        $"{ckTypeAttributeDto.DrawAttributeAutoCompleteValues()} | " +
-                                        $"{ckTypeAttributeDto.DrawAttributeAutoIncrementReference()} | " +
-                                        $"{ckTypeAttributeDto.IsOptional.ToString()} |");
-    }
-
-    private static string DrawAttributeAutoCompleteValues(this CkTypeAttributeDto ckTypeAttributeDto)
-    {
-        if (ckTypeAttributeDto.AutoCompleteValues != null)
-        {
-            StringBuilder stringBuilder = new();
-            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-
-
-            foreach (var attribute in ckTypeAttributeDto.AutoCompleteValues)
-            {
-                stringBuilder.Append("<li>");
-                stringBuilder.Append($"{attribute}");
-                stringBuilder.Append("</li>");
-            }
-
-            stringBuilder.Append("</ul>");
-            return stringBuilder.ToString();
-        }
-
-        return "";
-    }
-
-    private static string DrawAttributeAutoIncrementReference(this CkTypeAttributeDto ckTypeAttributeDto)
-    {
-        if (ckTypeAttributeDto.AutoIncrementReference != null)
-        {
-            StringBuilder stringBuilder = new();
-            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-            foreach (var attribute in ckTypeAttributeDto.AutoIncrementReference)
-            {
-                stringBuilder.Append("<li>");
-                stringBuilder.Append($"{attribute}");
-                stringBuilder.Append("</li>");
-            }
-
-            stringBuilder.Append("</ul>");
-
-            return stringBuilder.ToString();
-        }
-
-        return "";
-    }
-
-    private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto, string baseRelativePath)
-    {
-        var builder = new LinkItemBuilder(ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName, baseRelativePath);
-        builder.BuildLinkToAttribute();
-        return builder.ToString();
-    }
-}
-
-static class CkAssociationRoleGraphExtensions
-{
-    public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, CkTypeAssociationGraph? association, string baseRelativePath)
-    {
-        await outputFile.WriteLineAsync($"| {ckAssociationRoleGraph.AddAnchor() +
-                                             ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath)} | " +
-                                        $"{ckAssociationRoleGraph.InboundMultiplicity} | " +
-                                        $"{ckAssociationRoleGraph.InboundName} | " +
-                                        $"{ckAssociationRoleGraph.OutboundMultiplicity} | " +
-                                        $"{ckAssociationRoleGraph.OutboundName} | " +
-                                        $"{association?.TargetCkTypeId.SemanticVersionedFullName} | " +
-                                        $"{association?.DrawTargetAttributes()} |");
-    }
-
-    private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath)
-    {
-        var builder = new LinkItemBuilder(ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName, baseRelativePath);
-        builder.BuildLinkToAssociation();
-        return builder.ToString();
-    }
-
-    private static string AddAnchor(this CkAssociationRoleGraph ckAssociationRoleGraph)
-    {
-        return $"<a id=\"{ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName}\"></a>";
-    }
-
-    private static string DrawTargetAttributes(this CkTypeAssociationGraph? ckTypeAssociationGraph)
-    {
-        if (ckTypeAssociationGraph == null)
-        {
-            return "";
-        }
-
-        if (ckTypeAssociationGraph.TargetAttributes != null)
-        {
-            StringBuilder stringBuilder = new();
-            stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
-
-
-            foreach (var attribute in ckTypeAssociationGraph.TargetAttributes)
-            {
-                stringBuilder.Append("<li>");
-                stringBuilder.Append($"{attribute}");
-                stringBuilder.Append("</li>");
-            }
-
-            stringBuilder.Append("</ul>");
-            return stringBuilder.ToString();
-        }
-
-        return "";
-    }
-}
 
 public class GenerateDocsCommand : Command<OctoToolOptions>
 {
@@ -479,15 +19,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _docusaurusDestinationPathArg;
 
     //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
-    public static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
+    private static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
         string baseRelativePath)
     {
         BuildDirectory(docPath, ckModelId);
 
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
+        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
 
-        //Create Page Heading (could be delegated to function)
-        string[] split = ckModelId.SemanticVersionedFullName.Split('.');
+        //Create Page Heading
+        var split = ckModelId.SemanticVersionedFullName.Split('.');
         await outputFile.WriteLineAsync($"# {split.Last()}");
         await outputFile.WriteLineAsync();
 
@@ -532,15 +72,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Types.Select(x => x.Value);
     }
 
-    public static async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string baseRelativePath)
+    private static async Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string baseRelativePath)
     {
-        IEnumerable<CkAttributeGraph> attributes = GetAttributes(modelGraph)
+        var attributes = GetAttributes(modelGraph)
             .Where(attribute => MatchesModelId(attribute, ckModelId));
         if (attributes.Any())
         {
             BuildDirectory(docPath, ckModelId);
 
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
@@ -559,50 +99,48 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
         else
         {
-            Console.WriteLine($"No Attributes to draw for model ID: {ckModelId}");
+            logger.LogInformation("No Attributes to draw for model ID: {ckModelId}", ckModelId);
         }
     }
 
-    public static async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    private static async Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
-        IEnumerable<CkEnumGraph> enums = GetEnums(modelGraph)
+        var enums = GetEnums(modelGraph)
             .Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
         {
             BuildDirectory(docPath, ckModelId);
 
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
 
 
-            foreach (var Enum in GetEnums(modelGraph))
+            foreach (var @enum in GetEnums(modelGraph))
             {
-                if (MatchesModelId(Enum, ckModelId))
-                {
-                    await AddTitle(outputFile, null, Enum.CkEnumId.Key.SemanticVersionedFullName);
+                if (!MatchesModelId(@enum, ckModelId)) continue;
+                await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName);
 
-                    await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |");
-                    await outputFile.WriteLineAsync("| -----------| -----------| -----------|");
+                await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |");
+                await outputFile.WriteLineAsync("| -----------| -----------| -----------|");
                     
-                    await Enum.DrawEnum(outputFile);
-                }
+                await @enum.DrawEnum(outputFile);
             }
         }
         else
         {
-            Console.WriteLine($"No Enums to draw for model ID: {ckModelId}");
+            logger.LogInformation("No Enums to draw for model ID: {ckModelId}", ckModelId);
         }
     }
 
-    public static async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    private static async Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
     {
-        IEnumerable<CkRecordGraph> records = GetRecords(modelGraph)
+        var records = GetRecords(modelGraph)
             .Where(record => MatchesModelId(record, ckModelId));
 
         if (records.Any())
         {
             BuildDirectory(docPath, ckModelId);
 
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
@@ -619,91 +157,88 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
         else
         {
-            Console.WriteLine($"No Records to draw for model ID: {ckModelId}");
+            logger.LogInformation("No Records to draw for model ID: {ckModelId}", ckModelId);
         }
     }
 
-    public static async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
+    private static async Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
         string baseRelativePath)
     {
-        IEnumerable<CkTypeGraph> typeGraphs = GetTypes(modelGraph)
+        var typeGraphs = GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
         if (typeGraphs.Any())
         {
             BuildDirectory(docPath, ckModelId);
 
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
 
             foreach (var type in GetTypes(modelGraph))
             {
-                if (MatchesModelId(type, ckModelId))
+                if (!MatchesModelId(type, ckModelId)) continue;
+                await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
+                await AddHierarchy(outputFile, type, baseRelativePath);
+                await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+
+                if (type.DefinedAttributes.Count != 0)
                 {
-                    await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
-                    await AddHierarchy(outputFile, type, baseRelativePath);
-                    await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                    await outputFile.WriteLineAsync(
+                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |");
+                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |");
 
-                    if (type.DefinedAttributes.Count != 0)
+                    foreach (var attribute in type.DefinedAttributes)
                     {
-                        await outputFile.WriteLineAsync(
-                            $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |");
-                        await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |");
-
-                        foreach (var attribute in type.DefinedAttributes)
-                        {
-                            await attribute.DrawAttribute(outputFile, baseRelativePath);
-                        }
+                        await attribute.DrawAttribute(outputFile, baseRelativePath);
                     }
+                }
 
-                    //For Drawing all Associations that are associated with type
-                    if (type.Associations.DefinedAssociations.Count != 0)
+                //For Drawing all Associations that are associated with type
+                if (type.Associations.DefinedAssociations.Count == 0) continue;
+                var tableBuilt = false;
+
+                foreach (var association in type.Associations.Out.Owned)
+                {
+                    foreach (var item in GetAssociationRoles(modelGraph))
                     {
-                        bool tableBuilt = false;
-
-                        foreach (var association in type.Associations.Out.Owned)
+                        if (association.CkRoleId != item.CkRoleId) continue;
+                        if (!tableBuilt)
                         {
-                            foreach (var item in GetAssociationRoles(modelGraph))
-                            {
-                                if (association.CkRoleId == item.CkRoleId)
-                                {
-                                    if (!tableBuilt)
-                                    {
-                                        await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
-                                            true);
+                            await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
+                                true);
 
-                                        await outputFile.WriteLineAsync(
-                                            $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                                            $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
-                                        await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                                                        " -----------| -----------| ----------- |");
-                                        tableBuilt = true;
-                                    }
-
-                                    await item.DrawAssociationRole(outputFile, association,
-                                        baseRelativePath);
-                                }
-                            }
+                            await outputFile.WriteLineAsync(
+                                $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
+                            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                                            " -----------| -----------| ----------- |");
+                            tableBuilt = true;
                         }
+
+                        await item.DrawAssociationRole(outputFile, association,
+                            baseRelativePath);
                     }
                 }
             }
         }
         else
         {
-            Console.WriteLine($"No Types to draw for model ID: {ckModelId}");
+            logger.LogInformation("No Types to draw for model ID: {ckModelId}", ckModelId);
         }
     }
 
-    public static async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string baseRelativePath)
+    private static async Task GenerateAssociationRolesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph,
+        string docPath, CkModelId ckModelId, string baseRelativePath)
     {
+        
         // Check if there are any association roles to draw before proceeding
-        IEnumerable<CkAssociationRoleGraph> associationRoles = GetAssociationRoles(modelGraph)
+        var associationRoles = GetAssociationRoles(modelGraph)
             .Where(associationRole => MatchesModelId(associationRole, ckModelId));
 
-        if (associationRoles.Any())
+        var ckAssociationRoleGraphs = associationRoles as CkAssociationRoleGraph[] ?? associationRoles.ToArray();
+        if (ckAssociationRoleGraphs.Length != 0)
         {
             BuildDirectory(docPath, ckModelId);
-            using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
 
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
@@ -711,22 +246,21 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
                                             " -----------| -----------| ----------- |");
 
-            foreach (var associationRole in associationRoles)
+            foreach (var associationRole in ckAssociationRoleGraphs)
             {
                 await associationRole.DrawAssociationRole(outputFile, null, baseRelativePath);
             }
         }
         else
         {
-            Console.WriteLine($"No association roles to draw for model ID: {ckModelId}");
+            logger.LogInformation("No association roles to draw for model ID: {ckModelId}", ckModelId);
         }
     }
 
-    public static async Task GenerateVersionHistory(CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    private static async Task GenerateVersionHistory(string docPath, CkModelId ckModelId)
     {
         BuildDirectory(docPath, ckModelId);
-        using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
-        List<string> headings = ["Version", "Description"];
+        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
 
         await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |");
         await outputFile.WriteLineAsync("| -----------| -----------|");
@@ -775,7 +309,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph, string baseRelativePath)
     {
-        string hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
+        var hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
         await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
     }
 
@@ -784,21 +318,21 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         string[] separators = ["->", ":"];
 
         var parts = path.Split(separators, StringSplitOptions.TrimEntries);
-        var reconstructedhierachy = parts.Reverse();
+        var reconstructedHierarchy = parts.Reverse();
 
-        return BuildHierarchyString(reconstructedhierachy.ToArray(), baseRelativePath);
+        return BuildHierarchyString(reconstructedHierarchy.ToArray(), baseRelativePath);
     }
 
     private static string BuildHierarchyString(string[] reconstructedHierarchy, string baseRelativePath)
     {
         StringBuilder stringBuilder = new();
 
-        for (int i = 0; i < reconstructedHierarchy.Length; i++)
+        for (var i = 0; i < reconstructedHierarchy.Length; i++)
         {
             var obj = reconstructedHierarchy[i];
             var builder = new LinkItemBuilder(obj, baseRelativePath);
             builder.BuildLinkToType();
-            stringBuilder.Append(builder.ToString());
+            stringBuilder.Append(builder);
 
             if (i < reconstructedHierarchy.Length - 1)
             {
@@ -840,11 +374,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.AssociationRoles.Select(x => x.Value);
     }
 
-    private static IEnumerable<CkModelId> GetModelIDs(CkModelGraph modelGraph)
-    {
-        return modelGraph.Types.Select(x => x.Key.ModelId).Distinct();
-    }
-
     private static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
         string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
@@ -865,9 +394,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    public string GetRelativeDestinationPath()
+    private string GetRelativeDestinationPath()
     {
-        string lastPathSegment = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg)
+        var lastPathSegment = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg)
             .Split("\\")
             .Last();
 
@@ -926,15 +455,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
         //ID Determines Position in File Tree   
         await GenerateMermaidTextOutput(test, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
-        await GenerateVersionHistory(test, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateVersionHistory(docusaurusPath, compiledModelRoot.ModelId);
 
-        await GenerateAttributesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateAttributesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
-        await GenerateEnumsMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId);
-        await GenerateRecordsMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId);
-        await GenerateTypesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateEnumsMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateRecordsMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateTypesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
-        await GenerateAssociationRolesMarkdownTable(test, docusaurusPath, compiledModelRoot.ModelId,
+        await GenerateAssociationRolesMarkdownTable(Logger, test, docusaurusPath, compiledModelRoot.ModelId,
             relativeDestinationPath);
     }
 }

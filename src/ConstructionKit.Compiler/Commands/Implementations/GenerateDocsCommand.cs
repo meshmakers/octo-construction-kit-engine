@@ -20,12 +20,12 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _docusaurusDestinationPathArg;
 
     //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
-    private static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
-        string baseRelativePath)
+    private static async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
-        BuildDirectory(docPath, ckModelId);
+        BuildDirectory(documentPath, ckModelId);
+        var baseRelativePath = GetRelativeDestinationPath(documentPath);
 
-        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "index"));
+        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
 
         //Create Page Heading
         var split = ckModelId.SemanticVersionedFullName.Split('.');
@@ -73,15 +73,17 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return modelGraph.Types.Select(x => x.Value);
     }
 
-    private static async Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId, string baseRelativePath)
+    private static async Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
         var attributes = GetAttributes(modelGraph)
             .Where(attribute => MatchesModelId(attribute, ckModelId));
+        var baseRelativePath = GetRelativeDestinationPath(documentPath);
+        
         if (attributes.Any())
         {
-            BuildDirectory(docPath, ckModelId);
+            BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Attributes"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
@@ -104,15 +106,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    private static async Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    private static async Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
         var enums = GetEnums(modelGraph)
             .Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
         {
-            BuildDirectory(docPath, ckModelId);
+            BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Enums"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
 
             foreach (var @enum in GetEnums(modelGraph))
@@ -132,16 +134,16 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    private static async Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId)
+    private static async Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
         var records = GetRecords(modelGraph)
             .Where(record => MatchesModelId(record, ckModelId));
 
         if (records.Any())
         {
-            BuildDirectory(docPath, ckModelId);
+            BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Records"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
@@ -162,17 +164,18 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    private static async Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string docPath, CkModelId ckModelId,
-        string baseRelativePath)
+    private static async Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, 
+        string documentPath, CkModelId ckModelId)
     {
         var typeGraphs = GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
-
+        var baseRelativePath = GetRelativeDestinationPath(documentPath);
+        
         if (typeGraphs.Any())
         {
-            BuildDirectory(docPath, ckModelId);
+            BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Types"));
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
 
             foreach (var type in GetTypes(modelGraph))
             {
@@ -228,18 +231,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     }
 
     private static async Task GenerateAssociationRolesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph,
-        string docPath, CkModelId ckModelId, string baseRelativePath)
+        string documentPath, CkModelId ckModelId)
     {
         
         // Check if there are any association roles to draw before proceeding
         var associationRoles = GetAssociationRoles(modelGraph)
             .Where(associationRole => MatchesModelId(associationRole, ckModelId));
-
         var ckAssociationRoleGraphs = associationRoles as CkAssociationRoleGraph[] ?? associationRoles.ToArray();
+        var baseRelativePath = GetRelativeDestinationPath(documentPath);
+        
         if (ckAssociationRoleGraphs.Length != 0)
         {
-            BuildDirectory(docPath, ckModelId);
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "Associations"));
+            BuildDirectory(documentPath, ckModelId);
+            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
 
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
@@ -395,9 +399,8 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
     }
 
-    private string GetRelativeDestinationPath()
+    private static string GetRelativeDestinationPath(string directoryPath)
     {
-        var directoryPath = CommandArgumentValue.GetArgumentScalarValue<string>(_docusaurusDestinationPathArg);
         return "/" + Path.GetFileName(directoryPath);
     }
     
@@ -441,20 +444,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var originFileResolver = new OriginFileResolver(filePath);
         var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
-        //Variables
-        var relativeDestinationPath = GetRelativeDestinationPath();
-
         //ID Determines Position in File Tree   
-        await GenerateMermaidTextOutput(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId, relativeDestinationPath);
+        await GenerateMermaidTextOutput(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
         await GenerateVersionHistory(docusaurusPath, compiledModelRoot.ModelId);
 
-        await GenerateAttributesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
-            relativeDestinationPath);
+        await GenerateAttributesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
         await GenerateEnumsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
         await GenerateRecordsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
-        await GenerateTypesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
-            relativeDestinationPath);
-        await GenerateAssociationRolesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId,
-            relativeDestinationPath);
+        await GenerateTypesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await GenerateAssociationRolesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
     }
 }

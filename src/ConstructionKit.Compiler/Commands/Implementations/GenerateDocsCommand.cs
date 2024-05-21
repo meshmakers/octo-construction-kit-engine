@@ -34,7 +34,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await outputFile.WriteLineAsync($"# {split.Last()}");
         await outputFile.WriteLineAsync();
 
-        await AddDescription(outputFile, "DIAGRAM DESCRIPTION");
+        await TextWrapper.AddDescription(outputFile, "DIAGRAM DESCRIPTION");
 
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
@@ -179,7 +179,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 if (!MatchesModelId(type, ckModelId)) continue;
                 await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
                 await AddHierarchy(outputFile, type, baseRelativePath);
-                await AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION");
 
                 if (type.DefinedAttributes.Count != 0)
                 {
@@ -345,15 +345,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         }
 
         return stringBuilder.ToString();
-    }
-
-    private static async Task AddDescription(StreamWriter outputFile, string description)
-    {
-        //if description
-        await outputFile.WriteLineAsync("<details>");
-        await outputFile.WriteLineAsync("<summary>Description</summary>");
-        await outputFile.WriteLineAsync($"<div>{description}</div>");
-        await outputFile.WriteLineAsync("</details>");
     }
 
 

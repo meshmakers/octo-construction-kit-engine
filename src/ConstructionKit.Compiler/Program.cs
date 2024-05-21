@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
+using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -89,6 +90,9 @@ internal static class Program
         services.AddTransient<ICommand, GenerateDocsCommand>();
         services.AddTransient<ICommand, RestoreCommand>();
         services.AddTransient<ICommand, VersionCommand>();
+        
+        //Mermaid
+        services.AddTransient<IDirectoryTools, DirectoryTools>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

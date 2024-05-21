@@ -3,9 +3,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public class DirectoryTools(ILogger<GenerateDocsCommand> logger)
+public class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
 {
-    private readonly ILogger<GenerateDocsCommand> _logger = logger;
+    private readonly ILogger<DirectoryTools> _logger = logger;
 
     public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
@@ -23,12 +23,23 @@ public class DirectoryTools(ILogger<GenerateDocsCommand> logger)
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error Creating Directory {ex}", ex);
+            _logger.LogError("Error Creating Directory: {ex}", ex.ToString());
         }
     }
 
     public string GetRelativeDestinationDirectory(string directoryPath)
     {
-        return "/" + Path.GetFileName(directoryPath);
+        string directoryName;
+        
+        try
+        { 
+            directoryName = Path.GetFileName(directoryPath);
+        }
+        catch (ArgumentException e)
+        {
+            _logger.LogError("Invalid Characters in Path: {e}", e.ToString());
+            throw;
+        }
+        return "/" + directoryName;
     }
 }

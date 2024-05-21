@@ -18,7 +18,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
-    private readonly DirectoryTools _directoryTools;
+    private readonly IDirectoryTools _directoryTools;
 
     //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
     private async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
@@ -382,7 +382,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
-        IOptions<OctoToolOptions> options, DirectoryTools directoryTools)
+        IOptions<OctoToolOptions> options, IDirectoryTools directoryTools)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
     {
         _modelResolver = modelResolver;

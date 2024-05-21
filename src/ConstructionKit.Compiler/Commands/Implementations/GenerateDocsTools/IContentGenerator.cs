@@ -1,7 +1,5 @@
-﻿using Meshmakers.Common.CommandLineParser.Commands;
-using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
-using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 

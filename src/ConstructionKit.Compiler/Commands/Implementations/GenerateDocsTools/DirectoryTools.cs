@@ -1,10 +1,13 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public abstract class DirectoryTools
+public class DirectoryTools(ILogger<GenerateDocsCommand> logger)
 {
-    public static void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
+    private readonly ILogger<GenerateDocsCommand> _logger = logger;
+
+    public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
         string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
         path = Path.Combine(docusaurusPath, path);
@@ -20,11 +23,11 @@ public abstract class DirectoryTools
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            _logger.LogError("Error Creating Directory {ex}", ex);
         }
     }
 
-    public static string GetRelativeDestinationDirectory(string directoryPath)
+    public string GetRelativeDestinationDirectory(string directoryPath)
     {
         return "/" + Path.GetFileName(directoryPath);
     }

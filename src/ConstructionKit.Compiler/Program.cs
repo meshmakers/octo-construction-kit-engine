@@ -95,6 +95,7 @@ internal static class Program
         services.AddTransient<IDirectoryTools, DirectoryTools>();
         services.AddTransient<ILinkHelpers, LinkHelpers>();
         services.AddTransient<IMermaidGenerator, MermaidGenerator>();
+        services.AddTransient<IContentGenerator, ContentGenerator>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

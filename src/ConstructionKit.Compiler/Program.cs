@@ -91,9 +91,10 @@ internal static class Program
         services.AddTransient<ICommand, RestoreCommand>();
         services.AddTransient<ICommand, VersionCommand>();
         
-        //Mermaid
+        //GenerateDocsTools
         services.AddTransient<IDirectoryTools, DirectoryTools>();
         services.AddTransient<ILinkHelpers, LinkHelpers>();
+        services.AddTransient<IMermaidGenerator, MermaidGenerator>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

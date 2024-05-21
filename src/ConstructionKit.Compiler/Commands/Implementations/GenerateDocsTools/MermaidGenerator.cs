@@ -5,7 +5,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
 public class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IMermaidGenerator
 {
-
+    
     public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
@@ -23,16 +23,19 @@ public class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         await GenerateMermaidHeading(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
-        await GenerateMermaidDiagram(modelGraph, outputFile, baseRelativePath);
+        await GenerateMermaidDiagram(modelGraph, documentPath, ckModelId, outputFile);
 
         //final line to end mermaid code block
         await EndDiagram(outputFile);
 
         await LinkToVersionHistory(outputFile, baseRelativePath);
     }
-
-    private async Task GenerateMermaidDiagram(CkModelGraph modelGraph, StreamWriter outputFile, string baseRelativePath)
+    
+    public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, StreamWriter outputFile)
     {
+        directoryTools.BuildDirectory(documentPath, ckModelId);
+        var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
+        
         await GenerateMermaidInstructions(outputFile);
         
         foreach (var type in GetValues.GetTypes(modelGraph))

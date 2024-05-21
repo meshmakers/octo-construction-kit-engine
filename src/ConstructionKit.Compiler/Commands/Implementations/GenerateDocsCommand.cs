@@ -39,7 +39,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
-        foreach (var type in GetTypes(modelGraph))
+        foreach (var type in GetValues.GetTypes(modelGraph))
         {
             await type.DrawClass(outputFile);
             await type.DrawInheritance(outputFile);
@@ -70,14 +70,9 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await outputFile.WriteLineAsync("direction BT"); //Diagram Direction: Options TB, BT, RL, LR
     }
 
-    private static IEnumerable<CkTypeGraph> GetTypes(CkModelGraph modelGraph)
-    {
-        return modelGraph.Types.Select(x => x.Value);
-    }
-
     private async Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
-        var attributes = GetAttributes(modelGraph)
+        var attributes = GetValues.GetAttributes(modelGraph)
             .Where(attribute => MatchesModelId(attribute, ckModelId));
         var baseRelativePath = _directoryTools.GetRelativeDestinationDirectory(documentPath);
         
@@ -94,7 +89,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
-            foreach (var attribute in GetAttributes(modelGraph))
+            foreach (var attribute in GetValues.GetAttributes(modelGraph))
             {
                 if (MatchesModelId(attribute, ckModelId))
                 {
@@ -110,7 +105,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private async Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
-        var enums = GetEnums(modelGraph)
+        var enums = GetValues.GetEnums(modelGraph)
             .Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
         {
@@ -119,7 +114,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
 
-            foreach (var @enum in GetEnums(modelGraph))
+            foreach (var @enum in GetValues.GetEnums(modelGraph))
             {
                 if (!MatchesModelId(@enum, ckModelId)) continue;
                 await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName);
@@ -138,7 +133,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
     private async Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
     {
-        var records = GetRecords(modelGraph)
+        var records = GetValues.GetRecords(modelGraph)
             .Where(record => MatchesModelId(record, ckModelId));
 
         if (records.Any())
@@ -152,7 +147,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                 $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |");
             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |");
 
-            foreach (var record in GetRecords(modelGraph))
+            foreach (var record in GetValues.GetRecords(modelGraph))
             {
                 if (MatchesModelId(record, ckModelId))
                 {
@@ -169,7 +164,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private async Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, 
         string documentPath, CkModelId ckModelId)
     {
-        var typeGraphs = GetTypes(modelGraph)
+        var typeGraphs = GetValues.GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
         var baseRelativePath = _directoryTools.GetRelativeDestinationDirectory(documentPath);
         
@@ -179,7 +174,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
 
-            foreach (var type in GetTypes(modelGraph))
+            foreach (var type in GetValues.GetTypes(modelGraph))
             {
                 if (!MatchesModelId(type, ckModelId)) continue;
                 await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
@@ -204,7 +199,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
                 foreach (var association in type.Associations.Out.Owned)
                 {
-                    foreach (var item in GetAssociationRoles(modelGraph))
+                    foreach (var item in GetValues.GetAssociationRoles(modelGraph))
                     {
                         if (association.CkRoleId != item.CkRoleId) continue;
                         if (!tableBuilt)
@@ -237,7 +232,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     {
         
         // Check if there are any association roles to draw before proceeding
-        var associationRoles = GetAssociationRoles(modelGraph)
+        var associationRoles = GetValues.GetAssociationRoles(modelGraph)
             .Where(associationRole => MatchesModelId(associationRole, ckModelId));
         var ckAssociationRoleGraphs = associationRoles as CkAssociationRoleGraph[] ?? associationRoles.ToArray();
         var baseRelativePath = _directoryTools.GetRelativeDestinationDirectory(documentPath);
@@ -359,26 +354,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await outputFile.WriteLineAsync("<summary>Description</summary>");
         await outputFile.WriteLineAsync($"<div>{description}</div>");
         await outputFile.WriteLineAsync("</details>");
-    }
-
-    private static IEnumerable<CkAttributeGraph> GetAttributes(CkModelGraph modelGraph)
-    {
-        return modelGraph.Attributes.Select(x => x.Value);
-    }
-
-    private static IEnumerable<CkEnumGraph> GetEnums(CkModelGraph modelGraph)
-    {
-        return modelGraph.Enums.Select(x => x.Value);
-    }
-
-    private static IEnumerable<CkRecordGraph> GetRecords(CkModelGraph modelGraph)
-    {
-        return modelGraph.Records.Select(x => x.Value);
-    }
-
-    private static IEnumerable<CkAssociationRoleGraph> GetAssociationRoles(CkModelGraph modelGraph)
-    {
-        return modelGraph.AssociationRoles.Select(x => x.Value);
     }
 
 

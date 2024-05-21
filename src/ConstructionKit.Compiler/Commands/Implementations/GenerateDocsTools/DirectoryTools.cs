@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
+internal class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
 {
     private readonly ILogger<DirectoryTools> _logger = logger;
 

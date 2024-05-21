@@ -66,10 +66,10 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
         await _contentGenerator.GenerateVersionHistory(docusaurusPath, compiledModelRoot.ModelId);
 
-        await _contentGenerator.GenerateAttributesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateEnumsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateRecordsMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateTypesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateAssociationRolesMarkdownTable(Logger, resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
+        await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, docusaurusPath, compiledModelRoot.ModelId);
     }
 }

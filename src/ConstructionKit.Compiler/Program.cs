@@ -94,6 +94,8 @@ internal static class Program
         //GenerateDocsTools
         services.AddTransient<IDirectoryTools, DirectoryTools>();
         services.AddTransient<ILinkHelpers, LinkHelpers>();
+        
+        //GenerateDocsCommand
         services.AddTransient<IMermaidGenerator, MermaidGenerator>();
         services.AddTransient<IContentGenerator, ContentGenerator>();
 

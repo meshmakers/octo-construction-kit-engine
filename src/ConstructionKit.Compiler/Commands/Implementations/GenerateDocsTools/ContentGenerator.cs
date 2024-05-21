@@ -1,15 +1,14 @@
 ﻿using System.Text;
-using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public class ContentGenerator(IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IContentGenerator
+public class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IContentGenerator
 {
 
-    public async Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string 
+    public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
         documentPath, CkModelId ckModelId)
     {
         var attributes = GetValues.GetAttributes(modelGraph)
@@ -43,7 +42,7 @@ public class ContentGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         }
     }
 
-    public async Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, 
+    public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
         CkModelId ckModelId)
     {
         var enums = GetValues.GetEnums(modelGraph)
@@ -72,7 +71,7 @@ public class ContentGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         }
     }
 
-    public async Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, 
+    public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
         CkModelId ckModelId)
     {
         var records = GetValues.GetRecords(modelGraph)
@@ -103,7 +102,7 @@ public class ContentGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         }
     }
 
-    public async Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, 
+    public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, 
         string documentPath, CkModelId ckModelId)
     {
         var typeGraphs = GetValues.GetTypes(modelGraph)
@@ -169,7 +168,7 @@ public class ContentGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         }
     }
 
-    public async Task GenerateAssociationRolesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph,
+    public async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph,
         string documentPath, CkModelId ckModelId)
     {
         

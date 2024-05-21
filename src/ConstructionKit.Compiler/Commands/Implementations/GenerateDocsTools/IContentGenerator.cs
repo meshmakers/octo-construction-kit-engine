@@ -7,19 +7,19 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
 public interface IContentGenerator
 {
-    Task GenerateAttributesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string 
+    Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
         documentPath, CkModelId ckModelId);
 
-    Task GenerateEnumsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, 
+    Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
         CkModelId ckModelId);
 
-    Task GenerateRecordsMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, string documentPath, 
+    Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
         CkModelId ckModelId);
 
-    Task GenerateTypesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph, 
+    Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, 
         string documentPath, CkModelId ckModelId);
 
-    Task GenerateAssociationRolesMarkdownTable(ILogger<Command<OctoToolOptions>> logger, CkModelGraph modelGraph,
+    Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph,
         string documentPath, CkModelId ckModelId);
 
     Task GenerateVersionHistory(string docPath, CkModelId ckModelId);

@@ -5,10 +5,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
 internal static class CkAssociationRoleGraphExtensions
 {
-    public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, CkTypeAssociationGraph? association, string baseRelativePath)
+    public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, 
+        CkTypeAssociationGraph? association, string baseRelativePath, ILinkHelpers linkHelpers)
     {
         await outputFile.WriteLineAsync($"| {ckAssociationRoleGraph.AddAnchor() +
-                                             ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath)} | " +
+                                             ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath, linkHelpers)} | " +
                                         $"{ckAssociationRoleGraph.InboundMultiplicity} | " +
                                         $"{ckAssociationRoleGraph.InboundName} | " +
                                         $"{ckAssociationRoleGraph.OutboundMultiplicity} | " +
@@ -17,9 +18,10 @@ internal static class CkAssociationRoleGraphExtensions
                                         $"{association?.DrawTargetAttributes()} |");
     }
 
-    private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath)
+    private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath, 
+        ILinkHelpers linkHelpers)
     {
-        var builder = new LinkItemBuilder(ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName, baseRelativePath);
+        var builder = new LinkItemBuilder(ckAssociationRoleGraph.CkRoleId.SemanticVersionedFullName, baseRelativePath, linkHelpers);
         builder.BuildLinkToAssociation();
         return builder.ToString();
     }

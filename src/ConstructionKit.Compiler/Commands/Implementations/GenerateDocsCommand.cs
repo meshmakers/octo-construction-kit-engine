@@ -19,6 +19,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _filePathArg;
     private readonly IArgument _docusaurusDestinationPathArg;
     private readonly IDirectoryTools _directoryTools;
+    private readonly ILinkHelpers _linkHelpers;
 
     //Generates Full Mermaid Diagram for given CkModelGraph, ID Determines Position in File Tree
     private async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
@@ -26,7 +27,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         _directoryTools.BuildDirectory(documentPath, ckModelId);
         var baseRelativePath = _directoryTools.GetRelativeDestinationDirectory(documentPath);
 
-        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
+        await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
 
         //Create Page Heading
         var split = ckModelId.SemanticVersionedFullName.Split('.');
@@ -43,7 +44,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             await type.DrawClass(outputFile);
             await type.DrawInheritance(outputFile);
             await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value));
-            await type.LinkToType(outputFile, baseRelativePath);
+            await type.LinkToType(outputFile, baseRelativePath, _linkHelpers);
             await type.DrawNamespaces(outputFile);
         }
 
@@ -84,7 +85,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             _directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
+            await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
@@ -97,7 +98,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
             {
                 if (MatchesModelId(attribute, ckModelId))
                 {
-                    await attribute.DrawAttribute(outputFile, baseRelativePath);
+                    await attribute.DrawAttribute(outputFile, baseRelativePath, _linkHelpers);
                 }
             }
         }
@@ -115,7 +116,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             _directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
+            await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
 
             foreach (var @enum in GetEnums(modelGraph))
@@ -144,7 +145,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             _directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
+            await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
@@ -176,7 +177,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         {
             _directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
+            await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
 
             foreach (var type in GetTypes(modelGraph))
             {
@@ -193,7 +194,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
                     foreach (var attribute in type.DefinedAttributes)
                     {
-                        await attribute.DrawAttribute(outputFile, baseRelativePath);
+                        await attribute.DrawAttribute(outputFile, baseRelativePath, _linkHelpers);
                     }
                 }
 
@@ -220,7 +221,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
                         }
 
                         await item.DrawAssociationRole(outputFile, association,
-                            baseRelativePath);
+                            baseRelativePath, _linkHelpers);
                     }
                 }
             }
@@ -244,7 +245,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         if (ckAssociationRoleGraphs.Length != 0)
         {
             _directoryTools.BuildDirectory(documentPath, ckModelId);
-            await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
+            await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
 
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
@@ -254,7 +255,7 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
             foreach (var associationRole in ckAssociationRoleGraphs)
             {
-                await associationRole.DrawAssociationRole(outputFile, null, baseRelativePath);
+                await associationRole.DrawAssociationRole(outputFile, null, baseRelativePath, _linkHelpers);
             }
         }
         else
@@ -266,15 +267,15 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private async Task GenerateVersionHistory(string docPath, CkModelId ckModelId)
     {
         _directoryTools.BuildDirectory(docPath, ckModelId);
-        await using StreamWriter outputFile = new(LinkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
+        await using StreamWriter outputFile = new(_linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
 
         await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |");
         await outputFile.WriteLineAsync("| -----------| -----------|");
     }
 
-    private static async Task LinkToVersionHistory(StreamWriter outputFile, string baseRelativePath)
+    private async Task LinkToVersionHistory(StreamWriter outputFile, string baseRelativePath)
     {
-        var builder = new LinkItemBuilder("VersionHistory", baseRelativePath);
+        var builder = new LinkItemBuilder("VersionHistory", baseRelativePath, _linkHelpers);
         builder.BuildLinkToVersionHistory();
         await outputFile.WriteLineAsync(builder.ToString());
     }
@@ -313,13 +314,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
     }
 
-    private static async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph, string baseRelativePath)
+    private async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph, string baseRelativePath)
     {
         var hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
         await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
     }
 
-    private static string ReconstructHierarchyFromPath(string path, string baseRelativePath)
+    private string ReconstructHierarchyFromPath(string path, string baseRelativePath)
     {
         string[] separators = ["->", ":"];
 
@@ -329,14 +330,14 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         return BuildHierarchyString(reconstructedHierarchy.ToArray(), baseRelativePath);
     }
 
-    private static string BuildHierarchyString(string[] reconstructedHierarchy, string baseRelativePath)
+    private string BuildHierarchyString(string[] reconstructedHierarchy, string baseRelativePath)
     {
         StringBuilder stringBuilder = new();
 
         for (var i = 0; i < reconstructedHierarchy.Length; i++)
         {
             var obj = reconstructedHierarchy[i];
-            var builder = new LinkItemBuilder(obj, baseRelativePath);
+            var builder = new LinkItemBuilder(obj, baseRelativePath, _linkHelpers);
             builder.BuildLinkToType();
             stringBuilder.Append(builder);
 
@@ -382,12 +383,13 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
 
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
-        IOptions<OctoToolOptions> options, IDirectoryTools directoryTools)
+        IOptions<OctoToolOptions> options, IDirectoryTools directoryTools, ILinkHelpers linkHelpers)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
     {
         _modelResolver = modelResolver;
         _ckYamlSerializer = ckYamlSerializer;
         _directoryTools = directoryTools;
+        _linkHelpers = linkHelpers;
 
         _filePathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);

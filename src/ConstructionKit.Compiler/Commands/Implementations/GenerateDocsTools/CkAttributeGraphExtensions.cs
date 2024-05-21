@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 internal static class CkAttributeGraphExtensions
 {
     public static async Task DrawAttribute(this CkAttributeGraph ckAttributeGraph, StreamWriter outputFile,
-        string baseRelativePath)
+        string baseRelativePath, ILinkHelpers linkHelpers)
     {
 
         await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()} | " +
@@ -14,7 +14,7 @@ internal static class CkAttributeGraphExtensions
                                         $"{ckAttributeGraph.DrawDefaultValues()} | " +
                                         $"{ckAttributeGraph.IsDataStream.ToString()} | " +
                                         $"{ckAttributeGraph.Description ?? ""} | " +
-                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath)} |");
+                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath, linkHelpers)} |");
     }
 
 
@@ -41,18 +41,18 @@ internal static class CkAttributeGraphExtensions
 
     }
 
-    private static string LinkToRecordOrEnum(this CkAttributeGraph ckAttributeGraph, string baseRelativePath)
+    private static string LinkToRecordOrEnum(this CkAttributeGraph ckAttributeGraph, string baseRelativePath, ILinkHelpers linkHelpers)
     {
         if (ckAttributeGraph.ValueCkEnumId != null)
         {
-            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkEnumId.SemanticVersionedFullName, baseRelativePath);
+            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkEnumId.SemanticVersionedFullName, baseRelativePath, linkHelpers);
             builder.BuildLinkToEnum();
             return builder.ToString();
         }
 
         if (ckAttributeGraph.ValueCkRecordId == null) return "";
         {
-            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkRecordId.SemanticVersionedFullName, baseRelativePath);
+            var builder = new LinkItemBuilder(ckAttributeGraph.ValueCkRecordId.SemanticVersionedFullName, baseRelativePath, linkHelpers);
             builder.BuildLinkToRecord();
             return builder.ToString();
         }

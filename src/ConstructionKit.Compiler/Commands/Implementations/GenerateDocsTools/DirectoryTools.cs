@@ -3,11 +3,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-internal class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
+public class DirectoryTools(ILogger<DirectoryTools> logger, ILinkHelpers linkHelpers) : IDirectoryTools
 {
     public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
-        string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
+        string path = new(linkHelpers.GetCommonPathParts(ckModelId));
         path = Path.Combine(docusaurusPath, path);
 
         try

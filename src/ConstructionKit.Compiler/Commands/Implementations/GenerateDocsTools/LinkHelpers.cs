@@ -1,52 +1,58 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools
 {
-    internal static class LinkHelpers
+    public class LinkHelpers(ILogger<LinkHelpers> logger) : ILinkHelpers
     {
 
-        public static string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
+        public string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
         {
-            //return Path.Combine(BuildFilepath(docPath, modelId), $"{modelId.SemanticVersionedFullName}-{extension}.md");
             return Path.Combine(BuildFilepath(docPath, modelId), $"{extension}.md");
         }
 
-        public static string FormatAnchor(string unformattedAnchor)
+        public string FormatAnchor(string unformattedAnchor)
         {
-            string anchor = unformattedAnchor.Replace(".", "").ToLower();
+            var anchor = unformattedAnchor.Replace(".", "").ToLower();
             return anchor;
         }
 
-        public static string GetCommonPathParts(CkModelId ckModelId)
+        public string GetCommonPathParts(CkModelId ckModelId)
         {
-            //string[] modelIdparts = ckModelId.ModelId.Split(".");
-            string[] modelIdparts = ckModelId.SemanticVersionedFullName.Split(".");
-            string path = "";
-
-            for (int i = 0; i < modelIdparts.Length; i++)
+            try
             {
-                path = Path.Combine(path, modelIdparts[i]);
-            }
+                var modelIdParts = ckModelId.SemanticVersionedFullName.Split(".");
+                var path = "";
 
-            return path;
+                foreach (var modelIdPart in modelIdParts)
+                {
+                    path = Path.Combine(path, modelIdPart);
+                }
+                return path;
+            }
+            catch (Exception e)
+            {
+                logger.LogError("Error Generating Path: {e}", e.ToString());
+                throw;
+            }
         }
 
-        private static string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
+        private string BuildFilepath(string docusaurusPath, CkModelId ckModelId)
         {
-            string path = GetCommonPathParts(ckModelId);
+            var path = GetCommonPathParts(ckModelId);
             return Path.Combine(docusaurusPath, path);
         }
 
-        public static string CreateRelativeFilepath(CkModelId ckModelId, string suffix, string baseRelativePath /*= "/docs"*/)
+        private string CreateRelativeFilepath(CkModelId ckModelId, string suffix, string baseRelativePath /*= "/docs"*/)
         {
-            string path = GetCommonPathParts(ckModelId);
+            var path = GetCommonPathParts(ckModelId);
 
             var linkWithBackslash = Path.Combine(baseRelativePath, path, suffix);
             
             return linkWithBackslash.Replace("\\", "/");
         }
 
-        public static string CreateRelativeFilepath(string ckModelId, string suffix, string baseRelativePath)
+        public string CreateRelativeFilepath(string ckModelId, string suffix, string baseRelativePath)
         {
             CkModelId modelId = new(ckModelId);
             return CreateRelativeFilepath(modelId, suffix, baseRelativePath);

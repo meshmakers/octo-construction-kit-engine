@@ -93,6 +93,7 @@ internal static class Program
         
         //Mermaid
         services.AddTransient<IDirectoryTools, DirectoryTools>();
+        services.AddTransient<ILinkHelpers, LinkHelpers>();
 
         var serviceProvider = services.BuildServiceProvider();
         return serviceProvider;

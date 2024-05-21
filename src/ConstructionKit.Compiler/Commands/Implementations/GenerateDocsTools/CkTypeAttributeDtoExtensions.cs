@@ -5,9 +5,10 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
 internal static class CkTypeAttributeDtoExtensions
 {
-    public static async Task DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, string baseRelativePath)
+    public static async Task DrawAttribute(this CkTypeAttributeDto ckTypeAttributeDto, StreamWriter outputFile, string baseRelativePath,
+        ILinkHelpers linkHelpers)
     {
-        await outputFile.WriteLineAsync($"| {ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath)} | " +
+        await outputFile.WriteLineAsync($"| {ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath, linkHelpers)} | " +
                                         $"{ckTypeAttributeDto.DrawAttributeAutoCompleteValues()} | " +
                                         $"{ckTypeAttributeDto.DrawAttributeAutoIncrementReference()} | " +
                                         $"{ckTypeAttributeDto.IsOptional.ToString()} |");
@@ -50,9 +51,9 @@ internal static class CkTypeAttributeDtoExtensions
 
     }
 
-    private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto, string baseRelativePath)
+    private static string DrawLinkToDefinition(this CkTypeAttributeDto ckTypeAttributeDto, string baseRelativePath, ILinkHelpers linkHelpers)
     {
-        var builder = new LinkItemBuilder(ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName, baseRelativePath);
+        var builder = new LinkItemBuilder(ckTypeAttributeDto.CkAttributeId.SemanticVersionedFullName, baseRelativePath, linkHelpers);
         builder.BuildLinkToAttribute();
         return builder.ToString();
     }

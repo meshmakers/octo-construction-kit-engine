@@ -97,16 +97,13 @@ internal static class CkTypeGraphExtensions
     private static string FormatOutboundMultiplicity(CkAssociationRoleGraph item)
     {
         var outboundMultiplicity = item.OutboundMultiplicity;
-        var outboundMultiplicityConversion = "n";
 
-        if (outboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne)
+        var outboundMultiplicityConversion = outboundMultiplicity switch
         {
-            outboundMultiplicityConversion = "0..1";
-        }
-        else if (outboundMultiplicity == Contracts.DataTransferObjects.MultiplicitiesDto.One)
-        {
-            outboundMultiplicityConversion = "1";
-        }
+            Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne => "0..1",
+            Contracts.DataTransferObjects.MultiplicitiesDto.One => "1",
+            _ => "n"
+        };
 
         return outboundMultiplicityConversion;
     }
@@ -125,10 +122,10 @@ internal static class CkTypeGraphExtensions
         await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{");
     }
 
-    public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath)
+    public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)
     {
         await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
-        await outputFile.WriteAsync(LinkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types", baseRelativePath));
+        await outputFile.WriteAsync(linkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types", baseRelativePath));
         await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
     }
 

@@ -20,9 +20,21 @@ public class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
 
         await TextWrapper.AddDescription(outputFile, "DIAGRAM DESCRIPTION");
 
-        await GenerateMermaidBoilerplate(ckModelId.SemanticVersionedFullName, outputFile);
+        await GenerateMermaidHeading(ckModelId.SemanticVersionedFullName, outputFile);
 
         //Prints Class and Defined Attributes of Each Type if there is any
+        await GenerateMermaidDiagram(modelGraph, outputFile, baseRelativePath);
+
+        //final line to end mermaid code block
+        await EndDiagram(outputFile);
+
+        await LinkToVersionHistory(outputFile, baseRelativePath);
+    }
+
+    private async Task GenerateMermaidDiagram(CkModelGraph modelGraph, StreamWriter outputFile, string baseRelativePath)
+    {
+        await GenerateMermaidInstructions(outputFile);
+        
         foreach (var type in GetValues.GetTypes(modelGraph))
         {
             await type.DrawClass(outputFile);
@@ -31,11 +43,6 @@ public class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
             await type.LinkToType(outputFile, baseRelativePath, linkHelpers);
             await type.DrawNamespaces(outputFile);
         }
-
-        //final line to end mermaid code block
-        await EndDiagram(outputFile);
-
-        await LinkToVersionHistory(outputFile, baseRelativePath);
     }
 
     private static async Task EndDiagram(StreamWriter outputFile)
@@ -43,13 +50,17 @@ public class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkH
         await outputFile.WriteLineAsync("```");
     }
 
-    private static async Task GenerateMermaidBoilerplate(string classDiagramTitle, StreamWriter outputFile)
+    private static async Task GenerateMermaidHeading(string classDiagramTitle, StreamWriter outputFile)
     {
         //Boilerplate Instructions for Mermaid
         await outputFile.WriteLineAsync("```mermaid"); //Start Mermaid Code Block
         await outputFile.WriteLineAsync("---"); //Diagram Title Syntax
         await outputFile.WriteLineAsync($"title: {classDiagramTitle}");
         await outputFile.WriteLineAsync("---");
+    }
+
+    private static async Task GenerateMermaidInstructions(StreamWriter outputFile)
+    {
         await outputFile.WriteLineAsync("classDiagram"); //Diagram Type
         await outputFile.WriteLineAsync("direction BT"); //Diagram Direction: Options TB, BT, RL, LR
     }

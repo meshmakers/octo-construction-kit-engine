@@ -5,8 +5,6 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
 internal class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
 {
-    private readonly ILogger<DirectoryTools> _logger = logger;
-
     public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {
         string path = new(LinkHelpers.GetCommonPathParts(ckModelId));
@@ -23,7 +21,7 @@ internal class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error Creating Directory: {ex}", ex.ToString());
+            logger.LogError("Error Creating Directory: {ex}", ex.ToString());
         }
     }
 
@@ -37,7 +35,7 @@ internal class DirectoryTools(ILogger<DirectoryTools> logger) : IDirectoryTools
         }
         catch (ArgumentException e)
         {
-            _logger.LogError("Invalid Characters in Path: {e}", e.ToString());
+            logger.LogError("Invalid Characters in Path: {e}", e.ToString());
             throw;
         }
         return "/" + directoryName;

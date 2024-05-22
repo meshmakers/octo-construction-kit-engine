@@ -60,6 +60,10 @@ internal static class Program
 
         services.Configure<OctoToolOptions>(options =>
             config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
+        
+        //Add Options for Running in ASP Net
+        services.Configure<ModeSelectionOptions>(options => 
+            config.GetSection(ModeSelectionOptions.ModeSelection).Bind(options));
 
         // configure Logging with NLog
         services.AddLogging(loggingBuilder =>

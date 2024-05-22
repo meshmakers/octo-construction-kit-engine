@@ -18,16 +18,19 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _destinationPathArg;
     private readonly IMermaidGenerator _mermaidGenerator;
     private readonly IContentGenerator _contentGenerator;
+    private readonly ModeSelectionOptions _modeSelectionOptions;
 
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
-        IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator)
+        IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator, 
+        IOptions<ModeSelectionOptions> modeSelectionOptions)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
     {
         _modelResolver = modelResolver;
         _ckYamlSerializer = ckYamlSerializer;
         _mermaidGenerator = mermaidGenerator;
         _contentGenerator = contentGenerator;
+        _modeSelectionOptions = modeSelectionOptions.Value;
 
         _modelSourcePathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);
@@ -63,20 +66,20 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
         //Docusaurus
-        
-        //ID Determines Position in File Tree   
-        await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId);
+        if (_modeSelectionOptions.DocumentationMode)
+        {
+            //ID Determines Position in File Tree   
+            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId);
 
-        await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
-        
+            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+        }
         //ASP Net
-        var aspNet = false;
-        if (aspNet)
+        else
         {
             await using StreamWriter outputFile = new(Path.Combine(outputPath, "diagram.txt"));
             await _mermaidGenerator.GenerateMermaidDiagram(resolvedTypes, outputPath, compiledModelRoot.ModelId, outputFile);

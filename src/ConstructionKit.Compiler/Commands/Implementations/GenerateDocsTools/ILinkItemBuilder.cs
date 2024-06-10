@@ -1,6 +1,6 @@
 ﻿namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public interface ILinkItemBuilder
+internal interface ILinkItemBuilder
 {
     void BuildLinkToType();
     void BuildLinkToAttribute();

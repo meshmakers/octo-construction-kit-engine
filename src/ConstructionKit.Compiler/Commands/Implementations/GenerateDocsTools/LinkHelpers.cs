@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools
 {
-    public class LinkHelpers(ILogger<LinkHelpers> logger) : ILinkHelpers
+    internal class LinkHelpers(ILogger<LinkHelpers> logger) : ILinkHelpers
     {
 
         public string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)

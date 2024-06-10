@@ -3,7 +3,7 @@
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
 //Expected Format for itemName Class.Name/UnformattedAnchor
-public class LinkItemBuilder(string itemName, string baseRelativePath, ILinkHelpers linkHelpers) : ILinkItemBuilder
+internal class LinkItemBuilder(string itemName, string baseRelativePath, ILinkHelpers linkHelpers) : ILinkItemBuilder
 {
     private readonly StringBuilder _itemStringBuilder = new($"[{itemName}](");
 

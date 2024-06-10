@@ -2,7 +2,7 @@
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public interface ILinkHelpers
+internal interface ILinkHelpers
 {
     string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension);
     public string FormatAnchor(string unformattedAnchor);

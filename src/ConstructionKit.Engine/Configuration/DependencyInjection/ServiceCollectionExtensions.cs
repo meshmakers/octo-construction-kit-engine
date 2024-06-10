@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
@@ -61,10 +62,11 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <param name="services"></param>
     /// <returns></returns>
-    public static IServiceCollection AddDocumentationService(
+    public static IDocumentationBuilder AddDocumentationService(
         this IServiceCollection services)
     {
         services.AddOptions<ModeSelectionOptions>();
+        
         //GenerateDocsTools
         services.AddTransient<IDirectoryTools, DirectoryTools>();
         services.AddTransient<ILinkHelpers, LinkHelpers>();
@@ -73,6 +75,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IMermaidGenerator, MermaidGenerator>();
         services.AddTransient<IContentGenerator, ContentGenerator>();
 
-        return services;
+        return new DocumentationBuilder(services);
     }
 }

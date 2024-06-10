@@ -52,15 +52,6 @@ public class GenerateDocsCommand : Command<OctoToolOptions>
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
         var compiledModelRoot = await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult);
 
-        // Evaluates current ConstructionKit
-        if (compiledModelRoot.Types != null)
-        {
-            foreach (var ckCompiledTypeDto in compiledModelRoot.Types)
-            {
-                Logger.LogInformation("{TypeId}", ckCompiledTypeDto.TypeId.ToString(CultureInfo.InvariantCulture));
-            }
-        }
-
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
         var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);

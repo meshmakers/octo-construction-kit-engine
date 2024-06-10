@@ -51,12 +51,6 @@
     <data name="AutoIncrementReference" xml:space="preserve">
         <value>Auto Increment Reference</value>
     </data>
-    <data name="AutoCompleteValues" xml:space="preserve">
-        <value>Auto Complete Values</value>
-    </data>
-    <data name="CKAttributeID" xml:space="preserve">
-        <value>CKAttributeID</value>
-    </data>
     <data name="InboundMultiplicity" xml:space="preserve">
         <value>Inbound Multiplicity</value>
     </data>
@@ -77,5 +71,11 @@
     </data>
     <data name="Version" xml:space="preserve">
         <value>Version</value>
+    </data>
+    <data name="AutoCompleteValues" xml:space="preserve">
+        <value>Auto Complete Values</value>
+    </data>
+    <data name="CKAttributeID" xml:space="preserve">
+        <value>CKAttributeID</value>
     </data>
 </root>

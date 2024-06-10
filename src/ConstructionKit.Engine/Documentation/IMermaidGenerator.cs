@@ -1,7 +1,7 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 /// <summary>
 ///  Interface for a Mermaid Generator

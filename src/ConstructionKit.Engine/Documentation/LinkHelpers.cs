@@ -1,7 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
-using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation
 {
     internal class LinkHelpers : ILinkHelpers
     {
@@ -19,7 +18,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
         public string GetCommonPathParts(CkModelId ckModelId)
         {
-            var modelIdParts = ckModelId.SemanticVersionedFullName.Split(".");
+            var modelIdParts = ckModelId.SemanticVersionedFullName.Split('.');
             var path = "";
 
             foreach (var modelIdPart in modelIdParts)

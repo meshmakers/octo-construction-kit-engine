@@ -1,7 +1,7 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkTypeGraphExtensions
 {
@@ -25,23 +25,23 @@ internal static class CkTypeGraphExtensions
 
     public static async Task DrawClass(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}");
+        await outputFile.WriteAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}").ConfigureAwait(false);
 
         //for formatting check if attributes defined
         if (ckTypeGraph.DefinedAttributes.Count != 0)
         {
-            await outputFile.WriteLineAsync("{");
+            await outputFile.WriteLineAsync("{").ConfigureAwait(false);
 
             foreach (var attribute in ckTypeGraph.DefinedAttributes)
             {
-                await outputFile.WriteLineAsync($"+{attribute.AttributeName} : {attribute.AttributeName.GetTypeCode()}");
+                await outputFile.WriteLineAsync($"+{attribute.AttributeName} : {attribute.AttributeName.GetTypeCode()}").ConfigureAwait(false);
             }
 
-            await outputFile.WriteLineAsync("}");
+            await outputFile.WriteLineAsync("}").ConfigureAwait(false);
         }
         else
         {
-            await outputFile.WriteLineAsync();
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
     }
 
@@ -52,7 +52,7 @@ internal static class CkTypeGraphExtensions
         {
             await outputFile.WriteLineAsync(
                 $"{ckTypeGraph.CkTypeId.GetName()} --|> " +
-                $"{ckTypeGraph.BaseTypes.First(x => x.BaseTypeDepthIndex == 0).BaseCkTypeId.GetName()}");
+                $"{ckTypeGraph.BaseTypes.First(x => x.BaseTypeDepthIndex == 0).BaseCkTypeId.GetName()}").ConfigureAwait(false);
         }
     }
 
@@ -74,7 +74,7 @@ internal static class CkTypeGraphExtensions
                     await outputFile.WriteLineAsync(
                         $"{association.OriginCkTypeId.GetName()} \"{outboundMultiplicityConversion}\" -->" +
                         $" \"{inboundMultiplicityConversion}\" {association.TargetCkTypeId.GetName()} : " +
-                        $"{association.CkRoleId.SemanticVersionedFullName}");
+                        $"{association.CkRoleId.SemanticVersionedFullName}").ConfigureAwait(false);
                 }
             }
         }
@@ -110,23 +110,23 @@ internal static class CkTypeGraphExtensions
 
     public static async Task DrawNamespaces(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await GetNamespaceName(ckTypeGraph, outputFile);
+        await GetNamespaceName(ckTypeGraph, outputFile).ConfigureAwait(false);
 
-        await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}");
+        await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetName()}").ConfigureAwait(false);
 
-        await outputFile.WriteLineAsync($"}}");
+        await outputFile.WriteLineAsync($"}}").ConfigureAwait(false);
     }
 
     private static async Task GetNamespaceName(CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{");
+        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{").ConfigureAwait(false);
     }
 
     public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)
     {
-        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"");
-        await outputFile.WriteAsync(linkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types", baseRelativePath));
-        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"");
+        await outputFile.WriteAsync($"link {ckTypeGraph.CkTypeId.GetName()} \"").ConfigureAwait(false);
+        await outputFile.WriteAsync(linkHelpers.CreateRelativeFilepath(ckTypeGraph.CkTypeId.ModelId.FullName, "Types", baseRelativePath)).ConfigureAwait(false);
+        await outputFile.WriteLineAsync($"#{ckTypeGraph.CreateAnchor()}\"").ConfigureAwait(false);
     }
 
     private static string CreateAnchor(this CkTypeGraph ckTypeGraph)

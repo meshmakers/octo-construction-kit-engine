@@ -7,7 +7,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler {
+namespace Meshmakers.Octo.ConstructionKit.Engine {
     using System;
     
     
@@ -38,7 +38,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler {
         internal static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Meshmakers.Octo.ConstructionKit.Compiler.Text", typeof(Text).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Meshmakers.Octo.ConstructionKit.Engine.Text", typeof(Text).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;

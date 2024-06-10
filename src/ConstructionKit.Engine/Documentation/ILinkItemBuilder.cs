@@ -1,4 +1,4 @@
-﻿namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+﻿namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal interface ILinkItemBuilder
 {

@@ -1,14 +1,14 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal class DirectoryTools(ILogger<DirectoryTools> logger, ILinkHelpers linkHelpers) : IDirectoryTools
 {
-    public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
+    public void BuildDirectory(string documentPath, CkModelId ckModelId)
     {
-        string path = new(linkHelpers.GetCommonPathParts(ckModelId));
-        path = Path.Combine(docusaurusPath, path);
+        var path = linkHelpers.GetCommonPathParts(ckModelId);
+        path = Path.Combine(documentPath, path);
 
         try
         {

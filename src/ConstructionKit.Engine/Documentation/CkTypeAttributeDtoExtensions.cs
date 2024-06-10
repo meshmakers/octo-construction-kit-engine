@@ -1,7 +1,8 @@
 ﻿using System.Text;
+using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkTypeAttributeDtoExtensions
 {
@@ -11,7 +12,7 @@ internal static class CkTypeAttributeDtoExtensions
         await outputFile.WriteLineAsync($"| {ckTypeAttributeDto.DrawLinkToDefinition(baseRelativePath, linkHelpers)} | " +
                                         $"{ckTypeAttributeDto.DrawAttributeAutoCompleteValues()} | " +
                                         $"{ckTypeAttributeDto.DrawAttributeAutoIncrementReference()} | " +
-                                        $"{ckTypeAttributeDto.IsOptional.ToString()} |");
+                                        $"{ckTypeAttributeDto.IsOptional.ToString()} |").ConfigureAwait(false);
     }
 
     private static string DrawAttributeAutoCompleteValues(this CkTypeAttributeDto ckTypeAttributeDto)

@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 //Expected Format for itemName Class.Name/UnformattedAnchor
 internal class LinkItemBuilder(string itemName, string baseRelativePath, ILinkHelpers linkHelpers) : ILinkItemBuilder

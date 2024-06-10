@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

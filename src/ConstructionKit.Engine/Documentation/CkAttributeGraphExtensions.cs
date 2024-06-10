@@ -1,7 +1,8 @@
 ﻿using System.Text;
+using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkAttributeGraphExtensions
 {
@@ -14,7 +15,7 @@ internal static class CkAttributeGraphExtensions
                                         $"{ckAttributeGraph.DrawDefaultValues()} | " +
                                         $"{ckAttributeGraph.IsDataStream.ToString()} | " +
                                         $"{ckAttributeGraph.Description ?? ""} | " +
-                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath, linkHelpers)} |");
+                                        $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath, linkHelpers)} |").ConfigureAwait(false);
     }
 
 

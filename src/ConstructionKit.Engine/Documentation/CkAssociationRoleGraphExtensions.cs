@@ -1,7 +1,8 @@
 ﻿using System.Text;
+using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkAssociationRoleGraphExtensions
 {
@@ -15,7 +16,7 @@ internal static class CkAssociationRoleGraphExtensions
                                         $"{ckAssociationRoleGraph.OutboundMultiplicity} | " +
                                         $"{ckAssociationRoleGraph.OutboundName} | " +
                                         $"{association?.TargetCkTypeId.SemanticVersionedFullName} | " +
-                                        $"{association?.DrawTargetAttributes()} |");
+                                        $"{association?.DrawTargetAttributes()} |").ConfigureAwait(false);
     }
 
     private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath, 

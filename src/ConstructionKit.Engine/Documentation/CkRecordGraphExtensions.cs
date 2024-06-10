@@ -2,7 +2,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkRecordGraphExtensions
 {
@@ -13,7 +13,7 @@ internal static class CkRecordGraphExtensions
                                         $"{ckRecordGraph.DrawAttributeList((a) => a.IsOptional.ToString())} | " +
                                         $"{ckRecordGraph.DrawAttributeAutoIncrementReference()} | " +
                                         $"{ckRecordGraph.DrawAttributeAutoCompleteValues()} | " +
-                                        $"{ckRecordGraph.DrawAttributeList((a) => a.CkAttributeId.SemanticVersionedFullName)} |");
+                                        $"{ckRecordGraph.DrawAttributeList((a) => a.CkAttributeId.SemanticVersionedFullName)} |").ConfigureAwait(false);
     }
 
     private static string DrawAttributeList(this CkRecordGraph ckRecordGraph, Func<CkTypeAttributeDto, string> valueGetter)

@@ -1,6 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal static class CkEnumGraphExtensions
 {
@@ -11,7 +11,7 @@ internal static class CkEnumGraphExtensions
         {
             await outputFile.WriteLineAsync($"| {counter++} | " +
                                             $"{value.Name} | " +
-                                            $"{value.Description} |");
+                                            $"{value.Description} |").ConfigureAwait(false);
         }
     }
 }

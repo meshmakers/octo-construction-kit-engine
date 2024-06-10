@@ -30,6 +30,11 @@
         <Compile Update="Messages\MessageCodes.cs">
             <DependentUpon>MessageCodes.tt</DependentUpon>
         </Compile>
+        <Compile Update="Text.Designer.cs">
+          <DesignTime>True</DesignTime>
+          <AutoGen>True</AutoGen>
+          <DependentUpon>Text.resx</DependentUpon>
+        </Compile>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
@@ -45,5 +50,11 @@
             <PackagePath />
             <Link>LICENSE</Link>
         </None>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Update="Text.resx">
+        <Generator>ResXFileCodeGenerator</Generator>
+        <LastGenOutput>Text.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
     </ItemGroup>
 </Project>

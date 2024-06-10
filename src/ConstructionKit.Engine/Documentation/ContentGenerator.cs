@@ -1,9 +1,10 @@
 ﻿using System.Text;
+using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
 internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IContentGenerator
 {
@@ -19,12 +20,12 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
+            using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
-                $" {Text.Description} | {Text.CkEnumId_CkRecordId} |");
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |");
+                $" {Text.Description} | {Text.CkEnumId_CkRecordId} |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
             
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
@@ -32,7 +33,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             {
                 if (MatchesModelId(attribute, ckModelId))
                 {
-                    await attribute.DrawAttribute(outputFile, baseRelativePath, linkHelpers);
+                    await attribute.DrawAttribute(outputFile, baseRelativePath, linkHelpers).ConfigureAwait(false);
                 }
             }
         }
@@ -51,18 +52,18 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
+            using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
 
             foreach (var @enum in GetValues.GetEnums(modelGraph))
             {
                 if (!MatchesModelId(@enum, ckModelId)) continue;
-                await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName);
+                await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
 
-                await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |");
-                await outputFile.WriteLineAsync("| -----------| -----------| -----------|");
+                await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |").ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| -----------| -----------| -----------|").ConfigureAwait(false);
                     
-                await @enum.DrawEnum(outputFile);
+                await @enum.DrawEnum(outputFile).ConfigureAwait(false);
             }
         }
         else
@@ -81,18 +82,18 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
+            using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
-                $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |");
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |");
+                $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
 
             foreach (var record in GetValues.GetRecords(modelGraph))
             {
                 if (MatchesModelId(record, ckModelId))
                 {
-                    await record.DrawRecord(outputFile);
+                    await record.DrawRecord(outputFile).ConfigureAwait(false);
                 }
             }
         }
@@ -113,24 +114,24 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
-            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
+            using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
 
             foreach (var type in GetValues.GetTypes(modelGraph))
             {
                 if (!MatchesModelId(type, ckModelId)) continue;
-                await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName);
-                await AddHierarchy(outputFile, type, baseRelativePath);
-                await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION");
+                await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+                await AddHierarchy(outputFile, type, baseRelativePath).ConfigureAwait(false);
+                await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION").ConfigureAwait(false);
 
                 if (type.DefinedAttributes.Count != 0)
                 {
                     await outputFile.WriteLineAsync(
-                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |");
-                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |");
+                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |").ConfigureAwait(false);
+                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
 
                     foreach (var attribute in type.DefinedAttributes)
                     {
-                        await attribute.DrawAttribute(outputFile, baseRelativePath, linkHelpers);
+                        await attribute.DrawAttribute(outputFile, baseRelativePath, linkHelpers).ConfigureAwait(false);
                     }
                 }
 
@@ -146,18 +147,18 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                         if (!tableBuilt)
                         {
                             await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
-                                true);
+                                true).ConfigureAwait(false);
 
                             await outputFile.WriteLineAsync(
                                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
+                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
                             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                                            " -----------| -----------| ----------- |");
+                                                            " -----------| -----------| ----------- |").ConfigureAwait(false);
                             tableBuilt = true;
                         }
 
                         await item.DrawAssociationRole(outputFile, association,
-                            baseRelativePath, linkHelpers);
+                            baseRelativePath, linkHelpers).ConfigureAwait(false);
                     }
                 }
             }
@@ -181,17 +182,17 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         if (ckAssociationRoleGraphs.Length != 0)
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
-            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
+            using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
 
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|");
+                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                            " -----------| -----------| ----------- |");
+                                            " -----------| -----------| ----------- |").ConfigureAwait(false);
 
             foreach (var associationRole in ckAssociationRoleGraphs)
             {
-                await associationRole.DrawAssociationRole(outputFile, null, baseRelativePath, linkHelpers);
+                await associationRole.DrawAssociationRole(outputFile, null, baseRelativePath, linkHelpers).ConfigureAwait(false);
             }
         }
         else
@@ -203,10 +204,10 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId)
     {
         directoryTools.BuildDirectory(docPath, ckModelId);
-        await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
+        using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
 
-        await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |");
-        await outputFile.WriteLineAsync("| -----------| -----------|");
+        await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("| -----------| -----------|").ConfigureAwait(false);
     }
 
     private static bool MatchesModelId(object item, CkModelId modelId)
@@ -240,20 +241,21 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             titlePrefix = " ";
         }
 
-        await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}");
+        await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}").ConfigureAwait(false);
     }
 
     private async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph, string baseRelativePath)
     {
         var hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
-        await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}");
+        await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}").ConfigureAwait(false);
     }
 
     private string ReconstructHierarchyFromPath(string path, string baseRelativePath)
     {
         string[] separators = ["->", ":"];
 
-        var parts = path.Split(separators, StringSplitOptions.TrimEntries);
+        var parts = path.Split(separators, StringSplitOptions.None).Select(s => s.Trim()).ToArray();
+
         var reconstructedHierarchy = parts.Reverse();
 
         return BuildHierarchyString(reconstructedHierarchy.ToArray(), baseRelativePath);

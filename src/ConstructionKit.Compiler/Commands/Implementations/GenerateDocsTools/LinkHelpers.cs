@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools
 {
-    internal class LinkHelpers(ILogger<LinkHelpers> logger) : ILinkHelpers
+    internal class LinkHelpers : ILinkHelpers
     {
 
         public string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
@@ -19,22 +19,15 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.Gene
 
         public string GetCommonPathParts(CkModelId ckModelId)
         {
-            try
-            {
-                var modelIdParts = ckModelId.SemanticVersionedFullName.Split(".");
-                var path = "";
+            var modelIdParts = ckModelId.SemanticVersionedFullName.Split(".");
+            var path = "";
 
-                foreach (var modelIdPart in modelIdParts)
-                {
-                    path = Path.Combine(path, modelIdPart);
-                }
-                return path;
-            }
-            catch (Exception e)
+            foreach (var modelIdPart in modelIdParts)
             {
-                logger.LogError("Error Generating Path: {e}", e.ToString());
-                throw;
+                path = Path.Combine(path, modelIdPart);
             }
+
+            return path;
         }
 
         private string BuildFilepath(string docusaurusPath, CkModelId ckModelId)

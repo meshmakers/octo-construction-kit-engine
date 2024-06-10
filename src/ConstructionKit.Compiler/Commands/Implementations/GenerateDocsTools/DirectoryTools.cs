@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public class DirectoryTools(ILogger<DirectoryTools> logger, ILinkHelpers linkHelpers) : IDirectoryTools
+internal class DirectoryTools(ILogger<DirectoryTools> logger, ILinkHelpers linkHelpers) : IDirectoryTools
 {
     public void BuildDirectory(string docusaurusPath, CkModelId ckModelId)
     {

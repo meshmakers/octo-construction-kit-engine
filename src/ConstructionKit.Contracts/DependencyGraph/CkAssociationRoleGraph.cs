@@ -25,6 +25,7 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
         OutboundName = associationRoleDto.OutboundName;
         InboundMultiplicity = associationRoleDto.InboundMultiplicity;
         OutboundMultiplicity = associationRoleDto.OutboundMultiplicity;
+        Description = associationRoleDto.Description;
     }
 
     /// <summary>
@@ -37,11 +38,12 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
     /// <param name="outboundMultiplicity"></param>
     /// <param name="definedAttributes"></param>
     /// <param name="allAttributes"></param>
+    /// <param name="description"></param>
     [JsonConstructor]
     public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckRoleId, string inboundName, string outboundName,
         MultiplicitiesDto inboundMultiplicity, MultiplicitiesDto outboundMultiplicity,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
-        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes)
+        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes, string description)
         : base(definedAttributes, allAttributes)
     {
         CkRoleId = ckRoleId;
@@ -49,6 +51,7 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
         OutboundName = outboundName;
         InboundMultiplicity = inboundMultiplicity;
         OutboundMultiplicity = outboundMultiplicity;
+        Description = description;
     }
 
     /// <summary>
@@ -75,4 +78,9 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
     ///     Multiplicity of the outbound association
     /// </summary>
     public MultiplicitiesDto OutboundMultiplicity { get; }
+    
+    /// <summary>
+    ///     An optional description of the association role
+    /// </summary>
+    public string? Description { get; set; }
 }

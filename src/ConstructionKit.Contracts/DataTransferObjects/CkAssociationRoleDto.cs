@@ -43,4 +43,10 @@ public class CkAssociationRoleDto : CkTypeWithAttributesDto
     [JsonConverter(typeof(JsonStringEnumConverter))]
     [JsonRequired]
     public MultiplicitiesDto OutboundMultiplicity { get; set; }
+    
+    /// <summary>
+    ///     An optional description of the role
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? Description { get; set; }
 }

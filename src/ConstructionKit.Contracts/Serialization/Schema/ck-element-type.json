@@ -21,6 +21,9 @@
         "isAbstract": {
           "type": "boolean"
         },
+        "description": {
+          "type": "string"
+        },
         "attributes": {
           "type": "array",
           "items": {

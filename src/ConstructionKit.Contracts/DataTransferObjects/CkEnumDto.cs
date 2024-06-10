@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using YamlDotNet.Serialization;
 
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
@@ -35,4 +36,10 @@ public class CkEnumDto
     ///     Values of the enum
     /// </summary>
     public ICollection<CkEnumValueDto> Values { get; set; }
+    
+    /// <summary>
+    ///     An optional description of the enum
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? Description { get; set; }
 }

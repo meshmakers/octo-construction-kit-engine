@@ -23,6 +23,7 @@ public class CkEnumGraph
         CkEnumId = ckEnumId;
         UseFlags = enumDto.UseFlags;
         Values = enumDto.Values;
+        Description = enumDto.Description;
     }
 
     /// <summary>
@@ -31,12 +32,14 @@ public class CkEnumGraph
     /// <param name="ckEnumId"></param>
     /// <param name="useFlags"></param>
     /// <param name="values"></param>
+    /// <param name="description"></param>
     [JsonConstructor]
-    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, ICollection<CkEnumValueDto> values)
+    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, ICollection<CkEnumValueDto> values, string description)
     {
         CkEnumId = ckEnumId;
         UseFlags = useFlags;
         Values = values;
+        Description = description;
     }
 
     /// <summary>
@@ -53,4 +56,9 @@ public class CkEnumGraph
     ///     Returns the values of the enum.
     /// </summary>
     public ICollection<CkEnumValueDto> Values { get; }
+    
+    /// <summary>
+    ///     An optional description of the enum
+    /// </summary>
+    public string? Description { get; set; }
 }

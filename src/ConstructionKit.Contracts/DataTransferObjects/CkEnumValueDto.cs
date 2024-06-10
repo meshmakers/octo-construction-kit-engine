@@ -24,7 +24,7 @@ public class CkEnumValueDto
     public string Name { get; set; } = null!;
 
     /// <summary>
-    ///     A optional description of the enum value.
+    ///     An optional description of the enum value.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }

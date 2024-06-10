@@ -18,6 +18,9 @@
         "pattern": "^[a-zA-Z0-9-.]+$"
       }
     },
+    "description": {
+      "type": "string"
+    },
     "attributes": {
       "type": "array",
       "items": {

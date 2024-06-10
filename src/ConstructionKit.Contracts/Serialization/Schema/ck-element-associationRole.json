@@ -39,6 +39,9 @@
             "type": "object",
             "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json#/definitions/CkTypeAttribute"
           }
+        },
+        "description": {
+          "type": "string"
         }
       },
       "additionalProperties": false,

@@ -10,6 +10,7 @@ public class CkModelGraph
 {
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
     private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
+    private readonly IDictionary<CkModelId, CkModelPropertiesDto> _models;
     private readonly IDictionary<CkModelId, ICollection<CkModelId>> _dependencies;
     private readonly IDictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
     private readonly IDictionary<CkId<CkRecordId>, CkRecordGraph> _records;
@@ -26,12 +27,14 @@ public class CkModelGraph
         _records = new Dictionary<CkId<CkRecordId>, CkRecordGraph>();
         _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
         _dependencies = new Dictionary<CkModelId, ICollection<CkModelId>>();
+        _models = new Dictionary<CkModelId, CkModelPropertiesDto>();
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
         Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
+        Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
     }
 
     /// <summary>
@@ -46,12 +49,14 @@ public class CkModelGraph
         _records = ckCacheRoot.Records.ToDictionary(k => k.CkRecordId, v => v);
         _enums = ckCacheRoot.Enums.ToDictionary(k => k.CkEnumId, v => v);
         _dependencies = ckCacheRoot.Dependencies.ToDictionary(k => k.Key, v => v.Value);
+        _models = ckCacheRoot.Models.ToDictionary(k => k.ModelId, v => v);
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
         Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
+        Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
     }
 
     /// <summary>
@@ -85,6 +90,11 @@ public class CkModelGraph
     public IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; }
 
     /// <summary>
+    ///     Returns a list of model dependencies.
+    /// </summary>
+    public IReadOnlyDictionary<CkModelId, CkModelPropertiesDto> Models { get; }
+
+    /// <summary>
     ///     Returns the root object of the compiled version of a CK model.
     /// </summary>
     /// <returns></returns>
@@ -92,11 +102,13 @@ public class CkModelGraph
     {
         return new CkCacheRoot
         {
-            Types = _types.Values.OrderBy(x=> x.CkTypeId).ToList(),
-            Attributes = _attributes.Values.OrderBy(x=> x.CkAttributeId).ToList(),
-            AssociationRoles = _associationRoles.Values.OrderBy(x=> x.CkRoleId).ToList(),
-            Records = _records.Values.OrderBy(x=> x.CkRecordId).ToList(),
-            Enums = _enums.Values.OrderBy(x=> x.CkEnumId).ToList()
+            Models = _models.OrderBy(x => x.Key).Select(x => x.Value).ToList(),
+            Dependencies = _dependencies.ToDictionary(x => x.Key, x => x.Value),
+            Types = _types.Values.OrderBy(x => x.CkTypeId).ToList(),
+            Attributes = _attributes.Values.OrderBy(x => x.CkAttributeId).ToList(),
+            AssociationRoles = _associationRoles.Values.OrderBy(x => x.CkRoleId).ToList(),
+            Records = _records.Values.OrderBy(x => x.CkRecordId).ToList(),
+            Enums = _enums.Values.OrderBy(x => x.CkEnumId).ToList()
         };
     }
 
@@ -204,7 +216,8 @@ public class CkModelGraph
         {
             foreach (var ckAttribute in ckCompiledModelRoot.Attributes)
             {
-                GetOrCreateAttribute(new CkId<CkAttributeId>(ckCompiledModelRoot.ModelId, ckAttribute.AttributeId), ckAttribute);
+                GetOrCreateAttribute(new CkId<CkAttributeId>(ckCompiledModelRoot.ModelId, ckAttribute.AttributeId),
+                    ckAttribute);
             }
         }
 
@@ -212,7 +225,8 @@ public class CkModelGraph
         {
             foreach (var ckAssociationRole in ckCompiledModelRoot.AssociationRoles)
             {
-                GetOrCreateAssociationRole(new CkId<CkAssociationRoleId>(ckCompiledModelRoot.ModelId, ckAssociationRole.AssociationRoleId),
+                GetOrCreateAssociationRole(
+                    new CkId<CkAssociationRoleId>(ckCompiledModelRoot.ModelId, ckAssociationRole.AssociationRoleId),
                     ckAssociationRole);
             }
         }

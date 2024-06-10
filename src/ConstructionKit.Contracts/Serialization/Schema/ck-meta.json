@@ -17,6 +17,9 @@
         "type": "string",
         "pattern": "^[a-zA-Z0-9-.]+$"
       }
+    },
+    "description": {
+      "type": "string"
     }
   },
   "additionalProperties": false,

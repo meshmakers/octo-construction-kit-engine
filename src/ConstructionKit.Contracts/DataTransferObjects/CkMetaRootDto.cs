@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     Represents the content of the metadata file
 /// </summary>
 [OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.GetMetaSchema))]
-public class CkMetaRootDto
+public class CkMetaRootDto : CkModelPropertiesDto
 {
     /// <summary>
     ///     The URI of the schema for the CK meta.
@@ -30,12 +30,6 @@ public class CkMetaRootDto
     [YamlMember(Alias = "$schema")]
     [JsonPropertyName("$schema")]
     public virtual string SchemaUri { get; } = CkMetaSchemaUri;
-
-    /// <summary>
-    ///     Gets or sets the model id.
-    /// </summary>
-    [JsonRequired]
-    public CkModelId ModelId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the dependencies of the model.

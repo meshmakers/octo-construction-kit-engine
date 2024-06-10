@@ -29,6 +29,7 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
         IsAbstract = ckRecordDto.IsAbstract;
         IsFinal = ckRecordDto.IsFinal;
         DerivedFromCkRecordId = ckRecordDto.DerivedFromCkRecordId;
+        Description = ckRecordDto.Description;
         _baseRecords = new List<CkGraphRecordInheritance>();
         _derivedRecords = new List<CkGraphRecordInheritance>();
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
@@ -46,19 +47,21 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
     /// <param name="derivedRecords"></param>
     /// <param name="definedAttributes"></param>
     /// <param name="allAttributes"></param>
+    /// <param name="description"></param>
     [JsonConstructor]
     public CkRecordGraph(CkId<CkRecordId> ckRecordId, bool isAbstract, bool isFinal,
         IReadOnlyCollection<CkGraphRecordInheritance> baseRecords,
         CkId<CkRecordId>? derivedFromCkRecordId,
         IReadOnlyCollection<CkGraphRecordInheritance> derivedRecords,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
-        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes)
+        IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes, string description)
         : base(definedAttributes, allAttributes)
     {
         CkRecordId = ckRecordId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
         DerivedFromCkRecordId = derivedFromCkRecordId;
+        Description = description;
 
         _baseRecords = new List<CkGraphRecordInheritance>(baseRecords);
         _derivedRecords = new List<CkGraphRecordInheritance>(derivedRecords);
@@ -95,6 +98,11 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
     ///     Returns a list of derived records of the given construction kit record
     /// </summary>
     public IReadOnlyCollection<CkGraphRecordInheritance> DerivedRecords { get; }
+    
+    /// <summary>
+    ///     An optional description of the record
+    /// </summary>
+    public string? Description { get; set; }
 
     /// <summary>
     ///     Returns a string that describes the inheritance chain

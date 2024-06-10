@@ -123,7 +123,7 @@ public class CkTypeAttributeGraph
     public bool IsDataStream { get; }
 
     /// <summary>
-    ///     A optional description of the attribute
+    ///     An optional description of the attribute
     /// </summary>
     public string? Description { get; }
 }

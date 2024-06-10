@@ -48,4 +48,22 @@ public class CkModelIdConverter : JsonConverter<CkModelId>, IYamlTypeConverter
     {
         writer.WriteStringValue(value.ToString(CultureInfo.InvariantCulture));
     }
+
+    /// <inheritdoc />
+    public override CkModelId ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        var str = reader.TokenType == JsonTokenType.PropertyName
+            ? reader.GetString()
+            : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType, nameof(JsonTokenType.PropertyName));
+
+        return !string.IsNullOrEmpty(str) && str != null
+            ? new CkModelId(str)
+            : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
+    }
+
+    /// <inheritdoc />
+    public override void WriteAsPropertyName(Utf8JsonWriter writer, CkModelId value, JsonSerializerOptions options)
+    {
+        writer.WritePropertyName(value.FullName);
+    }
 }

@@ -32,6 +32,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IsStreamType = ckTypeDto.IsStreamType;
         IsCollectionRoot = ckTypeDto.IsCollectionRoot;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
+        Description = ckTypeDto.Description;
         _baseTypes = new List<CkGraphTypeInheritance>();
         _derivedTypes = new List<CkGraphTypeInheritance>();
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
@@ -57,6 +58,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="allAttributes"></param>
     /// <param name="indexes"></param>
     /// <param name="associations"></param>
+    /// <param name="description"></param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot, bool isStreamType,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -65,7 +67,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyCollection<CkGraphTypeInheritance> derivedTypes,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
-        IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations)
+        IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description)
         : base(definedAttributes, allAttributes)
     {
         CkTypeId = ckTypeId;
@@ -75,6 +77,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IsCollectionRoot = isCollectionRoot;
         DerivedFromCkTypeId = derivedFromCkTypeId;
         DefiningCollectionRootCkTypeId = definingCollectionRootCkTypeId;
+        Description = description;
 
         _baseTypes = new List<CkGraphTypeInheritance>(baseTypes);
         _derivedTypes = new List<CkGraphTypeInheritance>(derivedTypes);
@@ -142,6 +145,11 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// This information is gathered from the types.
     /// </summary>
     public bool IsStreamType { get; set; }
+    
+    /// <summary>
+    ///     An optional description of the type
+    /// </summary>
+    public string? Description { get; set; }
     
     /// <summary>
     ///     Returns a string that describes the inheritance chain

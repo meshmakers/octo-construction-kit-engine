@@ -87,7 +87,7 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
         streamWriter.Close();
 
         // Read
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var list = new List<OctoObjectId>();
 

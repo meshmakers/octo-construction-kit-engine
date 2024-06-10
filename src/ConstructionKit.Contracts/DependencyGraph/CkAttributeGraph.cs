@@ -38,7 +38,7 @@ public class CkAttributeGraph
     /// <param name="valueCkRecordId"></param>
     /// <param name="valueCkEnumId"></param>
     /// <param name="defaultValues"></param>
-    /// <param name="description">A optional description to the attribute</param>
+    /// <param name="description">An optional description to the attribute</param>
     /// <param name="metaData">Optional meta data of the attribute</param>
     /// <param name="isDataStream">Optional flag that tells if an attribute is a data stream </param>
     [JsonConstructor]
@@ -82,7 +82,7 @@ public class CkAttributeGraph
     public ICollection<object>? DefaultValues { get; }
 
     /// <summary>
-    ///     A optional description of the attribute
+    ///     An optional description of the attribute
     /// </summary>
     public string? Description { get; set; }
 

@@ -38,4 +38,10 @@ public class CkRecordDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsAbstract { get; set; }
+    
+    /// <summary>
+    ///     An optional description of the record
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? Description { get; set; }
 }

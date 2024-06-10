@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public interface IContentGenerator
+internal interface IContentGenerator
 {
     Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
         documentPath, CkModelId ckModelId);

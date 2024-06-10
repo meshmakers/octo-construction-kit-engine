@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
-public class GenerateDocsCommand : Command<OctoToolOptions>
+internal class GenerateDocsCommand : Command<OctoToolOptions>
 {
     private readonly IModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;

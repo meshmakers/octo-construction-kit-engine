@@ -1,6 +1,6 @@
 ﻿namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 
-public class ModeSelectionOptions
+internal class ModeSelectionOptions
 {
     public const string ModeSelection = "ModeSelection";
 

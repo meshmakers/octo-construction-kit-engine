@@ -1,5 +1,4 @@
-﻿using System.Globalization;
-using Meshmakers.Common.CommandLineParser;
+﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts;

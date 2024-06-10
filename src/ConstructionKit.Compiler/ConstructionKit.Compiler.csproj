@@ -54,8 +54,4 @@
         <LastGenOutput>Dictionary.Designer.cs</LastGenOutput>
       </EmbeddedResource>
     </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="Commands\Implementations\GenerateDocsTools\" />
-    </ItemGroup>
 </Project>

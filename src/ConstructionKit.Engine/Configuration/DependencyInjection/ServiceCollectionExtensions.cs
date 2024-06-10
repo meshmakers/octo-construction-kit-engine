@@ -67,11 +67,11 @@ public static class ServiceCollectionExtensions
     {
         services.AddOptions<ModeSelectionOptions>();
         
-        //GenerateDocsTools
+        //Helpers
         services.AddTransient<IDirectoryTools, DirectoryTools>();
         services.AddTransient<ILinkHelpers, LinkHelpers>();
         
-        //GenerateDocsCommand
+        //Generators
         services.AddTransient<IMermaidGenerator, MermaidGenerator>();
         services.AddTransient<IContentGenerator, ContentGenerator>();
 

@@ -4,7 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Configuration.DependencyInjection;
 
 /// <summary>
-/// 
+/// Allows for Selection of Documentation Mode
 /// </summary>
 public interface IDocumentationBuilder
 {

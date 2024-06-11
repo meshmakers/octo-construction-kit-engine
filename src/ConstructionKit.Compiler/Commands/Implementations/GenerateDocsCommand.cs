@@ -64,7 +64,7 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
         if (_modeSelectionOptions.DocumentationMode)
         {
             //ID Determines Position in File Tree   
-            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId);
+            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
             await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, versionNumber);
 
             await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);

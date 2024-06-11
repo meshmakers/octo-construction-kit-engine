@@ -7,17 +7,22 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IMermaidGenerator
 {
     
-    public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId)
+    public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
         var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
 
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
-
+        
         //Create Page Heading
         var split = ckModelId.SemanticVersionedFullName.Split('.');
         await outputFile.WriteLineAsync($"# {split.Last()}").ConfigureAwait(false);
         await outputFile.WriteLineAsync().ConfigureAwait(false);
+        
+        if (versionNumber != null)
+        {
+            await ContentGenerator.AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+        }
 
         await TextWrapper.AddDescription(outputFile, "DIAGRAM DESCRIPTION").ConfigureAwait(false);
 

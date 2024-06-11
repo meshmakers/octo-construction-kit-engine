@@ -320,7 +320,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         return stringBuilder.ToString();
     }
 
-    private static async Task AddVersionInfo(StreamWriter outputFile, string versionNumber)
+    internal static async Task AddVersionInfo(StreamWriter outputFile, string versionNumber)
     {
         await outputFile.WriteLineAsync($"#### Version: [{versionNumber}](https://docs.meshmakers.cloud)").ConfigureAwait(false);
     }

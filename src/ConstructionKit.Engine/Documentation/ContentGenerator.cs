@@ -6,7 +6,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
-internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IContentGenerator
+internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools,
+    ILinkHelpers linkHelpers) : IContentGenerator
 {
 
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
@@ -25,7 +26,8 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
                 $" {Text.Description} | {Text.CkEnumId_CkRecordId} |").ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------|" +
+                                            " ----------- |").ConfigureAwait(false);
             
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
@@ -87,7 +89,8 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
                 $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |").ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------|" +
+                                            " ----------- |").ConfigureAwait(false);
 
             foreach (var record in GetValues.GetRecords(modelGraph))
             {
@@ -126,7 +129,8 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 if (type.DefinedAttributes.Count != 0)
                 {
                     await outputFile.WriteLineAsync(
-                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} | {Text.IsOptional} |").ConfigureAwait(false);
+                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} |" +
+                        $" {Text.IsOptional} |").ConfigureAwait(false);
                     await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
 
                     foreach (var attribute in type.DefinedAttributes)
@@ -151,7 +155,8 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
                             await outputFile.WriteLineAsync(
                                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
+                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}|" +
+                                $" {Text.TargetAttributes}|").ConfigureAwait(false);
                             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
                                                             " -----------| -----------| ----------- |").ConfigureAwait(false);
                             tableBuilt = true;
@@ -186,7 +191,8 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
+                $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
+                $" {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
                                             " -----------| -----------| ----------- |").ConfigureAwait(false);
 

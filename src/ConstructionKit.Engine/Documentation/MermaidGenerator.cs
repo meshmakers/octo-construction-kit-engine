@@ -49,6 +49,22 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
         }
     }
 
+    //For Library Use
+    public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string outputPath)
+    {
+        using StreamWriter outputFile = new(outputPath);
+
+        await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
+        
+        foreach (var type in GetValues.GetTypes(modelGraph))
+        {
+            await type.DrawClass(outputFile).ConfigureAwait(false);
+            await type.DrawInheritance(outputFile).ConfigureAwait(false);
+            await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value)).ConfigureAwait(false);
+            await type.DrawNamespaces(outputFile).ConfigureAwait(false);
+        }
+    }
+
     private static async Task EndDiagram(StreamWriter outputFile)
     {
         await outputFile.WriteLineAsync("```").ConfigureAwait(false);

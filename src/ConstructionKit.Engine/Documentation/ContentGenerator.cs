@@ -11,7 +11,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 {
 
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
-        documentPath, CkModelId ckModelId)
+        documentPath, CkModelId ckModelId, string? versionNumber)
     {
         var attributes = GetValues.GetAttributes(modelGraph)
             .Where(attribute => MatchesModelId(attribute, ckModelId));
@@ -22,6 +22,13 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
+
+            if (versionNumber != null)
+            {
+                await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+            }
+            
+            await AddVersionInfo(outputFile, "3").ConfigureAwait(false);
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
@@ -46,7 +53,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
-        CkModelId ckModelId)
+        CkModelId ckModelId, string? versionNumber)
     {
         var enums = GetValues.GetEnums(modelGraph)
             .Where(en => MatchesModelId(en, ckModelId));
@@ -56,6 +63,10 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
+            if (versionNumber != null)
+            {
+                await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+            }
 
             foreach (var @enum in GetValues.GetEnums(modelGraph))
             {
@@ -75,7 +86,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
-        CkModelId ckModelId)
+        CkModelId ckModelId, string? versionNumber)
     {
         var records = GetValues.GetRecords(modelGraph)
             .Where(record => MatchesModelId(record, ckModelId));
@@ -85,6 +96,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
+            
+            if (versionNumber != null)
+            {
+                await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+            }
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
@@ -107,7 +123,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, 
-        string documentPath, CkModelId ckModelId)
+        string documentPath, CkModelId ckModelId, string? versionNumber)
     {
         var typeGraphs = GetValues.GetTypes(modelGraph)
             .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
@@ -118,6 +134,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
+            
+            if (versionNumber != null)
+            {
+                await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+            }
 
             foreach (var type in GetValues.GetTypes(modelGraph))
             {
@@ -175,7 +196,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph,
-        string documentPath, CkModelId ckModelId)
+        string documentPath, CkModelId ckModelId, string? versionNumber)
     {
         
         // Check if there are any association roles to draw before proceeding
@@ -189,6 +210,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
 
+            if (versionNumber != null)
+            {
+                await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+            }
+            
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
                 $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
@@ -207,11 +233,16 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId)
+    public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId, string? versionNumber)
     {
         directoryTools.BuildDirectory(docPath, ckModelId);
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
 
+        if (versionNumber != null)
+        {
+            await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+        }
+        
         await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |").ConfigureAwait(false);
         await outputFile.WriteLineAsync("| -----------| -----------|").ConfigureAwait(false);
     }
@@ -287,5 +318,10 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
 
         return stringBuilder.ToString();
+    }
+
+    private static async Task AddVersionInfo(StreamWriter outputFile, string versionNumber)
+    {
+        await outputFile.WriteLineAsync($"#### Version: [{versionNumber}](https://docs.meshmakers.cloud)").ConfigureAwait(false);
     }
 }

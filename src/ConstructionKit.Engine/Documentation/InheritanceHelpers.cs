@@ -61,11 +61,7 @@ internal class InheritanceHelpers(ILinkHelpers linkHelpers)
         
         foreach (var baseRecord in ckRecordGraph.BaseRecords)
         {
-            var obj = baseRecord.ToString();
-            if (obj == null)
-            {
-                break;
-            }
+            var obj = baseRecord.BaseCkRecordId.SemanticVersionedFullName;
             var builder = new LinkItemBuilder(obj, baseRelativePath, linkHelpers);
             builder.BuildLinkToRecord();
             stringBuilder.Append(builder);

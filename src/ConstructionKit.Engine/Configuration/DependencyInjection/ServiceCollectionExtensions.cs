@@ -1,6 +1,8 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Configuration.DependencyInjection;
+using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
@@ -53,5 +55,26 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkModelRepository, GitHubCkModelRepository>();
 
         return services;
+    }
+
+    /// <summary>
+    ///     Adds Ck model compiler services to the DI container.
+    /// </summary>
+    /// <param name="services"></param>
+    /// <returns></returns>
+    public static IDocumentationBuilder AddDocumentationService(
+        this IServiceCollection services)
+    {
+        services.AddOptions<ModeSelectionOptions>();
+        
+        //Helpers
+        services.AddTransient<IDirectoryTools, DirectoryTools>();
+        services.AddTransient<ILinkHelpers, LinkHelpers>();
+        
+        //Generators
+        services.AddTransient<IMermaidGenerator, MermaidGenerator>();
+        services.AddTransient<IContentGenerator, ContentGenerator>();
+
+        return new DocumentationBuilder(services);
     }
 }

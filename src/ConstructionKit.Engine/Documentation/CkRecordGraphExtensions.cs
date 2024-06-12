@@ -8,7 +8,7 @@ internal static class CkRecordGraphExtensions
 {
     public static async Task DrawRecord(this CkRecordGraph ckRecordGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"| {ckRecordGraph.CkRecordId.SemanticVersionedFullName} | " +
+        await outputFile.WriteLineAsync($"| " +
                                         $"{ckRecordGraph.DrawAttributeList((a) => a.AttributeName)} | " +
                                         $"{ckRecordGraph.DrawAttributeList((a) => a.IsOptional.ToString())} | " +
                                         $"{ckRecordGraph.DrawAttributeAutoIncrementReference()} | " +

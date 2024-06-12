@@ -10,7 +10,16 @@ internal class InheritanceHelpers(ILinkHelpers linkHelpers)
         var hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
         await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}").ConfigureAwait(false);
     }
-
+    
+    internal async Task AddRecordHierarchy(StreamWriter outputFile, CkRecordGraph ckRecordGraph, string baseRelativePath)
+    {
+        if (ckRecordGraph.BaseRecords.Count != 0)
+        {
+            var hierarchy = BuildRecordHierarchyString(ckRecordGraph , baseRelativePath);
+            await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}").ConfigureAwait(false);
+        }
+    }
+    
     private string ReconstructHierarchyFromPath(string path, string baseRelativePath)
     {
         string[] separators = ["->", ":"];
@@ -41,6 +50,37 @@ internal class InheritanceHelpers(ILinkHelpers linkHelpers)
             }
         }
 
+        return stringBuilder.ToString();
+    }
+
+    private string BuildRecordHierarchyString(CkRecordGraph ckRecordGraph, string baseRelativePath)
+    {
+        StringBuilder stringBuilder = new();
+        var counter = 0;
+        var size = ckRecordGraph.BaseRecords.Count;
+        
+        foreach (var baseRecord in ckRecordGraph.BaseRecords)
+        {
+            var obj = baseRecord.ToString();
+            if (obj == null)
+            {
+                break;
+            }
+            var builder = new LinkItemBuilder(obj, baseRelativePath, linkHelpers);
+            builder.BuildLinkToRecord();
+            stringBuilder.Append(builder);
+            
+            
+            if (counter < size - 1)
+            {
+                stringBuilder.Append(' ')
+                    .Append('\u2794')
+                    .Append(' ');
+            }
+            
+            counter++;
+        }
+        
         return stringBuilder.ToString();
     }
 }

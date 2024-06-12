@@ -92,6 +92,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         if (records.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
+            var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
             
@@ -100,18 +101,23 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
             
-            await outputFile.WriteLineAsync(
-                $"| {Text.ID}| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
-                $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |").ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------|" +
-                                            " ----------- |").ConfigureAwait(false);
+            
 
             foreach (var record in GetValues.GetRecords(modelGraph))
             {
-                if (MatchesModelId(record, ckModelId))
-                {
-                    await record.DrawRecord(outputFile).ConfigureAwait(false);
-                }
+                if (!MatchesModelId(record, ckModelId)) continue;
+                
+                await AddTitle(outputFile, null, record.CkRecordId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+
+                await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, baseRelativePath).ConfigureAwait(false);
+                
+                await outputFile.WriteLineAsync(
+                    $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
+                    $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |").ConfigureAwait(false);
+                await outputFile.WriteLineAsync("|  -----------| -----------| -----------| -----------|" +
+                                                " ----------- |").ConfigureAwait(false);
+                    
+                await record.DrawRecord(outputFile).ConfigureAwait(false);
             }
         }
         else

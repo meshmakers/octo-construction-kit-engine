@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;

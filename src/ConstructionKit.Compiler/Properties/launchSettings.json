@@ -2,7 +2,7 @@
   "profiles": {
     "ConstructionKit.Compiler": {
       "commandName": "Project",
-      "commandLineArgs": "-c generateDocs -f \"C:\\meshmakers\\octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\bin\\Debug\\net8.0\\octo-ck-libraries\\Octo.Sdk.Packages.Basic\\out\\ck-basic.yaml\" -o \"C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\Docusaurus\\construction-kit-visualizer\\docs\" -v 1.0"
+      "commandLineArgs": "-c generateDocs -f \"C:\\meshmakers\\octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\bin\\Debug\\net8.0\\octo-ck-libraries\\Octo.Sdk.Packages.Basic\\out\\ck-basic.yaml\" -o \"C:\\Users\\pschw\\Desktop\\rndm stuff\\FH Salzburg\\Semester 6\\Praktikum\\octo-documentation\\src\\octo-mesh-documentation\\docs\\technologyGuide\\constructionKits\" -v 1.0"
     }
   }
 }

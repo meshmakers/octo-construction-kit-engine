@@ -22,6 +22,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
+            
+            //Newline to fix acorn issue in Docusaurus
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
 
             if (versionNumber != null)
             {
@@ -61,6 +64,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
 
+            //Newline to fix acorn issue in Docusaurus
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
@@ -95,6 +101,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
+            
+            //Newline to fix acorn issue in Docusaurus
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
             
             if (versionNumber != null)
             {
@@ -138,6 +147,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
+            
+            //Newline to fix acorn issue in Docusaurus
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
             
             if (versionNumber != null)
             {
@@ -214,6 +226,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             directoryTools.BuildDirectory(documentPath, ckModelId);
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
 
+            //Newline to fix acorn issue in Docusaurus
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
@@ -242,6 +257,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         directoryTools.BuildDirectory(docPath, ckModelId);
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
 
+        //Newline to fix acorn issue in Docusaurus
+        await outputFile.WriteLineAsync().ConfigureAwait(false);
+        
         if (versionNumber != null)
         {
             await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);

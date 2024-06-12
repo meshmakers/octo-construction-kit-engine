@@ -14,6 +14,9 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
         
+        //Newline to fix acorn issue in Docusaurus
+        await outputFile.WriteLineAsync().ConfigureAwait(false);
+        
         //Create Page Heading
         var split = ckModelId.SemanticVersionedFullName.Split('.');
         await outputFile.WriteLineAsync($"# {split.Last()}").ConfigureAwait(false);

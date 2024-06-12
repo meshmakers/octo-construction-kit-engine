@@ -48,4 +48,10 @@
     <ItemGroup>
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
     </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Update="Dictionary.resx">
+        <LastGenOutput>Dictionary.Designer.cs</LastGenOutput>
+      </EmbeddedResource>
+    </ItemGroup>
 </Project>

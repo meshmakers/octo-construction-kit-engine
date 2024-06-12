@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
+﻿using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Microsoft.Extensions.Logging;
@@ -9,6 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools,
     ILinkHelpers linkHelpers) : IContentGenerator
 {
+    private readonly InheritanceHelpers _inheritanceHelpers = new(linkHelpers);
 
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string 
         documentPath, CkModelId ckModelId, string? versionNumber)
@@ -27,8 +27,6 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
-            
-            await AddVersionInfo(outputFile, "3").ConfigureAwait(false);
             
             await outputFile.WriteLineAsync(
                 $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
@@ -144,7 +142,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             {
                 if (!MatchesModelId(type, ckModelId)) continue;
                 await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
-                await AddHierarchy(outputFile, type, baseRelativePath).ConfigureAwait(false);
+                await _inheritanceHelpers.AddHierarchy(outputFile, type, baseRelativePath).ConfigureAwait(false);
                 await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION").ConfigureAwait(false);
 
                 if (type.DefinedAttributes.Count != 0)
@@ -279,45 +277,6 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
 
         await outputFile.WriteLineAsync($"###{titlePrefix}{tableTitle}").ConfigureAwait(false);
-    }
-
-    private async Task AddHierarchy(StreamWriter outputFile, CkTypeGraph ckTypeGraph, string baseRelativePath)
-    {
-        var hierarchy = ReconstructHierarchyFromPath(ckTypeGraph.Path, baseRelativePath);
-        await outputFile.WriteLineAsync($"**Inheritance:** {hierarchy}").ConfigureAwait(false);
-    }
-
-    private string ReconstructHierarchyFromPath(string path, string baseRelativePath)
-    {
-        string[] separators = ["->", ":"];
-
-        var parts = path.Split(separators, StringSplitOptions.None).Select(s => s.Trim()).ToArray();
-
-        var reconstructedHierarchy = parts.Reverse();
-
-        return BuildHierarchyString(reconstructedHierarchy.ToArray(), baseRelativePath);
-    }
-
-    private string BuildHierarchyString(string[] reconstructedHierarchy, string baseRelativePath)
-    {
-        StringBuilder stringBuilder = new();
-
-        for (var i = 0; i < reconstructedHierarchy.Length; i++)
-        {
-            var obj = reconstructedHierarchy[i];
-            var builder = new LinkItemBuilder(obj, baseRelativePath, linkHelpers);
-            builder.BuildLinkToType();
-            stringBuilder.Append(builder);
-
-            if (i < reconstructedHierarchy.Length - 1)
-            {
-                stringBuilder.Append(' ')
-                    .Append('\u2794')
-                    .Append(' ');
-            }
-        }
-
-        return stringBuilder.ToString();
     }
 
     internal static async Task AddVersionInfo(StreamWriter outputFile, string versionNumber)

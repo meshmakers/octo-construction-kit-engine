@@ -48,6 +48,8 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_modelSourcePathArg);
         var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_destinationPathArg);
+        //If directory changes alter this variable!
+        const string directoryPath = "/docs/technologyGuide/constructionKits/";
 
         var versionNumber = CommandArgumentValue.GetArgumentScalarValue<string>(_versionNumberArg);
         
@@ -64,21 +66,28 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
         if (_modeSelectionOptions.DocumentationMode)
         {
             //ID Determines Position in File Tree   
-            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
-            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, versionNumber);
+            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber, 
+                directoryPath);
+            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, versionNumber, 
+                directoryPath);
 
-            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
-            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
-            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
-            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber);
+            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber, 
+                directoryPath);
+            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber,
+                directoryPath);
+            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber, 
+                directoryPath);
+            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, versionNumber, 
+                directoryPath);
             await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath,
-                compiledModelRoot.ModelId, versionNumber);
+                compiledModelRoot.ModelId, versionNumber, directoryPath);
         }
         //ASP Net
         else
         {
             await using StreamWriter outputFile = new(Path.Combine(outputPath, "diagram.txt"));
-            await _mermaidGenerator.GenerateMermaidDiagram(resolvedTypes, outputPath, compiledModelRoot.ModelId, outputFile);
+            await _mermaidGenerator.GenerateMermaidDiagram(resolvedTypes, outputPath, compiledModelRoot.ModelId, outputFile, 
+                directoryPath);
         }
     }
 }

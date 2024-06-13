@@ -5,23 +5,26 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
-internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools,
-    ILinkHelpers linkHelpers) : IContentGenerator
+internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTools directoryTools, ILinkHelpers linkHelpers)
+    : IContentGenerator
 {
     private readonly InheritanceHelpers _inheritanceHelpers = new(linkHelpers);
 
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
         string? versionNumber, string directoryPath)
     {
-        var attributes = GetValues.GetAttributes(modelGraph)
-            .Where(attribute => MatchesModelId(attribute, ckModelId));
+        var attributes = GetValues.GetAttributes(modelGraph).Where(attribute => MatchesModelId(attribute, ckModelId));
 
         if (attributes.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
+#if NETSTANDARD2_0
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
-            
+#else
+            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Attributes"));
+#endif
+
             //Newline to fix acorn issue in Docusaurus
             await outputFile.WriteLineAsync().ConfigureAwait(false);
 
@@ -29,13 +32,13 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
-            
+
             await outputFile.WriteLineAsync(
-                $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
-                $" {Text.Description} | {Text.CkEnumId_CkRecordId} |").ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------|" +
-                                            " ----------- |").ConfigureAwait(false);
-            
+                    $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
+                    $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
+                .ConfigureAwait(false);
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
             foreach (var attribute in GetValues.GetAttributes(modelGraph))
@@ -52,20 +55,23 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, 
-        CkModelId ckModelId, string? versionNumber, string directoryPath)
+    public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
+        string directoryPath)
     {
-        var enums = GetValues.GetEnums(modelGraph)
-            .Where(en => MatchesModelId(en, ckModelId));
+        var enums = GetValues.GetEnums(modelGraph).Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
+#if NETSTANDARD2_0
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
+#else
+            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Enums"));
+#endif
 
             //Newline to fix acorn issue in Docusaurus
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            
+
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
@@ -78,7 +84,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
                 await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |").ConfigureAwait(false);
                 await outputFile.WriteLineAsync("| -----------| -----------| -----------|").ConfigureAwait(false);
-                    
+
                 await @enum.DrawEnum(outputFile).ConfigureAwait(false);
             }
         }
@@ -88,42 +94,44 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath,
-        CkModelId ckModelId, string? versionNumber, string directoryPath)
+    public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
+        string directoryPath)
     {
-        var records = GetValues.GetRecords(modelGraph)
-            .Where(record => MatchesModelId(record, ckModelId));
+        var records = GetValues.GetRecords(modelGraph).Where(record => MatchesModelId(record, ckModelId));
 
         if (records.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
+#if NETSTANDARD2_0
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
-            
+#else
+            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Records"));
+#endif
+
             //Newline to fix acorn issue in Docusaurus
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            
+
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
-            
-            
 
             foreach (var record in GetValues.GetRecords(modelGraph))
             {
                 if (!MatchesModelId(record, ckModelId)) continue;
-                
+
                 await AddTitle(outputFile, null, record.CkRecordId.Key.SemanticVersionedFullName).ConfigureAwait(false);
 
                 await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
-                
+
                 await outputFile.WriteLineAsync(
-                    $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
-                    $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |").ConfigureAwait(false);
-                await outputFile.WriteLineAsync("|  -----------| -----------| -----------| -----------|" +
-                                                " ----------- |").ConfigureAwait(false);
-                    
+                        $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
+                        $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |")
+                    .ConfigureAwait(false);
+                await outputFile.WriteLineAsync("|  -----------| -----------| -----------| -----------| ----------- |")
+                    .ConfigureAwait(false);
+
                 await record.DrawRecord(outputFile).ConfigureAwait(false);
             }
         }
@@ -133,21 +141,24 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph,
-        string documentPath, CkModelId ckModelId, string? versionNumber, string directoryPath)
+    public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
+        string directoryPath)
     {
-        var typeGraphs = GetValues.GetTypes(modelGraph)
-            .Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
+        var typeGraphs = GetValues.GetTypes(modelGraph).Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
         if (typeGraphs.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
 
+#if NETSTANDARD2_0
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
-            
+#else
+            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Types"));
+#endif
+
             //Newline to fix acorn issue in Docusaurus
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            
+
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
@@ -160,46 +171,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
                 await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION").ConfigureAwait(false);
 
-                if (type.DefinedAttributes.Count != 0)
-                {
-                    await outputFile.WriteLineAsync(
-                        $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} |" +
-                        $" {Text.IsOptional} |").ConfigureAwait(false);
-                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
+                await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
 
-                    foreach (var attribute in type.DefinedAttributes)
-                    {
-                        await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
-                    }
-                }
-
-                //For Drawing all Associations that are associated with type
-                if (type.Associations.DefinedAssociations.Count == 0) continue;
-                var tableBuilt = false;
-
-                foreach (var association in type.Associations.Out.Owned)
-                {
-                    foreach (var item in GetValues.GetAssociationRoles(modelGraph))
-                    {
-                        if (association.CkRoleId != item.CkRoleId) continue;
-                        if (!tableBuilt)
-                        {
-                            await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
-                                true).ConfigureAwait(false);
-
-                            await outputFile.WriteLineAsync(
-                                $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                                $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}|" +
-                                $" {Text.TargetAttributes}|").ConfigureAwait(false);
-                            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                                            " -----------| -----------| ----------- |").ConfigureAwait(false);
-                            tableBuilt = true;
-                        }
-
-                        await item.DrawAssociationRole(outputFile, association,
-                            directoryPath, linkHelpers).ConfigureAwait(false);
-                    }
-                }
+                await GenerateTypesAttributesTable(modelGraph, directoryPath, type, outputFile).ConfigureAwait(false);
             }
         }
         else
@@ -208,10 +182,57 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph,
-        string documentPath, CkModelId ckModelId, string? versionNumber, string directoryPath)
+    private async Task DrawTypeTables(string directoryPath, CkTypeGraph type, StreamWriter outputFile)
     {
-        
+        if (type.DefinedAttributes.Count != 0)
+        {
+            await outputFile.WriteLineAsync(
+                    $"| {Text.ID} | {Text.AutoCompleteValues} | {Text.AutoIncrementReference} |" + $" {Text.IsOptional} |")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| ----------- |").ConfigureAwait(false);
+
+            foreach (var attribute in type.DefinedAttributes)
+            {
+                await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
+            }
+        }
+    }
+
+    private async Task GenerateTypesAttributesTable(CkModelGraph modelGraph, string directoryPath, CkTypeGraph type,
+        StreamWriter outputFile)
+    {
+        //For Drawing all Associations that are associated with type
+        if (type.Associations.DefinedAssociations.Count == 0) return;
+        var tableBuilt = false;
+
+        foreach (var association in type.Associations.Out.Owned)
+        {
+            foreach (var item in GetValues.GetAssociationRoles(modelGraph))
+            {
+                if (association.CkRoleId != item.CkRoleId) continue;
+                if (!tableBuilt)
+                {
+                    await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", true)
+                        .ConfigureAwait(false);
+
+                    await outputFile.WriteLineAsync(
+                            $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                            $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}|" + $" {Text.TargetAttributes}|")
+                        .ConfigureAwait(false);
+                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                                    " -----------| -----------| ----------- |")
+                        .ConfigureAwait(false);
+                    tableBuilt = true;
+                }
+
+                await item.DrawAssociationRole(outputFile, association, directoryPath, linkHelpers).ConfigureAwait(false);
+            }
+        }
+    }
+
+    public async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
+        string? versionNumber, string directoryPath)
+    {
         // Check if there are any association roles to draw before proceeding
         var associationRoles = GetValues.GetAssociationRoles(modelGraph)
             .Where(associationRole => MatchesModelId(associationRole, ckModelId));
@@ -220,22 +241,28 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         if (ckAssociationRoleGraphs.Length != 0)
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
+#if NETSTANDARD2_0
             using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
+#else
+            await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Associations"));
+#endif
 
             //Newline to fix acorn issue in Docusaurus
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            
+
             if (versionNumber != null)
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
-            
+
             await outputFile.WriteLineAsync(
-                $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
-                $" {Text.TargetCKTypeID}| {Text.TargetAttributes}|").ConfigureAwait(false);
+                    $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                    $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
+                    $" {Text.TargetCKTypeID}| {Text.TargetAttributes}|")
+                .ConfigureAwait(false);
             await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                            " -----------| -----------| ----------- |").ConfigureAwait(false);
+                                            " -----------| -----------| ----------- |")
+                .ConfigureAwait(false);
 
             foreach (var associationRole in ckAssociationRoleGraphs)
             {
@@ -251,16 +278,20 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId, string? versionNumber, string directoryPath)
     {
         directoryTools.BuildDirectory(docPath, ckModelId);
+#if NETSTANDARD2_0
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
+#else
+        await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(docPath, ckModelId, "VersionHistory"));
+#endif
 
         //Newline to fix acorn issue in Docusaurus
         await outputFile.WriteLineAsync().ConfigureAwait(false);
-        
+
         if (versionNumber != null)
         {
             await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
         }
-        
+
         await outputFile.WriteLineAsync($"| {Text.Version} | {Text.Description} |").ConfigureAwait(false);
         await outputFile.WriteLineAsync("| -----------| -----------|").ConfigureAwait(false);
     }

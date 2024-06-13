@@ -186,6 +186,24 @@ namespace Meshmakers.Octo.ConstructionKit.Engine {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Document path cannot be empty..
+        /// </summary>
+        internal static string LinkHelpers_GetGeneratedFilePath_Document_path_cannot_be_empty {
+            get {
+                return ResourceManager.GetString("LinkHelpers_GetGeneratedFilePath_Document_path_cannot_be_empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Extension cannot be empty..
+        /// </summary>
+        internal static string LinkHelpers_GetGeneratedFilePath_Extension_cannot_be_empty {
+            get {
+                return ResourceManager.GetString("LinkHelpers_GetGeneratedFilePath_Extension_cannot_be_empty", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Outbound Multiplicity.
         /// </summary>
         internal static string OutboundMultiplicity {

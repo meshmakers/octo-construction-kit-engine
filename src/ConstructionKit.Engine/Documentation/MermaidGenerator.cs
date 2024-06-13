@@ -1,5 +1,4 @@
-﻿using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations.GenerateDocsTools;
-using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
@@ -11,8 +10,12 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
         string directoryPath)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
-
+#if NETSTANDARD2_0
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
+#else
+        await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
+#endif
+        
         
         
         
@@ -66,7 +69,12 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
     //For Library Use
     public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string outputPath)
     {
+#if NETSTANDARD2_0
         using StreamWriter outputFile = new(outputPath);
+#else
+        await using StreamWriter outputFile = new(outputPath);
+#endif
+        
 
         await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
         

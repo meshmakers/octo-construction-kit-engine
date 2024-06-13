@@ -48,7 +48,7 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_modelSourcePathArg);
         var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_destinationPathArg);
-        //If directory changes alter this variable!
+        //If directory changes alter this variable to match top level docusaurus folder!
         const string directoryPath = "/docs/technologyGuide/constructionKits/";
 
         var versionNumber = CommandArgumentValue.GetArgumentScalarValue<string>(_versionNumberArg);

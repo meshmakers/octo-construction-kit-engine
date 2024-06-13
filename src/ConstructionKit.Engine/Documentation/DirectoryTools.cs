@@ -24,20 +24,4 @@ internal class DirectoryTools(ILogger<DirectoryTools> logger, ILinkHelpers linkH
             logger.LogError("Error Creating Directory: {ex}", ex.ToString());
         }
     }
-
-    public string GetRelativeDestinationDirectory(string directoryPath)
-    {
-        string directoryName;
-        
-        try
-        { 
-            directoryName = Path.GetFileName(directoryPath);
-        }
-        catch (ArgumentException e)
-        {
-            logger.LogError("Invalid Characters in Path: {e}", e.ToString());
-            throw;
-        }
-        return "/" + directoryName;
-    }
 }

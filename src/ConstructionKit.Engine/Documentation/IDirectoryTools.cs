@@ -13,11 +13,4 @@ public interface IDirectoryTools
     /// <param name="documentPath">Determines where new directory is built</param>
     /// <param name="ckModelId">Determines file tree of directory</param>
     void BuildDirectory(string documentPath, CkModelId ckModelId);
-    
-    /// <summary>
-    /// Gets the relative directory of a given path
-    /// </summary>
-    /// <param name="directoryPath">Path that the relative directory is built from</param>
-    /// <returns></returns>
-    string GetRelativeDestinationDirectory(string directoryPath);
 }

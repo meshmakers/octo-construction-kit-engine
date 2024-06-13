@@ -7,10 +7,10 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers linkHelpers) : IMermaidGenerator
 {
     
-    public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber)
+    public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
+        string directoryPath)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
-        var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
 
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
         
@@ -38,19 +38,19 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
         await GenerateMermaidHeading(ckModelId.SemanticVersionedFullName, outputFile).ConfigureAwait(false);
 
         //Prints Class and Defined Attributes of Each Type if there is any
-        await GenerateMermaidDiagram(modelGraph, documentPath, ckModelId, outputFile).ConfigureAwait(false);
+        await GenerateMermaidDiagram(modelGraph, documentPath, ckModelId, outputFile, directoryPath).ConfigureAwait(false);
 
         //final line to end mermaid code block
         await EndDiagram(outputFile).ConfigureAwait(false);
 
-        await LinkToVersionHistory(outputFile, baseRelativePath).ConfigureAwait(false);
+        await LinkToVersionHistory(outputFile, directoryPath).ConfigureAwait(false);
     }
     
-    public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, StreamWriter outputFile)
+    public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, StreamWriter outputFile,
+        string directoryPath)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
-        var baseRelativePath = directoryTools.GetRelativeDestinationDirectory(documentPath);
-        
+
         await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
         
         foreach (var type in GetValues.GetTypes(modelGraph))
@@ -58,7 +58,7 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
             await type.DrawClass(outputFile).ConfigureAwait(false);
             await type.DrawInheritance(outputFile).ConfigureAwait(false);
             await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value)).ConfigureAwait(false);
-            await type.LinkToType(outputFile, baseRelativePath, linkHelpers).ConfigureAwait(false);
+            await type.LinkToType(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
             await type.DrawNamespaces(outputFile).ConfigureAwait(false);
         }
     }

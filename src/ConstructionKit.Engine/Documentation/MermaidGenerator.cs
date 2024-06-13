@@ -14,11 +14,17 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "index"));
         
-        //Newline to fix acorn issue in Docusaurus
-        await outputFile.WriteLineAsync().ConfigureAwait(false);
+        
         
         //Create Page Heading
         var split = ckModelId.SemanticVersionedFullName.Split('.');
+        
+        //Newline to fix acorn issue in Docusaurus
+        await outputFile.WriteLineAsync("---").ConfigureAwait(false);
+        await outputFile.WriteLineAsync($"title: {split.Last()}").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("---").ConfigureAwait(false);
+        await outputFile.WriteLineAsync().ConfigureAwait(false);
+        
         await outputFile.WriteLineAsync($"# {split.Last()}").ConfigureAwait(false);
         await outputFile.WriteLineAsync().ConfigureAwait(false);
         

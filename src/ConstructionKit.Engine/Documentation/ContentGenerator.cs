@@ -301,6 +301,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
     internal static async Task AddVersionInfo(StreamWriter outputFile, string versionNumber)
     {
-        await outputFile.WriteLineAsync($"#### Version: {versionNumber}").ConfigureAwait(false);
+        await outputFile.WriteLineAsync($"<span class=\"badge badge--secondary\">Version: {versionNumber}</span>").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("<p></p>").ConfigureAwait(false);
     }
 }

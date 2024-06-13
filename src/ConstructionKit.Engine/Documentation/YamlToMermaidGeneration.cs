@@ -33,7 +33,12 @@ public class YamlToMermaidGeneration
     /// <param name="outputPath">Path where File will be saved, include extension e.g. "diagram.txt"</param>
     public async Task YamlToMermaid(string filePath, string outputPath)
         {
-        using var stream = File.OpenRead(filePath);
+#if NETSTANDARD2_0
+            using var stream = File.OpenRead(filePath);
+#else
+            await using var stream = File.OpenRead(filePath);
+#endif
+        
 
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
         var compiledModelRoot = await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult).ConfigureAwait(false);

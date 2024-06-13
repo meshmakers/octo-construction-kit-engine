@@ -78,4 +78,10 @@
     <data name="CKAttributeID" xml:space="preserve">
         <value>CKAttributeID</value>
     </data>
+    <data name="LinkHelpers_GetGeneratedFilePath_Document_path_cannot_be_empty" xml:space="preserve">
+        <value>Document path cannot be empty.</value>
+    </data>
+    <data name="LinkHelpers_GetGeneratedFilePath_Extension_cannot_be_empty" xml:space="preserve">
+        <value>Extension cannot be empty.</value>
+    </data>
 </root>

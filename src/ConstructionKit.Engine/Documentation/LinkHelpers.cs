@@ -7,6 +7,15 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation
 
         public string GetGeneratedFilePath(string docPath, CkModelId modelId, string extension)
         {
+            if (string.IsNullOrEmpty(docPath))
+            {
+                throw new ArgumentException(Text.LinkHelpers_GetGeneratedFilePath_Document_path_cannot_be_empty, nameof(docPath));
+            }
+
+            if (string.IsNullOrEmpty(extension))
+            {
+                throw new ArgumentException(Text.LinkHelpers_GetGeneratedFilePath_Extension_cannot_be_empty, nameof(extension));
+            }
             return Path.Combine(BuildFilepath(docPath, modelId), $"{extension}.md");
         }
 

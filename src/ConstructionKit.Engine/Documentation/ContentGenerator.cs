@@ -31,21 +31,26 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             {
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
-
-            await outputFile.WriteLineAsync(
-                    $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
-                    $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
-                .ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
-                .ConfigureAwait(false);
+            
 
             //Checks for If the Attributes Model ID is the Same as the one that was given
             foreach (var attribute in GetValues.GetAttributes(modelGraph))
             {
-                if (MatchesModelId(attribute, ckModelId))
+                if (!MatchesModelId(attribute, ckModelId)) continue;
+                
+                if (attribute.Description != null)
                 {
-                    await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
+                    await TextWrapper.AddDescription(outputFile, attribute.Description).ConfigureAwait(false);
                 }
+                
+                await outputFile.WriteLineAsync(
+                        $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
+                        $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
+                    .ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
+                    .ConfigureAwait(false);
+                    
+                await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
             }
         }
         else
@@ -81,6 +86,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 if (!MatchesModelId(@enum, ckModelId)) continue;
                 await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
 
+                if (@enum.Description != null)
+                {
+                    await TextWrapper.AddDescription(outputFile, @enum.Description).ConfigureAwait(false);
+                }
+                
                 await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |").ConfigureAwait(false);
                 await outputFile.WriteLineAsync("| -----------| -----------| -----------|").ConfigureAwait(false);
 
@@ -124,6 +134,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
                 await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
 
+                if (record.Description != null)
+                {
+                    await TextWrapper.AddDescription(outputFile, record.Description).ConfigureAwait(false);
+                }
+                
                 await outputFile.WriteLineAsync(
                         $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
                         $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |")
@@ -168,8 +183,11 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 if (!MatchesModelId(type, ckModelId)) continue;
                 await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
                 await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
-                await TextWrapper.AddDescription(outputFile, "SAMPLE DESCRIPTION").ConfigureAwait(false);
-
+                if (type.Description != null)
+                {
+                    await TextWrapper.AddDescription(outputFile, type.Description).ConfigureAwait(false);
+                }
+                
                 await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
 
                 await GenerateTypesAttributesTable(modelGraph, directoryPath, type, outputFile).ConfigureAwait(false);
@@ -254,17 +272,22 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            await outputFile.WriteLineAsync(
-                    $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                    $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
-                    $" {Text.TargetCKTypeID}| {Text.TargetAttributes}|")
-                .ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                            " -----------| -----------| ----------- |")
-                .ConfigureAwait(false);
-
             foreach (var associationRole in ckAssociationRoleGraphs)
             {
+                if (associationRole.Description != null)
+                {
+                    await TextWrapper.AddDescription(outputFile, associationRole.Description).ConfigureAwait(false);
+                }
+                
+                await outputFile.WriteLineAsync(
+                        $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
+                        $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +
+                        $" {Text.TargetCKTypeID}| {Text.TargetAttributes}|")
+                    .ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                                " -----------| -----------| ----------- |")
+                    .ConfigureAwait(false);
+                
                 await associationRole.DrawAssociationRole(outputFile, null, directoryPath, linkHelpers).ConfigureAwait(false);
             }
         }

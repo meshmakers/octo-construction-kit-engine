@@ -32,30 +32,35 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
             
-
-            //Checks for If the Attributes Model ID is the Same as the one that was given
-            foreach (var attribute in GetValues.GetAttributes(modelGraph))
-            {
-                if (!MatchesModelId(attribute, ckModelId)) continue;
-                
-                if (attribute.Description != null)
-                {
-                    await TextWrapper.AddDescription(outputFile, attribute.Description).ConfigureAwait(false);
-                }
-                
-                await outputFile.WriteLineAsync(
-                        $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
-                        $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
-                    .ConfigureAwait(false);
-                await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
-                    .ConfigureAwait(false);
-                    
-                await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
-            }
+            await DrawAttributeTables(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
         }
         else
         {
             logger.LogDebug("No Attributes to draw for model ID: {ckModelId}", ckModelId);
+        }
+    }
+
+    private async Task DrawAttributeTables(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
+    {
+        
+        foreach (var attribute in GetValues.GetAttributes(modelGraph))
+        {
+            //Checks for If the Attributes Model ID is the Same as the one that was given
+            if (!MatchesModelId(attribute, ckModelId)) continue;
+                
+            if (attribute.Description != null)
+            {
+                await TextWrapper.AddDescription(outputFile, attribute.Description).ConfigureAwait(false);
+            }
+                
+            await outputFile.WriteLineAsync(
+                    $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
+                    $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
+                .ConfigureAwait(false);
+                    
+            await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);
         }
     }
 
@@ -81,25 +86,30 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            foreach (var @enum in GetValues.GetEnums(modelGraph))
-            {
-                if (!MatchesModelId(@enum, ckModelId)) continue;
-                await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
-
-                if (@enum.Description != null)
-                {
-                    await TextWrapper.AddDescription(outputFile, @enum.Description).ConfigureAwait(false);
-                }
-                
-                await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |").ConfigureAwait(false);
-                await outputFile.WriteLineAsync("| -----------| -----------| -----------|").ConfigureAwait(false);
-
-                await @enum.DrawEnum(outputFile).ConfigureAwait(false);
-            }
+            await DrawEnumTables(modelGraph, ckModelId, outputFile).ConfigureAwait(false);
         }
         else
         {
             logger.LogDebug("No Enums to draw for model ID: {ckModelId}", ckModelId);
+        }
+    }
+
+    private static async Task DrawEnumTables(CkModelGraph modelGraph, CkModelId ckModelId, StreamWriter outputFile)
+    {
+        foreach (var @enum in GetValues.GetEnums(modelGraph))
+        {
+            if (!MatchesModelId(@enum, ckModelId)) continue;
+            await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+
+            if (@enum.Description != null)
+            {
+                await TextWrapper.AddDescription(outputFile, @enum.Description).ConfigureAwait(false);
+            }
+                
+            await outputFile.WriteLineAsync($"|  {Text.ID} | {Text.Values} | {Text.Descriptions} |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------|").ConfigureAwait(false);
+
+            await @enum.DrawEnum(outputFile).ConfigureAwait(false);
         }
     }
 
@@ -126,32 +136,37 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            foreach (var record in GetValues.GetRecords(modelGraph))
-            {
-                if (!MatchesModelId(record, ckModelId)) continue;
-
-                await AddTitle(outputFile, null, record.CkRecordId.Key.SemanticVersionedFullName).ConfigureAwait(false);
-
-                await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
-
-                if (record.Description != null)
-                {
-                    await TextWrapper.AddDescription(outputFile, record.Description).ConfigureAwait(false);
-                }
-                
-                await outputFile.WriteLineAsync(
-                        $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
-                        $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |")
-                    .ConfigureAwait(false);
-                await outputFile.WriteLineAsync("|  -----------| -----------| -----------| -----------| ----------- |")
-                    .ConfigureAwait(false);
-
-                await record.DrawRecord(outputFile).ConfigureAwait(false);
-            }
+            await DrawRecordTables(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
         }
         else
         {
             logger.LogDebug("No Records to draw for model ID: {ckModelId}", ckModelId);
+        }
+    }
+
+    private async Task DrawRecordTables(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
+    {
+        foreach (var record in GetValues.GetRecords(modelGraph))
+        {
+            if (!MatchesModelId(record, ckModelId)) continue;
+
+            await AddTitle(outputFile, null, record.CkRecordId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+
+            await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
+
+            if (record.Description != null)
+            {
+                await TextWrapper.AddDescription(outputFile, record.Description).ConfigureAwait(false);
+            }
+                
+            await outputFile.WriteLineAsync(
+                    $"| {Text.DefinedAttributes} | {Text.IsOptional} | {Text.AutoIncrementReference} |" +
+                    $" {Text.AutoCompleteValues} | {Text.CKAttributeID} |")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("|  -----------| -----------| -----------| -----------| ----------- |")
+                .ConfigureAwait(false);
+
+            await record.DrawRecord(outputFile).ConfigureAwait(false);
         }
     }
 
@@ -178,24 +193,29 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            foreach (var type in GetValues.GetTypes(modelGraph))
-            {
-                if (!MatchesModelId(type, ckModelId)) continue;
-                await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
-                await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
-                if (type.Description != null)
-                {
-                    await TextWrapper.AddDescription(outputFile, type.Description).ConfigureAwait(false);
-                }
-                
-                await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
-
-                await GenerateTypesAttributesTable(modelGraph, directoryPath, type, outputFile).ConfigureAwait(false);
-            }
+            await DrawTypeEntry(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
         }
         else
         {
             logger.LogDebug("No Types to draw for model ID: {ckModelId}", ckModelId);
+        }
+    }
+
+    private async Task DrawTypeEntry(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
+    {
+        foreach (var type in GetValues.GetTypes(modelGraph))
+        {
+            if (!MatchesModelId(type, ckModelId)) continue;
+            await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+            await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
+            if (type.Description != null)
+            {
+                await TextWrapper.AddDescription(outputFile, type.Description).ConfigureAwait(false);
+            }
+                
+            await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
+
+            await GenerateTypesAttributesTable(modelGraph, directoryPath, type, outputFile).ConfigureAwait(false);
         }
     }
 
@@ -231,7 +251,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 {
                     await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations", true)
                         .ConfigureAwait(false);
-
+                    
+                    //Description not yet implemented!
+                    
                     await outputFile.WriteLineAsync(
                             $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
                             $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}|" + $" {Text.TargetAttributes}|")

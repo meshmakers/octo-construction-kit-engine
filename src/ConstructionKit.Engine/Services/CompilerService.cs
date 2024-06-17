@@ -228,6 +228,7 @@ public class CompilerService : ICompilerService
                             var ckCompiledTypeDto = new CkCompiledTypeDto
                             {
                                 TypeId = ckTypeDto.TypeId,
+                                Description = ckTypeDto.Description,
                                 DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId,
                                 Associations = ckTypeDto.Associations,
                                 Attributes = ckTypeDto.Attributes,
@@ -403,6 +404,7 @@ public class CompilerService : ICompilerService
         {
             ModelId = ckMetaDto.ModelId,
             Dependencies = ckMetaDto.Dependencies?.OrderBy(x=> x.ModelId).ToList(),
+            Description = ckMetaDto.Description,
             Types = types.Values.OrderBy(x=> x.TypeId).ToList(),
             Attributes = attributes.OrderBy(x=> x.AttributeId).ToList(),
             AssociationRoles = associationRoles.OrderBy(x=> x.AssociationRoleId).ToList(),

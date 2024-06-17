@@ -211,6 +211,7 @@ public class CkModelGraph
     public void AppendModel(CkCompiledModelRoot ckCompiledModelRoot)
     {
         _dependencies.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Dependencies ?? new List<CkModelId>());
+        _models.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot);
 
         if (ckCompiledModelRoot.Attributes != null)
         {

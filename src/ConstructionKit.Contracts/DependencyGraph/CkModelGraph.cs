@@ -203,6 +203,28 @@ public class CkModelGraph
         _enums.Add(ckEnumId, ckEnumGraph);
         return ckEnumGraph;
     }
+    
+    /// <summary>
+    /// Gets or creates a new model.
+    /// </summary>
+    /// <param name="ckModelId"></param>
+    /// <param name="description"></param>
+    /// <returns></returns>
+    public CkModelPropertiesDto GetOrCreateModel(CkModelId ckModelId, string? description)
+    {
+        if (_models.TryGetValue(ckModelId, out var ckModelPropertiesDto))
+        {
+            return ckModelPropertiesDto;
+        }
+
+        ckModelPropertiesDto = new CkModelPropertiesDto
+        {
+            ModelId = ckModelId,
+            Description = description
+        };
+        _models.Add(ckModelId, ckModelPropertiesDto);
+        return ckModelPropertiesDto;
+    }
 
     /// <summary>
     ///     Appends the model elements of the given <paramref name="ckCompiledModelRoot" /> to this instance.
@@ -211,7 +233,7 @@ public class CkModelGraph
     public void AppendModel(CkCompiledModelRoot ckCompiledModelRoot)
     {
         _dependencies.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Dependencies ?? new List<CkModelId>());
-        _models.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot);
+        GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
 
         if (ckCompiledModelRoot.Attributes != null)
         {

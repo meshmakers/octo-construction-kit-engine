@@ -55,7 +55,7 @@ public class CkCompiledModelRoot : CkMetaRootDto
     public List<CkRecordDto>? Records { get; set; }
 
     /// <summary>
-    ///     Returns enums of the model that are used for enum attributes
+    ///     Returns enums of the model used for enum attributes
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]

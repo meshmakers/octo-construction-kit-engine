@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <summary>
 /// Represents the properties of a CK model
 /// </summary>
-public abstract class CkModelPropertiesDto
+public class CkModelPropertiesDto
 {
     /// <summary>
     ///     Gets or sets the model id.

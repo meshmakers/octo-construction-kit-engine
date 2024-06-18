@@ -79,6 +79,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         {
             var task = Task.Run(async () =>
             {
+                Log.LogMessage(MessageImportance.High, "Using construction kit compiler located at '{0}'",
+                    compilerService.GetType().Assembly.Location);
                 foreach (var constructionKitFolder in ConstructionKitFolders)
                 {
                     var operationResult = new OperationResult();

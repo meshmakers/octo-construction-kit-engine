@@ -54,6 +54,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConstructionKit.Templates",
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConstructionKit.Compiler", "src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj", "{DE1E3BCC-2761-4384-97CF-81A2906A4C29}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ConstructionKit.Engine.SystemTests", "tests\ConstructionKit.Engine.SystemTests\ConstructionKit.Engine.SystemTests.csproj", "{CA10077F-46F5-4640-88A8-5AD02DA895A0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -151,6 +153,12 @@ Global
 		{DE1E3BCC-2761-4384-97CF-81A2906A4C29}.DebugL|Any CPU.Build.0 = DebugL|Any CPU
 		{DE1E3BCC-2761-4384-97CF-81A2906A4C29}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{DE1E3BCC-2761-4384-97CF-81A2906A4C29}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.DebugL|Any CPU.ActiveCfg = Debug|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.DebugL|Any CPU.Build.0 = Debug|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -171,6 +179,7 @@ Global
 		{85C7E016-83EE-4D57-A471-A7516707DBB7} = {F1C46494-17E7-4A51-8F48-92E61940FBCA}
 		{36C36BDE-4EC5-4835-9C18-62DE52166ACB} = {78EFC102-9ED6-4582-8C86-B613606EC6C3}
 		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {78EFC102-9ED6-4582-8C86-B613606EC6C3}
+		{CA10077F-46F5-4640-88A8-5AD02DA895A0} = {F1C46494-17E7-4A51-8F48-92E61940FBCA}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {FD6FC20C-884E-4863-A559-31860380F098}

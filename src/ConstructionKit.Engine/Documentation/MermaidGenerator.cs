@@ -7,7 +7,7 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 {
     
     public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
-        string directoryPath)
+        string linkPathRoot)
     {
         directoryTools.BuildDirectory(documentPath, ckModelId);
 #if NETSTANDARD2_0
@@ -43,12 +43,12 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
         await GenerateMermaidHeading(ckModelId.SemanticVersionedFullName, outputFile).ConfigureAwait(false);
 
         //Prints Class and Defined Attributes of Each Type if there is any
-        await GenerateMermaidDiagram(modelGraph, documentPath, ckModelId, outputFile, directoryPath).ConfigureAwait(false);
+        await GenerateMermaidDiagram(modelGraph, documentPath, ckModelId, outputFile, linkPathRoot).ConfigureAwait(false);
 
         //final line to end mermaid code block
         await EndDiagram(outputFile).ConfigureAwait(false);
 
-        await LinkToVersionHistory(outputFile, directoryPath).ConfigureAwait(false);
+        await LinkToVersionHistory(outputFile, linkPathRoot).ConfigureAwait(false);
     }
 
     private static string? GetModelDescription(CkModelGraph modelGraph, CkModelId ckModelId)

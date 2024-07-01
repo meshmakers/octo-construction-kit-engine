@@ -36,7 +36,9 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
             await ContentGenerator.AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
         }
 
-        await TextWrapper.AddDescription(outputFile, "DIAGRAM DESCRIPTION").ConfigureAwait(false);
+        var modelDescription = GetModelDescription(modelGraph, ckModelId);
+
+        if (modelDescription != null) await TextWrapper.AddDescription(outputFile, modelDescription).ConfigureAwait(false);
 
         await GenerateMermaidHeading(ckModelId.SemanticVersionedFullName, outputFile).ConfigureAwait(false);
 
@@ -48,7 +50,21 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         await LinkToVersionHistory(outputFile, directoryPath).ConfigureAwait(false);
     }
-    
+
+    private static string? GetModelDescription(CkModelGraph modelGraph, CkModelId ckModelId)
+    {
+        var modelDescription = "";
+        foreach (var model in modelGraph.Models)
+        {
+            if (model.Value.ModelId == ckModelId)
+            {
+                modelDescription = model.Value.Description;
+            }
+        }
+
+        return modelDescription;
+    }
+
     public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, StreamWriter outputFile,
         string directoryPath)
     {

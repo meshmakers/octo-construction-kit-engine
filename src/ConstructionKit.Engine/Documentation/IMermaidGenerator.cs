@@ -15,11 +15,11 @@ public interface IMermaidGenerator
     /// <param name="documentPath">Path where the generated Diagram is written</param>
     /// <param name="ckModelId">Used to determine position in file tree</param>
     /// <param name="versionNumber">Version of the Model used</param>
-    /// <param name="directoryPath"></param>
+    /// <param name="linkPathRoot"></param>
     /// ///
     /// <returns></returns>
     public Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber, 
-        string directoryPath);
+        string linkPathRoot);
 
     /// <summary>
     /// Generates Mermaid Diagram for given CkModelGraph

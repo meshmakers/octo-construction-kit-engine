@@ -10,7 +10,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     private readonly InheritanceHelpers _inheritanceHelpers = new(linkHelpers);
 
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
-        string? versionNumber, string directoryPath)
+        string? versionNumber, string linkPathRoot)
     {
         var attributes = modelGraph.GetAttributes().Where(attribute => MatchesModelId(attribute, ckModelId));
 
@@ -32,7 +32,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
             
-            await DrawAttributeTables(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
+            await DrawAttributeTables(modelGraph, ckModelId, linkPathRoot, outputFile).ConfigureAwait(false);
         }
         else
         {
@@ -65,7 +65,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
-        string directoryPath)
+        string linkPathRoot)
     {
         var enums = modelGraph.GetEnums().Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
@@ -114,7 +114,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
-        string directoryPath)
+        string linkPathRoot)
     {
         var records = modelGraph.GetRecords().Where(record => MatchesModelId(record, ckModelId));
 
@@ -136,7 +136,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            await DrawRecordTables(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
+            await DrawRecordTables(modelGraph, ckModelId, linkPathRoot, outputFile).ConfigureAwait(false);
         }
         else
         {
@@ -171,7 +171,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
-        string directoryPath)
+        string linkPathRoot)
     {
         var typeGraphs = modelGraph.GetTypes().Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
@@ -193,7 +193,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            await DrawTypeEntry(modelGraph, ckModelId, directoryPath, outputFile).ConfigureAwait(false);
+            await DrawTypeEntry(modelGraph, ckModelId, linkPathRoot, outputFile).ConfigureAwait(false);
         }
         else
         {
@@ -270,7 +270,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     }
 
     public async Task GenerateAssociationRolesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
-        string? versionNumber, string directoryPath)
+        string? versionNumber, string linkPathRoot)
     {
         // Check if there are any association roles to draw before proceeding
         var associationRoles = modelGraph.GetAssociationRoles()
@@ -310,7 +310,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                                                 " -----------| -----------| ----------- |")
                     .ConfigureAwait(false);
                 
-                await associationRole.DrawAssociationRole(outputFile, null, directoryPath, linkHelpers).ConfigureAwait(false);
+                await associationRole.DrawAssociationRole(outputFile, null, linkPathRoot, linkHelpers).ConfigureAwait(false);
             }
         }
         else
@@ -319,7 +319,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         }
     }
 
-    public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId, string? versionNumber, string directoryPath)
+    public async Task GenerateVersionHistory(string docPath, CkModelId ckModelId, string? versionNumber, string linkPathRoot)
     {
         directoryTools.BuildDirectory(docPath, ckModelId);
 #if NETSTANDARD2_0

@@ -255,4 +255,49 @@ public class CkModelGraph
             }
         }
     }
+    
+    /// <summary>
+    /// Gets all Types of a given ckModelGraph
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<CkTypeGraph> GetTypes()
+    {
+        return Types.Select(x => x.Value);
+    }
+
+    /// <summary>
+    /// Gets all Attributes of a given ckModelGraph
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<CkAttributeGraph> GetAttributes()
+    {
+        return Attributes.Select(x => x.Value);
+    }
+
+    /// <summary>
+    /// Gets all Enums of a given ckModelGraph
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<CkEnumGraph> GetEnums()
+    {
+        return Enums.Select(x => x.Value);
+    }
+
+    /// <summary>
+    /// Gets all Records of a given ckModelGraph
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<CkRecordGraph> GetRecords()
+    {
+        return Records.Select(x => x.Value);
+    }
+
+    /// <summary>
+    /// Gets all AssociationRoles of a given ckModelGraph
+    /// </summary>
+    /// <returns></returns>
+    public IEnumerable<CkAssociationRoleGraph> GetAssociationRoles()
+    {
+        return AssociationRoles.Select(x => x.Value);
+    }
 }

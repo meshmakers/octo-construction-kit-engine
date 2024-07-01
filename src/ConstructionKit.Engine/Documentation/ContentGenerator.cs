@@ -12,7 +12,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateAttributesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
         string? versionNumber, string directoryPath)
     {
-        var attributes = GetValues.GetAttributes(modelGraph).Where(attribute => MatchesModelId(attribute, ckModelId));
+        var attributes = modelGraph.GetAttributes().Where(attribute => MatchesModelId(attribute, ckModelId));
 
         if (attributes.Any())
         {
@@ -43,7 +43,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     private async Task DrawAttributeTables(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
     {
         
-        foreach (var attribute in GetValues.GetAttributes(modelGraph))
+        foreach (var attribute in modelGraph.GetAttributes())
         {
             //Checks for If the Attributes Model ID is the Same as the one that was given
             if (!MatchesModelId(attribute, ckModelId)) continue;
@@ -67,7 +67,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateEnumsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
         string directoryPath)
     {
-        var enums = GetValues.GetEnums(modelGraph).Where(en => MatchesModelId(en, ckModelId));
+        var enums = modelGraph.GetEnums().Where(en => MatchesModelId(en, ckModelId));
         if (enums.Any())
         {
             directoryTools.BuildDirectory(documentPath, ckModelId);
@@ -96,7 +96,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
     private static async Task DrawEnumTables(CkModelGraph modelGraph, CkModelId ckModelId, StreamWriter outputFile)
     {
-        foreach (var @enum in GetValues.GetEnums(modelGraph))
+        foreach (var @enum in modelGraph.GetEnums())
         {
             if (!MatchesModelId(@enum, ckModelId)) continue;
             await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
@@ -116,7 +116,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateRecordsMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
         string directoryPath)
     {
-        var records = GetValues.GetRecords(modelGraph).Where(record => MatchesModelId(record, ckModelId));
+        var records = modelGraph.GetRecords().Where(record => MatchesModelId(record, ckModelId));
 
         if (records.Any())
         {
@@ -146,7 +146,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
     private async Task DrawRecordTables(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
     {
-        foreach (var record in GetValues.GetRecords(modelGraph))
+        foreach (var record in modelGraph.GetRecords())
         {
             if (!MatchesModelId(record, ckModelId)) continue;
 
@@ -173,7 +173,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
     public async Task GenerateTypesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber,
         string directoryPath)
     {
-        var typeGraphs = GetValues.GetTypes(modelGraph).Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
+        var typeGraphs = modelGraph.GetTypes().Where(typeGraph => MatchesModelId(typeGraph, ckModelId));
 
         if (typeGraphs.Any())
         {
@@ -203,7 +203,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
     private async Task DrawTypeEntry(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath, StreamWriter outputFile)
     {
-        foreach (var type in GetValues.GetTypes(modelGraph))
+        foreach (var type in modelGraph.GetTypes())
         {
             if (!MatchesModelId(type, ckModelId)) continue;
             await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
@@ -244,7 +244,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
 
         foreach (var association in type.Associations.Out.Owned)
         {
-            foreach (var item in GetValues.GetAssociationRoles(modelGraph))
+            foreach (var item in modelGraph.GetAssociationRoles())
             {
                 if (association.CkRoleId != item.CkRoleId) continue;
                 if (!tableBuilt)
@@ -273,7 +273,7 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
         string? versionNumber, string directoryPath)
     {
         // Check if there are any association roles to draw before proceeding
-        var associationRoles = GetValues.GetAssociationRoles(modelGraph)
+        var associationRoles = modelGraph.GetAssociationRoles()
             .Where(associationRole => MatchesModelId(associationRole, ckModelId));
         var ckAssociationRoleGraphs = associationRoles as CkAssociationRoleGraph[] ?? associationRoles.ToArray();
 

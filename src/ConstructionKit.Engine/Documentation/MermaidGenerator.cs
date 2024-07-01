@@ -72,7 +72,7 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
         
-        foreach (var type in GetValues.GetTypes(modelGraph))
+        foreach (var type in modelGraph.GetTypes())
         {
             await type.DrawClass(outputFile).ConfigureAwait(false);
             await type.DrawInheritance(outputFile).ConfigureAwait(false);
@@ -94,7 +94,7 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
         
-        foreach (var type in GetValues.GetTypes(modelGraph))
+        foreach (var type in modelGraph.GetTypes())
         {
             await type.DrawClass(outputFile).ConfigureAwait(false);
             await type.DrawInheritance(outputFile).ConfigureAwait(false);

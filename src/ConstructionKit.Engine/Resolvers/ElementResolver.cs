@@ -16,6 +16,7 @@ internal class ElementResolver : IElementResolver
         OperationResult operationResult)
     {
         var ckModelGraph = new CkModelGraph();
+        ckModelGraph.GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
 
         if (ckCompiledModelRoot.Attributes != null)
         {
@@ -49,13 +50,13 @@ internal class ElementResolver : IElementResolver
                     ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.ToString());
                 }
 
-                if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId == null)
+                if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: null })
                 {
                     operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
                 
-                if (ckAttribute.ValueType == AttributeValueTypesDto.Enum && ckAttribute.ValueCkEnumId != null)
+                if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: not null })
                 {
                     ckAttribute.ValueCkEnumId = variableResolver.Resolve(ckAttribute.ValueCkEnumId.ToString());
                 }

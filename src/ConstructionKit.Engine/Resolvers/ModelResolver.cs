@@ -70,7 +70,7 @@ internal class ModelResolver : IModelResolver
         }
 
         // Before the checks, we need to build a cache of the model.
-        // We check if the can retrieve the model from one of the model repository sources (e.g. database).
+        // We check if they can retrieve the model from one of the model repository sources (e.g., database).
         // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {

@@ -30,6 +30,7 @@
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework)) -> $(OctoCkCompileOutputCompilerFolder)" />
+        <Message Importance="High" Text="Using construction kit compiler located at '$(MSBuildThisFileDirectory)'"/>
         <!--Calling our custom task-->
         <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" 
                    OutputPath="$(OctoCkCompileOutputCompilerFolder)"

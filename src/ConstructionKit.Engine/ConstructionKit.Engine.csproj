@@ -18,7 +18,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
         <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
-        <PackageReference Include="Octokit" Version="10.0.0" />
+        <PackageReference Include="Octokit" Version="13.0.0" />
     </ItemGroup>
     <ItemGroup>
         <None Update="Messages\MessageCodes.tt">

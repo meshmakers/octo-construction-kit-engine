@@ -2,6 +2,8 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -51,6 +53,18 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public string OutputPath { get; set; } = null!;
+    
+    /// <summary>
+    /// Gets or sets the Link path. Should Be the Root Directory of the Documentation
+    /// </summary>
+    [Required]
+    public string CkLinkPath { get; set; } = null!;
+    
+    /// <summary>
+    /// Gets or sets the Ck Version. The Version of the Ck that is generated 
+    /// </summary>
+    [Required]
+    public string CkVersion { get; set; } = null!;
 
     /// <summary>
     /// A list of compiled models that has been generated
@@ -139,7 +153,50 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                             if (GenerateCkDocumentation)
                             {
+                                services.AddDocumentationService();
+                                var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+                                var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
+                                var mermaidGenerator = serviceProvider.GetRequiredService<IMermaidGenerator>();
                                 
+                                
+                                Log.LogMessage(MessageImportance.High,
+                                    $"Generating construction kit model Documentation to {OutputPath}");
+#if NETSTANDARD2_0
+                                using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
+#else
+                                await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
+#endif
+
+                                var ckCompiledModelRoot =
+                                    await ckSerializer.DeserializeCompiledModelRootAsync(streamReader,
+                                        compileResult.CompiledModelFile,
+                                        operationResult);
+                                if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                                {
+                                    Log.LogError("Error loading model \'{FilePath}\'", compileResult.CompiledModelFile);
+                                    LogOperationResults(operationResult);
+                                    return;
+                                }
+                                
+                                var originFileResolver = new OriginFileResolver(compileResult.CompiledModelFile);
+                                var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot, originFileResolver, 
+                                    operationResult);
+                                
+                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                    CkLinkPath);
+                                await contentGenerator.GenerateVersionHistory(OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                    CkLinkPath);
+
+                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                    CkLinkPath);
+                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion,
+                                    CkLinkPath);
+                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                    CkLinkPath);
+                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                    CkLinkPath);
+                                await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, OutputPath,
+                                    ckCompiledModelRoot.ModelId, CkVersion, CkLinkPath);
                             }
                         }
 

@@ -95,13 +95,6 @@ internal static class Program
         services.AddTransient<ICommand, RestoreCommand>();
         services.AddTransient<ICommand, VersionCommand>();
         
-        // //GenerateDocsTools
-        // services.AddTransient<IDirectoryTools, DirectoryTools>();
-        // services.AddTransient<ILinkHelpers, LinkHelpers>();
-        //
-        // //GenerateDocsCommand
-        // services.AddTransient<IMermaidGenerator, MermaidGenerator>();
-        // services.AddTransient<IContentGenerator, ContentGenerator>();
         services.AddDocumentationService();
         
         

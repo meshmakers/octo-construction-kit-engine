@@ -55,6 +55,12 @@
         <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to repo $(OctoPublishCkModelRepo)"/>
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -rep $(OctoPublishCkModelRepo) -r">
         </Exec>
+        
+        <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
+                 Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>
+        <Exec Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" 
+              Command="$(OctoCompilerToolPath) -c generateDocs -f %(_CompiledModelFiles.Identity) -o $(OctoCkCompileOutputCompilerFolder) -l $(OctoCkLinkPath) -v $(OctoCkVersion)">
+        </Exec>
     </Target>
 
     <Target Name="CkRestore" BeforeTargets="BeforeBuild" 

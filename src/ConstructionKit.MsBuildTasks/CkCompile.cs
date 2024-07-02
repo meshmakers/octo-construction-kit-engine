@@ -39,6 +39,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public bool PublishCkModel { get; set; } = true;
+    
+    /// <summary>
+    /// When true, the compiled construction kit model is generated as .md files to the local repository
+    /// </summary>
+    [Required]
+    public bool GenerateCkDocumentation { get; set; } = true;
 
     /// <summary>
     /// Gets or sets the output path
@@ -129,6 +135,11 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     true);
                                 Log.LogMessage(MessageImportance.High,
                                     "Construction kit model published to 'LocalRepository'");
+                            }
+
+                            if (GenerateCkDocumentation)
+                            {
+                                
                             }
                         }
 

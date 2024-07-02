@@ -39,6 +39,11 @@
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>
         <OctoPublishCkModelRepo Condition="'$(OctoPublishCkModelRepo)' == ''">LocalRepository</OctoPublishCkModelRepo>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
+        <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
+    </PropertyGroup>
+    <PropertyGroup>
+        <OctoCkLinkPath>/docs/technologyGuide/constructionKits/</OctoCkLinkPath>
+        <OctoCkVersion>1.0</OctoCkVersion>
     </PropertyGroup>
 	
 

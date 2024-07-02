@@ -87,11 +87,17 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             loggingBuilder.SetMinimumLevel(LogLevel.Trace);
         });
         services.AddConstructionKit();
+        services.AddDocumentationService();
+        
         var serviceProvider = services.BuildServiceProvider();
 
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
         var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
         var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
+        
+        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+        var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
+        var mermaidGenerator = serviceProvider.GetRequiredService<IMermaidGenerator>();
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
@@ -153,12 +159,6 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                             if (GenerateCkDocumentation)
                             {
-                                services.AddDocumentationService();
-                                var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
-                                var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
-                                var mermaidGenerator = serviceProvider.GetRequiredService<IMermaidGenerator>();
-                                
-                                
                                 Log.LogMessage(MessageImportance.High,
                                     $"Generating construction kit model Documentation to {OutputPath}");
 #if NETSTANDARD2_0

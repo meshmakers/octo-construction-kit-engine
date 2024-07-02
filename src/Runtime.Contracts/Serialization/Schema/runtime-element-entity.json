@@ -45,8 +45,7 @@
       "additionalItems": false,
       "required": [
         "rtId",
-        "ckTypeId",
-        "attributes"
+        "ckTypeId"
       ]
     }
   }

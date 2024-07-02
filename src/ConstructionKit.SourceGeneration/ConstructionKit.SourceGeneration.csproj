@@ -53,6 +53,10 @@
       </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="bin\" />
+    </ItemGroup>
+
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
             <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->

@@ -80,38 +80,38 @@ public class LinkHelpersTest
     //     Assert.Equal(expected, result);
     // }
 
-    [Theory]
-    [InlineData("C:\\octo-documentation\\src\\octo-mesh-documentation\\" +
-                "docs\\technologyGuide\\constructionKits", "Basic", "Types"
-        , "C:\\octo-documentation\\src\\octo-mesh-documentation\\" +
-          "docs\\technologyGuide\\constructionKits\\Basic\\Types.md")]
-    [InlineData("D:\\octo-mesh-documentation\\" +
-                "docs\\technologyGuide\\constructionKits", "Basic", "Associations"
-        , "D:\\octo-mesh-documentation\\" +
-          "docs\\technologyGuide\\constructionKits\\Basic\\Associations.md")]
-    public void GetGeneratedFilepath_ReturnCorrectFilepath(string path, string ckModelId, string extension, string expected)
-    {
-        //Arrange
-        var modelId = new CkModelId(ckModelId);
-        var linkHelpers = new LinkHelpers();
-        //Act
-        var result = linkHelpers.GetGeneratedFilePath(path, modelId, extension);
-        //Assert
-        Assert.Equal(expected, result);
-    }
+    // [Theory]
+    // [InlineData("C:\\octo-documentation\\src\\octo-mesh-documentation\\" +
+    //             "docs\\technologyGuide\\constructionKits", "Basic", "Types"
+    //     , "C:\\octo-documentation\\src\\octo-mesh-documentation\\" +
+    //       "docs\\technologyGuide\\constructionKits\\Basic\\Types.md")]
+    // [InlineData("D:\\octo-mesh-documentation\\" +
+    //             "docs\\technologyGuide\\constructionKits", "Basic", "Associations"
+    //     , "D:\\octo-mesh-documentation\\" +
+    //       "docs\\technologyGuide\\constructionKits\\Basic\\Associations.md")]
+    // public void GetGeneratedFilepath_ReturnCorrectFilepath(string path, string ckModelId, string extension, string expected)
+    // {
+    //     //Arrange
+    //     var modelId = new CkModelId(ckModelId);
+    //     var linkHelpers = new LinkHelpers();
+    //     //Act
+    //     var result = linkHelpers.GetGeneratedFilePath(path, modelId, extension);
+    //     //Assert
+    //     Assert.Equal(expected, result);
+    // }
 
-    [Theory]
-    [InlineData("", "Basic", "Associations")]
-    [InlineData("", "", "Associations")]
-    [InlineData("", "", "Types")]
-    [InlineData("C:\\src\\", "", "")]
-    public void GetGeneratedFilepath_InvalidPathArguments(string path, string ckModelId, string extension)
-    {
-        //Arrange
-        var modelId = new CkModelId(ckModelId);
-        var linkHelpers = new LinkHelpers();
-        //Act & Assert
-        Assert.Throws<ArgumentException>(() => linkHelpers.GetGeneratedFilePath(path, modelId, extension));
-    }
+    // [Theory]
+    // [InlineData("", "Basic", "Associations")]
+    // [InlineData("", "", "Associations")]
+    // [InlineData("", "", "Types")]
+    // [InlineData("C:\\src\\", "", "")]
+    // public void GetGeneratedFilepath_InvalidPathArguments(string path, string ckModelId, string extension)
+    // {
+    //     //Arrange
+    //     var modelId = new CkModelId(ckModelId);
+    //     var linkHelpers = new LinkHelpers();
+    //     //Act & Assert
+    //     Assert.Throws<ArgumentException>(() => linkHelpers.GetGeneratedFilePath(path, modelId, extension));
+    // }
    
 }

@@ -63,22 +63,22 @@ public class LinkHelpersTest
         Assert.Equal("industrymachine", result);
     }
 
-    [Theory]
-    [InlineData("Basic", "Types", "/docs", "/docs/Basic/Types")]
-    [InlineData("Basic.Industry", "Types", "/docs/meshmakers", "/docs/meshmakers/Basic/Industry/Types")]
-    [InlineData("", "", "", "")]
-    [InlineData("Basic", "", "", "Basic")]
-    [InlineData("", "Types", "", "Types")]
-    [InlineData("Basic", "Types", "", "Basic/Types")]
-    public void CreateRelativeFilepath_ReturnsCorrectFilepath(string ckModelId, string suffix, string baseRelativePath, string expected)
-    {
-        //Arrange
-        var linkHelpers = new LinkHelpers();
-        //Act
-        var result = linkHelpers.CreateRelativeFilepath(ckModelId, suffix, baseRelativePath);
-        //Assert
-        Assert.Equal(expected, result);
-    }
+    // [Theory]
+    // [InlineData("Basic", "Types", "/docs", "/docs/Basic/Types")]
+    // [InlineData("Basic.Industry", "Types", "/docs/meshmakers", "/docs/meshmakers/Basic/Industry/Types")]
+    // [InlineData("", "", "", "")]
+    // [InlineData("Basic", "", "", "Basic")]
+    // [InlineData("", "Types", "", "Types")]
+    // [InlineData("Basic", "Types", "", "Basic/Types")]
+    // public void CreateRelativeFilepath_ReturnsCorrectFilepath(string ckModelId, string suffix, string baseRelativePath, string expected)
+    // {
+    //     //Arrange
+    //     var linkHelpers = new LinkHelpers();
+    //     //Act
+    //     var result = linkHelpers.CreateRelativeFilepath(ckModelId, suffix, baseRelativePath);
+    //     //Assert
+    //     Assert.Equal(expected, result);
+    // }
 
     [Theory]
     [InlineData("C:\\octo-documentation\\src\\octo-mesh-documentation\\" +

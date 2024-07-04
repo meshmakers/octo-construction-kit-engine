@@ -50,7 +50,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation
 
             var linkWithBackslash = Path.Combine(baseRelativePath, path, suffix);
             
-            return linkWithBackslash.Replace("\\", "/");
+            return linkWithBackslash.Replace(Path.DirectorySeparatorChar.ToString(), "/");
         }
 
         public string CreateRelativeFilepath(string ckModelId, string suffix, string baseRelativePath)

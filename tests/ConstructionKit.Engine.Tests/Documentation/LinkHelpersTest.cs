@@ -32,7 +32,7 @@ public class LinkHelpersTest
 
         // Assert
 
-        Assert.Equal("Basic\\Industry", result);
+        Assert.Equal(Path.Combine("Basic", "Industry"), result);
     }
     
     [Fact]

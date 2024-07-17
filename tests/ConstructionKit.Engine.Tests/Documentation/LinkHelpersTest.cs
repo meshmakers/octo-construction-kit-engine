@@ -79,9 +79,7 @@ public class LinkHelpersTest
         //Assert
         Assert.Equal(expected, result);
     }
-
-   
-    //fails because combining Windows Paths with other system specific paths
+    
     [Theory]
     [InlineData("octo-documentation/src", "Basic", "Types"
         , "octo-documentation/src/Basic/Types.md")]

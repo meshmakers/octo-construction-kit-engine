@@ -26,3 +26,31 @@ $outputPath = "$baseOutputPath/apiReference/Runtime.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
 mmxmldoc2md $sourcePath $outputPath --github-pages
+
+function callCompilerCommand {
+    param (
+        [string]$commandName,
+        [string]$sourcePath,
+        [string]$outputPath,
+        [string]$version,
+        [string]$linkPath
+    )
+    
+    Write-Host "Generating docs with the following parameters:"
+    Write-Host "Command Name: $commandName"
+    Write-Host "Source Path: $sourcePath"
+    Write-Host "Output Path: $outputPath"
+    Write-Host "Version: $version"
+    
+    # Call the specified command from the installed tool
+    Meshmakers.Octo.ConstructionKit.Compiler -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
+}
+
+# Calls the callCompilerCommand with the specified parameters
+$commandName = "generateDocs"
+# intended path?
+$sourcePath = Join-Path $modulePath "../../octo-construction-kit/src/constructionKits/Octo.Sdk.Packages.Basic/ConstructionKit/ckModel.yaml"
+$outputPath = "$baseOutputPath/technologyGuide/constructionKits"
+$version = "1.0"
+$linkPath = "/docs/technologyGuide/constructionKits/"
+callCompilerCommand -commandName $commandName -sourcePath $sourcePath -outputPath $outputPath -version $version -linkPath $linkPath

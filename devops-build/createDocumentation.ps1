@@ -1,7 +1,6 @@
 param ($configuration = "Release")
 
 dotnet tool update --global MMXMLDoc2Markdown
-dotnet tool update --global Meshmakers.Octo.ConstructionKit.Compiler
 
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $baseBinPath = Join-Path $modulePath "../bin/$configuration/net8.0"
@@ -44,7 +43,7 @@ function callCompilerCommand {
     Write-Host "Version: $version"
     
     # Call the specified command from the installed tool
-    Meshmakers.Octo.ConstructionKit.Compiler -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
+    & dotnet run --project ConstructionKit.Compiler -- -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
 }
 
 # Calls the callCompilerCommand with the specified parameters

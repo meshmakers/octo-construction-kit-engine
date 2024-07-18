@@ -46,7 +46,7 @@ function callCompilerCommand {
     Write-Host "Link Path: $linkPath"
     
     # Call the specified command from the installed tool
-    & dotnet run --project $projectPath -- -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
+    & $projectPath -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
 }
 
 # Calls the callCompilerCommand with the specified parameters

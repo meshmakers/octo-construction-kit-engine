@@ -27,7 +27,7 @@ $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
 mmxmldoc2md $sourcePath $outputPath --github-pages
 
-$projectPath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Compiler.dll"
+$projectPath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Engine.dll"
 
 function callCompilerCommand {
     param (

@@ -44,6 +44,7 @@ function callCompilerCommand {
     Write-Host "Output Path: $outputPath"
     Write-Host "Version: $version"
     Write-Host "Link Path: $linkPath"
+    Write-Host "TEMP MODULE PATH: $modulePath"
     
     # Call the specified command from the installed tool
     dotnet $projectPath -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
@@ -52,7 +53,7 @@ function callCompilerCommand {
 # Calls the callCompilerCommand with the specified parameters
 $commandName = "generateDocs"
 # intended path?
-$sourcePath = Join-Path $modulePath "../../octo-construction-kit/src/constructionKits/Octo.Sdk.Packages.Basic/ConstructionKit/ckModel.yaml"
+$sourcePath = Join-Path $modulePath "../octo-construction-kit/src/constructionKits/Octo.Sdk.Packages.Basic/ConstructionKit/ckModel.yaml"
 $outputPath = "$baseOutputPath/technologyGuide/constructionKits"
 $version = "1.0"
 $linkPath = "/docs/technologyGuide/constructionKits/"

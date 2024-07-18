@@ -53,7 +53,7 @@ function callCompilerCommand {
 # Calls the callCompilerCommand with the specified parameters
 $commandName = "generateDocs"
 # intended path?
-$sourcePath = Join-Path $modulePath "../octo-construction-kit/src/constructionKits/Octo.Sdk.Packages.Basic/ConstructionKit/ckModel.yaml"
+$sourcePath = "$baseBinPath/octo-ck-libraries/SystemCkModel/out/ck-system.yaml"
 $outputPath = "$baseOutputPath/technologyGuide/constructionKits"
 $version = "1.0"
 $linkPath = "/docs/technologyGuide/constructionKits/"

@@ -27,7 +27,7 @@ $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
 mmxmldoc2md $sourcePath $outputPath --github-pages
 
-$projectPath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Engine.dll"
+$projectPath = "$baseBinPath/publish/octo-ckc.dll"
 
 function callCompilerCommand {
     param (
@@ -46,7 +46,7 @@ function callCompilerCommand {
     Write-Host "Link Path: $linkPath"
     
     # Call the specified command from the installed tool
-    & $projectPath -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
+    dotnet $projectPath -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
 }
 
 # Calls the callCompilerCommand with the specified parameters

@@ -59,6 +59,6 @@ $version = "1.0"
 $linkPath = "/docs/technologyGuide/constructionKits/"
 callCompilerCommand -commandName $commandName -sourcePath $sourcePath -outputPath $outputPath -version $version -linkPath $linkPath
 
-Write-Host "Checking Available Directories in "$modulePath/..""
-cd "$modulePath/.."
+Write-Host "Checking Available Directories in "$baseBinPath/octo-ck-libraries""
+cd "$baseBinPath/octo-ck-libraries"
 ls

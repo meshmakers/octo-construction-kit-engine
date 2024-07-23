@@ -41,7 +41,7 @@ public class DefaultCrsNewtonsoftTests
         Assert.Equal(CRSType.Name, point.CRS.Type);
     }
 
-    [Fact(Skip = "As long as AB#1405 is not fixed, this test will fail.")]
+    [Fact]
     public void Can_Serialize_CRS_issue_89()
     {
         var expected =
@@ -54,7 +54,7 @@ public class DefaultCrsNewtonsoftTests
         Assert.Equal(expected, json);
     }
 
-    [Fact(Skip = "As long as AB#1405 is not fixed, this test will fail.")]
+    [Fact]
     public void Can_Serialize_DefaultCRS_issue_89()
     {
         var expected =

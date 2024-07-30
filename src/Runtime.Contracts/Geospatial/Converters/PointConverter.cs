@@ -17,7 +17,7 @@ internal class PointConverter : IYamlTypeConverter
         return typeof(Point).IsAssignableFrom(type);
     }
 
-    public object ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         IPosition? position = null;
         ICRSObject? crsObject = null;
@@ -29,7 +29,7 @@ internal class PointConverter : IYamlTypeConverter
             switch (propertyName.Value.ToPascalCase())
             {
                 case nameof(Point.Coordinates):
-                    position = (IPosition)_positionConverter.ReadYaml(parser, typeof(IPosition));
+                    position = (IPosition)_positionConverter.ReadYaml(parser, typeof(IPosition), rootDeserializer);
                     break;
                 case nameof(Point.Type):
                     var valueScalar = parser.Consume<Scalar>();
@@ -47,7 +47,7 @@ internal class PointConverter : IYamlTypeConverter
                 default:
                     if (propertyName.Value == "crs")
                     {
-                        crsObject = (ICRSObject?)_crsConverter.ReadYaml(parser, typeof(ICRSObject));
+                        crsObject = (ICRSObject?)_crsConverter.ReadYaml(parser, typeof(ICRSObject), rootDeserializer);
                     }
                     break;
             }
@@ -64,7 +64,7 @@ internal class PointConverter : IYamlTypeConverter
         };
     }
 
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         throw RuntimeModelParseException.NotImplemented();
     }

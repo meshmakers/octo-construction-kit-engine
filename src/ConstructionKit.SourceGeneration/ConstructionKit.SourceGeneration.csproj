@@ -19,7 +19,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.9.2" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.3.4" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" PrivateAssets="all"/>
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" PrivateAssets="all"/>
@@ -51,10 +51,6 @@
       <Content Update="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.targets">
         <PackagePath>build\</PackagePath>
       </Content>
-    </ItemGroup>
-
-    <ItemGroup>
-      <Folder Include="bin\" />
     </ItemGroup>
 
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">

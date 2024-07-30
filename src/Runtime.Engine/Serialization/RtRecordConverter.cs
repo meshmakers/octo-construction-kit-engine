@@ -22,7 +22,7 @@ internal class RtRecordConverter : IYamlTypeConverter
         return false;
     }
 
-    public object? ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         var rtRecord = new RtRecordDto();
 
@@ -74,7 +74,7 @@ internal class RtRecordConverter : IYamlTypeConverter
         return rtRecord;
     }
 
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         throw RuntimeModelParseException.NotImplemented();
     }

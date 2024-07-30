@@ -19,14 +19,14 @@ public class CkTypeIdConverter : JsonConverter<CkTypeId>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public object ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         var value = parser.Consume<Scalar>().Value;
         return new CkTypeId(value);
     }
 
     /// <inheritdoc />
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         var ckTypeId = (CkTypeId)value!;
         emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckTypeId.SemanticVersionedFullName, ScalarStyle.Any, true, false));

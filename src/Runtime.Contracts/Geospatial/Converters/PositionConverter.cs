@@ -105,7 +105,7 @@ public class PositionConverter : JsonConverter<IPosition>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public object ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         var coordinates = new List<double>();
 
@@ -126,7 +126,7 @@ public class PositionConverter : JsonConverter<IPosition>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         if (value is IPosition position)
         {

@@ -44,14 +44,14 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public object ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         var value = parser.Consume<Scalar>().Value;
         return new CkId<TKey>(value);
     }
 
     /// <inheritdoc />
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         var ckId = (CkId<TKey>)value!;
         emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckId.FullName, ScalarStyle.Any, true, false));

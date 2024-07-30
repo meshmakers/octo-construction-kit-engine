@@ -81,7 +81,7 @@ public class CrsConverter: JsonConverter<ICRSObject>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public object? ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         Dictionary<string, Scalar> properties = new();
         string? crsType = null;
@@ -135,7 +135,7 @@ public class CrsConverter: JsonConverter<ICRSObject>, IYamlTypeConverter
     }
 
     /// <inheritdoc />
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         if (value == null)
         {

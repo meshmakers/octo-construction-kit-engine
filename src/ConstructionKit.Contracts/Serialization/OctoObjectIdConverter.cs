@@ -18,14 +18,14 @@ public class OctoObjectIdConverter : JsonConverter<OctoObjectId>, IYamlTypeConve
     }
 
     /// <inheritdoc />
-    public object ReadYaml(IParser parser, Type type)
+    public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
         var value = parser.Consume<Scalar>().Value;
         return new OctoObjectId(value);
     }
 
     /// <inheritdoc />
-    public void WriteYaml(IEmitter emitter, object? value, Type type)
+    public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         var octoObjectId = (OctoObjectId)value!;
         emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, octoObjectId.ToString(), ScalarStyle.Any, true, false));

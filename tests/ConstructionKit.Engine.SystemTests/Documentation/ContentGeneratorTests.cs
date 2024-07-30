@@ -13,27 +13,14 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
     private async Task<(IContentGenerator contentGenerator, string rootPath, CkModelGraph resolvedTypes, CkModelId modelId)>
             SetupTestAsync(string relativePath)
         {
-            var currentDirectory = Directory.GetCurrentDirectory();
-
-            while (!currentDirectory.EndsWith("octo-construction-kit-engine"))
-            {
-                var parentDirectory = Directory.GetParent(currentDirectory);
-                if (parentDirectory == null)
-                {
-                    throw new DirectoryNotFoundException("The specified directory 'octo-construction-kit-engine' was not found in the path.");
-                }
-                currentDirectory = parentDirectory.FullName;
-            }
-
-            var path = Path.Combine(currentDirectory, relativePath);
-            await using var stream = File.OpenRead(path);
+            await using var stream = File.OpenRead(relativePath);
 
             await using var serviceProvider = fixture.Services.BuildServiceProvider();
 
             OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
             var ckYamlSerializer = serviceProvider.GetRequiredService<ICkYamlSerializer>();
-            var compiledModelRoot = await ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, path, operationResult);
-            var originFileResolver = new OriginFileResolver(path);
+            var compiledModelRoot = await ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, relativePath, operationResult);
+            var originFileResolver = new OriginFileResolver(relativePath);
             var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
             var resolvedTypes = await modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
@@ -48,7 +35,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateAttributesMarkdownTable_ShouldCreateAttributesFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
 
             // Act
@@ -64,7 +51,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateEnumsMarkdownTable_ShouldNOTCreateEnumsFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
 
             // Act
@@ -79,7 +66,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateRecordsMarkdownTable_ShouldNOTCreateRecordsFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
 
             // Act
@@ -94,7 +81,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateTypesMarkdownTable_ShouldCreateTypesFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
 
             // Act
@@ -110,7 +97,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateAssociationRolesMarkdownTable_ShouldCreateAssociationsFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
 
             // Act
@@ -126,7 +113,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         public async Task GenerateVersionHistory_ShouldCreateVersionHistoryFile()
         {
             // Arrange
-            const string relativePath = "tests\\TestCkModel\\CkTest\\ConstructionKit\\ckModel.yaml";
+            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
             var (contentGenerator, rootPath, _, modelId) = await SetupTestAsync(relativePath);
 
             // Act

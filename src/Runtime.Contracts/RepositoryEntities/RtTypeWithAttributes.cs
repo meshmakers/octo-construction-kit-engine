@@ -32,7 +32,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    ///     Returns an dictionary of attributes.
+    ///     Returns a dictionary of attributes.
     /// </summary>
     /// <remarks>
     ///     Vor getting/setting values use the GetAttribute/SetAttribute-Methods
@@ -47,7 +47,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the attribute value or the standard value if the attribute is not set.
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="standardValue"></param>
@@ -77,7 +77,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the attribute value or the default value if the attribute is not set.
-    ///     This methods allows nullable types
+    ///     This method allow nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -108,7 +108,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -140,7 +140,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <returns></returns>
@@ -171,7 +171,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -203,7 +203,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This methods allows nullable types
+    ///     This method allows nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -238,7 +238,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -273,7 +273,7 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Gets the value of an attribute when the value is a list
-    ///     This method allows non nullable types
+    ///     This method allows non-nullable types
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <returns></returns>
@@ -305,7 +305,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    ///     Gets the value of an attribute when the value is non nullable
+    ///     Gets the value of an attribute when the value is non-nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
@@ -356,7 +356,7 @@ public abstract class RtTypeWithAttributes
 
 
     /// <summary>
-    ///     Gets the value of an RtRecord attribute when the value is non nullable
+    ///     Gets the value of an RtRecord attribute when the value is non-nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -387,7 +387,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    ///     Gets the value of an RtRecord attribute when the value is non nullable
+    ///     Gets the value of an RtRecord attribute when the value is non-nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -468,7 +468,7 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
-    ///     Sets the value of an attribute when the value is non nullable
+    ///     Sets the value of an attribute when the value is non-nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="attributeValueTypes">Type of attribute value</param>

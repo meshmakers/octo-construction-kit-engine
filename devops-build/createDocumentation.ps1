@@ -55,7 +55,7 @@ $commandName = "generateDocs"
 # intended path?
 $sourcePath = "$baseBinPath/octo-ck-libraries/SystemCkModel/out/ck-system.yaml"
 $outputPath = "$baseOutputPath/technologyGuide/constructionKits"
-$version = "1.0"
+$version = $(MajorVersion).$(MinorVersion).0.0
 $linkPath = "/docs/technologyGuide/constructionKits/"
 callCompilerCommand -commandName $commandName -sourcePath $sourcePath -outputPath $outputPath -version $version -linkPath $linkPath
 

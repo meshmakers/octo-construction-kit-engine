@@ -79,7 +79,6 @@ public class LinkHelpersTest
         //Assert
         Assert.Equal(expected, result);
     }
-
     
     [Theory]
     [InlineData("octo-documentation/src", "Basic", "Types"

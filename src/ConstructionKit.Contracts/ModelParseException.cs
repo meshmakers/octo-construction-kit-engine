@@ -48,14 +48,9 @@ public class ModelParseException : CkModelException
         return new ModelParseException($"Value cannot be null or empty for element '{elementName}'.");
     }
 
-    internal static Exception CannotDeserializeModel(string filePath, OperationResult operationResult)
+    internal static Exception CannotDeserializeModel(string locationReference, OperationResult operationResult)
     {
-        return new ModelParseException($"File '{filePath}' contains invalid construction kit model.", operationResult);
-    }
-
-    internal static Exception CannotDeserializeModel(OperationResult operationResult)
-    {
-        return new ModelParseException("Stream contains invalid construction kit model.", operationResult);
+        return new ModelParseException($"Location '{locationReference}' contains invalid construction kit model.", operationResult);
     }
 
     internal static Exception SchemaValidationFailed(string locationReference, OperationResult operationResult)
@@ -63,27 +58,5 @@ public class ModelParseException : CkModelException
         return new ModelParseException(
             $"{locationReference}: Stream contains invalid construction kit model so that the schema validation failed.",
             operationResult);
-    }
-
-    internal static Exception CannotDeserializeRtModel(string filePath, OperationResult operationResult)
-    {
-        return new ModelParseException($"File '{filePath}' contains invalid runtime model.", operationResult);
-    }
-
-    internal static Exception CannotDeserializeModeByJsonString(string jsonString, OperationResult operationResult)
-    {
-        return new ModelParseException($"JSON string '{jsonString}' contains invalid construction kit model.",
-            operationResult);
-    }
-
-    internal static Exception CommonErrorReadCkModel(string filePath, Exception exception,
-        OperationResult operationResult)
-    {
-        return new ModelParseException($"File '{filePath}' cannot be read.", exception, operationResult);
-    }
-
-    internal static Exception CommonErrorReadRtModel(Exception exception, OperationResult operationResult)
-    {
-        return new ModelParseException("Cannot be read runtime model.", exception, operationResult);
     }
 }

@@ -162,13 +162,13 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             if (GenerateCkDocumentation)
                             {
                                 Log.LogMessage(MessageImportance.High,
-                                    $"Generating construction kit model Documentation to {OutputPath}");
+                                    $"Generating construction kit model Documentation to {OutputPath.GetOsSpecificPath()}");
 #if NETSTANDARD2_0
                                 using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #else
                                 await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #endif
-
+                                var path = OutputPath.GetOsSpecificPath();
                                 var ckCompiledModelRoot =
                                     await ckSerializer.DeserializeCompiledModelRootAsync(streamReader,
                                         compileResult.CompiledModelFile,
@@ -184,20 +184,20 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot, originFileResolver, 
                                     operationResult);
                                 
-                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
                                     CkLinkPath);
-                                await contentGenerator.GenerateVersionHistory(OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId, CkVersion, 
                                     CkLinkPath);
 
-                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
                                     CkLinkPath);
-                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion,
+                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion,
                                     CkLinkPath);
-                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
                                     CkLinkPath);
-                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, OutputPath, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
                                     CkLinkPath);
-                                await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, OutputPath,
+                                await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, path,
                                     ckCompiledModelRoot.ModelId, CkVersion, CkLinkPath);
                             }
                         }

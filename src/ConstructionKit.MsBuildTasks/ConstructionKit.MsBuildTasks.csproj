@@ -27,12 +27,12 @@
     <ItemGroup>
         <None Include="..\..\assets\meshmakers64.png">
             <Pack>True</Pack>
-            <PackagePath/>
+            <PackagePath />
             <Link>meshmakers64.png</Link>
         </None>
         <None Include="..\..\LICENSE">
             <Pack>True</Pack>
-            <PackagePath/>
+            <PackagePath />
             <Link>LICENSE</Link>
         </None>
        </ItemGroup>
@@ -41,6 +41,7 @@
         <PackageReference Include="Microsoft.Build.Utilities.Core" Version="17.10.4" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" PrivateAssets="all" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.Options" Version="8.0.2" />
         <PackageReference Include="System.Buffers" Version="4.5.1" />
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all" />
     </ItemGroup>
@@ -56,21 +57,14 @@
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
             <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->
-            <BuildOutputInPackage
-                    Include="@(ReferenceCopyLocalPaths)"
-                    TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />
+            <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths)" TargetPath="%(ReferenceCopyLocalPaths.DestinationSubPath)" />
         </ItemGroup>
     </Target>
 
     <!-- This target adds the generated deps.json file to our package output -->
-    <Target Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput"
-            BeforeTargets="BuiltProjectOutputGroup"
-            Condition=" '$(GenerateDependencyFile)' == 'true'">
+    <Target Name="AddBuildDependencyFileToBuiltProjectOutputGroupOutput" BeforeTargets="BuiltProjectOutputGroup" Condition=" '$(GenerateDependencyFile)' == 'true'">
         <ItemGroup>
-            <BuiltProjectOutputGroupOutput
-                    Include="$(ProjectDepsFilePath)"
-                    TargetPath="$(ProjectDepsFileName)"
-                    FinalOutputPath="$(ProjectDepsFilePath)" />
+            <BuiltProjectOutputGroupOutput Include="$(ProjectDepsFilePath)" TargetPath="$(ProjectDepsFileName)" FinalOutputPath="$(ProjectDepsFilePath)" />
         </ItemGroup>
     </Target>
 </Project>

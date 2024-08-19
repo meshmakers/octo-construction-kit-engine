@@ -10,13 +10,14 @@
     </PropertyGroup>
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
-    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
+    <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props" />
     
     <ItemGroup>
       <PackageReference Include="MartinCostello.Logging.XUnit" Version="0.4.0" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
       <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
       <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
+      <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
       <PackageReference Include="xunit" Version="2.9.0" />
       <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
         <PrivateAssets>all</PrivateAssets>

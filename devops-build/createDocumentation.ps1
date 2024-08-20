@@ -26,39 +26,3 @@ $outputPath = "$baseOutputPath/apiReference/Runtime.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
 mmxmldoc2md $sourcePath $outputPath --github-pages
-
-$projectPath = "$baseBinPath/publish/octo-ckc.dll"
-
-function callCompilerCommand {
-    param (
-        [string]$commandName,
-        [string]$sourcePath,
-        [string]$outputPath,
-        [string]$version,
-        [string]$linkPath
-    )
-    
-    Write-Host "Generating docs with the following parameters:"
-    Write-Host "Command Name: $commandName"
-    Write-Host "Source Path: $sourcePath"
-    Write-Host "Output Path: $outputPath"
-    Write-Host "Version: $version"
-    Write-Host "Link Path: $linkPath"
-    Write-Host "TEMP MODULE PATH: $modulePath"
-    
-    # Call the specified command from the installed tool
-    dotnet $projectPath -c $commandName -f $sourcePath -o $outputPath -v $version -l $linkPath
-}
-
-# Calls the callCompilerCommand with the specified parameters
-$commandName = "generateDocs"
-# intended path?
-$sourcePath = "$baseBinPath/octo-ck-libraries/SystemCkModel/out/ck-system.yaml"
-$outputPath = "$baseOutputPath/technologyGuide/constructionKits"
-$version = $buildNumberShort
-$linkPath = "/docs/technologyGuide/constructionKits/"
-callCompilerCommand -commandName $commandName -sourcePath $sourcePath -outputPath $outputPath -version $version -linkPath $linkPath
-
-Write-Host "Checking Available Directories in "$baseBinPath/octo-ck-libraries""
-cd "$baseBinPath/octo-ck-libraries"
-ls

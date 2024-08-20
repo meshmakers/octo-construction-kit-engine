@@ -15,8 +15,8 @@ variables:
   isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/r')]
   MajorVersion: 0
   MinorVersion: 0
-  name: generateDocumentation
-  value: 'true'
+  generateDocumentation: 'true'
+  
 
 stages:
  - stage: Build

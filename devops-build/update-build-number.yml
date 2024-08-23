@@ -7,10 +7,11 @@ steps:
       Write-Host "Source Branch Name $(Build.SourceBranchName)"
       $branch = '$(Build.SourceBranch)'
       $branchName = '$(Build.SourceBranchName)'
-      $major = [int]$branchName.Split(".")[0].substring(1)
-      $minor = [int]$branchName.Split(".")[1]
-      $build = [int]$branchName.Split(".")[2]
-      $revision = [int]$branchName.Split(".")[3]
+      $buildNumber = '$(Build.BuildNumber)'
+      $major = [int]$buildNumber.Split(".")[0].substring(1)
+      $minor = [int]$buildNumber.Split(".")[1]
+      $build = [int]$buildNumber.Split(".")[2]
+      $revision = [int]$buildNumber.Split(".")[3]
       $buildNumberShort = "$major.$minor.$build"
       $buildNumberLong = "$major.$minor.$build.$revision"
       

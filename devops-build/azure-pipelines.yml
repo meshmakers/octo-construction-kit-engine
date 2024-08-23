@@ -1,4 +1,4 @@
-name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)-$(Build.SourceBranch)
+name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)-$(Build.SourceBranchName)
 
 trigger:
   batch: true
@@ -24,11 +24,11 @@ stages:
       pool:
         name: Gerald-Local-Linux
       steps:
-      - template: setBuildNumber.yml
       - checkout: self
         clean: true
         submodules: true
-      - template: setversion.yml
+      - template: update-build-number.yml
+      - template: set-version.yml
       - task: DotNetCoreCLI@2
         displayName: 'Build src'
         inputs:

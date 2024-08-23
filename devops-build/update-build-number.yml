@@ -5,18 +5,27 @@ steps:
     script: |
       Write-Host "Source Branch $(Build.SourceBranch)"
       Write-Host "Source Branch Name $(Build.SourceBranchName)"
+      Write-Host "Buildnumber $(Build.BuildNumber)"
       $branch = '$(Build.SourceBranch)'
-      $branchName = '$(Build.SourceBranchName)'
       $buildNumber = '$(Build.BuildNumber)'
-      $major = [int]$buildNumber.Split(".")[0].substring(1)
-      $minor = [int]$buildNumber.Split(".")[1]
-      $build = [int]$buildNumber.Split(".")[2]
-      $revision = [int]$buildNumber.Split(".")[3]
+      $versionString = $buildNumber.SubString(0, $buildNumber.IndexOf("-"))
+      $versionArray = $versionString.Split(".")
+      $major = [int]$versionArray[0]
+      $minor = [int]$versionArray[1]
+      $build = [int]$versionArray[2]
+      $revision = [int]$versionArray[3]
       $buildNumberShort = "$major.$minor.$build"
       $buildNumberLong = "$major.$minor.$build.$revision"
       
       if ($branch.StartsWith("refs/tags/r")) {
-        $buildNumberLong = "$major.$minor.$revision.0"
+        $branchName = '$(Build.SourceBranchName)'
+        $versionString = $branchName.SubString(1)
+        $versionArray = $versionString.Split(".")
+        $major = [int]$versionArray[0]
+        $minor = [int]$versionArray[1]
+        $build = [int]$versionArray[2]
+        $buildNumberShort = "$major.$minor.$build"
+        $buildNumberLong = "$major.$minor.$build.0"
         Write-Host "Setting build number to $buildNumberLong"
         Write-Host "##vso[build.updatebuildnumber]$buildNumberLong"
       }

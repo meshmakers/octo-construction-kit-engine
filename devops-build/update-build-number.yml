@@ -1,0 +1,27 @@
+steps:
+- task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      Write-Host "Source Branch $(Build.SourceBranch)"
+      Write-Host "Source Branch Name $(Build.SourceBranchName)"
+      $branch = '$(Build.SourceBranch)'
+      $branchName = '$(Build.SourceBranchName)'
+      $major = [int]$branchName.Split(".")[0].substring(1)
+      $minor = [int]$branchName.Split(".")[1]
+      $build = [int]$branchName.Split(".")[2]
+      $revision = [int]$branchName.Split(".")[3]
+      $buildNumberShort = "$major.$minor.$build"
+      $buildNumberLong = "$major.$minor.$build.$revision"
+      
+      if ($branch.StartsWith("refs/tags/r")) {
+        $buildNumberLong = "$major.$minor.$revision.0"
+        Write-Host "Setting build number to $buildNumberLong"
+        Write-Host "##vso[build.updatebuildnumber]$buildNumberLong"
+      }
+      Write-Host "Setting build number short to '$buildNumberShort', build number long to '$buildNumberLong'"
+      Write-Host "##vso[task.setvariable variable=MajorVersion;]$major"
+      Write-Host "##vso[task.setvariable variable=MinorVersion;]$minor"
+      Write-Host "##vso[task.setvariable variable=BuildNumberShort;]$buildNumberShort"
+      Write-Host "##vso[task.setvariable variable=BuildNumberLong;]$buildNumberLong"
+  displayName: 'Set build number'

@@ -9,9 +9,9 @@ steps:
     FileEncoding: 'auto'
     Product: $(Build.SourceBranchName) - $(Build.SourceVersion) (release)
     VersionNumber: $(MajorVersion).$(MinorVersion).0.0
-    FileVersionNumber: $(Build.BuildNumber)
+    FileVersionNumber: $(BuildNumberLong)
     InformationalVersion: $(Build.BuildNumber)
-    PackageVersion: $(Build.BuildNumber)
+    PackageVersion: $(BuildNumberLong)
     DisableTelemetry: true
 - task: PowerShell@2
   inputs:
@@ -20,6 +20,6 @@ steps:
       # Replace placeholder in a file with build number
       $file = '$(Build.SourcesDirectory)/src/ConstructionKit.Templates/Templates/ConstructionKit.CSharp/GeneratedConstructionKitProject.csproj'
       $fileContent = Get-Content $file
-      $fileContent = $fileContent -replace '999.0.0.0', '$(Build.BuildNumber)'
+      $fileContent = $fileContent -replace '999.0.0.0', '$(BuildNumberLong)'
       $fileContent | Set-Content $file
   displayName: 'Updates project template version'    

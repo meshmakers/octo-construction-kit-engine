@@ -93,10 +93,11 @@ stages:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
             **/*.nupkg
+            bin/**/octo-ck-libraries/**/*.*
             bin/**/documentation/**/*.*
           TargetFolder: $(build.artifactstagingdirectory)
       - task: PowerShell@2
-        displayName: 'Create versioninfo file'
+        displayName: 'Create version info file'
         inputs:
           targetType: 'inline'
           script: |

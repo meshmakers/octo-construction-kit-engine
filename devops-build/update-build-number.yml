@@ -5,13 +5,16 @@ steps:
     script: |
       Write-Host "Source Branch $(Build.SourceBranch)"
       Write-Host "Source Branch Name $(Build.SourceBranchName)"
+      Write-Host "Buildnumber $(Build.BuildNumber)"
       $branch = '$(Build.SourceBranch)'
       $branchName = '$(Build.SourceBranchName)'
       $buildNumber = '$(Build.BuildNumber)'
-      $major = [int]$buildNumber.Split(".")[0].substring(1)
-      $minor = [int]$buildNumber.Split(".")[1]
-      $build = [int]$buildNumber.Split(".")[2]
-      $revision = [int]$buildNumber.Split(".")[3]
+      $versionString = $buildNumber.SubString(0, $buildNumber.IndexOf("-"))
+      $versionArray = $versionString.Split(".")
+      $major = [int]$versionArray[0]
+      $minor = [int]$versionArray[1]
+      $build = [int]$versionArray[2]
+      $revision = [int]$versionArray[3]
       $buildNumberShort = "$major.$minor.$build"
       $buildNumberLong = "$major.$minor.$build.$revision"
       

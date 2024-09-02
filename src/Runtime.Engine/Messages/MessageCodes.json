@@ -34,7 +34,7 @@
       "key": "AssociationCardinalityViolationOnCreate",
       "number": 6,
       "level": "FATALERROR",
-      "text": "{tenantId}: Entity '{ckTypeId}@{rtId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association."
+      "text": "{tenantId}: Entity with CkTypeId '{ckTypeId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association."
     },
     {
       "key": "AssociationNotAllowed",
@@ -97,10 +97,10 @@
       "text": "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}@{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does already exist."
     },
     {
-      "key": "RtEntityNeedsToBeDefinedAtInsertUpdateReplace",
+      "key": "RtEntityNeedsToBeDefinedAtUpdateReplace",
       "number": 17,
       "level": "FATALERROR",
-      "text": "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at insert, update or replace."
+      "text": "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at update or replace."
     },
     {
       "key": "RtEntityIdAlreadyExistInUpdateList",
@@ -113,6 +113,12 @@
       "number": 19,
       "level": "ERROR",
       "text": "{tenantId}: CkRecordId '{ckRecordId}' not found."
+    },
+    {
+      "key": "RtEntityNeedsToBeDefinedAtInsert",
+      "number": 20,
+      "level": "FATALERROR",
+      "text": "{tenantId}: RtEntity of CkTypeId '{rtEntityCkTypeId}' needs to be defined at insert."
     }
   ]
 }

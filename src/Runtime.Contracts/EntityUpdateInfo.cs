@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
-///     Interface for a entity update info.
+///     Interface for an entity update info.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
 public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
@@ -16,51 +16,90 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     public TEntity? RtEntity { get; }
 
     /// <summary>
-    ///     Entity id for modification.
+    ///     Runtime Identifier of an existing entity.
     /// </summary>
-    public RtEntityId RtEntityId { get; }
+    public OctoObjectId? RtId { get; }
+    
+    /// <summary>
+    ///     Construction Kit Type Identifier of entity to be modified.
+    /// </summary>
+    public CkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     MOD option.
     /// </summary>
     public EntityModOptions ModOption { get; }
+
+    /// <summary>
+    /// Gets the runtime entity identifier.
+    /// </summary>
+    /// <returns></returns>
+    RtEntityId GetRtEntityId();
 }
 
 /// <summary>
-///     Represents a entity update info.
+///     Represents an entity update info.
 /// </summary>
 /// <typeparam name="TEntity"></typeparam>
 public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     where TEntity : RtEntity
 {
     [JsonConstructor]
-    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity? rtEntity, EntityModOptions modOption)
+    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
+        : this(rtEntityId, modOption)
     {
-        RtEntityId = rtEntityId;
+        RtEntity = rtEntity;
+    }
+    
+    private EntityUpdateInfo(CkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
+    {
+        CkTypeId = ckTypeId;
         RtEntity = rtEntity;
         ModOption = modOption;
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, EntityModOptions modOption)
     {
-        RtEntityId = rtEntityId;
+        RtId = rtEntityId.RtId;
+        CkTypeId = rtEntityId.CkTypeId;
         ModOption = modOption;
     }
 
-    /// <summary>
-    ///     Entity for modification.
-    /// </summary>
+    /// <inheritdoc />
     public TEntity? RtEntity { get; }
 
-    /// <summary>
-    ///     Entity id for modification.
-    /// </summary>
-    public RtEntityId RtEntityId { get; }
+    /// <inheritdoc />
+    public OctoObjectId? RtId { get; }
+    
+    /// <inheritdoc />
+    public CkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     MOD option.
     /// </summary>
     public EntityModOptions ModOption { get; }
+
+    /// <inheritdoc />
+    public RtEntityId GetRtEntityId()
+    {
+        if (RtId == null)
+        {
+            throw new InvalidOperationException("RtId is null");
+        }
+        
+        return new RtEntityId(CkTypeId, RtId.Value);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for insert.
+    /// </summary>
+    /// <param name="ckTypeId">Type identifier of the construction kit</param>
+    /// <param name="rtEntity">Runtime entity to insert</param>
+    /// <returns></returns>
+    public static EntityUpdateInfo<TEntity> CreateInsert(CkId<CkTypeId> ckTypeId, TEntity rtEntity)
+    {
+        return new EntityUpdateInfo<TEntity>(ckTypeId, rtEntity, EntityModOptions.Insert);
+    }
 
     /// <summary>
     ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for insert.

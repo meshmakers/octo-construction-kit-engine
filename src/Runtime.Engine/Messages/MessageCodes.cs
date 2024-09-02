@@ -45,8 +45,8 @@ internal static class MessageCodes
     internal static OperationMessage MandatoryAttributeMissingAtUpdate(string? location, object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
         GetMessage("MandatoryAttributeMissingAtUpdate", location, tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
 
-    internal static OperationMessage AssociationCardinalityViolationOnCreate(string? location, object tenantId, object ckTypeId, object rtId, object roleId, object multiplicity) =>
-        GetMessage("AssociationCardinalityViolationOnCreate", location, tenantId, ckTypeId, rtId, roleId, multiplicity);
+    internal static OperationMessage AssociationCardinalityViolationOnCreate(string? location, object tenantId, object ckTypeId, object roleId, object multiplicity) =>
+        GetMessage("AssociationCardinalityViolationOnCreate", location, tenantId, ckTypeId, roleId, multiplicity);
 
     internal static OperationMessage AssociationNotAllowed(string? location, object tenantId, object ckTypeId, object rtId, object roleId) =>
         GetMessage("AssociationNotAllowed", location, tenantId, ckTypeId, rtId, roleId);
@@ -78,14 +78,17 @@ internal static class MessageCodes
     internal static OperationMessage AssociationAlreadyExists(string? location, object tenantId, object roleId, object originCkTypeId, object originRtId, object targetCkTypeId, object targetRtId) =>
         GetMessage("AssociationAlreadyExists", location, tenantId, roleId, originCkTypeId, originRtId, targetCkTypeId, targetRtId);
 
-    internal static OperationMessage RtEntityNeedsToBeDefinedAtInsertUpdateReplace(string? location, object tenantId, object rtEntityCkTypeId, object rtId) =>
-        GetMessage("RtEntityNeedsToBeDefinedAtInsertUpdateReplace", location, tenantId, rtEntityCkTypeId, rtId);
+    internal static OperationMessage RtEntityNeedsToBeDefinedAtUpdateReplace(string? location, object tenantId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("RtEntityNeedsToBeDefinedAtUpdateReplace", location, tenantId, rtEntityCkTypeId, rtId);
 
     internal static OperationMessage RtEntityIdAlreadyExistInUpdateList(string? location, object tenantId, object rtEntityCkTypeId, object rtId) =>
         GetMessage("RtEntityIdAlreadyExistInUpdateList", location, tenantId, rtEntityCkTypeId, rtId);
 
     internal static OperationMessage CkRecordIdNotFound(string? location, object tenantId, object ckRecordId) =>
         GetMessage("CkRecordIdNotFound", location, tenantId, ckRecordId);
+
+    internal static OperationMessage RtEntityNeedsToBeDefinedAtInsert(string? location, object tenantId, object rtEntityCkTypeId) =>
+        GetMessage("RtEntityNeedsToBeDefinedAtInsert", location, tenantId, rtEntityCkTypeId);
 
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
@@ -122,8 +125,8 @@ internal static class MessageCodes
         {
             "AssociationCardinalityViolationOnCreate",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 6, "{tenantId}: Entity '{ckTypeId}@{rtId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association.",
-                 new [] {"tenantId", "ckTypeId", "rtId", "roleId", "multiplicity"})
+                 6, "{tenantId}: Entity with CkTypeId '{ckTypeId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association.",
+                 new [] {"tenantId", "ckTypeId", "roleId", "multiplicity"})
         },
         {
             "AssociationNotAllowed",
@@ -186,9 +189,9 @@ internal static class MessageCodes
                  new [] {"tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"})
         },
         {
-            "RtEntityNeedsToBeDefinedAtInsertUpdateReplace",
+            "RtEntityNeedsToBeDefinedAtUpdateReplace",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 17, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at insert, update or replace.",
+                 17, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at update or replace.",
                  new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
         },
         {
@@ -202,6 +205,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  19, "{tenantId}: CkRecordId '{ckRecordId}' not found.",
                  new [] {"tenantId", "ckRecordId"})
+        },
+        {
+            "RtEntityNeedsToBeDefinedAtInsert",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 20, "{tenantId}: RtEntity of CkTypeId '{rtEntityCkTypeId}' needs to be defined at insert.",
+                 new [] {"tenantId", "rtEntityCkTypeId"})
         },
     };
 }

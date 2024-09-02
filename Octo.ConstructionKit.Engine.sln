@@ -49,6 +49,9 @@ EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConstructionKit.Compiler.SystemTests", "tests\ConstructionKit.Compiler.SystemTests\ConstructionKit.Compiler.SystemTests.csproj", "{62DEE08A-10DC-49E8-A4BF-6481A308F7CD}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConstructionKit.Engine.Tests", "tests\ConstructionKit.Engine.Tests\ConstructionKit.Engine.Tests.csproj", "{85C7E016-83EE-4D57-A471-A7516707DBB7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{DE1E3BCC-2761-4384-97CF-81A2906A4C29} = {DE1E3BCC-2761-4384-97CF-81A2906A4C29}
+	EndProjectSection
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ConstructionKit.Templates", "src\ConstructionKit.Templates\ConstructionKit.Templates.csproj", "{36C36BDE-4EC5-4835-9C18-62DE52166ACB}"
 EndProject

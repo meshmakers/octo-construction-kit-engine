@@ -5,6 +5,7 @@
         <RootNamespace>TestCkModel</RootNamespace>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net8.0'">true</OctoPublishCkModel>
     </PropertyGroup>
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
@@ -18,5 +19,13 @@
     <ItemGroup>
         <ConstructionKitFolder Visible="false" Include="ConstructionKit"/>
         <ConstructionKitFolder Visible="false" Include="CkTest\ConstructionKit" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="binRelease\net8.0\octo-ck-librariesTestCkModelout\ck-system.testidentity.yaml" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="binRelease\net8.0\octo-ck-librariesTestCkModelout\" />
     </ItemGroup>
 </Project>

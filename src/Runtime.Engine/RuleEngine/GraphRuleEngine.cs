@@ -75,7 +75,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         // Currently, the only mandatory association has multiplicity of One
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert))
         {
-            var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.RtEntityId.CkTypeId);
+            var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
 
             var inputAssociationGraphs =
                 ckTypeGraph.Associations.In.All.Where(a =>
@@ -89,7 +89,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnCreate(
                         originFileResolver.Resolve(repositoryDataSource.TenantId),
                         repositoryDataSource.TenantId,
-                        entityUpdateInfo.RtEntityId.CkTypeId, entityUpdateInfo.RtEntityId.RtId, inputAssociationGraph.CkRoleId,
+                        entityUpdateInfo.CkTypeId, inputAssociationGraph.CkRoleId,
                         MultiplicitiesDto.One));
                 }
             }
@@ -99,7 +99,8 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete))
         {
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                entityUpdateInfo.RtEntityId.RtId, GraphDirections.Any).ConfigureAwait(false);
+                entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet(),
+                GraphDirections.Any).ConfigureAwait(false);
             graphRuleEngineResult.RtAssociationsToDelete.AddRange(result);
         }
     }

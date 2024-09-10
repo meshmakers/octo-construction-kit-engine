@@ -59,12 +59,6 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public string CkLinkPath { get; set; } = null!;
-    
-    /// <summary>
-    /// Gets or sets the Ck Version. The Version of the Ck that is generated 
-    /// </summary>
-    [Required]
-    public string CkVersion { get; set; } = null!;
 
     /// <summary>
     /// A list of compiled models that has been generated
@@ -184,21 +178,21 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot, originFileResolver, 
                                     operationResult);
                                 
-                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
-                                await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
 
-                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
-                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion,
+                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
-                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, CkVersion, 
+                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
                                 await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, CkVersion, CkLinkPath);
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), CkLinkPath);
                             }
                         }
 

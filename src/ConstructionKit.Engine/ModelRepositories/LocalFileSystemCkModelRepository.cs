@@ -104,6 +104,10 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
                 await using var streamWriter = new StreamWriter(compiledModelFilePath);
 #endif
                 await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+                await streamWriter.FlushAsync().ConfigureAwait(false);
+                streamWriter.Close();
+                await Task.Delay(500).ConfigureAwait(false);
+                return;
             }
             catch (Exception)
             {

@@ -45,6 +45,14 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     where TEntity : RtEntity
 {
     [JsonConstructor]
+    private EntityUpdateInfo(OctoObjectId? rtId, CkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption)
+    {
+        RtId = rtId;
+        CkTypeId = ckTypeId;
+        ModOption = modOption;
+        RtEntity = rtEntity;
+    }
+    
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
         : this(rtEntityId, modOption)
     {

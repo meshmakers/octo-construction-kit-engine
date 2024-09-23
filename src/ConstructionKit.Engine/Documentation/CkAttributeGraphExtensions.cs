@@ -9,7 +9,7 @@ internal static class CkAttributeGraphExtensions
         string baseRelativePath, ILinkHelpers linkHelpers)
     {
 
-        await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor()}{ckAttributeGraph.AddName()} | " +
+        await outputFile.WriteLineAsync($"| {ckAttributeGraph.AddAnchor(linkHelpers)}{ckAttributeGraph.AddName()} | " +
                                         $"{ckAttributeGraph.ValueType.ToString()} | " +
                                         $"{ckAttributeGraph.DrawDefaultValues()} | " +
                                         $"{ckAttributeGraph.IsDataStream.ToString()} | " +
@@ -18,9 +18,9 @@ internal static class CkAttributeGraphExtensions
     }
 
 
-    private static string AddAnchor(this CkAttributeGraph ckAttributeGraph)
+    private static string AddAnchor(this CkAttributeGraph ckAttributeGraph, ILinkHelpers linkHelpers)
     {
-        return $"<a id=\"{ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName.ToLower()}\"></a>";
+        return $"<a id=\"{linkHelpers.FormatAnchor(ckAttributeGraph.CkAttributeId.Key.SemanticVersionedFullName)}\"></a>";
     }
 
     private static string AddName(this CkAttributeGraph ckAttributeGraph)

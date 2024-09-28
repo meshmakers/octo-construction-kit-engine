@@ -58,10 +58,18 @@ internal class CompileCommand : CkcCommand
             Logger.LogDebug("Cache directory: {Path}", Path.GetFullPath(cacheFilePath));
         }
 
-        var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath);
-        if (writeCompileResult)
+        try
         {
-            Console.WriteLine(compileResult.CompiledModelFile);
+            var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath);
+            if (writeCompileResult)
+            {
+                Console.WriteLine(compileResult.CompiledModelFile);
+            }
+        }
+        catch (Exception)
+        {
+            Logger.LogError("Error compiling construction kit model directory \'{Path}\'", Path.GetFullPath(rootPath));
+            throw;
         }
 
         Logger.LogInformation("Construction kit model directory compiled");

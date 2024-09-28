@@ -24,7 +24,7 @@ public interface ICkSerializer
     Task SerializeAsync(StreamWriter streamWriter, CkCompiledModelRoot compiledModel);
 
     /// <summary>
-    ///     Serializes the meta data to the stream.
+    ///     Serializes the metadata to the stream.
     /// </summary>
     /// <param name="streamWriter">A stream ready to write used for serialization</param>
     /// <param name="metaRootDto">Model to serialize</param>

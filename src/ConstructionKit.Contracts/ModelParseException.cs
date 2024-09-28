@@ -48,9 +48,14 @@ public class ModelParseException : CkModelException
         return new ModelParseException($"Value cannot be null or empty for element '{elementName}'.");
     }
 
-    internal static Exception CannotDeserializeModel(string locationReference, OperationResult operationResult)
+    internal static Exception CannotDeserializeModel(string locationReference, OperationResult operationResult, Exception e)
     {
-        return new ModelParseException($"Location '{locationReference}' contains invalid construction kit model.", operationResult);
+        return new ModelParseException($"Location '{locationReference}' contains invalid construction kit model.", e, operationResult);
+    }
+    
+    internal static Exception DeserializedModelWasNull(string locationReference, OperationResult operationResult)
+    {
+        return new ModelParseException($"Location '{locationReference}' contains invalid construction kit model. The deserialized value was null.", operationResult);
     }
 
     internal static Exception SchemaValidationFailed(string locationReference, OperationResult operationResult)

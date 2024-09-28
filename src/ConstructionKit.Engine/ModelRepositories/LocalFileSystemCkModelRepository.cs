@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
@@ -93,20 +94,29 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
         Directory.CreateDirectory(path);
 
+        var tempFilePath = Path.GetTempFileName();
+
+        try
+        {
+#if NETSTANDARD2_0
+            using var streamWriter = new StreamWriter(tempFilePath);
+#else
+            await using var streamWriter = new StreamWriter(tempFilePath);
+#endif
+            await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+            streamWriter.Close();
+        }
+        catch (Exception e)
+        {
+            throw ModelRepositoryException.PublishFailed(ckCompiledModel.ModelId, RepositoryName, e);
+        }
+
         var i = 0;
         while (i++ < 20)
         {
             try
             {
-#if NETSTANDARD2_0
-                using var streamWriter = new StreamWriter(compiledModelFilePath);
-#else
-                await using var streamWriter = new StreamWriter(compiledModelFilePath);
-#endif
-                await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
-                await streamWriter.FlushAsync().ConfigureAwait(false);
-                streamWriter.Close();
-                await Task.Delay(500).ConfigureAwait(false);
+                File.Copy(tempFilePath, compiledModelFilePath, true);
                 return;
             }
             catch (Exception)

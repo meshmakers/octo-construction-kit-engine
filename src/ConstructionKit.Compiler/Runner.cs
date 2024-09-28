@@ -15,6 +15,12 @@ internal class Runner(ILogger<Runner> logger, ICommandParser parser)
 
             return 0;
         }
+        catch (ModelValidationException ex) 
+        {
+            logger.LogError("{Message}", ex.Message);
+            
+            return -6;
+        }
         catch (CompilerException ex)
         {
             logger.LogError("{Message}", ex.Message);

@@ -37,21 +37,23 @@ internal class PublishCommand : CkcCommand
     public override async Task Execute()
     {
         await base.Execute();
-        
+
         Logger.LogInformation("Publish construction kit model");
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
-        var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ?? "LocalRepository";
+        var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
+                             "LocalRepository";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
-        Logger.LogDebug("Path of compiled construction kit file: {FilePath}", filePath);
-        Logger.LogDebug("Repository '{Repository}'", repositoryName);
+        Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
+        Logger.LogInformation("Repository '{Repository}'", repositoryName);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver(filePath);
         await using var streamReader = File.OpenRead(filePath);
         try
         {
-            var ckCompiledModelRoot = await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
+            var ckCompiledModelRoot =
+                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error loading model \'{FilePath}\'", filePath);
@@ -71,15 +73,10 @@ internal class PublishCommand : CkcCommand
 
             Logger.LogInformation("Construction kit model published");
         }
-        catch (ModelParseException)
+        catch (Exception)
         {
-            Logger.LogError("Error loading model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
-        }
-        catch (ModelValidationException)
-        {
-            Logger.LogError("Error validating model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
+            Logger.LogError("Error publishing model \'{FilePath}\'", filePath);
+            throw;
         }
     }
 }

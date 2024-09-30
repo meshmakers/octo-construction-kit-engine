@@ -44,6 +44,7 @@ public class CkAttributeDto
     /// <summary>
     ///     Default value of the attribute
     /// </summary>
+    [JsonConverter(typeof(DefaultValuesConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public ICollection<object>? DefaultValues { get; set; }
 

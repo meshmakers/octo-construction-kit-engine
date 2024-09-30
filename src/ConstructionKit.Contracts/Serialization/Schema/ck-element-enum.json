@@ -25,6 +25,9 @@
               },
               "description": {
                 "type": "string"
+              },
+              "isExtension": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false,
@@ -35,6 +38,9 @@
           }
         },
         "useFlags": {
+          "type": "boolean"
+        },
+        "isExtensible": {
           "type": "boolean"
         },
         "description": {

@@ -22,6 +22,7 @@ public class CkEnumGraph
     {
         CkEnumId = ckEnumId;
         UseFlags = enumDto.UseFlags;
+        IsExtensible = enumDto.IsExtensible;
         Values = enumDto.Values;
         Description = enumDto.Description;
     }
@@ -31,10 +32,11 @@ public class CkEnumGraph
     /// </summary>
     /// <param name="ckEnumId"></param>
     /// <param name="useFlags"></param>
+    /// <param name="isExtensible"></param>
     /// <param name="values"></param>
     /// <param name="description"></param>
     [JsonConstructor]
-    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, ICollection<CkEnumValueDto> values, string description)
+    public CkEnumGraph(CkId<CkEnumId> ckEnumId, bool useFlags, bool isExtensible, ICollection<CkEnumValueDto> values, string description)
     {
         CkEnumId = ckEnumId;
         UseFlags = useFlags;
@@ -51,6 +53,11 @@ public class CkEnumGraph
     ///     When true the enum is handles as flags enum
     /// </summary>
     public bool UseFlags { get; set; }
+    
+    /// <summary>
+    ///     When true the enum is extensible using the API
+    /// </summary>
+    public bool IsExtensible { get; set; }
 
     /// <summary>
     ///     Returns the values of the enum.

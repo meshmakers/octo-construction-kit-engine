@@ -102,8 +102,8 @@ public class GitHubCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null)
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, bool publishExtensions = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         try
         {

@@ -31,10 +31,12 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 continue;
             }
 
-            var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+            var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier)
+                .ConfigureAwait(false);
             if (hasBeenFound)
             {
-                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier).ConfigureAwait(false);
+                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier)
+                    .ConfigureAwait(false);
             }
         }
 
@@ -57,6 +59,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
 
     /// <inheritdoc />
     public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
+        bool publishExtensions,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
@@ -76,11 +79,13 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
             throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
 
-        await ckModelRepository.PublishModelAsync(ckCompiledModel, isForced, sourceIdentifier).ConfigureAwait(false);
+        await ckModelRepository.PublishModelAsync(ckCompiledModel, isForced, publishExtensions, sourceIdentifier)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+    public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
@@ -103,7 +108,8 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
         await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier).ConfigureAwait(false);
     }
 
-    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null)
+    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId,
+        object? sourceIdentifier = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
             repositoryName, StringComparison.OrdinalIgnoreCase) == 0);

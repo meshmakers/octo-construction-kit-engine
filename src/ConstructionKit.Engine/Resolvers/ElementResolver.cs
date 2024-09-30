@@ -264,6 +264,12 @@ internal class ElementResolver : IElementResolver
                     ignoreEnum = true;
                 }
 
+                if (!ckEnum.IsExtensible && ckEnum.Values.Any(x => x.IsExtension))
+                {
+                    operationResult.AddMessage(MessageCodes.EnumIsNotExtensibleButContainsExtension(originFileResolver.Resolve(ckEnumId), ckEnumId));
+                    ignoreEnum = true;
+                }
+
                 if (ignoreEnum)
                 {
                     continue;

@@ -26,7 +26,8 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     public string RepositoryName => "EmbeddedResourceRepository";
 
     /// <inheritdoc />
-    public string Description => "Embedded resource repository, construction kits that are delivered with the application.";
+    public string Description =>
+        "Embedded resource repository, construction kits that are delivered with the application.";
 
     /// <inheritdoc />
     public bool CanWrite => false;
@@ -44,7 +45,8 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult, object? sourceIdentifier = null,
+    public Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         var embeddedModel = _embeddedModels.FirstOrDefault(m => m.ModelId == modelId);
@@ -57,8 +59,8 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null)
+    public Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
+        bool publishExtensions = false, object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         throw ModelRepositoryException.ModelRepositoryNotWritable(RepositoryName);
     }

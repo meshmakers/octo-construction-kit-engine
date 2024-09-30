@@ -156,7 +156,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 }
 
                                 await ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot,
-                                    true);
+                                    true, false);
                                 Log.LogMessage(MessageImportance.High,
                                     "Construction kit model published to 'LocalRepository'");
                             }

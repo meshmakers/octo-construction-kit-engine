@@ -28,4 +28,10 @@ public class CkEnumValueDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }
+    
+    /// <summary>
+    ///     Indicates that the current enum value is an extension to the original enum.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsExtension { get; set; } = false;
 }

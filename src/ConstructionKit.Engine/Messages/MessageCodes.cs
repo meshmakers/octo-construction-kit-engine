@@ -1,4 +1,4 @@
-//------------------------------------------------------------------------------
+﻿//------------------------------------------------------------------------------
 // <auto-generate>
 //     The code was generated from a template.
 //
@@ -187,6 +187,9 @@ internal static class MessageCodes
         GetMessage("FileContainsNoModel", location);
     internal static OperationMessage NoImportsFound(string? location) =>
         GetMessage("NoImportsFound", location);
+    internal static OperationMessage EnumIsNotExtensibleButContainsExtension(string? location, object ckEnumId) =>
+        GetMessage("EnumIsNotExtensibleButContainsExtension", location, ckEnumId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -512,6 +515,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Warning,
                  54, "No imports founds in construction kit model configuration file.",
                  new string[] {})
+        },
+        {
+            "EnumIsNotExtensibleButContainsExtension",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 55, "Enum '{ckEnumId}' is not extensible but contains an extension.",
+                 new [] {"ckEnumId"})
         },
     };
 }

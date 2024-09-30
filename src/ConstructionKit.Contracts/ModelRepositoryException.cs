@@ -71,4 +71,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Publishing model '{modelId}' to repository '{repositoryName}' failed.", exception);
     }
+
+    internal static Exception CustomizationNotSupported(string repositoryName)
+    {
+        return new ModelRepositoryException($"Customization is not supported by repository '{repositoryName}'.");
+    }
 }

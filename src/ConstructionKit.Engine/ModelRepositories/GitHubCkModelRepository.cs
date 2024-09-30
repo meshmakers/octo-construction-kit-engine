@@ -139,6 +139,20 @@ public class GitHubCkModelRepository : ICkModelRepository
         }
     }
 
+    /// <inheritdoc />
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, bool publishExtensions = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        return PublishModelAsync(ckCompiledModel, false, publishExtensions, sourceIdentifier, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        throw ModelRepositoryException.CustomizationNotSupported(RepositoryName);
+    }
+
     private async Task<string> ReadContentAsync(CkCompiledModelRoot ckCompiledModel)
     {
         using var memoryStream = new MemoryStream();
@@ -153,13 +167,6 @@ public class GitHubCkModelRepository : ICkModelRepository
 
         string content = await new StreamReader(memoryStream).ReadToEndAsync().ConfigureAwait(false);
         return content;
-    }
-
-    /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null)
-    {
-        throw new NotImplementedException();
     }
 
     private IGitHubClient CreateClient()

@@ -58,10 +58,11 @@ public interface ICkModelRepository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
     /// <param name="force">Forces the operation by replacing model files if they exist.</param>
+    /// <param name="publishExtensions">When true, custom extensions are published, e.g. custom enum values</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
-    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, object? sourceIdentifier = null,
+    Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, bool publishExtensions = false, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null);
 
     /// <summary>

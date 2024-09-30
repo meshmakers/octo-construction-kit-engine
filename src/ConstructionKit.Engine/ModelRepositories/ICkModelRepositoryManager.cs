@@ -32,10 +32,11 @@ internal interface ICkModelRepositoryManager
     /// <param name="repositoryName">Name of Repository.</param>
     /// <param name="ckCompiledModel">Deserialized construction kit model.</param>
     /// <param name="isForced">When true, existing construction kit models are replaced.</param>
+    /// <param name="publishExtensions">When true, custom extensions are published, e.g. custom enum values</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
-    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null,
+    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, bool publishExtensions, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null);
 
     /// <summary>

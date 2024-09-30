@@ -55,10 +55,10 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     }
 
     public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
-        object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null)
+        bool publishExtensions, object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier,
+        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, publishExtensions,
+                sourceIdentifier,
                 cancellationToken)
             .ConfigureAwait(false);
     }
@@ -117,7 +117,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             operationResult.AddMessage(MessageCodes.NoImportsFound(modelConfigurationFilePath));
             return new List<CompileResult>();
         }
-        
+
         if (!Directory.Exists(outputPath))
         {
             Directory.CreateDirectory(outputPath);
@@ -144,9 +144,9 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             if (operationResult.HasErrors || operationResult.HasFatalErrors || compiledModelRoot == null)
             {
                 _logger.LogError("Error loading model \'{ModelId}\'", ckModelId);
-               throw CompilerException.OperationResultWithErrors(operationResult);
+                throw CompilerException.OperationResultWithErrors(operationResult);
             }
-            
+
 #if NETSTANDARD2_0
             using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else

@@ -323,7 +323,12 @@
       "number": 54,
       "level": "WARNING",
       "text": "No imports founds in construction kit model configuration file."
+    },
+    {
+      "key": "EnumIsNotExtensibleButContainsExtension",
+      "number": 55,
+      "level": "ERROR",
+      "text": "Enum '{ckEnumId}' is not extensible but contains an extension."
     }
-    
   ]
 }

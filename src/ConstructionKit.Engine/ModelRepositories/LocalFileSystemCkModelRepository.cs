@@ -83,7 +83,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
     /// <inheritdoc />
     public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
-        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+        bool publishExtensions = false, object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
         if (File.Exists(compiledModelFilePath) && !force)

@@ -31,11 +31,12 @@ public interface ICkModelRepositoryService
     /// <param name="repositoryName">Name of Repository.</param>
     /// <param name="ckCompiledModel">Deserialized construction kit model.</param>
     /// <param name="isForced">When true, existing construction kit models are replaced.</param>
+    /// <param name="publishExtensions">When true, custom extensions are published, e.g. custom enum values</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
-    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced, object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null);
+    Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
+        bool publishExtensions, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>
     ///     Updates a model to a repository
@@ -56,7 +57,7 @@ public interface ICkModelRepositoryService
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in given repository</returns>
     Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null);
-    
+
     /// <summary>
     /// Restores construction kit models based on a construction kit model configuration file.
     /// </summary>
@@ -68,8 +69,9 @@ public interface ICkModelRepositoryService
     /// </param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath, string outputPath, string? createCacheFilePath, object? sourceIdentifier = null);
-    
+    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath,
+        string outputPath, string? createCacheFilePath, object? sourceIdentifier = null);
+
     /// <summary>
     /// Returns information about the construction kit model folder.
     /// </summary>
@@ -82,6 +84,7 @@ public interface ICkModelRepositoryService
     /// <param name="operationResult">Operation result</param>
     /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
     /// <returns></returns>
-    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath, string outputPath, string? createCacheFilePath, OperationResult operationResult, object? sourceIdentifier = null);
-
+    Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath,
+        string outputPath, string? createCacheFilePath, OperationResult operationResult,
+        object? sourceIdentifier = null);
 }

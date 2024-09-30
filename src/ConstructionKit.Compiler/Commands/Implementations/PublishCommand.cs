@@ -13,6 +13,7 @@ internal class PublishCommand : CkcCommand
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
     private readonly IArgument _forceArg;
+    private readonly IArgument _publishExtensionsArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _repositoryArg;
 
@@ -25,13 +26,16 @@ internal class PublishCommand : CkcCommand
         _ckValidationService = ckValidationService;
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
-            new[] { "Path of compiled construction kit model file" }, true, 1);
+            ["Path of compiled construction kit model file"], true, 1);
 
         _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
-            new[] { "Name of the construction kit repository. By default 'LocalRepository' is used." }, 1);
+            ["Name of the construction kit repository. By default 'LocalRepository' is used."], 1);
 
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
-            new[] { "Replaces construction kits models that may exists in repo." }, 0);
+            ["Replaces construction kits models that may exists in repo."], 0);
+        
+        _publishExtensionsArg = CommandArgumentValue.AddArgument("pe", "publishExtensions",
+            ["Publish custom extensions, e.g. custom enum values."], 0);
     }
 
     public override async Task Execute()
@@ -44,6 +48,7 @@ internal class PublishCommand : CkcCommand
         var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
                              "LocalRepository";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
+        var publishExtensions = CommandArgumentValue.IsArgumentUsed(_publishExtensionsArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
         Logger.LogInformation("Repository '{Repository}'", repositoryName);
 
@@ -69,7 +74,7 @@ internal class PublishCommand : CkcCommand
                 return;
             }
 
-            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced);
+            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced, publishExtensions);
 
             Logger.LogInformation("Construction kit model published");
         }

@@ -256,7 +256,6 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
     }
 
-
     /// <inheritdoc />
     public async Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId, RtEntity rtEntity)
     {

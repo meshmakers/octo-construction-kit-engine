@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
 /// <summary>
-///     Manages the repositories that can be used to lookup a compiled model.
+///     Manages the repositories that can be used to look up a compiled model.
 /// </summary>
 internal class CkModelRepositoryManager : ICkModelRepositoryManager
 {
@@ -85,7 +85,33 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
 
     /// <inheritdoc />
     public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel,
-        object? sourceIdentifier = null,
+        bool publishExtensions,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+        {
+            throw ModelRepositoryException.ModelRepositoryDoesNotSupportSourceIdentifier(repositoryName);
+        }
+
+        if (!ckModelRepository.CanWrite)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
+        }
+
+        await ckModelRepository.UpdateModelAsync(ckCompiledModel, publishExtensions, sourceIdentifier)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task CustomizeCkEnumAsync(string repositoryName, CkId<CkEnumId> ckEnumId,
+        ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
@@ -105,7 +131,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
             throw ModelRepositoryException.ModelRepositoryNotWritable(repositoryName);
         }
 
-        await ckModelRepository.UpdateModelAsync(ckCompiledModel, sourceIdentifier).ConfigureAwait(false);
+        await ckModelRepository.CustomizeCkEnumAsync(ckEnumId, ckEnumUpdates, sourceIdentifier).ConfigureAwait(false);
     }
 
     public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId,

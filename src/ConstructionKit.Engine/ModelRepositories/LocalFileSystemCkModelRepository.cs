@@ -127,10 +127,17 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, bool publishExtensions = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        return PublishModelAsync(ckCompiledModel, true, publishExtensions, sourceIdentifier, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        throw new NotImplementedException();
+        throw ModelRepositoryException.CustomizationNotSupported(RepositoryName);
     }
 
     private string CreatePath(CkModelId ckModelId)

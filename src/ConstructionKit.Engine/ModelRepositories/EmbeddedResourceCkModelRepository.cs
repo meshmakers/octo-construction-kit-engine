@@ -66,7 +66,15 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, bool publishExtensions = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        throw ModelRepositoryException.ModelRepositoryNotWritable(RepositoryName);
+    }
+
+    /// <inheritdoc />
+    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         throw ModelRepositoryException.ModelRepositoryNotWritable(RepositoryName);

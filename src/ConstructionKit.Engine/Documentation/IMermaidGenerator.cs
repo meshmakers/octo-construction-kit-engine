@@ -15,7 +15,7 @@ public interface IMermaidGenerator
     /// <param name="documentPath">Path where the generated Diagram is written</param>
     /// <param name="ckModelId">Used to determine position in file tree</param>
     /// <param name="versionNumber">Version of the Model used</param>
-    /// <param name="linkPathRoot"></param>
+    /// <param name="linkPathRoot">Used to determine Link Paths please use the relative Root directory Path</param>
     /// ///
     /// <returns></returns>
     public Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, string? versionNumber, 
@@ -35,8 +35,8 @@ public interface IMermaidGenerator
     /// <param name="documentPath">Used to find relative Path and Directory Path</param>
     /// <param name="ckModelId">Used to build directory</param>
     /// <param name="outputFile">The file where the Diagram is generated</param>
-    /// <param name="directoryPath"></param>
+    /// <param name="linkPathRoot">Used to determine Link Paths please use the relative Root directory Path</param>
     /// <returns></returns>
     public Task GenerateMermaidDiagram(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId, StreamWriter outputFile,
-        string directoryPath);
+        string linkPathRoot);
 }

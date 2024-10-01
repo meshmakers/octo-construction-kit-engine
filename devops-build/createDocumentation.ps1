@@ -20,9 +20,9 @@ if (Test-Path -Path $baseOutputPath) {
 $outputPath = "$baseOutputPath/apiReference/ConstructionKit.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.ConstructionKit.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
-mmxmldoc2md $sourcePath $outputPath --github-pages
+mmxmldoc2md $sourcePath $outputPath
 
 $outputPath = "$baseOutputPath/apiReference/Runtime.Contracts"
 $sourcePath = "$baseBinPath/Meshmakers.Octo.Runtime.Contracts.dll"
 Write-Host "Creating documentation for $sourcePath, doc is generated at $outputPath"
-mmxmldoc2md $sourcePath $outputPath --github-pages
+mmxmldoc2md $sourcePath $outputPath

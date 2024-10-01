@@ -42,4 +42,9 @@ public class PersistenceException : Exception
     {
         return new PersistenceException("AssociationRoleId not set");
     }
+
+    internal static Exception RtIdNotSet()
+    {
+        throw new PersistenceException("RtId not set");
+    }
 }

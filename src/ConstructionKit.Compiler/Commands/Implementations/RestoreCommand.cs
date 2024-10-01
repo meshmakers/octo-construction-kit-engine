@@ -42,10 +42,10 @@ public class RestoreCommand : Command<OctoToolOptions>
         {
             cacheFilePath = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_cachePathArg);
         }
-
-        var operationResult = new OperationResult();
+        
         try
         {
+            var operationResult = new OperationResult();
             await _ckModelRepositoryService.RestoreConstructionKitModelsAsync(filePath, outputPath, cacheFilePath,
                 operationResult);
             if (operationResult.HasErrors || operationResult.HasFatalErrors)
@@ -54,18 +54,13 @@ public class RestoreCommand : Command<OctoToolOptions>
                 operationResult.WriteMessagesToLogger(Logger);
                 return;
             }
+        }
+        catch (Exception)
+        {
+            Logger.LogError("Error loading model configuration \'{FilePath}\'", filePath);
+            throw;
+        }
 
-            Logger.LogInformation("Construction kit model configuration restored");
-        }
-        catch (ModelParseException)
-        {
-            Logger.LogError("Error loading model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
-        }
-        catch (ModelValidationException)
-        {
-            Logger.LogError("Error validating model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
-        }
+        Logger.LogInformation("Construction kit model configuration restored");
     }
 }

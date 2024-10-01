@@ -102,7 +102,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var modelConfigDto = _deserializer.Deserialize<CkModelConfigDto>(streamReader);
-        return Task.FromResult(modelConfigDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult));
+        return Task.FromResult(modelConfigDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult));
     }
 
     /// <inheritdoc />
@@ -116,7 +116,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckMetaDto = _deserializer.Deserialize<CkMetaRootDto>(streamReader);
-        return Task.FromResult(ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult));
+        return Task.FromResult(ckMetaDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult));
     }
 
     /// <inheritdoc />
@@ -130,7 +130,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckElementsDto = _deserializer.Deserialize<CkElementsRootDto>(streamReader);
-        return Task.FromResult(ckElementsDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult));
+        return Task.FromResult(ckElementsDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult));
     }
 
     /// <inheritdoc />
@@ -140,7 +140,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         var ckCompiledModelRoot = await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
-        return ckCompiledModelRoot ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+        return ckCompiledModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
     }
 
     /// <inheritdoc />
@@ -149,7 +149,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
         var ckCompiledModelRoot =  DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
-        return ckCompiledModelRoot ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+        return ckCompiledModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
     }
 
     /// <inheritdoc />
@@ -169,6 +169,6 @@ internal class CkYamlSerializer : ICkYamlSerializer
 
         using var streamReader = new StreamReader(stream);
         var ckModelRoot = _deserializer.Deserialize<CkCompiledModelRoot>(streamReader);
-        return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+        return ckModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
     }
 }

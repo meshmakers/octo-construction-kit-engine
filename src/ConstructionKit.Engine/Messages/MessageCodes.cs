@@ -1,4 +1,4 @@
-//------------------------------------------------------------------------------
+﻿//------------------------------------------------------------------------------
 // <auto-generate>
 //     The code was generated from a template.
 //
@@ -187,6 +187,18 @@ internal static class MessageCodes
         GetMessage("FileContainsNoModel", location);
     internal static OperationMessage NoImportsFound(string? location) =>
         GetMessage("NoImportsFound", location);
+    internal static OperationMessage EnumIsNotExtensibleButContainsExtension(string? location, object ckEnumId) =>
+        GetMessage("EnumIsNotExtensibleButContainsExtension", location, ckEnumId);
+
+    internal static OperationMessage EnumNameMayNotContainWhitespaceSpecialCharacters(string? location, object ckEnumId, object CKEnumKey) =>
+        GetMessage("EnumNameMayNotContainWhitespaceSpecialCharacters", location, ckEnumId, CKEnumKey);
+
+    internal static OperationMessage EnumNameMyNotBeEmpty(string? location, object ckEnumId, object CKEnumKey) =>
+        GetMessage("EnumNameMyNotBeEmpty", location, ckEnumId, CKEnumKey);
+
+    internal static OperationMessage EnumKeyMayNotBeNegative(string? location, object ckEnumId, object CKEnumKey) =>
+        GetMessage("EnumKeyMayNotBeNegative", location, ckEnumId, CKEnumKey);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -512,6 +524,30 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Warning,
                  54, "No imports founds in construction kit model configuration file.",
                  new string[] {})
+        },
+        {
+            "EnumIsNotExtensibleButContainsExtension",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 55, "Enum '{ckEnumId}' is not extensible but contains an extension.",
+                 new [] {"ckEnumId"})
+        },
+        {
+            "EnumNameMayNotContainWhitespaceSpecialCharacters",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 56, "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters.",
+                 new [] {"ckEnumId", "CKEnumKey"})
+        },
+        {
+            "EnumNameMyNotBeEmpty",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 57, "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters.",
+                 new [] {"ckEnumId", "CKEnumKey"})
+        },
+        {
+            "EnumKeyMayNotBeNegative",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 58, "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative.",
+                 new [] {"ckEnumId", "CKEnumKey"})
         },
     };
 }

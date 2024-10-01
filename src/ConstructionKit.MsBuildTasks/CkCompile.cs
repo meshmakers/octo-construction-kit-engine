@@ -41,7 +41,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public bool PublishCkModel { get; set; } = true;
-    
+
     /// <summary>
     /// When true, the compiled construction kit model is generated as .md files to the local repository
     /// </summary>
@@ -53,7 +53,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// </summary>
     [Required]
     public string OutputPath { get; set; } = null!;
-    
+
     /// <summary>
     /// Gets or sets the Link path. Should Be the Root Directory of the Documentation
     /// </summary>
@@ -82,13 +82,13 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         });
         services.AddConstructionKit();
         services.AddDocumentationService();
-        
+
         var serviceProvider = services.BuildServiceProvider();
 
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
         var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
         var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
-        
+
         var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
         var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
         var mermaidGenerator = serviceProvider.GetRequiredService<IMermaidGenerator>();
@@ -118,7 +118,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                         {
                             Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                 constructionKitFolderPath);
-                            var compileResult = await compilerService.CompileAsync(constructionKitFolderPath.GetOsSpecificPath(),
+                            var compileResult = await compilerService.CompileAsync(
+                                constructionKitFolderPath.GetOsSpecificPath(),
                                 OutputPath.GetOsSpecificPath(), CacheFilePath?.GetOsSpecificPath(), operationResult);
                             compiledModelFiles.Add(compileResult.CompiledModelFile);
                             if (compileResult.CompiledModelCacheFilePath != null)
@@ -129,7 +130,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             if (PublishCkModel)
                             {
                                 Log.LogMessage(MessageImportance.High,
-                                    "Publishing construction kit model to 'LocalRepository'");
+                                    "Publishing construction kit model from '{0}' to 'LocalRepository'",
+                                    constructionKitFolderPath);
 #if NETSTANDARD2_0
                                 using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #else
@@ -148,7 +150,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 }
 
                                 await ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot,
-                                    true);
+                                    true, false);
                                 Log.LogMessage(MessageImportance.High,
                                     "Construction kit model published to 'LocalRepository'");
                             }
@@ -173,9 +175,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     LogOperationResults(operationResult);
                                     return;
                                 }
-                                
+
                                 var originFileResolver = new OriginFileResolver(compileResult.CompiledModelFile);
-                                var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot, originFileResolver, 
+                                var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot,
+                                    originFileResolver,
                                     operationResult);
                                 
                                 await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
@@ -190,6 +193,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
                                 await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+
                                     CkLinkPath);
                                 await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, path,
                                     ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), CkLinkPath);

@@ -34,10 +34,10 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
 #endif
         {
-            if (!ckCache.TryGetCkType(tenantId, info.RtEntityId.CkTypeId, out var ckTypeGraph))
+            if (!ckCache.TryGetCkType(tenantId, info.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
-                    info.RtEntityId.CkTypeId));
+                    info.CkTypeId));
 #if NETSTANDARD2_0
                 return;
 #else
@@ -56,7 +56,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId),
                     tenantId,
-                    info.RtEntityId.CkTypeId));
+                    info.CkTypeId));
 #if NETSTANDARD2_0
                 return;
 #else
@@ -111,9 +111,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 case EntityModOptions.Insert:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsert(
                             originFileResolver.Resolve(tenantId), tenantId,
-                            info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+                            info.CkTypeId));
 #if NETSTANDARD2_0
                         return;
 #else
@@ -126,9 +126,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 case EntityModOptions.Update:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
-                            info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+                            info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
 #if NETSTANDARD2_0
                         return;
 #else
@@ -136,11 +136,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 #endif
                     }
 
-                    if (!entitiesToUpdate.TryAdd(info.RtEntityId, info.RtEntity))
+                    if (!entitiesToUpdate.TryAdd(info.GetRtEntityId(), info.RtEntity))
                     {
                         operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
                             originFileResolver.Resolve(tenantId), tenantId,
-                            info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+                            info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
 #if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
 #endif
@@ -150,9 +150,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 case EntityModOptions.Replace:
                     if (info.RtEntity == null)
                     {
-                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsertUpdateReplace(
+                        operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
-                            info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+                            info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
 #if NETSTANDARD2_0
                         return;
 #else
@@ -160,12 +160,12 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 #endif
                     }
 
-                    if (!entitiesToReplace.TryAdd(info.RtEntityId, info.RtEntity))
+                    if (!entitiesToReplace.TryAdd(info.GetRtEntityId(), info.RtEntity))
                     {
                         operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
                             originFileResolver.Resolve(tenantId),
                             tenantId,
-                            info.RtEntityId.CkTypeId, info.RtEntityId.RtId));
+                            info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
 #if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
 #endif
@@ -173,7 +173,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 
                     break;
                 case EntityModOptions.Delete:
-                    entitiesToDelete.Add(info.RtEntityId);
+                    entitiesToDelete.Add(info.GetRtEntityId());
                     break;
                 default:
                     throw new InvalidOperationException($"Unknown mod option '{info.ModOption}'");

@@ -2,6 +2,7 @@ using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
@@ -55,20 +56,29 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     }
 
     public async Task PublishModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel, bool isForced,
-        object? sourceIdentifier = null,
-        CancellationToken? cancellationToken = null)
+        bool publishExtensions, object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier,
+        await _ckModelRepositoryManager.PublishModelAsync(repositoryName, ckCompiledModel, isForced, publishExtensions,
+                sourceIdentifier,
                 cancellationToken)
             .ConfigureAwait(false);
     }
 
     public async Task UpdateModelAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel,
-        object? sourceIdentifier = null,
+        bool publishExtensions, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         await _ckModelRepositoryManager
-            .UpdateModelAsync(repositoryName, ckCompiledModel, sourceIdentifier, cancellationToken)
+            .UpdateModelAsync(repositoryName, ckCompiledModel, publishExtensions, sourceIdentifier, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task CustomizeCkEnumAsync(string repositoryName, CkId<CkEnumId> ckEnumId,
+        ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        await _ckModelRepositoryManager
+            .CustomizeCkEnumAsync(repositoryName, ckEnumId, ckEnumUpdates, sourceIdentifier, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -117,7 +127,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             operationResult.AddMessage(MessageCodes.NoImportsFound(modelConfigurationFilePath));
             return new List<CompileResult>();
         }
-        
+
         if (!Directory.Exists(outputPath))
         {
             Directory.CreateDirectory(outputPath);
@@ -144,9 +154,9 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             if (operationResult.HasErrors || operationResult.HasFatalErrors || compiledModelRoot == null)
             {
                 _logger.LogError("Error loading model \'{ModelId}\'", ckModelId);
-               throw CompilerException.OperationResultWithErrors(operationResult);
+                throw CompilerException.OperationResultWithErrors(operationResult);
             }
-            
+
 #if NETSTANDARD2_0
             using var streamWriter = new StreamWriter(compiledModelFilePath);
 #else

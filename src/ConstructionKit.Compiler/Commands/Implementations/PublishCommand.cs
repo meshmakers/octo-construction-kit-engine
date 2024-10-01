@@ -13,6 +13,7 @@ internal class PublishCommand : CkcCommand
     private readonly ICkSerializer _ckSerializer;
     private readonly ICkValidationService _ckValidationService;
     private readonly IArgument _forceArg;
+    private readonly IArgument _publishExtensionsArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _repositoryArg;
 
@@ -25,33 +26,39 @@ internal class PublishCommand : CkcCommand
         _ckValidationService = ckValidationService;
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
-            new[] { "Path of compiled construction kit model file" }, true, 1);
+            ["Path of compiled construction kit model file"], true, 1);
 
         _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
-            new[] { "Name of the construction kit repository. By default 'LocalRepository' is used." }, 1);
+            ["Name of the construction kit repository. By default 'LocalRepository' is used."], 1);
 
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
-            new[] { "Replaces construction kits models that may exists in repo." }, 0);
+            ["Replaces construction kits models that may exists in repo."], 0);
+        
+        _publishExtensionsArg = CommandArgumentValue.AddArgument("pe", "publishExtensions",
+            ["Publish custom extensions, e.g. custom enum values."], 0);
     }
 
     public override async Task Execute()
     {
         await base.Execute();
-        
+
         Logger.LogInformation("Publish construction kit model");
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
-        var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ?? "LocalRepository";
+        var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
+                             "LocalRepository";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
-        Logger.LogDebug("Path of compiled construction kit file: {FilePath}", filePath);
-        Logger.LogDebug("Repository '{Repository}'", repositoryName);
+        var publishExtensions = CommandArgumentValue.IsArgumentUsed(_publishExtensionsArg);
+        Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
+        Logger.LogInformation("Repository '{Repository}'", repositoryName);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver(filePath);
         await using var streamReader = File.OpenRead(filePath);
         try
         {
-            var ckCompiledModelRoot = await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
+            var ckCompiledModelRoot =
+                await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
             if (operationResult.HasErrors)
             {
                 Logger.LogError("Error loading model \'{FilePath}\'", filePath);
@@ -67,19 +74,14 @@ internal class PublishCommand : CkcCommand
                 return;
             }
 
-            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced);
+            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced, publishExtensions);
 
             Logger.LogInformation("Construction kit model published");
         }
-        catch (ModelParseException)
+        catch (Exception)
         {
-            Logger.LogError("Error loading model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
-        }
-        catch (ModelValidationException)
-        {
-            Logger.LogError("Error validating model \'{FilePath}\'", filePath);
-            operationResult.WriteMessagesToLogger(Logger);
+            Logger.LogError("Error publishing model \'{FilePath}\'", filePath);
+            throw;
         }
     }
 }

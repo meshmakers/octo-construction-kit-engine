@@ -37,6 +37,14 @@ internal class BulkRtMutation : IBulkRtMutation
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
+        foreach (var entityUpdateInfo in entityUpdateInfoList)
+        {
+            if (entityUpdateInfo.RtEntity != null)
+            {
+                entityUpdateInfo.RtEntity.CkTypeId = entityUpdateInfo.CkTypeId;
+            }
+        }
+        
         OperationResult operationResult = new();
         OriginFileResolver originFileResolver = new("-");
         var entityValidatorResult = await _entityRuleEngine.ValidateAsync(repositoryDataSource.TenantId,

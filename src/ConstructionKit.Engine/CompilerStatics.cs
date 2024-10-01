@@ -9,6 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine;
 internal static class CompilerStatics
 {
     public const string AllowedCharactersInNamesRegex = @"^[a-zA-Z0-9_.]+$";
+    public const string AllowedCharactersInEnumNamesRegex = @"^[_a-zA-Z][_a-zA-Z0-9]*$";
 
     public const string AttributesDirectoryName = "attributes";
     public const string AssociationsDirectoryName = "associations";
@@ -25,5 +26,5 @@ internal static class CompilerStatics
     public const string Sample1Association = "sampleAssocation1.yaml";
 
     public static IEnumerable<CkId<CkTypeId>> WhiteListedCkTypeIds { get; } =
-        new CkId<CkTypeId>[] { new("System/Entity") };
+        [new("System/Entity")];
 }

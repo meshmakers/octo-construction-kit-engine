@@ -65,12 +65,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
         try
         {
             var ckMetaDto = await JsonSerializer.DeserializeAsync<CkModelConfigDto>(stream, _options).ConfigureAwait(false);
-            return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            return ckMetaDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
         {
             CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult, e);
         }
     }
 
@@ -80,12 +80,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
         try
         {
             var ckMetaDto = await JsonSerializer.DeserializeAsync<CkMetaRootDto>(stream, _options).ConfigureAwait(false);
-            return ckMetaDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            return ckMetaDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
         {
             CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult, e);
         }
     }
 
@@ -95,12 +95,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
         try
         {
             var ckElementsDto = await JsonSerializer.DeserializeAsync<CkElementsRootDto>(stream, _options).ConfigureAwait(false);
-            return ckElementsDto ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            return ckElementsDto ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
         {
             CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult, e);
         }
     }
 
@@ -129,12 +129,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
         try
         {
             var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options).ConfigureAwait(false);
-            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            return ckModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
         {
             CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult, e);
         }
     }
 
@@ -143,12 +143,12 @@ internal class CkJsonSerializer : ICkJsonSerializer
         try
         {
             var ckModelRoot = JsonSerializer.Deserialize<CkCompiledModelRoot>(stream, _options);
-            return ckModelRoot ?? throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            return ckModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
         {
             CheckException(locationReference, operationResult, e);
-            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult);
+            throw ModelParseException.CannotDeserializeModel(locationReference, operationResult, e);
         }
     }
 

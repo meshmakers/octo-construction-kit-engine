@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 
@@ -7,6 +8,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 ///     Represents a unique identifier of a runtime model entity and its construction kit type.
 /// </summary>
 [Newtonsoft.Json.JsonConverter(typeof(NewtonRtEntityIdConverter))]
+[TypeConverter(typeof(RtEntityIdConverter))]
 public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntityId>, IConvertible
 {
     /// <summary>

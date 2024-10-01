@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
@@ -82,7 +83,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
     /// <inheritdoc />
     public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
-        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+        bool publishExtensions = false, object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
         if (File.Exists(compiledModelFilePath) && !force)
@@ -93,17 +94,30 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
         Directory.CreateDirectory(path);
 
+        var tempFilePath = Path.GetTempFileName();
+
+        try
+        {
+#if NETSTANDARD2_0
+            using var streamWriter = new StreamWriter(tempFilePath);
+#else
+            await using var streamWriter = new StreamWriter(tempFilePath);
+#endif
+            await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+            streamWriter.Close();
+        }
+        catch (Exception e)
+        {
+            throw ModelRepositoryException.PublishFailed(ckCompiledModel.ModelId, RepositoryName, e);
+        }
+
         var i = 0;
         while (i++ < 20)
         {
             try
             {
-#if NETSTANDARD2_0
-                using var streamWriter = new StreamWriter(compiledModelFilePath);
-#else
-                await using var streamWriter = new StreamWriter(compiledModelFilePath);
-#endif
-                await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+                File.Copy(tempFilePath, compiledModelFilePath, true);
+                return;
             }
             catch (Exception)
             {
@@ -113,10 +127,17 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, object? sourceIdentifier = null,
+    public Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, bool publishExtensions = false,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        return PublishModelAsync(ckCompiledModel, true, publishExtensions, sourceIdentifier, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        throw new NotImplementedException();
+        throw ModelRepositoryException.CustomizationNotSupported(RepositoryName);
     }
 
     private string CreatePath(CkModelId ckModelId)

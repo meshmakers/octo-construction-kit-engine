@@ -257,10 +257,37 @@ internal class ElementResolver : IElementResolver
                 }
 
                 var ignoreEnum = false;
+                foreach (var ckEnumValueDto in ckEnum.Values)
+                {
+                    if (string.IsNullOrWhiteSpace(ckEnumValueDto.Name))
+                    {
+                        operationResult.AddMessage(MessageCodes.EnumNameMyNotBeEmpty(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        ignoreEnum = true;
+                    }
+                    
+                    if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.AllowedCharactersInEnumNamesRegex))
+                    {
+                        operationResult.AddMessage(MessageCodes.EnumNameMayNotContainWhitespaceSpecialCharacters(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        ignoreEnum = true;
+                    }
+
+                    if (ckEnumValueDto.Key < 0)
+                    {
+                        operationResult.AddMessage(MessageCodes.EnumKeyMayNotBeNegative(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        ignoreEnum = true;
+                    }
+                }
+                
                 foreach (var ckSelectionValueGroup in
                          ckEnum.Values.GroupBy(x => x.Key).Where(x => x.Count() > 1))
                 {
                     operationResult.AddMessage(MessageCodes.SelectionValueNotUnique(originFileResolver.Resolve(ckEnumId), ckEnumId, ckSelectionValueGroup.Key));
+                    ignoreEnum = true;
+                }
+
+                if (!ckEnum.IsExtensible && ckEnum.Values.Any(x => x.IsExtension))
+                {
+                    operationResult.AddMessage(MessageCodes.EnumIsNotExtensibleButContainsExtension(originFileResolver.Resolve(ckEnumId), ckEnumId));
                     ignoreEnum = true;
                 }
 

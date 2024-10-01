@@ -32,13 +32,13 @@ public class CkTypeAttributeDto
     public string AttributeName { get; set; } = null!;
 
     /// <summary>
-    ///     Gets or sets a list of values that are used for auto completion.
+    ///     Gets or sets a list of values that are used for auto-completion.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<object>? AutoCompleteValues { get; set; }
 
     /// <summary>
-    ///     If auto completion is enabled, this property defines the attribute that is used as a reference for the auto completion values.
+    ///     If auto-completion is enabled, this property defines the attribute that is used as a reference for the auto-completion values.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? AutoIncrementReference { get; set; }

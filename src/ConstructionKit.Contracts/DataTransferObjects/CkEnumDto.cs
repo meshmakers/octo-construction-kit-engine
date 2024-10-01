@@ -30,7 +30,14 @@ public class CkEnumDto
     /// <summary>
     ///     When true the enum is handles as flags enum
     /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool UseFlags { get; set; }
+    
+    /// <summary>
+    ///     When true the enum is extensible using the API
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsExtensible { get; set; } = false;
 
     /// <summary>
     ///     Values of the enum

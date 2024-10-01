@@ -329,6 +329,24 @@
       "number": 55,
       "level": "ERROR",
       "text": "Enum '{ckEnumId}' is not extensible but contains an extension."
+    },
+    {
+      "key": "EnumNameMayNotContainWhitespaceSpecialCharacters",
+      "number": 56,
+      "level": "ERROR",
+      "text": "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters."
+    },
+    {
+      "key": "EnumNameMyNotBeEmpty",
+      "number": 57,
+      "level": "ERROR",
+      "text": "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters."
+    },
+    {
+      "key": "EnumKeyMayNotBeNegative",
+      "number": 58,
+      "level": "ERROR",
+      "text": "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative."
     }
   ]
 }

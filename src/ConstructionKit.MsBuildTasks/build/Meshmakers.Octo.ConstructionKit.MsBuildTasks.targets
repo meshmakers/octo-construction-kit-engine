@@ -38,8 +38,7 @@
                    Compile="$(OctoCompileCkModel)"
                    PublishCkModel="$(OctoPublishCkModel)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
-                   CkLinkPath="$(OctoCkLinkPath)"
-                   CkVersion="$(OctoCkVersion)">
+                   CkLinkPath="$(OctoCkLinkPath)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
         </CkCompile>

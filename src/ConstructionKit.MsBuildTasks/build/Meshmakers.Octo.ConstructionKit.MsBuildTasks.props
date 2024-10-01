@@ -24,6 +24,5 @@
     <!--Additional Parameters for Generate Docs-->
     <PropertyGroup>
         <OctoCkLinkPath>/docs/technologyGuide/constructionKits/</OctoCkLinkPath>
-        <OctoCkVersion>1.0</OctoCkVersion>
     </PropertyGroup>
 </Project>

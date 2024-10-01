@@ -35,6 +35,11 @@ internal class InheritanceHelpers(ILinkHelpers linkHelpers)
     {
         StringBuilder stringBuilder = new();
 
+        if (string.IsNullOrEmpty(reconstructedHierarchy.ElementAt(0)))
+        {
+            reconstructedHierarchy = reconstructedHierarchy.Where(x => !string.IsNullOrEmpty(x)).ToArray();
+        }
+        
         for (var i = 0; i < reconstructedHierarchy.Length; i++)
         {
             var obj = reconstructedHierarchy[i];

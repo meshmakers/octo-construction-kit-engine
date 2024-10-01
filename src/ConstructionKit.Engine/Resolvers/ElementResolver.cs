@@ -265,7 +265,7 @@ internal class ElementResolver : IElementResolver
                         ignoreEnum = true;
                     }
                     
-                    if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+                    if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.AllowedCharactersInEnumNamesRegex))
                     {
                         operationResult.AddMessage(MessageCodes.EnumNameMayNotContainWhitespaceSpecialCharacters(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
                         ignoreEnum = true;

@@ -3,7 +3,7 @@ associationRoles:
   - id: ParentChild
     inboundName: Parent
     outboundName: Children
-    inboundMultiplicity: ZeroOrOne
+    inboundMultiplicity: One
     outboundMultiplicity: N
   - id: Related
     inboundName: RelatesTo

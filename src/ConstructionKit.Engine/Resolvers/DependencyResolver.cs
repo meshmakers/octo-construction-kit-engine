@@ -57,7 +57,7 @@ internal class DependencyResolver : IDependencyResolver
                 }
             }
 
-            _logger.LogDebug("Adding resolved dependency '{CkTypeId}' to dependency graph", ckDependencyRootModel.ModelId);
+            _logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph", ckDependencyRootModel.ModelId);
             ckModelGraph.AppendModel(ckDependencyRootModel);
         }
     }

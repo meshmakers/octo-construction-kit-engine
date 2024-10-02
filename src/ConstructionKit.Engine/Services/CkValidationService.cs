@@ -23,15 +23,19 @@ public class CkValidationService : ICkValidationService
     }
 
     /// <inheritdoc />
-    public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
-        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult).ConfigureAwait(false);
+        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult)
+    public async Task<CkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel, OperationResult operationResult,
+        object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
-        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult).ConfigureAwait(false);
+        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
+            .ConfigureAwait(false);
     }
 }

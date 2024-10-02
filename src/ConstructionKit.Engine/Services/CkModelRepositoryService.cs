@@ -165,7 +165,8 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot).ConfigureAwait(false);
 
             var ckModelGraph = await _ckValidationService
-                .ValidateAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
+                .ValidateAsync(compiledModelRoot, originFileResolver, operationResult, sourceIdentifier)
+                .ConfigureAwait(false);
 
             var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, ckModelId, createCacheFilePath)
                 .ConfigureAwait(false);

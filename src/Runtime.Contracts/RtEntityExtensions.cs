@@ -55,7 +55,7 @@ public static class RtEntityExtensions
         var ckTypeId = TryGetGetCkTypeId(type);
         if (ckTypeId == null)
         {
-            throw PersistenceException.CkIdAttributeNotSet(type);
+            throw PersistenceException.CkTypeIdNotSet(type);
         }
 
         return ckTypeId;

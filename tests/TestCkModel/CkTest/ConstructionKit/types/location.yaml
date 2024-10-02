@@ -18,6 +18,12 @@ types:
     isFinal: true
     isAbstract: false
 
+  - typeId: Ocean
+    derivedFromCkTypeId: Test/Location
+    isFinal: true
+    isAbstract: false
+
+
   - typeId: Country
     derivedFromCkTypeId: Test/Location
     isFinal: true
@@ -32,6 +38,8 @@ types:
     associations:
       - id: System/ParentChild
         targetCkTypeId: Test/Continent
+      - id: System/ParentChild
+        targetCkTypeId: Test/Ocean        
 
   - typeId: Region
     derivedFromCkTypeId: Test/LocationWithSensor

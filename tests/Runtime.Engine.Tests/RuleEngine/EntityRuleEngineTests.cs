@@ -6,30 +6,22 @@ using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RuleEngine;
 
-public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
+public class EntityRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
 {
-    private readonly CacheServiceFixture _fixture;
-
-    public EntityRuleEngineTests(CacheServiceFixture fixture)
-    {
-        _fixture = fixture;
-    }
-
     [Fact]
     public async Task ValidateAsync_NonExistingTypeId_Fail()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Sample1/SampleType35"
             })
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -43,18 +35,17 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_MandatoryAttributeWithoutDefaultMissing_Fail()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Test/City"
             })
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -68,18 +59,17 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_AbstractType_Fail()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(new RtEntity
             {
                 CkTypeId = "Test/LocationWithSensor"
             })
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -93,13 +83,12 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_Create_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(
                 new RtEntity(
                     "Test/Country",
@@ -109,7 +98,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                         { "Designation", "Test" },
                         { "RecordArrayTests", new List<object>() }
                     }))
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Single(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -122,13 +111,12 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_Update_MissingMandatoryAttribute_Fail()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateUpdate(
                 new RtEntityId("Test/Country", OctoObjectId.GenerateNewId()),
                 new RtEntity(
@@ -138,7 +126,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                     {
                         { "Designation", null }
                     }))
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Empty(ruleEngineResult.RtEntitiesToUpdate);
@@ -152,13 +140,12 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_Update_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateUpdate(
                 new RtEntityId("Test/Country", OctoObjectId.GenerateNewId()),
                 new RtEntity(
@@ -168,7 +155,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                     {
                         { "Designation", "Test" }
                     }))
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
@@ -181,7 +168,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_StringArrayWithDefaultValues_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
@@ -194,10 +181,9 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "RecordArrayTests", new List<object>() }
             });
 
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         var list = rtEntity.GetAttributeStringValues("StringArrayTests");
 
@@ -210,7 +196,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_IntArrayWithDefaultValues_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
@@ -223,10 +209,9 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "RecordArrayTests", new List<object>() }
             });
 
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         var list = rtEntity.GetAttributeValues<int>("IntArrayTests");
 
@@ -239,7 +224,7 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ValidateAsync_RecordArray_Empty_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
+        var ckCacheService = await fixture.GetCacheServiceAsync();
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var ruleEngine = new EntityRuleEngine(ckCacheService);
@@ -252,10 +237,9 @@ public class EntityRuleEngineTests : IClassFixture<CacheServiceFixture>
                 { "RecordArrayTests", new List<RtRecord>() }
             });
 
-        var ruleEngineResult = await ruleEngine.ValidateAsync(_fixture.TenantId, new[]
-        {
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
             EntityUpdateInfo<RtEntity>.CreateInsert(rtEntity)
-        }, originFileResolver, operationResult);
+        ], originFileResolver, operationResult);
 
         var list = rtEntity.GetRtRecordAttributeValues<RtTestRecordRecord>("RecordArrayTests");
 

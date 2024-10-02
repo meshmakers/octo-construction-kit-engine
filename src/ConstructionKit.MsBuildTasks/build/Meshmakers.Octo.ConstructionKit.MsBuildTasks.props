@@ -23,6 +23,6 @@
     </PropertyGroup>
     <!--Additional Parameters for Generate Docs-->
     <PropertyGroup>
-        <OctoCkLinkPath>/docs/technologyGuide/constructionKits/</OctoCkLinkPath>
+        <OctoCkLinkPath>/docs/technologyGuide/constructionKits/libraries/</OctoCkLinkPath>
     </PropertyGroup>
 </Project>

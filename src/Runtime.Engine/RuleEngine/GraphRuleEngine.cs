@@ -35,9 +35,12 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         var createAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
         var deleteAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
 
+        // Checks if assoc already exists in the repository
         await ValidateAssociationsToCreate(session, repositoryDataSource, createAssociations, graphValidationResult, originFileResolver,
                 operationResult)
             .ConfigureAwait(false);
+        
+        // Checks if assoc exists in the repository, if not it cannot be deleted...
         await ValidateAssociationsToDelete(session, repositoryDataSource, deleteAssociations, graphValidationResult, originFileResolver,
                 operationResult)
             .ConfigureAwait(false);
@@ -71,30 +74,29 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 operationResult)
             .ConfigureAwait(false);
 
-        // Ensure that all associations exists when creating an entity
-        // Currently, the only mandatory association has multiplicity of One
+        // Ensure that all mandatory associations with multiplicity of One exists when creating an entity
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert))
         {
             var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
 
             var inputAssociationGraphs =
-                ckTypeGraph.Associations.In.All.Where(a =>
-                    a.Multiplicity == MultiplicitiesDto.One);
-            foreach (var inputAssociationGraph in inputAssociationGraphs)
+                ckTypeGraph.Associations.Out.All.Where(a =>
+                    a.Multiplicity == MultiplicitiesDto.One).GroupBy(x=> x.CkRoleId);
+            foreach (var inputAssociationGraphGrouping in inputAssociationGraphs)
             {
                 if (!associationUpdateInfoList.Any(x =>
                         x.ModOption == AssociationModOptionsDto.Create &&
-                        x.RoleId == inputAssociationGraph.CkRoleId))
+                        x.RoleId == inputAssociationGraphGrouping.Key))
                 {
                     operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnCreate(
                         originFileResolver.Resolve(repositoryDataSource.TenantId),
                         repositoryDataSource.TenantId,
-                        entityUpdateInfo.CkTypeId, inputAssociationGraph.CkRoleId,
+                        entityUpdateInfo.CkTypeId, inputAssociationGraphGrouping.Key,
                         MultiplicitiesDto.One));
                 }
             }
         }
-
+        
         // Delete all corresponding associations if an entity is deleted  
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete))
         {
@@ -282,6 +284,9 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         }
     }
 
+    /// <summary>
+    /// This method validates the associations to be deleted. It checks if the association exists in the database.
+    /// </summary>
     private async Task ValidateAssociationsToDelete(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IEnumerable<AssociationUpdateInfo> deleteAssociations, GraphRuleEngineResult graphRuleEngineResult,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
@@ -307,6 +312,9 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         }
     }
 
+    /// <summary>
+    /// This method validates the associations to be created. It checks if the association already exists in the database.
+    /// </summary>
     private async Task ValidateAssociationsToCreate(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IEnumerable<AssociationUpdateInfo> createAssociations, GraphRuleEngineResult graphRuleEngineResult,
         IOriginFileResolver originFileResolver, OperationResult operationResult)

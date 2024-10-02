@@ -42,4 +42,28 @@ public record AssociationUpdateInfo
     ///     Mod option.
     /// </summary>
     public AssociationModOptionsDto ModOption { get; }
+    
+    /// <summary>
+    /// Creates an association update info for creating an association.
+    /// </summary>
+    /// <param name="origin">Runtime entity identifier of the origin entity.</param>
+    /// <param name="target">Runtime entity identifier of the target entity.</param>
+    /// <param name="roleId">Role identifier of the association.</param>
+    /// <returns>Create association update info.</returns>
+    public static AssociationUpdateInfo CreateCreate(RtEntityId origin, RtEntityId target, CkId<CkAssociationRoleId> roleId)
+    {
+        return new AssociationUpdateInfo(origin, target, roleId, AssociationModOptionsDto.Create);
+    }
+    
+    /// <summary>
+    /// Creates an association update info for deleting an association.
+    /// </summary>
+    /// <param name="origin">Runtime entity identifier of the origin entity.</param>
+    /// <param name="target">Runtime entity identifier of the target entity.</param>
+    /// <param name="roleId">Role identifier of the association.</param>
+    /// <returns>Create association update info.</returns>
+    public static AssociationUpdateInfo CreateDelete(RtEntityId origin, RtEntityId target, CkId<CkAssociationRoleId> roleId)
+    {
+        return new AssociationUpdateInfo(origin, target, roleId, AssociationModOptionsDto.Delete);
+    }
 }

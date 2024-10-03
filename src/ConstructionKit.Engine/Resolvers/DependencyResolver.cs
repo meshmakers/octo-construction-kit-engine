@@ -49,7 +49,7 @@ internal class DependencyResolver : IDependencyResolver
             {
                 foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)
                 {
-                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency))
+                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) && !dependencies.Contains(ckChildDependency))
                     {
                         _logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
                         dependencies.Add(ckChildDependency);

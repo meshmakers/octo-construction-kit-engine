@@ -27,7 +27,7 @@
         <OctoVersion Condition="'$(OctoNugetPrivateServer)'=='' And '$(OctoVersion)'==''">3.1.*</OctoVersion>
         <Version Condition="'$(Configuration)'=='DebugL'">999.0.0</Version>
         <PackageVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</PackageVersion>
-        <MeshmakerVersion>4.0.2409.18001</MeshmakerVersion>
+        <MeshmakerVersion>4.0.2410.1002</MeshmakerVersion>
         <MeshmakerVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</MeshmakerVersion>
         <RestoreSources Condition="'$(OctoNugetPrivateServer)'!=''">$(OctoNugetPrivateServer)</RestoreSources>
         <RestoreSources Condition="'$(Configuration)'=='DebugL'">$(RestoreSources);$(OctoRepoRootPath)../nuget</RestoreSources>

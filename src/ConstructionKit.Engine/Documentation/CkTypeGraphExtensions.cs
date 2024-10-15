@@ -146,4 +146,11 @@ internal static class CkTypeGraphExtensions
     {
         return ckTypeGraph.CkTypeId.Key.TypeId.ToLower();
     }
+    
+    public static async Task DrawExternal(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)
+    {
+        await outputFile.WriteLineAsync($"class {ckTypeGraph.CkTypeId.GetClassName()}").ConfigureAwait(false);
+        await DrawNamespaces(ckTypeGraph, outputFile).ConfigureAwait(false);
+        await LinkToType(ckTypeGraph, outputFile, baseRelativePath, linkHelpers).ConfigureAwait(false);
+    }
 }

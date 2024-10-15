@@ -72,14 +72,37 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
 
         await GenerateMermaidInstructions(outputFile).ConfigureAwait(false);
         
+        var drawnTypes = new HashSet<CkId<CkTypeId>>();
+        var externalTypes = new HashSet<CkId<CkTypeId>>();
+        
         foreach (var type in modelGraph.GetTypes())
         {
-            await type.DrawClass(outputFile).ConfigureAwait(false);
-            await type.DrawInheritance(outputFile).ConfigureAwait(false);
-            await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value)).ConfigureAwait(false);
-            await type.LinkToType(outputFile, linkPathRoot, linkHelpers).ConfigureAwait(false);
-            await type.DrawNamespaces(outputFile).ConfigureAwait(false);
+            if (type.CkTypeId.ModelId != ckModelId) continue;
+            await DrawTypeOfModel(modelGraph, outputFile, linkPathRoot, type, drawnTypes, externalTypes).ConfigureAwait(false);
         }
+        foreach (var externalType in externalTypes)
+        {
+            modelGraph.Types.TryGetValue(externalType, out var baseTypeGraph);
+            await baseTypeGraph!.DrawExternal(outputFile, linkPathRoot, linkHelpers).ConfigureAwait(false);
+        }
+    }
+
+    private async Task DrawTypeOfModel(CkModelGraph modelGraph, StreamWriter outputFile, string linkPathRoot,
+        CkTypeGraph type, HashSet<CkId<CkTypeId>> drawnTypes, HashSet<CkId<CkTypeId>> externalTypes)
+    {
+        if (drawnTypes.Contains(type.CkTypeId)) return;
+        
+        await type.DrawClass(outputFile).ConfigureAwait(false);
+        await type.DrawInheritance(outputFile).ConfigureAwait(false);
+        await type.DrawAssociations(outputFile, modelGraph.AssociationRoles.Select(x => x.Value)).ConfigureAwait(false);
+        await type.LinkToType(outputFile, linkPathRoot, linkHelpers).ConfigureAwait(false);
+        await type.DrawNamespaces(outputFile).ConfigureAwait(false);
+        drawnTypes.Add(type.CkTypeId);
+        foreach (var baseType in type.BaseTypes.Where(bt => bt.BaseTypeDepthIndex == 0))
+        {
+            externalTypes.Add(baseType.BaseCkTypeId);
+        }
+        
     }
 
     //For Library Use

@@ -1,4 +1,5 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
@@ -69,12 +70,24 @@ internal static class CkTypeGraphExtensions
                 foreach (var item in ckAssociationRoleGraphs)
                 {
                     if (association.CkRoleId.FullName != item.CkRoleId.FullName) continue;
-                    var outboundMultiplicityConversion = FormatOutboundMultiplicity(item);
-                    var inboundMultiplicityConversion = FormatInboundMultiplicity(item);
-                    await outputFile.WriteLineAsync(
-                        $"{association.OriginCkTypeId.GetName()} \"{outboundMultiplicityConversion}\" -->" +
-                        $" \"{inboundMultiplicityConversion}\" {association.TargetCkTypeId.GetName()} : " +
-                        $"{association.CkRoleId.SemanticVersionedFullName}").ConfigureAwait(false);
+                    
+                    if (item is { InboundMultiplicity: MultiplicitiesDto.One, OutboundMultiplicity: MultiplicitiesDto.N })
+                    {
+                        await outputFile.WriteLineAsync(
+                            $"{association.OriginCkTypeId.GetName()}  --* " +
+                            $"{association.TargetCkTypeId.GetName()} : " +
+                            $"{association.CkRoleId.SemanticVersionedFullName}").ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        var outboundMultiplicityConversion = FormatOutboundMultiplicity(item);
+                        var inboundMultiplicityConversion = FormatInboundMultiplicity(item);
+                        await outputFile.WriteLineAsync(
+                            $"{association.OriginCkTypeId.GetName()} \"{outboundMultiplicityConversion}\" -->" +
+                            $" \"{inboundMultiplicityConversion}\" {association.TargetCkTypeId.GetName()} : " +
+                            $"{association.CkRoleId.SemanticVersionedFullName}").ConfigureAwait(false);
+                    }
+                    
                 }
             }
         }
@@ -86,8 +99,8 @@ internal static class CkTypeGraphExtensions
 
         var inboundMultiplicityConversion = inboundMultiplicity switch
         {
-            Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne => "0..1",
-            Contracts.DataTransferObjects.MultiplicitiesDto.One => "1",
+            MultiplicitiesDto.ZeroOrOne => "0..1",
+            MultiplicitiesDto.One => "1",
             _ => "n"
         };
 
@@ -100,8 +113,8 @@ internal static class CkTypeGraphExtensions
 
         var outboundMultiplicityConversion = outboundMultiplicity switch
         {
-            Contracts.DataTransferObjects.MultiplicitiesDto.ZeroOrOne => "0..1",
-            Contracts.DataTransferObjects.MultiplicitiesDto.One => "1",
+            MultiplicitiesDto.ZeroOrOne => "0..1",
+            MultiplicitiesDto.One => "1",
             _ => "n"
         };
 

@@ -13,7 +13,6 @@ internal static class CkAttributeGraphExtensions
                                         $"{ckAttributeGraph.ValueType.ToString()} | " +
                                         $"{ckAttributeGraph.DrawDefaultValues()} | " +
                                         $"{ckAttributeGraph.IsDataStream.ToString()} | " +
-                                        $"{ckAttributeGraph.Description ?? ""} | " +
                                         $"{ckAttributeGraph.LinkToRecordOrEnum(baseRelativePath, linkHelpers)} |").ConfigureAwait(false);
     }
 

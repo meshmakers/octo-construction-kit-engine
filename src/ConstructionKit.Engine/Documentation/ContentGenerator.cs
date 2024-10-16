@@ -58,9 +58,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
             
             await outputFile.WriteLineAsync(
                     $"| {Text.ID} | {Text.DataType} | {Text.DefaultValues} | {Text.IsDataStream} |" +
-                    $" {Text.Description} | {Text.CkEnumId_CkRecordId} |")
+                    $" {Text.CkEnumId_CkRecordId} |")
                 .ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| -----------| ----------- |")
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------| ----------- |")
                 .ConfigureAwait(false);
                     
             await attribute.DrawAttribute(outputFile, directoryPath, linkHelpers).ConfigureAwait(false);

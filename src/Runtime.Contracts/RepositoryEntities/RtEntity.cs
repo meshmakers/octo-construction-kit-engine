@@ -67,6 +67,11 @@ public class RtEntity : RtTypeWithAttributes
     ///     Returns the well known name to access well known entities in a faster way
     /// </summary>
     public string? RtWellKnownName { get; set; }
+    
+    /// <summary>
+    ///     Gets or sets the runtime version, which is used to detect changes of the entity
+    /// </summary>
+    public ulong RtVersion { get; set; }
 
     /// <inheritdoc />
     protected override string GetLocation()

@@ -304,6 +304,9 @@ internal class ContentGenerator(ILogger<ContentGenerator> logger, IDirectoryTool
                     await TextWrapper.AddDescription(outputFile, associationRole.Description).ConfigureAwait(false);
                 }
                 
+                //Extra Newline to prevent table melting
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+                
                 await outputFile.WriteLineAsync(
                         $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
                         $" {Text.OutboundMultiplicity}| {Text.OutboundName}|" +

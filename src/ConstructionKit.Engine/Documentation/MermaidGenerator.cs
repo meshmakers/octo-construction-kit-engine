@@ -106,6 +106,7 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
     }
 
     //For Library Use
+    //Has not implemented new diagram generation!
     public async Task GenerateMermaidDiagram(CkModelGraph modelGraph, string outputPath)
     {
 #if NETSTANDARD2_0

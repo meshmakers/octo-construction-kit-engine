@@ -23,16 +23,33 @@ attributes:
     valueType: Int
   - id: ConfigurationValue
     valueType: String
+    
   - id: Query.Columns
-    valueType: String
+    valueType: StringArray
   - id: Query.CkTypeId
     valueType: String
   - id: Query.Sorting
-    valueType: String
+    valueType: RecordArray
+    valueCkRecordId: ${thisModel}/SortOrderItem
   - id: Query.FieldFilter
-    valueType: String
+    valueType: RecordArray
+    valueCkRecordId: ${thisModel}/FieldFilter
   - id: Query.TextSearchFilter
-    valueType: String
+    valueType: Record
+    valueCkRecordId: ${thisModel}/TextSearchFilter
   - id: Query.AttributeSearchFilter
+    valueType: Record
+    valueCkRecordId: ${thisModel}/AttributeSearchFilter
+    
+  - id: ReferencedAttributeName
     valueType: String
-
+  - id: ReferencedAttributeNames
+    valueType: StringArray    
+  - id: FieldFilter.Operator
+    valueType: Enum
+    valueCkEnumId: ${thisModel}/FieldFilterOperator
+  - id: ComparisonValue
+    valueType: String
+  - id: SortOrder
+    valueType: Enum
+    valueCkEnumId: ${thisModel}/SortOrders

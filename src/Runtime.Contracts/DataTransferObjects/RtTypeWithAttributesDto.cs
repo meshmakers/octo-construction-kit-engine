@@ -6,13 +6,14 @@
 namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 
 /// <summary>
-///     Defines an type with attributes for the runtime 
+///     Defines a type (entity or record) with attributes for runtime model 
 /// </summary>
 public class RtTypeWithAttributesDto
 {
     /// <summary>
     ///     Creates a new instance of <see cref="RtTypeWithAttributesDto" />
     /// </summary>
+    // ReSharper disable once MemberCanBeProtected.Global
     public RtTypeWithAttributesDto()
     {
         Attributes = new List<RtAttributeDto>();

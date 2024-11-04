@@ -1,0 +1,8 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+- recordId: SortOrderItem
+  attributes:
+    - id: ${thisModel}/ReferencedAttributeName
+      name: AttributeName
+    - id: ${thisModel}/SortOrder
+      name: SortOrder

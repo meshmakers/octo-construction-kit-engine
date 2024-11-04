@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -69,7 +70,7 @@ public static class AttributeValueConverter
                     return stringArray.ToList();
                 }
 
-                if (value is List<object> objectList)
+                if (value is IEnumerable<object> objectList)
                 {
                     return objectList.Select(x =>
                     {

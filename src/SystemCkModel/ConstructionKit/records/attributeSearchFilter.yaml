@@ -1,0 +1,8 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+- recordId: AttributeSearchFilter
+  attributes:
+    - id: ${thisModel}/ReferencedAttributeNames
+      name: AttributeNames
+    - id: ${thisModel}/ComparisonValue
+      name: SearchValue

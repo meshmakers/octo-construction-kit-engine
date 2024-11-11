@@ -2,9 +2,13 @@
 types:
   - typeId: Configuration
     derivedFromCkTypeId: System/Entity
+    isFinal: false
+    isAbstract: true
+  - typeId: TenantConfiguration
+    derivedFromCkTypeId: ${thisModel}/Configuration
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System/ConfigurationValue
+      - id: ${thisModel}/ConfigurationValue
         name: ConfigurationValue
         isOptional: true

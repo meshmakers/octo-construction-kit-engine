@@ -20,9 +20,9 @@
 
     <ItemGroup>
         <PackageReference Include="JsonSchema.Net" Version="7.2.3" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.2" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" PrivateAssets="All" />
-        <PackageReference Include="System.Text.Json" Version="8.0.5" />
+        <PackageReference Include="System.Text.Json" Version="9.0.0" />
         <PackageReference Include="YamlDotNet" Version="16.2.0" />
     </ItemGroup>
 

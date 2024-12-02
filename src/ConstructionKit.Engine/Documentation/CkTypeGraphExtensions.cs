@@ -35,7 +35,7 @@ internal static class CkTypeGraphExtensions
 
             foreach (var attribute in ckTypeGraph.DefinedAttributes)
             {
-                await outputFile.WriteLineAsync($"+{attribute.AttributeName} : {attribute.AttributeName.GetTypeCode()}").ConfigureAwait(false);
+                await outputFile.WriteLineAsync($"+{attribute.AttributeName} : {ckTypeGraph.GetAttributeType(attribute)}").ConfigureAwait(false);
             }
 
             await outputFile.WriteLineAsync("}").ConfigureAwait(false);
@@ -44,6 +44,13 @@ internal static class CkTypeGraphExtensions
         {
             await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
+    }
+
+    private static string GetAttributeType(this CkTypeGraph ckTypeGraph, CkTypeAttributeDto attribute)
+    {
+        return ckTypeGraph.AllAttributes
+            .FirstOrDefault(x => x.Key == attribute.CkAttributeId)
+            .Value.ValueType.ToString();
     }
 
     public static async Task DrawInheritance(this CkTypeGraph ckTypeGraph, StreamWriter outputFile)

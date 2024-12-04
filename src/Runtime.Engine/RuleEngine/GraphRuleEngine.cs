@@ -145,10 +145,10 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                          .Where(a => a.Target == targetEntityId)
                          .GroupBy(a => a.RoleId))
             {
-                var inboundTypeAssociationGraph =
-                    targetCkTypeGraph.Associations.In.All.FirstOrDefault(a =>
-                        a.CkRoleId == associationUpdateInfosByRoleId.Key);
-                if (inboundTypeAssociationGraph == null)
+                var inboundTypeAssociationGraphs =
+                    targetCkTypeGraph.Associations.In.All.Where(a =>
+                        a.CkRoleId == associationUpdateInfosByRoleId.Key).ToArray();
+                if (!inboundTypeAssociationGraphs.Any())
                 {
                     operationResult.AddMessage(MessageCodes.OutboundAssociationNotAllowedForCkType(
                         originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
@@ -156,9 +156,16 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                         targetCkTypeGraph.CkTypeId));
                     continue;
                 }
+                
+                var multiplicity = inboundTypeAssociationGraphs.First().Multiplicity;
 
-                var originCkTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId,
-                    inboundTypeAssociationGraph.OriginCkTypeId);
+                var originCkTypeGraphs = inboundTypeAssociationGraphs.Select(ckType => 
+                    ckCache.GetCkType(repositoryDataSource.TenantId, ckType.OriginCkTypeId)).ToArray();
+                
+                List<CkId<CkTypeId>> originCkTypeGraphList = new();
+                originCkTypeGraphList.AddRange(originCkTypeGraphs.Select(x => x.CkTypeId));
+                originCkTypeGraphList.AddRange(
+                    originCkTypeGraphs.SelectMany(x => x.DerivedTypes.Select(y => y.InheritorCkTypeId)));
 
                 foreach (var associationUpdateInfo in associationUpdateInfosByRoleId)
                 {
@@ -169,8 +176,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                         var originTypeGraph =
                             ckCache.GetCkType(repositoryDataSource.TenantId, originEntity.GetCkTypeId());
 
-                        if (originCkTypeGraph.CkTypeId != originTypeGraph.CkTypeId &&
-                            originCkTypeGraph.DerivedTypes.All(x => x.InheritorCkTypeId != originTypeGraph.CkTypeId))
+                        if (!originCkTypeGraphList.Contains(originTypeGraph.CkTypeId))
                         {
                             operationResult.AddMessage(MessageCodes.AssociationNotAllowed(
                                 originFileResolver.Resolve(repositoryDataSource.TenantId),
@@ -193,7 +199,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 if (changeDelta < 0)
                 {
                     if (storedTargetAssociations == CurrentMultiplicity.One &&
-                        inboundTypeAssociationGraph.Multiplicity == MultiplicitiesDto.One)
+                        multiplicity == MultiplicitiesDto.One)
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(
                             originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
@@ -205,8 +211,8 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 if (changeDelta > 0)
                 {
                     if (storedTargetAssociations == CurrentMultiplicity.One &&
-                        (inboundTypeAssociationGraph.Multiplicity == MultiplicitiesDto.One ||
-                         inboundTypeAssociationGraph.Multiplicity == MultiplicitiesDto.ZeroOrOne))
+                        (multiplicity == MultiplicitiesDto.One ||
+                         multiplicity == MultiplicitiesDto.ZeroOrOne))
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(
                             originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,

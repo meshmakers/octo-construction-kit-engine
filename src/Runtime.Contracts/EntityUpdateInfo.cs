@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
-using Newtonsoft.Json;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
 
@@ -44,7 +43,8 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
 public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     where TEntity : RtEntity
 {
-    [JsonConstructor]
+    [Newtonsoft.Json.JsonConstructor]
+    [System.Text.Json.Serialization.JsonConstructor]
     private EntityUpdateInfo(OctoObjectId? rtId, CkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption)
     {
         RtId = rtId;
@@ -85,6 +85,7 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     /// <summary>
     ///     MOD option.
     /// </summary>
+    [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Include)]
     public EntityModOptions ModOption { get; }
 
     /// <inheritdoc />

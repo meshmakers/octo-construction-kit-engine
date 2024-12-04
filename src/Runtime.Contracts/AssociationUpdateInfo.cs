@@ -41,6 +41,7 @@ public record AssociationUpdateInfo
     /// <summary>
     ///     Mod option.
     /// </summary>
+    [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Include)]
     public AssociationModOptionsDto ModOption { get; }
     
     /// <summary>

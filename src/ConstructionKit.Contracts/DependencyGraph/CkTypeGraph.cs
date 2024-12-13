@@ -258,4 +258,10 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
 
         return list;
     }
+    
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        return CkTypeId.ToString();
+    }
 }

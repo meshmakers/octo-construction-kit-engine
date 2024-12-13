@@ -163,4 +163,10 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
 
         return list;
     }
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        return CkRecordId.ToString();
+    }
 }

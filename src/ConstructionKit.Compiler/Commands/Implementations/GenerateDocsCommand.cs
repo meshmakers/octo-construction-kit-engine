@@ -54,6 +54,8 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.
         var compiledModelRoot = await _ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, filePath, operationResult);
+        
+        Logger.LogInformation("Construction kit model {CkModelId} loaded", compiledModelRoot.ModelId);
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);

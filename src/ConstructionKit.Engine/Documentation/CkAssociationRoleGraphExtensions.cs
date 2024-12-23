@@ -6,16 +6,29 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 internal static class CkAssociationRoleGraphExtensions
 {
     public static async Task DrawAssociationRole(this CkAssociationRoleGraph ckAssociationRoleGraph, StreamWriter outputFile, 
-        CkTypeAssociationGraph? association, string baseRelativePath, ILinkHelpers linkHelpers)
-    {
-        await outputFile.WriteLineAsync($"| {ckAssociationRoleGraph.AddAnchor() +
-                                             ckAssociationRoleGraph.DrawLinkToDefinition(baseRelativePath, linkHelpers)} | " +
-                                        $"{ckAssociationRoleGraph.InboundMultiplicity} | " +
-                                        $"{ckAssociationRoleGraph.InboundName} | " +
-                                        $"{ckAssociationRoleGraph.OutboundMultiplicity} | " +
-                                        $"{ckAssociationRoleGraph.OutboundName} | " +
-                                        $"{association?.TargetCkTypeId.SemanticVersionedFullName} | " +
-                                        $"{association?.DrawTargetAttributes()} |").ConfigureAwait(false);
+        CkTypeAssociationGraph? association, string baseRelativePath, IDirectoryTools directoryTools, ILinkHelpers linkHelpers)
+    { 
+       await outputFile.WriteLineAsync("| Property | Value |").ConfigureAwait(false);
+       await outputFile.WriteLineAsync("| -----------| -----------|").ConfigureAwait(false);
+       await outputFile.WriteLineAsync($"| InboundMultiplicity | {ckAssociationRoleGraph.InboundMultiplicity} |").ConfigureAwait(false);
+       await outputFile.WriteLineAsync($"| InboundName | {ckAssociationRoleGraph.InboundName} |").ConfigureAwait(false);
+       await outputFile.WriteLineAsync($"| OutboundMultiplicity | {ckAssociationRoleGraph.OutboundMultiplicity} |").ConfigureAwait(false);
+       await outputFile.WriteLineAsync($"| OutboundName | {ckAssociationRoleGraph.OutboundName} |").ConfigureAwait(false);
+       if (association != null)
+       {
+           await outputFile.WriteLineAsync($"| TargetCkTypeId | {ckAssociationRoleGraph.OutboundName} |").ConfigureAwait(false);
+           if (association.TargetAttributes != null)
+           {
+               await outputFile.WriteLineAsync($"| TargetAttributes | {association.DrawTargetAttributes()} |").ConfigureAwait(false);
+           }
+       }
+       
+       await outputFile.WriteLineAsync($"#### Diagram").ConfigureAwait(false);
+      
+       // Diagram to show the association role  
+       await new MermaidGenerator(directoryTools, linkHelpers)
+           .GenerateAssociationGraph(outputFile, ckAssociationRoleGraph)
+           .ConfigureAwait(false);
     }
 
     private static string DrawLinkToDefinition(this CkAssociationRoleGraph ckAssociationRoleGraph, string baseRelativePath, 

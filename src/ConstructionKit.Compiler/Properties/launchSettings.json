@@ -2,10 +2,11 @@
   "profiles": {
     "ConstructionKit.Compiler": {
       "commandName": "Project",
+      "commandLineArgs": "-c generateDocs -f \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Packages.EnergyCommunity/bin/DebugL/net8.0/octo-ck-libraries/Octo.Sdk.Packages.EnergyCommunity/out/ck-energycommunity.yaml\" -l \"/docs/technologyGuide/constructionKits/libraries/\" -o \"$(OctoRepoRootPath)../octo-documentation/src/octo-mesh-documentation/docs/technologyGuide/constructionKits/libraries\""
 //      "commandLineArgs": "-c generateDocs -f \"$(OctoRepoRootPath)octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\bin\\Debug\\net8.0\\octo-ck-libraries\\Octo.Sdk.Packages.Basic\\out\\ck-basic.yaml\" -o \"$(OctoRepoRootPath)octo-documentation\\src\\octo-mesh-documentation\\docs\\technologyGuide\\constructionKits\" -v 1.0"
 //      "commandLineArgs": "-c generateDocs -f \"D:\\Development\\meshmakers\\octo-construction-kit-engine\\tests\\TestCkModel\\bin\\DebugL\\net8.0\\octo-ck-libraries\\TestCkModel\\out\\ck-system.testidentity.yaml\" -o \"$(OctoRepoRootPath)octo-documentation\\src\\octo-mesh-documentation\\docs\\technologyGuide\\constructionKits\" -v 1.0"
 //      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\bin\\Debug\\net8.0\\octo-ck-libraries\\Octo.Sdk.Packages.Basic\\out\\ck-basic.yaml\" -rep \"PublicGitHubRepository\" -r"
-      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\ConstructionKit\" -o \"$(OctoRepoRootPath)temp\""
+//      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)octo-construction-kit\\src\\ConstructionKits\\Octo.Sdk.Packages.Basic\\ConstructionKit\" -o \"$(OctoRepoRootPath)temp\""
     }
   }
 }

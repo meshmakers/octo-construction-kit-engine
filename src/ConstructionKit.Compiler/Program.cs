@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
+using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -60,8 +61,10 @@ internal static class Program
 
         services.Configure<OctoToolOptions>(options =>
             config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
+        services.Configure<GitHubOptions>(options => 
+            config.GetSection(Constants.OctoToolGitHubRootNode).Bind(options));
         
-        //Add Options for Running in ASP Net
+        // Add Options for Running in ASP Net
         services.Configure<ModeSelectionOptions>(options => 
             config.GetSection(ModeSelectionOptions.ModeSelection).Bind(options));
 
@@ -82,6 +85,8 @@ internal static class Program
             var configWriter = new ConfigWriter();
             configWriter.AddOptions(Constants.OctoToolOptionsRootNode,
                 provider.GetRequiredService<IOptions<OctoToolOptions>>());
+            configWriter.AddOptions(Constants.OctoToolGitHubRootNode,
+                provider.GetRequiredService<IOptions<GitHubOptions>>());
             return configWriter;
         });
 

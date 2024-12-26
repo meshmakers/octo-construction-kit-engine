@@ -76,4 +76,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException($"Customization is not supported by repository '{repositoryName}'.");
     }
+
+    internal static Exception GitHubTokenMissing()
+    {
+        return new ModelRepositoryException("GitHub token is missing.");
+    }
 }

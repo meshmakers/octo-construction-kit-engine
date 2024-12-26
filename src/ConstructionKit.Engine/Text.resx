@@ -64,7 +64,7 @@
         <value>Outbound Name</value>
     </data>
     <data name="TargetCKTypeID" xml:space="preserve">
-        <value>TargetCKType ID</value>
+        <value>TargetCKTypeId</value>
     </data>
     <data name="TargetAttributes" xml:space="preserve">
         <value>Target Attributes</value>
@@ -76,12 +76,15 @@
         <value>Auto Complete Values</value>
     </data>
     <data name="CKAttributeID" xml:space="preserve">
-        <value>CKAttributeID</value>
+        <value>CkAttributeId</value>
     </data>
     <data name="LinkHelpers_GetGeneratedFilePath_Document_path_cannot_be_empty" xml:space="preserve">
         <value>Document path cannot be empty.</value>
     </data>
     <data name="LinkHelpers_GetGeneratedFilePath_Extension_cannot_be_empty" xml:space="preserve">
         <value>Extension cannot be empty.</value>
+    </data>
+    <data name="RoleId" xml:space="preserve">
+        <value>CkRoleId</value>
     </data>
 </root>

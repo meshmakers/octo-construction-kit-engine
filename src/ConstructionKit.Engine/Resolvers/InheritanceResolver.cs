@@ -221,12 +221,12 @@ internal class InheritanceResolver : IInheritanceResolver
                 }
             }
 
-            var inAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.OutboundName,
-                ckAssociationRole.OutboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
-            var outAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.InboundName,
+            var inboundAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.InboundName,
                 ckAssociationRole.InboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
-            targetCkTypeGraph.Associations.In.Owned.Add(inAssociationGraph);
-            originTypeGraph.Associations.Out.Owned.Add(outAssociationGraph);
+            var outboundAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.OutboundName,
+                ckAssociationRole.OutboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
+            targetCkTypeGraph.Associations.In.Owned.Add(inboundAssociationGraph);
+            originTypeGraph.Associations.Out.Owned.Add(outboundAssociationGraph);
         }
 
         // Check if the attributes (=defined+inherited at type) have duplicate attribute names

@@ -1,12 +1,12 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 associationRoles:
   - id: ParentChild
-    inboundName: Parent
-    outboundName: Children
-    inboundMultiplicity: One
-    outboundMultiplicity: N
-  - id: Related
-    inboundName: RelatesTo
-    outboundName: RelatesFrom
+    inboundName: Children
     inboundMultiplicity: N
+    outboundName: Parent
+    outboundMultiplicity: One
+  - id: Related
+    inboundName: RelatesFrom
+    inboundMultiplicity: N
+    outboundName: RelatesTo
     outboundMultiplicity: N

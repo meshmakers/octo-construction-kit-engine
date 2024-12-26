@@ -69,7 +69,8 @@ internal class ContentGenerator(
             if (attribute.IsDataStream)
             {
                 await outputFile.WriteLineAsync().ConfigureAwait(false);
-                await TextWrapper.AddDescription(outputFile, "This attribute allows data streams.").ConfigureAwait(false);
+                await TextWrapper.AddDescription(outputFile, "This attribute allows data streams.")
+                    .ConfigureAwait(false);
             }
 
             await outputFile.WriteLineAsync("##### Data Type").ConfigureAwait(false);
@@ -90,12 +91,13 @@ internal class ContentGenerator(
                         .ConfigureAwait(false);
                     break;
                 default:
-                    await outputFile.WriteLineAsync(attribute.ValueType.ToString().ToConstantCase()).ConfigureAwait(false);
+                    await outputFile.WriteLineAsync(attribute.ValueType.ToString().ToConstantCase())
+                        .ConfigureAwait(false);
                     break;
             }
-            
+
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            
+
             if (attribute.DefaultValues != null)
             {
                 await outputFile.WriteLineAsync("##### Default Values").ConfigureAwait(false);
@@ -117,8 +119,8 @@ internal class ContentGenerator(
                     await outputFile.WriteLineAsync($"| {metaData.Key} | {metaData.Value} |").ConfigureAwait(false);
                 }
             }
-            await outputFile.WriteLineAsync("---").ConfigureAwait(false);
 
+            await outputFile.WriteLineAsync("---").ConfigureAwait(false);
         }
     }
 
@@ -272,17 +274,25 @@ internal class ContentGenerator(
     {
         foreach (var type in modelGraph.GetTypes())
         {
-            if (!MatchesModelId(type, ckModelId)) continue;
+            if (!MatchesModelId(type, ckModelId))
+            {
+                continue;
+            }
+
             await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
             await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
             if (type.Description != null)
             {
                 await TextWrapper.AddDescription(outputFile, type.Description).ConfigureAwait(false);
             }
+            else
+            {
+                await outputFile.WriteLineAsync("No description available currently.").ConfigureAwait(false);
+            }
 
             await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
 
-            await GenerateTypesAttributesTable(modelGraph, directoryPath, type, outputFile).ConfigureAwait(false);
+            await GenerateTypeAssociationsTable(type, outputFile, directoryPath).ConfigureAwait(false);
         }
     }
 
@@ -304,40 +314,59 @@ internal class ContentGenerator(
         }
     }
 
-    private async Task GenerateTypesAttributesTable(CkModelGraph modelGraph, string directoryPath, CkTypeGraph type,
-        StreamWriter outputFile)
+    private async Task GenerateTypeAssociationsTable(CkTypeGraph type, StreamWriter outputFile, string baseRelativePath)
     {
-        //For Drawing all Associations that are associated with type
-        if (type.Associations.DefinedAssociations.Count == 0) return;
-        var tableBuilt = false;
-
-        foreach (var association in type.Associations.Out.Owned)
+        if (!type.Associations.DefinedAssociations.Any())
         {
-            foreach (var item in modelGraph.GetAssociationRoles())
+            return;
+        }
+
+        if (type.Associations.Out.Owned.Any())
+        {
+            await AddTitle(outputFile, null, "Outbound Associations",
+                    true)
+                .ConfigureAwait(false);
+
+            await outputFile.WriteLineAsync(
+                    $"| {Text.OutboundName} | {Text.OutboundMultiplicity} | {Text.RoleId} |" +
+                    $" {Text.TargetCKTypeID} | {Text.TargetAttributes}|")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                            " -----------|")
+                .ConfigureAwait(false);
+
+            foreach (var association in type.Associations.Out.Owned)
             {
-                if (association.CkRoleId != item.CkRoleId) continue;
-                if (!tableBuilt)
-                {
-                    await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName + " Associations",
-                            true)
-                        .ConfigureAwait(false);
-
-                    //Description not yet implemented!
-
-                    await outputFile.WriteLineAsync(
-                            $"| {Text.ID} | {Text.InboundMultiplicity} | {Text.InboundName} |" +
-                            $" {Text.OutboundMultiplicity}| {Text.OutboundName}| {Text.TargetCKTypeID}|" +
-                            $" {Text.TargetAttributes}|")
-                        .ConfigureAwait(false);
-                    await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
-                                                    " -----------| -----------| ----------- |")
-                        .ConfigureAwait(false);
-                    tableBuilt = true;
-                }
-
-                await item.DrawAssociationRole(outputFile, association, directoryPath, directoryTools, linkHelpers)
+                await association.DrawTypeAssociation(GraphDirections.Outbound, outputFile,
+                        baseRelativePath, linkHelpers)
                     .ConfigureAwait(false);
             }
+
+            await outputFile.WriteLineAsync("").ConfigureAwait(false);
+        }
+
+        if (type.Associations.In.Owned.Any())
+        {
+            await AddTitle(outputFile, null, "Inbound Associations",
+                    true)
+                .ConfigureAwait(false);
+
+            await outputFile.WriteLineAsync(
+                    $"| {Text.InboundName} | {Text.InboundMultiplicity} | {Text.RoleId} |" +
+                    $" {Text.TargetCKTypeID} | {Text.TargetAttributes}|")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| -----------| -----------| -----------| -----------|" +
+                                            " -----------|")
+                .ConfigureAwait(false);
+
+            foreach (var association in type.Associations.In.Owned)
+            {
+                await association.DrawTypeAssociation(GraphDirections.Inbound, outputFile,
+                        baseRelativePath, linkHelpers)
+                    .ConfigureAwait(false);
+            }
+
+            await outputFile.WriteLineAsync("").ConfigureAwait(false);
         }
     }
 
@@ -369,9 +398,10 @@ internal class ContentGenerator(
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            foreach (var associationRole in ckAssociationRoleGraphs.OrderBy(a=>a.CkRoleId.Key))
+            foreach (var associationRole in ckAssociationRoleGraphs.OrderBy(a => a.CkRoleId.Key))
             {
-                await AddTitle(outputFile, null, associationRole.CkRoleId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+                await AddTitle(outputFile, null, associationRole.CkRoleId.Key.SemanticVersionedFullName)
+                    .ConfigureAwait(false);
 
                 if (associationRole.Description != null)
                 {
@@ -381,8 +411,8 @@ internal class ContentGenerator(
                 {
                     await outputFile.WriteLineAsync("No description available currently.").ConfigureAwait(false);
                 }
-                
-                await associationRole.DrawAssociationRole(outputFile, null, linkPathRoot, directoryTools, linkHelpers)
+
+                await associationRole.DrawAssociationRole(outputFile, directoryTools, linkHelpers)
                     .ConfigureAwait(false);
             }
         }

@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
+using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -8,31 +9,59 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class ConfigCommand : Command<OctoToolOptions>
 {
+    private readonly IOptions<GitHubOptions> _githubOptions;
     private readonly IConfigWriter _configWriter;
     private readonly IArgument _localCkModelRepoPath;
+    private readonly IArgument _gitHubRepositoryOwner;
+    private readonly IArgument _gitHubRepositoryName;
+    private readonly IArgument _gitHubRepositoryBranch;
+    private readonly IArgument _gitHubApiToken;
 
-    public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options,
+    public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options, IOptions<GitHubOptions> githubOptions,
         IConfigWriter configWriter)
         : base(logger, "Config", "Configures the tool.", options)
     {
+        _githubOptions = githubOptions;
         _configWriter = configWriter;
 
         _localCkModelRepoPath = CommandArgumentValue.AddArgument("lp", "localCkModelRepoPath",
-            new[] { "Path of the local Construction Kit Model Repository" }, 1);
+            ["Path of the local Construction Kit Model Repository"], false, 1);
+        _gitHubRepositoryOwner = CommandArgumentValue.AddArgument("go", "gitHubRepositoryOwner",
+            ["GitHub Repository Owner to publish to a GitHub Repository"], false, 1);
+        _gitHubRepositoryName = CommandArgumentValue.AddArgument("gr", "gitHubRepositoryName",
+            ["GitHub Repository to publish to a GitHub Repository"], false, 1);
+        _gitHubRepositoryBranch = CommandArgumentValue.AddArgument("gb", "gitHubRepositoryBranch",
+            ["GitHub Repository Branch to publish to a GitHub Repository"], false, 1);
+        _gitHubApiToken = CommandArgumentValue.AddArgument("gt", "gitHubApiToken",
+            ["GitHub API token to publish to a GitHub Repository"], false, 1);
     }
 
     public override Task Execute()
     {
         Logger.LogInformation("Configuring the tool");
 
-        if (CommandArgumentValue.IsArgumentUsed(_localCkModelRepoPath))
+        Options.Value.LocalCkModelRepositoryPath = CommandArgumentValue.IsArgumentUsed(_localCkModelRepoPath)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_localCkModelRepoPath).ToLower()
+            : null;
+
+        if (CommandArgumentValue.IsArgumentUsed(_gitHubRepositoryName))
         {
-            Options.Value.LocalCkModelRepositoryPath = CommandArgumentValue.GetArgumentScalarValue<string>(_localCkModelRepoPath).ToLower();
+            _githubOptions.Value.GitHubRepositoryName = CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubRepositoryName).ToLower();
         }
-        else
+        
+        if (CommandArgumentValue.IsArgumentUsed(_gitHubRepositoryOwner))
         {
-            Options.Value.LocalCkModelRepositoryPath = null;
+            _githubOptions.Value.GitHubRepositoryOwner = CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubRepositoryOwner).ToLower();
         }
+        
+        if (CommandArgumentValue.IsArgumentUsed(_gitHubRepositoryBranch))
+        {
+            _githubOptions.Value.GitHubRepositoryBranch = CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubRepositoryBranch).ToLower();
+        }
+        
+        _githubOptions.Value.GitHubApiToken = CommandArgumentValue.IsArgumentUsed(_gitHubApiToken)
+            ? CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubApiToken)
+            : null;
 
         _configWriter.WriteSettings(Constants.OctoToolUserFolderName);
 

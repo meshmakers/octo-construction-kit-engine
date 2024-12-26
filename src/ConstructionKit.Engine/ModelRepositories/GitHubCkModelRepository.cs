@@ -2,6 +2,8 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
+using Microsoft.Extensions.Options;
 using Octokit;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
@@ -11,18 +13,16 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 /// </summary>
 public class GitHubCkModelRepository : ICkModelRepository
 {
-    private const string GitRepositoryOwner = "meshmakers";
-    private const string GitRepositoryName = "construction-kit-libraries";
-    private const string GitRepositoryBranch = "main";
-
     private readonly ICkJsonSerializer _ckJsonSerializer;
+    private readonly IOptions<GitHubOptions> _gitHubOptions;
 
     /// <summary>
     /// Creates a new instance of the <see cref="GitHubCkModelRepository"/> class.
     /// </summary>
-    public GitHubCkModelRepository(ICkJsonSerializer ckJsonSerializer)
+    public GitHubCkModelRepository(ICkJsonSerializer ckJsonSerializer, IOptions<GitHubOptions> gitHubOptions)
     {
         _ckJsonSerializer = ckJsonSerializer;
+        _gitHubOptions = gitHubOptions;
     }
 
     /// <inheritdoc />
@@ -56,10 +56,19 @@ public class GitHubCkModelRepository : ICkModelRepository
 
         var filePath = CreatePath(modelId);
 
-        var contents =
-            await gitHubClient.Repository.Content.GetAllContentsByRef(GitRepositoryOwner, GitRepositoryName, filePath, GitRepositoryBranch)
-                .ConfigureAwait(false);
-        return contents;
+        try
+        {
+            var contents =
+                await gitHubClient.Repository.Content.GetAllContentsByRef(_gitHubOptions.Value.GitHubRepositoryOwner,
+                        _gitHubOptions.Value.GitHubRepositoryName, filePath,
+                        _gitHubOptions.Value.GitHubRepositoryBranch)
+                    .ConfigureAwait(false);
+            return contents;
+        }
+        catch (NotFoundException)
+        {
+            return new List<RepositoryContent>();
+        }
     }
 
     /// <inheritdoc />
@@ -77,7 +86,8 @@ public class GitHubCkModelRepository : ICkModelRepository
         var filePath = CreatePath(modelId);
 
         var contents =
-            await gitHubClient.Repository.Content.GetAllContentsByRef(GitRepositoryOwner, GitRepositoryName, filePath, GitRepositoryBranch)
+            await gitHubClient.Repository.Content.GetAllContentsByRef(_gitHubOptions.Value.GitHubRepositoryOwner,
+                    _gitHubOptions.Value.GitHubRepositoryName, filePath, _gitHubOptions.Value.GitHubRepositoryBranch)
                 .ConfigureAwait(false);
         if (contents.Count == 0)
         {
@@ -88,21 +98,20 @@ public class GitHubCkModelRepository : ICkModelRepository
         byte[] data = Convert.FromBase64String(contents[0].EncodedContent);
 
         // Create a MemoryStream from the byte array
-        using (MemoryStream memoryStream = new MemoryStream(data))
+        using MemoryStream memoryStream = new MemoryStream(data);
+        var compiledModelRoot = await _ckJsonSerializer
+            .DeserializeCompiledModelRootAsync(memoryStream, "", operationResult).ConfigureAwait(false);
+        if (operationResult.HasErrors)
         {
-            var compiledModelRoot = await _ckJsonSerializer
-                .DeserializeCompiledModelRootAsync(memoryStream, "", operationResult).ConfigureAwait(false);
-            if (operationResult.HasErrors)
-            {
-                throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);
-            }
-
-            return compiledModelRoot;
+            throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);
         }
+
+        return compiledModelRoot;
     }
 
     /// <inheritdoc />
-    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, bool publishExtensions = false,
+    public async Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
+        bool publishExtensions = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         try
@@ -118,8 +127,9 @@ public class GitHubCkModelRepository : ICkModelRepository
                 if (force)
                 {
                     await gitHubClient.Repository.Content.UpdateFile(
-                        GitRepositoryOwner, GitRepositoryName, filePath,
-                        new UpdateFileRequest($"Update to {ckCompiledModel.ModelId.FullName}", content, contents.First().Sha)).ConfigureAwait(false);
+                        _gitHubOptions.Value.GitHubRepositoryOwner, _gitHubOptions.Value.GitHubRepositoryName, filePath,
+                        new UpdateFileRequest($"Update to {ckCompiledModel.ModelId.FullName}", content,
+                            contents.First().Sha)).ConfigureAwait(false);
                 }
                 else
                 {
@@ -129,8 +139,9 @@ public class GitHubCkModelRepository : ICkModelRepository
             else
             {
                 await gitHubClient.Repository.Content.CreateFile(
-                    GitRepositoryOwner, GitRepositoryName, filePath,
-                    new CreateFileRequest($"First commit for {ckCompiledModel.ModelId.FullName}", content, GitRepositoryBranch)).ConfigureAwait(false);
+                    _gitHubOptions.Value.GitHubRepositoryOwner, _gitHubOptions.Value.GitHubRepositoryName, filePath,
+                    new CreateFileRequest($"First commit for {ckCompiledModel.ModelId.FullName}", content,
+                        _gitHubOptions.Value.GitHubRepositoryBranch)).ConfigureAwait(false);
             }
         }
         catch (ApiValidationException e)
@@ -147,7 +158,8 @@ public class GitHubCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
-    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates, object? sourceIdentifier = null,
+    public Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates,
+        object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
         throw ModelRepositoryException.CustomizationNotSupported(RepositoryName);
@@ -171,9 +183,14 @@ public class GitHubCkModelRepository : ICkModelRepository
 
     private IGitHubClient CreateClient()
     {
+        if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
+        {
+            throw ModelRepositoryException.GitHubTokenMissing();
+        }
+
         var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"))
         {
-            Credentials = new Credentials("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")
+            Credentials = new Credentials(_gitHubOptions.Value.GitHubApiToken)
         };
 
         return gitHubClient;

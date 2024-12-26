@@ -16,7 +16,11 @@ internal static class CkTypeAttributeDtoExtensions
 
     private static string DrawAttributeAutoCompleteValues(this CkTypeAttributeDto ckTypeAttributeDto)
     {
-        if (ckTypeAttributeDto.AutoCompleteValues == null) return "";
+        if (ckTypeAttributeDto.AutoCompleteValues == null)
+        {
+            return "";
+        }
+
         StringBuilder stringBuilder = new();
         stringBuilder.Append("<ul style={{ listStyleType: \"none\" }}>");
 

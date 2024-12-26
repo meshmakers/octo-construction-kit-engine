@@ -52,7 +52,7 @@ public class GitHubCkModelRepository : ICkModelRepository
 
     private async Task<IReadOnlyList<RepositoryContent>> GetContentAsync(CkModelId modelId)
     {
-        var gitHubClient = CreateClient();
+        var gitHubClient = CreateClient(false);
 
         var filePath = CreatePath(modelId);
 
@@ -81,7 +81,7 @@ public class GitHubCkModelRepository : ICkModelRepository
             throw ModelRepositoryException.ModelNotFound(modelId, RepositoryName);
         }
 
-        var gitHubClient = CreateClient();
+        var gitHubClient = CreateClient(false);
 
         var filePath = CreatePath(modelId);
 
@@ -116,7 +116,7 @@ public class GitHubCkModelRepository : ICkModelRepository
     {
         try
         {
-            var gitHubClient = CreateClient();
+            var gitHubClient = CreateClient(true);
 
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
             string filePath = CreatePath(ckCompiledModel.ModelId);
@@ -181,17 +181,18 @@ public class GitHubCkModelRepository : ICkModelRepository
         return content;
     }
 
-    private IGitHubClient CreateClient()
+    private IGitHubClient CreateClient(bool isWrite)
     {
         if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
         {
             throw ModelRepositoryException.GitHubTokenMissing();
         }
 
-        var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"))
+        var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"));
+        if (isWrite)
         {
-            Credentials = new Credentials(_gitHubOptions.Value.GitHubApiToken)
-        };
+            gitHubClient.Credentials = new Credentials(_gitHubOptions.Value.GitHubApiToken);
+        }
 
         return gitHubClient;
     }

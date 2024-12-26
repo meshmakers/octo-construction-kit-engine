@@ -183,14 +183,13 @@ public class GitHubCkModelRepository : ICkModelRepository
 
     private IGitHubClient CreateClient(bool isWrite)
     {
-        if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
-        {
-            throw ModelRepositoryException.GitHubTokenMissing();
-        }
-
         var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"));
         if (isWrite)
         {
+            if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
+            {
+                throw ModelRepositoryException.GitHubTokenMissing();
+            }
             gitHubClient.Credentials = new Credentials(_gitHubOptions.Value.GitHubApiToken);
         }
 

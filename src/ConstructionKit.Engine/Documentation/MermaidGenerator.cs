@@ -14,27 +14,26 @@ internal class MermaidGenerator(IDirectoryTools directoryTools, ILinkHelpers lin
         await outputFile.WriteLineAsync("classDiagram").ConfigureAwait(false);
         await outputFile.WriteLineAsync("direction LR").ConfigureAwait(false);
 
-        await outputFile.WriteLineAsync("class Target[\"Target (Inbound)\"] {").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("class Target[\"Target (Inbound direction)\"] {").ConfigureAwait(false);
         await outputFile.WriteLineAsync($"  {ckAssociationRoleGraph.InboundName}").ConfigureAwait(false);
         await outputFile.WriteLineAsync("}").ConfigureAwait(false);
-        await outputFile.WriteLineAsync("class Source[\"Source (Outbound)\"]  {").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("class Origin[\"Origin (Outbound direction)\"]  {").ConfigureAwait(false);
         await outputFile.WriteLineAsync($"  {ckAssociationRoleGraph.OutboundName}").ConfigureAwait(false);
         await outputFile.WriteLineAsync("}").ConfigureAwait(false);
-     //   await outputFile.WriteLineAsync("note for Source \"Association defined here\"").ConfigureAwait(false);
 
         string outboundMultiplicity = GetMultiplicity(ckAssociationRoleGraph.OutboundMultiplicity);
         string inboundMultiplicity = GetMultiplicity(ckAssociationRoleGraph.InboundMultiplicity);
         string associationRepresentation = GetAssociationRepresentation(ckAssociationRoleGraph);
 
 
-        string t = $"Source \"{inboundMultiplicity}\"" +
+        string t = $"Origin \"{inboundMultiplicity}\"" +
                    $" {associationRepresentation} \"{outboundMultiplicity}\" Target";
         await outputFile.WriteLineAsync(t).ConfigureAwait(false);
 
         //final line to end mermaid code block
         await EndDiagram(outputFile).ConfigureAwait(false);
         
-        await outputFile.WriteLineAsync("Source entity defines the association").ConfigureAwait(false);
+        await outputFile.WriteLineAsync("At `Origin` entity an association is defined.").ConfigureAwait(false);
     }
 
     public async Task GenerateMermaidTextOutput(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,

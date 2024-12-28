@@ -13,6 +13,9 @@ public class GitHubOptions
         GitHubRepositoryOwner = "meshmakers";
         GitHubRepositoryName = "construction-kit-libraries";
         GitHubRepositoryBranch = "main";
+        
+        // This is a token to read from public GitHub repositories
+        GitHubApiToken = "***REMOVED-PAT-AB3837***";
     }
     
     /// <summary>

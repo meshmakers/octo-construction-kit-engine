@@ -199,6 +199,15 @@ internal static class MessageCodes
     internal static OperationMessage EnumKeyMayNotBeNegative(string? location, object ckEnumId, object CKEnumKey) =>
         GetMessage("EnumKeyMayNotBeNegative", location, ckEnumId, CKEnumKey);
 
+    internal static OperationMessage AttributeUsesUnknownCkEnumId(string? location, object ckAttributeId, object ckEnumId) =>
+        GetMessage("AttributeUsesUnknownCkEnumId", location, ckAttributeId, ckEnumId);
+
+    internal static OperationMessage AttributeIsEnumButValueIsNotSet(string? location, object ckAttributeId) =>
+        GetMessage("AttributeIsEnumButValueIsNotSet", location, ckAttributeId);
+
+    internal static OperationMessage AttributeIsRecordButValueIsNotSet(string? location, object ckAttributeId) =>
+        GetMessage("AttributeIsRecordButValueIsNotSet", location, ckAttributeId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -548,6 +557,24 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  58, "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative.",
                  new [] {"ckEnumId", "CKEnumKey"})
+        },
+        {
+            "AttributeUsesUnknownCkEnumId",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 59, "CkAttributeId '{ckAttributeId}' uses unknown CkEnumId '{ckEnumId}'. This may happen because a dependency to another construction kit model is missing.",
+                 new [] {"ckAttributeId", "ckEnumId"})
+        },
+        {
+            "AttributeIsEnumButValueIsNotSet",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 60, "CkAttributeId '{ckAttributeId}' defines an enum but the enum reference (ValueCkEnumId) is not set.",
+                 new [] {"ckAttributeId"})
+        },
+        {
+            "AttributeIsRecordButValueIsNotSet",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 61, "CkAttributeId '{ckAttributeId}' defines an record or record array but the record reference (ValueCkRecordId) is not set.",
+                 new [] {"ckAttributeId"})
         },
     };
 }

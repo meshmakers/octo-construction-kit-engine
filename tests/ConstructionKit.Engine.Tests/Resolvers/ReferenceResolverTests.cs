@@ -54,6 +54,57 @@ public class ReferenceResolverTests
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(41, operationResult.Messages[0].MessageNumber);
     }
+    
+    [Fact]
+    public void Resolve_Attribute_CkRecordIdNotDefined_CompilerErrorMessage()
+    {
+        CkModelGraph modelGraph = new();
+        modelGraph.AppendModel(Builder.Build());
+        modelGraph.AppendModel(sampleData.records1_recordIdDoesNotDefined.Builder.Build());
+
+        OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
+        ReferenceResolver modelResolver = new();
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(61, operationResult.Messages[0].MessageNumber);
+    }
+    
+    [Fact]
+    public void Resolve_Attribute_CkEnumIdDoesNotExist_CompilerErrorMessage()
+    {
+        CkModelGraph modelGraph = new();
+        modelGraph.AppendModel(Builder.Build());
+        modelGraph.AppendModel(sampleData.enums_enumIdDoesNotExist.Builder.Build());
+
+        OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
+        ReferenceResolver modelResolver = new();
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(59, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void Resolve_Attribute_CkEnumIdNotDefined_CompilerErrorMessage()
+    {
+        CkModelGraph modelGraph = new();
+        modelGraph.AppendModel(Builder.Build());
+        modelGraph.AppendModel(sampleData.enums_enumIdNotDefined.Builder.Build());
+
+        OperationResult operationResult = new();
+        OriginFileResolver originFileResolver = new("TEST");
+        ReferenceResolver modelResolver = new();
+        modelResolver.Resolve(modelGraph, originFileResolver, operationResult);
+
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(60, operationResult.Messages[0].MessageNumber);
+    }
 
     [Fact]
     public void Resolve_Record_AttributeDoesNotExist_CompilerErrorMessage()
@@ -89,7 +140,7 @@ public class ReferenceResolverTests
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(43, operationResult.Messages[0].MessageNumber);
     }
-
+    
     [Fact]
     public void Resolve_Type_DerivedDoesNotExist_CompilerErrorMessage()
     {

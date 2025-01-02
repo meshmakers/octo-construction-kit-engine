@@ -347,6 +347,24 @@
       "number": 58,
       "level": "ERROR",
       "text": "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative."
+    }, 
+    {
+      "key": "AttributeUsesUnknownCkEnumId",
+      "number": 59,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' uses unknown CkEnumId '{ckEnumId}'. This may happen because a dependency to another construction kit model is missing."
+    },
+    {
+      "key": "AttributeIsEnumButValueIsNotSet",
+      "number": 60,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' defines an enum but the enum reference (ValueCkEnumId) is not set."
+    },
+    {
+      "key": "AttributeIsRecordButValueIsNotSet",
+      "number": 61,
+      "level": "ERROR",
+      "text": "CkAttributeId '{ckAttributeId}' defines an record or record array but the record reference (ValueCkRecordId) is not set."
     }
   ]
 }

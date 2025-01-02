@@ -378,7 +378,7 @@ public class ElementResolverTests
     }
 
     [Fact]
-    public void Resolve_CkCkAssociation_AttributesSameName_CompilerErrorMessage()
+    public void Resolve_CkAssociation_AttributesSameName_CompilerErrorMessage()
     {
         var compiledModelRoot = sampleData.associations1_attributes_sameName_fail.Builder.Build();
 

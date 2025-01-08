@@ -8,7 +8,7 @@
         <PackageId>Meshmakers.Octo.ConstructionKit.MsBuildTasks</PackageId>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.MsBuildTasks</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.MsBuildTasks</RootNamespace>
-        <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net9.0;netstandard2.0</TargetFrameworks>
         <!-- we need the assemblies bundled, so set this so we don't expose any dependencies to the outside world -->
         <GenerateDependencyFile>true</GenerateDependencyFile>
         <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);CopyProjectReferencesToPackage</TargetsForTfmSpecificBuildOutput>

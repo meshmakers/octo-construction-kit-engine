@@ -4,7 +4,7 @@
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Engine.Tests</RootNamespace>
-        <TargetFramework>net8.0</TargetFramework>
+        <TargetFramework>net9.0</TargetFramework>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
     </PropertyGroup>
@@ -12,17 +12,17 @@
     <ItemGroup>
         <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
         <PackageReference Include="FakeItEasy" Version="8.3.0" />
-        <PackageReference Include="MartinCostello.Logging.XUnit" Version="0.4.0" />
+        <PackageReference Include="MartinCostello.Logging.XUnit" Version="0.5.1" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.0" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
         <PackageReference Include="xunit" Version="2.9.2" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.0.0">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="coverlet.collector" Version="6.0.2">
+        <PackageReference Include="coverlet.collector" Version="6.0.3">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>

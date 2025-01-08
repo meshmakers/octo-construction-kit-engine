@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 using TestCkModel.Generated.System.TestIdentity.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.RepositoryEntities;
@@ -27,5 +28,18 @@ public class RtEntityTests
 
         var test = rtEntity.GetAttributeValue<TimeSpan>(nameof(RtClient.DPoPClockSkew));
         Assert.Equal(TimeSpan.FromMinutes(5), test);
+    }
+    
+    [Fact]
+    public void GetAttributeValue_Point_Deserialized_OK()
+    {
+        var point = new Point(new Position(1, 2, 3));
+        var rtEntity = new RtEntity("demo/demo", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
+        {
+            { nameof(RtClient.DPoPClockSkew), point }
+        });
+
+        var test = rtEntity.GetAttributeGeometryObjectValue<Point>(nameof(RtClient.DPoPClockSkew));
+        Assert.Equal(point, test);
     }
 }

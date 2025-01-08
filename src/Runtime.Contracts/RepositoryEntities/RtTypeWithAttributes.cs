@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
@@ -84,7 +85,7 @@ public abstract class RtTypeWithAttributes
     /// <typeparam name="TValue"></typeparam>
     /// <returns></returns>
     // ReSharper disable once MemberCanBeProtected.Global
-    public TValue? GetAttributeValueOrDefault<TValue>(string attributeName, TValue? defaultValue = default)
+    public TValue? GetAttributeValueOrDefault<TValue>(string attributeName, TValue? defaultValue = null)
         where TValue : struct
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
@@ -213,12 +214,12 @@ public abstract class RtTypeWithAttributes
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
-            return default;
+            return null;
         }
 
         if (value == null)
         {
-            return default;
+            return null;
         }
 
         if (value is List<TValue> list)
@@ -248,12 +249,12 @@ public abstract class RtTypeWithAttributes
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
-            return default;
+            return null;
         }
 
         if (value == null)
         {
-            return default;
+            return null;
         }
 
         if (value is List<RtRecord> list)
@@ -281,12 +282,12 @@ public abstract class RtTypeWithAttributes
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
-            return default;
+            return null;
         }
 
         if (value == null)
         {
-            return default;
+            return null;
         }
 
         if (value is List<string> list)
@@ -330,12 +331,67 @@ public abstract class RtTypeWithAttributes
             return (TValue)Enum.ToObject(typeof(TValue), value);
         }
 
-        if (typeof(TValue) == typeof(TimeSpan) && value is string)
+        if (typeof(TValue) == typeof(TimeSpan) && value is string s)
         {
-            return (TValue)Convert.ChangeType(TimeSpan.Parse((string)value), typeof(TValue));
+            return (TValue)Convert.ChangeType(TimeSpan.Parse(s), typeof(TValue));
         }
 
         return (TValue)Convert.ChangeType(value, typeof(TValue));
+    }
+    
+    /// <summary>
+    ///     Gets the value of an RtRecord attribute when the value is non-nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <typeparam name="TValue"></typeparam>
+    /// <returns></returns>
+    public TValue? GetAttributeGeometryObjectValueOrDefault<TValue>(string attributeName)
+        where TValue : class, IGeometryObject
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            return null;
+        }
+
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is TValue geometryObject)
+        {
+            return geometryObject;
+        }
+
+
+        throw InvalidAttributeValueException.InvalidGeometryObjectValue(attributeName, typeof(TValue));
+    }
+    
+    /// <summary>
+    ///     Gets the value of an attribute when the value is non-nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <typeparam name="TValue"></typeparam>
+    /// <returns></returns>
+    public TValue GetAttributeGeometryObjectValue<TValue>(string attributeName)
+        where TValue : class, IGeometryObject
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value == null)
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value is TValue geometryObject)
+        {
+            return geometryObject;
+        }
+        
+        throw InvalidAttributeValueException.InvalidGeometryObjectValue(attributeName, typeof(TValue));
     }
 
     /// <summary>
@@ -344,7 +400,7 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
     /// <returns></returns>
-    public object? GetAttributeValueOrDefault(string attributeName, object? defaultValue = default)
+    public object? GetAttributeValueOrDefault(string attributeName, object? defaultValue = null)
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {
@@ -353,7 +409,6 @@ public abstract class RtTypeWithAttributes
 
         return value;
     }
-
 
     /// <summary>
     ///     Gets the value of an RtRecord attribute when the value is non-nullable
@@ -376,11 +431,12 @@ public abstract class RtTypeWithAttributes
 
         if (value is RtRecord rtRecord)
         {
-            var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
-            if (x == null)
+            var rtTypedRecord = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
+            if (rtTypedRecord == null)
             {
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
+            return rtTypedRecord;
         }
 
         throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
@@ -412,16 +468,16 @@ public abstract class RtTypeWithAttributes
 
         if (value is RtRecord rtRecord)
         {
-            var x = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
-            if (x == null)
+            var rtTypedRecord = (TValue?)Activator.CreateInstance(typeof(TValue), rtRecord);
+            if (rtTypedRecord == null)
             {
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
+            return rtTypedRecord;
         }
 
         throw InvalidAttributeValueException.InvalidRecordValue(attributeName, typeof(TValue));
     }
-
 
     /// <summary>
     ///     Gets the value of an attribute if the value is nullable and a string
@@ -429,7 +485,7 @@ public abstract class RtTypeWithAttributes
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <param name="defaultValue"></param>
     /// <returns></returns>
-    public string? GetAttributeStringValueOrDefault(string attributeName, string? defaultValue = default)
+    public string? GetAttributeStringValueOrDefault(string attributeName, string? defaultValue = null)
     {
         if (!Attributes.TryGetValue(attributeName, out var value))
         {

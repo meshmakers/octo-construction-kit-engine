@@ -1,7 +1,7 @@
 ﻿namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-///     The type of an attribute value.
+///     The type of attribute value.
 /// </summary>
 public enum AttributeValueTypesDto
 {
@@ -71,7 +71,7 @@ public enum AttributeValueTypesDto
     Enum = 13,
 
     /// <summary>
-    ///     Indicates that the attribute value is a 64 bit integer.
+    ///     Indicates that the attribute value is a 64-bit integer.
     /// </summary>
     Int64 = 14,
 

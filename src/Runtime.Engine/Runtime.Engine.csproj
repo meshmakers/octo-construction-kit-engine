@@ -11,7 +11,7 @@
         <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
         <DocumentationFile>..\..\bin\$(Configuration)\$(AssemblyName).xml</DocumentationFile>
         <NoWarn>1701;1702;CS8002</NoWarn>
-        <TargetFrameworks>net8.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net9.0;netstandard2.0</TargetFrameworks>
     </PropertyGroup>
 
     <ItemGroup>

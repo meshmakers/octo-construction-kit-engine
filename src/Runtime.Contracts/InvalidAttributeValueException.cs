@@ -47,4 +47,9 @@ public class InvalidAttributeValueException : PersistenceException
     {
         return new InvalidAttributeValueException($"Cannot convert to type '{type}' at attribute with name '{attributeName}'");
     }
+
+    internal static Exception InvalidGeometryObjectValue(string attributeName, Type type)
+    {
+       return new InvalidAttributeValueException($"Cannot convert to type '{type}' at attribute with name '{attributeName}'");
+    }
 }

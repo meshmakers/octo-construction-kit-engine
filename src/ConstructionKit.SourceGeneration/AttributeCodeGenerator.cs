@@ -143,6 +143,14 @@ internal static class AttributeCodeGenerator
                 }
 
                 break;
+            case AttributeValueTypesDto.GeospatialPoint:
+                sb.AppendLine($"  public Point? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeGeometryObjectValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.GeospatialPoint, value);");
+                sb.AppendLine("  }");
+                break;           
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;
@@ -280,6 +288,14 @@ internal static class AttributeCodeGenerator
                 }
 
                 break;
+            case AttributeValueTypesDto.GeospatialPoint:
+                sb.AppendLine($"  public Point {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeGeometryObjectValue<Point>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.GeospatialPoint, value);");
+                sb.AppendLine("  }");
+                break;                   
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;

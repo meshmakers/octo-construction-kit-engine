@@ -41,6 +41,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine();
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts;");
         sb.AppendLine("using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;");
+        sb.AppendLine("using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;");
         sb.AppendLine("using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;");
         sb.AppendLine();
         sb.AppendLine($"namespace {ns};");

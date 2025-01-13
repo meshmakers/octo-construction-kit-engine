@@ -48,8 +48,15 @@ public class InvalidAttributeValueException : PersistenceException
         return new InvalidAttributeValueException($"Cannot convert to type '{type}' at attribute with name '{attributeName}'");
     }
 
-    internal static Exception InvalidGeometryObjectValue(string attributeName, Type type)
+    internal static Exception AttributeDoesNotExist(string location, string attributeName)
     {
-       return new InvalidAttributeValueException($"Cannot convert to type '{type}' at attribute with name '{attributeName}'");
+        return new InvalidAttributeValueException(
+            $"Attribute with name '{attributeName}' does not exist for '{location}'");
+    }
+
+    internal static Exception InvalidDataType(string getLocation, string attributeName, Type actualType, Type expectType)
+    {
+        return new InvalidAttributeValueException(
+            $"Attribute value must be of type '{expectType}' but was '{actualType}' for '{getLocation}' at attribute with name '{attributeName}'");
     }
 }

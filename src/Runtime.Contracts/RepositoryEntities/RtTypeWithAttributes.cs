@@ -340,6 +340,56 @@ public abstract class RtTypeWithAttributes
     }
     
     /// <summary>
+    ///     Gets the byte array value of an attribute when the value is nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns></returns>
+    public byte[]? GetAttributeBytesValueOrDefault(string attributeName)
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            return null;
+        }
+
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is byte[] b)
+        {
+            return b;
+        }
+
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(byte[]));
+    }
+    
+    /// <summary>
+    ///     Gets the byte array value of an attribute when the value is non-nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns></returns>
+    public byte[] GetAttributeBytesValue(string attributeName)
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            throw InvalidAttributeValueException.AttributeDoesNotExist(GetLocation(), attributeName);
+        }
+
+        if (value == null)
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value is byte[] b)
+        {
+            return b;
+        }
+
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(byte[]));
+    }
+    
+    /// <summary>
     ///     Gets the value of an RtRecord attribute when the value is non-nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
@@ -364,7 +414,7 @@ public abstract class RtTypeWithAttributes
         }
 
 
-        throw InvalidAttributeValueException.InvalidGeometryObjectValue(attributeName, typeof(TValue));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
     }
     
     /// <summary>
@@ -391,7 +441,7 @@ public abstract class RtTypeWithAttributes
             return geometryObject;
         }
         
-        throw InvalidAttributeValueException.InvalidGeometryObjectValue(attributeName, typeof(TValue));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
     }
 
     /// <summary>

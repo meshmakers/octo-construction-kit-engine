@@ -151,9 +151,17 @@ internal static class AttributeCodeGenerator
                               "), AttributeValueTypesDto.GeospatialPoint, value);");
                 sb.AppendLine("  }");
                 break;           
+            case AttributeValueTypesDto.Binary:
+                sb.AppendLine($"  public byte[]? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<byte[]>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.Binary, value);");
+                sb.AppendLine("  }");
+                break;                
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
-                break;
+                break;            
         }
     }
 
@@ -295,7 +303,15 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.GeospatialPoint, value);");
                 sb.AppendLine("  }");
-                break;                   
+                break;       
+            case AttributeValueTypesDto.Binary:
+                sb.AppendLine($"  public byte[] {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeBytesValue(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.Binary, value);");
+                sb.AppendLine("  }");
+                break;                  
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;

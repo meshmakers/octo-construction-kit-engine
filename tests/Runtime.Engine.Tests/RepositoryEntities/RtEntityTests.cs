@@ -42,4 +42,17 @@ public class RtEntityTests
         var test = rtEntity.GetAttributeGeometryObjectValue<Point>(nameof(RtClient.DPoPClockSkew));
         Assert.Equal(point, test);
     }
+    
+    [Fact]
+    public void GetAttributeValue_EmbeddedBinary_Deserialized_OK()
+    {
+        byte[] bytes = [0x5, 0x6, 0x7, 0x8];
+        var rtEntity = new RtEntity("demo/demo", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
+        {
+            { nameof(RtClient.DPoPClockSkew), bytes }
+        });
+
+        var test = rtEntity.GetAttributeBytesValue(nameof(RtClient.DPoPClockSkew));
+        Assert.Equal(bytes, test);
+    }
 }

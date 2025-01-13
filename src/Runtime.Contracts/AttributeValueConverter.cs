@@ -70,6 +70,19 @@ public static class AttributeValueConverter
                     return stringArray.ToList();
                 }
 
+                if (value is IEnumerable<object> objectList)
+                {
+                    return objectList.Select(x =>
+                    {
+                        if (x is JsonElement jsonElement)
+                        {
+                            return jsonElement.GetString();
+                        }
+
+                        return Convert.ToString(x);
+                    }).ToList();
+                }
+
                 if (value is AttributeStringValueList stringList)
                 {
                     return stringList.InnerList;

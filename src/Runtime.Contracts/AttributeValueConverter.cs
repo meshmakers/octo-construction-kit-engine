@@ -69,7 +69,13 @@ public static class AttributeValueConverter
                 {
                     return stringArray.ToList();
                 }
+                
+                if (value is AttributeStringValueList stringList)
+                {
+                    return stringList.InnerList;
+                }
 
+                // This code is used for default value deserialization
                 if (value is IEnumerable<object> objectList)
                 {
                     return objectList.Select(x =>
@@ -81,11 +87,6 @@ public static class AttributeValueConverter
 
                         return Convert.ToString(x);
                     }).ToList();
-                }
-
-                if (value is AttributeStringValueList stringList)
-                {
-                    return stringList.InnerList;
                 }
 
                 break;

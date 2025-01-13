@@ -44,6 +44,19 @@ internal static class CkTypeGraphExtensions
         {
             await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
+
+        await outputFile.WriteAsync($"{ckTypeGraph.AddClassModifier(ckTypeGraph.CkTypeId.GetName())}").ConfigureAwait(false);
+    }
+
+    private static string AddClassModifier(this CkTypeGraph ckTypeGraph, string className)
+    {
+        var returnString = "";
+        if (ckTypeGraph.IsAbstract)
+        {
+            returnString = "<<Abstract>>" + " " + className + "\n";
+        }
+
+        return returnString;
     }
 
     private static string GetAttributeType(this CkTypeGraph ckTypeGraph, CkTypeAttributeDto attribute)

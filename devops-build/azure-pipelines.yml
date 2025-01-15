@@ -103,7 +103,7 @@ stages:
           script: |
               New-Item $(build.artifactstagingdirectory)/versioninfo.txt
               Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
-      - ${{ if and(eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion)) }}:
+      - ${{ if eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion) }}:
           - template: generate-documentation.yml
             parameters:
               ConstructionKits:

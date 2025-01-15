@@ -79,17 +79,16 @@ stages:
         inputs:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
-            bin/net9.0/octo-ck-libraries/**/*.*
+            bin/Release/net9.0/octo-ck-libraries/**/*.yaml
           TargetFolder: $(build.artifactstagingdirectory)/ck-libraries
           flattenFolders: true     
       - task: CopyFiles@2
         displayName: 'Copy docs to $(build.artifactstagingdirectory)'
         inputs:
-          SourceFolder: $(Build.SourcesDirectory)
+          SourceFolder: $(Build.SourcesDirectory)/bin/Release/net9.0/documentation
           Contents: |
-            bin/**/documentation/**/*.*
+           **/*.*
           TargetFolder: $(build.artifactstagingdirectory)/docs
-          flattenFolders: true
       - task: PowerShell@2
         displayName: 'Create version info file'
         inputs:

@@ -13,6 +13,9 @@ steps:
     InformationalVersion: $(Build.BuildNumber)
     PackageVersion: $(BuildNumberLong)
     DisableTelemetry: true
+    Authors: $(Authors)
+    Company: $(Company)
+    Copyright: $(Copyright)
 - task: PowerShell@2
   inputs:
     targetType: 'inline'

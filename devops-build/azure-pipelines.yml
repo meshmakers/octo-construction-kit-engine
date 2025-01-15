@@ -72,7 +72,7 @@ stages:
           filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'
           arguments: '-configuration $(buildConfiguration) -frameworkVersion $(artifactsFrameworkVersion)'
         displayName: 'Create api documentation'
-      - template: generate-ck-library-docs.yml
+      - template: handle-artifacts.yml
         parameters:
           constructionKitLibraryPaths:
             - 'bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'       

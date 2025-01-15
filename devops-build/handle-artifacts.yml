@@ -23,7 +23,7 @@ steps:
           Contents: |
             /**/*.md
             !*.yaml
-          TargetFolder: $(build.artifactstagingdirectory)/docs
+          TargetFolder: $(build.artifactstagingdirectory)/docs/technologyGuide/constructionKits/libraries
       - task: CopyFiles@2
         displayName: 'Copy construction kits ${{ constructionKitLibraryPath }}/out/*.yaml to $(build.artifactstagingdirectory)'
         inputs:

@@ -101,11 +101,10 @@ stages:
           script: |
               New-Item $(build.artifactstagingdirectory)/versioninfo.txt
               Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
-      - ${{ if eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion) }}:
-          - template: generate-documentation.yml
-            parameters:
-              ConstructionKits:
-                - '**/SystemCkModel.csproj'
+      - template: generate-documentation.yml
+        parameters:
+          ConstructionKits:
+            - '**/SystemCkModel.csproj'
       - task: PublishBuildArtifacts@1
         displayName: 'Publish Artifact: local'
         inputs:

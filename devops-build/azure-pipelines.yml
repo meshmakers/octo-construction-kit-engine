@@ -11,13 +11,20 @@ trigger:
       - '*'
   
 variables:
-  buildConfiguration: 'Release'
-  artifactsFrameworkVersion: 'net9.0'
-  isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/r')]
-  MajorVersion: 0
-  MinorVersion: 1
-  generateDocumentation: 'true'
-  
+- group: ApiKeys
+- group: OctoDefault
+- name: artifactsFrameworkVersion
+  value: 'net9.0'  
+- name: isRelease
+  value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
+- name: buildConfiguration
+  value: 'Release'
+- name: buildPlatform
+  value: 'Any CPU'
+- name: isRelease
+  value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
+- name: isMain
+  value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
 
 stages:
  - stage: Build
@@ -96,7 +103,7 @@ stages:
           script: |
               New-Item $(build.artifactstagingdirectory)/versioninfo.txt
               Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
-      - ${{ if and(eq(variables.generateDocumentation, true), eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion)) }}:
+      - ${{ if and(eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion)) }}:
           - template: generate-documentation.yml
             parameters:
               ConstructionKits:

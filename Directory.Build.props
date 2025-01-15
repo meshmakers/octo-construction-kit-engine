@@ -10,9 +10,6 @@
     <!-- Import the Directory.Build.props file of the root directory -->
     <Import Condition="Exists($(OctoRootDirectoryPropsFilePath))" Project="$(OctoRootDirectoryPropsFilePath)"/>
     <PropertyGroup>
-        <Authors>meshmakers GmbH and Contributors</Authors>
-        <Company>meshmakers GmbH and Contributors</Company>
-        <Copyright>(c) 2022-2025 meshmakers GmbH</Copyright>
         <LangVersion>latestmajor</LangVersion>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

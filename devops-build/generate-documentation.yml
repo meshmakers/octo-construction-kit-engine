@@ -18,4 +18,4 @@ steps:
       SourceFolder: $(Build.SourcesDirectory)
       Contents: |
         /**/octo-ck-libraries/**/out/**/*.md
-      TargetFolder: $(build.artifactstagingdirectory)
+      TargetFolder: $(build.artifactstagingdirectory)/docs

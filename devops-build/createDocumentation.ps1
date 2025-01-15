@@ -1,9 +1,9 @@
-param ($configuration = "Release")
+param ($configuration = "Release", $frameworkVersion = "net9.0")
 
 dotnet tool update --global MMXMLDoc2Markdown
 
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$baseBinPath = Join-Path $modulePath "../bin/$configuration/net9.0"
+$baseBinPath = Join-Path $modulePath "../bin/$configuration/$frameworkVersion "
 if (-not (Test-Path -Path $baseBinPath)) {
     throw "Bin path '$baseBinPath' does not exist"
 }

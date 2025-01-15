@@ -12,6 +12,7 @@ trigger:
   
 variables:
   buildConfiguration: 'Release'
+  artifactsFrameworkVersion: 'net9.0'
   isRelease: $[startsWith(variables['Build.SourceBranch'], 'refs/tags/r')]
   MajorVersion: 0
   MinorVersion: 1
@@ -56,7 +57,7 @@ stages:
       - task: PowerShell@2
         inputs:
           filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'
-          arguments: '-configuration $(buildConfiguration)'
+          arguments: '-configuration $(buildConfiguration) -frameworkVersion $(artifactsFrameworkVersion)'
         displayName: 'Create documentation'          
       - task: PublishSymbols@2
         displayName: Publish symbols path
@@ -78,13 +79,13 @@ stages:
         inputs:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
-            bin/Release/net9.0/octo-ck-libraries/**/*.yaml
+            bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/**/*.yaml
           TargetFolder: $(build.artifactstagingdirectory)/ck-libraries
           flattenFolders: true     
       - task: CopyFiles@2
         displayName: 'Copy docs to $(build.artifactstagingdirectory)'
         inputs:
-          SourceFolder: $(Build.SourcesDirectory)/bin/Release/net9.0/documentation
+          SourceFolder: $(Build.SourcesDirectory)/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation
           Contents: |
            **/*.*
           TargetFolder: $(build.artifactstagingdirectory)/docs
@@ -95,7 +96,7 @@ stages:
           script: |
               New-Item $(build.artifactstagingdirectory)/versioninfo.txt
               Set-Content $(build.artifactstagingdirectory)/versioninfo.txt $(Build.BuildNumber)
-      - ${{ if and(eq(variables.generateDocumentation, true), eq(variables.FrameworkVersion, 'net9.0')) }}:
+      - ${{ if and(eq(variables.generateDocumentation, true), eq(variables.FrameworkVersion, variables.artifactsFrameworkVersion)) }}:
           - template: generate-documentation.yml
             parameters:
               ConstructionKits:

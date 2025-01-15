@@ -15,8 +15,6 @@ variables:
 - group: OctoDefault
 - name: artifactsFrameworkVersion
   value: 'net9.0'  
-- name: isRelease
-  value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
 - name: buildConfiguration
   value: 'Release'
 - name: buildPlatform

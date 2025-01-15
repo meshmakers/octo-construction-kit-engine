@@ -29,7 +29,6 @@ stages:
       - template: update-build-number.yml
       - checkout: self
         clean: true
-        submodules: true
       - template: set-version.yml
       - task: DotNetCoreCLI@2
         displayName: 'Build src'

@@ -1,9 +1,10 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
+using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
 
-public class RtSchemaValidatorTests
+public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
 {
     [Fact]
     public void ValidateModelInJson_ok()
@@ -46,6 +47,11 @@ public class RtSchemaValidatorTests
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
+        foreach (var operationMessage in operationResult.Messages)
+        {
+            _testOutputHelper.WriteLine($"{operationMessage.MessageLevel}{operationMessage.MessageNumber}: {operationMessage.MessageText}");
+        }
+                
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.False(operationResult.HasErrors);

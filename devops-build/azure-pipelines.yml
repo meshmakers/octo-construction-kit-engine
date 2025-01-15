@@ -72,9 +72,24 @@ stages:
           SourceFolder: $(Build.SourcesDirectory)
           Contents: |
             **/*.nupkg
-            bin/**/octo-ck-libraries/**/*.*
+          TargetFolder: $(build.artifactstagingdirectory)/nuget
+          flattenFolders: true
+      - task: CopyFiles@2
+        displayName: 'Copy construction kits to $(build.artifactstagingdirectory)'
+        inputs:
+          SourceFolder: $(Build.SourcesDirectory)
+          Contents: |
+            bin/net9.0/octo-ck-libraries/**/*.*
+          TargetFolder: $(build.artifactstagingdirectory)/ck-libraries
+          flattenFolders: true     
+      - task: CopyFiles@2
+        displayName: 'Copy docs to $(build.artifactstagingdirectory)'
+        inputs:
+          SourceFolder: $(Build.SourcesDirectory)
+          Contents: |
             bin/**/documentation/**/*.*
-          TargetFolder: $(build.artifactstagingdirectory)
+          TargetFolder: $(build.artifactstagingdirectory)/docs
+          flattenFolders: true
       - task: PowerShell@2
         displayName: 'Create version info file'
         inputs:

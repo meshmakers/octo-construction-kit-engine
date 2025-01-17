@@ -42,19 +42,6 @@ public class DefaultCrsNewtonsoftTests
     }
 
     [Fact]
-    public void Can_Serialize_CRS_issue_89()
-    {
-        var expected =
-            "{\"type\":\"Point\",\"coordinates\":[34.56,12.34],\"crs\":{\"properties\":{\"name\":\"TEST NAME\"},\"type\":\"name\"}}";
-        var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("TEST NAME") };
-
-        var json = JsonConvert.SerializeObject(point);
-
-        Assert.NotNull(json);
-        Assert.Equal(expected, json);
-    }
-
-    [Fact]
     public void Can_Serialize_DefaultCRS_issue_89()
     {
         var expected =

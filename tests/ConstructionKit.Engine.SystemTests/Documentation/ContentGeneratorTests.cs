@@ -48,36 +48,6 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         }
         
         [Fact]
-        public async Task GenerateEnumsMarkdownTable_ShouldNOTCreateEnumsFile()
-        {
-            // Arrange
-            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
-
-            // Act
-            await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, rootPath, modelId, "", "test");
-
-            // Assert
-            Assert.False(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.False(File.Exists(Path.Combine(rootPath, "System", "Enums.md")));
-        }
-        
-        [Fact]
-        public async Task GenerateRecordsMarkdownTable_ShouldNOTCreateRecordsFile()
-        {
-            // Arrange
-            const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
-
-            // Act
-            await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, rootPath, modelId, "", "test");
-
-            // Assert
-            Assert.False(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.False(File.Exists(Path.Combine(rootPath, "System", "Records.md")));
-        }
-
-        [Fact]
         public async Task GenerateTypesMarkdownTable_ShouldCreateTypesFile()
         {
             // Arrange

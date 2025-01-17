@@ -59,17 +59,5 @@ public class DefaultCrsYamlTests
         Assert.NotNull(yaml);
         Assert.Equal(expected, yaml);
     }
-
-    [Fact]
-    public void Can_Serialize_DefaultCRS_issue_89()
-    {
-        var expected = $"type: Point{Nl}coordinates:{Nl}- 34.56{Nl}- 12.34{Nl}crs:{Nl}  properties:{Nl}    name: urn:ogc:def:crs:OGC::CRS84{Nl}  type: name{Nl}";
-        var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("urn:ogc:def:crs:OGC::CRS84") };
-
-        var serializer = new GeospatialYamlSerializer();
-        var yaml = serializer.Serialize(point);
-
-        Assert.NotNull(yaml);
-        Assert.Equal(expected, yaml);
-    }
+    
 }

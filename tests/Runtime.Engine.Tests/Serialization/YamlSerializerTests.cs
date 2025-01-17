@@ -120,17 +120,25 @@ public class YamlSerializerTests
     [Fact]
     public async Task DeserializeAsync_MalformedAttributeValue_Fail()
     {
-        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+        try
+        {
+            var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
-        var filePath = "sampleData/files/malformedAttributeValue.yaml";
-        var stream = File.OpenRead(filePath);
-        var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
-            await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
-        Assert.Single(operationResult.Messages);
-        Assert.False(operationResult.HasErrors);
-        Assert.True(operationResult.HasFatalErrors);
-        Assert.Equal(1, operationResult.Messages[0].MessageNumber);
+            var filePath = "sampleData/files/malformedAttributeValue.yaml";
+            var stream = File.OpenRead(filePath);
+            var operationResult = new OperationResult();
+            await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+                await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
+            Assert.Single(operationResult.Messages);
+            Assert.False(operationResult.HasErrors);
+            Assert.True(operationResult.HasFatalErrors);
+            Assert.Equal(1, operationResult.Messages[0].MessageNumber);
+        }
+        catch (Exception e)
+        {
+            _testOutputHelper.WriteLine(e.ToString());
+            throw;
+        }
     }
 
     [Fact]

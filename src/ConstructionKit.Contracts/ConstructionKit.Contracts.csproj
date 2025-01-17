@@ -15,7 +15,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Meshmakers.Common.Shared" Version="4.0.2501.15003" />
+        <PackageReference Include="Meshmakers.Common.Shared" Version="$(MeshmakerVersion)" />
     </ItemGroup>
 
     <ItemGroup>

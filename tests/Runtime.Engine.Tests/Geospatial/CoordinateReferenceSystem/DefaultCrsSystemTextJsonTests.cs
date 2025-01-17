@@ -53,4 +53,17 @@ public class DefaultCrsSystemTextJsonTests
         Assert.NotNull(json);
         Assert.Equal(expected, json);
     }
+
+    [Fact]
+    public void Can_Serialize_DefaultCRS_issue_89()
+    {
+        var expected =
+            "{\"type\":\"Point\",\"coordinates\":[34.56,12.34],\"crs\":{\"properties\":{\"name\":\"urn:ogc:def:crs:OGC::CRS84\"},\"type\":\"name\"}}";
+        var point = new Point(new Position(12.34, 34.56)) { CRS = new NamedCRS("urn:ogc:def:crs:OGC::CRS84") };
+
+        var json = JsonSerializer.Serialize(point);
+
+        Assert.NotNull(json);
+        Assert.Equal(expected, json);
+    }
 }

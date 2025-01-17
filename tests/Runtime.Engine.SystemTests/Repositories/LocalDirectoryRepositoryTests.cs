@@ -95,11 +95,10 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Sensor");
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Ocean");
         rtEntity.SetAttributeValue(TestCkIds.DesignationAttribute, AttributeValueTypesDto.String, "TestSensor1");
-        rtEntity.SetAttributeValue(TestCkIds.ConnectionStateAttribute, AttributeValueTypesDto.Enum, 0);
 
-        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), "Test/Sensor", rtEntity);
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), "Test/Ocean", rtEntity);
     }
 
     [Fact]
@@ -112,11 +111,10 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-        rtEntity.Designation = "TestSensor2";
-        rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "TestSensor2";
 
-        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
     }
 
     [Fact]
@@ -129,17 +127,16 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-        rtEntity.Designation = "TestSensor2";
-        rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "TestSensor2";
 
-        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
 
         var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync(new LocalSession(),
-            new RtEntityId(rtEntity.CkTypeId ?? throw new Exception(), rtEntity.RtId));
+            new RtEntityId(rtOcean.CkTypeId ?? throw new Exception(), rtOcean.RtId));
 
         Assert.NotNull(copy);
-        Assert.Equal(copy.RtId, rtEntity.RtId);
+        Assert.Equal(copy.RtId, rtOcean.RtId);
     }
 
     [Fact]
@@ -152,27 +149,21 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-        rtEntity.Designation = "TestSensor2";
-        rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
-        rtEntity.DataCount = 5;
-        rtEntity.LocationX = 43.4959;
+        var rtInsertOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtInsertOcean.Designation = "TestSensor2";
 
-        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtInsertOcean);
 
-        var rtEntity2 = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-        rtEntity2.Designation = "TestSensor2";
-        rtEntity2.ConnectionState = RtConnectionStateEnum.NotConnected;
-        rtEntity2.DataCount = 6;
-        rtEntity2.LocationX = 43.4959;
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "TestSensor3";
 
-        await localDirectoryRepository.ReplaceOneRtEntityByIdAsync(new LocalSession(), rtEntity.RtId, rtEntity2);
+        await localDirectoryRepository.ReplaceOneRtEntityByIdAsync(new LocalSession(), rtInsertOcean.RtId, rtOcean);
 
-        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtSensor>(new LocalSession(), rtEntity.RtId);
+        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtInsertOcean.RtId);
 
         Assert.NotNull(copy);
-        Assert.Equal(6, copy.DataCount);
-        Assert.Equal(rtEntity.RtId, copy.RtId);
+        Assert.Equal("TestSensor3", copy.Designation);
+        Assert.Equal(rtInsertOcean.RtId, copy.RtId);
     }
 
     [Fact]
@@ -185,27 +176,22 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
             new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
         rtEntity.Designation = "TestSensor2";
-        rtEntity.ConnectionState = RtConnectionStateEnum.NotConnected;
-        rtEntity.DataCount = 5;
-        rtEntity.LocationX = 43.4959;
 
         await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtEntity);
 
-        var rtEntity2 = new RtSensor
+        var rtEntity2 = new RtOcean
         {
-            DataCount = 7
+            Designation = "TestSensor284358ß2"
         };
 
         await localDirectoryRepository.UpdateOneRtEntityByIdAsync(new LocalSession(), rtEntity.RtId, rtEntity2);
 
-        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtSensor>(new LocalSession(), rtEntity.RtId);
+        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtEntity.RtId);
 
         Assert.NotNull(copy);
-        Assert.Equal(7, copy.DataCount);
-        Assert.Equal(43.4959, copy.LocationX);
-        Assert.Equal("TestSensor2", copy.Designation);
+        Assert.Equal("TestSensor284358ß2", copy.Designation);
         Assert.Equal(rtEntity.RtId, copy.RtId);
     }
 
@@ -221,31 +207,28 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
 
         for (var i = 0; i < 20; i++)
         {
-            var rtSensor = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-            rtSensor.Designation = "TestSensor" + i;
-            rtSensor.ConnectionState = RtConnectionStateEnum.NotConnected;
-            rtSensor.DataCount = 5 + i;
-            rtSensor.LocationX = 43.4959;
+            var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+            rtOcean.Designation = "TestSensor" + i;
 
-            await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtSensor);
+            await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
         }
 
-        var updateEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
-        updateEntity.DataCount = 15;
+        var updateEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        updateEntity.Designation = "TestSensor154737";
 
         await localDirectoryRepository.UpdateManyRtEntityAsync(new LocalSession(), new List<FieldFilter>
         {
-            new(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor10")
+            new(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor0")
         }, updateEntity);
 
         var dataQueryOperation = DataQueryOperation.Create()
-            .FieldFilter(TestCkIds.DataCountAttribute, FieldFilterOperator.Equals, 15);
+            .FieldFilter(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor154737");
 
-        var copy = await localDirectoryRepository.GetRtEntitiesByTypeAsync<RtSensor>(new LocalSession(), dataQueryOperation);
+        var copy = await localDirectoryRepository.GetRtEntitiesByTypeAsync<RtOcean>(new LocalSession(), dataQueryOperation);
 
         Assert.Equal(1, copy.TotalCount);
         Assert.Single(copy.Items);
-        Assert.Equal(15, copy.Items.ElementAt(0).DataCount);
+        Assert.Equal("TestSensor154737", copy.Items.ElementAt(0).Designation);
     }
 
 

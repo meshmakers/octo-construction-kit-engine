@@ -1,14 +1,14 @@
 <Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
-        <OctoCkCompileOutputImportFolder Condition="'$(OctoCkCompileOutputImportFolder)' == ''">$(OutputPath)octo-ck-libraries\$(ProjectName)\imports</OctoCkCompileOutputImportFolder>
-        <OctoCkCompileCacheImportFolder Condition="'$(OctoCkCompileCacheImportFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache\$(ProjectName)\imports</OctoCkCompileCacheImportFolder>
-        <OctoCkCompileOutputCompilerFolder Condition="'$(OctoCkCompileOutputCompilerFolder)' == ''">$(OutputPath)octo-ck-libraries\$(ProjectName)\out</OctoCkCompileOutputCompilerFolder>
-        <OctoCkCompileCacheCompileFolder Condition="'$(OctoCkCompileCacheCompileFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache\$(ProjectName)\out</OctoCkCompileCacheCompileFolder>
+        <OctoCkCompileOutputImportFolder Condition="'$(OctoCkCompileOutputImportFolder)' == ''">$(OutputPath)octo-ck-libraries/$(ProjectName)/imports</OctoCkCompileOutputImportFolder>
+        <OctoCkCompileCacheImportFolder Condition="'$(OctoCkCompileCacheImportFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache/$(ProjectName)/imports</OctoCkCompileCacheImportFolder>
+        <OctoCkCompileOutputCompilerFolder Condition="'$(OctoCkCompileOutputCompilerFolder)' == ''">$(OutputPath)octo-ck-libraries/$(ProjectName)/out</OctoCkCompileOutputCompilerFolder>
+        <OctoCkCompileCacheCompileFolder Condition="'$(OctoCkCompileCacheCompileFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache/$(ProjectName)/out</OctoCkCompileCacheCompileFolder>
     </PropertyGroup>
     
     <!--Defining all the text files input parameters-->
     <ItemGroup>
-        <ConstructionKitConfigFile Include="$(MSBuildProjectDirectory)\construction-kits.yaml"/>
+        <ConstructionKitConfigFile Include="$(MSBuildProjectDirectory)/construction-kits.yaml"/>
     </ItemGroup>
 
     <Target Name="GatherCompileFiles">

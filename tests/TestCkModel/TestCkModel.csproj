@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFramework>net9.0</TargetFramework>
+        <TargetFrameworks>net9.0;netstandard2.0</TargetFrameworks>
         <AssemblyName>TestCkModel</AssemblyName>
         <RootNamespace>TestCkModel</RootNamespace>
         <Configurations>Debug;Release;DebugL</Configurations>
@@ -12,12 +12,19 @@
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
-        <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj"/>
+        <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          OutputItemType="Analyzer">
+            <Private>False</Private>
+            <CopyLocalSatelliteAssemblies>False</CopyLocalSatelliteAssemblies>
+            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+        </ProjectReference>
+        <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
         <ConstructionKitFolder Visible="false" Include="ConstructionKit"/>
         <ConstructionKitFolder Visible="false" Include="CkTest\ConstructionKit" />
     </ItemGroup>
+
 </Project>

@@ -106,6 +106,13 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     {
         ArgumentValidation.ValidateExistingFile(nameof(modelConfigurationFilePath), modelConfigurationFilePath);
         ArgumentValidation.ValidateDirectoryPath(nameof(outputPath), outputPath);
+        
+        modelConfigurationFilePath = MmPath.NormalizePath(modelConfigurationFilePath);
+        outputPath = MmPath.NormalizePath(outputPath);
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
+        {
+            createCacheFilePath = MmPath.NormalizePath(createCacheFilePath);
+        }
 
         var originFileResolver = new OriginFileResolver(modelConfigurationFilePath);
 

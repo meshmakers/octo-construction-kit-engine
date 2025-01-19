@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Common.Shared;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -119,8 +120,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                 constructionKitFolderPath);
                             var compileResult = await compilerService.CompileAsync(
-                                constructionKitFolderPath.GetOsSpecificPath(),
-                                OutputPath.GetOsSpecificPath(), CacheFilePath?.GetOsSpecificPath(), operationResult);
+                                constructionKitFolderPath,
+                                OutputPath, CacheFilePath, operationResult);
                             compiledModelFiles.Add(compileResult.CompiledModelFile);
                             if (compileResult.CompiledModelCacheFilePath != null)
                             {
@@ -158,13 +159,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             if (GenerateCkDocumentation)
                             {
                                 Log.LogMessage(MessageImportance.High,
-                                    $"Generating construction kit model Documentation to {OutputPath.GetOsSpecificPath()}");
+                                    $"Generating construction kit model Documentation to {OutputPath}");
 #if NETSTANDARD2_0
                                 using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #else
                                 await using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #endif
-                                var path = OutputPath.GetOsSpecificPath();
                                 var ckCompiledModelRoot =
                                     await ckSerializer.DeserializeCompiledModelRootAsync(streamReader,
                                         compileResult.CompiledModelFile,
@@ -180,7 +180,9 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot,
                                     originFileResolver,
                                     operationResult);
-                                
+
+                                var path = MmPath.NormalizePath(OutputPath);
+
                                 await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
                                     CkLinkPath);
                                 await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 

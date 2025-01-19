@@ -39,7 +39,10 @@ public class CompilerService : ICompilerService
     public async Task CreateNewAsync(string rootPath)
     {
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
-
+        
+        // Ensure that the paths are normalized (We do not want to mix separators because it leads to issues)
+        rootPath = MmPath.NormalizePath(rootPath);
+        
         var operationResult = new OperationResult();
 
         if (Directory.Exists(rootPath) && Directory.EnumerateFileSystemEntries(rootPath).Any())
@@ -188,6 +191,14 @@ public class CompilerService : ICompilerService
         ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
         ArgumentValidation.ValidateDirectoryPath(nameof(outputPath), outputPath);
 
+        // Ensure that the paths are normalized (We do not want to mix separators because it leads to issues)
+        outputPath = MmPath.NormalizePath(outputPath);
+        rootPath = MmPath.NormalizePath(rootPath);
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
+        {
+            createCacheFilePath = MmPath.NormalizePath(createCacheFilePath);
+        }
+        
         var originFileResolver = new OriginFileResolver(rootPath);
 
         if (!Directory.Exists(rootPath))
@@ -424,7 +435,7 @@ public class CompilerService : ICompilerService
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
-        
+
         if (!Directory.Exists(outputPath))
         {
             Directory.CreateDirectory(outputPath);

@@ -51,10 +51,16 @@ internal static class CkTypeGraphExtensions
     private static string AddClassModifier(this CkTypeGraph ckTypeGraph, string className)
     {
         var returnString = "";
+        //Mermaid only supports 1 annotation per class!
         if (ckTypeGraph.IsAbstract)
         {
-            returnString = "<<Abstract>>" + " " + className + "\n";
+            returnString = returnString + "<<Abstract>>" + " " + className + "\n";
         }
+        else if (ckTypeGraph.IsFinal)
+        {
+            returnString = returnString + "<<Final>>" + " " + className + "\n";
+        }
+        
 
         return returnString;
     }

@@ -44,6 +44,25 @@ internal static class CkTypeGraphExtensions
         {
             await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
+
+        await outputFile.WriteAsync($"{ckTypeGraph.AddClassModifier(ckTypeGraph.CkTypeId.GetName())}").ConfigureAwait(false);
+    }
+
+    private static string AddClassModifier(this CkTypeGraph ckTypeGraph, string className)
+    {
+        var returnString = "";
+        //Mermaid only supports 1 annotation per class!
+        if (ckTypeGraph.IsAbstract)
+        {
+            returnString = returnString + "<<Abstract>>" + " " + className + "\n";
+        }
+        else if (ckTypeGraph.IsFinal)
+        {
+            returnString = returnString + "<<Final>>" + " " + className + "\n";
+        }
+        
+
+        return returnString;
     }
 
     private static string GetAttributeType(this CkTypeGraph ckTypeGraph, CkTypeAttributeDto attribute)

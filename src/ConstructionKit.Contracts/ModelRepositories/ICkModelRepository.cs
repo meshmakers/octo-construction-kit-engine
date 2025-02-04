@@ -30,7 +30,8 @@ public interface ICkModelRepository
     /// <summary>
     ///     Returns true, if the defined source identifier ist supported by the repository.
     /// </summary>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <returns></returns>
     bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
 
@@ -38,7 +39,8 @@ public interface ICkModelRepository
     ///     Checks if a model exists in this repository
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <returns>True if the model exists in this repository, otherwise false</returns>
     Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null);
 
@@ -46,8 +48,9 @@ public interface ICkModelRepository
     ///     Gets a model by its id
     /// </summary>
     /// <param name="modelId">The construction kit model id</param>
-    /// <param name="operationResult">Operation results that contains validation messages occured during deserialization.</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="operationResult">Operation results that contain validation messages occured during deserialization.</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns>The deserialized and schema validated construction kit model</returns>
     Task<CkCompiledModelRoot> GetModelAsync(CkModelId modelId, OperationResult operationResult,
@@ -59,8 +62,9 @@ public interface ICkModelRepository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
     /// <param name="force">Forces the operation by replacing model files if they exist.</param>
-    /// <param name="publishExtensions">When true, custom extensions are published, e.g. custom enum values</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="publishExtensions">When true, custom extensions are published, e.g., custom enum values</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
     Task PublishModelAsync(CkCompiledModelRoot ckCompiledModel, bool force = false, bool publishExtensions = false,
@@ -71,8 +75,9 @@ public interface ICkModelRepository
     ///     Updates a model in the repository
     /// </summary>
     /// <param name="ckCompiledModel">The validated construction kit model</param>
-    /// <param name="publishExtensions">When true, custom extensions are published, e.g. custom enum values</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="publishExtensions">When true, custom extensions are published, e.g., custom enum values</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
     Task UpdateModelAsync(CkCompiledModelRoot ckCompiledModel, bool publishExtensions = false,
@@ -84,7 +89,8 @@ public interface ICkModelRepository
     /// </summary>
     /// <param name="ckEnumId">Construction kit enum id</param>
     /// <param name="ckEnumUpdates">Describes the updates to the enum</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns></returns>
     Task CustomizeCkEnumAsync(CkId<CkEnumId> ckEnumId, ICollection<CkEnumUpdate> ckEnumUpdates,

@@ -1,6 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Xunit;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;

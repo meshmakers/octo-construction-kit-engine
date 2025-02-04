@@ -20,7 +20,7 @@ public interface ICkCacheService
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
     /// <param name="modelGraph">The ready analyzed graph model</param>
     /// <exception cref="Exception"></exception>
-    void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph);
+    void LoadCkModelGraph(string tenantId, ICkModelGraph modelGraph);
 
     /// <summary>
     ///     Returns the construction kit model library ids for a tenant.
@@ -165,4 +165,11 @@ public interface ICkCacheService
     /// <param name="jsonText">JSON formatted cache representation</param>
     /// <exception cref="Exception"></exception>
     void RestoreCache(string tenantId, string jsonText);
+
+    /// <summary>
+    ///     Returns the construction kit model library ids for a tenant.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
+    /// <param name="ckTypeId">The construction kit type id</param>
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId);
 }

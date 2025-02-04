@@ -1,12 +1,15 @@
 using System.Collections.ObjectModel;
+using Meshmakers.Common.Shared;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+namespace Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 
 /// <summary>
 ///     Defines the graph of a CK model
 /// </summary>
-public class CkModelGraph
+public class CkModelGraph : ICkModelGraph
 {
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
     private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
@@ -322,5 +325,15 @@ public class CkModelGraph
     public IEnumerable<CkAssociationRoleGraph> GetAssociationRoles()
     {
         return AssociationRoles.Select(x => x.Value);
+    }
+
+    /// <summary>
+    ///     Returns a list of all query column attribute paths for the given construction kit type
+    /// </summary>
+    /// <returns></returns>
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId)
+    {
+        var collector = new CkTypeQueryColumnCollector(this);
+        return collector.GetColumns(ckTypeId);
     }
 }

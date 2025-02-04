@@ -7,6 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
@@ -15,7 +16,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Caching;
 internal class CkCache : IDisposable
 {
     private readonly ILogger _logger;
-    private CkModelGraph? _modelGraph;
+    private ICkModelGraph? _modelGraph;
 
     internal CkCache(ILogger logger, string tenantId)
     {
@@ -34,7 +35,7 @@ internal class CkCache : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public void LoadCkModelGraph(CkModelGraph modelGraph)
+    public void LoadCkModelGraph(ICkModelGraph modelGraph)
     {
         _logger.LogDebug("Loading model graph into cache for tenant {TenantId}", TenantId);
         _modelGraph = modelGraph;
@@ -279,5 +280,21 @@ internal class CkCache : IDisposable
         }
 
         return missingModelIds;
+    }
+
+    /// <summary>
+    /// Get the query column paths for a CK type.
+    /// </summary>
+    /// <param name="ckTypeId">The CK type ID</param>
+    /// <returns></returns>
+    /// <exception cref="CkCacheException">Thrown if the cache is not loaded</exception>
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId);
     }
 }

@@ -5,6 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 using Microsoft.Extensions.Logging;
@@ -184,7 +185,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
         return compileResults;
     }
 
-    private async Task<string> CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)
+    private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)
     {
         var tempTenantId = Guid.NewGuid().ToString();
         _ckCacheService.CreateTenant(tempTenantId);

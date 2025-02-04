@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Caching;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -26,22 +27,14 @@ public class CkCacheService : ICkCacheService
         _ckCaches = new ConcurrentDictionary<string, CkCache>();
     }
 
-    /// <summary>
-    ///     Create a new tenant cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <inheritdoc />
     public void CreateTenant(string tenantId)
     {
         _ckCaches[tenantId] = new CkCache(_logger, tenantId);
     }
 
-    /// <summary>
-    ///     Loads a already analyzed model into a tenant cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="modelGraph">The ready analyzed graph model</param>
-    /// <exception cref="Exception"></exception>
-    public void LoadCkModelGraph(string tenantId, CkModelGraph modelGraph)
+    /// <inheritdoc />
+    public void LoadCkModelGraph(string tenantId, ICkModelGraph modelGraph)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
@@ -73,10 +66,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.EnsureModelIds(modelIds);
     }
 
-    /// <summary>
-    ///     Unload a tenant cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <inheritdoc />
     public void Unload(string tenantId)
     {
         if (!_ckCaches.TryRemove(tenantId, out var ckCache))
@@ -87,11 +77,7 @@ public class CkCacheService : ICkCacheService
         ckCache.Dispose();
     }
 
-    /// <summary>
-    ///     Returns true if the tenant is loaded
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <returns></returns>
+    /// <inheritdoc />
     public bool IsTenantLoaded(string tenantId)
     {
         return _ckCaches.ContainsKey(tenantId);
@@ -109,13 +95,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.GetCkTypes();
     }
 
-    /// <summary>
-    ///     Returns a <see cref="CkTypeGraph" /> from the cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="ckTypeId">Construction Kit type id.</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public CkTypeGraph GetCkType(string tenantId, CkId<CkTypeId> ckTypeId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -169,13 +149,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.TryGetCkRecord(ckRecordId, out ckRecordGraph);
     }
 
-    /// <summary>
-    ///     Returns a <see cref="CkAttributeGraph" /> from the cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="ckAttributeId">Construction Kit attribute id.</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public CkAttributeGraph GetCkAttribute(string tenantId, CkId<CkAttributeId> ckAttributeId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -186,13 +160,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.GetCkAttribute(ckAttributeId);
     }
 
-    /// <summary>
-    ///     Returns a <see cref="CkAssociationRoleGraph" /> from the cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="ckAssociationRoleId">Construction Kit attribute id.</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public CkAssociationRoleGraph GetCkAssociationRole(string tenantId, CkId<CkAssociationRoleId> ckAssociationRoleId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -203,13 +171,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.GetCkAssociationRole(ckAssociationRoleId);
     }
 
-    /// <summary>
-    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="ckRecordId">Construction Kit record id.</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public CkRecordGraph GetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -231,13 +193,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.GetCkEnums();
     }
 
-    /// <summary>
-    ///     Returns a <see cref="CkRecordGraph" /> from the cache.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
-    /// <param name="ckEnumId">Construction Kit record id.</param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public CkEnumGraph GetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -248,12 +204,7 @@ public class CkCacheService : ICkCacheService
         return ckCache.GetCkEnum(ckEnumId);
     }
 
-    /// <summary>
-    ///     Saves the cache to a stream.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
-    /// <param name="stream">Stream ready for write</param>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public async Task SaveCacheAsync(string tenantId, Stream stream)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -264,12 +215,7 @@ public class CkCacheService : ICkCacheService
         await ckCache.SaveCacheAsync(stream).ConfigureAwait(false);
     }
 
-    /// <summary>
-    ///     Restores the cache from a stream.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
-    /// <param name="stream">Stream ready for read</param>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public async Task RestoreCacheAsync(string tenantId, Stream stream)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -280,12 +226,7 @@ public class CkCacheService : ICkCacheService
         await ckCache.RestoreCacheAsync(stream).ConfigureAwait(false);
     }
 
-    /// <summary>
-    ///     Restores the cache from a stream.
-    /// </summary>
-    /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
-    /// <param name="jsonText">JSON formatted cache representation</param>
-    /// <exception cref="Exception"></exception>
+    /// <inheritdoc />
     public void RestoreCache(string tenantId, string jsonText)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -294,5 +235,16 @@ public class CkCacheService : ICkCacheService
         }
 
         ckCache.RestoreCache(jsonText);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetCkTypeQueryColumnPaths(ckTypeId);
     }
 }

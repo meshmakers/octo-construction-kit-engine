@@ -64,7 +64,7 @@ public class RtEntity : RtTypeWithAttributes
     public CkId<CkTypeId>? CkTypeId { get; set; }
 
     /// <summary>
-    ///     Returns the well known name to access well known entities in a faster way
+    ///     Returns the well-known name to access well-known entities in a faster way
     /// </summary>
     public string? RtWellKnownName { get; set; }
     

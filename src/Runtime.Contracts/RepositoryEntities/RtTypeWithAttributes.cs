@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 
@@ -559,6 +560,16 @@ public abstract class RtTypeWithAttributes
         }
 
         return (string)value;
+    }
+
+    /// <summary>
+    ///     Gets the value of an attribute in the current object or an embedded document using the given path
+    /// </summary>
+    /// <param name="path">Path list to the attribute</param>
+    /// <returns>The value of the attribute or otherwise null</returns>
+    public object? GetAttributeValueByAccessPath(IEnumerable<PathTerm> path)
+    {
+        return RtPathEvaluator.GetValue(this, path);
     }
 
     /// <summary>

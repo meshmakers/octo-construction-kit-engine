@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
@@ -8,6 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// <summary>
 ///     Represents a construction kit attribute of a type, record or association role in the dependency graph
 /// </summary>
+[DebuggerDisplay("Name = {" + nameof(AttributeName) + "}, CkAttributeId = {" + nameof(CkAttributeId) + "}")]
 public class CkTypeAttributeGraph
 {
     /// <summary>

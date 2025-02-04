@@ -121,12 +121,12 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     public bool IsCollectionRoot { get; private set; }
 
     /// <summary>
-    ///     Returns a list of base types of the given construction kit type
+    ///     Returns a list of base types for the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> BaseTypes { get; }
 
     /// <summary>
-    ///     Returns a list of derived types of the given construction kit type
+    ///     Returns a list of derived types for the given construction kit type
     /// </summary>
     public IReadOnlyCollection<CkGraphTypeInheritance> DerivedTypes { get; }
 
@@ -224,7 +224,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     }
 
     /// <summary>
-    ///     Returns a list of derived types of the given construction kit type
+    ///     Returns a list of derived types for the given construction kit type
     /// </summary>
     /// <param name="includeSelf">When true, the current type is included to the list</param>
     /// <returns></returns>
@@ -242,7 +242,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     }
 
     /// <summary>
-    ///     Returns a list of base types of the given construction kit type
+    ///     Returns a list of base types for the given construction kit type
     /// </summary>
     /// <param name="includeSelf">When true, the current type is included to the list</param>
     /// <returns></returns>

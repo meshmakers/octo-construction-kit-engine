@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Text.Json.Serialization;
+using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -60,7 +61,7 @@ public abstract class CkTypeWithAttributesGraph
     
     
     /// <summary>
-    ///     Adds a attribute to the current type
+    ///     Adds an attribute to the current type
     /// </summary>
     /// <param name="ckTypeAttributeGraph"></param>
     internal bool TryAddAttribute(CkTypeAttributeGraph ckTypeAttributeGraph)

@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Microsoft.Extensions.Logging;
 
@@ -494,7 +495,7 @@ public class CompilerService : ICompilerService
             new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } }).ConfigureAwait(false);
     }
 
-    private async Task<string> CreateCacheFileAsync(CkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)
+    private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)
     {
         var tempTenantId = Guid.NewGuid().ToString();
         _ckCacheService.CreateTenant(tempTenantId);

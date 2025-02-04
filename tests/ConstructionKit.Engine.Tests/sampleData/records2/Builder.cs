@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
-namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.records1;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.records2;
 
 public class Builder
 {
@@ -10,82 +10,88 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("TestRecords", "1.0.0"),
-            Dependencies = new List<CkModelId> { new("System", "1.0.0") },
-            AssociationRoles = new List<CkAssociationRoleDto>
-            {
+            Dependencies = [new("System", "1.0.0")],
+            AssociationRoles =
+            [
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
                 }
-            },
-            Attributes = new List<CkAttributeDto>
-            {
+            ],
+            Attributes =
+            [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
+
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
+
                 new()
                 {
                     AttributeId = "Record1",
                     ValueType = AttributeValueTypesDto.Record,
                     ValueCkRecordId = "TestRecords/Record1"
                 }
-            },
-            Records = new List<CkRecordDto>
-            {
+            ],
+            Records =
+            [
                 new()
                 {
                     RecordId = "Record1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "MyAttributeA" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "MyAttributeB" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "MyAttributeC" }
-                    }
+                    Attributes =
+                    [
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "MyAttributeA" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "MyAttributeB" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "MyAttributeC" }
+                    ]
                 }
-            },
-            Types = new List<CkCompiledTypeDto>
-            {
+            ],
+            Types =
+            [
                 new()
                 {
                     TypeId = "Demo1",
                     DerivedFromCkTypeId = "System/Entity",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "MyAttributeA" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "MyAttributeB" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "MyAttributeC" },
+                    Attributes =
+                    [
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "MyAttributeA" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "MyAttributeB" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "MyAttributeC" },
                         new() { CkAttributeId = "TestRecords/Record1", AttributeName = "MyRecord" }
-                    }
+                    ]
                 }
-            }
+            ]
         };
     }
 }

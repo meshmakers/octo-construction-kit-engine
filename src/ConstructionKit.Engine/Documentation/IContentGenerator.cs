@@ -1,5 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 

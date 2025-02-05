@@ -1,7 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.elements;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Serializers;
 
@@ -130,11 +129,11 @@ public class JsonSerializerTests
         await using var streamWriter = new StreamWriter(stream);
         var ckElementsDto = Builder.Build();
         await ckJsonSerializer.SerializeAsync(streamWriter, ckElementsDto);
-        await streamWriter.FlushAsync();
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         stream.Position = 0;
         var streamReader = new StreamReader(stream);
-        var json = await streamReader.ReadToEndAsync();
+        var json = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("output:");
         _testOutputHelper.WriteLine(json);
         Assert.NotNull(json);

@@ -4,7 +4,6 @@ using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 using RandomFriendlyNameGenerator;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Serializers;
 

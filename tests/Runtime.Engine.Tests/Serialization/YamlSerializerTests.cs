@@ -3,7 +3,6 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
 
@@ -150,11 +149,11 @@ public class YamlSerializerTests
         await using var streamWriter = new StreamWriter(stream);
         var ckElementsDto = Builder.Build();
         await rtYamlSerializer.SerializeAsync(streamWriter, ckElementsDto);
-        await streamWriter.FlushAsync();
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
 
         stream.Position = 0;
         var streamReader = new StreamReader(stream);
-        var json = await streamReader.ReadToEndAsync();
+        var json = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
         _testOutputHelper.WriteLine("output:");
         _testOutputHelper.WriteLine(json);
         Assert.NotNull(json);

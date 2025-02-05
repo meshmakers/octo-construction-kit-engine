@@ -4,7 +4,6 @@ using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.systemFake;
 using Microsoft.Extensions.Logging;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.Resolvers;
 

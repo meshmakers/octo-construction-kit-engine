@@ -224,9 +224,9 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         foreach (var filter in filters)
         {
             // Generate the predicate for the current filter
-            if (!ckTypeGraph.AllAttributesByName.TryGetValue(filter.AttributeName, out var attribute))
+            if (!ckTypeGraph.AllAttributesByName.TryGetValue(filter.AttributePath, out var attribute))
             {
-                throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(ckTypeGraph.CkTypeId, filter.AttributeName);
+                throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(ckTypeGraph.CkTypeId, filter.AttributePath);
             }
 
             var filterExpression = FilterExpression<TEntity>(filter, attribute);
@@ -258,11 +258,11 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         switch (filter.Operator)
         {
             case FieldFilterOperator.Equals:
-                return rtEntity => rtEntity.Attributes.ContainsKey(filter.AttributeName) &&
-                                   Equals(rtEntity.Attributes[filter.AttributeName], filter.ComparisonValue);
+                return rtEntity => rtEntity.Attributes.ContainsKey(filter.AttributePath) &&
+                                   Equals(rtEntity.Attributes[filter.AttributePath], filter.ComparisonValue);
             case FieldFilterOperator.NotEquals:
-                return x => x.Attributes.ContainsKey(filter.AttributeName) &&
-                            !Equals(x.Attributes[filter.AttributeName], filter.ComparisonValue);
+                return x => x.Attributes.ContainsKey(filter.AttributePath) &&
+                            !Equals(x.Attributes[filter.AttributePath], filter.ComparisonValue);
             // case FieldFilterOperator.LessEqualThan:
             //     return x=>  x.Attributes.ContainsKey(filter.AttributeName) && Expression.LessThanOrEqual(x.Attributes[filter.AttributeName], filter.ComparisonValue);
             //     

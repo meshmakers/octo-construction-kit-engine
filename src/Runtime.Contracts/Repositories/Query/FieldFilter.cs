@@ -10,22 +10,22 @@ public class FieldFilter
     /// <summary>
     ///     Creates a new instance of <see cref="FieldFilter" />
     /// </summary>
-    /// <param name="attributeName">The name of the attribute to compare</param>
+    /// <param name="attributePath">The path to the attribute to compare</param>
     /// <param name="comparisonOperator">Operator to use for the comparison</param>
     /// <param name="comparisonValue">The value to compare with</param>
-    public FieldFilter(string attributeName, FieldFilterOperator comparisonOperator, object? comparisonValue)
+    public FieldFilter(string attributePath, FieldFilterOperator comparisonOperator, object? comparisonValue)
     {
-        ArgumentValidation.ValidateString(nameof(attributeName), attributeName);
+        ArgumentValidation.ValidateString(nameof(attributePath), attributePath);
 
-        AttributeName = attributeName;
+        AttributePath = attributePath;
         Operator = comparisonOperator;
         ComparisonValue = comparisonValue;
     }
 
     /// <summary>
-    ///     Gets the name of the attribute to compare
+    ///     Gets the path to the attribute to compare
     /// </summary>
-    public string AttributeName { get; }
+    public string AttributePath { get; }
 
     /// <summary>
     ///     The operator to use for the comparison
@@ -40,6 +40,6 @@ public class FieldFilter
     /// <inheritdoc />
     public override string ToString()
     {
-        return $"{AttributeName} {Operator} {ComparisonValue}";
+        return $"{AttributePath} {Operator} {ComparisonValue}";
     }
 }

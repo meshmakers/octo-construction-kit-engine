@@ -8,11 +8,11 @@ public class AttributeSearchFilter
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="attributeNames">List of attribute names</param>
+    /// <param name="attributePaths">List of attribute paths</param>
     /// <param name="searchTerm">Search term that must exist in one of the given attributes</param>
-    public AttributeSearchFilter(IEnumerable<string> attributeNames, object searchTerm)
+    public AttributeSearchFilter(IEnumerable<string> attributePaths, object searchTerm)
     {
-        AttributeNames = attributeNames;
+        AttributePaths = attributePaths;
         SearchTerm = searchTerm;
     }
 
@@ -22,7 +22,7 @@ public class AttributeSearchFilter
     public object SearchTerm { get; }
 
     /// <summary>
-    ///     Attribute names to search in
+    ///     Attribute paths to search in
     /// </summary>
-    public IEnumerable<string> AttributeNames { get; }
+    public IEnumerable<string> AttributePaths { get; }
 }

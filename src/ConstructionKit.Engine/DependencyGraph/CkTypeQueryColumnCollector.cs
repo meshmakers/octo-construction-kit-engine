@@ -9,7 +9,6 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 {
     private const string Array = "[{0}]";
     private const string FirstElement = "0";
-    private const string LastElement = "-1";
     private const string AllElements = "*";
     private const string Separator = ".";
     private const string SystemAttributeRtId = "RtId";
@@ -111,16 +110,6 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                             c.ValueType);
                     }));
 
-                    columns.AddRange(recordColumns.Select(c =>
-                    {
-                        var l = c.AccessPathList.ToList();
-                        l.Insert(0, new(LastElement, PathType.ArrayIndex));
-                        l.Insert(0, new (attributeNamePascalCase, PathType.Attribute));
-                        return new CkTypeQueryColumn(
-                            attributeNameCamelCase + string.Format(Array, LastElement) + Separator + c.Path, l,
-                            c.ValueType);
-                    }));
-
                     break;
                 case AttributeValueTypesDto.StringArray:
                 case AttributeValueTypesDto.IntArray:
@@ -131,9 +120,6 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
                     l = [new(attributeNamePascalCase, PathType.Attribute), new(AllElements, PathType.ArrayIndex)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, AllElements), l,
-                        attributeGraph.ValueType));
-                    l = [new(attributeNamePascalCase, PathType.Attribute), new(LastElement, PathType.ArrayIndex)];
-                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, LastElement), l,
                         attributeGraph.ValueType));
                     break;
                 default:

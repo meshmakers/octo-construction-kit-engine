@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
 

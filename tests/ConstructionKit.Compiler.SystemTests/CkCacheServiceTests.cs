@@ -2,10 +2,8 @@ using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.sampleData.sample1;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.ConstructionKit.Engine;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests;
 

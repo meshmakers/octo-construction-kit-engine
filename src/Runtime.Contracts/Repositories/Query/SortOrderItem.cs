@@ -10,20 +10,20 @@ public class SortOrderItem
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="attributeName">Attribute name</param>
+    /// <param name="attributePath">Path to an attribute to filter for</param>
     /// <param name="sortOrder">Type of sort order</param>
-    internal SortOrderItem(string attributeName, SortOrders sortOrder)
+    internal SortOrderItem(string attributePath, SortOrders sortOrder)
     {
-        ArgumentValidation.ValidateString(nameof(attributeName), attributeName);
+        ArgumentValidation.ValidateString(nameof(attributePath), attributePath);
 
-        AttributeName = attributeName;
+        AttributePath = attributePath;
         SortOrder = sortOrder;
     }
 
     /// <summary>
     ///     Gets the attribute name to sort by.
     /// </summary>
-    public string AttributeName { get; }
+    public string AttributePath { get; }
 
     /// <summary>
     ///     How to sort the attribute.

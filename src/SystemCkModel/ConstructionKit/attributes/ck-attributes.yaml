@@ -41,9 +41,9 @@ attributes:
     valueType: Record
     valueCkRecordId: ${thisModel}/AttributeSearchFilter
     
-  - id: ReferencedAttributeName
+  - id: AttributePath
     valueType: String
-  - id: ReferencedAttributeNames
+  - id: AttributePaths
     valueType: StringArray    
   - id: FieldFilter.Operator
     valueType: Enum

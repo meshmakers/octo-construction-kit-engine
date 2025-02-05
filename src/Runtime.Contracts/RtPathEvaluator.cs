@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Text.RegularExpressions;
+using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
@@ -39,7 +40,13 @@ public static class RtPathEvaluator
         return EvaluatePath(root, path.ToList());
     }
 
-    private static List<PathTerm> TokenizePath(string path)
+    /// <summary>
+    /// Tokenizes a path into a list of path terms
+    /// </summary>
+    /// <param name="path"></param>
+    /// <returns></returns>
+    // ReSharper disable once MemberCanBePrivate.Global
+    public static List<PathTerm> TokenizePath(string path)
     {
         var tokens = new List<PathTerm>();
         foreach (Match match in Regex.Matches(path))
@@ -47,7 +54,7 @@ public static class RtPathEvaluator
             // If the group name "property" contains a value, it is a property name.
             if (match.Groups["property"].Success)
             {
-                tokens.Add(new PathTerm(match.Groups["property"].Value, PathType.Attribute));
+                tokens.Add(new PathTerm(match.Groups["property"].Value.ToPascalCase(), PathType.Attribute));
             }
             // Otherwise, we check if the arrayIndex group was successful.
             else if (match.Groups["arrayIndex"].Success)

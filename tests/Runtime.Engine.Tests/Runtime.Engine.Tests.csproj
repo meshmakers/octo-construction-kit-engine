@@ -4,10 +4,9 @@
         <IsPackable>false</IsPackable>
         <AssemblyName>Meshmakers.Octo.Runtime.Engine.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.Runtime.Engine.Tests</RootNamespace>
+        <TargetFramework>net9.0</TargetFramework>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <TargetFramework>net9.0</TargetFramework>
-        <OutputType>Library</OutputType>
     </PropertyGroup>
 
     <ItemGroup>

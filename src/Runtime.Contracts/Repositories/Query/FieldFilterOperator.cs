@@ -63,10 +63,10 @@ public enum FieldFilterOperator
     /// <summary>
     ///   Scalar strings: Check equality of any element to a string comparison value, e.g. *value*
     /// </summary>
-    AnyLike = 10,
+    AnyLike = 11,
 
     /// <summary>
     ///     Matches documents that contain an array field with at least one element that matches all the specified query criteria.
     /// </summary>
-    Match = 11
+    Match = 12
 }

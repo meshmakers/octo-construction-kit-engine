@@ -1,7 +1,7 @@
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
-/// Extension methods to work fluent with field filter criterias
+/// Extension methods to work fluently with field filter criteria
 /// </summary>
 public static class FieldFilterCriteriaExtensions
 {
@@ -146,7 +146,7 @@ public static class FieldFilterCriteriaExtensions
     }
     
     /// <summary>
-    ///     Adds a field filter that checks if the value of an attribute match the given regex expression.
+    ///     Adds a field filter that checks if the value of an attribute matches the given regex expression.
     /// </summary>
     /// <param name="this">The field filter collection</param>
     /// <param name="attributeName">Name of attribute</param>
@@ -169,6 +169,23 @@ public static class FieldFilterCriteriaExtensions
         where T : FieldFilterCriteria
     {
         @this.AddFieldFilter(attributeName, FieldFilterOperator.AnyEq, comparisonValue);
+
+        return @this;
+    }
+
+    /// <summary>
+    ///     Adds a field filter that checks if any value of an array attribute is like the given value.
+    /// </summary>
+    /// <remarks>
+    /// Wildcards are allowed in the comparison value.
+    /// </remarks>
+    /// <param name="this">The field filter collection</param>
+    /// <param name="attributeName">Name of attribute</param>
+    /// <param name="comparisonValue">Comparison value of the field filter</param>
+    public static T FieldAnyLike<T>(this T @this, string attributeName, object? comparisonValue)
+        where T : FieldFilterCriteria
+    {
+        @this.AddFieldFilter(attributeName, FieldFilterOperator.AnyLike, comparisonValue);
 
         return @this;
     }

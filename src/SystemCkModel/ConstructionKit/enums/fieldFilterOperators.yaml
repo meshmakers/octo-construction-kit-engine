@@ -37,5 +37,8 @@ enums:
     name: AnyEq
     description: Compares an array field with at least one element that matches the specified value.
   - key: 11
+    name: AnyLike
+    description: Compares an array field with at least one element that matches the specified value using a pattern matching comparison. Use * as a wildcard character.
+  - key: 12
     name: Match
     description: Matches an array field with at least one element that matches all the specified query criteria.

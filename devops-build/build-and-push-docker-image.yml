@@ -1,0 +1,59 @@
+parameters:
+  - name: ContainerRegistry
+    type: string
+  - name: Repository
+    type: string
+  - name: Dockerfile
+    type: string
+  - name: Architecture
+    type: string
+    default: linux/amd64
+  - name: PrivateRegistry
+    type: string
+
+steps:
+  - task: Docker@2
+    displayName: Login to ${{ parameters.ContainerRegistry }}
+    inputs:
+      command: login
+      containerRegistry: ${{ parameters.ContainerRegistry }}
+
+  - task: CmdLine@2
+    condition: eq(variables.isRelease, true)
+    displayName: Build/Push to public ${{ parameters.Repository }}:$(Build.BuildNumber)
+    inputs:
+      script: |
+        docker buildx create --use --name mybuilder --bootstrap --config ~/buildkitd.default.toml &&
+        docker buildx build --platform ${{ parameters.Architecture }} \
+          --build-arg OCTO_PRIVATE_NUGET_SERVICE="$(NugetPrivateServer)" --build-arg OCTO_PRIVATE_NUGET_CERTIFICATE="$(NugetPrivateServerCa)" \
+          -f ${{ parameters.Dockerfile }} \
+          -t ${{ parameters.Repository }}:$(Build.BuildNumber) \
+          --push \
+          $(System.DefaultWorkingDirectory) &&
+        docker buildx rm mybuilder
+
+  - task: CmdLine@2
+    condition: or(eq(variables.isMain, true), eq(variables.isRelease, true))
+    displayName: Build/Push to private ${{ parameters.Repository }}:$(Build.BuildNumber)
+    inputs:
+      script: |
+        docker buildx create --use --name mybuilder --bootstrap --config ~/buildkitd.default.toml &&
+        docker buildx build --platform ${{ parameters.Architecture }} \
+          --build-arg OCTO_PRIVATE_NUGET_SERVICE="$(NugetPrivateServer)" --build-arg OCTO_PRIVATE_NUGET_CERTIFICATE="$(NugetPrivateServerCa)" \
+          -f ${{ parameters.Dockerfile }} \
+          -t ${{ parameters.PrivateRegistry }}/${{ parameters.Repository }}:$(Build.BuildNumber) \
+          --push \
+          $(System.DefaultWorkingDirectory) &&
+        docker buildx rm mybuilder
+  - task: CmdLine@2
+    condition: and(ne(variables.isMain, true), ne(variables.isRelease, true))
+    displayName: Build ONLY for non-main branch ${{ parameters.Repository }}:$(Build.BuildNumber)
+    inputs:
+      script: |
+        docker buildx create --use --name mybuilder --bootstrap --config ~/buildkitd.default.toml &&
+        docker buildx build --platform ${{ parameters.Architecture }} \
+          --build-arg OCTO_PRIVATE_NUGET_SERVICE="$(NugetPrivateServer)" --build-arg OCTO_PRIVATE_NUGET_CERTIFICATE="$(NugetPrivateServerCa)" \
+          -f ${{ parameters.Dockerfile }} \
+          -t ${{ parameters.PrivateRegistry }}/${{ parameters.Repository }}:$(Build.BuildNumber) \
+          $(System.DefaultWorkingDirectory) &&
+        docker buildx rm mybuilder

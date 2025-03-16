@@ -27,39 +27,32 @@
     </ItemGroup>
 
     <ItemGroup>
-        <None Remove="Serialization\Schema\ck-model-config.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-model-config.json">
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-enum.schema.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-record.schema.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-compiled.schema.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-compiled-model.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-compiled-model.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-associationRole.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-associationRole.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-element-associationRole.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-attribute.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-attribute.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-element-attribute.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-type.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-element-type.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-element-enum.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <EmbeddedResource Include="Serialization\Schema\ck-element-record.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-meta.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
-        <EmbeddedResource Include="Serialization\Schema\ck-element-type.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-elements.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-elements.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-        </EmbeddedResource>
-        <None Remove="Serialization\Schema\ck-meta.json" />
-        <EmbeddedResource Include="Serialization\Schema\ck-meta.json">
-            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-model-config.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
     </ItemGroup>
 

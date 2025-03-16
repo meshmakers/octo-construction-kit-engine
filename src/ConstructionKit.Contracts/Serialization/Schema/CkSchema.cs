@@ -12,12 +12,12 @@ public static class CkSchema
 
     static CkSchema()
     {
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-attribute")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-type")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-associationRole")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-record")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-element-enum")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "ck-model-config")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-attribute.schema")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-type.schema")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-associationRole.schema")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-record.schema")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-enum.schema")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-model-config.schema")));
     }
 
     /// <summary>
@@ -25,7 +25,7 @@ public static class CkSchema
     /// </summary>
     public static JsonSchema GetElementsSchema()
     {
-        var elementsSchema = GetSchema(string.Format(SchemaPath, "ck-elements"));
+        var elementsSchema = GetSchema(string.Format(SchemaPath, "construction-kit-elements.schema"));
         return elementsSchema.Bundle();
     }
 
@@ -34,7 +34,7 @@ public static class CkSchema
     /// </summary>
     public static JsonSchema GetMetaSchema()
     {
-        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-meta"));
+        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-meta.schema"));
         return metaSchemaInternal.Bundle();
     }
 
@@ -43,7 +43,7 @@ public static class CkSchema
     /// </summary>
     public static JsonSchema GetModelConfigSchema()
     {
-        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-model-config"));
+        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-model-config.schema"));
         return metaSchemaInternal.Bundle();
     }
     
@@ -52,7 +52,7 @@ public static class CkSchema
     /// </summary>
     public static JsonSchema GetCompiledModelSchema()
     {
-        var compiledModelSchemaInternal = GetSchema(string.Format(SchemaPath, "ck-compiled-model"));
+        var compiledModelSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-compiled.schema"));
         return compiledModelSchemaInternal.Bundle();
     }
 

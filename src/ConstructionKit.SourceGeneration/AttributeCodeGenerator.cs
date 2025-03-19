@@ -158,7 +158,15 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.Binary, value);");
                 sb.AppendLine("  }");
-                break;                
+                break;
+            case AttributeValueTypesDto.BinaryLinked:
+                sb.AppendLine($"  public OctoObjectId? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<OctoObjectId>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.BinaryLinked, value);");
+                sb.AppendLine("  }");
+                break;
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;            
@@ -311,7 +319,15 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.Binary, value);");
                 sb.AppendLine("  }");
-                break;                  
+                break;
+            case AttributeValueTypesDto.BinaryLinked:
+                sb.AppendLine($"  public OctoObjectId {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeValue<OctoObjectId>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.BinaryLinked, value);");
+                sb.AppendLine("  }");
+                break;
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;

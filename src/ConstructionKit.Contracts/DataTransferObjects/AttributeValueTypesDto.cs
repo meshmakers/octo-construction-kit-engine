@@ -8,7 +8,12 @@ public enum AttributeValueTypesDto
     /// <summary>
     ///     Indicates that the attribute value is an integer.
     /// </summary>
-    Int = 1,
+    Int = Integer,
+    
+    /// <summary>
+    ///     Indicates that the attribute value is an integer.
+    /// </summary>
+    Integer = 1,
 
     /// <summary>
     ///     Indicates that the attribute value is a string.
@@ -43,7 +48,12 @@ public enum AttributeValueTypesDto
     /// <summary>
     ///     Indicates that the attribute value is an integer array.
     /// </summary>
-    IntArray = 8,
+    IntArray = IntegerArray,
+    
+    /// <summary>
+    ///     Indicates that the attribute value is an integer array.
+    /// </summary>
+    IntegerArray = 8,
 
     /// <summary>
     ///     Indicates that the attribute value is a binary file in a storage linked to the attribute.
@@ -73,7 +83,12 @@ public enum AttributeValueTypesDto
     /// <summary>
     ///     Indicates that the attribute value is a 64-bit integer.
     /// </summary>
-    Int64 = 14,
+    Int64 = Integer64,
+    
+    /// <summary>
+    ///     Indicates that the attribute value is a 64-bit integer.
+    /// </summary>
+    Integer64 = 14,
 
     /// <summary>
     ///     Indicates that the attribute value is a date time offset.

@@ -41,6 +41,8 @@
     <PropertyGroup>
         <OctoCkLinkPath>/docs/technologyGuide/constructionKits/libraries/</OctoCkLinkPath>
     </PropertyGroup>
-	
 
+    <ItemGroup>
+        <Compile Include="$(MSBuildThisFileDirectory)DotNetStandardFix.cs" Visible="false" />
+    </ItemGroup>
 </Project>

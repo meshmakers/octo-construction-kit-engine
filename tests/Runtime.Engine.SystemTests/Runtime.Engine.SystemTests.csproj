@@ -32,4 +32,17 @@
         <ProjectReference Include="..\TestCkModel\TestCkModel.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="sampleData\largeBinaries\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Update="sampleData\largeBinaries\Customers.xlsx">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Update="sampleData\largeBinaries\Products.pdf">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+    </ItemGroup>
+
 </Project>

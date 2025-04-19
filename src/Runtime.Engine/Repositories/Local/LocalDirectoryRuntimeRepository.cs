@@ -54,7 +54,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
             .ConfigureAwait(false);
     }
 
@@ -72,7 +72,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
             .ConfigureAwait(false);
     }
 
@@ -136,7 +136,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
             .ConfigureAwait(false);
     }
 
@@ -181,7 +181,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateDelete(rtEntity.ToRtEntityId()));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
             .ConfigureAwait(false);
     }
 
@@ -200,7 +200,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(rtEntity.ToRtEntityId()) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, new AssociationUpdateInfo[] { })
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
             .ConfigureAwait(false);
     }
 

@@ -15,22 +15,16 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 {
     private const string Validation = "validation";
 
-    //private readonly JsonSerializerOptions _options;
-    private readonly JsonSerializerOptions _options;
-
-    public RtRepositorySerializer()
+    private readonly JsonSerializerOptions _options = new()
     {
-        _options = new JsonSerializerOptions
+        DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters =
         {
-            DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingDefault,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters =
-            {
-                new CkIdTypeIdConverter(), new CkIdAssociationRoleIdConverter()
-            }
-        };
-    }
+            new CkIdTypeIdConverter(), new CkIdAssociationRoleIdConverter()
+        }
+    };
 
     public async Task SerializeAsync(StreamWriter streamWriter, IEnumerable<RtEntity> collection)
     {
@@ -73,6 +67,11 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, associationJsons, _options).ConfigureAwait(false);
     }
 
+    public async Task SerializeAsync(StreamWriter streamWriter, IEnumerable<BinaryInfo> collection)
+    {
+        await JsonSerializer.SerializeAsync(streamWriter.BaseStream, collection, _options).ConfigureAwait(false);
+    }
+
     public async Task<IEnumerable<RtEntity>> DeserializeEntitiesAsync(Stream stream, string locationReference,
         OperationResult operationResult)
     {
@@ -104,6 +103,20 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         {
             var rtAssociations = await JsonSerializer.DeserializeAsync<IEnumerable<RtAssociation>>(stream, _options).ConfigureAwait(false);
             return rtAssociations ?? throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
+        }
+        catch (JsonException e)
+        {
+            CheckException(locationReference, operationResult, e);
+            throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
+        }
+    }
+
+    public async Task<IEnumerable<BinaryInfo>> DeserializeBinaryInfosAsync(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        try
+        {
+            var binaryInfos = await JsonSerializer.DeserializeAsync<IEnumerable<BinaryInfo>>(stream, _options).ConfigureAwait(false);
+            return binaryInfos ?? throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
         {

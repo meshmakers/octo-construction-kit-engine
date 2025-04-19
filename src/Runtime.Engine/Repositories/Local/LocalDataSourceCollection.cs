@@ -6,29 +6,18 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
-internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCollection<TKey, TDocument>
+internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
+    string tenantId,
+    string filePath,
+    IDataSourceMapper<TKey, TDocument, TDto> dataSourceMapper)
+    : IDataSourceCollection<TKey, TDocument>
     where TDocument : new()
     where TKey : notnull
 {
-    private readonly IDataSourceMapper<TKey, TDocument, TDto> _dataSourceMapper;
-    private readonly string _filePath;
-
-    private readonly ConcurrentDictionary<TKey, TDocument> _rtEntities;
+    private readonly ConcurrentDictionary<TKey, TDocument> _rtEntities = new();
     private readonly SemaphoreSlim _semaphoreSlim = new(1, 1);
 
-    private readonly string _tenantId;
     private bool _isLoaded;
-
-    public LocalDataSourceCollection(string tenantId, string filePath,
-        IDataSourceMapper<TKey, TDocument, TDto> dataSourceMapper)
-    {
-        _tenantId = tenantId;
-        _filePath = filePath;
-        _dataSourceMapper = dataSourceMapper;
-
-        _rtEntities = new ConcurrentDictionary<TKey, TDocument>();
-        _isLoaded = false;
-    }
 
 
     public async Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents)
@@ -40,7 +29,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         long updateCount = 0;
         foreach (var document in documents)
         {
-            var key = _dataSourceMapper.GetId(document);
+            var key = dataSourceMapper.GetId(document);
             if (!_rtEntities.TryAdd(key, document))
             {
                 if (_rtEntities.TryGetValue(key, out var comparisionDocument))
@@ -74,10 +63,10 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
     {
         await LoadAsync().ConfigureAwait(false);
 
-        var key = _dataSourceMapper.GetId(document);
+        var key = dataSourceMapper.GetId(document);
         if (!_rtEntities.TryAdd(key, document))
         {
-            throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
+            throw RuntimeRepositoryException.DocumentAlreadyAdded(tenantId, key);
         }
 
         await SaveAsync().ConfigureAwait(false);
@@ -89,10 +78,10 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         foreach (var document in documents)
         {
-            var key = _dataSourceMapper.GetId(document);
+            var key = dataSourceMapper.GetId(document);
             if (!_rtEntities.TryAdd(key, document))
             {
-                throw RuntimeRepositoryException.DocumentAlreadyAdded(_tenantId, key);
+                throw RuntimeRepositoryException.DocumentAlreadyAdded(tenantId, key);
             }
         }
 
@@ -105,16 +94,16 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         foreach (var document in documents)
         {
-            var key = _dataSourceMapper.GetId(document);
+            var key = dataSourceMapper.GetId(document);
 
             _rtEntities.TryGetValue(key, out var savedDocument);
 
             if (savedDocument == null)
             {
-                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+                throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
             }
 
-            _dataSourceMapper.Apply(savedDocument, document);
+            dataSourceMapper.Apply(savedDocument, document);
         }
 
         await SaveAsync().ConfigureAwait(false);
@@ -126,16 +115,16 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         foreach (var document in documents)
         {
-            var key = _dataSourceMapper.GetId(document);
+            var key = dataSourceMapper.GetId(document);
 
             _rtEntities.TryGetValue(key, out var savedDocument);
 
             if (savedDocument == null)
             {
-                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+                throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
             }
 
-            _dataSourceMapper.Apply(savedDocument, document);
+            dataSourceMapper.Apply(savedDocument, document);
         }
 
         await SaveAsync().ConfigureAwait(false);
@@ -149,10 +138,10 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         if (savedDocument == null)
         {
-            throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+            throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
         }
 
-        _dataSourceMapper.Apply(savedDocument, document);
+        dataSourceMapper.Apply(savedDocument, document);
 
         await SaveAsync().ConfigureAwait(false);
     }
@@ -163,7 +152,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
         if (!_rtEntities.TryRemove(key, out _))
         {
-            throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+            throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
         }
 
         await SaveAsync().ConfigureAwait(false);
@@ -190,7 +179,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
         {
             if (!_rtEntities.TryRemove(key, out _))
             {
-                throw RuntimeRepositoryException.DocumentDoesNotExist(_tenantId, key, typeof(TDocument));
+                throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
             }
         }
 
@@ -298,11 +287,11 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
             }
 
 #if NETSTANDARD2_0
-            using var streamWriter = new StreamWriter(_filePath);
+            using var streamWriter = new StreamWriter(filePath);
 #else
-            await using var streamWriter = new StreamWriter(_filePath);
+            await using var streamWriter = new StreamWriter(filePath);
 #endif
-            await _dataSourceMapper.SerializeAsync(streamWriter, _rtEntities).ConfigureAwait(false);
+            await dataSourceMapper.SerializeAsync(streamWriter, _rtEntities).ConfigureAwait(false);
         }
         finally
         {
@@ -321,7 +310,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
                 return;
             }
 
-            if (!File.Exists(_filePath))
+            if (!File.Exists(filePath))
             {
                 _isLoaded = true;
                 return;
@@ -329,12 +318,12 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto> : IDataSourceCol
 
             OperationResult operationResult = new();
 #if NETSTANDARD2_0
-            using var fileStream = File.OpenRead(_filePath);
+            using var fileStream = File.OpenRead(filePath);
 #else
-            await using var fileStream = File.OpenRead(_filePath);
+            await using var fileStream = File.OpenRead(filePath);
 #endif
 
-            var rtEntities = await _dataSourceMapper.DeserializeAsync(fileStream, _filePath, operationResult).ConfigureAwait(false);
+            var rtEntities = await dataSourceMapper.DeserializeAsync(fileStream, filePath, operationResult).ConfigureAwait(false);
             foreach (var keyValuePair in rtEntities)
             {
                 _rtEntities.TryAdd(keyValuePair.Key, keyValuePair.Value);

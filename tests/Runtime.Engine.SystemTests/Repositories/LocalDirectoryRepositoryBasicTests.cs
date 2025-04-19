@@ -10,23 +10,16 @@ using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories;
 
-public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
+public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
 {
-    private readonly CacheServiceFixture _fixture;
-
-    public LocalDirectoryRepositoryTests(CacheServiceFixture fixture)
-    {
-        _fixture = fixture;
-    }
-
     [Fact]
     public async Task CreateTransientRtEntity_Abstract_Exception()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         await Assert.ThrowsAsync<RuntimeRepositoryException>(async () =>
@@ -36,11 +29,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task CreateTransientRtEntity_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var entity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtSensor>();
@@ -51,11 +44,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task InsertOneRtEntityAsync_Abstract_Exception()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtEntity = new RtEntity("Test/LocationWithSensor", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
@@ -70,11 +63,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task InsertOneRtEntityAsync_MandatoryAttributeMissing_Exception()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Sensor");
@@ -88,11 +81,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task InsertOneRtEntityAsync_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Ocean");
@@ -104,11 +97,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task InsertOneRtEntityAsync_Typed_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
@@ -120,11 +113,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task GetRtEntityByRtIdAsync_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
@@ -142,11 +135,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ReplaceOneRtEntityByIdAsync_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtInsertOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
@@ -169,11 +162,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task UpdateOneRtEntityByIdAsync_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
@@ -198,11 +191,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task UpdateManyRtEntityAsync_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         for (var i = 0; i < 20; i++)
@@ -235,11 +228,11 @@ public class LocalDirectoryRepositoryTests : IClassFixture<CacheServiceFixture>
     [Fact]
     public async Task ApplyChanges_CreateAssociation_OK()
     {
-        var ckCacheService = await _fixture.GetCacheServiceAsync();
-        var rtSerializer = _fixture.GetRtRepositorySerializer();
-        var bulkRtMutation = _fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService,
-            new LocalRepositoryDataSource(_fixture.TenantId, _fixture.RepositoryPath, ckCacheService, rtSerializer),
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
         List<EntityUpdateInfo<RtEntity>> entityUpdateInfos = new();

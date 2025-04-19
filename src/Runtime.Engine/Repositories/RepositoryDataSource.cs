@@ -53,7 +53,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds, GraphDirections direction)
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<OctoObjectId> rtIds, GraphDirections direction)
     {
         var associations = new List<RtAssociation>();
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
@@ -96,7 +97,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
+    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<OctoObjectId> rtIds,
         GraphDirections direction, CkId<CkAssociationRoleId> roleId)
     {
         var associations = new List<RtAssociation>();
@@ -118,7 +120,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public abstract Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session, RtEntityId rtEntityId,
+    public abstract Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session,
+        RtEntityId rtEntityId,
         CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
 
     /// <inheritdoc />
@@ -147,4 +150,35 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             TargetRtId = targetRtEntityId.RtId
         };
     }
+
+    /// <inheritdoc />
+    public abstract Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType,
+        BinaryType binaryType,
+        Stream stream,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task ReplaceLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
+        BinaryType binaryType,
+        Stream stream, CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
+        Stream stream,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task DeleteLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task<IDownloadStreamHandler> DownloadLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+    public abstract Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, string fileName, BinaryType binaryType,
+        CancellationToken cancellationToken = default);
 }

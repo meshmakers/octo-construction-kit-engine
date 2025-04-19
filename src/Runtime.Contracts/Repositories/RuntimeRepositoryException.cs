@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
@@ -98,5 +99,21 @@ public class RuntimeRepositoryException : PersistenceException
     internal static Exception NotComparable(object? key)
     {
         return new RuntimeRepositoryException($"Key '{key}' is not comparable.");
+    }
+
+    internal static Exception BinaryWithFilenameNotFound(string filename, BinaryType binaryType)
+    {
+        return new RuntimeRepositoryException(
+            $"Binary with filename '{filename}' and binary type '{binaryType}' not found.");
+    }
+
+    internal static Exception BinaryWithIdNotFound(OctoObjectId largeBinaryId)
+    {
+        return new RuntimeRepositoryException($"Binary with id '{largeBinaryId}' not found.");
+    }
+
+    internal static Exception BinaryContentWithIdNotFound(OctoObjectId largeBinaryId)
+    {
+        return new RuntimeRepositoryException($"Binary content with id '{largeBinaryId}' not found.");
     }
 }

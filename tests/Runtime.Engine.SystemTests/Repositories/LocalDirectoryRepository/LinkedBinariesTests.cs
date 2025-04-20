@@ -80,7 +80,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         await localDirectoryRepository.ReplaceOneRtEntityByIdAsync(replaceSession, binaryEntity.RtId, replaceBinaryEntity);
 
-        await session.CommitTransactionAsync();
+        await replaceSession.CommitTransactionAsync();
 
         var r = await GetRtBinaryEntity(localDirectoryRepository, binaryEntity);
 
@@ -124,7 +124,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         await localDirectoryRepository.UpdateOneRtEntityByIdAsync(replaceSession, binaryEntity.RtId, replaceBinaryEntity);
 
-        await session.CommitTransactionAsync();
+        await replaceSession.CommitTransactionAsync();
 
         var r = await GetRtBinaryEntity(localDirectoryRepository, binaryEntity);
 

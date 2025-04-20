@@ -13,5 +13,5 @@ public enum BinaryType
     /// <summary>
     /// Binaries stored in a cache
     /// </summary>
-    Cache = 1,
+    Temporary = 1,
 }

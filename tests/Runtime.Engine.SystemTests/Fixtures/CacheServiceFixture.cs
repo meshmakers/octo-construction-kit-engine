@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Microsoft.Extensions.DependencyInjection;

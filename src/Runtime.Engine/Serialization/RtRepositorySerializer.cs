@@ -22,7 +22,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters =
         {
-            new CkIdTypeIdConverter(), new CkIdAssociationRoleIdConverter()
+            new CkIdTypeIdConverter(),
+            new CkIdAssociationRoleIdConverter()
         }
     };
 

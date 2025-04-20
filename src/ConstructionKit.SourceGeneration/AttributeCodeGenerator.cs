@@ -160,9 +160,9 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.BinaryLinked:
-                sb.AppendLine($"  public OctoObjectId? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public EntityBinaryInfo? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<OctoObjectId>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeLinkedBinaryValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.BinaryLinked, value);");
                 sb.AppendLine("  }");
@@ -321,9 +321,9 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.BinaryLinked:
-                sb.AppendLine($"  public OctoObjectId {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public EntityBinaryInfo {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValue<OctoObjectId>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeLinkedBinaryValue(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.BinaryLinked, value);");
                 sb.AppendLine("  }");

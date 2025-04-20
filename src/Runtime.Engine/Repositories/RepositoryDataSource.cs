@@ -11,12 +11,17 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 /// </summary>
 public abstract class RepositoryDataSource : IRepositoryDataSource
 {
+    /// <inheritdoc />
+    public ILinkedBinaryDataSource BinaryDataSource { get; }
+
     /// <summary>
     ///     Constructor
     /// </summary>
     /// <param name="tenantId"></param>
-    protected RepositoryDataSource(string tenantId)
+    /// <param name="linkedBinaryDataSource">The corresponding linked binary data source</param>
+    protected RepositoryDataSource(string tenantId, ILinkedBinaryDataSource linkedBinaryDataSource)
     {
+        BinaryDataSource = linkedBinaryDataSource;
         TenantId = tenantId;
     }
 
@@ -152,33 +157,44 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public abstract Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType,
-        BinaryType binaryType,
-        Stream stream,
-        CancellationToken cancellationToken = default);
+    public Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime,
+        Stream stream, CancellationToken cancellationToken = default)
+    {
+        return BinaryDataSource.UploadTemporaryBinaryAsync(session, filename, contentType, expiryDateTime, stream, cancellationToken);
+    }
 
     /// <inheritdoc />
-    public abstract Task ReplaceLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
-        BinaryType binaryType,
-        Stream stream, CancellationToken cancellationToken = default);
+    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
+        CancellationToken cancellationToken = default)
+    {
+        return BinaryDataSource.ReplaceTemporaryLargeBinaryAsync(session, filename, contentType, stream, cancellationToken);
+    }
 
     /// <inheritdoc />
-    public abstract Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
-        Stream stream,
-        CancellationToken cancellationToken = default);
+    public async Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default)
+    {
+        await BinaryDataSource.DeleteTemporaryLargeBinaryAsync(session, largeBinaryId, cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
-    public abstract Task DeleteLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    public Task<IDownloadStreamHandler> DownloadBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default)
+    {
+        return BinaryDataSource.DownloadBinaryAsync(session, largeBinaryId, cancellationToken);
+    }
 
     /// <inheritdoc />
-    public abstract Task<IDownloadStreamHandler> DownloadLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
-        CancellationToken cancellationToken = default);
+    public Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, OctoObjectId binaryId,
+        CancellationToken cancellationToken = default)
+    {
+        return BinaryDataSource.GetTemporaryBinaryAsync(session, binaryId, cancellationToken);
+    }
 
     /// <inheritdoc />
-    public abstract Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
-        CancellationToken cancellationToken = default);
-
-    /// <inheritdoc />
-    public abstract Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, string fileName, BinaryType binaryType,
-        CancellationToken cancellationToken = default);
+    public Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName, CancellationToken cancellationToken = default)
+    {
+        return BinaryDataSource.GetTemporaryBinaryAsync(session, fileName, cancellationToken);
+    }
 }

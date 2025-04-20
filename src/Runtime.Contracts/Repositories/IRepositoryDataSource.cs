@@ -12,7 +12,12 @@ public interface IRepositoryDataSource
     /// <summary>
     ///     Returns the corresponding tenant id
     /// </summary>
-    public string TenantId { get; }
+    string TenantId { get; }
+
+    /// <summary>
+    /// Returns the binary data source for the repository
+    /// </summary>
+    ILinkedBinaryDataSource BinaryDataSource { get; }
 
     /// <summary>
     ///     Returns the associations collection
@@ -104,35 +109,18 @@ public interface IRepositoryDataSource
     RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
         RtEntityId targetRtEntityId);
 
-
-    #region Large Binaries
-
     /// <summary>
     /// Uploads a large binary file to the repository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
+    /// <param name="expiryDateTime">Expiry date time of the file</param>
     /// <param name="stream">Binary stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType, Stream stream,
+    Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime, Stream stream,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Replaces a large binary file in the repository based on the large binary id
-    /// </summary>
-    /// <param name="session">Session object for transaction handling</param>
-    /// <param name="largeBinaryId">Object id of the large binary</param>
-    /// <param name="filename">Filename of the file</param>
-    /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
-    /// <param name="stream">Stream of the file</param>
-    /// <param name="cancellationToken">An optional cancellation token</param>
-    /// <returns></returns>
-    Task ReplaceLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType, BinaryType binaryType,
-        Stream stream, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Replaces a large binary file in the repository based on the filename and binary type
@@ -140,12 +128,10 @@ public interface IRepositoryDataSource
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
     /// <param name="stream">Stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns>Object id of the large binary</returns>
-    Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
-        Stream stream,
+    Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -155,7 +141,7 @@ public interface IRepositoryDataSource
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task DeleteLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Downloads a large binary file from the repository based on the large binary id
@@ -164,28 +150,27 @@ public interface IRepositoryDataSource
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns>Handler for the download stream</returns>
-    Task<IDownloadStreamHandler> DownloadLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+    Task<IDownloadStreamHandler> DownloadBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
         CancellationToken cancellationToken = default);
 
+
     /// <summary>
-    /// Gets a large binary file from the repository based on the large binary id
+    /// Gets a large binary file from the repository based on the object id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="largeBinaryId">Object id of the large binary</param>
+    /// <param name="binaryId">Binary id of the file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Binary info of the file including size, content type, etc.</returns>
-    Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, OctoObjectId binaryId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets a large binary file from the repository based on the filename and binary type
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="fileName">Filename of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Binary info of the file including size, content type, etc.</returns>
-    Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, string fileName, BinaryType binaryType,
+    Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName,
         CancellationToken cancellationToken = default);
-
-    #endregion Large Binaries
 }

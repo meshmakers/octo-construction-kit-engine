@@ -52,8 +52,8 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
-    /// <param name="skip">Amount of items to skip</param>
-    /// <param name="take">Amount of items to take</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
     Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null);
@@ -64,8 +64,8 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
-    /// <param name="skip">Amount of items to skip</param>
-    /// <param name="take">Amount of items to take</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns>Returns a result set of the given type</returns>
     Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds,
@@ -78,8 +78,8 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
-    /// <param name="skip">Amount of items to skip</param>
-    /// <param name="take">Amount of items to take</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
     Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation,
@@ -89,8 +89,8 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="dataQueryOperation">Query options for data query</param>
-    /// <param name="skip">Amount of items to skip</param>
-    /// <param name="take">Amount of items to take</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
@@ -435,44 +435,28 @@ public interface IRuntimeRepository
     #region Large Binaries
 
     /// <summary>
-    /// Uploads a large binary file to the repository
+    /// Uploads a file to be cached in the repository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
+    /// <param name="expiryDateTime">Expiry date time of the file</param>
     /// <param name="stream">Binary stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType, Stream stream,
+    Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime, Stream stream,
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Replaces a large binary file in the repository based on the large binary id
-    /// </summary>
-    /// <param name="session">Session object for transaction handling</param>
-    /// <param name="largeBinaryId">Object id of the large binary</param>
-    /// <param name="filename">Filename of the file</param>
-    /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
-    /// <param name="stream">Stream of the file</param>
-    /// <param name="cancellationToken">An optional cancellation token</param>
-    /// <returns></returns>
-    Task ReplaceLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType, BinaryType binaryType,
-        Stream stream, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Replaces a large binary file in the repository based on the filename and binary type
+    /// Replaces a cached large binary file in the repository based on the file name
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="filename">Filename of the file</param>
     /// <param name="contentType">Content type of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
     /// <param name="stream">Stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns>Object id of the large binary</returns>
-    Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
-        Stream stream,
+    Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -482,7 +466,7 @@ public interface IRuntimeRepository
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task DeleteLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Downloads a large binary file from the repository based on the large binary id
@@ -498,20 +482,20 @@ public interface IRuntimeRepository
     /// Gets a large binary file from the repository based on the large binary id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="largeBinaryId">Object id of the large binary</param>
+    /// <param name="binaryId">Object id of the large binary</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Binary info of the file including size, content type, etc.</returns>
-    Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId binaryId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets a large binary file from the repository based on the filename and binary type
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="fileName">Filename of the file</param>
-    /// <param name="binaryType">Binary type of the file</param>
     /// <param name="cancellationToken">Optional cancellation token</param>
     /// <returns>Binary info of the file including size, content type, etc.</returns>
-    Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, string fileName, BinaryType binaryType,
+    Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, string fileName,
         CancellationToken cancellationToken = default);
 
     #endregion Large Binaries

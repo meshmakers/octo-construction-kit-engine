@@ -116,4 +116,10 @@ public class RuntimeRepositoryException : PersistenceException
     {
         return new RuntimeRepositoryException($"Binary content with id '{largeBinaryId}' not found.");
     }
+
+    internal static Exception StreamDataIsMissing(RtEntityId rtEntityId)
+    {
+        return new RuntimeRepositoryException(
+            $"Stream data is missing for entity with id '{rtEntityId}'.");
+    }
 }

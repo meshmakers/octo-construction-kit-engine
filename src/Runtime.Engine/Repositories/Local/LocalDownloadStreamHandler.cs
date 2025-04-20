@@ -12,8 +12,10 @@ internal class LocalDownloadStreamHandler(Stream stream, BinaryInfo binaryInfo) 
     public string ContentType  => binaryInfo.ContentType;
     public OctoObjectId BinaryId => binaryInfo.BinaryId;
     public string Filename => binaryInfo.Filename;
+    public DateTime? ExpiryDateTime => binaryInfo.ExpiryDateTime;
     public DateTime UploadDateTime => binaryInfo.UploadDateTime;
     public BinaryType BinaryType => binaryInfo.BinaryType;
+    public RtEntityId? RtEntityId => binaryInfo.RtEntityId;
     public long Size => binaryInfo.Size;
     public Stream Stream => stream;
 

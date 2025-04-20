@@ -28,9 +28,19 @@ public interface IBinaryInfo
     public DateTime UploadDateTime { get; }
 
     /// <summary>
+    /// Gets the expiry date/time of the binary if applicable
+    /// </summary>
+    public DateTime? ExpiryDateTime { get; }
+
+    /// <summary>
     /// Gets the binary type
     /// </summary>
     public BinaryType BinaryType { get; }
+
+    /// <summary>
+    /// Gets the runtime entity id of the binary
+    /// </summary>
+    public RtEntityId? RtEntityId { get;  }
 
     /// <summary>
     /// Gets the size of the binary in bytes

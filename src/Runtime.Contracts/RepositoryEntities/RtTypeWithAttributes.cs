@@ -391,7 +391,7 @@ public abstract class RtTypeWithAttributes
     }
     
     /// <summary>
-    ///     Gets the value of an RtRecord attribute when the value is non-nullable
+    ///     Gets the value of an RtRecord attribute when the value is nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>
     /// <typeparam name="TValue"></typeparam>
@@ -416,6 +416,32 @@ public abstract class RtTypeWithAttributes
 
 
         throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
+    }
+
+    /// <summary>
+    ///     Gets the value of a linked binary attribute when the value is nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns></returns>
+    public EntityBinaryInfo? GetAttributeLinkedBinaryValueOrDefault(string attributeName)
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            return null;
+        }
+
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (value is EntityBinaryInfo binaryInfo)
+        {
+            return binaryInfo;
+        }
+
+
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(EntityBinaryInfo));
     }
     
     /// <summary>
@@ -444,6 +470,33 @@ public abstract class RtTypeWithAttributes
         
         throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
     }
+
+    /// <summary>
+    ///     Gets the value of a linked binary attribute when the value is non-nullable
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns></returns>
+    public EntityBinaryInfo GetAttributeLinkedBinaryValue(string attributeName)
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value))
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value == null)
+        {
+            throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
+        }
+
+        if (value is EntityBinaryInfo binaryInfo)
+        {
+            return binaryInfo;
+        }
+
+
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(EntityBinaryInfo));
+    }
+
 
     /// <summary>
     ///     Gets the value of an attribute if the value is nullable

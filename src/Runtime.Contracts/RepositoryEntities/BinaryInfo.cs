@@ -21,7 +21,13 @@ public class BinaryInfo : IBinaryInfo
     public DateTime UploadDateTime { get; set; }
 
     /// <inheritdoc />
+    public DateTime? ExpiryDateTime { get; set; }
+
+    /// <inheritdoc />
     public BinaryType BinaryType { get; set; }
+
+    /// <inheritdoc />
+    public RtEntityId? RtEntityId { get; set; }
 
     /// <inheritdoc />
     public long Size { get; set; }

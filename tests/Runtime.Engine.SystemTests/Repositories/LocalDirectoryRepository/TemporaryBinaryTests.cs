@@ -1,12 +1,12 @@
 using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 
-namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories;
+namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories.LocalDirectoryRepository;
 
-public class LocalDirectoryRepositoryLargeBinaryTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
+public class LocalDirectoryRepositoryTemporaryBinaryTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
 {
     [Fact]
-    public async Task Cache_UploadLargeBinaryAsync()
+    public async Task Cache_UploadTemporaryLargeBinaryAsync()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
@@ -22,10 +22,11 @@ public class LocalDirectoryRepositoryLargeBinaryTests(CacheServiceFixture fixtur
         var session = await localDirectoryRepository.GetSessionAsync();
         session.StartTransaction();
 
-        var id = await localDirectoryRepository.UploadLargeBinaryAsync(session, "Customers.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", BinaryType.Cache, stream,
+        var id = await localDirectoryRepository.UploadTemporaryLargeBinaryAsync(session, "Customers.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", DateTime.UtcNow.AddHours(1), stream,
             CancellationToken.None);
 
-        var r = await localDirectoryRepository.GetLargeBinaryAsync(session, id, CancellationToken.None);
+        var r = await localDirectoryRepository.GetTemporaryLargeBinaryAsync(session, id, CancellationToken.None);
 
         Assert.NotNull(r);
         Assert.Equal("Customers.xlsx", r.Filename);
@@ -34,7 +35,7 @@ public class LocalDirectoryRepositoryLargeBinaryTests(CacheServiceFixture fixtur
     }
 
     [Fact]
-    public async Task Cache_DeleteLargeBinaryAsync()
+    public async Task Cache_DeleteTemporaryLargeBinaryAsync()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
@@ -50,12 +51,13 @@ public class LocalDirectoryRepositoryLargeBinaryTests(CacheServiceFixture fixtur
         var session = await localDirectoryRepository.GetSessionAsync();
         session.StartTransaction();
 
-        var id = await localDirectoryRepository.UploadLargeBinaryAsync(session, "Customers.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", BinaryType.Cache, stream,
+        var id = await localDirectoryRepository.UploadTemporaryLargeBinaryAsync(session, "Customers.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", DateTime.UtcNow.AddHours(1), stream,
             CancellationToken.None);
 
-        await localDirectoryRepository.DeleteLargeBinaryAsync(session, id, CancellationToken.None);
+        await localDirectoryRepository.DeleteTemporaryLargeBinaryAsync(session, id, CancellationToken.None);
 
-        var r = await localDirectoryRepository.GetLargeBinaryAsync(session, id, CancellationToken.None);
+        var r = await localDirectoryRepository.GetTemporaryLargeBinaryAsync(session, id, CancellationToken.None);
 
         Assert.Null(r);
     }

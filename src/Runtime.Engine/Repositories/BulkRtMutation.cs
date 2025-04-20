@@ -1,4 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -16,7 +18,8 @@ internal class BulkRtMutation(
     IEnumerable<IPreDocumentModification<RtEntity>> preDocumentModifications)
     : IBulkRtMutation
 {
-    private readonly List<IPreDocumentModification<RtEntity>> _preDocumentModifications = preDocumentModifications.ToList();
+    private readonly List<IPreDocumentModification<RtEntity>> _preDocumentModifications =
+        preDocumentModifications.ToList();
 
     /// <summary>
     ///     Applies the changes to the data source
@@ -26,7 +29,8 @@ internal class BulkRtMutation(
     /// <param name="ckCacheService"></param>
     /// <param name="entityUpdateInfoList"></param>
     /// <param name="associationUpdateInfoList"></param>
-    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList)
     {
@@ -37,7 +41,7 @@ internal class BulkRtMutation(
                 entityUpdateInfo.RtEntity.CkTypeId = entityUpdateInfo.CkTypeId;
             }
         }
-        
+
         OperationResult operationResult = new();
         OriginFileResolver originFileResolver = new("-");
         var entityValidatorResult = await entityRuleEngine.ValidateAsync(repositoryDataSource.TenantId,
@@ -45,41 +49,50 @@ internal class BulkRtMutation(
 
         var graphValidationResult =
             await graphRuleEngine
-                .ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList, originFileResolver,
+                .ValidateAsync(session, repositoryDataSource, entityUpdateInfoList, associationUpdateInfoList,
+                    originFileResolver,
                     operationResult)
                 .ConfigureAwait(false);
 
         RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
 
-        await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult).ConfigureAwait(false);
-        await ApplyRtAssociationChangesAsync(session, repositoryDataSource, graphValidationResult).ConfigureAwait(false);
+        await ApplyRtEntityChangesAsync(session, repositoryDataSource, ckCacheService, entityValidatorResult)
+            .ConfigureAwait(false);
+        await ApplyRtAssociationChangesAsync(session, repositoryDataSource, graphValidationResult)
+            .ConfigureAwait(false);
     }
 
-    private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task ApplyRtEntityChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         EntityRuleEngineResult<RtEntity> entityRuleEngineResult)
     {
         if (entityRuleEngineResult.RtEntitiesToDelete.Any())
         {
-            await DeleteRtEntityAsync(session, repositoryDataSource, ckCacheService, entityRuleEngineResult.RtEntitiesToDelete).ConfigureAwait(false);
+            await DeleteRtEntityAsync(session, repositoryDataSource, ckCacheService,
+                entityRuleEngineResult.RtEntitiesToDelete).ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
         {
-            await UpdateRtEntities(session, repositoryDataSource, ckCacheService, entityRuleEngineResult.RtEntitiesToUpdate).ConfigureAwait(false);
+            await UpdateRtEntities(session, repositoryDataSource, ckCacheService,
+                entityRuleEngineResult.RtEntitiesToUpdate).ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToReplace.Any())
         {
-            await ReplaceRtEntities(session, repositoryDataSource, ckCacheService, entityRuleEngineResult.RtEntitiesToReplace).ConfigureAwait(false);
+            await ReplaceRtEntities(session, repositoryDataSource, ckCacheService,
+                entityRuleEngineResult.RtEntitiesToReplace).ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToInsert.Any())
         {
-            await InsertRtEntitiesAsync(session, repositoryDataSource, ckCacheService, entityRuleEngineResult.RtEntitiesToInsert).ConfigureAwait(false);
+            await InsertRtEntitiesAsync(session, repositoryDataSource, ckCacheService,
+                entityRuleEngineResult.RtEntitiesToInsert).ConfigureAwait(false);
         }
     }
 
-    private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task InsertRtEntitiesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         IEnumerable<RtEntity> rtEntityList,
         bool disablePreDocumentModifications = false)
     {
@@ -97,7 +110,6 @@ internal class BulkRtMutation(
 
             var ckTypeId = rtEntityGrouping.Key;
 
-            // TODO: check if attribute of type binary and add insert command of large binary here.
             if (!disablePreDocumentModifications)
             {
                 foreach (var preDocumentModification in _preDocumentModifications)
@@ -106,13 +118,16 @@ internal class BulkRtMutation(
                 }
 
                 var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
+                await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityGrouping).ConfigureAwait(false);
+
                 var rtCollection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
                 await rtCollection.InsertManyAsync(session, rtEntityGrouping).ConfigureAwait(false);
             }
         }
     }
 
-    private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task ReplaceRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
@@ -122,12 +137,13 @@ internal class BulkRtMutation(
                 throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(RtEntity));
             }
 
-            await ReplaceRtEntitiesByCkId(session, repositoryDataSource, ckCacheService, 
+            await ReplaceRtEntitiesByCkId(session, repositoryDataSource, ckCacheService,
                 rtEntityGrouping.Key, rtEntityGrouping).ConfigureAwait(false);
         }
     }
 
-    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
@@ -157,10 +173,48 @@ internal class BulkRtMutation(
         }
 
         // TODO: check if attribute of type binary and update command of large binary here.
-        await collection.UpdateManyAsync(session, rtEntityGrouping.Select(x => x.Value)).ConfigureAwait(false);
+
+        var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
+
+        foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>
+                     a.ValueType == AttributeValueTypesDto.BinaryLinked))
+        {
+            foreach (var rtEntity in rtEntities)
+            {
+                var entityBinaryInfo =
+                    rtEntity.GetAttributeLinkedBinaryValueOrDefault(ckTypeAttributeGraph.AttributeName);
+                if (entityBinaryInfo != null)
+                {
+                    if (entityBinaryInfo.Stream == null)
+                    {
+                        throw RuntimeRepositoryException.StreamDataIsMissing(rtEntity.ToRtEntityId());
+                    }
+
+                    entityBinaryInfo.Size = entityBinaryInfo.Stream.Length;
+
+                    if (entityBinaryInfo.BinaryId == null)
+                    {
+                        var binaryId = await repositoryDataSource.BinaryDataSource
+                            .UploadFileSystemBinaryAsync(session, rtEntity.ToRtEntityId(), entityBinaryInfo.Filename, entityBinaryInfo.ContentType, entityBinaryInfo.Stream, CancellationToken.None)
+                            .ConfigureAwait(false);
+                        entityBinaryInfo.BinaryId = binaryId;
+                    }
+                    else
+                    {
+                        await repositoryDataSource.BinaryDataSource
+                            .ReplaceFileSystemBinaryAsync(session, entityBinaryInfo.BinaryId.Value, entityBinaryInfo.Filename, entityBinaryInfo.ContentType, entityBinaryInfo.Stream, CancellationToken.None)
+                            .ConfigureAwait(false);
+                    }
+                }
+            }
+        }
+
+
+        await collection.UpdateManyAsync(session, rtEntities).ConfigureAwait(false);
     }
 
-    private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
     {
         var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
@@ -171,13 +225,21 @@ internal class BulkRtMutation(
             keyValuePair.Value.RtId = keyValuePair.Key.RtId;
             keyValuePair.Value.CkTypeId = keyValuePair.Key.CkTypeId;
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
+
+            // We need to delete the binary data from the file system if it is a linked binary
+            await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, keyValuePair.Key).ConfigureAwait(false);
         }
 
-        // TODO: check if attribute of type binary and replace command of large binary here.
-        await collection.ReplaceManyAsync(session, rtEntityGrouping.Select(x => x.Value)).ConfigureAwait(false);
+        var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
+
+        // Upload the new linked binary data
+        await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntities).ConfigureAwait(false);
+
+        await collection.ReplaceManyAsync(session, rtEntities).ConfigureAwait(false);
     }
 
-    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         IReadOnlyList<RtEntityId> rtEntityIds)
     {
         foreach (var rtEntityGrouping in rtEntityIds.GroupBy(x => x.CkTypeId))
@@ -187,22 +249,26 @@ internal class BulkRtMutation(
                 throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(RtEntity));
             }
 
-            await DeleteRtEntityAsync<RtEntity>(session, repositoryDataSource, ckCacheService, rtEntityGrouping.Key, rtEntityGrouping)
+            await DeleteRtEntityAsync<RtEntity>(session, repositoryDataSource, ckCacheService, rtEntityGrouping.Key,
+                    rtEntityGrouping)
                 .ConfigureAwait(false);
         }
     }
 
-    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
+    private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        ICkCacheService ckCacheService,
         CkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
         where TEntity : RtEntity, new()
     {
         var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
-        // TODO: check if attribute of type binary and add delete command of large binary here.
         foreach (var rtEntityId in rtEntityIds.AsParallel())
         {
+            // Delete the entity from the database
             await collection.DeleteOneAsync(session, rtEntityId.RtId).ConfigureAwait(false);
+            // We need to delete the binary data from the file system if it is a linked binary
+            await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityId).ConfigureAwait(false);
         }
     }
 
@@ -234,4 +300,45 @@ internal class BulkRtMutation(
         await repositoryDataSource.RtAssociations.DeleteManyAsync(session, rtAssociations.Select(x => x.AssociationId))
             .ConfigureAwait(false);
     }
+
+    #region Linked Binary
+
+    private static async Task HandleDeleteLinkedBinary(IOctoSession session,
+        IRepositoryDataSource repositoryDataSource, CkTypeGraph ckTypeGraph, RtEntityId rtEntityId)
+    {
+        if (ckTypeGraph.AllAttributes.Values.Any(x => x.ValueType == AttributeValueTypesDto.BinaryLinked))
+        {
+            await repositoryDataSource.BinaryDataSource.DeleteAllFileSystemBinariesAsync(session, rtEntityId,
+                CancellationToken.None).ConfigureAwait(false);
+        }
+    }
+
+    private static async Task HandleUploadLinkedBinary(IOctoSession session, IRepositoryDataSource repositoryDataSource,
+        CkTypeGraph ckTypeGraph, IEnumerable<RtEntity> rtEntities)
+    {
+        foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>
+                     a.ValueType == AttributeValueTypesDto.BinaryLinked))
+        {
+            foreach (var rtEntity in rtEntities)
+            {
+                var entityBinaryInfo =
+                    rtEntity.GetAttributeLinkedBinaryValueOrDefault(ckTypeAttributeGraph.AttributeName);
+                if (entityBinaryInfo != null)
+                {
+                    if (entityBinaryInfo.Stream == null)
+                    {
+                        throw RuntimeRepositoryException.StreamDataIsMissing(rtEntity.ToRtEntityId());
+                    }
+                    entityBinaryInfo.Size = entityBinaryInfo.Stream.Length;
+
+                    var binaryId = await repositoryDataSource.BinaryDataSource
+                        .UploadFileSystemBinaryAsync(session, rtEntity.ToRtEntityId(), entityBinaryInfo.Filename, entityBinaryInfo.ContentType, entityBinaryInfo.Stream, CancellationToken.None)
+                        .ConfigureAwait(false);
+                    entityBinaryInfo.BinaryId = binaryId;
+                }
+            }
+        }
+    }
+
+    #endregion Linked Binary
 }

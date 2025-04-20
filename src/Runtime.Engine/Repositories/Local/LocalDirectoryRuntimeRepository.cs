@@ -21,12 +21,13 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     ///     Creates a new instance of <see cref="LocalDirectoryRuntimeRepository" />.
     /// </summary>
     /// <param name="tenantId">The id of the tenant to request services</param>
-    /// <param name="directoryPath">Path to directory the runtime entities are located.</param>
+    /// <param name="directoryPath">Path to directory the runtime entities is located.</param>
     /// <param name="ckCacheService">Construction kit cache service</param>
     /// <param name="repositoryDataSource">Data source of a local repository</param>
     /// <param name="bulkRtMutation">Bulk runtime mutation implementation</param>
     public LocalDirectoryRuntimeRepository(string tenantId, string directoryPath, ICkCacheService ckCacheService,
-        ILocalRepositoryDataSource repositoryDataSource, IBulkRtMutation bulkRtMutation)
+        ILocalRepositoryDataSource repositoryDataSource,
+        IBulkRtMutation bulkRtMutation)
         : base(tenantId, ckCacheService, repositoryDataSource, bulkRtMutation)
     {
         DirectoryPath = directoryPath;

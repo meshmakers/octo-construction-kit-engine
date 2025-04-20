@@ -245,6 +245,17 @@ public static class AttributeValueConverter
                 var rtRecord = (RtRecord)value;
 
                 return new RtRecord(rtRecord.CkRecordId, rtRecord.Attributes);
+            case AttributeValueTypesDto.BinaryLinked:
+                if (value is EntityBinaryInfo binaryInfo)
+                {
+                    return binaryInfo;
+                }
+                if (value is JsonElement jsonElement)
+                {
+                    return jsonElement.Deserialize<EntityBinaryInfo>(JsonSerializerOptions.Web);
+                }
+                break;
+
         }
 
         return value;

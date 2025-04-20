@@ -8,9 +8,9 @@ using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 using TestCkModel.Generated.Test.v1;
 
-namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories;
+namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories.LocalDirectoryRepository;
 
-public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
+public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServiceFixture>
 {
     [Fact]
     public async Task CreateTransientRtEntity_Abstract_Exception()
@@ -18,7 +18,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -32,7 +33,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -47,17 +49,20 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = new RtEntity("Test/LocationWithSensor", OctoObjectId.GenerateNewId(), new Dictionary<string, object?>
-        {
-            { "Designation", "Test" }
-        });
+        var rtEntity = new RtEntity("Test/LocationWithSensor", OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?>
+            {
+                { "Designation", "Test" }
+            });
 
         await Assert.ThrowsAsync<RuntimeRepositoryException>(async () =>
-            await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), "Test/LocationWithSensor", rtEntity));
+            await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), "Test/LocationWithSensor",
+                rtEntity));
     }
 
     [Fact]
@@ -66,7 +71,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -84,7 +90,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -100,7 +107,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -116,7 +124,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -138,7 +147,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -152,7 +162,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
 
         await localDirectoryRepository.ReplaceOneRtEntityByIdAsync(new LocalSession(), rtInsertOcean.RtId, rtOcean);
 
-        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtInsertOcean.RtId);
+        var copy = await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(),
+            rtInsertOcean.RtId);
 
         Assert.NotNull(copy);
         Assert.Equal("TestSensor3", copy.Designation);
@@ -165,7 +176,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -194,7 +206,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -217,7 +230,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var dataQueryOperation = DataQueryOperation.Create()
             .FieldFilter(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor154737");
 
-        var copy = await localDirectoryRepository.GetRtEntitiesByTypeAsync<RtOcean>(new LocalSession(), dataQueryOperation);
+        var copy = await localDirectoryRepository.GetRtEntitiesByTypeAsync<RtOcean>(new LocalSession(),
+            dataQueryOperation);
 
         Assert.Equal(1, copy.TotalCount);
         Assert.Single(copy.Items);
@@ -231,7 +245,8 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         var ckCacheService = await fixture.GetCacheServiceAsync();
         var rtSerializer = fixture.GetRtRepositorySerializer();
         var bulkRtMutation = fixture.GetBulkRtMutation();
-        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath, ckCacheService,
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
@@ -248,15 +263,18 @@ public class LocalDirectoryRepositoryBasicTests(CacheServiceFixture fixture) : I
         rtSensor.LocationX = 43.4959;
         entityUpdateInfos.Add(EntityUpdateInfo<RtEntity>.CreateInsert(rtSensor));
 
-        associationUpdateInfos.Add(new AssociationUpdateInfo(rtSensor.ToRtEntityId(), rtZone.ToRtEntityId(), "System/ParentChild",
+        associationUpdateInfos.Add(new AssociationUpdateInfo(rtSensor.ToRtEntityId(), rtZone.ToRtEntityId(),
+            "System/ParentChild",
             AssociationModOptionsDto.Create));
 
         OperationResult operationResult = new();
-        await localDirectoryRepository.ApplyChangesAsync(new LocalSession(), entityUpdateInfos, associationUpdateInfos, operationResult);
+        await localDirectoryRepository.ApplyChangesAsync(new LocalSession(), entityUpdateInfos, associationUpdateInfos,
+            operationResult);
 
 
         var rtAssociations =
-            await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(), rtZone.RtId, GraphDirections.Inbound);
+            await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(), rtZone.RtId,
+                GraphDirections.Inbound);
 
         var associations = rtAssociations.ToList();
         Assert.Single(associations);

@@ -1,0 +1,9 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: BinaryEntity
+    derivedFromCkTypeId: System/Entity
+    attributes:
+      - id: ${thisModel}/Binary
+        name: Binary
+      - id: ${thisModel}/DataCount
+        name: DataCount

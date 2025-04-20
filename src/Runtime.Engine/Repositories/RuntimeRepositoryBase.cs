@@ -418,56 +418,47 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
-        Stream stream,
-        CancellationToken cancellationToken = default)
-    {
-        return RepositoryDataSource.UploadLargeBinaryAsync(session, filename, contentType, binaryType, stream, cancellationToken);
-    }
-
-    /// <inheritdoc />
-    public Task ReplaceLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
-        BinaryType binaryType,
+    public Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.ReplaceLargeBinaryAsync(session, largeBinaryId, filename, contentType, binaryType, stream,
+        return RepositoryDataSource.UploadTemporaryBinaryAsync(session, filename, contentType, expiryDateTime, stream,
             cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
-        Stream stream,
+    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
         CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.ReplaceLargeBinaryAsync(session, filename, contentType, binaryType, stream,
+        return RepositoryDataSource.ReplaceTemporaryLargeBinaryAsync(session, filename, contentType, stream,
             cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task DeleteLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default)
+    public async Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.DeleteLargeBinaryAsync(session, largeBinaryId, cancellationToken);
+        await RepositoryDataSource.DeleteTemporaryLargeBinaryAsync(session, largeBinaryId, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public Task<IDownloadStreamHandler> DownloadLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
         CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.DownloadLargeBinaryAsync(session, largeBinaryId, cancellationToken);
+        return RepositoryDataSource.DownloadBinaryAsync(session, largeBinaryId,
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
-        CancellationToken cancellationToken = default)
+    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId binaryId, CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.GetLargeBinaryAsync(session, largeBinaryId, cancellationToken);
+        return RepositoryDataSource.GetTemporaryBinaryAsync(session, binaryId, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<IBinaryInfo?> GetLargeBinaryAsync(IOctoSession session, string fileName, BinaryType binaryType,
-        CancellationToken cancellationToken = default)
+    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, string fileName, CancellationToken cancellationToken = default)
     {
-        return RepositoryDataSource.GetLargeBinaryAsync(session, fileName, binaryType, cancellationToken);
+        return RepositoryDataSource.GetTemporaryBinaryAsync(session, fileName, cancellationToken);
     }
 
     /// <summary>

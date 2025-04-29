@@ -172,8 +172,6 @@ internal class BulkRtMutation(
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
         }
 
-        // TODO: check if attribute of type binary and update command of large binary here.
-
         var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
 
         foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>

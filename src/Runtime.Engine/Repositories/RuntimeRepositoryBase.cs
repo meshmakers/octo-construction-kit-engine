@@ -141,16 +141,6 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public virtual async Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session,
-        RtEntityId rtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction)
-    {
-        return await RepositoryDataSource
-            .GetCurrentRtAssociationMultiplicityAsync(session, rtEntityId, ckRoleId, direction)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
     public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
         RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
     {

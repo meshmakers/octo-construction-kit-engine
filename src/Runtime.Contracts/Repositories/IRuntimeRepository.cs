@@ -129,18 +129,6 @@ public interface IRuntimeRepository
         GraphDirections direction, CkId<CkAssociationRoleId> roleId);
 
     /// <summary>
-    ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity
-    ///     and role
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtEntityId">Object id of the runtime entity</param>
-    /// <param name="ckRoleId">Construction kit role id of the association</param>
-    /// <param name="direction">Direction of associations to get</param>
-    /// <returns></returns>
-    Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session, RtEntityId rtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
-
-    /// <summary>
     ///     Gets an association by its origin, target and role id.
     /// </summary>
     /// <param name="session">The session object</param>

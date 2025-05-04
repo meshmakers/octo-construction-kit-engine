@@ -88,8 +88,16 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="key">The unique key</param>
-    /// <returns></returns>
+    /// <returns>The document or null if not found</returns>
     Task<TDocument?> DocumentAsync(IOctoSession session, TKey key);
+
+    /// <summary>
+    ///     Gets the document with the given key
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="keys">A list of unique keys for the documents</param>
+    /// <returns>A list of documents</returns>
+    Task<IReadOnlyList<TDocument>> DocumentsAsync(IOctoSession session, IEnumerable<TKey> keys);
 
     /// <summary>
     ///     Gets the document with the given key

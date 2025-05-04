@@ -43,39 +43,62 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
 
     public override IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
 
-    public override async Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session,
-        RtEntityId rtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction)
+    public override async Task<IReadOnlyList<RtAssociationsMultiplicityResult>> GetRtAssociationsMultiplicityAsync(
+        IOctoSession session, IEnumerable<RtEntityRoleIdDirectionPair> entityRoleIdDirectionPairs)
     {
-        long counter = 0;
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
 
-        if (direction == GraphDirections.Inbound || direction == GraphDirections.Any)
+        var results = new List<RtAssociationsMultiplicityResult>();
+
+        foreach (var pair in entityRoleIdDirectionPairs)
         {
-            var r = queryable.Count(a =>
-                a.TargetRtId == rtEntityId.RtId && a.TargetCkTypeId == rtEntityId.CkTypeId &&
-                a.AssociationRoleId == ckRoleId);
-            counter = Math.Max(r, counter);
+            var count = 0;
+            if (pair.Direction == GraphDirections.Inbound || pair.Direction == GraphDirections.Any)
+            {
+                count += queryable.Count(a =>
+                    a.TargetRtId == pair.RtEntityId.RtId && a.TargetCkTypeId == pair.RtEntityId.CkTypeId &&
+                    a.AssociationRoleId == pair.CkRoleId);
+            }
+
+            if (pair.Direction == GraphDirections.Outbound || pair.Direction == GraphDirections.Any)
+            {
+                count += queryable.Count(a =>
+                    a.OriginRtId == pair.RtEntityId.RtId && a.OriginCkTypeId == pair.RtEntityId.CkTypeId &&
+                    a.AssociationRoleId == pair.CkRoleId);
+            }
+
+            CurrentMultiplicity multiplicity = count switch
+            {
+                >= 2 => CurrentMultiplicity.Many,
+                1 => CurrentMultiplicity.One,
+                _ => CurrentMultiplicity.Zero
+            };
+
+            results.Add(new RtAssociationsMultiplicityResult(pair, multiplicity));
         }
 
-        if (direction == GraphDirections.Outbound || direction == GraphDirections.Any)
+        return results;
+    }
+
+    public override async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair)
+    {
+        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
+
+        var associations = new List<RtAssociation>();
+        foreach (var pair in rtOriginTargetPair)
         {
-            var r = queryable.Count(a =>
-                a.OriginRtId == rtEntityId.RtId && a.OriginCkTypeId == rtEntityId.CkTypeId &&
-                a.AssociationRoleId == ckRoleId);
-            counter = Math.Max(r, counter);
+            var association = queryable.FirstOrDefault(a =>
+                a.OriginRtId == pair.Origin.RtId && a.OriginCkTypeId == pair.Origin.CkTypeId &&
+                a.TargetRtId == pair.Target.RtId && a.TargetCkTypeId == pair.Target.CkTypeId &&
+                a.AssociationRoleId == pair.AssociationRoleId);
+
+            if (association != null)
+            {
+                associations.Add(association);
+            }
         }
 
-        if (counter >= 2)
-        {
-            return CurrentMultiplicity.Many;
-        }
-
-        if (counter == 1)
-        {
-            return CurrentMultiplicity.One;
-        }
-
-        return CurrentMultiplicity.Zero;
+        return associations;
     }
 }

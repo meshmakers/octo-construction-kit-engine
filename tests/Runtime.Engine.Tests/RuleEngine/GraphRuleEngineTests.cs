@@ -14,13 +14,13 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     public async Task ValidateAsync_Composition_OK()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
-        
+
         var target = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Continent"
         };
-        var origin  = new RtEntity
+        var origin = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Country"
@@ -29,22 +29,22 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         var session = A.Fake<IOctoSession>();
         var repositoryDataSource = A.Fake<IRepositoryDataSource>();
         A.CallTo(() => repositoryDataSource.TenantId).Returns(fixture.TenantId);
-        A.CallTo(() => repositoryDataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>.Ignored,
-                origin.ToRtEntityId(), target.ToRtEntityId(), "System/ParentChild"))
-            .Returns<RtAssociation?>(null);
+
+        A.CallTo(() => repositoryDataSource.GetRtAssociationsAsync(A<IOctoSession>.Ignored, A<IEnumerable<RtOriginTargetPair>>.Ignored))
+            .Returns(new List<RtAssociation>());
 
         var targetDataSourceCollection = A.Fake<IDataSourceCollection<OctoObjectId, RtEntity>>();
-        A.CallTo(()=> targetDataSourceCollection.DocumentAsync(A<IOctoSession>.Ignored, A<OctoObjectId>.Ignored))
-            .Returns(target);
+        A.CallTo(() => targetDataSourceCollection.DocumentsAsync(A<IOctoSession>.Ignored, A<IEnumerable<OctoObjectId>>.Ignored))
+            .Returns([target]);
 
-        A.CallTo(()=> repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
+        A.CallTo(() => repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
             .Returns(targetDataSourceCollection);
-        
+
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var graphRuleEngine = new GraphRuleEngine(ckCacheService);
-        
+
         var ruleEngineResult = await graphRuleEngine.ValidateAsync(session, repositoryDataSource, [
                 EntityUpdateInfo<RtEntity>.CreateInsert(origin)
             ],
@@ -60,12 +60,12 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         Assert.False(operationResult.HasFatalErrors);
     }
 
-    [Fact] 
+    [Fact]
     public async Task ValidateAsync_Composition_Missing_Fail()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
-        
-        var origin  = new RtEntity
+
+        var origin = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Country"
@@ -74,16 +74,15 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         var session = A.Fake<IOctoSession>();
         var repositoryDataSource = A.Fake<IRepositoryDataSource>();
         A.CallTo(() => repositoryDataSource.TenantId).Returns(fixture.TenantId);
-       
+
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var graphRuleEngine = new GraphRuleEngine(ckCacheService);
-        
+
         var ruleEngineResult = await graphRuleEngine.ValidateAsync(session, repositoryDataSource, [
                 EntityUpdateInfo<RtEntity>.CreateInsert(origin)
             ],
-            
             originFileResolver, operationResult);
 
         Assert.Empty(ruleEngineResult.RtAssociationsToCreate);
@@ -93,56 +92,54 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(6, operationResult.Messages[0].MessageNumber);
     }
-    
-        [Fact]
+
+    [Fact]
     public async Task ValidateAsync_Composition_RemoveAdd_OK()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
-        
+
         var oldTarget = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Continent"
         };
-        
+
         var target = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Continent"
         };
-        var origin  = new RtEntity
+        var origin = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Country"
         };
 
+        var rtOriginTargetPair = new RtOriginTargetPair(origin.ToRtEntityId(), target.ToRtEntityId(),
+            "System/ParentChild");
+
         var session = A.Fake<IOctoSession>();
         var repositoryDataSource = A.Fake<IRepositoryDataSource>();
         A.CallTo(() => repositoryDataSource.TenantId).Returns(fixture.TenantId);
-        A.CallTo(() => repositoryDataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>.Ignored,
-                origin.ToRtEntityId(), target.ToRtEntityId(), "System/ParentChild"))
-            .Returns<RtAssociation?>(null);
+        A.CallTo(() => repositoryDataSource.GetRtAssociationsAsync(A<IOctoSession>.Ignored, A<IEnumerable<RtOriginTargetPair>>.Ignored))
+            .Returns(new List<RtAssociation>());
 
         var targetDataSourceCollection = A.Fake<IDataSourceCollection<OctoObjectId, RtEntity>>();
-        A.CallTo(() => targetDataSourceCollection.DocumentAsync(A<IOctoSession>.Ignored, oldTarget.RtId))
-            .Returns(oldTarget);
-        A.CallTo(() => targetDataSourceCollection.DocumentAsync(A<IOctoSession>.Ignored, target.RtId))
-            .Returns(target);
-        A.CallTo(() => targetDataSourceCollection.DocumentAsync(A<IOctoSession>.Ignored, origin.RtId))
-            .Returns(origin);
-            
-        A.CallTo(()=> repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
+        A.CallTo(() => targetDataSourceCollection.DocumentsAsync(A<IOctoSession>.Ignored, A<IEnumerable<OctoObjectId>>.Ignored))
+            .Returns([target, origin, oldTarget]);
+        A.CallTo(() => repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
             .Returns(targetDataSourceCollection);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var graphRuleEngine = new GraphRuleEngine(ckCacheService);
-        
+
         var ruleEngineResult = await graphRuleEngine.ValidateAsync(session, repositoryDataSource, [
                 EntityUpdateInfo<RtEntity>.CreateInsert(origin)
             ],
             [
-                AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), oldTarget.ToRtEntityId(), "System/ParentChild"),
+                AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), oldTarget.ToRtEntityId(),
+                    "System/ParentChild"),
                 AssociationUpdateInfo.CreateCreate(origin.ToRtEntityId(), target.ToRtEntityId(), "System/ParentChild")
             ],
             originFileResolver, operationResult);
@@ -153,50 +150,55 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
-            [Fact]
+
+    [Fact]
     public async Task ValidateAsync_Composition_Remove_Fail()
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
-        
+
         var oldTarget = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Continent"
         };
-        
-        var origin  = new RtEntity
+
+        var origin = new RtEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
             CkTypeId = "Test/Country"
         };
+
+        var rtEntityRoleIdDirectionPair = new RtEntityRoleIdDirectionPair(origin.ToRtEntityId(), "System/ParentChild",
+            GraphDirections.Outbound);
 
         var session = A.Fake<IOctoSession>();
         var repositoryDataSource = A.Fake<IRepositoryDataSource>();
         A.CallTo(() => repositoryDataSource.TenantId).Returns(fixture.TenantId);
         A.CallTo(() => repositoryDataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>.Ignored,
                 origin.ToRtEntityId(), oldTarget.ToRtEntityId(), "System/ParentChild"))
-            .Returns<RtAssociation?>(new RtAssociation());
-        A.CallTo(()=> repositoryDataSource.GetCurrentRtAssociationMultiplicityAsync(A<IOctoSession>.Ignored,
-                origin.ToRtEntityId(), "System/ParentChild", GraphDirections.Outbound))
-            .Returns(CurrentMultiplicity.One);
+            .Returns(new RtAssociation());
+        A.CallTo(() =>
+            repositoryDataSource.GetRtAssociationsMultiplicityAsync(A<IOctoSession>.Ignored, A<IEnumerable<RtEntityRoleIdDirectionPair>>.That.Matches(x=> x.Count() == 1 && x.First().Direction == GraphDirections.Outbound)
+                )).Returns([new RtAssociationsMultiplicityResult(rtEntityRoleIdDirectionPair, CurrentMultiplicity.One)
+        ]);
 
         var targetDataSourceCollection = A.Fake<IDataSourceCollection<OctoObjectId, RtEntity>>();
-        A.CallTo(()=> targetDataSourceCollection.DocumentAsync(A<IOctoSession>.Ignored, A<OctoObjectId>.Ignored))
-            .Returns(oldTarget);
+        A.CallTo(() => targetDataSourceCollection.DocumentsAsync(A<IOctoSession>.Ignored, A<IEnumerable<OctoObjectId>>.Ignored))
+            .Returns([oldTarget]);
 
-        A.CallTo(()=> repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
+        A.CallTo(() => repositoryDataSource.GetRtCollection<RtEntity>(A<CkTypeGraph>.Ignored))
             .Returns(targetDataSourceCollection);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("Test");
         var graphRuleEngine = new GraphRuleEngine(ckCacheService);
-        
+
         var ruleEngineResult = await graphRuleEngine.ValidateAsync(session, repositoryDataSource, [
                 EntityUpdateInfo<RtEntity>.CreateUpdate(origin.ToRtEntityId(), origin)
             ],
             [
-                AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), oldTarget.ToRtEntityId(), "System/ParentChild"),
+                AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), oldTarget.ToRtEntityId(),
+                    "System/ParentChild"),
             ],
             originFileResolver, operationResult);
 

@@ -26,7 +26,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             throw DependencyGraphException.CkTypeIdNotFound(ckTypeId);
         }
 
-        CollectColumns(type, columns);
+        CollectTypeColumns(type, columns);
+        CollectionNavigationColumns(type, columns);
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(), [new(SystemAttributeRtId, PathType.Attribute)],
             AttributeValueTypesDto.String));
@@ -41,8 +42,53 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         return columns;
     }
 
+    private void CollectionNavigationColumns(CkTypeGraph typeGraph, List<CkTypeQueryColumn> columns)
+    {
+        foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.Out.All.GroupBy(x => x.NavigationPropertyName))
+        {
+            var allowedTypes = new List<CkId<CkTypeId>>();
+            foreach (var typeAssociationGraph in ckTypeAssociationGraphGrouping)
+            {
+                if (!ckModelGraph.Types.TryGetValue(typeAssociationGraph.TargetCkTypeId, out var ckType))
+                {
+                    throw DependencyGraphException.CkTypeIdNotFound(typeAssociationGraph.TargetCkTypeId);
+                }
 
-    private void CollectColumns(CkTypeWithAttributesGraph current, List<CkTypeQueryColumn> columns)
+                allowedTypes.AddRange(ckType.GetAllDerivedTypes(true));
+            }
+
+            if (!allowedTypes.Any())
+            {
+                continue; // All Ck types are abstract for that association
+            }
+
+            foreach (var allowedTypeCkId in allowedTypes)
+            {
+                columns.Add(new CkTypeQueryColumn(ckTypeAssociationGraphGrouping.Key + Separator + GetTypeName(allowedTypeCkId), [
+                        new(ckTypeAssociationGraphGrouping.Key, PathType.Attribute),
+                        new(GetTypeName(allowedTypeCkId), PathType.Attribute),
+                    ],
+                    AttributeValueTypesDto.String));
+
+            }
+
+            // this.AssociationField(graphTypesCache, ckTypeAssociationGraph.Key,
+            //     allowedTypes.Select(x => x).Distinct().ToList(), _ckTypeGraph.CkTypeId,
+            //     ckTypeAssociationGraph.First().CkRoleId, GraphDirections.Outbound);
+        }
+
+
+    }
+
+    private static string GetTypeName(CkId<CkTypeId> ckTypeId)
+    {
+        return ckTypeId.SemanticVersionedFullName
+            .Replace(".", "")
+            .Replace("/", "")
+            .ToCamelCase();
+    }
+
+    private void CollectTypeColumns(CkTypeWithAttributesGraph current, List<CkTypeQueryColumn> columns)
     {
         foreach (var attribute in current.AllAttributes.Values)
         {
@@ -68,7 +114,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     }
 
                     var recordColumns = new List<CkTypeQueryColumn>();
-                    CollectColumns(recordGraph, recordColumns);
+                    CollectTypeColumns(recordGraph, recordColumns);
                     columns.AddRange(recordColumns.Select(c =>
                     {
                         var l = c.AccessPathList.ToList();
@@ -88,7 +134,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     }
 
                     recordColumns = new List<CkTypeQueryColumn>();
-                    CollectColumns(recordGraph, recordColumns);
+                    CollectTypeColumns(recordGraph, recordColumns);
 
                     columns.AddRange(recordColumns.Select(c =>
                     {

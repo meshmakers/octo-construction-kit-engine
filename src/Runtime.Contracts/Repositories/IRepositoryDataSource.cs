@@ -80,12 +80,10 @@ public interface IRepositoryDataSource
     ///     and role
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtEntityId">Object id of the runtime entity</param>
-    /// <param name="ckRoleId">Construction kit role id of the association</param>
-    /// <param name="direction">Direction of associations to get</param>
+    /// <param name="entityRoleIdDirectionPairs">Direction pairs of runtime entity and role id</param>
     /// <returns></returns>
-    Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session, RtEntityId rtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
+    Task<IReadOnlyList<RtAssociationsMultiplicityResult>> GetRtAssociationsMultiplicityAsync(IOctoSession session,
+        IEnumerable<RtEntityRoleIdDirectionPair> entityRoleIdDirectionPairs);
 
     /// <summary>
     ///     Gets an association by its origin, target and role id.
@@ -94,10 +92,19 @@ public interface IRepositoryDataSource
     /// <param name="originRtEntityId">Runtime id of the origin entity</param>
     /// <param name="targetRtEntityId">Runtime id of the target entity</param>
     /// <param name="ckRoleId">Construction kit role id of the association</param>
-    /// <returns></returns>
+    /// <returns>An association object or null if not found</returns>
     Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
         RtEntityId targetRtEntityId,
         CkId<CkAssociationRoleId> ckRoleId);
+
+    /// <summary>
+    /// Gets associations by origin, target and role id for multiple pairs.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtOriginTargetPair">Pairs of origin and target runtime entity identifiers</param>
+    /// <returns>The list of associations</returns>
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair);
 
     /// <summary>
     ///     Creates an instance of a runtime association

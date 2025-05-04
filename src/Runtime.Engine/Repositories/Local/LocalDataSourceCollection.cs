@@ -197,6 +197,21 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         return document;
     }
 
+    public async Task<IReadOnlyList<TDocument>> DocumentsAsync(IOctoSession session, IEnumerable<TKey> keys)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        var result = new List<TDocument>();
+        foreach (var key in keys)
+        {
+            if (_rtEntities.TryGetValue(key, out var document))
+            {
+                result.Add(document);
+            }
+        }
+        return result;
+    }
+
     public async Task<TDerived?> DocumentAsync<TDerived>(IOctoSession session, TKey key) where TDerived : TDocument, new()
     {
         await LoadAsync().ConfigureAwait(false);

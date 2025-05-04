@@ -125,9 +125,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public abstract Task<CurrentMultiplicity> GetCurrentRtAssociationMultiplicityAsync(IOctoSession session,
-        RtEntityId rtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId, GraphDirections direction);
+    public abstract Task<IReadOnlyList<RtAssociationsMultiplicityResult>> GetRtAssociationsMultiplicityAsync(
+        IOctoSession session, IEnumerable<RtEntityRoleIdDirectionPair> entityRoleIdDirectionPairs);
 
     /// <inheritdoc />
     public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
@@ -140,6 +139,10 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
                                                                        a.TargetCkTypeId == targetRtEntityId.CkTypeId
                                                                        && a.AssociationRoleId == ckRoleId);
     }
+
+    /// <inheritdoc />
+    public abstract Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair);
 
     /// <inheritdoc />
     public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
@@ -157,17 +160,21 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime,
+    public Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType,
+        DateTime expiryDateTime,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return BinaryDataSource.UploadTemporaryBinaryAsync(session, filename, contentType, expiryDateTime, stream, cancellationToken);
+        return BinaryDataSource.UploadTemporaryBinaryAsync(session, filename, contentType, expiryDateTime, stream,
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
+    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename,
+        string contentType, Stream stream,
         CancellationToken cancellationToken = default)
     {
-        return BinaryDataSource.ReplaceTemporaryLargeBinaryAsync(session, filename, contentType, stream, cancellationToken);
+        return BinaryDataSource.ReplaceTemporaryLargeBinaryAsync(session, filename, contentType, stream,
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -193,7 +200,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName, CancellationToken cancellationToken = default)
+    public Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName,
+        CancellationToken cancellationToken = default)
     {
         return BinaryDataSource.GetTemporaryBinaryAsync(session, fileName, cancellationToken);
     }

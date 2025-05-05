@@ -52,7 +52,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.Out.All.GroupBy(x =>
                      x.NavigationPropertyName))
         {
-            var ckTypeAssociationDirectionTuples = new List<CkTypeAssociationDirectionTuple>();
+            var ckTypeAssociationDirectionTuples = new List<CkTypeAssociationTuple>();
             foreach (var typeAssociationGraph in ckTypeAssociationGraphGrouping)
             {
                 if (!ckModelGraph.Types.TryGetValue(typeAssociationGraph.TargetCkTypeId, out var ckType))
@@ -61,7 +61,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 }
 
                 ckTypeAssociationDirectionTuples.AddRange(ckType.GetAllDerivedTypes(true)
-                    .Select(t => new CkTypeAssociationDirectionTuple(t, typeAssociationGraph.CkRoleId)));
+                    .Select(t => new CkTypeAssociationTuple(t, typeAssociationGraph.CkRoleId)));
             }
 
             if (!ckTypeAssociationDirectionTuples.Any())
@@ -121,7 +121,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     {
                         var l = c.AccessPathList.ToList();
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
-                        return new CkTypeQueryColumn(attributeNameCamelCase + Separator + c.Path, l, c.ValueType);
+                        return new CkTypeQueryColumn(attributeNameCamelCase + Separator + c.Path, l, false,
+                            attributeGraph.ValueCkRecordId);
                     }));
                     break;
                 case AttributeValueTypesDto.RecordArray:
@@ -145,7 +146,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, FirstElement) + Separator + c.Path, l,
-                            c.ValueType);
+                            true, attributeGraph.ValueCkRecordId);
                     }));
 
                     columns.AddRange(recordColumns.Select(c =>
@@ -155,7 +156,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, AllElements) + Separator + c.Path, l,
-                            c.ValueType);
+                            true, attributeGraph.ValueCkRecordId);
                     }));
 
                     break;
@@ -170,6 +171,15 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     l = [new(attributeNamePascalCase, PathType.Attribute), new(AllElements, PathType.ArrayIndex)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, AllElements), l,
                         attributeGraph.ValueType));
+                    break;
+                case AttributeValueTypesDto.Enum:
+                    if (attributeGraph.ValueCkEnumId == null)
+                    {
+                        throw DependencyGraphException.CkEnumIdNotDefined(attributeGraph.CkAttributeId);
+                    }
+
+                    l = [new(attributeNamePascalCase, PathType.Attribute)];
+                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueCkEnumId));
                     break;
                 default:
                     l = [new(attributeNamePascalCase, PathType.Attribute)];

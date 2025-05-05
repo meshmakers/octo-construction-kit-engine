@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// <summary>
 ///     Represents a construction kit enum in the dependency graph
 /// </summary>
-[DebuggerDisplay("{" + nameof(Path) + "}")]
+[DebuggerDisplay("{" + nameof(CkEnumId) + "}")]
 public class CkEnumGraph
 {
     /// <summary>

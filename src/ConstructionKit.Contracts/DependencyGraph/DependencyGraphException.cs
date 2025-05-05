@@ -28,4 +28,9 @@ public class DependencyGraphException : CkModelException
     {
         return new DependencyGraphException($"Record '{ckRecordId}' not found.");
     }
+
+    internal static Exception CkEnumIdNotDefined(CkId<CkAttributeId> ckAttributeId)
+    {
+        return new DependencyGraphException($"CkEnumId not defined for attribute '{ckAttributeId}'.");
+    }
 }

@@ -15,16 +15,44 @@ public class CkTypeQueryColumn
     /// <param name="path">Path to the column within a type query.</param>
     /// <param name="accessPathList">Access paths to the column as a list of single properties.</param>
     /// <param name="valueType">Type of the column.</param>
-    /// <param name="associationDirectionTuple">When the value type is association,
+    /// <param name="associationTuple">When the value type is association,
     /// this represents the association direction tuple of the column.</param>
-    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, AttributeValueTypesDto valueType, CkTypeAssociationDirectionTuple? associationDirectionTuple = null)
+    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, AttributeValueTypesDto valueType, CkTypeAssociationTuple? associationTuple = null)
     {
         Path = path;
         AccessPathList = accessPathList;
         ValueType = valueType;
-        AssociationDirectionTuple = associationDirectionTuple;
+        AssociationTuple = associationTuple;
     }
 
+    /// <summary>
+    /// Creates a new instance of <see cref="CkTypeQueryColumn"/>.
+    /// </summary>
+    /// <param name="path">Path to the column within a type query.</param>
+    /// <param name="accessPathList">Access paths to the column as a list of single properties.</param>
+    /// <param name="ckEnumId">The enum id of the column if the value type is an enum.</param>
+    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList,  CkId<CkEnumId> ckEnumId)
+    {
+        Path = path;
+        AccessPathList = accessPathList;
+        ValueType = AttributeValueTypesDto.Enum;
+        CkEnumId = ckEnumId;
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="CkTypeQueryColumn"/>.
+    /// </summary>
+    /// <param name="path">Path to the column within a type query.</param>
+    /// <param name="accessPathList">Access paths to the column as a list of single properties.</param>
+    /// <param name="isArray">Whether the column is an array.</param>
+    /// <param name="ckRecordId">The enum id of the column if the value type is a record.</param>
+    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, bool isArray, CkId<CkRecordId> ckRecordId)
+    {
+        Path = path;
+        AccessPathList = accessPathList;
+        ValueType = isArray ? AttributeValueTypesDto.RecordArray : AttributeValueTypesDto.Record;
+        CkRecordId = ckRecordId;
+    }
 
     /// <summary>
     /// Represents a path to a column within a type query.
@@ -42,7 +70,17 @@ public class CkTypeQueryColumn
     public AttributeValueTypesDto ValueType { get; }
 
     /// <summary>
-    /// Represents the association direction tuple of the column.
+    /// Returns the association direction tuple of the column if the value type is an association.
     /// </summary>
-    public CkTypeAssociationDirectionTuple? AssociationDirectionTuple { get; }
+    public CkTypeAssociationTuple? AssociationTuple { get; }
+
+    /// <summary>
+    /// Returns the enum id of the column if the value type is an enum.
+    /// </summary>
+    public CkId<CkEnumId>? CkEnumId  { get; }
+
+    /// <summary>
+    /// Returns the record id of the column if the value type is a record.
+    /// </summary>
+    public CkId<CkRecordId>? CkRecordId  { get; }
 }

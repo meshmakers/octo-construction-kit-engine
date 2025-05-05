@@ -5,4 +5,4 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// </summary>
 /// <param name="CkTypeId">Construction Kit type id</param>
 /// <param name="CkAssociationRoleId">Construction Kit association role id</param>
-public record CkTypeAssociationDirectionTuple(CkId<CkTypeId> CkTypeId, CkId<CkAssociationRoleId> CkAssociationRoleId);
+public record CkTypeAssociationTuple(CkId<CkTypeId> CkTypeId, CkId<CkAssociationRoleId> CkAssociationRoleId);

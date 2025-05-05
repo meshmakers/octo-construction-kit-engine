@@ -98,5 +98,11 @@ public enum AttributeValueTypesDto
     /// <summary>
     /// Geo spatial data according to RFC 7946 section 3.2.1
     /// </summary>
-    GeospatialPoint = 16
+    GeospatialPoint = 16,
+
+
+    /// <summary>
+    /// Association to another entity, only available in some interfaces.
+    /// </summary>
+    Association = 100,
 }

@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -46,6 +47,12 @@ public abstract class RtTypeWithAttributes
     /// </summary>
     /// <returns></returns>
     protected abstract string GetLocation();
+
+    /// <inheritdoc />
+    public override string ToString()
+    {
+        return $"{GetType().Name}: {GetLocation()}";
+    }
 
     /// <summary>
     ///     Gets the attribute value or the standard value if the attribute is not set.
@@ -618,11 +625,37 @@ public abstract class RtTypeWithAttributes
     /// <summary>
     ///     Gets the value of an attribute in the current object or an embedded document using the given path
     /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
     /// <param name="path">Path list to the attribute</param>
     /// <returns>The value of the attribute or otherwise null</returns>
-    public object? GetAttributeValueByAccessPath(IEnumerable<PathTerm> path)
+    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, IEnumerable<PathTerm> path)
     {
-        return RtPathEvaluator.GetValue(this, path);
+        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path);
+    }
+
+    /// <summary>
+    ///     Gets the value of an attribute in the current object or an embedded document using the given path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="path">Path list to the attribute</param>
+    /// <returns>The value of the attribute or otherwise null</returns>
+    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path)
+    {
+        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path);
+    }
+
+    /// <summary>
+    /// Sets the value of an attribute in the current object or an embedded document using the given path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="path">Path list to the attribute</param>
+    /// <param name="value">Value to set</param>
+    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, IEnumerable<PathTerm> path, object? value)
+    {
+        RtPathEvaluator.SetValue(ckCacheService, tenantId, this, path, value);
     }
 
     /// <summary>

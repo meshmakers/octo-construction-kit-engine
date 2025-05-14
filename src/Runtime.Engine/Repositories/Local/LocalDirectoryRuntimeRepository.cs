@@ -38,6 +38,18 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         return Task.FromResult((IOctoSession)new LocalSession());
     }
 
+    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
+        IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
+    {
+        throw new NotImplementedException();
+    }
+
     public string DirectoryPath { get; }
 
     protected override async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,

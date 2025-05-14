@@ -40,7 +40,11 @@ attributes:
   - id: Query.AttributeSearchFilter
     valueType: Record
     valueCkRecordId: ${thisModel}/AttributeSearchFilter
-    
+  - id: Query.Types
+    valueType: Enum
+    valueCkEnumId: ${thisModel}/QueryTypes
+    defaultValues:
+      - 0
   - id: AttributePath
     valueType: String
   - id: AttributePaths

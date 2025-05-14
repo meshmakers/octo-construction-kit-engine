@@ -13,5 +13,15 @@ public enum PathType
     /// <summary>
     /// Access to an array index
     /// </summary>
-    ArrayIndex = 1
+    ArrayIndex = 1,
+
+    /// <summary>
+    /// Access to a navigation property
+    /// </summary>
+    Navigation = 2,
+
+    /// <summary>
+    /// Access to a target construction kit type id
+    /// </summary>
+    TargetCkTypeId = 3,
 }

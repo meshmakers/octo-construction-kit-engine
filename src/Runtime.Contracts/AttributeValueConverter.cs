@@ -145,6 +145,11 @@ public static class AttributeValueConverter
                     return intList.InnerList;
                 }
 
+                if (value is int iValue)
+                {
+                    return new[] { iValue };
+                }
+
                 break;
             case AttributeValueTypesDto.Int:
             case AttributeValueTypesDto.Enum:

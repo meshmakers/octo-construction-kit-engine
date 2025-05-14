@@ -91,7 +91,19 @@ types:
         name: LocationX
         isOptional: true
       - id: Test/IsEnabled
-        name: IsEnabled        
+        name: IsEnabled
+      - id: Test/RecordTest
+        name: RecordTest
+        isOptional: true
+      - id: Test/StringArrayTests
+        name: StringArrayTests
+        isOptional: true
+      - id: Test/IntArrayTests
+        name: IntArrayTests
+        isOptional: true
+      - id: Test/RecordArrayTests
+        name: RecordArrayTests
+        isOptional: true
     associations:
       - id: System/ParentChild
         targetCkTypeId: Test/LocationWithSensor

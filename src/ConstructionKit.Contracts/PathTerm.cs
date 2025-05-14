@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 /// <param name="value">Value of the term</param>
 /// <param name="type">Type of the term</param>
+[DebuggerDisplay("{Value} ({Type})")]
 public class PathTerm(string value, PathType type)
 {
     /// <summary>

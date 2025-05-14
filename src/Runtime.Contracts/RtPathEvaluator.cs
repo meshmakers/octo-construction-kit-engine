@@ -2,6 +2,10 @@ using System.Collections;
 using System.Text.RegularExpressions;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -11,50 +15,138 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 /// </summary>
 public static class RtPathEvaluator
 {
-    // Regex for splitting the terms:
-    // - (?<property>[^\.\[\]]+) captures properties (anything except a dot or square brackets)
-    // - (?<arrayIndex>-?\d+|\*) captures array accesses (a number, optionally with a minus sign, or the wildcard *)
-    private static readonly Regex Regex = new( @"(?:^|\.)(?<property>[^\.\[\]]+)|\[(?<arrayIndex>-?\d+|\*)\]");
+    private record PathTuple(PathTerm? Term, List<PathLocator> Locators);
 
+    private record PathLocator(
+        RtTypeWithAttributes RtTypeWithAttributes,
+        CkTypeAttributeGraph? CkTypeAttributeGraph,
+        int? Index,
+        object? Value);
+
+    private const string PatternString = @"(?:(?<=^)|(?<=\.))(?<navigationProperty>[^.\[\]\->]+)(?=\.([^.\[\]\->]+)->)
+                      | \.(?<targetCkTypeId>[^.\[\]\->]+)(?=->)
+                      | \[(?<arrayIndex>-?\d+|\*)\]
+                      | (?:(?<=^)|(?<=\.))(?<property>[^.\[\]\->]+)(?!->)
+                      | ->(?<property>[^.\[\]\->]+)";
+
+    private const string MatchPatternString =
+        @"^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*(?:\.[^.\[\]\->]
+        +(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$
+        |^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$";
+
+    // This regex is used to parse a path expression in the form of "property1.property2.property3[0]"
+    // or "property1->property2.property3" or "property1[0].property2.property3"
+    // or "property1[*].property2.property3".
+    // It captures the following groups:
+    // - property: the name of the property
+    // - arrayIndex: the index of the array element (if any)
+    // - navigationProperty: the name of the navigation property (if any)
+    // - targetCkTypeId: the target construction kit type id (if any)
+    // The regex uses non-capturing groups (?:...) to group the different parts of the expression
+    private static readonly Regex Regex = new(PatternString,
+        RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
+
+    // This regex is used to validate the path expression
+    // It checks that the path expression does not contain any invalid characters
+    private static readonly Regex MatchRegex =
+        new(MatchPatternString, RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
 
     /// <summary>
     /// Gets the value of an attribute path
     /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
     /// <param name="root">The root object</param>
     /// <param name="path">Path of attributes to be evaluated</param>
     /// <returns>The value of the attribute path</returns>
-    public static object? GetValue(RtTypeWithAttributes root, string path)
+    public static object? GetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
+        string path)
     {
         var tokens = TokenizePath(path);
-        return EvaluatePath(root, tokens);
+        return GetValueByPath(ckCacheService, tenantId, root, tokens);
     }
 
     /// <summary>
     /// Gets the value of an attribute path
     /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
     /// <param name="root">The root object</param>
     /// <param name="path">Path of attributes to be evaluated</param>
     /// <returns>The value of the attribute path</returns>
-    public static object? GetValue(RtTypeWithAttributes root, IEnumerable<PathTerm> path)
+    public static object? GetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
+        IEnumerable<PathTerm> path)
     {
-        return EvaluatePath(root, path.ToList());
+        return GetValueByPath(ckCacheService, tenantId, root, path.ToList());
+    }
+
+    /// <summary>
+    /// Sets the value of an attribute path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="root">The root object</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="value">Value to be set</param>
+    public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
+        IEnumerable<PathTerm> path, object? value)
+    {
+        var pathList = path.ToList();
+        SetValueByPath(ckCacheService, tenantId, root, pathList, value);
+    }
+
+    /// <summary>
+    /// Sets the value of an attribute path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="root">The root object</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="value">Value to be set</param>
+    public static void SetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root, string path,
+        object? value)
+    {
+        var tokens = TokenizePath(path);
+        SetValueByPath(ckCacheService, tenantId, root, tokens, value);
     }
 
     /// <summary>
     /// Tokenizes a path into a list of path terms
     /// </summary>
-    /// <param name="path"></param>
-    /// <returns></returns>
+    /// <param name="path">Path to be tokenized</param>
+    /// <exception cref="InvalidPathException">Indicates that the term is invalid.</exception>
+    /// <returns>A list of path terms with value and type</returns>
     // ReSharper disable once MemberCanBePrivate.Global
     public static List<PathTerm> TokenizePath(string path)
     {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw InvalidPathException.NoEmptyPaths();
+        }
+
+        var validPath = MatchRegex.Match(path);
+        if (!validPath.Success)
+        {
+            throw InvalidPathException.InvalidPathTerm(path);
+        }
+
         var tokens = new List<PathTerm>();
         foreach (Match match in Regex.Matches(path))
         {
             // If the group name "property" contains a value, it is a property name.
             if (match.Groups["property"].Success)
             {
-                tokens.Add(new PathTerm(match.Groups["property"].Value.ToPascalCase(), PathType.Attribute));
+                tokens.Add(new PathTerm(match.Groups["property"].Value.ToCamelCase(), PathType.Attribute));
+            }
+            else if (match.Groups["navigationProperty"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["navigationProperty"].Value.ToCamelCase(),
+                    PathType.Navigation));
+            }
+            else if (match.Groups["targetCkTypeId"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["targetCkTypeId"].Value.ToCamelCase(),
+                    PathType.TargetCkTypeId));
             }
             // Otherwise, we check if the arrayIndex group was successful.
             else if (match.Groups["arrayIndex"].Success)
@@ -62,75 +154,422 @@ public static class RtPathEvaluator
                 tokens.Add(new PathTerm(match.Groups["arrayIndex"].Value, PathType.ArrayIndex));
             }
         }
+
         return tokens;
     }
 
-    private static object? EvaluatePath(object? current, List<PathTerm> tokens)
+    /// <summary>
+    /// Tokenizes a path into a list of role id and direction pairs
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <returns>A list of role id and direction pairs</returns>
+    public static List<NavigationPair> TokenizeAndGetNavigationPairs(ICkCacheService ckCacheService, string tenantId,
+        CkId<CkTypeId> ckTypeId, string path)
     {
-        foreach (var token in tokens)
+        var pairs = new List<NavigationPair>();
+
+        var tokens = TokenizePath(path);
+
+        // Get all combinations in tokens list with type= PathType.Navigation and PathType.TargetCkTypeId
+        var combinations = new List<Tuple<PathTerm, PathTerm>>();
+        for (int i = 0; i < tokens.Count; i++)
         {
-            if (current == null)
+            if (tokens[i].Type == PathType.Navigation)
             {
-                return null;
-            }
-
-            if (current is RtTypeWithAttributes rtTypeWithAttributes)
-            {
-                if (rtTypeWithAttributes.Attributes.TryGetValue(token.Value, out var value))
+                var currentToken = tokens[i];
+                var nextToken = tokens[i + 1];
+                if (nextToken.Type != PathType.TargetCkTypeId)
                 {
-                    current = value;
-                }
-                else if (token.Value == nameof(RtEntity.RtId) ||
-                         token.Value == nameof(RtEntity.RtWellKnownName) ||
-                         token.Value == nameof(RtEntity.RtVersion) ||
-                         token.Value == nameof(RtEntity.RtCreationDateTime) ||
-                         token.Value == nameof(RtEntity.RtChangedDateTime))
-                {
-                    current = rtTypeWithAttributes.GetType().GetProperty(token.Value)?.GetValue(rtTypeWithAttributes);
-                }
-                else
-                {
-                    return null;
-                }
-            }
-            else if (current is IEnumerable list && token.Type == PathType.ArrayIndex)
-            {
-                var indexStr = token.Value;
-                if (indexStr == "*")
-                {
-                    var results = new List<object>();
-                    foreach (var item in list)
-                    {
-                        var result = EvaluatePath(item, tokens.Skip(tokens.IndexOf(token) + 1).ToList());
-                        if (result != null)
-                        {
-                            results.Add(result);
-                        }
-                    }
-
-                    return results;
+                    throw InvalidPathException.InvalidPathTermTargetCkTypeIdMissing(path, currentToken);
                 }
 
-                var enumerable = list as object[] ?? list.Cast<object>().ToArray();
-                if (int.TryParse(indexStr, out int index) && index >= 0 && index < enumerable.Length)
-                {
-                    current = enumerable.ElementAt(index);
-                }
-                else if (index == -1)
-                {
-                    current = enumerable.LastOrDefault();
-                }
-                else
-                {
-                    return null;
-                }
-            }
-            else
-            {
-                return null;
+                combinations.Add(Tuple.Create(tokens[i], nextToken));
             }
         }
 
-        return current;
+        if (!ckCacheService.TryGetCkType(tenantId, ckTypeId, out var ckTypeGraph) ||
+            // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+            ckTypeGraph == null)
+        {
+            throw InvalidPathException.CkTypeIdNotFound(tenantId, ckTypeId);
+        }
+
+        foreach (var combination in combinations)
+        {
+            var navigationProperty = combination.Item1;
+            var targetTypeProperty = combination.Item2;
+
+            var inAssociations = ckTypeGraph.Associations.In.All
+                .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
+                            a.TargetCkTypeId.GetTypeName() == targetTypeProperty.Value).ToList();
+            var outAssociations = ckTypeGraph.Associations.Out.All
+                .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
+                            a.TargetCkTypeId.GetTypeName() == targetTypeProperty.Value).ToList();
+
+            if (inAssociations.Count == 0 && outAssociations.Count == 0)
+            {
+                throw InvalidPathException.AssociationNotFound(path, navigationProperty, targetTypeProperty);
+            }
+
+            foreach (var association in inAssociations)
+            {
+                var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Inbound,
+                    association.TargetCkTypeId);
+                pairs.Add(roleIdDirectionPair);
+            }
+
+            foreach (var association in outAssociations)
+            {
+                var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Outbound,
+                    association.TargetCkTypeId);
+                pairs.Add(roleIdDirectionPair);
+            }
+        }
+
+        return pairs;
+    }
+
+    private static object? GetValueByPath(ICkCacheService ckCacheService, string tenantId,
+        RtTypeWithAttributes rtTypeWithAttributes, List<PathTerm> tokens)
+    {
+        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens);
+
+        var pathTuple = evaluatedPath.Last();
+
+        List<object?> results = new List<object?>();
+        foreach (var pathTupleLocator in pathTuple.Locators)
+        {
+            results.Add(pathTupleLocator.Value);
+        }
+
+        return results.Count switch
+        {
+            0 => null,
+            1 => results[0],
+            _ => results
+        };
+    }
+
+    private static void SetValueByPath(ICkCacheService ckCacheService, string tenantId,
+        RtTypeWithAttributes rtTypeWithAttributes,
+        List<PathTerm> tokens, object? setValue)
+    {
+        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens);
+
+        var pathTuple = evaluatedPath.Last();
+
+        foreach (var pathTupleLocator in pathTuple.Locators)
+        {
+            if (pathTuple.Term == null)
+            {
+                throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes, tokens);
+            }
+
+            if (pathTuple.Term.Value == nameof(RtEntity.RtId) ||
+                pathTuple.Term.Value == nameof(RtEntity.RtWellKnownName) ||
+                pathTuple.Term.Value == nameof(RtEntity.RtVersion) ||
+                pathTuple.Term.Value == nameof(RtEntity.RtCreationDateTime) ||
+                pathTuple.Term.Value == nameof(RtEntity.RtChangedDateTime))
+            {
+                pathTupleLocator.RtTypeWithAttributes.GetType().GetProperty(pathTuple.Term.Value)
+                    ?.SetValue(pathTupleLocator.RtTypeWithAttributes, setValue);
+            }
+
+            if (pathTupleLocator.CkTypeAttributeGraph == null)
+            {
+                throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes, pathTuple.Term);
+            }
+
+            switch (pathTupleLocator.CkTypeAttributeGraph.ValueType)
+            {
+                case AttributeValueTypesDto.IntArray:
+                case AttributeValueTypesDto.StringArray:
+                case AttributeValueTypesDto.RecordArray:
+
+                    if (pathTupleLocator.Index == null)
+                    {
+                        throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes,
+                            pathTuple.Term);
+                    }
+
+                    if (!pathTupleLocator.RtTypeWithAttributes.Attributes.TryGetValue(pathTupleLocator
+                            .CkTypeAttributeGraph.AttributeName, out var value))
+                    {
+                        throw InvalidPathException.CannotGetAttributeValue(
+                            pathTupleLocator.RtTypeWithAttributes, pathTuple.Term);
+                    }
+
+                    if (!(value is IEnumerable values))
+                    {
+                        throw InvalidPathException.AttributeValueIsNotArray(
+                            pathTupleLocator.RtTypeWithAttributes, pathTuple.Term);
+                    }
+
+                    var x = values.Cast<object?>().ToList();
+                    x[pathTupleLocator.Index.Value] = setValue;
+
+                    pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                        pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.CkTypeAttributeGraph.ValueType, x);
+                    break;
+                default:
+                    pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                        pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.CkTypeAttributeGraph.ValueType, setValue);
+                    break;
+            }
+        }
+    }
+
+    private static List<PathTuple> MapPath(ICkCacheService ckCacheService, string tenantId,
+        RtTypeWithAttributes rtTypeWithAttributes2,
+        List<PathTerm> tokens)
+    {
+        // This list contains the current state of path evaluation (transformation from path to object structure)
+        var evaluatedPath = new List<PathTuple>([
+            new PathTuple(null, [new PathLocator(rtTypeWithAttributes2, null, null, rtTypeWithAttributes2)])
+        ]);
+
+        // We evaluate the path terms to find the target attribute
+        foreach (var token in tokens)
+        {
+            var lastPathTuple = evaluatedPath.Last();
+            var newPathLocators = new List<PathLocator>();
+            evaluatedPath.Add(new PathTuple(token, newPathLocators));
+
+            foreach (var locator in lastPathTuple.Locators)
+            {
+                // Navigation property
+                if (token.Type == PathType.Navigation)
+                {
+                    if (locator.RtTypeWithAttributes is RtEntityGraphItem rtEntityGraphItem)
+                    {
+                        var navigationEnds = rtEntityGraphItem.Associations.Where(x =>
+                                x.NavigationPropertyName == token.Value.ToPascalCase())
+                            .ToList();
+
+                        if (navigationEnds.Count == 0)
+                        {
+                            throw InvalidPathException.NavigationPropertyNotFound(tokens, token);
+                        }
+
+                        newPathLocators.Add(new PathLocator(locator.RtTypeWithAttributes, null,
+                            null, navigationEnds));
+                    }
+                    else
+                    {
+                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes, token);
+                    }
+                }
+                else if (token.Type == PathType.TargetCkTypeId)
+                {
+                    if (locator.Value is not List<NavigationEnd> navigationEnds)
+                    {
+                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes, token);
+                    }
+
+                    var filteredNavigationEnds = navigationEnds
+                        .Where(ne => ne.TargetCkTypeId.GetTypeName() == token.Value).ToList();
+
+                    if (filteredNavigationEnds.Count == 0)
+                    {
+                        throw InvalidPathException.TargetCkTypeIdNotFound(tokens, token);
+                    }
+
+                    if (filteredNavigationEnds.Count == 1)
+                    {
+                        var navigationEnd = navigationEnds.First();
+                        if (navigationEnd.Targets.Count() == 1)
+                        {
+                            newPathLocators.Add(new PathLocator(navigationEnd.Targets.First(), null,
+                                null, navigationEnd.Targets.First()));
+                        }
+                        else
+                        {
+                            var targets = navigationEnd.Targets.ToList();
+                            for (int i = 0; i < targets.Count; i++)
+                            {
+                                var target = targets[i];
+                                newPathLocators.Add(new PathLocator(target, null,
+                                    i, target));
+                            }
+                        }
+                    }
+                    else
+                    {
+                        throw InvalidPathException.MultipleNavigationEndsUnsupported(locator.RtTypeWithAttributes,
+                            token);
+                    }
+                }
+                // Attribute
+                else if (token.Type == PathType.Attribute)
+                {
+                    if (locator.Value == null)
+                    {
+                        newPathLocators.Add(
+                            locator with { Index = null, Value = null });
+                        continue;
+                    }
+
+                    if (!(locator.Value is RtTypeWithAttributes valueRtTypeWithAttribute))
+                    {
+                        throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
+                    }
+
+                    if (valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(), out var value))
+                    {
+                        switch (valueRtTypeWithAttribute)
+                        {
+                            case RtEntity rtEntity
+                                when ckCacheService.TryGetCkType(tenantId, rtEntity.GetCkTypeId(), out var ckTypeGraph)
+                                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                     && ckTypeGraph != null &&
+                                     ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                         out var ckTypeAttributeGraph):
+                                newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null, value));
+                                continue;
+                            case RtRecord rtRecord
+                                when ckCacheService.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
+                                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                     && ckRecordGraph != null &&
+                                     ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                         out var ckRecordAttributeGraph):
+                                newPathLocators.Add(
+                                    new PathLocator(rtRecord, ckRecordAttributeGraph, null, value));
+                                continue;
+                            default:
+                                throw InvalidPathException.InvalidRuntimeType(valueRtTypeWithAttribute, token);
+                        }
+                    }
+
+                    throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
+                }
+                else if (token.Type == PathType.ArrayIndex)
+                {
+                    if (locator.CkTypeAttributeGraph == null)
+                    {
+                        throw InvalidPathException.InvalidArrayIndexToken(locator.RtTypeWithAttributes, token);
+                    }
+
+                    if (locator.Value == null)
+                    {
+                        newPathLocators.Add(new PathLocator(locator.RtTypeWithAttributes, null, null, null));
+                    }
+
+                    var indexStr = token.Value;
+
+
+                    if (locator.Value is IEnumerable<RtRecord> rtRecords)
+                    {
+                        var recordList = rtRecords.ToList();
+
+                        if (indexStr == "*")
+                        {
+                            for (int i = 0; i < recordList.Count; i++)
+                            {
+                                var item = recordList.ElementAt(i);
+                                newPathLocators.Add(new PathLocator(item, null, i, item));
+                            }
+
+                            continue;
+                        }
+
+                        if (!int.TryParse(indexStr, out int index))
+                        {
+                            throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                        }
+
+                        if (index >= 0)
+                        {
+                            if (index < recordList.Count)
+                            {
+                                var rtRecord = recordList.ElementAt(index);
+                                newPathLocators.Add(locator with { Index = index, Value = rtRecord });
+                            }
+                            else
+                            {
+                                throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                            }
+
+                            continue;
+                        }
+
+                        var calcIndex = recordList.Count + index;
+
+                        if (calcIndex < recordList.Count)
+                        {
+                            var rtRecord = recordList.ElementAt(calcIndex);
+                            newPathLocators.Add(locator with { Index = calcIndex, Value = rtRecord });
+                        }
+                        else
+                        {
+                            throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                        }
+
+                        continue;
+                    }
+
+                    if (locator.Value is IEnumerable list)
+                    {
+                        var scalarValues = list.Cast<object>().ToList();
+                        if (indexStr == "*")
+                        {
+                            for (int i = 0; i < scalarValues.Count; i++)
+                            {
+                                var item = scalarValues.ElementAt(i);
+                                newPathLocators.Add(locator with { Index = i, Value = item });
+                            }
+
+                            continue;
+                        }
+
+                        if (!int.TryParse(indexStr, out int index))
+                        {
+                            throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                        }
+
+                        if (index >= 0)
+                        {
+                            if (index < scalarValues.Count)
+                            {
+                                var v = scalarValues.ElementAt(index);
+                                newPathLocators.Add(locator with { Index = index, Value = v });
+                            }
+                            else
+                            {
+                                throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                            }
+
+                            continue;
+                        }
+
+                        var calcIndex = scalarValues.Count + index;
+
+                        if (calcIndex >= 0 && calcIndex < scalarValues.Count)
+                        {
+                            var v = scalarValues.ElementAt(index);
+                            newPathLocators.Add(locator with { Index = calcIndex, Value = v });
+                        }
+                        else
+                        {
+                            throw InvalidPathException.InvalidArrayIndex(locator.RtTypeWithAttributes, token);
+                        }
+
+                        continue;
+                    }
+
+                    throw InvalidPathException.InvalidArrayIndexData(locator.RtTypeWithAttributes, token);
+                }
+                else
+                {
+                    throw InvalidPathException.InvalidTokenType(token);
+                }
+            }
+        }
+
+        return evaluatedPath;
     }
 }

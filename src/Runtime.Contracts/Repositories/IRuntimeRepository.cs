@@ -55,7 +55,8 @@ public interface IRuntimeRepository
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
-    Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
+    Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        IReadOnlyList<OctoObjectId> rtIds,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null);
 
     /// <summary>
@@ -104,7 +105,8 @@ public interface IRuntimeRepository
     /// <param name="rtId">Object id of the runtime entity</param>
     /// <param name="direction">Direction of associations to get</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId, GraphDirections direction);
+    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
+        GraphDirections direction);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role
@@ -136,7 +138,8 @@ public interface IRuntimeRepository
     /// <param name="targetRtEntityId">Runtime id of the target entity</param>
     /// <param name="ckRoleId">Construction kit role id of the association</param>
     /// <returns></returns>
-    Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId, RtEntityId targetRtEntityId,
+    Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
+        RtEntityId targetRtEntityId,
         CkId<CkAssociationRoleId> ckRoleId);
 
     /// <summary>
@@ -154,6 +157,36 @@ public interface IRuntimeRepository
     /// <returns></returns>
     IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null)
         where TEntity : RtEntity, new();
+
+    /// <summary>
+    /// Retrieves a graph of runtime entities based on the given type and role id direction pairs.
+    /// </summary>
+    /// <param name="session"></param>
+    /// <param name="ckTypeId"></param>
+    /// <param name="dataQueryOperation"></param>
+    /// <param name="roleIdDirectionPairs"></param>
+    /// <param name="skip"></param>
+    /// <param name="take"></param>
+    /// <returns></returns>
+    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs,
+        int? skip = null, int? take = null);
+
+    /// <summary>
+    /// Retrieves a graph of runtime entities based on the given runtime identifier and role id direction pairs.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="ckTypeId">Construction kit type id</param>
+    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="roleIdDirectionPairs">>Role id direction pairs that are loaded with this request</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
+    /// <returns>Returns a result set of the given type</returns>
+    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
+        int? take = null);
 
     #endregion Data query (simple)
 
@@ -221,7 +254,8 @@ public interface IRuntimeRepository
     /// <param name="rtEntities">Objects to insert</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities) where TEntity : RtEntity, new();
+    Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities)
+        where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Replace a single runtime entity
@@ -231,7 +265,8 @@ public interface IRuntimeRepository
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task ReplaceOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId, RtEntity rtEntity);
+    Task ReplaceOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity);
 
     /// <summary>
     ///     Replace a single runtime entity
@@ -273,7 +308,8 @@ public interface IRuntimeRepository
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId, RtEntity rtEntity);
+    Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        RtEntity rtEntity);
 
     /// <summary>
     ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
@@ -371,7 +407,8 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilters">A collection of filter objects</param>
     /// <returns></returns>
-    Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<FieldFilter> fieldFilters);
+    Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+        ICollection<FieldFilter> fieldFilters);
 
     /// <summary>
     ///     Deletes all entities with the given filter options
@@ -432,7 +469,8 @@ public interface IRuntimeRepository
     /// <param name="stream">Binary stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime, Stream stream,
+    Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType,
+        DateTime expiryDateTime, Stream stream,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -444,7 +482,8 @@ public interface IRuntimeRepository
     /// <param name="stream">Stream of the file</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns>Object id of the large binary</returns>
-    Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
+    Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType,
+        Stream stream,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -454,7 +493,8 @@ public interface IRuntimeRepository
     /// <param name="largeBinaryId">Object id of the large binary</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, CancellationToken cancellationToken = default);
+    Task DeleteTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Downloads a large binary file from the repository based on the large binary id

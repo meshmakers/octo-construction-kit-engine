@@ -27,5 +27,9 @@ attributes:
     valueType: RecordArray
     valueCkRecordId: Test/TestRecord
 
+  - id: RecordTest
+    valueType: Record
+    valueCkRecordId: Test/TestRecord
+
   - id: Binary
     valueType: BinaryLinked

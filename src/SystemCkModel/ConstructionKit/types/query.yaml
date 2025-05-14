@@ -1,25 +1,27 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Query
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${thisModel}/Entity
     isFinal: false
     isAbstract: false
     attributes:
-      - id: System/Query.CkTypeId
+      - id: ${thisModel}/Query.CkTypeId
         name: QueryCkTypeId
-      - id: System/Query.Columns
+      - id: ${thisModel}/Query.Types
+        name: QueryType
+      - id: ${thisModel}/Query.Columns
         name: Columns
-      - id: System/Query.Sorting
+      - id: ${thisModel}/Query.Sorting
         name: Sorting
         isOptional: true
-      - id: System/Query.FieldFilter
+      - id: ${thisModel}/Query.FieldFilter
         name: FieldFilter
         isOptional: true
-      - id: System/Query.TextSearchFilter
+      - id: ${thisModel}/Query.TextSearchFilter
         name: TextSearchFilter
         isOptional: true
-      - id: System/Query.AttributeSearchFilter
+      - id: ${thisModel}/Query.AttributeSearchFilter
         name: AttributeSearchFilter
         isOptional: true
-      - id: System/Name
+      - id: ${thisModel}/Name
         name: Name

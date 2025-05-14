@@ -1,16 +1,16 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Tenant
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${thisModel}/Entity
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System/TenantId
+      - id: ${thisModel}/TenantId
         name: TenantId
-      - id: System/ParentTenantId
+      - id: ${thisModel}/ParentTenantId
         name: ParentTenantId
         isOptional: true
-      - id: System/DatabaseName
+      - id: ${thisModel}/DatabaseName
         name: DatabaseName
     indexes:
       - indexType: Ascending

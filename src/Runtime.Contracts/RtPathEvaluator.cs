@@ -445,6 +445,18 @@ public static class RtPathEvaluator
                         }
                     }
 
+                    if (token.Value.ToPascalCase() == nameof(RtEntity.RtId) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtWellKnownName) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtVersion) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtCreationDateTime) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtChangedDateTime))
+                    {
+                        value = valueRtTypeWithAttribute.GetType().GetProperty(token.Value.ToPascalCase())
+                            ?.GetValue(valueRtTypeWithAttribute);
+                        newPathLocators.Add(new PathLocator(valueRtTypeWithAttribute, null, null, value));
+                        continue;
+                    }
+
                     throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
                 }
                 else if (token.Type == PathType.ArrayIndex)

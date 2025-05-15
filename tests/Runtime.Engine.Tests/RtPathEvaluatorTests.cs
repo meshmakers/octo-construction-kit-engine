@@ -1,3 +1,4 @@
+using System.Collections;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -104,6 +105,114 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     #endregion TokenizePath
 
     #region GetValue
+
+    private class SystemDataGenerator : IEnumerable<object[]>
+    {
+        private readonly List<object[]> _data =
+        [
+            new object[] { "RtId", OctoObjectId.Parse("68259915225146801209c9f1") },
+            new object[] { "RtWellKnownName", "ExpectedWellknownName" },
+            new object[] { "RtVersion", (ulong)5 },
+            new object[] { "RtCreationDateTime", new DateTime(2021, 10, 9, 8, 7, 6) },
+            new object[] { "RtChangedDateTime", new DateTime(2020, 9, 8, 7, 6, 5) }
+        ];
+
+        public IEnumerator<object[]> GetEnumerator() => _data.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
+    [Theory]
+    [ClassData(typeof(SystemDataGenerator))]
+    public async Task GetValue_SystemAttributes_OK(string attributePath, object expectedValue)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var d = new Dictionary<string, object?>
+        {
+            { "Designation", "Test" },
+            { "IsEnabled", true }
+        };
+
+        var rtId = OctoObjectId.Parse("68259915225146801209c9f1");
+        var rtEntity = new RtEntity("Test/Sensor", rtId, d)
+        {
+            RtWellKnownName = "ExpectedWellknownName",
+            RtVersion = 5,
+            RtCreationDateTime = new DateTime(2021, 10, 9, 8, 7, 6),
+            RtChangedDateTime = new DateTime(2020, 9, 8, 7, 6, 5),
+        };
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, attributePath);
+        Assert.Equal(expectedValue, result);
+    }
+
+    private class NavigationSystemDataGenerator : IEnumerable<object[]>
+    {
+        private readonly List<object[]> _data =
+        [
+            new object[] { "myNavPropName.testSensor->RtId", OctoObjectId.Parse("68259915225146801209c9f1") },
+            new object[] { "myNavPropName.testSensor->RtWellKnownName", "ExpectedWellknownName" },
+            new object[] { "myNavPropName.testSensor->RtVersion", (ulong)867 },
+            new object[] { "myNavPropName.testSensor->RtCreationDateTime", new DateTime(2022, 10, 9, 8, 7, 6) },
+            new object[] { "myNavPropName.testSensor->RtChangedDateTime", new DateTime(2023, 9, 8, 7, 6, 5) }
+        ];
+
+        public IEnumerator<object[]> GetEnumerator() => _data.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
+
+    [Theory]
+    [ClassData(typeof(NavigationSystemDataGenerator))]
+    public async Task GetValue_Navigation_SystemAttributes_OK(string attributePath, object expectedValue)
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var d = new Dictionary<string, object?>
+        {
+            { "Designation", "Test" },
+            { "IsEnabled", true },
+            { "DataCount", 42 },
+            {
+                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                {
+                    { "Designation", "DemoValueInnerString" }
+                })
+            }
+        };
+
+        var d2 = new Dictionary<string, object?>
+        {
+            { "Designation", "Child item text" },
+            { "DataCount", 49 }
+        };
+
+        var associations = new List<NavigationEnd>
+        {
+            new()
+            {
+                AssociationId = OctoObjectId.GenerateNewId(),
+                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
+                TargetCkTypeId = "Test/Sensor",
+                NavigationPropertyName = "MyNavPropName",
+                Targets = [new RtEntity("Test/Sensor", OctoObjectId.Parse("68259915225146801209c9f1"), d2)        {
+                    RtWellKnownName = "ExpectedWellknownName",
+                    RtVersion = 867,
+                    RtCreationDateTime = new DateTime(2022, 10, 9, 8, 7, 6),
+                    RtChangedDateTime = new DateTime(2023, 9, 8, 7, 6, 5),
+                }]
+            }
+        };
+
+        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, attributePath);
+        Assert.Equal(expectedValue, result);
+    }
 
     [Fact]
     public async Task GetValue_SimpleStringValue_OK()

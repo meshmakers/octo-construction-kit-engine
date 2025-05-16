@@ -204,10 +204,12 @@ public static class RtPathEvaluator
 
             var inAssociations = ckTypeGraph.Associations.In.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
-                            a.TargetCkTypeId.GetTypeName() == targetTypeProperty.Value).ToList();
+                            ckCacheService.GetCkType(tenantId, a.TargetCkTypeId).GetAllDerivedTypes(true)
+                                .Select(t => t.GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
             var outAssociations = ckTypeGraph.Associations.Out.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
-                            a.TargetCkTypeId.GetTypeName() == targetTypeProperty.Value).ToList();
+                            ckCacheService.GetCkType(tenantId, a.TargetCkTypeId).GetAllDerivedTypes(true)
+                                .Select(t => t.GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
 
             if (inAssociations.Count == 0 && outAssociations.Count == 0)
             {
@@ -419,45 +421,45 @@ public static class RtPathEvaluator
                         throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
                     }
 
-                    if (valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(), out var value))
-                    {
-                        switch (valueRtTypeWithAttribute)
-                        {
-                            case RtEntity rtEntity
-                                when ckCacheService.TryGetCkType(tenantId, rtEntity.GetCkTypeId(), out var ckTypeGraph)
-                                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                     && ckTypeGraph != null &&
-                                     ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
-                                         out var ckTypeAttributeGraph):
-                                newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null, value));
-                                continue;
-                            case RtRecord rtRecord
-                                when ckCacheService.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
-                                     // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                     && ckRecordGraph != null &&
-                                     ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
-                                         out var ckRecordAttributeGraph):
-                                newPathLocators.Add(
-                                    new PathLocator(rtRecord, ckRecordAttributeGraph, null, value));
-                                continue;
-                            default:
-                                throw InvalidPathException.InvalidRuntimeType(valueRtTypeWithAttribute, token);
-                        }
-                    }
-
                     if (token.Value.ToPascalCase() == nameof(RtEntity.RtId) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtWellKnownName) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtVersion) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtCreationDateTime) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtChangedDateTime))
                     {
-                        value = valueRtTypeWithAttribute.GetType().GetProperty(token.Value.ToPascalCase())
+                        var value = valueRtTypeWithAttribute.GetType().GetProperty(token.Value.ToPascalCase())
                             ?.GetValue(valueRtTypeWithAttribute);
                         newPathLocators.Add(new PathLocator(valueRtTypeWithAttribute, null, null, value));
                         continue;
                     }
 
-                    throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
+                    switch (valueRtTypeWithAttribute)
+                    {
+                        case RtEntity rtEntity
+                            when ckCacheService.TryGetCkType(tenantId, rtEntity.GetCkTypeId(), out var ckTypeGraph)
+                                 // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                 && ckTypeGraph != null &&
+                                 ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                     out var ckTypeAttributeGraph):
+                            valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
+                                out var entityValue);
+                            newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null, entityValue));
+                            continue;
+                        case RtRecord rtRecord
+                            when ckCacheService.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
+                                 // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                 && ckRecordGraph != null &&
+                                 ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                     out var ckRecordAttributeGraph):
+                            valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
+                                out var recordValue);
+                            newPathLocators.Add(
+                                new PathLocator(rtRecord, ckRecordAttributeGraph, null, recordValue));
+
+                            continue;
+                        default:
+                            throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
+                    }
                 }
                 else if (token.Type == PathType.ArrayIndex)
                 {

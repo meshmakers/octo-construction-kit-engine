@@ -986,4 +986,59 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     #endregion SetValue
+
+    #region TokenizeAndGetNavigationPairs
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_NoNavigation_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
+            "Designation");
+
+        Assert.Empty(r);
+    }
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_NoNavigation_Record_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
+            "RecordTest.Designation");
+
+        Assert.Empty(r);
+    }
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
+            "children.testLocationWithSensor->Designation");
+
+        Assert.Single(r);
+        Assert.Equal("System/ParentChild", r[0].CkRoleId);
+        Assert.Equal("Test/LocationWithSensor", r[0].TargetCkTypeId);
+        Assert.Equal(GraphDirections.Inbound, r[0].Direction);
+    }
+
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_InheritedTargetType_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
+            "parent.testZone->Designation");
+
+        Assert.Single(r);
+        Assert.Equal("System/ParentChild", r[0].CkRoleId);
+        Assert.Equal("Test/LocationWithSensor", r[0].TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r[0].Direction);
+    }
+
+    #endregion TokenizeAndGetNavigationPairs
 }

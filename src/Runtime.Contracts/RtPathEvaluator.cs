@@ -23,16 +23,14 @@ public static class RtPathEvaluator
         int? Index,
         object? Value);
 
-    private const string PatternString = @"(?:(?<=^)|(?<=\.))(?<navigationProperty>[^.\[\]\->]+)(?=\.([^.\[\]\->]+)->)
-                      | \.(?<targetCkTypeId>[^.\[\]\->]+)(?=->)
-                      | \[(?<arrayIndex>-?\d+|\*)\]
-                      | (?:(?<=^)|(?<=\.))(?<property>[^.\[\]\->]+)(?!->)
-                      | ->(?<property>[^.\[\]\->]+)";
+    private const string PatternString =
+        @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->]+)(?=\.[^.\[\]\->]+->)  
+          | \.(?<targetCkTypeId>[^.\[\]\->]+)(?=->)                                          
+          | \[(?<arrayIndex>-?\d+|\*)\]                                                    
+          | (?:(?<=^)|(?<=\.|->))(?<property>[^.\[\]\->]+)(?!->)";
 
     private const string MatchPatternString =
-        @"^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*(?:\.[^.\[\]\->]
-        +(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$
-        |^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$";
+        @"^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)|(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$";
 
     // This regex is used to parse a path expression in the form of "property1.property2.property3[0]"
     // or "property1->property2.property3" or "property1[0].property2.property3"
@@ -50,6 +48,56 @@ public static class RtPathEvaluator
     // It checks that the path expression does not contain any invalid characters
     private static readonly Regex MatchRegex =
         new(MatchPatternString, RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
+
+
+    /// <summary>
+    /// Tokenizes a path into a list of path terms
+    /// </summary>
+    /// <param name="path">Path to be tokenized</param>
+    /// <exception cref="InvalidPathException">Indicates that the term is invalid.</exception>
+    /// <returns>A list of path terms with value and type</returns>
+    // ReSharper disable once MemberCanBePrivate.Global
+    public static List<PathTerm> TokenizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            throw InvalidPathException.NoEmptyPaths();
+        }
+
+        var validPath = MatchRegex.Match(path);
+        if (!validPath.Success)
+        {
+            throw InvalidPathException.InvalidPathTerm(path);
+        }
+
+        var tokens = new List<PathTerm>();
+        foreach (Match match in Regex.Matches(path))
+        {
+            // If the group name "property" contains a value, it is a property name.
+            if (match.Groups["property"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["property"].Value.ToCamelCase(), PathType.Attribute));
+            }
+            else if (match.Groups["navigationProperty"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["navigationProperty"].Value.ToCamelCase(),
+                    PathType.Navigation));
+            }
+            else if (match.Groups["targetCkTypeId"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["targetCkTypeId"].Value.ToCamelCase(),
+                    PathType.TargetCkTypeId));
+            }
+            // Otherwise, we check if the arrayIndex group was successful.
+            else if (match.Groups["arrayIndex"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["arrayIndex"].Value, PathType.ArrayIndex));
+            }
+        }
+
+        return tokens;
+    }
+
 
     /// <summary>
     /// Gets the value of an attribute path
@@ -111,66 +159,18 @@ public static class RtPathEvaluator
     }
 
     /// <summary>
-    /// Tokenizes a path into a list of path terms
-    /// </summary>
-    /// <param name="path">Path to be tokenized</param>
-    /// <exception cref="InvalidPathException">Indicates that the term is invalid.</exception>
-    /// <returns>A list of path terms with value and type</returns>
-    // ReSharper disable once MemberCanBePrivate.Global
-    public static List<PathTerm> TokenizePath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            throw InvalidPathException.NoEmptyPaths();
-        }
-
-        var validPath = MatchRegex.Match(path);
-        if (!validPath.Success)
-        {
-            throw InvalidPathException.InvalidPathTerm(path);
-        }
-
-        var tokens = new List<PathTerm>();
-        foreach (Match match in Regex.Matches(path))
-        {
-            // If the group name "property" contains a value, it is a property name.
-            if (match.Groups["property"].Success)
-            {
-                tokens.Add(new PathTerm(match.Groups["property"].Value.ToCamelCase(), PathType.Attribute));
-            }
-            else if (match.Groups["navigationProperty"].Success)
-            {
-                tokens.Add(new PathTerm(match.Groups["navigationProperty"].Value.ToCamelCase(),
-                    PathType.Navigation));
-            }
-            else if (match.Groups["targetCkTypeId"].Success)
-            {
-                tokens.Add(new PathTerm(match.Groups["targetCkTypeId"].Value.ToCamelCase(),
-                    PathType.TargetCkTypeId));
-            }
-            // Otherwise, we check if the arrayIndex group was successful.
-            else if (match.Groups["arrayIndex"].Success)
-            {
-                tokens.Add(new PathTerm(match.Groups["arrayIndex"].Value, PathType.ArrayIndex));
-            }
-        }
-
-        return tokens;
-    }
-
-    /// <summary>
     /// Tokenizes a path into a list of role id and direction pairs
     /// </summary>
     /// <param name="ckCacheService">The cache service</param>
     /// <param name="tenantId">Tenant id</param>
     /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
     /// <param name="path">Path of attributes to be evaluated</param>
-    /// <returns>A list of role id and direction pairs</returns>
-    public static List<NavigationPair> TokenizeAndGetNavigationPairs(ICkCacheService ckCacheService, string tenantId,
+    /// <returns>The top most pair of the given path</returns>
+    public static NavigationPair? TokenizeAndGetNavigationPairs(ICkCacheService ckCacheService, string tenantId,
         CkId<CkTypeId> ckTypeId, string path)
     {
-        var pairs = new List<NavigationPair>();
-
+        NavigationPair? navigationPair = null;
+        NavigationPair? currentNavigationPair = null;
         var tokens = TokenizePath(path);
 
         // Get all combinations in tokens list with type= PathType.Navigation and PathType.TargetCkTypeId
@@ -218,20 +218,45 @@ public static class RtPathEvaluator
 
             foreach (var association in inAssociations)
             {
+                var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.TargetCkTypeId)
+                    .GetAllDerivedTypes(true)
+                    .First(t => t.GetTypeName() == targetTypeProperty.Value);
+                ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
+
                 var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Inbound,
-                    association.TargetCkTypeId);
-                pairs.Add(roleIdDirectionPair);
+                    realTargetCkTypeId);
+
+                if (currentNavigationPair != null)
+                {
+                    currentNavigationPair.InnerNavigationPair = roleIdDirectionPair;
+                }
+
+                currentNavigationPair = roleIdDirectionPair;
+
             }
 
             foreach (var association in outAssociations)
             {
+                var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.TargetCkTypeId)
+                    .GetAllDerivedTypes(true)
+                    .First(t => t.GetTypeName() == targetTypeProperty.Value);
+                ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
+
                 var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Outbound,
-                    association.TargetCkTypeId);
-                pairs.Add(roleIdDirectionPair);
+                    realTargetCkTypeId);
+
+                if (currentNavigationPair != null)
+                {
+                    currentNavigationPair.InnerNavigationPair = roleIdDirectionPair;
+                }
+
+                currentNavigationPair = roleIdDirectionPair;
             }
+
+            navigationPair ??= currentNavigationPair;
         }
 
-        return pairs;
+        return navigationPair;
     }
 
     private static object? GetValueByPath(ICkCacheService ckCacheService, string tenantId,

@@ -102,6 +102,56 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             RtPathEvaluator.TokenizePath("myNavPropName->Record.InnerString"));
     }
 
+    [Fact]
+    public void TokenizePath_NavigationProperty_NavigationProperty_OK()
+    {
+        var result = RtPathEvaluator.TokenizePath("nav1.type1->nav2.type2->property1");
+
+        Assert.Equal(5, result.Count);
+        Assert.Equal("nav1", result[0].Value);
+        Assert.Equal(PathType.Navigation, result[0].Type);
+
+        Assert.Equal("type1", result[1].Value);
+        Assert.Equal(PathType.TargetCkTypeId, result[1].Type);
+
+        Assert.Equal("nav2", result[2].Value);
+        Assert.Equal(PathType.Navigation, result[2].Type);
+
+        Assert.Equal("type2", result[3].Value);
+        Assert.Equal(PathType.TargetCkTypeId, result[3].Type);
+
+        Assert.Equal("property1", result[4].Value);
+        Assert.Equal(PathType.Attribute, result[4].Type);
+    }
+
+    [Fact]
+    public void TokenizePath_NavigationProperty_NavigationProperty_NavigationProperty_OK()
+    {
+        var result = RtPathEvaluator.TokenizePath("nav1.type1->nav2.type2->nav3.type3->property1");
+
+        Assert.Equal(7, result.Count);
+        Assert.Equal("nav1", result[0].Value);
+        Assert.Equal(PathType.Navigation, result[0].Type);
+
+        Assert.Equal("type1", result[1].Value);
+        Assert.Equal(PathType.TargetCkTypeId, result[1].Type);
+
+        Assert.Equal("nav2", result[2].Value);
+        Assert.Equal(PathType.Navigation, result[2].Type);
+
+        Assert.Equal("type2", result[3].Value);
+        Assert.Equal(PathType.TargetCkTypeId, result[3].Type);
+
+        Assert.Equal("nav3", result[4].Value);
+        Assert.Equal(PathType.Navigation, result[4].Type);
+
+        Assert.Equal("type3", result[5].Value);
+        Assert.Equal(PathType.TargetCkTypeId, result[5].Type);
+
+        Assert.Equal("property1", result[6].Value);
+        Assert.Equal(PathType.Attribute, result[6].Type);
+    }
+
     #endregion TokenizePath
 
     #region GetValue
@@ -997,7 +1047,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
             "Designation");
 
-        Assert.Empty(r);
+        Assert.Null(r);
     }
 
     [Fact]
@@ -1008,7 +1058,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
             "RecordTest.Designation");
 
-        Assert.Empty(r);
+        Assert.Null(r);
     }
 
     [Fact]
@@ -1019,10 +1069,10 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Zone",
             "children.testLocationWithSensor->Designation");
 
-        Assert.Single(r);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId);
-        Assert.Equal("Test/LocationWithSensor", r[0].TargetCkTypeId);
-        Assert.Equal(GraphDirections.Inbound, r[0].Direction);
+        Assert.NotNull(r);
+        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("Test/LocationWithSensor", r.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Inbound, r.Direction);
     }
 
 
@@ -1034,10 +1084,50 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
             "parent.testZone->Designation");
 
-        Assert.Single(r);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId);
-        Assert.Equal("Test/LocationWithSensor", r[0].TargetCkTypeId);
-        Assert.Equal(GraphDirections.Outbound, r[0].Direction);
+        Assert.NotNull(r);
+        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.Direction);
+    }
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_Two_Layers_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
+            "parent.testZone->parent.testDistrict->Designation");
+
+        Assert.NotNull(r);
+        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.Direction);
+        Assert.NotNull(r.InnerNavigationPair);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPair.CkRoleId);
+        Assert.Equal("Test/District", r.InnerNavigationPair.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPair.Direction);
+    }
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_Three_Layers_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
+            "parent.testZone->parent.testDistrict->parent.testCity->Designation");
+
+        Assert.NotNull(r);
+        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.Direction);
+        Assert.NotNull(r.InnerNavigationPair);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPair.CkRoleId);
+        Assert.Equal("Test/District", r.InnerNavigationPair.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPair.Direction);
+        Assert.NotNull(r.InnerNavigationPair.InnerNavigationPair);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPair.InnerNavigationPair.CkRoleId);
+        Assert.Equal("Test/City", r.InnerNavigationPair.InnerNavigationPair.TargetCkTypeId);
+        Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPair.InnerNavigationPair.Direction);
     }
 
     #endregion TokenizeAndGetNavigationPairs

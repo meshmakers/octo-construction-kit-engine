@@ -159,14 +159,51 @@ public static class RtPathEvaluator
     }
 
     /// <summary>
-    /// Tokenizes a path into a list of role id and direction pairs
+    /// Tokenizes a list of paths into a list of traversal navigation pairs
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
+    /// <param name="paths">List of paths to be evaluated</param>
+    /// <returns>A list of navigation pairs, an empty list is returned if no navigation property has been used</returns>
+    public static List<NavigationPair> TokenizeAndGetNavigationPairs(ICkCacheService ckCacheService, string tenantId,
+        CkId<CkTypeId> ckTypeId,
+        IEnumerable<string> paths)
+    {
+        List<NavigationPair> navigationPairs = new();
+        foreach (var path in paths)
+        {
+            var navigationPair = TokenizeAndGetNavigationPair(ckCacheService, tenantId, ckTypeId, path);
+            if (navigationPair != null)
+            {
+                var existingNavigationPair = navigationPairs.SingleOrDefault(x =>
+                    x.CkRoleId == navigationPair.CkRoleId &&
+                    x.Direction == navigationPair.Direction &&
+                    x.TargetCkTypeId == navigationPair.TargetCkTypeId);
+                if (existingNavigationPair != null)
+                {
+                    // We ensure that navigation pairs with the same role id and direction are merged
+                    existingNavigationPair.Merge(navigationPair);
+                }
+                else
+                {
+                    navigationPairs.Add(navigationPair);
+                }
+            }
+        }
+
+        return navigationPairs;
+    }
+
+    /// <summary>
+    /// Tokenizes a path into a traversable navigation pair
     /// </summary>
     /// <param name="ckCacheService">The cache service</param>
     /// <param name="tenantId">Tenant id</param>
     /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
     /// <param name="path">Path of attributes to be evaluated</param>
-    /// <returns>The top most pair of the given path</returns>
-    public static NavigationPair? TokenizeAndGetNavigationPairs(ICkCacheService ckCacheService, string tenantId,
+    /// <returns>If navigation is used, the corresponding navigation pair is returned</returns>
+    public static NavigationPair? TokenizeAndGetNavigationPair(ICkCacheService ckCacheService, string tenantId,
         CkId<CkTypeId> ckTypeId, string path)
     {
         NavigationPair? navigationPair = null;
@@ -228,7 +265,7 @@ public static class RtPathEvaluator
 
                 if (currentNavigationPair != null)
                 {
-                    currentNavigationPair.InnerNavigationPair = roleIdDirectionPair;
+                    currentNavigationPair.InnerNavigationPairs.Add(roleIdDirectionPair);
                 }
 
                 currentNavigationPair = roleIdDirectionPair;
@@ -247,7 +284,7 @@ public static class RtPathEvaluator
 
                 if (currentNavigationPair != null)
                 {
-                    currentNavigationPair.InnerNavigationPair = roleIdDirectionPair;
+                    currentNavigationPair.InnerNavigationPairs.Add(roleIdDirectionPair);
                 }
 
                 currentNavigationPair = roleIdDirectionPair;

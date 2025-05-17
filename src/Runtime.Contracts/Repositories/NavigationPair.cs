@@ -1,3 +1,4 @@
+using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -9,9 +10,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public record NavigationPair
 {
     /// <summary>
-    /// Gets the navigation pair used to further traverse the object graph.
+    /// Gets the navigation pairs used to further traverse the object graph.
     /// </summary>
-    public NavigationPair? InnerNavigationPair { get; internal set; }
+    public List<NavigationPair> InnerNavigationPairs { get;  }
 
     /// <summary>
     /// Gets the association role id.
@@ -42,7 +43,7 @@ public record NavigationPair
         CkRoleId = ckRoleId;
         Direction = direction;
         TargetCkTypeId = targetCkTypeId;
-        InnerNavigationPair = null;
+        InnerNavigationPairs = new List<NavigationPair>();
     }
 
     /// <summary>
@@ -51,15 +52,47 @@ public record NavigationPair
     /// <param name="ckRoleId">Association role id</param>
     /// <param name="direction">Direction of the association</param>
     /// <param name="targetCkTypeId">Target construction kit type id</param>
-    /// <param name="innerNavigationPair">Navigation pair used to further traverse the object graph</param>
+    /// <param name="innerNavigationPairs">Navigation pairs used to further traverse the object graph</param>
     public NavigationPair(
         CkId<CkAssociationRoleId> ckRoleId,
         GraphDirections direction,
         CkId<CkTypeId> targetCkTypeId,
-        NavigationPair? innerNavigationPair)
+        IEnumerable<NavigationPair> innerNavigationPairs)
      : this(ckRoleId, direction, targetCkTypeId)
     {
-        InnerNavigationPair = innerNavigationPair;
+        InnerNavigationPairs = new List<NavigationPair>(innerNavigationPairs);
+    }
+
+    /// <summary>
+    /// Merges the given <paramref name="other" /> navigation pair into this one by adding the inner navigation pairs of the other navigation pair to this one.
+    /// </summary>
+    /// <param name="other">The other navigation pair to merge</param>
+    public void Merge(NavigationPair other)
+    {
+        ArgumentValidation.Validate(nameof(other), other);
+
+        if (other.CkRoleId != CkRoleId || other.Direction != Direction || other.TargetCkTypeId != TargetCkTypeId)
+        {
+            throw new InvalidOperationException("Cannot merge navigation pairs with different properties.");
+        }
+
+        foreach (var otherInnerNavigationPair in other.InnerNavigationPairs)
+        {
+            var innerNavigationPair = InnerNavigationPairs.SingleOrDefault(x =>
+                x.CkRoleId == otherInnerNavigationPair.CkRoleId && x.Direction == otherInnerNavigationPair.Direction &&
+                x.TargetCkTypeId == otherInnerNavigationPair.TargetCkTypeId);
+
+            if (innerNavigationPair == null)
+            {
+                InnerNavigationPairs.Add(otherInnerNavigationPair);
+            }
+            else
+            {
+                innerNavigationPair.Merge(otherInnerNavigationPair);
+            }
+        }
+
+
     }
 }
 

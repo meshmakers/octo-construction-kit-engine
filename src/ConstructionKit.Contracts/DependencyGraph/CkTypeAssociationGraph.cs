@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
@@ -8,6 +9,10 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 /// <summary>
 ///     Represents an association assigned to a type in the graph model.
 /// </summary>
+[DebuggerDisplay("CkRoleId = {" + nameof(CkRoleId) + "}, NavigationPropertyName = {"
+                 + nameof(NavigationPropertyName) + "}, Multiplicity = {"
+                 + nameof(Multiplicity) + "}, TargetCkTypeId = {"
+                 + nameof(TargetCkTypeId) + "}")]
 public class CkTypeAssociationGraph
 {
     /// <summary>

@@ -32,7 +32,7 @@ public class NavigationEnd : RtTypeWithAttributes
     /// <summary>
     /// Gets or sets the target construction kit type id
     /// </summary>
-    public required IEnumerable<RtEntity> Targets { get; set; }
+    public required IEnumerable<RtEntityGraphItem> Targets { get; set; }
 
     protected override string GetLocation()
     {

@@ -249,7 +249,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.Parse("68259915225146801209c9f1"), d2)        {
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.Parse("68259915225146801209c9f1"), d2)        {
                     RtWellKnownName = "ExpectedWellknownName",
                     RtVersion = 867,
                     RtCreationDateTime = new DateTime(2022, 10, 9, 8, 7, 6),
@@ -512,7 +512,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationId = OctoObjectId.GenerateNewId(),
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };
@@ -555,7 +555,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
@@ -597,7 +597,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
@@ -638,7 +638,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
@@ -679,7 +679,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
@@ -982,7 +982,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationId = OctoObjectId.GenerateNewId(),
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };
@@ -1023,7 +1023,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
                 AssociationId = OctoObjectId.GenerateNewId(),
                 AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
                 TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };

@@ -1,5 +1,6 @@
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 
@@ -7,7 +8,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 /// Pair of rt association roles id and direction.
 /// </summary>
 // ReSharper disable once ClassNeverInstantiated.Global
-public record NavigationPair
+public record NavigationPair : FieldFilterCriteria
 {
     /// <summary>
     /// Gets the navigation pairs used to further traverse the object graph.
@@ -30,16 +31,33 @@ public record NavigationPair
     public CkId<CkTypeId> TargetCkTypeId { get; }
 
     /// <summary>
+    /// Gets the path terms to the navigation pair.
+    /// </summary>
+    public IEnumerable<PathTerm> PathTerms { get;  }
+
+    /// <summary>
+    /// Gets the sub path terms of the navigation pair. This property lists
+    /// all sub paths of the navigation pair. The sub path terms are used to
+    /// </summary>
+    public IEnumerable<IEnumerable<PathTerm>> SubPathTerms { get; private set; }
+
+    /// <summary>
     ///     Creates a new <see cref="NavigationPair" /> from the given <paramref name="ckRoleId" />, <paramref name="direction" />, and <paramref name="targetCkTypeId" />.
     /// </summary>
+    /// <param name="pathTerms">Path terms to the navigation pair</param>
+    /// <param name="subPathTerms">Sub path terms to the navigation pair</param>
     /// <param name="ckRoleId">Association role id</param>
     /// <param name="direction">Direction of the association</param>
     /// <param name="targetCkTypeId">Target construction kit type id</param>
     public NavigationPair(
+        IEnumerable<PathTerm> pathTerms,
+        IEnumerable<IEnumerable<PathTerm>> subPathTerms,
         CkId<CkAssociationRoleId> ckRoleId,
         GraphDirections direction,
         CkId<CkTypeId> targetCkTypeId)
     {
+        PathTerms = pathTerms;
+        SubPathTerms = subPathTerms;
         CkRoleId = ckRoleId;
         Direction = direction;
         TargetCkTypeId = targetCkTypeId;
@@ -49,16 +67,20 @@ public record NavigationPair
     /// <summary>
     ///     Creates a new <see cref="NavigationPair" /> from the given <paramref name="ckRoleId" />, <paramref name="direction" />, and <paramref name="targetCkTypeId" />.
     /// </summary>
+    /// <param name="pathTerms">Path terms to the navigation pair</param>
+    /// <param name="subPathTerms">Sub path terms to the navigation pair</param>
     /// <param name="ckRoleId">Association role id</param>
     /// <param name="direction">Direction of the association</param>
     /// <param name="targetCkTypeId">Target construction kit type id</param>
     /// <param name="innerNavigationPairs">Navigation pairs used to further traverse the object graph</param>
     public NavigationPair(
+        IEnumerable<PathTerm> pathTerms,
+        IEnumerable<IEnumerable<PathTerm>> subPathTerms,
         CkId<CkAssociationRoleId> ckRoleId,
         GraphDirections direction,
         CkId<CkTypeId> targetCkTypeId,
         IEnumerable<NavigationPair> innerNavigationPairs)
-     : this(ckRoleId, direction, targetCkTypeId)
+     : this(pathTerms, subPathTerms, ckRoleId, direction, targetCkTypeId)
     {
         InnerNavigationPairs = new List<NavigationPair>(innerNavigationPairs);
     }
@@ -92,6 +114,8 @@ public record NavigationPair
             }
         }
 
+
+        SubPathTerms = SubPathTerms.Union(other.SubPathTerms);
 
     }
 }

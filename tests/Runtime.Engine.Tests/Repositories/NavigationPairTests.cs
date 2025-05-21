@@ -8,19 +8,25 @@ public class NavigationPairTests
     [Fact]
     public void Merge_Same_OK()
     {
-        var navigationPair1 = new NavigationPair("System/ParentChild", GraphDirections.Outbound, "Test/Zone",
+        var navigationPair1 = new NavigationPair([], [[]], "System/ParentChild",
+            GraphDirections.Outbound,
+            "Test/Zone",
             new List<NavigationPair>
             {
-                new("System/ParentChild", GraphDirections.Outbound, "Test/District"),
-                new("Test/Demo", GraphDirections.Outbound, "Test/Item")
+                new([], [[]], "System/ParentChild", GraphDirections.Outbound,
+                    "Test/District"),
+                new([], [[]], "Test/Demo", GraphDirections.Outbound, "Test/Item")
             }
         );
 
-        var navigationPair2 = new NavigationPair("System/ParentChild", GraphDirections.Outbound, "Test/Zone",
+        var navigationPair2 = new NavigationPair([], [[]], "System/ParentChild",
+            GraphDirections.Outbound,
+            "Test/Zone",
             new List<NavigationPair>
             {
-                new("System/ParentChild", GraphDirections.Outbound, "Test/District"),
-                new("Test/Demo", GraphDirections.Outbound, "Test/Item")
+                new([], [[]], "System/ParentChild", GraphDirections.Outbound,
+                    "Test/District"),
+                new([], [[]], "Test/Demo", GraphDirections.Outbound, "Test/Item")
             }
         );
 
@@ -41,19 +47,23 @@ public class NavigationPairTests
     [Fact]
     public void Merge_Different_TargetTypes_OK()
     {
-        var navigationPair1 = new NavigationPair("System/ParentChild", GraphDirections.Outbound, "Test/Zone",
+        var navigationPair1 = new NavigationPair([], [[]], "System/ParentChild",
+            GraphDirections.Outbound, "Test/Zone",
             new List<NavigationPair>
             {
-                new("System/ParentChild", GraphDirections.Outbound, "Test/District"),
-                new("Test/Demo", GraphDirections.Outbound, "Test/Item")
+                new([], [[]], "System/ParentChild", GraphDirections.Outbound,
+                    "Test/District"),
+                new([], [[]], "Test/Demo", GraphDirections.Outbound, "Test/Item")
             }
         );
 
-        var navigationPair2 = new NavigationPair("System/ParentChild", GraphDirections.Outbound, "Test/Zone",
+        var navigationPair2 = new NavigationPair([], [[]], "System/ParentChild",
+            GraphDirections.Outbound, "Test/Zone",
             new List<NavigationPair>
             {
-                new("System/ParentChild", GraphDirections.Outbound, "Test/District"),
-                new("Test/Demo", GraphDirections.Outbound, "Test/Item2")
+                new([], [[]], "System/ParentChild", GraphDirections.Outbound,
+                    "Test/District"),
+                new([], [[]], "Test/Demo", GraphDirections.Outbound, "Test/Item2")
             }
         );
 

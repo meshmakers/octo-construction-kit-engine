@@ -3,7 +3,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 /// <summary>
 /// Represents a collection of field filters for a query.
 /// </summary>
-public class FieldFilterCriteria
+public record FieldFilterCriteria
 {
     /// <summary>
     /// Creates a new instance of <see cref="FieldFilterCriteria" />
@@ -16,7 +16,7 @@ public class FieldFilterCriteria
     /// <summary>
     ///     Represents field filters for specific attributes with different comparison operators.
     /// </summary>
-    public ICollection<FieldFilter>? FieldFilters { get; internal set; }
+    public ICollection<FieldFilter>? FieldFilters { get; private set; }
     
     /// <summary>
     ///     Adds a field filter to the query.

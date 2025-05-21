@@ -5,7 +5,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 /// <summary>
 ///     Represents a data query operation.
 /// </summary>
-public class DataQueryOperation : FieldFilterCriteria
+public record DataQueryOperation : FieldFilterCriteria
 {
     /// <summary>
     ///     Constructor

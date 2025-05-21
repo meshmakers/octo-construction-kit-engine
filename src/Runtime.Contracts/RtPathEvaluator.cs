@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Text;
 using System.Text.RegularExpressions;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -15,13 +17,29 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 /// </summary>
 public static class RtPathEvaluator
 {
+    [DebuggerDisplay("Term = {Term} (Locator Count = {Locators.Count})")]
     private record PathTuple(PathTerm? Term, List<PathLocator> Locators);
 
-    private record PathLocator(
-        RtTypeWithAttributes RtTypeWithAttributes,
-        CkTypeAttributeGraph? CkTypeAttributeGraph,
-        int? Index,
-        object? Value);
+    [DebuggerDisplay(
+        "Entity = {RtTypeWithAttributes} (Attribute = {CkTypeAttributeGraph}): Index = {Index}, Value = {Value}")]
+    private record PathLocator
+    {
+        public PathLocator(RtTypeWithAttributes? RtTypeWithAttributes,
+            CkTypeAttributeGraph? CkTypeAttributeGraph,
+            int? Index,
+            object? Value)
+        {
+            this.RtTypeWithAttributes = RtTypeWithAttributes;
+            this.CkTypeAttributeGraph = CkTypeAttributeGraph;
+            this.Index = Index;
+            this.Value = Value;
+        }
+
+        public RtTypeWithAttributes? RtTypeWithAttributes { get; set; }
+        public CkTypeAttributeGraph? CkTypeAttributeGraph { get; init; }
+        public int? Index { get; init; }
+        public object? Value { get; set; }
+    }
 
     private const string PatternString =
         @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->]+)(?=\.[^.\[\]\->]+->)  
@@ -48,6 +66,40 @@ public static class RtPathEvaluator
     // It checks that the path expression does not contain any invalid characters
     private static readonly Regex MatchRegex =
         new(MatchPatternString, RegexOptions.Compiled | RegexOptions.IgnorePatternWhitespace);
+
+    /// <summary>
+    /// Gets the path as a string from a list of path terms
+    /// </summary>
+    /// <param name="pathTerms">List of path terms</param>
+    /// <returns>The path as a string</returns>
+    public static string GetPath(IEnumerable<PathTerm> pathTerms)
+    {
+        StringBuilder sb = new();
+
+        PathType? lastPathType = null;
+        foreach (var pathTerm in pathTerms)
+        {
+            if (lastPathType != null)
+            {
+                sb.Append(lastPathType != PathType.TargetCkTypeId ? "." : "->");
+            }
+
+            switch (pathTerm.Type)
+            {
+                case PathType.ArrayIndex:
+                    sb.Append($"[{pathTerm.Value}]");
+                    break;
+                default:
+                    sb.Append(pathTerm.Value.ToCamelCase());
+                    break;
+            }
+
+            lastPathType = pathTerm.Type;
+        }
+
+
+        return sb.ToString();
+    }
 
 
     /// <summary>
@@ -260,7 +312,11 @@ public static class RtPathEvaluator
                     .First(t => t.GetTypeName() == targetTypeProperty.Value);
                 ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
 
-                var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Inbound,
+                var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
+                pathTerms.Add(targetTypeProperty);
+                var roleIdDirectionPair = new NavigationPair(pathTerms,
+                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId,
+                    GraphDirections.Inbound,
                     realTargetCkTypeId);
 
                 if (currentNavigationPair != null)
@@ -269,7 +325,6 @@ public static class RtPathEvaluator
                 }
 
                 currentNavigationPair = roleIdDirectionPair;
-
             }
 
             foreach (var association in outAssociations)
@@ -279,7 +334,11 @@ public static class RtPathEvaluator
                     .First(t => t.GetTypeName() == targetTypeProperty.Value);
                 ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
 
-                var roleIdDirectionPair = new NavigationPair(association.CkRoleId, GraphDirections.Outbound,
+                var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
+                pathTerms.Add(targetTypeProperty);
+                var roleIdDirectionPair = new NavigationPair(pathTerms,
+                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId,
+                    GraphDirections.Outbound,
                     realTargetCkTypeId);
 
                 if (currentNavigationPair != null)
@@ -323,10 +382,62 @@ public static class RtPathEvaluator
     {
         var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens);
 
+        if (setValue != null)
+        {
+            RtRecord? lastRecord = null;
+            foreach (var tuple in evaluatedPath)
+            {
+                if (tuple.Term?.Type == PathType.Attribute)
+                {
+                    foreach (var tupleLocator in tuple.Locators)
+                    {
+                        tupleLocator.RtTypeWithAttributes ??= lastRecord;
+
+                        if (tupleLocator.Value == null && tupleLocator.CkTypeAttributeGraph != null
+                                                       && tupleLocator.CkTypeAttributeGraph.ValueCkRecordId != null
+                                                       && tupleLocator.CkTypeAttributeGraph?.ValueType ==
+                                                       AttributeValueTypesDto.Record)
+                        {
+                            if (tupleLocator.RtTypeWithAttributes == null)
+                            {
+                                throw InvalidPathException.PathNotSettableBecauseNull(tokens);
+                            }
+
+                            lastRecord = new RtRecord
+                            {
+                                CkRecordId = tupleLocator.CkTypeAttributeGraph.ValueCkRecordId,
+                            };
+                            tupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                                tupleLocator.CkTypeAttributeGraph.AttributeName, AttributeValueTypesDto.Record,
+                                lastRecord);
+                            tupleLocator.Value = lastRecord;
+                        }
+                    }
+                }
+            }
+        }
+
         var pathTuple = evaluatedPath.Last();
+
+        if (pathTuple.Locators.Count == 0)
+        {
+            throw InvalidPathException.PathNotSettable(pathTuple.Term, tokens);
+        }
 
         foreach (var pathTupleLocator in pathTuple.Locators)
         {
+            if (pathTupleLocator.RtTypeWithAttributes == null)
+            {
+                // If the value is null and the object is null, we do nothing (a record does not exist but also
+                // is not needed to be created)
+                if (setValue == null)
+                {
+                    return;
+                }
+
+                throw InvalidPathException.PathNotSettableBecauseNull(tokens);
+            }
+
             if (pathTuple.Term == null)
             {
                 throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes, tokens);
@@ -389,12 +500,12 @@ public static class RtPathEvaluator
     }
 
     private static List<PathTuple> MapPath(ICkCacheService ckCacheService, string tenantId,
-        RtTypeWithAttributes rtTypeWithAttributes2,
+        RtTypeWithAttributes rtTypeWithAttributes,
         List<PathTerm> tokens)
     {
         // This list contains the current state of path evaluation (transformation from path to object structure)
         var evaluatedPath = new List<PathTuple>([
-            new PathTuple(null, [new PathLocator(rtTypeWithAttributes2, null, null, rtTypeWithAttributes2)])
+            new PathTuple(null, [new PathLocator(rtTypeWithAttributes, null, null, rtTypeWithAttributes)])
         ]);
 
         // We evaluate the path terms to find the target attribute
@@ -417,7 +528,43 @@ public static class RtPathEvaluator
 
                         if (navigationEnds.Count == 0)
                         {
-                            throw InvalidPathException.NavigationPropertyNotFound(tokens, token);
+                            if (rtEntityGraphItem.CkTypeId != null)
+                            {
+                                var ckTypeGraph = ckCacheService.GetCkType(tenantId, rtEntityGraphItem.CkTypeId);
+                                if (ckTypeGraph == null)
+                                {
+                                    throw InvalidPathException.CkTypeIdNotFound(tenantId, rtEntityGraphItem.CkTypeId);
+                                }
+
+                                var ckTypeAssociationGraphs = ckTypeGraph.Associations.Out.All
+                                    .Where(x => x.NavigationPropertyName == token.Value.ToPascalCase())
+                                    .ToList();
+                                ckTypeAssociationGraphs.AddRange(ckTypeGraph.Associations.In.All
+                                    .Where(x => x.NavigationPropertyName == token.Value.ToPascalCase()));
+
+                                if (ckTypeAssociationGraphs.Count == 0)
+                                {
+                                    throw InvalidPathException.NavigationPropertyNotFound(tokens, token);
+                                }
+
+                                foreach (var ckTypeAssociationGraph in ckTypeAssociationGraphs)
+                                {
+                                    navigationEnds.Add(new NavigationEnd
+                                    {
+                                        AssociationRoleId = ckTypeAssociationGraph.CkRoleId,
+                                        AssociationId = OctoObjectId.Empty,
+                                        NavigationPropertyName = ckTypeAssociationGraph.NavigationPropertyName,
+                                        TargetCkTypeId = ckTypeAssociationGraph.TargetCkTypeId,
+                                        Targets = new List<RtEntityGraphItem>()
+                                    });
+                                }
+
+                                rtEntityGraphItem.Associations.AddRange(navigationEnds);
+                            }
+                            else
+                            {
+                                throw InvalidPathException.NavigationPropertyNotFound(tokens, token);
+                            }
                         }
 
                         newPathLocators.Add(new PathLocator(locator.RtTypeWithAttributes, null,
@@ -436,7 +583,9 @@ public static class RtPathEvaluator
                     }
 
                     var filteredNavigationEnds = navigationEnds
-                        .Where(ne => ne.TargetCkTypeId.GetTypeName() == token.Value).ToList();
+                        .Where(ne =>
+                            ckCacheService.GetCkType(tenantId, ne.TargetCkTypeId).GetAllDerivedTypes(true)
+                                .Select(t => t.GetTypeName()).Contains(token.Value)).ToList();
 
                     if (filteredNavigationEnds.Count == 0)
                     {
@@ -446,6 +595,8 @@ public static class RtPathEvaluator
                     if (filteredNavigationEnds.Count == 1)
                     {
                         var navigationEnd = navigationEnds.First();
+                        navigationEnd.TargetCkTypeId = ckCacheService.GetCkType(tenantId, navigationEnd.TargetCkTypeId)
+                            .GetAllDerivedTypes(true).Single(t => t.GetTypeName() == token.Value);
                         if (navigationEnd.Targets.Count() == 1)
                         {
                             newPathLocators.Add(new PathLocator(navigationEnd.Targets.First(), null,
@@ -473,8 +624,21 @@ public static class RtPathEvaluator
                 {
                     if (locator.Value == null)
                     {
-                        newPathLocators.Add(
-                            locator with { Index = null, Value = null });
+                        if (locator.CkTypeAttributeGraph?.ValueCkRecordId != null &&
+                            ckCacheService.TryGetCkRecord(tenantId, locator.CkTypeAttributeGraph.ValueCkRecordId,
+                                // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                out var ckRecordGraph) && ckRecordGraph != null)
+                        {
+                            if (ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                    out var ckRecordAttributeGraph))
+                            {
+                                newPathLocators.Add(new PathLocator(null,
+                                    ckRecordAttributeGraph, null, null));
+                                continue;
+                            }
+                        }
+
+                        newPathLocators.Add(new(null, null, null, null));
                         continue;
                     }
 

@@ -45,13 +45,12 @@ public class CkTypeQueryColumn
     /// <param name="path">Path to the column within a type query.</param>
     /// <param name="accessPathList">Access paths to the column as a list of single properties.</param>
     /// <param name="isArray">Whether the column is an array.</param>
-    /// <param name="ckRecordId">The enum id of the column if the value type is a record.</param>
-    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, bool isArray, CkId<CkRecordId> ckRecordId)
+    /// <param name="valueType">Type of the column.</param>
+    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, bool isArray, AttributeValueTypesDto valueType)
     {
         Path = path;
         AccessPathList = accessPathList;
         ValueType = isArray ? AttributeValueTypesDto.RecordArray : AttributeValueTypesDto.Record;
-        CkRecordId = ckRecordId;
     }
 
     /// <summary>
@@ -78,9 +77,4 @@ public class CkTypeQueryColumn
     /// Returns the enum id of the column if the value type is an enum.
     /// </summary>
     public CkId<CkEnumId>? CkEnumId  { get; }
-
-    /// <summary>
-    /// Returns the record id of the column if the value type is a record.
-    /// </summary>
-    public CkId<CkRecordId>? CkRecordId  { get; }
 }

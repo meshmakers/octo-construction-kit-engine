@@ -40,29 +40,29 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException("Empty paths are not allowed.");
     }
 
-    internal static Exception InvalidNavigationPropertyToken(RtTypeWithAttributes currentTypeWithAttributes, PathTerm token)
+    internal static Exception InvalidNavigationPropertyToken(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm token)
     {
-        return new InvalidPathException($"Invalid navigation property token '{token.Value}' for runtime type '{currentTypeWithAttributes}'.");
+        return new InvalidPathException($"Invalid navigation property token '{token.Value}' for runtime type '{rtTypeWithAttributes}'.");
     }
 
-    internal static Exception InvalidArrayIndexToken(RtTypeWithAttributes locatorRtTypeWithAttributes, PathTerm token)
+    internal static Exception InvalidArrayIndexToken(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm token)
     {
-        return new InvalidPathException($"Invalid array index token '{token.Value}' for runtime type '{locatorRtTypeWithAttributes}'.");
+        return new InvalidPathException($"Invalid array index token '{token.Value}' for runtime type '{rtTypeWithAttributes}'.");
     }
 
-    internal static Exception InvalidArrayIndex(RtTypeWithAttributes locatorRtTypeWithAttributes, PathTerm token)
+    internal static Exception InvalidArrayIndex(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm token)
     {
-        return new InvalidPathException($"Invalid array index '{token.Value}' for runtime type '{locatorRtTypeWithAttributes}'.");
+        return new InvalidPathException($"Invalid array index '{token.Value}' for runtime type '{rtTypeWithAttributes}'.");
     }
 
-    internal static Exception InvalidArrayIndexData(RtTypeWithAttributes locatorRtTypeWithAttributes, PathTerm token)
+    internal static Exception InvalidArrayIndexData(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm token)
     {
-        return new InvalidPathException($"Array index does not point to records for token '{token.Value}' of runtime type '{locatorRtTypeWithAttributes}'.");
+        return new InvalidPathException($"Array index does not point to records for token '{token.Value}' of runtime type '{rtTypeWithAttributes}'.");
     }
 
-    internal static Exception MultipleNavigationEndsUnsupported(RtTypeWithAttributes locatorRtTypeWithAttributes, PathTerm token)
+    internal static Exception MultipleNavigationEndsUnsupported(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm token)
     {
-        return new InvalidPathException($"Multiple navigation ends are not supported for token '{token.Value}' of runtime type '{locatorRtTypeWithAttributes}'.");
+        return new InvalidPathException($"Multiple navigation ends are not supported for token '{token.Value}' of runtime type '{rtTypeWithAttributes}'.");
     }
 
     internal static Exception PathNotSettable(RtTypeWithAttributes rtTypeWithAttributes, PathTerm? pathTupleTerm)
@@ -78,7 +78,7 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException($"Path '{path}' is not settable for runtime type '{rtTypeWithAttributes}'.");
     }
 
-    internal static Exception CannotGetAttributeValue(RtTypeWithAttributes rtTypeWithAttributes, PathTerm pathTupleTerm)
+    internal static Exception CannotGetAttributeValue(RtTypeWithAttributes? rtTypeWithAttributes, PathTerm pathTupleTerm)
     {
         return new InvalidPathException($"Cannot get attribute value '{pathTupleTerm.Value}' for runtime type '{rtTypeWithAttributes}'.");
     }
@@ -121,5 +121,15 @@ public class InvalidPathException : PersistenceException
     internal static Exception TargetCkTypeIdNotFound(List<PathTerm> tokens, PathTerm token)
     {
         return new InvalidPathException($"TargetCkTypeId not found for token '{token.Value}' in path '{string.Join(".", tokens.Select(t => t.Value))}'.");
+    }
+
+    internal static Exception PathNotSettableBecauseNull(List<PathTerm> tokens)
+    {
+        return new InvalidPathException($"Path '{string.Join(".", tokens.Select(t => t.Value))}' is not settable because it is null.");
+    }
+
+    internal static Exception PathNotSettable(PathTerm? pathTupleTerm, List<PathTerm> tokens)
+    {
+        return new InvalidPathException($"Path '{pathTupleTerm?.Value}' is not settable for runtime type '{string.Join(".", tokens.Select(t => t.Value))}'.");
     }
 }

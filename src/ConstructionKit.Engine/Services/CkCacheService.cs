@@ -238,13 +238,13 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
 
-        return ckCache.GetCkTypeQueryColumnPaths(ckTypeId);
+        return ckCache.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
     }
 }

@@ -286,15 +286,16 @@ internal class CkCache : IDisposable
     /// Get the query column paths for a CK type.
     /// </summary>
     /// <param name="ckTypeId">The CK type ID</param>
+    /// <param name="ignoreNavigationProperties">Whether to ignore navigation properties</param>
     /// <returns></returns>
     /// <exception cref="CkCacheException">Thrown if the cache is not loaded</exception>
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
     {
         if (_modelGraph == null)
         {
             throw CkCacheException.CacheUnloaded(TenantId);
         }
 
-        return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId);
+        return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
     }
 }

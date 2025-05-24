@@ -697,6 +697,7 @@ public static class RtPathEvaluator
                     if (locator.Value == null)
                     {
                         newPathLocators.Add(new PathLocator(locator.RtTypeWithAttributes, null, null, null));
+                        continue;
                     }
 
                     var indexStr = token.Value;

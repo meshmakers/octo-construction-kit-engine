@@ -137,5 +137,5 @@ public interface ICkModelGraph
     ///     Returns a list of all query column attribute paths for the given construction kit type
     /// </summary>
     /// <returns></returns>
-    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId);
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties);
 }

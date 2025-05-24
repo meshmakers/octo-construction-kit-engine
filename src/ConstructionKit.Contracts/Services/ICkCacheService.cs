@@ -171,5 +171,6 @@ public interface ICkCacheService
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="ckTypeId">The construction kit type id</param>
-    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId);
+    /// <param name="ignoreNavigationProperties">When true, the navigation properties are ignored</param>
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false);
 }

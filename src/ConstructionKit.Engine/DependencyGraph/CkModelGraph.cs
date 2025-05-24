@@ -331,9 +331,9 @@ public class CkModelGraph : ICkModelGraph
     ///     Returns a list of all query column attribute paths for the given construction kit type
     /// </summary>
     /// <returns></returns>
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
     {
         var collector = new CkTypeQueryColumnCollector(this);
-        return collector.GetColumns(ckTypeId);
+        return collector.GetColumns(ckTypeId, ignoreNavigationProperties);
     }
 }

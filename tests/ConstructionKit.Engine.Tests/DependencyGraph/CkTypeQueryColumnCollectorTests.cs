@@ -45,7 +45,7 @@ public class CkTypeQueryColumnCollectorTests
 
         var ckTypeQueryColumnCollector = new CkTypeQueryColumnCollector(modelGraph);
 
-        var result = ckTypeQueryColumnCollector.GetColumns("sample1/Demo1");
+        var result = ckTypeQueryColumnCollector.GetColumns("sample1/Demo1", true);
         Assert.Equal<object>(
             ["a", "b", "c", "rtId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
             result.Select(x => x.Path));

@@ -47,9 +47,9 @@ public class CkTypeQueryColumnCollectorTests
 
         var result = ckTypeQueryColumnCollector.GetColumns("sample1/Demo1", true);
         Assert.Equal<object>(
-            ["a", "b", "c", "rtId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
+            ["a", "b", "c", "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
             result.Select(x => x.Path));
-        Assert.Equal<object>(["a", "b", "c", "RtId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
+        Assert.Equal<object>(["a", "b", "c", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }
 
@@ -67,12 +67,12 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal<object>(
         [
             "myAttributeA", "myAttributeB", "myAttributeC", "myRecord.myAttributeA", "myRecord.myAttributeB",
-            "myRecord.myAttributeC", "rtId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"
+            "myRecord.myAttributeC", "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"
         ], result.Select(x => x.Path));
         Assert.Equal<object>(
         [
             "MyAttributeA", "MyAttributeB", "MyAttributeC", "MyRecord", "MyAttributeA", "MyRecord", "MyAttributeB",
-            "MyRecord", "MyAttributeC", "RtId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
+            "MyRecord", "MyAttributeC", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"
         ], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }

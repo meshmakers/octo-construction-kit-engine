@@ -241,20 +241,28 @@ public static class RtPathEvaluator
                 }
 
                 var innerCandidate = candidate.InnerNavigationPairs.FirstOrDefault();
-                var tmpInnerCandidate = innerCandidate;
-                while (tmpInnerCandidate != null)
+                if (innerCandidate != null)
                 {
-                    navigationPair = navigationPair.InnerNavigationPairs.FirstOrDefault(inp =>
-                        inp.CkRoleId == tmpInnerCandidate.CkRoleId &&
-                        inp.TargetCkTypeId == tmpInnerCandidate.TargetCkTypeId);
-                    if (navigationPair == null)
+                    var tmpInnerCandidate = innerCandidate;
+                    while (tmpInnerCandidate != null)
                     {
-                        throw InvalidPathException.CannotMergeFieldFilterToNavigationPair(
-                            fieldFilter.AttributePath, ckTypeId, tmpInnerCandidate.CkRoleId, tmpInnerCandidate.TargetCkTypeId);
-                    }
+                        navigationPair = navigationPair.InnerNavigationPairs.FirstOrDefault(inp =>
+                            inp.CkRoleId == tmpInnerCandidate.CkRoleId &&
+                            inp.TargetCkTypeId == tmpInnerCandidate.TargetCkTypeId);
+                        if (navigationPair == null)
+                        {
+                            throw InvalidPathException.CannotMergeFieldFilterToNavigationPair(
+                                fieldFilter.AttributePath, ckTypeId, tmpInnerCandidate.CkRoleId,
+                                tmpInnerCandidate.TargetCkTypeId);
+                        }
 
-                    innerCandidate = tmpInnerCandidate;
-                    tmpInnerCandidate = tmpInnerCandidate.InnerNavigationPairs.FirstOrDefault();
+                        innerCandidate = tmpInnerCandidate;
+                        tmpInnerCandidate = tmpInnerCandidate.InnerNavigationPairs.FirstOrDefault();
+                    }
+                }
+                else
+                {
+                    innerCandidate = candidate;
                 }
 
                 if (innerCandidate == null)

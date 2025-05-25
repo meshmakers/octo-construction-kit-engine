@@ -520,6 +520,7 @@ public static class RtPathEvaluator
             }
 
             if (pathTuple.Term.Value == nameof(RtEntity.RtId) ||
+                pathTuple.Term.Value == nameof(RtEntity.CkTypeId) ||
                 pathTuple.Term.Value == nameof(RtEntity.RtWellKnownName) ||
                 pathTuple.Term.Value == nameof(RtEntity.RtVersion) ||
                 pathTuple.Term.Value == nameof(RtEntity.RtCreationDateTime) ||
@@ -724,6 +725,7 @@ public static class RtPathEvaluator
                     }
 
                     if (token.Value.ToPascalCase() == nameof(RtEntity.RtId) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.CkTypeId) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtWellKnownName) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtVersion) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtCreationDateTime) ||

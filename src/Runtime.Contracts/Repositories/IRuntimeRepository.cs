@@ -169,7 +169,7 @@ public interface IRuntimeRepository
     /// <param name="take"></param>
     /// <returns></returns>
     Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs,
+        DataQueryOperation dataQueryOperation, ICollection<NavigationPair> roleIdDirectionPairs,
         int? skip = null, int? take = null);
 
     /// <summary>

@@ -39,7 +39,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     }
 
     public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
-        IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
+        ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
     {
         throw new NotImplementedException();
     }

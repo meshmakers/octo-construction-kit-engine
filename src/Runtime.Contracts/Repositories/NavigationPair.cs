@@ -13,7 +13,7 @@ public record NavigationPair : FieldFilterCriteria
     /// <summary>
     /// Gets the navigation pairs used to further traverse the object graph.
     /// </summary>
-    public List<NavigationPair> InnerNavigationPairs { get;  }
+    public List<NavigationPair> InnerNavigationPairs { get; }
 
     /// <summary>
     /// Gets the association role id.
@@ -33,7 +33,7 @@ public record NavigationPair : FieldFilterCriteria
     /// <summary>
     /// Gets the path terms to the navigation pair.
     /// </summary>
-    public IEnumerable<PathTerm> PathTerms { get;  }
+    public IEnumerable<PathTerm> PathTerms { get; }
 
     /// <summary>
     /// Gets the sub path terms of the navigation pair. This property lists
@@ -80,7 +80,7 @@ public record NavigationPair : FieldFilterCriteria
         GraphDirections direction,
         CkId<CkTypeId> targetCkTypeId,
         IEnumerable<NavigationPair> innerNavigationPairs)
-     : this(pathTerms, subPathTerms, ckRoleId, direction, targetCkTypeId)
+        : this(pathTerms, subPathTerms, ckRoleId, direction, targetCkTypeId)
     {
         InnerNavigationPairs = new List<NavigationPair>(innerNavigationPairs);
     }
@@ -116,7 +116,5 @@ public record NavigationPair : FieldFilterCriteria
 
 
         SubPathTerms = SubPathTerms.Union(other.SubPathTerms);
-
     }
 }
-

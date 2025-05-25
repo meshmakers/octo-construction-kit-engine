@@ -256,11 +256,12 @@ public static class RtPathEvaluator
     /// <param name="path">Path of attributes to be evaluated</param>
     /// <returns>If navigation is used, the corresponding navigation pair is returned</returns>
     public static NavigationPair? TokenizeAndGetNavigationPair(ICkCacheService ckCacheService, string tenantId,
-        CkId<CkTypeId> ckTypeId, string path)
+        CkId<CkTypeId> ckTypeId, IEnumerable<PathTerm> path)
     {
         NavigationPair? navigationPair = null;
         NavigationPair? currentNavigationPair = null;
-        var tokens = TokenizePath(path);
+
+        var tokens = path.ToList();
 
         // Get all combinations in tokens list with type= PathType.Navigation and PathType.TargetCkTypeId
         var combinations = new List<Tuple<PathTerm, PathTerm>>();
@@ -272,7 +273,7 @@ public static class RtPathEvaluator
                 var nextToken = tokens[i + 1];
                 if (nextToken.Type != PathType.TargetCkTypeId)
                 {
-                    throw InvalidPathException.InvalidPathTermTargetCkTypeIdMissing(path, currentToken);
+                    throw InvalidPathException.InvalidPathTermTargetCkTypeIdMissing(tokens, currentToken);
                 }
 
                 combinations.Add(Tuple.Create(tokens[i], nextToken));
@@ -302,7 +303,7 @@ public static class RtPathEvaluator
 
             if (inAssociations.Count == 0 && outAssociations.Count == 0)
             {
-                throw InvalidPathException.AssociationNotFound(path, navigationProperty, targetTypeProperty);
+                throw InvalidPathException.AssociationNotFound(tokens, navigationProperty, targetTypeProperty);
             }
 
             foreach (var association in inAssociations)
@@ -353,6 +354,21 @@ public static class RtPathEvaluator
         }
 
         return navigationPair;
+    }
+
+    /// <summary>
+    /// Tokenizes a path into a traversable navigation pair
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <returns>If navigation is used, the corresponding navigation pair is returned</returns>
+    public static NavigationPair? TokenizeAndGetNavigationPair(ICkCacheService ckCacheService, string tenantId,
+        CkId<CkTypeId> ckTypeId, string path)
+    {
+        var tokens = TokenizePath(path);
+        return TokenizeAndGetNavigationPair(ckCacheService, tenantId, ckTypeId, tokens);
     }
 
     private static object? GetValueByPath(ICkCacheService ckCacheService, string tenantId,

@@ -98,9 +98,9 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException($"Invalid runtime type '{valueRtTypeWithAttribute}' for token '{token.Value}'.");
     }
 
-    internal static Exception InvalidPathTermTargetCkTypeIdMissing(string path, PathTerm currentToken)
+    internal static Exception InvalidPathTermTargetCkTypeIdMissing(IEnumerable<PathTerm> path, PathTerm currentToken)
     {
-        return new InvalidPathException($"Invalid path term '{path}'. TargetCkTypeId is missing after '{currentToken.Value}'.");
+        return new InvalidPathException($"Invalid path term '{RtPathEvaluator.GetPath(path)}'. TargetCkTypeId is missing after '{currentToken.Value}'.");
     }
 
     internal static Exception CkTypeIdNotFound(string tenantId, CkId<CkTypeId> ckTypeId)
@@ -108,9 +108,9 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException($"CkTypeId '{ckTypeId}' not found for tenant '{tenantId}'.");
     }
 
-    internal static Exception AssociationNotFound(string path, PathTerm navigationProperty, PathTerm targetTypeProperty)
+    internal static Exception AssociationNotFound(IEnumerable<PathTerm> path, PathTerm navigationProperty, PathTerm targetTypeProperty)
     {
-        return new InvalidPathException($"Association not found for path '{path}'. Navigation property '{navigationProperty.Value}' and target type property '{targetTypeProperty.Value}' do not match.");
+        return new InvalidPathException($"Association not found for path '{RtPathEvaluator.GetPath(path)}'. Navigation property '{navigationProperty.Value}' and target type property '{targetTypeProperty.Value}' do not match.");
     }
 
     internal static Exception NavigationPropertyNotFound(List<PathTerm> tokens, PathTerm token)

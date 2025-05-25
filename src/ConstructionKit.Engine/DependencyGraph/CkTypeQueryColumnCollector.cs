@@ -17,6 +17,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string SystemAttributeRtVersion = "RtVersion";
     private const string SystemAttributeRtCreationDateTime = "RtCreationDateTime";
     private const string SystemAttributeRtChangedDateTime = "RtChangedDateTime";
+    private const string SystemAttributeCkTypeId = "CkTypeId";
 
     public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
     {
@@ -44,6 +45,9 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(),
             [new(SystemAttributeRtId, PathType.Attribute)],
+            AttributeValueTypesDto.String));
+        columns.Add(new CkTypeQueryColumn(SystemAttributeCkTypeId.ToCamelCase(),
+            [new(SystemAttributeCkTypeId, PathType.Attribute)],
             AttributeValueTypesDto.String));
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtWellKnownName.ToCamelCase(),
             [new(SystemAttributeRtWellKnownName, PathType.Attribute)],

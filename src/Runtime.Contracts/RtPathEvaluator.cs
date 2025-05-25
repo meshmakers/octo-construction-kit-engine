@@ -8,6 +8,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -208,6 +209,65 @@ public static class RtPathEvaluator
     {
         var tokens = TokenizePath(path);
         SetValueByPath(ckCacheService, tenantId, root, tokens, value);
+    }
+
+    /// <summary>
+    ///  Merges field filters into navigation pairs.
+    /// </summary>
+    /// <remarks>
+    /// Field filters are updated when a merge is successful, and the field filter is removed from the collection.
+    /// </remarks>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
+    /// <param name="navigationPairs">Navigation pairs to be merged with field filters</param>
+    /// <param name="fieldFilters">> Field filters to be merged into navigation pairs</param>
+    public static void MergeFieldFilterToNavigationPairs(ICkCacheService ckCacheService, string tenantId,
+        CkId<CkTypeId> ckTypeId, ICollection<NavigationPair> navigationPairs,
+        ICollection<FieldFilter> fieldFilters)
+    {
+        foreach (FieldFilter fieldFilter in fieldFilters.ToArray())
+        {
+            var candidate = TokenizeAndGetNavigationPair(ckCacheService, tenantId, ckTypeId,
+                fieldFilter.AttributePath);
+            if (candidate != null)
+            {
+                var navigationPair = navigationPairs.FirstOrDefault(np =>
+                    np.CkRoleId == candidate.CkRoleId && np.TargetCkTypeId == candidate.TargetCkTypeId);
+                if (navigationPair == null)
+                {
+                    throw InvalidPathException.CannotMergeFieldFilterToNavigationPair(
+                        fieldFilter.AttributePath, ckTypeId, candidate.CkRoleId, candidate.TargetCkTypeId);
+                }
+
+                var innerCandidate = candidate.InnerNavigationPairs.FirstOrDefault();
+                var tmpInnerCandidate = innerCandidate;
+                while (tmpInnerCandidate != null)
+                {
+                    navigationPair = navigationPair.InnerNavigationPairs.FirstOrDefault(inp =>
+                        inp.CkRoleId == tmpInnerCandidate.CkRoleId &&
+                        inp.TargetCkTypeId == tmpInnerCandidate.TargetCkTypeId);
+                    if (navigationPair == null)
+                    {
+                        throw InvalidPathException.CannotMergeFieldFilterToNavigationPair(
+                            fieldFilter.AttributePath, ckTypeId, tmpInnerCandidate.CkRoleId, tmpInnerCandidate.TargetCkTypeId);
+                    }
+
+                    innerCandidate = tmpInnerCandidate;
+                    tmpInnerCandidate = tmpInnerCandidate.InnerNavigationPairs.FirstOrDefault();
+                }
+
+                if (innerCandidate == null)
+                {
+                    throw InvalidPathException.CannotMergeFieldFilterToNavigationPairInvalidPath(
+                        fieldFilter.AttributePath, ckTypeId);
+                }
+
+                navigationPair.AddFieldFilter(GetPath(innerCandidate.SubPathTerms.First()),
+                    fieldFilter.Operator, fieldFilter.ComparisonValue);
+                fieldFilters.Remove(fieldFilter);
+            }
+        }
     }
 
     /// <summary>

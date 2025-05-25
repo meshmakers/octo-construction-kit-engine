@@ -176,7 +176,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session,
         CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
-        IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null);
+        ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null);
 
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session,

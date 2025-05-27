@@ -575,6 +575,56 @@ public static class RtPathEvaluator
                         pathTupleLocator.CkTypeAttributeGraph.AttributeName,
                         pathTupleLocator.CkTypeAttributeGraph.ValueType, x);
                     break;
+                case AttributeValueTypesDto.Enum:
+
+                    if (pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId == null)
+                    {
+                        throw InvalidPathException.CkEnumIdNotSet(
+                            pathTupleLocator.RtTypeWithAttributes, pathTuple.Term);
+                    }
+
+                    var ckEnumGraph =
+                        ckCacheService.GetCkEnum(tenantId, pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId);
+
+                    if (setValue is string strValue)
+                    {
+                        var enumValue = ckEnumGraph.Values.FirstOrDefault(v =>
+                            string.Compare(v.Name, strValue, StringComparison.OrdinalIgnoreCase) == 0);
+                        if (enumValue == null)
+                        {
+                            enumValue = ckEnumGraph.Values.FirstOrDefault(v =>
+                                string.Compare(v.Key.ToString(), strValue, StringComparison.OrdinalIgnoreCase) == 0);
+                        }
+
+                        if (enumValue == null)
+                        {
+                            throw InvalidPathException.EnumValueNotFound(
+                                pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, strValue);
+                        }
+
+
+                        rtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                            pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
+                        break;
+                    }
+
+                    if (setValue is int intValue)
+                    {
+                        var enumValue = ckEnumGraph.Values.FirstOrDefault(v => v.Key == intValue);
+                        if (enumValue == null)
+                        {
+                            throw InvalidPathException.EnumValueNotFound(
+                                pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, intValue.ToString());
+                        }
+
+                        rtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                            pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
+                        break;
+                    }
+
+                    throw InvalidPathException.InvalidEnumValueType(
+                        pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, setValue?.GetType().Name ?? "null");
+
                 default:
                     pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
                         pathTupleLocator.CkTypeAttributeGraph.AttributeName,
@@ -618,7 +668,8 @@ public static class RtPathEvaluator
                                 var ckTypeGraph = ckCacheService.GetCkType(tenantId, rtEntityGraphItem.CkTypeId);
                                 if (ckTypeGraph == null)
                                 {
-                                    throw InvalidPathException.CkTypeIdNotFound(tenantId, rtEntityGraphItem.CkTypeId);
+                                    throw InvalidPathException.CkTypeIdNotFound(tenantId,
+                                        rtEntityGraphItem.CkTypeId);
                                 }
 
                                 var ckTypeAssociationGraphs = ckTypeGraph.Associations.Out.All
@@ -657,14 +708,16 @@ public static class RtPathEvaluator
                     }
                     else
                     {
-                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes, token);
+                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes,
+                            token);
                     }
                 }
                 else if (token.Type == PathType.TargetCkTypeId)
                 {
                     if (locator.Value is not List<NavigationEnd> navigationEnds)
                     {
-                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes, token);
+                        throw InvalidPathException.InvalidNavigationPropertyToken(locator.RtTypeWithAttributes,
+                            token);
                     }
 
                     var filteredNavigationEnds = navigationEnds
@@ -680,7 +733,8 @@ public static class RtPathEvaluator
                     if (filteredNavigationEnds.Count == 1)
                     {
                         var navigationEnd = navigationEnds.First();
-                        navigationEnd.TargetCkTypeId = ckCacheService.GetCkType(tenantId, navigationEnd.TargetCkTypeId)
+                        navigationEnd.TargetCkTypeId = ckCacheService
+                            .GetCkType(tenantId, navigationEnd.TargetCkTypeId)
                             .GetAllDerivedTypes(true).Single(t => t.GetTypeName() == token.Value);
                         if (navigationEnd.Targets.Count() == 1)
                         {

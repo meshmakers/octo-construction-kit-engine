@@ -165,4 +165,22 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException(
             $"Cannot merge field filter '{fieldFilterAttributePath}' to navigation pair with CkTypeId '{ckTypeId}'. Ensure that the field filter is compatible with the navigation pair and that the path is valid.");
     }
+
+    internal static Exception CkEnumIdNotSet(RtTypeWithAttributes rtTypeWithAttributes, PathTerm pathTupleTerm)
+    {
+        return new InvalidPathException(
+            $"CkEnumId is not set for path '{pathTupleTerm.Value}' of runtime type '{rtTypeWithAttributes}'. Ensure that the CkEnumId is defined and set correctly.");
+    }
+
+    internal static Exception EnumValueNotFound(CkId<CkEnumId> valueCkEnumId, string strValue)
+    {
+        return new InvalidPathException(
+            $"Enum value '{strValue}' not found for CkEnumId '{valueCkEnumId}'. Ensure that the value is defined in the CkEnum.");
+    }
+
+    internal static Exception InvalidEnumValueType(CkId<CkEnumId> valueCkEnumId, string name)
+    {
+        return new InvalidPathException(
+            $"Invalid enum value type for CkEnumId '{valueCkEnumId}' with name '{name}'. Ensure that the value is of the correct type defined in the CkEnum.");
+    }
 }

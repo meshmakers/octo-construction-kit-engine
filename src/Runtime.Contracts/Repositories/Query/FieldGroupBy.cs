@@ -5,10 +5,10 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 /// </summary>
 public class FieldGroupBy
 {
-    private readonly List<string> _avgAttributeNames;
-    private readonly List<string> _countAttributeNames;
-    private readonly List<string> _maxAttributeNames;
-    private readonly List<string> _minAttributeNames;
+    private readonly List<string> _avgAttributePaths;
+    private readonly List<string> _countAttributePaths;
+    private readonly List<string> _maxAttributePaths;
+    private readonly List<string> _minAttributePaths;
 
     /// <summary>
     ///     Constructor
@@ -17,10 +17,10 @@ public class FieldGroupBy
     public FieldGroupBy(IEnumerable<string> groupByAttributeNames)
     {
         GroupByAttributeNameList = groupByAttributeNames;
-        _countAttributeNames = new List<string>();
-        _minAttributeNames = new List<string>();
-        _maxAttributeNames = new List<string>();
-        _avgAttributeNames = new List<string>();
+        _countAttributePaths = new List<string>();
+        _minAttributePaths = new List<string>();
+        _maxAttributePaths = new List<string>();
+        _avgAttributePaths = new List<string>();
     }
 
     /// <summary>
@@ -31,22 +31,22 @@ public class FieldGroupBy
     /// <summary>
     ///     Attribute names whose existence to count, NULL values are not counted.
     /// </summary>
-    public IEnumerable<string> CountAttributeNameList => _countAttributeNames;
+    public IEnumerable<string> CountAttributePathList => _countAttributePaths;
 
     /// <summary>
     ///     Attributes names whose maximum value is to be determined.
     /// </summary>
-    public IEnumerable<string> MaxValueAttributeNameList => _maxAttributeNames;
+    public IEnumerable<string> MaxValueAttributePathList => _maxAttributePaths;
 
     /// <summary>
     ///     Attributes names whose minimum value is to be determined.
     /// </summary>
-    public IEnumerable<string> MinValueAttributeNameList => _minAttributeNames;
+    public IEnumerable<string> MinValueAttributePathList => _minAttributePaths;
 
     /// <summary>
     ///     Attributes names whose average value is to be determined.
     /// </summary>
-    public IEnumerable<string> AvgAttributeNameList => _avgAttributeNames;
+    public IEnumerable<string> AvgAttributePathList => _avgAttributePaths;
 
     /// <summary>
     ///     Attributes names whose amount of non-null values is to be determined.
@@ -55,7 +55,7 @@ public class FieldGroupBy
     /// <returns></returns>
     public FieldGroupBy CountAttributeNames(params string[] attributeNames)
     {
-        _countAttributeNames.AddRange(attributeNames);
+        _countAttributePaths.AddRange(attributeNames);
         return this;
     }
 
@@ -66,7 +66,7 @@ public class FieldGroupBy
     /// <returns></returns>
     public FieldGroupBy MinAttributeNames(params string[] attributeNames)
     {
-        _minAttributeNames.AddRange(attributeNames);
+        _minAttributePaths.AddRange(attributeNames);
         return this;
     }
 
@@ -77,7 +77,7 @@ public class FieldGroupBy
     /// <returns></returns>
     public FieldGroupBy MaxAttributeNames(params string[] attributeNames)
     {
-        _maxAttributeNames.AddRange(attributeNames);
+        _maxAttributePaths.AddRange(attributeNames);
         return this;
     }
 
@@ -88,7 +88,7 @@ public class FieldGroupBy
     /// <returns></returns>
     public FieldGroupBy AvgAttributeNames(params string[] attributeNames)
     {
-        _avgAttributeNames.AddRange(attributeNames);
+        _avgAttributePaths.AddRange(attributeNames);
         return this;
     }
 }

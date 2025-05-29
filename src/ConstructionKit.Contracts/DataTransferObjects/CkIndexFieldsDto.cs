@@ -18,8 +18,8 @@ public class CkIndexFieldsDto
     public int? Weight { get; set; }
 
     /// <summary>
-    ///     A list of attribute names that are indexed.
+    ///     A list of attribute paths that are used to create the index.
     /// </summary>
     [JsonRequired]
-    public List<string> AttributeNames { get; set; } = null!;
+    public List<string> AttributePaths { get; set; } = null!;
 }

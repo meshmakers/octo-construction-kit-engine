@@ -96,11 +96,11 @@ public record DataQueryOperation : FieldFilterCriteria
     /// <summary>
     ///     Sets the attribute search filter.
     /// </summary>
-    /// <param name="attributeNames">List of attribute names for full text search</param>
+    /// <param name="attributePaths">List of attribute paths for full text search</param>
     /// <param name="searchTerm">Search term for full text search.</param>
-    public DataQueryOperation AttributeSearch(IEnumerable<string> attributeNames, object searchTerm)
+    public DataQueryOperation AttributeSearch(IEnumerable<string> attributePaths, object searchTerm)
     {
-        AttributeSearchFilter = new AttributeSearchFilter(attributeNames, searchTerm);
+        AttributeSearchFilter = new AttributeSearchFilter(attributePaths, searchTerm);
 
         return this;
     }

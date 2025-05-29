@@ -10,20 +10,20 @@ public class GroupingResult
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="groupByAttributeNames">The attribute names that were used to group the result</param>
+    /// <param name="groupByAttributePaths">The attribute names that were used to group the result</param>
     /// <param name="keys">Values of the keys that were used to group the result</param>
     /// <param name="count">Count of items in the group</param>
     /// <param name="countStatistics">Count statistics for each attribute</param>
     /// <param name="minStatistics">Min statistics for each attribute</param>
     /// <param name="maxStatistics">Max statistics for each attribute</param>
     /// <param name="avgStatistics">Average value statistics for each attribute</param>
-    public GroupingResult(IEnumerable<string> groupByAttributeNames, IEnumerable<object?> keys, long count,
+    public GroupingResult(IEnumerable<string> groupByAttributePaths, IEnumerable<object?> keys, long count,
         IEnumerable<StatisticsResult> countStatistics,
         IEnumerable<StatisticsResult> minStatistics,
         IEnumerable<StatisticsResult> maxStatistics,
         IEnumerable<StatisticsResult> avgStatistics)
     {
-        GroupByAttributeNames = groupByAttributeNames;
+        GroupByAttributePaths = groupByAttributePaths;
         Keys = keys;
         Count = count;
         CountStatistics = countStatistics;
@@ -35,7 +35,7 @@ public class GroupingResult
     /// <summary>
     ///     Attribute names that were used to group the result
     /// </summary>
-    public IEnumerable<string> GroupByAttributeNames { get; }
+    public IEnumerable<string> GroupByAttributePaths { get; }
 
     /// <summary>
     ///     Returns the values of the keys that were used to group the result

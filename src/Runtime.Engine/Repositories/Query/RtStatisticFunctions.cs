@@ -43,13 +43,13 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
                 _groupBy.GroupByAttributeNameList,
                 entityGrouping.Key.Keys,
                 entityGrouping.Count(),
-                RunStatistics(_groupBy.CountAttributeNameList,
+                RunStatistics(_groupBy.CountAttributePathList,
                     attributeName => entityGrouping.Count(x => GetValue(attributeName)(x) != null)),
-                RunStatistics(_groupBy.MinValueAttributeNameList,
+                RunStatistics(_groupBy.MinValueAttributePathList,
                     attributeName => entityGrouping.Min(x => GetValue(attributeName)(x))),
-                RunStatistics(_groupBy.MaxValueAttributeNameList,
+                RunStatistics(_groupBy.MaxValueAttributePathList,
                     attributeName => entityGrouping.Max(x => GetValue(attributeName)(x))),
-                RunStatistics(_groupBy.AvgAttributeNameList,
+                RunStatistics(_groupBy.AvgAttributePathList,
                     attributeName => entityGrouping.Average(x => (decimal?)GetValue(attributeName)(x)))
             );
             calculateGrouping.Add(grouping);
@@ -58,13 +58,13 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
         return calculateGrouping;
     }
 
-    private static List<StatisticsResult> RunStatistics(IEnumerable<string>? attributeNames,
+    private static List<StatisticsResult> RunStatistics(IEnumerable<string>? attributePaths,
         Func<string, object?> calcFunction)
     {
         var list = new List<StatisticsResult>();
-        if (attributeNames != null)
+        if (attributePaths != null)
         {
-            foreach (var attributeName in attributeNames)
+            foreach (var attributeName in attributePaths)
             {
                 list.Add(new StatisticsResult
                 {

@@ -43,18 +43,18 @@ stages:
           projects: |
             src/**/*.csproj
             !src/**/Generated*.csproj
-          arguments: '--configuration $(buildConfiguration)'
+          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
       - task: DotNetCoreCLI@2
         displayName: 'Build samples'
         inputs:
           command: 'build'
           projects:  'samples/**/*.csproj'
-          arguments: '--configuration $(buildConfiguration)'          
+          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'          
       - task: DotNetCoreCLI@2
         displayName: 'Test'
         inputs:
           command: 'test'
-          arguments: '--configuration $(buildConfiguration)'
+          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
           projects: |
             **/*Tests.csproj
             !**/*SystemTests.csproj

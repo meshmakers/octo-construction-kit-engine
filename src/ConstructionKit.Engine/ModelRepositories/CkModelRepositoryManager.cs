@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
+using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 
@@ -9,14 +10,17 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 /// </summary>
 internal class CkModelRepositoryManager : ICkModelRepositoryManager
 {
+    private readonly ILogger<CkModelRepositoryManager> _logger;
     private readonly IEnumerable<ICkModelRepository> _ckModelRepositories;
 
     /// <summary>
     ///     Creates a new instance of the <see cref="CkModelRepositoryManager" /> class.
     /// </summary>
-    /// <param name="ckModelRepositories"></param>
-    public CkModelRepositoryManager(IEnumerable<ICkModelRepository> ckModelRepositories)
+    /// <param name="logger">Logger for this class.</param>
+    /// <param name="ckModelRepositories">List of construction kit model repositories.</param>
+    public CkModelRepositoryManager(ILogger<CkModelRepositoryManager> logger, IEnumerable<ICkModelRepository> ckModelRepositories)
     {
+        _logger = logger;
         _ckModelRepositories = ckModelRepositories;
     }
 
@@ -24,12 +28,16 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
     public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
+        _logger.LogInformation("Looking up CK model with id {CkModelId} in repositories", ckModelId);
+
         foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x => x.Order))
         {
             if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
             {
                 continue;
             }
+
+            _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}", ckModelRepository.RepositoryName, ckModelId);
 
             var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);

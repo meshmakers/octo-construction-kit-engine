@@ -4,6 +4,7 @@ using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Newtonsoft.Json.Linq;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
 
@@ -61,6 +62,11 @@ public static class AttributeValueConverter
         {
             return null;
         }
+        
+        if (value is JValue { Type: JTokenType.Null })
+        {
+            return null;
+        }
 
         switch (attributeValueTypes)
         {
@@ -80,9 +86,9 @@ public static class AttributeValueConverter
                 {
                     return objectList.Select(x =>
                     {
-                        if (x is JsonElement jsonElement)
+                        if (x is JsonElement jsonElementList)
                         {
-                            return jsonElement.GetString();
+                            return jsonElementList.GetString();
                         }
 
                         return Convert.ToString(x);
@@ -131,9 +137,9 @@ public static class AttributeValueConverter
                 {
                     return objectListInt.Select(x =>
                     {
-                        if (x is JsonElement jsonElement)
+                        if (x is JsonElement jsonElementObject)
                         {
-                            return Convert.ToInt32(jsonElement.GetString());
+                            return Convert.ToInt32(jsonElementObject.GetString());
                         }
 
                         return Convert.ToInt32(x);

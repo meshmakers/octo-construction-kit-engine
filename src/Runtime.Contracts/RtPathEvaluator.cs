@@ -603,7 +603,7 @@ public static class RtPathEvaluator
                         }
 
 
-                        rtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
                             pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
                         break;
                     }
@@ -617,7 +617,7 @@ public static class RtPathEvaluator
                                 pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, intValue.ToString());
                         }
 
-                        rtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
                             pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
                         break;
                     }

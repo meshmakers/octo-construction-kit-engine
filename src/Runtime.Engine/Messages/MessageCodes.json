@@ -10,7 +10,7 @@
       "key": "MandatoryAttributeMissing",
       "number": 2,
       "level": "FATALERROR",
-      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value and is missing."
+      "text": "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value or auto increment reference and is therefore missing."
     },
     {
       "key": "CkTypeIdNotFound",

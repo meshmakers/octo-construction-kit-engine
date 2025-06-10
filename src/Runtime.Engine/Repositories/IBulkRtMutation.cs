@@ -13,12 +13,13 @@ public interface IBulkRtMutation
     /// <summary>
     ///     Applies the changes to the data source
     /// </summary>
-    /// <param name="session"></param>
-    /// <param name="repositoryDataSource"></param>
-    /// <param name="ckCacheService"></param>
-    /// <param name="entityUpdateInfoList"></param>
-    /// <param name="associationUpdateInfoList"></param>
+    /// <param name="session">Session to use for the operation</param>
+    /// <param name="repositoryDataSource">Repository data source to apply changes to</param>
+    /// <param name="ckCacheService">Cache service for Construction Kit</param>
+    /// <param name="entityUpdateInfoList">List of entity updates to apply</param>
+    /// <param name="associationUpdateInfoList">List of association updates to apply</param>
+    /// <param name="options">Options for the bulk mutation</param>
     Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource, ICkCacheService ckCacheService,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
-        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList);
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList, BulkRtMutationOptions options);
 }

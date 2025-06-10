@@ -339,7 +339,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -351,7 +351,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -395,7 +395,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList)
+                associationUpdateInfoList, BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -571,7 +571,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         rtEntity.CkTypeId = ckTypeId;
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -596,7 +596,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -652,7 +652,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(rtEntityId, rtEntity) };
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -698,7 +698,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(rtEntityId, rtEntity) };
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [])
+                [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 

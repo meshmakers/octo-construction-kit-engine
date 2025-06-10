@@ -2,13 +2,13 @@
 types:
   - typeId: AutoIncrement
     derivedFromCkTypeId: ${thisModel}/Entity
-    isFinal: false
-    isAbstract: false
+    isFinal: true
     attributes:
       - id: ${thisModel}/AutoIncrement.Start
         name: Start
       - id: ${thisModel}/AutoIncrement.End
         name: End
+      - id: ${thisModel}/AutoIncrement.Format
+        name: Format
       - id: ${thisModel}/AutoIncrement.CurrentValue
         name: CurrentValue
-        isOptional: true

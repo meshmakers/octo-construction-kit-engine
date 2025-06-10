@@ -12,8 +12,10 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="documents">The list of documents to import</param>
+    /// <param name="options">Options for the bulk operation</param>
     /// <returns>Returns the result of the import</returns>
-    Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents);
+    Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents,
+        BulkOperationOptions options);
 
     /// <summary>
     ///     Inserts a new document into the collection

@@ -101,7 +101,7 @@ internal static class MessageCodes
         {
             "MandatoryAttributeMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value and is missing.",
+                 2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value or auto increment reference and is therefore missing.",
                  new [] {"tenantId", "attributeCkAttributeId", "reference"})
         },
         {

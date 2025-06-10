@@ -223,7 +223,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                             break;
                     }
                 }
-                else
+                // if no value set, at least there must be an auto increment reference;
+                // otherwise the attribute is missing
+                else if (string.IsNullOrWhiteSpace(attribute.AutoIncrementReference))
                 {
                     operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(originFileResolver.Resolve(tenantId), tenantId,
                         attribute.CkAttributeId, reference));

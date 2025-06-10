@@ -38,14 +38,17 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         return Task.FromResult((IOctoSession)new LocalSession());
     }
 
-    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
+    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session,
+        CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
         ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
     {
         throw new NotImplementedException();
     }
 
-    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
+    public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session,
+        CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
+        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
+        int? take = null)
     {
         throw new NotImplementedException();
     }
@@ -59,7 +62,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
-        var savedEntities = queryable.Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
+        var savedEntities =
+            queryable.Where(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
 
         List<EntityUpdateInfo<RtEntity>> entitiesUpdate = new();
         foreach (var savedEntity in savedEntities)
@@ -67,7 +71,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
+                BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -78,18 +83,21 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
-        var savedEntity = queryable.FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
+        var savedEntity =
+            queryable.FirstOrDefault(CombineFilterExpressions<TEntity>(fieldFilters, ckTypeGraph, LogicalOperator.And));
         if (savedEntity == null)
         {
             throw RuntimeRepositoryException.FieldFilterDidNotReturnResult(typeof(TEntity), fieldFilters);
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
+                BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
-    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
+        CkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, int? skip = null,
         int? take = null)
     {
@@ -99,12 +107,14 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
 
         if (dataQueryOperation.AttributeSearchFilter != null)
         {
-            throw RuntimeRepositoryException.AttributeFilterNotSupportedByDataSource(typeof(LocalDirectoryRuntimeRepository));
+            throw RuntimeRepositoryException.AttributeFilterNotSupportedByDataSource(
+                typeof(LocalDirectoryRuntimeRepository));
         }
 
         if (dataQueryOperation.TextSearchFilter != null)
         {
-            throw RuntimeRepositoryException.TextFilterNotSupportedByDataSource(typeof(LocalDirectoryRuntimeRepository));
+            throw RuntimeRepositoryException.TextFilterNotSupportedByDataSource(
+                typeof(LocalDirectoryRuntimeRepository));
         }
 
         if (dataQueryOperation.SortOrders != null)
@@ -149,11 +159,13 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
+                BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
-    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session,
+        CkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null)
     {
@@ -194,7 +206,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateDelete(rtEntity.ToRtEntityId()));
         }
 
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
+                BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -213,7 +226,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(rtEntity.ToRtEntityId()) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [])
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
+                BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
 
@@ -239,7 +253,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             // Generate the predicate for the current filter
             if (!ckTypeGraph.AllAttributesByName.TryGetValue(filter.AttributePath, out var attribute))
             {
-                throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(ckTypeGraph.CkTypeId, filter.AttributePath);
+                throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(ckTypeGraph.CkTypeId,
+                    filter.AttributePath);
             }
 
             var filterExpression = FilterExpression<TEntity>(filter, attribute);
@@ -258,7 +273,8 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         return combinedPredicate;
     }
 
-    private static Expression<Func<TEntity, bool>> FilterExpression<TEntity>(FieldFilter filter, CkTypeAttributeGraph ckTypeAttributeGraph)
+    private static Expression<Func<TEntity, bool>> FilterExpression<TEntity>(FieldFilter filter,
+        CkTypeAttributeGraph ckTypeAttributeGraph)
         where TEntity : RtEntity
     {
         // TODO: Implement

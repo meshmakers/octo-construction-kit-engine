@@ -20,7 +20,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
     private bool _isLoaded;
 
 
-    public async Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    public async Task<IBulkImportResult> BulkImportAsync(IOctoSession session, IEnumerable<TDocument> documents,
+        BulkOperationOptions options)
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -32,7 +33,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
             var key = dataSourceMapper.GetId(document);
             if (!_rtEntities.TryAdd(key, document))
             {
-                if (_rtEntities.TryGetValue(key, out var comparisionDocument))
+                if (options.InsertStrategy == BulkInsertStrategy.Upsert &&
+                    _rtEntities.TryGetValue(key, out var comparisionDocument))
                 {
                     if (!_rtEntities.TryUpdate(key, document, comparisionDocument))
                     {
@@ -156,7 +158,6 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         }
 
 
-
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -209,10 +210,12 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
                 result.Add(document);
             }
         }
+
         return result;
     }
 
-    public async Task<TDerived?> DocumentAsync<TDerived>(IOctoSession session, TKey key) where TDerived : TDocument, new()
+    public async Task<TDerived?> DocumentAsync<TDerived>(IOctoSession session, TKey key)
+        where TDerived : TDocument, new()
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -235,14 +238,16 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         return _rtEntities.Values.AsQueryable();
     }
 
-    public async Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    public async Task<TDocument?> FindSingleOrDefaultAsync(IOctoSession session,
+        Expression<Func<TDocument, bool>> expression)
     {
         await LoadAsync().ConfigureAwait(false);
 
         return _rtEntities.Values.AsQueryable().SingleOrDefault(expression);
     }
 
-    public async Task<ICollection<TDocument>> FindManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
+    public async Task<ICollection<TDocument>> FindManyAsync(IOctoSession session,
+        Expression<Func<TDocument, bool>> expression,
         int? skip = null, int? take = null)
     {
         await LoadAsync().ConfigureAwait(false);
@@ -340,7 +345,8 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
             await using var fileStream = File.OpenRead(filePath);
 #endif
 
-            var rtEntities = await dataSourceMapper.DeserializeAsync(fileStream, filePath, operationResult).ConfigureAwait(false);
+            var rtEntities = await dataSourceMapper.DeserializeAsync(fileStream, filePath, operationResult)
+                .ConfigureAwait(false);
             foreach (var keyValuePair in rtEntities)
             {
                 _rtEntities.TryAdd(keyValuePair.Key, keyValuePair.Value);

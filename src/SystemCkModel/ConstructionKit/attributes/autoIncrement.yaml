@@ -1,0 +1,10 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: AutoIncrement.Start
+    valueType: Int
+  - id: AutoIncrement.End
+    valueType: Int
+  - id: AutoIncrement.CurrentValue
+    valueType: Int
+  - id: AutoIncrement.Format
+    valueType: String

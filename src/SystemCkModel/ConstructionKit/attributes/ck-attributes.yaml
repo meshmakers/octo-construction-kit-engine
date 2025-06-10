@@ -15,12 +15,6 @@ attributes:
     valueType: String
   - id: DatabaseName
     valueType: String
-  - id: AutoIncrement.Start
-    valueType: Int
-  - id: AutoIncrement.End
-    valueType: Int
-  - id: AutoIncrement.CurrentValue
-    valueType: Int
   - id: ConfigurationValue
     valueType: String
     

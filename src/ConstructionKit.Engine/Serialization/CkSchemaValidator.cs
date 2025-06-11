@@ -1,4 +1,5 @@
 using System.Text.Json.Nodes;
+using Json.Pointer;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
@@ -60,7 +61,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
         var json = JsonNode.Parse(stream);
 
         var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, json);
     }
 
     private static bool ValidateModelYaml(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
@@ -81,11 +82,11 @@ internal class CkSchemaValidator : ICkSchemaValidator
         var singleNode = yamlStream.Documents[0].ToJsonNode();
 
         var evaluationResults = schema.Evaluate(singleNode, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, singleNode);
     }
 
     private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
-        EvaluationResults evaluationResults)
+        EvaluationResults evaluationResults, JsonNode? rootNode = null)
     {
         if (!evaluationResults.IsValid)
         {
@@ -93,10 +94,92 @@ internal class CkSchemaValidator : ICkSchemaValidator
             {
                 var path = evaluationResult.InstanceLocation.ToString();
                 var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
+                
+                // Get detailed information about the failing object
+                var objectDetails = GetObjectDetails(rootNode, evaluationResult.InstanceLocation);
+                var enhancedErrorMessage = string.IsNullOrEmpty(objectDetails) ? errorMessages : $"{errorMessages}. Object details: {objectDetails}";
+                
+                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, enhancedErrorMessage));
             }
         }
 
         return evaluationResults.IsValid;
+    }
+
+    private const int MaxDisplayedProperties = 10;
+    private const int MaxDisplayedArrayElements = 5;
+
+    private static string GetObjectDetails(JsonNode? rootNode, JsonPointer instanceLocation)
+    {
+        if (rootNode == null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var rootJson = System.Text.Json.JsonSerializer.Serialize(rootNode);
+            using var document = System.Text.Json.JsonDocument.Parse(rootJson);
+            var targetElement = instanceLocation.Evaluate(document.RootElement);
+            
+            if (!targetElement.HasValue)
+            {
+                return "Target object not found";
+            }
+
+            var element = targetElement.Value;
+            return element.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Object => FormatObjectProperties(element),
+                System.Text.Json.JsonValueKind.Array => FormatArrayElements(element),
+                _ => $"Value: {FormatElementValue(element)}"
+            };
+        }
+        catch (Exception)
+        {
+            return string.Empty;
+        }
+    }
+
+    private static string FormatObjectProperties(System.Text.Json.JsonElement element)
+    {
+        var properties = element.EnumerateObject()
+            .Take(MaxDisplayedProperties)
+            .Select(property => $"{property.Name}: {FormatElementValue(property.Value)}")
+            .ToList();
+
+        var totalCount = element.EnumerateObject().Count();
+        var additionalPropertiesInfo = totalCount > MaxDisplayedProperties 
+            ? $", ... and {totalCount - MaxDisplayedProperties} more properties" 
+            : string.Empty;
+
+        return $"{{ {string.Join(", ", properties)}{additionalPropertiesInfo} }}";
+    }
+
+    private static string FormatArrayElements(System.Text.Json.JsonElement element)
+    {
+        var elements = element.EnumerateArray()
+            .Take(MaxDisplayedArrayElements)
+            .Select(FormatElementValue);
+
+        var totalCount = element.GetArrayLength();
+        var additionalElementsInfo = totalCount > MaxDisplayedArrayElements ? "..." : string.Empty;
+
+        return $"Array with {totalCount} elements: [{string.Join(", ", elements)}{additionalElementsInfo}]";
+    }
+
+    private static string FormatElementValue(System.Text.Json.JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Null => "null",
+            System.Text.Json.JsonValueKind.True => "true",
+            System.Text.Json.JsonValueKind.False => "false",
+            System.Text.Json.JsonValueKind.Number => element.GetRawText(),
+            System.Text.Json.JsonValueKind.String => $"\"{element.GetString()}\"",
+            System.Text.Json.JsonValueKind.Object => $"{{object with {element.EnumerateObject().Count()} properties}}",
+            System.Text.Json.JsonValueKind.Array => $"[array with {element.GetArrayLength()} elements]",
+            _ => element.ValueKind.ToString()
+        };
     }
 }

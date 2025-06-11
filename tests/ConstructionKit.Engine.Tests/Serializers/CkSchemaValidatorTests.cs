@@ -52,6 +52,39 @@ public class CkSchemaValidatorTests
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
 
+    [Fact]
+    public void ValidateMetaInJson_WithValidElementsFile_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Using elements file for meta validation should fail as it doesn't match meta schema
+        var filePath = "sampleData/files/types-ok.json";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMetaInJson(stream, filePath, operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.Messages.Any());
+        Assert.True(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ValidateCompiledModelInJson_WithValidElementsFile_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Using elements file for compiled model validation should fail as it doesn't match compiled model schema
+        var filePath = "sampleData/files/types-ok.json";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateCompiledModelInJson(stream, filePath, operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.Messages.Any());
+        Assert.True(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
 
     [Fact]
     public void ValidateElementsInYaml_ok()
@@ -95,6 +128,57 @@ public class CkSchemaValidatorTests
         var isValid = schemaValidator.ValidateElementsInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
+        Assert.True(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ValidateModelConfigInYaml_WithValidElementsFile_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Using elements file for model config validation should fail as it doesn't match model config schema
+        var filePath = "sampleData/files/types-ok.yaml";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateModelConfigInYaml(stream, filePath, operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.Messages.Any());
+        Assert.True(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ValidateMetaInYaml_WithValidElementsFile_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Using elements file for meta validation should fail as it doesn't match meta schema
+        var filePath = "sampleData/files/types-ok.yaml";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMetaInYaml(stream, filePath, operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.Messages.Any());
+        Assert.True(operationResult.HasErrors);
+        Assert.False(operationResult.HasFatalErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ValidateCompiledModelInYaml_WithValidElementsFile_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Using elements file for compiled model validation should fail as it doesn't match compiled model schema
+        var filePath = "sampleData/files/types-ok.yaml";
+        var stream = File.OpenRead(filePath);
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateCompiledModelInYaml(stream, filePath, operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.Messages.Any());
         Assert.True(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);

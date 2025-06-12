@@ -3,3 +3,6 @@ types:
   - typeId: Entity
     isFinal: false
     isAbstract: true
+    associations:
+    - id: ${thisModel}/Related
+      targetCkTypeId: ${thisModel}/Entity

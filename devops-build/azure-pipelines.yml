@@ -30,7 +30,7 @@ stages:
     - job: buildAndTest
       displayName: "Build nuget and execute tests"
       pool:
-        name: Gerald-Local-Linux
+        name: meshmakers-infra
       steps:
       - template: update-build-number.yml
       - checkout: self

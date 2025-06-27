@@ -11,7 +11,7 @@ trigger:
       - '*'
   
 variables:
-- group: ApiKeys
+- group: ApiKeys-mm-cloud
 - group: OctoDefault
 - name: artifactsFrameworkVersion
   value: 'net9.0'  

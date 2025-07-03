@@ -30,7 +30,7 @@ stages:
     - job: buildAndTest
       displayName: "Build nuget and execute tests"
       pool:
-        name: meshmakers-infra
+        name: meshmakers-ci-agents
       steps:
       - template: update-build-number.yml
       - checkout: self

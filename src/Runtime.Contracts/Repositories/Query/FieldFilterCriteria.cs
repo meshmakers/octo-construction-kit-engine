@@ -21,14 +21,14 @@ public record FieldFilterCriteria
     /// <summary>
     ///     Adds a field filter to the query.
     /// </summary>
-    /// <param name="attributeName">Name of attribute</param>
+    /// <param name="attributePath">Path of attribute</param>
     /// <param name="comparisonOperator">Operator of attribute</param>
     /// <param name="comparisonValue">Comparison value of the field filter</param>
-    public void AddFieldFilter(string attributeName, FieldFilterOperator comparisonOperator, object? comparisonValue)
+    public void AddFieldFilter(string attributePath, FieldFilterOperator comparisonOperator, object? comparisonValue)
     {
         FieldFilters ??= new List<FieldFilter>();
 
-        FieldFilters.Add(new FieldFilter(attributeName, comparisonOperator, comparisonValue));
+        FieldFilters.Add(new FieldFilter(attributePath, comparisonOperator, comparisonValue));
     }
     
     /// <summary>

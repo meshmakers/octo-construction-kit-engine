@@ -24,6 +24,12 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     /// <exception cref="ArgumentOutOfRangeException"></exception>
     public CkId(string ckId)
     {
+        if (string.IsNullOrWhiteSpace(ckId))
+        {
+            ModelId = null!;
+            Key = default!;
+            return;
+        }
         var modelIndex = ckId.IndexOf("/", StringComparison.Ordinal);
         if (modelIndex < 0)
         {
@@ -58,7 +64,7 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     {
         return new CkId<TKey>(value);
     }
-    
+
     /// <inheritdoc />
     public bool Equals(CkId<TKey>? other)
     {

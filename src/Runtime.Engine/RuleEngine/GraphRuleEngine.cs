@@ -85,7 +85,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             .ConfigureAwait(false);
 
         await ValidateOrigin(session, repositoryDataSource, associationUpdateInfoList, originEntities, targetEntities,
-                originFileResolver,
+                originFileResolver, entityUpdateInfoList,
                 operationResult)
             .ConfigureAwait(false);
         await ValidateTarget(session, repositoryDataSource, associationUpdateInfoList, originEntities, targetEntities,
@@ -236,7 +236,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
     private async Task ValidateOrigin(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         Dictionary<RtEntityId, RtEntity> originEntities, Dictionary<RtEntityId, RtEntity> targetEntities,
-        IOriginFileResolver originFileResolver,
+        IOriginFileResolver originFileResolver, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         OperationResult operationResult)
     {
         // Get the current multiplicity of the associations

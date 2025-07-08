@@ -1,8 +1,12 @@
+using System.Linq;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
 
@@ -13,6 +17,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     private const string CountryTypeId = "Test/Country";
     private const string ContinentTypeId = "Test/Continent";
     private const string ParentChildRoleId = "System/ParentChild";
+    private static CkId<CkAssociationRoleId> ParentChildRoleIdCk => new(ParentChildRoleId);
 
     #region Successful Validation Tests
 
@@ -87,7 +92,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         
         SetupEntityRetrieval(dataSource, [origin, oldTarget, newTarget]);
         SetupEmptyAssociations(dataSource);
-        SetupExistingAssociation(dataSource, origin, oldTarget, ParentChildRoleId);
+        SetupExistingAssociation(dataSource, origin, oldTarget, ParentChildRoleIdCk);
 
         // Act
         var result = await engine.ValidateAsync(session, dataSource, 
@@ -135,11 +140,11 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         var target = CreateEntity(ContinentTypeId);
         
         SetupEntityRetrieval(dataSource, [origin, target]);
-        SetupExistingAssociation(dataSource, origin, target, ParentChildRoleId);
-        SetupMultiplicity(dataSource, origin, ParentChildRoleId, GraphDirections.Outbound, CurrentMultiplicity.One);
+        SetupExistingAssociation(dataSource, origin, target, ParentChildRoleIdCk);
+        SetupMultiplicity(dataSource, origin, ParentChildRoleIdCk, GraphDirections.Outbound, CurrentMultiplicity.One);
 
         // Act
-        var result = await engine.ValidateAsync(session, dataSource, 
+        await engine.ValidateAsync(session, dataSource,
             [EntityUpdateInfo<RtEntity>.CreateUpdate(origin.ToRtEntityId(), origin)],
             [AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), target.ToRtEntityId(), ParentChildRoleId)],
             originFileResolver, operationResult);
@@ -159,7 +164,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         var target = CreateEntity(ContinentTypeId);
         
         SetupEntityRetrieval(dataSource, [origin, target]);
-        SetupExistingAssociationInGetRtAssociationsAsync(dataSource, origin, target, ParentChildRoleId);
+        SetupExistingAssociationInGetRtAssociationsAsync(dataSource, origin, target, ParentChildRoleIdCk);
 
         // Act
         await engine.ValidateAsync(session, dataSource, 
@@ -183,7 +188,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         
         SetupEntityRetrieval(dataSource, [origin, target]);
         A.CallTo(() => dataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>._, 
-            origin.ToRtEntityId(), target.ToRtEntityId(), ParentChildRoleId))
+            origin.ToRtEntityId(), target.ToRtEntityId(), ParentChildRoleIdCk))
             .Returns(Task.FromResult<RtAssociation?>(null));
 
         // Act
@@ -231,7 +236,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         
         SetupEntityRetrieval(dataSource, [origin, target1, target2]);
         SetupEmptyAssociations(dataSource);
-        SetupMultiplicity(dataSource, origin, ParentChildRoleId, GraphDirections.Outbound, CurrentMultiplicity.One);
+        SetupMultiplicity(dataSource, origin, ParentChildRoleIdCk, GraphDirections.Outbound, CurrentMultiplicity.One);
 
         // Act
         await engine.ValidateAsync(session, dataSource, 
@@ -259,7 +264,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
         var entity = CreateEntity(CountryTypeId);
         var associatedEntity = CreateEntity(ContinentTypeId);
-        var association = CreateAssociation(entity, associatedEntity, ParentChildRoleId);
+        var association = CreateAssociation(entity, associatedEntity, ParentChildRoleIdCk);
         
         A.CallTo(() => dataSource.GetRtAssociationsAsync(session, entity.RtId, GraphDirections.Any))
             .Returns([association]);
@@ -272,6 +277,56 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         // Assert
         Assert.Single(result.RtAssociationsToDelete);
         Assert.Equal(association, result.RtAssociationsToDelete[0]);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DeleteEntityAndAssociation_NoCardinalityError()
+    {
+        // Arrange
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin = CreateEntity(CountryTypeId);
+        var target = CreateEntity(ContinentTypeId);
+        
+        SetupEntityRetrieval(dataSource, [origin, target]);
+        SetupExistingAssociation(dataSource, origin, target, ParentChildRoleIdCk);
+        SetupMultiplicity(dataSource, origin, ParentChildRoleIdCk, GraphDirections.Outbound, CurrentMultiplicity.One);
+
+        // Act - Delete both entity and association
+        await engine.ValidateAsync(session, dataSource,
+            [EntityUpdateInfo<RtEntity>.CreateDelete(origin.ToRtEntityId())],
+            [AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), target.ToRtEntityId(), ParentChildRoleId)],
+            originFileResolver, operationResult);
+
+        // Assert - No cardinality error should occur since entity is being deleted
+        Assert.DoesNotContain(operationResult.Messages, m => m.MessageNumber == 13);
+        Assert.False(operationResult.HasFatalErrors);
+    }
+
+    #endregion
+
+    #region Entity Deletion Edge Cases
+
+    [Fact]
+    public async Task ValidateAsync_DeleteTargetEntityWithMandatoryInboundAssociation_NoCardinalityError()
+    {
+        // Arrange
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin = CreateEntity(CountryTypeId);
+        var target = CreateEntity(ContinentTypeId);
+        
+        SetupEntityRetrieval(dataSource, [origin, target]);
+        SetupExistingAssociation(dataSource, origin, target, ParentChildRoleIdCk);
+        SetupMultiplicity(dataSource, target, ParentChildRoleIdCk, GraphDirections.Inbound, CurrentMultiplicity.One);
+
+        // Act - Delete target entity and the association pointing to it
+        await engine.ValidateAsync(session, dataSource,
+            [EntityUpdateInfo<RtEntity>.CreateDelete(target.ToRtEntityId())],
+            [AssociationUpdateInfo.CreateDelete(origin.ToRtEntityId(), target.ToRtEntityId(), ParentChildRoleId)],
+            originFileResolver, operationResult);
+
+        // Assert - No cardinality error should occur since target entity is being deleted
+        Assert.DoesNotContain(operationResult.Messages, m => m.MessageNumber == 13);
+        Assert.False(operationResult.HasFatalErrors);
     }
 
     #endregion
@@ -354,7 +409,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     private static void SetupExistingAssociation(IRepositoryDataSource dataSource, 
-        RtEntity origin, RtEntity target, string roleId)
+        RtEntity origin, RtEntity target, CkId<CkAssociationRoleId> roleId)
     {
         var association = CreateAssociation(origin, target, roleId);
         A.CallTo(() => dataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>._, 
@@ -363,7 +418,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     private static void SetupExistingAssociationInGetRtAssociationsAsync(IRepositoryDataSource dataSource,
-        RtEntity origin, RtEntity target, string roleId)
+        RtEntity origin, RtEntity target, CkId<CkAssociationRoleId> roleId)
     {
         var association = CreateAssociation(origin, target, roleId);
         A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._))
@@ -371,7 +426,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     private static void SetupMultiplicity(IRepositoryDataSource dataSource, RtEntity entity, 
-        string roleId, GraphDirections direction, CurrentMultiplicity multiplicity)
+        CkId<CkAssociationRoleId> roleId, GraphDirections direction, CurrentMultiplicity multiplicity)
     {
         var pair = new RtEntityRoleIdDirectionPair(entity.ToRtEntityId(), roleId, direction);
         var result = new RtAssociationsMultiplicityResult(pair, multiplicity);
@@ -379,7 +434,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         A.CallTo(() => dataSource.GetRtAssociationsMultiplicityAsync(A<IOctoSession>._, 
             A<IEnumerable<RtEntityRoleIdDirectionPair>>.That.Matches(x => 
                 x.Any(p => p.RtEntityId.Equals(entity.ToRtEntityId()) && 
-                          p.CkRoleId == roleId && 
+                          p.CkRoleId.Equals(roleId) && 
                           p.Direction == direction))))
             .Returns([result]);
     }

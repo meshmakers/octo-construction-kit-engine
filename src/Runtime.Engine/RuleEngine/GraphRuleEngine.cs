@@ -89,7 +89,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 operationResult)
             .ConfigureAwait(false);
         await ValidateTarget(session, repositoryDataSource, associationUpdateInfoList, originEntities, targetEntities,
-                originFileResolver,
+                originFileResolver, entityUpdateInfoList,
                 operationResult)
             .ConfigureAwait(false);
 
@@ -129,7 +129,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
     private async Task ValidateTarget(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         Dictionary<RtEntityId, RtEntity> originEntities, Dictionary<RtEntityId, RtEntity> targetEntities,
-        IOriginFileResolver originFileResolver,
+        IOriginFileResolver originFileResolver, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         OperationResult operationResult)
     {
         // Get the current multiplicity of the associations
@@ -206,7 +206,15 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 if (changeDelta < 0)
                 {
-                    if (currentMultiplicity == CurrentMultiplicity.One &&
+                    // Check if any of the origin entities being deleted for these associations
+                    var isAnyOriginEntityBeingDeleted = associationUpdateInfosByRoleId
+                        .Where(a => a.ModOption == AssociationModOptionsDto.Delete)
+                        .Any(assoc => entityUpdateInfoList.Any(e => 
+                            e.ModOption == EntityModOptions.Delete && 
+                            e.RtId == assoc.Origin.RtId));
+                    
+                    if (!isAnyOriginEntityBeingDeleted && 
+                        currentMultiplicity == CurrentMultiplicity.One &&
                         multiplicity == MultiplicitiesDto.One)
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(
@@ -314,7 +322,13 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 if (changeDelta < 0)
                 {
-                    if (currentMultiplicity == CurrentMultiplicity.One &&
+                    // Check if origin entity is being deleted - if so, don't validate cardinality
+                    var isOriginEntityBeingDeleted = entityUpdateInfoList.Any(e => 
+                        e.ModOption == EntityModOptions.Delete && 
+                        e.RtId == originEntity.Key.RtId);
+                    
+                    if (!isOriginEntityBeingDeleted && 
+                        currentMultiplicity == CurrentMultiplicity.One &&
                         multiplicity == MultiplicitiesDto.One)
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnDelete(

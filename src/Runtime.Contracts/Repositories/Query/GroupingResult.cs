@@ -17,11 +17,13 @@ public class GroupingResult
     /// <param name="minStatistics">Min statistics for each attribute</param>
     /// <param name="maxStatistics">Max statistics for each attribute</param>
     /// <param name="avgStatistics">Average value statistics for each attribute</param>
+    /// <param name="sumStatistics">Sum value statistics for each attribute</param>
     public GroupingResult(IEnumerable<string> groupByAttributePaths, IEnumerable<object?> keys, long count,
         IEnumerable<StatisticsResult> countStatistics,
         IEnumerable<StatisticsResult> minStatistics,
         IEnumerable<StatisticsResult> maxStatistics,
-        IEnumerable<StatisticsResult> avgStatistics)
+        IEnumerable<StatisticsResult> avgStatistics,
+        IEnumerable<StatisticsResult> sumStatistics)
     {
         GroupByAttributePaths = groupByAttributePaths;
         Keys = keys;
@@ -30,6 +32,7 @@ public class GroupingResult
         MinStatistics = minStatistics;
         MaxStatistics = maxStatistics;
         AvgStatistics = avgStatistics;
+        SumStatistics = sumStatistics;
     }
 
     /// <summary>
@@ -66,4 +69,9 @@ public class GroupingResult
     ///     Returns the average value statistics for each attribute
     /// </summary>
     public IEnumerable<StatisticsResult> AvgStatistics { get; }
+
+    /// <summary>
+    ///     Returns the sum value statistics for each attribute
+    /// </summary>
+    public IEnumerable<StatisticsResult> SumStatistics { get; }
 }

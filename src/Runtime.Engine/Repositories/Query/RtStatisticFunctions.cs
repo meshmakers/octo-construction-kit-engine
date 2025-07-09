@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
@@ -12,17 +13,20 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 /// <typeparam name="TEntity"></typeparam>
 public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
 {
-    private readonly CkTypeGraph _ckTypeGraph;
+    private readonly ICkCacheService _ckCacheService;
+    private readonly string _tenantId;
     private readonly FieldGroupBy _groupBy;
 
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="ckTypeGraph">The type graph</param>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">The tenant ID</param>
     /// <param name="groupBy">The grouping information</param>
-    public RtStatisticFunctions(CkTypeGraph ckTypeGraph, FieldGroupBy groupBy)
+    public RtStatisticFunctions(ICkCacheService ckCacheService, string tenantId, FieldGroupBy groupBy)
     {
-        _ckTypeGraph = ckTypeGraph;
+        _ckCacheService = ckCacheService;
+        _tenantId = tenantId;
         _groupBy = groupBy;
     }
 
@@ -34,23 +38,25 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
     public IEnumerable<GroupingResult> Calculate(IEnumerable<TEntity> resultList)
     {
         var groupByPropertiesResult =
-            resultList.GroupBy(g => new Key(_groupBy.GroupByAttributeNameList.Select(a => GetValue(a)(g))));
+            resultList.GroupBy(g => new Key(_groupBy.GroupByAttributePathList.Select(a => g.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, a))));
 
         var calculateGrouping = new List<GroupingResult>();
         foreach (var entityGrouping in groupByPropertiesResult.OrderBy(x => x.Key))
         {
             var grouping = new GroupingResult(
-                _groupBy.GroupByAttributeNameList,
+                _groupBy.GroupByAttributePathList,
                 entityGrouping.Key.Keys,
                 entityGrouping.Count(),
                 RunStatistics(_groupBy.CountAttributePathList,
-                    attributeName => entityGrouping.Count(x => GetValue(attributeName)(x) != null)),
+                    attributePath => entityGrouping.Count(x => x.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, attributePath) != null)),
                 RunStatistics(_groupBy.MinValueAttributePathList,
-                    attributeName => entityGrouping.Min(x => GetValue(attributeName)(x))),
+                    attributePath => entityGrouping.Min(x => x.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, attributePath))),
                 RunStatistics(_groupBy.MaxValueAttributePathList,
-                    attributeName => entityGrouping.Max(x => GetValue(attributeName)(x))),
+                    attributePath => entityGrouping.Max(x => x.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, attributePath))),
                 RunStatistics(_groupBy.AvgAttributePathList,
-                    attributeName => entityGrouping.Average(x => (decimal?)GetValue(attributeName)(x)))
+                    attributePath => entityGrouping.Average(x => (decimal?)x.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, attributePath))),
+                RunStatistics(_groupBy.SumAttributePathList,
+                    attributePath => entityGrouping.Sum(x => (decimal?)x.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, attributePath)))
             );
             calculateGrouping.Add(grouping);
         }
@@ -77,32 +83,9 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
         return list;
     }
 
-    private Func<TEntity, object?> GetValue(string propertyName)
+    private class Key(IEnumerable<object?> keys) : IComparable
     {
-        return entity =>
-        {
-            if (_ckTypeGraph.AllAttributesByName.TryGetValue(propertyName, out var attributeCacheItem))
-            {
-                if (entity.Attributes.TryGetValue(propertyName, out var value))
-                {
-                    return AttributeValueConverter.ConvertAttributeValue(attributeCacheItem.ValueType, value);
-                }
-
-                return null;
-            }
-
-            throw RuntimeRepositoryException.AttributeWithNameDoesNotExist(_ckTypeGraph.CkTypeId, propertyName);
-        };
-    }
-
-    private class Key : IComparable
-    {
-        public Key(IEnumerable<object?> keys)
-        {
-            Keys = keys;
-        }
-
-        public IEnumerable<object?> Keys { get; }
+        public IEnumerable<object?> Keys { get; } = keys;
 
         public int CompareTo(object? obj)
         {

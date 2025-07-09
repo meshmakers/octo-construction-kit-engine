@@ -6,6 +6,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 public class FieldGroupBy
 {
     private readonly List<string> _avgAttributePaths;
+    private readonly List<string> _sumAttributePaths;
     private readonly List<string> _countAttributePaths;
     private readonly List<string> _maxAttributePaths;
     private readonly List<string> _minAttributePaths;
@@ -13,20 +14,21 @@ public class FieldGroupBy
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="groupByAttributeNames">Attribute names to group by</param>
-    public FieldGroupBy(IEnumerable<string> groupByAttributeNames)
+    /// <param name="groupByAttributePaths">Attribute names to group by</param>
+    public FieldGroupBy(IEnumerable<string> groupByAttributePaths)
     {
-        GroupByAttributeNameList = groupByAttributeNames;
+        GroupByAttributePathList = groupByAttributePaths;
         _countAttributePaths = new List<string>();
         _minAttributePaths = new List<string>();
         _maxAttributePaths = new List<string>();
         _avgAttributePaths = new List<string>();
+        _sumAttributePaths = new List<string>();
     }
 
     /// <summary>
     ///     Attribute names to group by
     /// </summary>
-    public IEnumerable<string> GroupByAttributeNameList { get; }
+    public IEnumerable<string> GroupByAttributePathList { get; }
 
     /// <summary>
     ///     Attribute names whose existence to count, NULL values are not counted.
@@ -47,6 +49,11 @@ public class FieldGroupBy
     ///     Attributes names whose average value is to be determined.
     /// </summary>
     public IEnumerable<string> AvgAttributePathList => _avgAttributePaths;
+
+    /// <summary>
+    ///     Attributes names whose sum value is to be determined.
+    /// </summary>
+    public IEnumerable<string> SumAttributePathList => _sumAttributePaths;
 
     /// <summary>
     ///     Attributes names whose amount of non-null values is to be determined.
@@ -87,6 +94,17 @@ public class FieldGroupBy
     /// <param name="attributeNames">Attribute names</param>
     /// <returns></returns>
     public FieldGroupBy AvgAttributeNames(params string[] attributeNames)
+    {
+        _avgAttributePaths.AddRange(attributeNames);
+        return this;
+    }
+
+    /// <summary>
+    ///     Attributes names whose sum value is to be determined.
+    /// </summary>
+    /// <param name="attributeNames">Attribute names</param>
+    /// <returns></returns>
+    public FieldGroupBy SumAttributeNames(params string[] attributeNames)
     {
         _avgAttributePaths.AddRange(attributeNames);
         return this;

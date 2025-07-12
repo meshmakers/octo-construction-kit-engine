@@ -33,9 +33,14 @@ public record DataQueryOperation : FieldFilterCriteria
     public AttributeSearchFilter? AttributeSearchFilter { get; private set; }
 
     /// <summary>
-    ///     Represents field group by for specific attributes.
+    ///     Represents aggregation input for grouping by specific attributes.
     /// </summary>
-    public FieldGroupBy? FieldGroupBy { get; private set; }
+    public FieldAggregationInput? FieldAggregation { get; private set; }
+
+    /// <summary>
+    /// Represents aggregation input for the result.
+    /// </summary>
+    public AggregationInput? ResultAggregation { get; private set; }
 
     /// <summary>
     ///     Represents sort order for specific attributes.
@@ -71,13 +76,13 @@ public record DataQueryOperation : FieldFilterCriteria
     /// <summary>
     ///     Adds a sort order to the query.
     /// </summary>
-    /// <param name="attributeName">Attribute name</param>
+    /// <param name="attributePath">Path of attribute to sort</param>
     /// <param name="sortOrder">Sort order</param>
-    public DataQueryOperation SortOrder(string attributeName, SortOrders sortOrder)
+    public DataQueryOperation SortOrder(string attributePath, SortOrders sortOrder)
     {
         SortOrders ??= new List<SortOrderItem>();
 
-        SortOrders.Add(new SortOrderItem(attributeName, sortOrder));
+        SortOrders.Add(new SortOrderItem(attributePath, sortOrder));
 
         return this;
     }
@@ -106,15 +111,26 @@ public record DataQueryOperation : FieldFilterCriteria
     }
 
     /// <summary>
-    ///     Groups by the given attribute names.
+    ///     Groups by the given attribute paths.
     /// </summary>
-    /// <param name="attributeNames">Attribute names to group by.</param>
+    /// <param name="attributePaths">Attribute paths to group by.</param>
     /// <returns></returns>
-    public FieldGroupBy GroupBy(params string[] attributeNames)
+    public FieldAggregationInput AggregateFieldGroupBy(params string[] attributePaths)
     {
-        FieldGroupBy = new FieldGroupBy(attributeNames);
+        FieldAggregation = new FieldAggregationInput(attributePaths);
 
-        return FieldGroupBy;
+        return FieldAggregation;
+    }
+
+    /// <summary>
+    ///     Aggregates the result
+    /// </summary>
+    /// <returns></returns>
+    public AggregationInput AggregateResult()
+    {
+        ResultAggregation = new AggregationInput();
+
+        return ResultAggregation;
     }
     
     /// <summary>

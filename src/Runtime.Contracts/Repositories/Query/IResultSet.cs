@@ -17,7 +17,12 @@ public interface IResultSet<out TDocument>
     IEnumerable<TDocument> Items { get; }
 
     /// <summary>
-    ///     Returns the grouping result
+    ///     Returns the aggregation input for the result set.
     /// </summary>
-    public IEnumerable<GroupingResult>? Grouping { get; }
+    public AggregationResult? AggregationResult { get; }
+
+    /// <summary>
+    ///     Returns the aggregation results for a field aggregation operation.
+    /// </summary>
+    public IEnumerable<FieldAggregationResult>? FieldAggregationResult { get; }
 }

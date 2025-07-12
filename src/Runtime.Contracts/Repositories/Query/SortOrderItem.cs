@@ -21,7 +21,7 @@ public class SortOrderItem
     }
 
     /// <summary>
-    ///     Gets the attribute name to sort by.
+    ///     Gets the attribute path to sort by.
     /// </summary>
     public string AttributePath { get; }
 

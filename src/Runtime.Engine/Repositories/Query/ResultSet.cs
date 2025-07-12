@@ -12,13 +12,17 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
     ///     Constructor
     /// </summary>
     /// <param name="result">Items of the current page</param>
-    /// <param name="totalCount">Total count of items based on query.</param>
-    /// <param name="groupingResults">The optional grouping results if requested.</param>
-    public ResultSet(IEnumerable<TDocument> result, long totalCount, IEnumerable<GroupingResult>? groupingResults)
+    /// <param name="totalCount">Total count of items based on a query.</param>
+    /// <param name="aggregationResults">The optional aggregation results if requested.</param>
+    /// <param name="fieldAggregationResult">The optional field aggregation results if requested.</param>
+    public ResultSet(IEnumerable<TDocument> result, long totalCount,
+        AggregationResult? aggregationResults,
+        IEnumerable<FieldAggregationResult>? fieldAggregationResult)
     {
         Items = result;
         TotalCount = totalCount;
-        Grouping = groupingResults;
+        AggregationResult = aggregationResults;
+        FieldAggregationResult = fieldAggregationResult;
     }
 
     /// <inheritdoc />
@@ -28,5 +32,8 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
     public IEnumerable<TDocument> Items { get; }
 
     /// <inheritdoc />
-    public IEnumerable<GroupingResult>? Grouping { get; }
+    public AggregationResult? AggregationResult { get; }
+
+    /// <inheritdoc />
+    public IEnumerable<FieldAggregationResult>? FieldAggregationResult { get; }
 }

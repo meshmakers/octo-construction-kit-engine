@@ -140,7 +140,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             queryable = queryable.Take(take.Value);
         }
 
-        var resultSet = new ResultSet<TEntity>(queryable, queryable.Count(), null);
+        var resultSet = new ResultSet<TEntity>(queryable, queryable.Count(), null, null);
         return resultSet;
     }
 
@@ -186,7 +186,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             pagedQueryable = pagedQueryable.Take(take.Value);
         }
 
-        var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count(), null);
+        var resultSet = new ResultSet<TEntity>(pagedQueryable, queryable.Count(), null, null);
         return resultSet;
     }
 

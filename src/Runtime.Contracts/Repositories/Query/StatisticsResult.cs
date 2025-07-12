@@ -6,9 +6,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 public class StatisticsResult
 {
     /// <summary>
-    ///     Attribute name of the calculated statistics.
+    ///     Path of attribute the calculated statistics is for.
     /// </summary>
-    public string AttributeName { get; set; } = null!;
+    public string AttributePath { get; set; } = null!;
 
     /// <summary>
     ///     Value of the calculated statistics.

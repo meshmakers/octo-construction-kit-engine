@@ -122,4 +122,10 @@ public class RuntimeRepositoryException : PersistenceException
         return new RuntimeRepositoryException(
             $"Stream data is missing for entity with id '{rtEntityId}'.");
     }
+
+    internal static Exception InvalidValueType(object value, Type type)
+    {
+        return new RuntimeRepositoryException(
+            $"Value '{value}' of type '{value.GetType().FullName}' is not valid for type '{type.FullName}'.");
+    }
 }

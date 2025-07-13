@@ -659,6 +659,18 @@ public abstract class RtTypeWithAttributes
     }
 
     /// <summary>
+    /// Sets the value of an attribute in the current object or an embedded document using the given path
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="path">Path as string to the attribute</param>
+    /// <param name="value">Value to set</param>
+    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path, object? value)
+    {
+        RtPathEvaluator.SetValue(ckCacheService, tenantId, this, path, value);
+    }
+
+    /// <summary>
     ///     Sets the value of an attribute when the value is nullable
     /// </summary>
     /// <param name="attributeName">The name of the property in PascalCase</param>

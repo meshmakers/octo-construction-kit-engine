@@ -212,6 +212,16 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
                     return -1;
                 }
 
+                if (key == null && otherKey == null)
+                {
+                    continue;
+                }
+
+                if (key != null && otherKey == null)
+                {
+                    return 1;
+                }
+
                 if (key is IComparable comparable)
                 {
                     var result = comparable.CompareTo(otherKey);
@@ -222,7 +232,14 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
                 }
                 else
                 {
-                    throw RuntimeRepositoryException.NotComparable(key);
+                    // Fallback: Use string comparison for non-comparable types
+                    var keyString = key?.ToString() ?? "";
+                    var otherKeyString = otherKey?.ToString() ?? "";
+                    var result = string.Compare(keyString, otherKeyString, StringComparison.Ordinal);
+                    if (result != 0)
+                    {
+                        return result;
+                    }
                 }
             }
 

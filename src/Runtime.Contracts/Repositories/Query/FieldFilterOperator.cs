@@ -68,5 +68,35 @@ public enum FieldFilterOperator
     /// <summary>
     ///     Matches documents that contain an array field with at least one element that matches all the specified query criteria.
     /// </summary>
-    Match = 12
+    Match = 12,
+
+    /// <summary>
+    ///     Contains substring (string comparison)
+    /// </summary>
+    Contains = 13,
+
+    /// <summary>
+    ///     Starts with prefix (string comparison)
+    /// </summary>
+    StartsWith = 14,
+
+    /// <summary>
+    ///     Ends with suffix (string comparison)
+    /// </summary>
+    EndsWith = 15,
+
+    /// <summary>
+    ///     Between two values (inclusive)
+    /// </summary>
+    Between = 16,
+
+    /// <summary>
+    ///     Is null value
+    /// </summary>
+    IsNull = 17,
+
+    /// <summary>
+    ///     Is not null value
+    /// </summary>
+    IsNotNull = 18
 }

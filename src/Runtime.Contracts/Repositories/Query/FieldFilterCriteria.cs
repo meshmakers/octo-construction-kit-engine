@@ -30,6 +30,20 @@ public record FieldFilterCriteria
 
         FieldFilters.Add(new FieldFilter(attributePath, comparisonOperator, comparisonValue));
     }
+
+    /// <summary>
+    ///     Adds a field filter to the query with a secondary value.
+    /// </summary>
+    /// <param name="attributePath">Path of attribute</param>
+    /// <param name="comparisonOperator">Operator of attribute</param>
+    /// <param name="comparisonValue">Primary comparison value of the field filter</param>
+    /// <param name="secondaryValue">Secondary comparison value (used for operators like Between)</param>
+    public void AddFieldFilter(string attributePath, FieldFilterOperator comparisonOperator, object? comparisonValue, object? secondaryValue)
+    {
+        FieldFilters ??= new List<FieldFilter>();
+
+        FieldFilters.Add(new FieldFilter(attributePath, comparisonOperator, comparisonValue, secondaryValue));
+    }
     
     /// <summary>
     /// Creates a new instance of <see cref="FieldFilterCriteria" />.

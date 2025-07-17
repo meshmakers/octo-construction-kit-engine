@@ -18,7 +18,7 @@ public record FieldFilterCriteria
     ///     Gets the logical operator for combining field filters
     /// </summary>
     public LogicalOperator Operator { get; }
-    
+
     /// <summary>
     ///     Represents field filters for specific attributes with different comparison operators.
     /// </summary>
@@ -28,7 +28,7 @@ public record FieldFilterCriteria
     ///     Gets the list of nested filters for complex logical operations
     /// </summary>
     public List<FieldFilterCriteria>? NestedFilters { get; private set; }
-    
+
     /// <summary>
     ///     Adds a field filter to the query.
     /// </summary>
@@ -49,7 +49,8 @@ public record FieldFilterCriteria
     /// <param name="comparisonOperator">Operator of attribute</param>
     /// <param name="comparisonValue">Primary comparison value of the field filter</param>
     /// <param name="secondaryValue">Secondary comparison value (used for operators like Between)</param>
-    public void AddFieldFilter(string attributePath, FieldFilterOperator comparisonOperator, object? comparisonValue, object? secondaryValue)
+    public void AddFieldFilter(string attributePath, FieldFilterOperator comparisonOperator, object? comparisonValue,
+        object? secondaryValue)
     {
         FieldFilters ??= new List<FieldFilter>();
 
@@ -70,7 +71,7 @@ public record FieldFilterCriteria
         NestedFilters ??= new List<FieldFilterCriteria>();
         NestedFilters.Add(nestedFilter);
     }
-    
+
     /// <summary>
     /// Creates a new instance of <see cref="FieldFilterCriteria" /> using the default logical operator (And).
     /// </summary>
@@ -85,11 +86,24 @@ public record FieldFilterCriteria
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
     /// <returns>New instance of <see cref="FieldFilterCriteria" /></returns>
-    public  FieldFilterCriteria Create(LogicalOperator logicalOperator)
+    public static FieldFilterCriteria Create(LogicalOperator logicalOperator)
     {
         return new FieldFilterCriteria(logicalOperator);
     }
-    
+
+    /// <summary>
+    ///     Adds a field filter
+///         that checks if the value of an attribute matches the given operator and comparison value.
+    /// </summary>
+    /// <param name="attributePath">Path of attribute</param>
+    /// <param name="fieldFilterOperator">Operator of attribute</param>
+    /// <param name="comparisonValue">Comparison value of the field filter</param>
+    public FieldFilterCriteria Field(string attributePath, FieldFilterOperator fieldFilterOperator, object? comparisonValue)
+    {
+        AddFieldFilter(attributePath, fieldFilterOperator, comparisonValue);
+        return this;
+    }
+
     /// <summary>
     ///     Adds a field filter that checks if the value of an attribute contains the given substring.
     /// </summary>

@@ -1,3 +1,5 @@
+using Meshmakers.Common.Shared;
+
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
@@ -101,6 +103,25 @@ public record FieldFilterCriteria
     public FieldFilterCriteria Field(string attributePath, FieldFilterOperator fieldFilterOperator, object? comparisonValue)
     {
         AddFieldFilter(attributePath, fieldFilterOperator, comparisonValue);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds a collection of field filters to the criteria.
+    /// </summary>
+    /// <param name="fieldFilters">Collection of field filters to add</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException">Thrown when the collection is null or empty.</exception>
+    public FieldFilterCriteria Fields(ICollection<FieldFilter> fieldFilters)
+    {
+        ArgumentValidation.Validate(nameof(fieldFilters), fieldFilters);
+
+        FieldFilters ??= new List<FieldFilter>();
+        foreach (var fieldFilter in fieldFilters)
+        {
+            FieldFilters.Add(fieldFilter);
+        }
+
         return this;
     }
 

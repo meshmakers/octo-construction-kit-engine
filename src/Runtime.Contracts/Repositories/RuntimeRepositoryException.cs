@@ -70,10 +70,10 @@ public class RuntimeRepositoryException : PersistenceException
             $"Document with key '{key}' of type '{documentType.FullName}' does not exist in tenant '{tenantId}'.");
     }
 
-    internal static Exception FieldFilterDidNotReturnResult(Type type, ICollection<FieldFilter> fieldFilters)
+    internal static Exception FieldFilterDidNotReturnResult(Type type, FieldFilterCriteria fieldFilterCriteria)
     {
         return new RuntimeRepositoryException(
-            $"Field filter did not return a result for type '{type.FullName}' and field filters '{string.Join(", ", fieldFilters)}'.");
+            $"Field filter did not return a result for type '{type.FullName}' with criteria: {fieldFilterCriteria}");
     }
 
     internal static Exception AttributeFilterNotSupportedByDataSource(Type type)
@@ -127,5 +127,12 @@ public class RuntimeRepositoryException : PersistenceException
     {
         return new RuntimeRepositoryException(
             $"Value '{value}' of type '{value.GetType().FullName}' is not valid for type '{type.FullName}'.");
+    }
+
+    internal static Exception FieldFilterCriteriaNestedFiltersUnsupported(Type type, FieldFilterCriteria fieldFilterCriteria)
+    {
+        return new RuntimeRepositoryException(
+            $"Field filter criteria with nested filters is not supported for type '{type.FullName}'." +
+            $" Field filter criteria: {fieldFilterCriteria}");
     }
 }

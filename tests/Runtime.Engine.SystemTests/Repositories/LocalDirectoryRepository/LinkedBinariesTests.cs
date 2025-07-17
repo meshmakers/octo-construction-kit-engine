@@ -70,6 +70,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         var replaceBinaryEntity = new RtBinaryEntity
         {
+            DataCount = 5,
             Binary = new EntityBinaryInfo
             {
                 Filename = "Products.pdf",

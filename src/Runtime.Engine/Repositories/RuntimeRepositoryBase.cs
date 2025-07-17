@@ -262,22 +262,22 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task ReplaceOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task ReplaceOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
         await ReplaceOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
-                fieldFilters, rtEntity)
+                fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -296,41 +296,41 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task UpdateOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task UpdateOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
         await UpdateOneRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
-                fieldFilters, rtEntity)
+                fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task UpdateManyRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task UpdateManyRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         RtEntity rtEntity)
     {
         await UpdateManyRtEntityAsync(session, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
-                fieldFilters, rtEntity)
+                fieldFilterCriteria, rtEntity)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters,
+    public async Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilters, rtEntity).ConfigureAwait(false);
+        await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -357,34 +357,34 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public async Task DeleteOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters)
+        FieldFilterCriteria fieldFilterCriteria)
     {
-        await DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilters).ConfigureAwait(false);
+        await DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters)
+    public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilters).ConfigureAwait(false);
+        await DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters)
+        FieldFilterCriteria fieldFilterCriteria)
     {
-        await DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilters).ConfigureAwait(false);
+        await DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters)
+    public async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
 
-        await DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilters).ConfigureAwait(false);
+        await DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -419,7 +419,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime,
+    public Task<OctoObjectId> UploadTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType,
+        DateTime expiryDateTime,
         Stream stream, CancellationToken cancellationToken = default)
     {
         return RepositoryDataSource.UploadTemporaryBinaryAsync(session, filename, contentType, expiryDateTime, stream,
@@ -427,7 +428,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
+    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename,
+        string contentType, Stream stream,
         CancellationToken cancellationToken = default)
     {
         return RepositoryDataSource.ReplaceTemporaryLargeBinaryAsync(session, filename, contentType, stream,
@@ -451,13 +453,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId binaryId, CancellationToken cancellationToken = default)
+    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId binaryId,
+        CancellationToken cancellationToken = default)
     {
         return RepositoryDataSource.GetTemporaryBinaryAsync(session, binaryId, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, string fileName, CancellationToken cancellationToken = default)
+    public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, string fileName,
+        CancellationToken cancellationToken = default)
     {
         return RepositoryDataSource.GetTemporaryBinaryAsync(session, fileName, cancellationToken);
     }
@@ -605,34 +609,34 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Deletes a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Updates a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
@@ -661,24 +665,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Replace a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters, TEntity rtEntity) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Replace a single runtime entity

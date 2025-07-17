@@ -283,20 +283,20 @@ public interface IRuntimeRepository
     ///     Replace a single runtime entity
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="entity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task ReplaceOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity entity);
+    Task ReplaceOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, RtEntity entity);
 
     /// <summary>
     ///     Replace a single runtime entity
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="entity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters, TEntity entity)
+    Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, TEntity entity)
         where TEntity : RtEntity, new();
 
 
@@ -326,40 +326,40 @@ public interface IRuntimeRepository
     ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task UpdateOneRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity);
+    Task UpdateOneRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, RtEntity rtEntity);
 
     /// <summary>
     ///     Updates a single runtime entity. Only attributes of the entity that are set in the update object are updated.
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
+    Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity)
         where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Updates a multiple runtime entities. Only attributes of the entity that are set in the update object are updated.
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task UpdateManyRtEntityAsync(IOctoSession session, ICollection<FieldFilter> fieldFilters, RtEntity rtEntity);
+    Task UpdateManyRtEntityAsync(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, RtEntity rtEntity);
 
     /// <summary>
     ///     Updates multiple runtime entities. Only attributes of the entity that are set in the update object are updated.
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters, TEntity rtEntity)
+    Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -386,18 +386,18 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <returns></returns>
-    Task DeleteOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<FieldFilter> fieldFilters);
+    Task DeleteOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, FieldFilterCriteria fieldFilterCriteria);
 
     /// <summary>
     ///     Deletes a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters)
+    Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -405,19 +405,19 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <returns></returns>
     Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
-        ICollection<FieldFilter> fieldFilters);
+        FieldFilterCriteria fieldFilterCriteria);
 
     /// <summary>
     ///     Deletes all entities with the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
-    /// <param name="fieldFilters">A collection of filter objects</param>
+    /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, ICollection<FieldFilter> fieldFilters)
+    Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new();
 
     #endregion Modification (simple)

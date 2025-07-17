@@ -47,7 +47,7 @@ steps:
           $(System.DefaultWorkingDirectory) &&
         docker buildx rm mybuilder
   - task: CmdLine@2
-    condition: and(ne(variables.isMain, true), ne(variables.isRelease, true))
+    condition: and(ne(variables.isMain, true), ne(variables.isTest, true), ne(variables.isRelease, true))
     displayName: Build ONLY for non-main branch ${{ parameters.Repository }}:$(Build.BuildNumber)
     inputs:
       script: |

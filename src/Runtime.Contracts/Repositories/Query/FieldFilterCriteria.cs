@@ -8,15 +8,26 @@ public record FieldFilterCriteria
     /// <summary>
     /// Creates a new instance of <see cref="FieldFilterCriteria" />
     /// </summary>
-    protected FieldFilterCriteria()
+    /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
+    protected FieldFilterCriteria(LogicalOperator logicalOperator = LogicalOperator.And)
     {
-        
+        Operator = logicalOperator;
     }
+
+    /// <summary>
+    ///     Gets the logical operator for combining field filters
+    /// </summary>
+    public LogicalOperator Operator { get; }
     
     /// <summary>
     ///     Represents field filters for specific attributes with different comparison operators.
     /// </summary>
     public ICollection<FieldFilter>? FieldFilters { get; private set; }
+
+    /// <summary>
+    ///     Gets the list of nested filters for complex logical operations
+    /// </summary>
+    public List<FieldFilterCriteria>? NestedFilters { get; private set; }
     
     /// <summary>
     ///     Adds a field filter to the query.
@@ -44,13 +55,38 @@ public record FieldFilterCriteria
 
         FieldFilters.Add(new FieldFilter(attributePath, comparisonOperator, comparisonValue, secondaryValue));
     }
+
+    /// <summary>
+    ///     Adds a nested filter to the entity filter
+    /// </summary>
+    /// <param name="nestedFilter">The nested filter to add</param>
+    public void AddNestedFilter(FieldFilterCriteria nestedFilter)
+    {
+        if (nestedFilter == null)
+        {
+            throw new ArgumentNullException(nameof(nestedFilter));
+        }
+
+        NestedFilters ??= new List<FieldFilterCriteria>();
+        NestedFilters.Add(nestedFilter);
+    }
     
     /// <summary>
-    /// Creates a new instance of <see cref="FieldFilterCriteria" />.
+    /// Creates a new instance of <see cref="FieldFilterCriteria" /> using the default logical operator (And).
     /// </summary>
-    /// <returns></returns>
+    /// <returns>New instance of <see cref="FieldFilterCriteria" /></returns>
     public static FieldFilterCriteria Create()
     {
         return new FieldFilterCriteria();
+    }
+
+    /// <summary>
+    /// Creates a new instance of <see cref="FieldFilterCriteria" />.
+    /// </summary>
+    /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
+    /// <returns>New instance of <see cref="FieldFilterCriteria" /></returns>
+    public static FieldFilterCriteria Create(LogicalOperator logicalOperator)
+    {
+        return new FieldFilterCriteria(logicalOperator);
     }
 }

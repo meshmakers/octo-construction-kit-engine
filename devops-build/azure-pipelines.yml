@@ -5,6 +5,7 @@ trigger:
   branches:
     include:
       - dev/*
+      - test/*
       - main
   tags:
     exclude:
@@ -23,8 +24,8 @@ variables:
   value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
 - name: isMain
   value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
-- name: MinorVersion
-  value: '2'
+- name: isTest
+  value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
 
 stages:
  - stage: Build

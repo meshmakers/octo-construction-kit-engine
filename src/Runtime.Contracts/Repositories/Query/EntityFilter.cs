@@ -1,3 +1,4 @@
+// ReSharper disable MemberCanBePrivate.Global
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>

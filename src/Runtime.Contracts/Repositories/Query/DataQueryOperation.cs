@@ -10,8 +10,10 @@ public record DataQueryOperation : FieldFilterCriteria
     /// <summary>
     ///     Constructor
     /// </summary>
-    /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
-    private DataQueryOperation(string language = "en")
+    /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
+    /// <param name="language">The language to use for text search. This text has to be the two-letter ISO language name.</param>
+    private DataQueryOperation(LogicalOperator logicalOperator = LogicalOperator.And, string language = "en")
+     : base(logicalOperator)
     {
         Language = language;
     }
@@ -55,11 +57,12 @@ public record DataQueryOperation : FieldFilterCriteria
     /// <summary>
     ///     Creates a new instance of <see cref="DataQueryOperation" />.
     /// </summary>
-    /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
+    /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
+    /// <param name="language">The language to use for text search. This text has to be the two-letter ISO language name.</param>
     /// <returns></returns>
-    public static DataQueryOperation Create(string language = "en")
+    public static DataQueryOperation Create(LogicalOperator logicalOperator = LogicalOperator.And, string language = "en")
     {
-        return new DataQueryOperation(language);
+        return new DataQueryOperation(logicalOperator, language);
     }
 
     /// <summary>

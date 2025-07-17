@@ -65,7 +65,7 @@ stages:
 
       - template: build-and-push-docker-image.yml
         parameters:
-          ContainerRegistry: $(DockerRegistryPublicConnection)
+          PublicRegistryServiceConnection: $(DockerRegistryPublicConnection)
           Repository: meshmakers/octo-schema-provider
           Dockerfile: src/ConstructionKit.SchemaProvider/Dockerfile
           PrivateRegistry: $(DockerRegistryPrivateUri)

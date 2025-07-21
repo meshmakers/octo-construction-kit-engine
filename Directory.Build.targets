@@ -12,66 +12,62 @@
     
     <!--Defining all the text files input parameters-->
     <ItemGroup>
-        <ConstructionKitConfigFile Include="$(MSBuildProjectDirectory)/construction-kits.yaml"/>
+        <ConstructionKitConfigFile Include="$(MSBuildProjectDirectory)/construction-kits.yaml" />
     </ItemGroup>
 
     <Target Name="GatherCompileFiles">
         <ItemGroup>
-            <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" />
-            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
+            <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder-&gt;'%(Identity)/**/*.yaml')" />
+            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
         </ItemGroup>
     </Target>
 
     <Target Name="GatherImportFiles">
         <ItemGroup>
             <ConstructionKitFolderInputImportFiles Include="@(ConstructionKitConfigFile)" />
-            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml"/>
+            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml" />
         </ItemGroup>
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
-    <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
-            DependsOnTargets="GatherCompileFiles">
+    <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)" DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
-        <Message Importance="High" Text="Using construction kit compiler located at '$(MSBuildThisFileDirectory)'"/>
+        <Message Importance="High" Text="Using construction kit compiler located at '$(MSBuildThisFileDirectory)'" />
         <ItemGroup>
             <!-- Define a temporary item group to iterate through -->
-            <_ConstructionKitFolder Include="@(ConstructionKitFolder)"/>
+            <_ConstructionKitFolder Include="@(ConstructionKitFolder)" />
         </ItemGroup>
 
-        <Message Condition="!Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Create new construction kit library"/>
+        <Message Condition="!Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Create new construction kit library" />
         <Exec Condition="!Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c new -p %(_ConstructionKitFolder.Identity)">
         </Exec>
 
-        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
+        <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)" />
         <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o  $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" ItemName="CompiledModelFiles" />
         </Exec>
         
         <ItemGroup>
             <!-- Define a temporary item group to iterate through -->
-            <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
+            <_CompiledModelFiles Include="@(CompiledModelFiles)" />
         </ItemGroup>
-        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to repo $(OctoPublishCkModelRepo)"/>
+        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to repo $(OctoPublishCkModelRepo)" />
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -rep $(OctoPublishCkModelRepo) -r">
         </Exec>
         
-        <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
-                 Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>
-        <Exec Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" 
-              Command="$(OctoCompilerToolPath) -c generateDocs -f %(_CompiledModelFiles.Identity) -o $(OctoCkCompileOutputCompilerFolder) -l $(OctoCkLinkPath)">
+        <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)" />
+        <Exec Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c generateDocs -f %(_CompiledModelFiles.Identity) -o $(OctoCkCompileOutputCompilerFolder) -l $(OctoCkLinkPath)">
         </Exec>
     </Target>
 
-    <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
-            DependsOnTargets="GatherImportFiles">      
-        <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
+    <Target Name="CkRestore" BeforeTargets="BeforeBuild" DependsOnTargets="GatherImportFiles">      
+        <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)" />
         <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder)">
         </Exec>
     </Target>
     
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild" >
+    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild">
         <ItemGroup>
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">

@@ -244,7 +244,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             return _ => true; // Return a true predicate if no filters are provided
         }
 
-        if (!fieldFilterCriteria.NestedFilters?.Any() == true)
+        if (fieldFilterCriteria.NestedFilters?.Any() == true)
         {
             throw RuntimeRepositoryException.FieldFilterCriteriaNestedFiltersUnsupported(
                 typeof(TEntity), fieldFilterCriteria);

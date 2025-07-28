@@ -5,6 +5,7 @@ trigger:
   branches:
     include:
       - dev/*
+      - test/*
       - main
   tags:
     exclude:
@@ -23,6 +24,8 @@ variables:
   value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
 - name: isMain
   value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+- name: isTest
+  value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
 
 stages:
  - stage: Build
@@ -62,10 +65,10 @@ stages:
 
       - template: build-and-push-docker-image.yml
         parameters:
-          ContainerRegistry: $(DockerRegistryPublicConnection)
+          PublicRegistryServiceConnection: $(DockerRegistryPublicConnection)
+          PrivateRegistryName: $(DockerRegistryPrivateUri)
           Repository: meshmakers/octo-schema-provider
           Dockerfile: src/ConstructionKit.SchemaProvider/Dockerfile
-          PrivateRegistry: $(DockerRegistryPrivateUri)
       - task: PowerShell@2
         inputs:
           filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'

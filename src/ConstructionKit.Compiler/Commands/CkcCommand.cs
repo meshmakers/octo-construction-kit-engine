@@ -44,6 +44,10 @@ internal abstract class CkcCommand : Command<OctoToolOptions>
     
     private void DetailedOutput()
     {
+        if (LogManager.Configuration == null)
+        {
+            return;
+        }
         foreach (var rule in LogManager.Configuration.LoggingRules)
         {
             rule.EnableLoggingForLevels(NLog.LogLevel.Trace, NLog.LogLevel.Info);
@@ -54,6 +58,10 @@ internal abstract class CkcCommand : Command<OctoToolOptions>
     
     private void DisableOutput()
     {
+        if (LogManager.Configuration == null)
+        {
+            return;
+        }
         foreach (var rule in LogManager.Configuration.LoggingRules)
         {
             rule.DisableLoggingForLevels(NLog.LogLevel.Trace, NLog.LogLevel.Info);

@@ -222,10 +222,9 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
         var updateEntity = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
         updateEntity.Designation = "TestSensor154737";
 
-        await localDirectoryRepository.UpdateManyRtEntityAsync(new LocalSession(), new List<FieldFilter>
-        {
-            new(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor0")
-        }, updateEntity);
+        await localDirectoryRepository.UpdateManyRtEntityAsync(new LocalSession(),
+            FieldFilterCriteria.Create().FieldEquals(TestCkIds.DesignationAttribute, "TestSensor0"),
+            updateEntity);
 
         var dataQueryOperation = DataQueryOperation.Create()
             .FieldFilter(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor154737");

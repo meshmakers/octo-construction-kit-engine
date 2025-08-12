@@ -6,6 +6,7 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 
 // ReSharper disable MemberCanBePrivate.Global
 
@@ -48,6 +49,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public string TenantId { get; }
 
+    /// <summary>
+    /// Loads the cache for the tenant using the provided cache service.
+    /// </summary>
+    /// <param name="cacheService">The cache service to use for loading the cache.</param>
+    public async Task LoadCacheForTenantAsync(ICkCacheService cacheService)
+    {
+        await RefreshCkCacheServiceAsync(cacheService).ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public abstract Task<IOctoSession> GetSessionAsync();
@@ -114,30 +123,43 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        OctoObjectId rtId,
-        GraphDirections direction)
+    public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        RtEntityId rtEntityId, GraphDirections direction, int? skip = null, int? take = null)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction).ConfigureAwait(false);
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], direction).ConfigureAwait(false);
+
+        return r.Values.FirstOrDefault() ??
+               new ResultSet<RtAssociation>(new List<RtAssociation>(), 0, null, null);
     }
 
     /// <inheritdoc />
-    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<OctoObjectId> rtIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    public async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, int? skip = null,
+        int? take = null)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtIds, direction, roleId)
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, direction, skip, take)
             .ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
+    public virtual async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null,
+        int? take = null)
+    {
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, direction, roleId)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
-    public virtual async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        OctoObjectId rtId,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
+    public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        RtEntityId rtEntityId, GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null,
+        int? take = null)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtId, direction, roleId)
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], direction, roleId)
             .ConfigureAwait(false);
+
+        return r.Values.FirstOrDefault() ??
+               new ResultSet<RtAssociation>(new List<RtAssociation>(), 0, null, null);
     }
 
     /// <inheritdoc />
@@ -718,4 +740,37 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
         CkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null) where TEntity : RtEntity, new();
+
+
+    #region Advanced functionality
+
+    /// <inheritdoc />
+    public async Task<AggregatedBulkImportResult> BulkInsertRtEntitiesAsync(IOctoSession session,
+        IEnumerable<RtEntity> rtEntityList, BulkOperationOptions options)
+    {
+        var results = new List<IBulkImportResult>();
+        foreach (var groupedEntities in rtEntityList.GroupBy(x => x.CkTypeId))
+        {
+            if (groupedEntities.Key == null)
+            {
+                throw PersistenceException.CkTypeIdNotSet();
+            }
+
+            var ckTypeGraph = await GetCkTypeGraphAsync(groupedEntities.Key).ConfigureAwait(false);
+
+            results.Add(await RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph)
+                .BulkImportAsync(session, groupedEntities, options).ConfigureAwait(false));
+        }
+
+        return new AggregatedBulkImportResult(results);
+    }
+
+    /// <inheritdoc />
+    public async Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options)
+    {
+        return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, rtAssociations, options).ConfigureAwait(false);
+    }
+
+    #endregion Advanced functionality
 }

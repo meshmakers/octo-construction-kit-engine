@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
@@ -14,6 +15,13 @@ public interface IRuntimeRepository
     ///     Returns the tenant id
     /// </summary>
     string TenantId { get; }
+
+    /// <summary>
+    /// Loads the construction kit cache for the tenant based on the data in the repository.
+    /// </summary>
+    /// <param name="cacheService">Cache service to load the cache into</param>
+    /// <returns></returns>
+    Task LoadCacheForTenantAsync(ICkCacheService cacheService);
 
     #region Transaction Handling
 
@@ -102,33 +110,39 @@ public interface IRuntimeRepository
     ///     Gets associations for a runtime entity.
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtId">Object id of the runtime entity</param>
+    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
     /// <param name="direction">Direction of associations to get</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction);
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
+        GraphDirections direction, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtId">Object id of the runtime entity</param>
+    /// <param name="rtEntityId">Runtime entity identifier to get associations for</param>
     /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">Association role</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
+    Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, RtEntityId rtEntityId,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     /// Gets associations for multiple runtime entities of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtIds">Object ids of the runtime entities</param>
+    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
     /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">Association role</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Gets an association by its origin, target and role id.
@@ -527,6 +541,29 @@ public interface IRuntimeRepository
         CancellationToken cancellationToken = default);
 
     #endregion Large Binaries
+
+    #region Advanced functionality
+
+    /// <summary>
+    /// Imports a list of runtime entities in bulk.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtEntityList">List of runtime entities to import</param>
+    /// <param name="options">Bulk operation options for the import</param>
+    /// <returns>Aggregated result of the bulk import operation</returns>
+    Task<AggregatedBulkImportResult>
+        BulkInsertRtEntitiesAsync(IOctoSession session, IEnumerable<RtEntity> rtEntityList, BulkOperationOptions options);
+
+    /// <summary>
+    /// Imports a list of runtime entities in bulk.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="rtAssociations">List of runtime associations to import</param>
+    /// <param name="options">Bulk operation options for the import</param>
+    /// <returns>Aggregated result of the bulk import operation</returns>
+    Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session, IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options);
+
+    #endregion Advanced functionality
 
     /// <summary>
     /// Gets the construction kit type graph from the cache service

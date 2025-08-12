@@ -2,7 +2,9 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
@@ -36,93 +38,98 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     public abstract IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction)
+    public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, int? skip = null,
+        int? take = null)
     {
-        var associations = new List<RtAssociation>();
-        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                x.TargetRtId == rtId));
-        }
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                x.OriginRtId == rtId));
-        }
-
-        return associations;
+        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), direction, null, skip, take);
     }
+
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<OctoObjectId> rtIds, GraphDirections direction)
+    public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId> roleId,
+        int? skip = null,
+        int? take = null)
     {
-        var associations = new List<RtAssociation>();
+        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), direction, roleId, skip, take);
+    }
+
+    private async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsInternalAsync(IOctoSession session,
+        ICollection<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId>? roleId,
+        int? skip = null,
+        int? take = null)
+    {
+        var associations = new Dictionary<RtEntityId, List<RtAssociation>>();
+        foreach (var rtEntityId in rtEntityIds)
+        {
+            associations.Add(rtEntityId, new List<RtAssociation>());
+        }
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
         {
-            associations.AddRange(queryable.Where(x =>
-                rtIds.Contains(x.TargetRtId)));
+            foreach (var rtAssociation in queryable.Where(x =>
+                         rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
+                                                       rtEntityId.CkTypeId == x.TargetCkTypeId &&
+                                                       roleId == null || x.AssociationRoleId == roleId)))
+            {
+                // Add the association to the dictionary if it does not already exist
+                var rtEntityId = new RtEntityId(rtAssociation.TargetCkTypeId, rtAssociation.TargetRtId);
+                if (!associations.ContainsKey(rtEntityId))
+                {
+                    associations.Add(rtEntityId, [rtAssociation]);
+                }
+                else
+                {
+                    associations[rtEntityId].Add(rtAssociation);
+                }
+            }
         }
 
         if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
         {
-            associations.AddRange(queryable.Where(x =>
-                rtIds.Contains(x.OriginRtId)));
+            foreach (var rtAssociation in queryable.Where(x => rtEntityIds.Any(rtEntityId =>
+                             rtEntityId.RtId == x.OriginRtId &&
+                             rtEntityId.CkTypeId == x.OriginCkTypeId &&
+                             roleId == null || x.AssociationRoleId == roleId)))
+            {
+                // Add the association to the dictionary if it does not already exist
+                var rtEntityId = new RtEntityId(rtAssociation.OriginCkTypeId, rtAssociation.OriginRtId);
+                if (!associations.ContainsKey(rtEntityId))
+                {
+                    associations.Add(rtEntityId, [rtAssociation]);
+                }
+                else
+                {
+                    associations[rtEntityId].Add(rtAssociation);
+                }
+            }
         }
 
-        return associations;
+
+        var multipleResult =
+            associations.ToDictionary(kvp => kvp.Key,
+                kvp => new ResultSet<RtAssociation>(kvp.Value, kvp.Value.Count, null, null));
+        if (skip.HasValue)
+        {
+            foreach (var resultSetValue in multipleResult.Values)
+            {
+                resultSetValue.Skip(skip.Value);
+            }
+        }
+
+        if (take.HasValue)
+        {
+            foreach (var resultSetValue in multipleResult.Values)
+            {
+                resultSetValue.Take(take.Value);
+            }
+        }
+
+        return new AssociationMultipleOriginResultSet(multipleResult);
     }
 
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
-    {
-        var associations = new List<RtAssociation>();
-        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                x.TargetRtId == rtId && x.AssociationRoleId == roleId));
-        }
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                x.OriginRtId == rtId && x.AssociationRoleId == roleId));
-        }
-
-        return associations;
-    }
-
-    /// <inheritdoc />
-    public async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<OctoObjectId> rtIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId)
-    {
-        var associations = new List<RtAssociation>();
-        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                rtIds.Contains(x.TargetRtId) && x.AssociationRoleId == roleId));
-        }
-
-        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
-        {
-            associations.AddRange(queryable.Where(x =>
-                rtIds.Contains(x.OriginRtId) && x.AssociationRoleId == roleId));
-        }
-
-        return associations;
-    }
 
     /// <inheritdoc />
     public abstract Task<IReadOnlyList<RtAssociationsMultiplicityResult>> GetRtAssociationsMultiplicityAsync(

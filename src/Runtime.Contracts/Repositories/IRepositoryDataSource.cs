@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
@@ -34,46 +35,29 @@ public interface IRepositoryDataSource
         where TEntity : RtEntity, new();
 
     /// <summary>
-    ///     Gets associations for a runtime entity.
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtId">Object id of the runtime entity</param>
-    /// <param name="direction">Direction of associations to get</param>
-    /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction);
-
-    /// <summary>
     ///     Gets associations for multiple runtime entities.
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtIds">Object id of runtime entities</param>
+    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
     /// <param name="direction">Direction of associations to get</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
-        GraphDirections direction);
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
+        GraphDirections direction, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="rtId">Object id of the runtime entity</param>
+    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
     /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">The construction kit role to get</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, OctoObjectId rtId,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
-
-    /// <summary>
-    ///     Gets associations for a runtime entity of a specific role
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtIds">Object id of runtime entities</param>
-    /// <param name="direction">Direction of associations to get</param>
-    /// <param name="roleId">The construction kit role to get</param>
-    /// <returns></returns>
-    Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<OctoObjectId> rtIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId);
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
+        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity

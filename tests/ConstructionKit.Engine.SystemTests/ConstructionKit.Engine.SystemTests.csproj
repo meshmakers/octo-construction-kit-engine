@@ -11,7 +11,7 @@
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
     <Import Project="../../src/ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props" />
-    
+
     <ItemGroup>
       <PackageReference Include="MartinCostello.Logging.XUnit.v3" Version="0.6.0" />
       <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.7" />

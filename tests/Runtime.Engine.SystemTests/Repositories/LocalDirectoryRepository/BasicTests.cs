@@ -272,10 +272,11 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
 
 
         var rtAssociations =
-            await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(), rtZone.RtId,
+            await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(),
+                rtZone.ToRtEntityId(),
                 GraphDirections.Inbound);
 
-        var associations = rtAssociations.ToList();
+        var associations = rtAssociations.Items.ToList();
         Assert.Single(associations);
         var assoc = associations.First();
 

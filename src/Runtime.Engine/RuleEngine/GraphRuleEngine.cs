@@ -119,10 +119,15 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         // Delete all corresponding associations if an entity is deleted  
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete).AsParallel())
         {
+            var rtEntityId = new RtEntityId(entityUpdateInfo.CkTypeId,
+                entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet());
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet(),
+                [rtEntityId],
                 GraphDirections.Any).ConfigureAwait(false);
-            graphRuleEngineResult.RtAssociationsToDelete.AddRange(result);
+            if (result.TryGetValue(rtEntityId, out var value))
+            {
+                graphRuleEngineResult.RtAssociationsToDelete.AddRange(value.Items);
+            }
         }
     }
 

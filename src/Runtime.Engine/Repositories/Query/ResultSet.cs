@@ -8,6 +8,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 /// <typeparam name="TDocument">Type of document</typeparam>
 public class ResultSet<TDocument> : IResultSet<TDocument>
 {
+    private List<TDocument> _items;
+
     /// <summary>
     ///     Constructor
     /// </summary>
@@ -19,7 +21,7 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
         AggregationResult? aggregationResults,
         IEnumerable<FieldAggregationResult>? fieldAggregationResult)
     {
-        Items = result;
+        _items = result.ToList();
         TotalCount = totalCount;
         AggregationResult = aggregationResults;
         FieldAggregationResult = fieldAggregationResult;
@@ -29,11 +31,29 @@ public class ResultSet<TDocument> : IResultSet<TDocument>
     public long TotalCount { get; }
 
     /// <inheritdoc />
-    public IEnumerable<TDocument> Items { get; }
+    public IEnumerable<TDocument> Items => _items;
 
     /// <inheritdoc />
     public AggregationResult? AggregationResult { get; }
 
     /// <inheritdoc />
     public IEnumerable<FieldAggregationResult>? FieldAggregationResult { get; }
+
+    /// <summary>
+    /// Skips a number of items in the result set.
+    /// </summary>
+    /// <param name="count">The number of items to skip.</param>
+    public void Skip(int count)
+    {
+        _items = _items.Skip(count).ToList();
+    }
+
+    /// <summary>
+    /// Takes a number of items from the result set.
+    /// </summary>
+    /// <param name="count">The number of items to take.</param>
+    public void Take(int count)
+    {
+        _items = _items.Take(count).ToList();
+    }
 }

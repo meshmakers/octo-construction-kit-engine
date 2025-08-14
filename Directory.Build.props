@@ -40,7 +40,7 @@
     <PropertyGroup>
         <OctoCkLinkPath>/docs/technologyGuide/constructionKits/libraries/</OctoCkLinkPath>
     </PropertyGroup>
-    <PropertyGroup Condition="'$(Configuration)' == 'DebugL'">
+    <PropertyGroup Condition=" '$(Configuration)' == 'DebugL' ">
         <DebugSymbols>true</DebugSymbols>
         <DebugType>full</DebugType>
         <Optimize>false</Optimize>

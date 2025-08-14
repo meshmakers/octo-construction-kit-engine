@@ -30,7 +30,7 @@ internal class ImportRtModelCommand(
     private int _associationsCount;
 
     public async Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText,
-        CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
     {
         logger.LogInformation("Importing RT entities using text started");
 
@@ -43,7 +43,8 @@ internal class ImportRtModelCommand(
             var rtModelRoot = await _rtYamlSerializer.DeserializeAsync(jsonText, "-", operationResult)
                 .ConfigureAwait(false);
             ValidateCkModels(runtimeRepository.TenantId, rtModelRoot.Dependencies);
-            await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository).ConfigureAwait(false);
+            await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository, importStrategy)
+                .ConfigureAwait(false);
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
 
@@ -58,7 +59,7 @@ internal class ImportRtModelCommand(
     }
 
     public async Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootDto rtModelRoot,
-        CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
     {
         logger.LogInformation("Importing RT entities using text started");
 
@@ -73,7 +74,8 @@ internal class ImportRtModelCommand(
             session.StartTransaction();
 
             ValidateCkModels(runtimeRepository.TenantId, rtModelRoot.Dependencies);
-            await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository).ConfigureAwait(false);
+            await ImportEntityAsync(session, rtModelRoot.Entities, runtimeRepository, importStrategy)
+                .ConfigureAwait(false);
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
 
@@ -88,7 +90,7 @@ internal class ImportRtModelCommand(
     }
 
     public async Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
-        CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
     {
         logger.LogInformation("Importing RT entities using file started");
 
@@ -113,7 +115,8 @@ internal class ImportRtModelCommand(
                     var rtModelRootDto = await _rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult)
                         .ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
-                    await ImportEntityAsync(session, rtModelRootDto.Entities, runtimeRepository).ConfigureAwait(false);
+                    await ImportEntityAsync(session, rtModelRootDto.Entities, runtimeRepository, importStrategy)
+                        .ConfigureAwait(false);
                 }
                 else
                 {
@@ -121,7 +124,7 @@ internal class ImportRtModelCommand(
                         .ConfigureAwait(false);
                     rtDeserializeStream.BulkDeserialized += async (_, args) =>
                     {
-                        await ImportEntityAsync(session, args.DeserializedEntities, runtimeRepository)
+                        await ImportEntityAsync(session, args.DeserializedEntities, runtimeRepository, importStrategy)
                             .ConfigureAwait(false);
 
                         args.IsHandled = true;
@@ -153,7 +156,7 @@ internal class ImportRtModelCommand(
     }
 
     private async Task ImportEntityAsync(IOctoSession session, IEnumerable<RtEntityDto> modelRtEntities,
-        IRuntimeRepository runtimeRepository)
+        IRuntimeRepository runtimeRepository, ImportStrategy importStrategy)
     {
 #if NETSTANDARD2_0
         Parallel.ForEach(modelRtEntities, modelRtEntity =>
@@ -217,11 +220,14 @@ internal class ImportRtModelCommand(
                     Interlocked.Increment(ref _associationsCount);
                 }
             }
+#if NETSTANDARD2_0
         });
-
+#else
+        }).ConfigureAwait(false);
+#endif
         logger.LogInformation("{EntityCount} entities (total imports of {Count}) imported", _importEntityQueue.Count,
             _entityImportIds.Count);
-        await ImportToDatabase(session, runtimeRepository).ConfigureAwait(false);
+        await ImportToDatabase(session, runtimeRepository, importStrategy).ConfigureAwait(false);
     }
 
     private void AssignAttributes<TKey>(IRuntimeRepository runtimeRepository,
@@ -349,7 +355,8 @@ internal class ImportRtModelCommand(
         }
     }
 
-    private async Task ImportToDatabase(IOctoSession session, IRuntimeRepository runtimeRepository)
+    private async Task ImportToDatabase(IOctoSession session, IRuntimeRepository runtimeRepository,
+        ImportStrategy importStrategy)
     {
         logger.LogInformation("Importing {Count} to database", _importEntityQueue.Count);
 
@@ -385,18 +392,22 @@ internal class ImportRtModelCommand(
                 }
             }
 
+            var bulkInsertStrategy = importStrategy == ImportStrategy.Insert
+                ? BulkInsertStrategy.InsertOnly
+                : BulkInsertStrategy.Upsert;
+
             if (importEntities.Any())
             {
                 logger.LogInformation("Adding entities...");
                 await runtimeRepository.BulkInsertRtEntitiesAsync(session, importEntities,
-                    new BulkOperationOptions { InsertStrategy = BulkInsertStrategy.InsertOnly }).ConfigureAwait(false);
+                    new BulkOperationOptions { InsertStrategy = bulkInsertStrategy }).ConfigureAwait(false);
             }
 
             if (importAssociations.Any())
             {
                 logger.LogInformation("Adding associations...");
                 await runtimeRepository.BulkRtAssociationsAsync(session, importAssociations,
-                    new BulkOperationOptions { InsertStrategy = BulkInsertStrategy.InsertOnly }).ConfigureAwait(false);
+                    new BulkOperationOptions { InsertStrategy = bulkInsertStrategy }).ConfigureAwait(false);
             }
 
 

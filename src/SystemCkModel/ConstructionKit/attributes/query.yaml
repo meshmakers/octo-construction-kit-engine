@@ -1,23 +1,5 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
-  - id: Name
-    valueType: String
-  - id: DisplayName
-    valueType: String
-  - id: Description
-    valueType: String
-    description: Further information on the item.
-  - id: Enabled
-    valueType: Boolean
-  - id: TenantId
-    valueType: String
-  - id: ParentTenantId
-    valueType: String
-  - id: DatabaseName
-    valueType: String
-  - id: ConfigurationValue
-    valueType: String
-    
   - id: Query.Columns
     valueType: StringArray
   - id: Query.CkTypeId

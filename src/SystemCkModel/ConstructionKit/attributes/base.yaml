@@ -1,0 +1,11 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: Name
+    valueType: String
+  - id: DisplayName
+    valueType: String
+  - id: Description
+    valueType: String
+    description: Further information on the item.
+  - id: Enabled
+    valueType: Boolean

@@ -1,0 +1,14 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: ConfigurationValue
+    valueType: String
+  - id: EnvironmentMode
+    valueType: Enum
+    valueCkEnumId: ${thisModel}/EnvironmentModes
+    defaultValues:
+      - 0
+  - id: MaintenanceLevel
+    valueType: Enum
+    valueCkEnumId: ${thisModel}/MaintenanceLevels
+    defaultValues:
+      - 0

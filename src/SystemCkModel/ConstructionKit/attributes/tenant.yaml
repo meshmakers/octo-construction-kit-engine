@@ -1,0 +1,8 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: TenantId
+    valueType: String
+  - id: ParentTenantId
+    valueType: String
+  - id: DatabaseName
+    valueType: String

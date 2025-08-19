@@ -63,6 +63,13 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
     public abstract Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName,
         CancellationToken cancellationToken = default);
 
+    /// <inheritdoc />
+    public abstract Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime,
+        CancellationToken cancellationToken);
+
+    /// <inheritdoc />
+    public abstract Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken);
+
     /// <summary>
     /// Uploads a large binary file to the repository
     /// </summary>

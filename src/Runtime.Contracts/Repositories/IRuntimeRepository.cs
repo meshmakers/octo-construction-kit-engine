@@ -511,6 +511,23 @@ public interface IRuntimeRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Deletes all expired temporary large binaries from the repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="expiryDateTime">Expiry date time to filter expired binaries</param>
+    /// <param name="cancellationToken">An optional cancellation token</param>
+    /// <returns></returns>
+    Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes all temporary large binaries from the repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="cancellationToken">An optional cancellation token</param>
+    /// <returns></returns>
+    Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Downloads a large binary file from the repository based on the large binary id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>

@@ -115,4 +115,23 @@ public interface ILinkedBinaryDataSource
     /// <returns>Binary info of the file including size, content type, etc.</returns>
     Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Deletes all expired temporary large binaries from the repository.
+    /// This method is typically called by a background job to clean up expired files.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="expiryDateTime">Expiry date time to filter expired binaries</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns></returns>
+    Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes all temporary large binaries from the repository.
+    /// This method is typically called by a background job to clean up all temporary files.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns></returns>
+    Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken);
 }

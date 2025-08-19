@@ -100,6 +100,48 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         return binaryInfo;
     }
 
+    public override async Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken)
+    {
+        EnsureLargeBinaryDirectory();
+
+        var binaryInfos = await _largeBinaries
+            .FindManyAsync(session, info => info.ExpiryDateTime < expiryDateTime && info.BinaryType == BinaryType.Temporary)
+            .ConfigureAwait(false);
+
+        foreach (var binaryInfo in binaryInfos)
+        {
+            var filePath = GetFilePath(binaryInfo.BinaryId);
+
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            await _largeBinaries.DeleteOneAsync(session, binaryInfo.BinaryId).ConfigureAwait(false);
+        }
+    }
+
+    public override async Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken)
+    {
+        EnsureLargeBinaryDirectory();
+
+        var binaryInfos = await _largeBinaries
+            .FindManyAsync(session, info => info.BinaryType == BinaryType.Temporary)
+            .ConfigureAwait(false);
+
+        foreach (var binaryInfo in binaryInfos)
+        {
+            var filePath = GetFilePath(binaryInfo.BinaryId);
+
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            await _largeBinaries.DeleteOneAsync(session, binaryInfo.BinaryId).ConfigureAwait(false);
+        }
+    }
+
     protected override async Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
         RtEntityId? rtEntityId, DateTime? expiryDateTime, Stream stream, CancellationToken cancellationToken = default)
     {

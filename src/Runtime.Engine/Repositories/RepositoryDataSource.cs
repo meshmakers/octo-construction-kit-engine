@@ -212,4 +212,16 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     {
         return BinaryDataSource.GetTemporaryBinaryAsync(session, fileName, cancellationToken);
     }
+
+    /// <inheritdoc />
+    public Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken)
+    {
+        return BinaryDataSource.DeleteExpiredTemporaryLargeBinariesAsync(session, expiryDateTime, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken)
+    {
+        return BinaryDataSource.DeleteAllTemporaryLargeBinariesAsync(session, cancellationToken);
+    }
 }

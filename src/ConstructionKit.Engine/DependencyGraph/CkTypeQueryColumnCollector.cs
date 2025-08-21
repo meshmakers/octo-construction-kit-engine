@@ -21,15 +21,14 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
     public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
     {
-        return GetColumns(ckTypeId, ignoreNavigationProperties, new HashSet<CkId<CkTypeId>>());
+        return GetColumns(ckTypeId, ignoreNavigationProperties,
+            new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>());
     }
 
 
-    public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties,
-        HashSet<CkId<CkTypeId>> ignoredNavigationCkTypeIds)
-
+    private List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
     {
-        ignoredNavigationCkTypeIds.Add(ckTypeId);
         var columns = new List<CkTypeQueryColumn>();
 
         if (!ckModelGraph.Types.TryGetValue(ckTypeId, out var type))
@@ -40,7 +39,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         CollectTypeColumns(type, columns);
         if (!ignoreNavigationProperties)
         {
-            CollectNavigationColumns(type, ignoreNavigationProperties, columns, ignoredNavigationCkTypeIds);
+            CollectNavigationColumns(type, columns, ignoredNavigations);
         }
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(),
@@ -64,8 +63,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         return columns;
     }
 
-    private void CollectNavigationColumns(CkTypeGraph typeGraph, bool ignoreNavigationProperties,
-        List<CkTypeQueryColumn> columns, HashSet<CkId<CkTypeId>> ignoredNavigationCkTypeIds)
+    private void CollectNavigationColumns(CkTypeGraph typeGraph,
+        List<CkTypeQueryColumn> columns, HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
     {
         foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.Out.All.GroupBy(x =>
                      x.NavigationPropertyName))
@@ -73,7 +72,9 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             var ckTypeAssociationDirectionTuples = new List<CkTypeAssociationTuple>();
             foreach (var typeAssociationGraph in ckTypeAssociationGraphGrouping)
             {
-                if (ignoredNavigationCkTypeIds.Contains(typeAssociationGraph.TargetCkTypeId))
+                var ignoreTuple = new Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>(
+                    typeAssociationGraph.TargetCkTypeId, typeAssociationGraph.CkRoleId);
+                if (!ignoredNavigations.Add(ignoreTuple))
                 {
                     continue;
                 }
@@ -99,8 +100,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 if (ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.ZeroOrOne ||
                     ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.One)
                 {
-                    var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, ignoreNavigationProperties,
-                        ignoredNavigationCkTypeIds);
+                    var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, false,
+                        ignoredNavigations);
                     foreach (var subColumn in subColumns)
                     {
                         var queryColumn = new CkTypeQueryColumn(

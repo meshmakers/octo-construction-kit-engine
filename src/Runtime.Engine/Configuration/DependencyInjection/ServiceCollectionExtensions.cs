@@ -1,7 +1,9 @@
+using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
+using Meshmakers.Octo.Runtime.Engine.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
@@ -39,6 +41,9 @@ public static class ServiceCollectionExtensions
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();
         services.AddTransient<IImportRtModelCommand, ImportRtModelCommand>();
+
+        // Add converters
+        services.AddTransient<IRtEntityToDtoConverter, RtEntityToDtoConverter>();
 
         return new RuntimeEngineBuilder(services);
     }

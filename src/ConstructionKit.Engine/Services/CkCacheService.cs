@@ -150,6 +150,22 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+#if NETSTANDARD2_0
+    public bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, out CkEnumGraph? ckEnumGraph)
+#else
+    public bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph)
+#endif
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckEnumGraph = null;
+            return false;
+        }
+
+        return ckCache.TryGetCkEnum(ckEnumId, out ckEnumGraph);
+    }
+
+    /// <inheritdoc />
     public CkAttributeGraph GetCkAttribute(string tenantId, CkId<CkAttributeId> ckAttributeId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))

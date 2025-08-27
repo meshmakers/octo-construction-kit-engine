@@ -114,6 +114,25 @@ internal class CkCache : IDisposable
 
         return true;
     }
+    
+#if NETSTANDARD2_0
+    public bool TryGetCkEnum(CkId<CkEnumId> ckEnumId, out CkEnumGraph? ckEnumGraph)
+#else
+    public bool TryGetCkEnum(CkId<CkEnumId> ckEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph)
+#endif
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.Enums.TryGetValue(ckEnumId, out ckEnumGraph))
+        {
+            return false;
+        }
+
+        return true;
+    }
 
     public CkAttributeGraph GetCkAttribute(CkId<CkAttributeId> ckAttributeId)
     {
@@ -268,7 +287,7 @@ internal class CkCache : IDisposable
         {
             throw CkCacheException.CacheUnloaded(TenantId);
         }
-        
+
         // check if dependent ck models are existing.
         List<CkModelId> missingModelIds = new();
         foreach (var ckModelId in ckModelIds)
@@ -289,7 +308,8 @@ internal class CkCache : IDisposable
     /// <param name="ignoreNavigationProperties">Whether to ignore navigation properties</param>
     /// <returns></returns>
     /// <exception cref="CkCacheException">Thrown if the cache is not loaded</exception>
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
+        bool ignoreNavigationProperties)
     {
         if (_modelGraph == null)
         {

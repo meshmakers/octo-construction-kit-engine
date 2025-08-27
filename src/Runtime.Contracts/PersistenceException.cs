@@ -1,4 +1,7 @@
-﻿namespace Meshmakers.Octo.Runtime.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+
+namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
 ///     Exception thrown when a persistence error occurs.
@@ -51,5 +54,29 @@ public class PersistenceException : Exception
     internal static Exception RtIdNotSet()
     {
         throw new PersistenceException("RtId not set");
+    }
+
+    internal static Exception AttributeNameNotFound(string attributeName, CkTypeWithAttributesGraph ckTypeWithAttributesGraph)
+    {
+        return new PersistenceException(
+            $"Attribute with name '{attributeName}' not found in type '{ckTypeWithAttributesGraph}'.");
+    }
+
+    internal static Exception CkEnumIdNotSet(string attributeName, CkTypeAttributeGraph ckTypeAttributeGraph)
+    {
+        return new PersistenceException(
+            $"CkEnumId not set for attribute '{attributeName}' in type '{ckTypeAttributeGraph}'.");
+    }
+
+    internal static Exception CkEnumIdNotFound(string attributeName, CkTypeAttributeGraph ckTypeAttributeGraph)
+    {
+        return new PersistenceException(
+            $"CkEnumId '{ckTypeAttributeGraph.ValueCkEnumId}' not found for attribute '{attributeName}' in type '{ckTypeAttributeGraph}'.");
+    }
+
+    internal static Exception EnumIdValueNotFound(CkId<CkEnumId> ckEnumId, int value)
+    {
+        return new PersistenceException(
+            $"Value '{value}' not found in enum '{ckEnumId}'.");
     }
 }

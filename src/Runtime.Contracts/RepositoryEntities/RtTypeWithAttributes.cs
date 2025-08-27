@@ -346,7 +346,7 @@ public abstract class RtTypeWithAttributes
 
         return (TValue)Convert.ChangeType(value, typeof(TValue));
     }
-    
+
     /// <summary>
     ///     Gets the byte array value of an attribute when the value is nullable
     /// </summary>
@@ -369,9 +369,10 @@ public abstract class RtTypeWithAttributes
             return b;
         }
 
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(byte[]));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(byte[]));
     }
-    
+
     /// <summary>
     ///     Gets the byte array value of an attribute when the value is non-nullable
     /// </summary>
@@ -394,9 +395,10 @@ public abstract class RtTypeWithAttributes
             return b;
         }
 
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(byte[]));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(byte[]));
     }
-    
+
     /// <summary>
     ///     Gets the value of an RtRecord attribute when the value is nullable
     /// </summary>
@@ -422,7 +424,8 @@ public abstract class RtTypeWithAttributes
         }
 
 
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(TValue));
     }
 
     /// <summary>
@@ -448,9 +451,10 @@ public abstract class RtTypeWithAttributes
         }
 
 
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(EntityBinaryInfo));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(EntityBinaryInfo));
     }
-    
+
     /// <summary>
     ///     Gets the value of an attribute when the value is non-nullable
     /// </summary>
@@ -474,8 +478,9 @@ public abstract class RtTypeWithAttributes
         {
             return geometryObject;
         }
-        
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(TValue));
+
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(TValue));
     }
 
     /// <summary>
@@ -501,7 +506,8 @@ public abstract class RtTypeWithAttributes
         }
 
 
-        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(), typeof(EntityBinaryInfo));
+        throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+            typeof(EntityBinaryInfo));
     }
 
 
@@ -547,6 +553,7 @@ public abstract class RtTypeWithAttributes
             {
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
+
             return rtTypedRecord;
         }
 
@@ -584,6 +591,7 @@ public abstract class RtTypeWithAttributes
             {
                 throw InvalidAttributeValueException.CannotActivateInstance(typeof(TValue));
             }
+
             return rtTypedRecord;
         }
 
@@ -628,10 +636,13 @@ public abstract class RtTypeWithAttributes
     /// <param name="ckCacheService">The cache service</param>
     /// <param name="tenantId">Tenant id</param>
     /// <param name="path">Path list to the attribute</param>
+    /// <param name="attributeValueResolveFlags">Flags to control how attribute values are resolved</param>
     /// <returns>The value of the attribute or otherwise null</returns>
-    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, IEnumerable<PathTerm> path)
+    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId,
+        IEnumerable<PathTerm> path,
+        AttributeValueResolveFlags attributeValueResolveFlags = AttributeValueResolveFlags.Default)
     {
-        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path);
+        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path, attributeValueResolveFlags);
     }
 
     /// <summary>
@@ -640,10 +651,12 @@ public abstract class RtTypeWithAttributes
     /// <param name="ckCacheService">The cache service</param>
     /// <param name="tenantId">Tenant id</param>
     /// <param name="path">Path list to the attribute</param>
+    /// <param name="attributeValueResolveFlags">Flags to control how attribute values are resolved</param>
     /// <returns>The value of the attribute or otherwise null</returns>
-    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path)
+    public object? GetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path,
+        AttributeValueResolveFlags attributeValueResolveFlags = AttributeValueResolveFlags.Default)
     {
-        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path);
+        return RtPathEvaluator.GetValue(ckCacheService, tenantId, this, path, attributeValueResolveFlags);
     }
 
     /// <summary>
@@ -653,7 +666,8 @@ public abstract class RtTypeWithAttributes
     /// <param name="tenantId">Tenant id</param>
     /// <param name="path">Path list to the attribute</param>
     /// <param name="value">Value to set</param>
-    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, IEnumerable<PathTerm> path, object? value)
+    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId,
+        IEnumerable<PathTerm> path, object? value)
     {
         RtPathEvaluator.SetValue(ckCacheService, tenantId, this, path, value);
     }
@@ -665,7 +679,8 @@ public abstract class RtTypeWithAttributes
     /// <param name="tenantId">Tenant id</param>
     /// <param name="path">Path as string to the attribute</param>
     /// <param name="value">Value to set</param>
-    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path, object? value)
+    public void SetAttributeValueByAccessPath(ICkCacheService ckCacheService, string tenantId, string path,
+        object? value)
     {
         RtPathEvaluator.SetValue(ckCacheService, tenantId, this, path, value);
     }

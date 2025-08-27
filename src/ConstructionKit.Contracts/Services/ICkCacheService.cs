@@ -101,6 +101,20 @@ public interface ICkCacheService
 #endif
 
     /// <summary>
+    ///     Returns a <see cref="CkEnumGraph" /> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="ckEnumId">Construction Kit enum id.</param>
+    /// <param name="ckEnumGraph">Returns the ck enum graph</param>
+    /// <returns>True, when the given ck enum id exists</returns>
+    /// <exception cref="Exception"></exception>
+#if NETSTANDARD2_0
+    bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, out CkEnumGraph? ckEnumGraph);
+#else
+    bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph);
+#endif
+
+    /// <summary>
     ///     Returns a <see cref="CkAttributeGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>

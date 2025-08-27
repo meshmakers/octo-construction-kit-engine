@@ -159,12 +159,14 @@ public static class RtPathEvaluator
     /// <param name="tenantId">Tenant id</param>
     /// <param name="root">The root object</param>
     /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="attributeValueResolveFlags">Flags to control how attribute values are resolved</param>
     /// <returns>The value of the attribute path</returns>
     public static object? GetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
-        string path)
+        string path,
+        AttributeValueResolveFlags attributeValueResolveFlags = AttributeValueResolveFlags.Default)
     {
         var tokens = TokenizePath(path);
-        return GetValueByPath(ckCacheService, tenantId, root, tokens);
+        return GetValueByPath(ckCacheService, tenantId, root, tokens, attributeValueResolveFlags);
     }
 
     /// <summary>
@@ -174,11 +176,13 @@ public static class RtPathEvaluator
     /// <param name="tenantId">Tenant id</param>
     /// <param name="root">The root object</param>
     /// <param name="path">Path of attributes to be evaluated</param>
+    /// <param name="attributeValueResolveFlags">Flags to control how attribute values are resolved</param>
     /// <returns>The value of the attribute path</returns>
     public static object? GetValue(ICkCacheService ckCacheService, string tenantId, RtTypeWithAttributes root,
-        IEnumerable<PathTerm> path)
+        IEnumerable<PathTerm> path,
+        AttributeValueResolveFlags attributeValueResolveFlags = AttributeValueResolveFlags.Default)
     {
-        return GetValueByPath(ckCacheService, tenantId, root, path.ToList());
+        return GetValueByPath(ckCacheService, tenantId, root, path.ToList(), attributeValueResolveFlags);
     }
 
     /// <summary>
@@ -440,9 +444,10 @@ public static class RtPathEvaluator
     }
 
     private static object? GetValueByPath(ICkCacheService ckCacheService, string tenantId,
-        RtTypeWithAttributes rtTypeWithAttributes, List<PathTerm> tokens)
+        RtTypeWithAttributes rtTypeWithAttributes, List<PathTerm> tokens,
+        AttributeValueResolveFlags attributeValueResolveFlags)
     {
-        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens);
+        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens, attributeValueResolveFlags);
 
         var pathTuple = evaluatedPath.Last();
 
@@ -464,7 +469,8 @@ public static class RtPathEvaluator
         RtTypeWithAttributes rtTypeWithAttributes,
         List<PathTerm> tokens, object? setValue)
     {
-        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens);
+        var evaluatedPath = MapPath(ckCacheService, tenantId, rtTypeWithAttributes, tokens,
+            AttributeValueResolveFlags.Default);
 
         if (setValue != null)
         {
@@ -603,7 +609,8 @@ public static class RtPathEvaluator
                         }
 
 
-                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                            pathTupleLocator.CkTypeAttributeGraph.AttributeName,
                             pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
                         break;
                     }
@@ -617,7 +624,8 @@ public static class RtPathEvaluator
                                 pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, intValue.ToString());
                         }
 
-                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                        pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                            pathTupleLocator.CkTypeAttributeGraph.AttributeName,
                             pathTupleLocator.CkTypeAttributeGraph.ValueType, enumValue.Key);
                         break;
                     }
@@ -636,7 +644,7 @@ public static class RtPathEvaluator
 
     private static List<PathTuple> MapPath(ICkCacheService ckCacheService, string tenantId,
         RtTypeWithAttributes rtTypeWithAttributes,
-        List<PathTerm> tokens)
+        List<PathTerm> tokens, AttributeValueResolveFlags attributeValueResolveFlags)
     {
         // This list contains the current state of path evaluation (transformation from path to object structure)
         var evaluatedPath = new List<PathTuple>([
@@ -809,7 +817,9 @@ public static class RtPathEvaluator
                                      out var ckTypeAttributeGraph):
                             valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
                                 out var entityValue);
-                            newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null, entityValue));
+                            newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null,
+                                ConvertAttributeValue(ckCacheService, tenantId, ckTypeGraph, token.Value.ToPascalCase(),
+                                    entityValue, attributeValueResolveFlags)));
                             continue;
                         case RtRecord rtRecord
                             when ckCacheService.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
@@ -820,7 +830,9 @@ public static class RtPathEvaluator
                             valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
                                 out var recordValue);
                             newPathLocators.Add(
-                                new PathLocator(rtRecord, ckRecordAttributeGraph, null, recordValue));
+                                new PathLocator(rtRecord, ckRecordAttributeGraph, null,
+                                    ConvertAttributeValue(ckCacheService, tenantId, ckRecordGraph,
+                                        token.Value.ToPascalCase(), recordValue, attributeValueResolveFlags)));
 
                             continue;
                         default:
@@ -952,5 +964,57 @@ public static class RtPathEvaluator
         }
 
         return evaluatedPath;
+    }
+
+    private static object? ConvertAttributeValue(ICkCacheService ckCacheService, string tenantId,
+        CkTypeWithAttributesGraph ckTypeWithAttributesGraph, string attributeName, object? value,
+        AttributeValueResolveFlags attributeValueResolveFlags)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        if (!ckTypeWithAttributesGraph.AllAttributesByName.TryGetValue(attributeName, out var ckTypeAttributeGraph))
+        {
+            throw PersistenceException.AttributeNameNotFound(attributeName, ckTypeWithAttributesGraph);
+        }
+
+        switch (ckTypeAttributeGraph.ValueType)
+        {
+            case AttributeValueTypesDto.Enum:
+                if (!attributeValueResolveFlags.HasFlag(AttributeValueResolveFlags.ResolveEnumsToNames))
+                {
+                    return value;
+                }
+
+                // Resolve enum key to name
+                if (ckTypeAttributeGraph.ValueCkEnumId == null)
+                {
+                    throw PersistenceException.CkEnumIdNotSet(attributeName, ckTypeAttributeGraph);
+                }
+
+                if (!ckCacheService.TryGetCkEnum(tenantId, ckTypeAttributeGraph.ValueCkEnumId, out var ckEnumGraph) ||
+                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                    ckEnumGraph == null)
+                {
+                    throw PersistenceException.CkEnumIdNotFound(attributeName, ckTypeAttributeGraph);
+                }
+
+                if (value is int intValue)
+                {
+                    var enumValue = ckEnumGraph.Values.FirstOrDefault(v => v.Key == intValue);
+                    if (enumValue == null)
+                    {
+                        throw PersistenceException.EnumIdValueNotFound(ckTypeAttributeGraph.ValueCkEnumId, intValue);
+                    }
+
+                    return enumValue.Name;
+                }
+
+                break;
+        }
+
+        return value;
     }
 }

@@ -604,7 +604,7 @@ public static class RtPathEvaluator
 
                         if (enumValue == null)
                         {
-                            throw InvalidPathException.EnumValueNotFound(
+                            throw CkEnumValueNotFoundException.EnumValueNotFound(
                                 pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, strValue);
                         }
 
@@ -620,8 +620,8 @@ public static class RtPathEvaluator
                         var enumValue = ckEnumGraph.Values.FirstOrDefault(v => v.Key == intValue);
                         if (enumValue == null)
                         {
-                            throw InvalidPathException.EnumValueNotFound(
-                                pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, intValue.ToString());
+                            throw CkEnumValueNotFoundException.EnumValueNotFound(
+                                pathTupleLocator.CkTypeAttributeGraph.ValueCkEnumId, intValue);
                         }
 
                         pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(

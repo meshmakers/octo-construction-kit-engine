@@ -1,6 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
 
@@ -52,7 +52,7 @@ public class YamlSerializerTests
         Assert.Equal("Basic/Name", rtModelRootDto.Entities[0].Attributes[0].Id);
         Assert.Equal("Spritzguss 1", rtModelRootDto.Entities[0].Attributes[0].Value);
         Assert.Equal("Basic/NamePlate", rtModelRootDto.Entities[0].Attributes[1].Id);
-        Assert.IsType<RtRecordDto>(rtModelRootDto.Entities[0].Attributes[1].Value);
+        Assert.IsType<RtRecordTcDto>(rtModelRootDto.Entities[0].Attributes[1].Value);
     }
     
     [Fact]
@@ -80,8 +80,8 @@ public class YamlSerializerTests
         var x = (List<object>)rtModelRootDto.Entities[0].Attributes[1].Value!;
         Assert.Equal(2, x.Count);
         
-        Assert.IsType<RtRecordDto>(x[0]);
-        Assert.IsType<RtRecordDto>(x[1]);
+        Assert.IsType<RtRecordTcDto>(x[0]);
+        Assert.IsType<RtRecordTcDto>(x[1]);
     }
 
 

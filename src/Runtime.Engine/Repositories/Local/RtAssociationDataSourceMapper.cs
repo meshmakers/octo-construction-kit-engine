@@ -1,16 +1,16 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
 ///     Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}" /> for <see cref="RtAssociation" />
 /// </summary>
-public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtAssociation, RtAssociationDto>
+public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtAssociation, RtAssociationTcDto>
 {
     private readonly ICkCacheService _ckCacheService;
     private readonly IRtRepositorySerializer _rtSerializer;
@@ -30,7 +30,7 @@ public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtA
     }
 
     /// <inheritdoc />
-    public OctoObjectId GetId(RtAssociationDto dto)
+    public OctoObjectId GetId(RtAssociationTcDto dto)
     {
         throw new NotImplementedException();
     }
@@ -42,13 +42,13 @@ public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtA
     }
 
     /// <inheritdoc />
-    public RtAssociation MapToDocument(RtAssociationDto dto)
+    public RtAssociation MapToDocument(RtAssociationTcDto dto)
     {
         throw new NotImplementedException();
     }
 
     /// <inheritdoc />
-    public RtAssociationDto MapToDto(RtAssociation document)
+    public RtAssociationTcDto MapToDto(RtAssociation document)
     {
         throw new NotImplementedException();
     }

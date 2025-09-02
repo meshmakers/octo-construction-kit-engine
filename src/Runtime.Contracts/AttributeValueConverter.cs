@@ -2,7 +2,6 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Newtonsoft.Json.Linq;
 

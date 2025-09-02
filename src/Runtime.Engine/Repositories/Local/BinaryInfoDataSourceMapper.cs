@@ -1,16 +1,15 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
 ///     Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}" /> for <see cref="RtAssociation" />
 /// </summary>
-public class BinaryInfoDataSourceMapper : IDataSourceMapper<OctoObjectId, BinaryInfo, BinaryInfoDto>
+public class BinaryInfoDataSourceMapper : IDataSourceMapper<OctoObjectId, BinaryInfo, BinaryInfoTcDto>
 {
     private readonly IRtRepositorySerializer _rtSerializer;
     private readonly string _tenantId;
@@ -33,19 +32,19 @@ public class BinaryInfoDataSourceMapper : IDataSourceMapper<OctoObjectId, Binary
     }
 
     /// <inheritdoc />
-    public OctoObjectId GetId(BinaryInfoDto document)
+    public OctoObjectId GetId(BinaryInfoTcDto document)
     {
         return document.BinaryId;
     }
 
     /// <inheritdoc />
-    public BinaryInfo MapToDocument(BinaryInfoDto dto)
+    public BinaryInfo MapToDocument(BinaryInfoTcDto dto)
     {
         throw new NotImplementedException();
     }
 
     /// <inheritdoc />
-    public BinaryInfoDto MapToDto(BinaryInfo document)
+    public BinaryInfoTcDto MapToDto(BinaryInfo document)
     {
         throw new NotImplementedException();
     }

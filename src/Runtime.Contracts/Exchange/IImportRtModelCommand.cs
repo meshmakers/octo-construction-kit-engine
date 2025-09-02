@@ -1,5 +1,5 @@
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Exchange;
 
@@ -23,11 +23,11 @@ public interface IImportRtModelCommand
     ///     Imports a model root
     /// </summary>
     /// <param name="runtimeRepository">The runtime repository</param>
-    /// <param name="rtModelRoot">The model root</param>
+    /// <param name="rtModelRootTc">The model root</param>
     /// <param name="importStrategy">Defines the import strategy</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootDto rtModelRoot,
+    Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRootTc,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null);
 
     /// <summary>

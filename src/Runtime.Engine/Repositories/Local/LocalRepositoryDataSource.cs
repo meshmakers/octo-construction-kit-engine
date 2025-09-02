@@ -2,11 +2,11 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
@@ -25,7 +25,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
         _rtSerializer = rtSerializer;
         _directoryPath = directoryPath;
 
-        RtAssociations = new LocalDataSourceCollection<OctoObjectId, RtAssociation, RtAssociationDto>(TenantId,
+        RtAssociations = new LocalDataSourceCollection<OctoObjectId, RtAssociation, RtAssociationTcDto>(TenantId,
             Path.Combine(_directoryPath, "associations.json"),
             new RtAssociationDataSourceMapper(TenantId, _ckCacheService, _rtSerializer));
     }
@@ -38,7 +38,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
 
         var dataSourceMapper = new RtEntityDataSourceMapper<TEntity>(TenantId, _ckCacheService, _rtSerializer);
 
-        return new LocalDataSourceCollection<OctoObjectId, TEntity, RtEntityDto>(TenantId, filePath, dataSourceMapper);
+        return new LocalDataSourceCollection<OctoObjectId, TEntity, RtEntityTcDto>(TenantId, filePath, dataSourceMapper);
     }
 
     public override IDataSourceCollection<OctoObjectId, RtAssociation> RtAssociations { get; }

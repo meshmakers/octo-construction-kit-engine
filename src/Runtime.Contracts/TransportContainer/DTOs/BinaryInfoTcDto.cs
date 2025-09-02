@@ -1,13 +1,13 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 /// Represents information about a binary.
 /// </summary>
 // ReSharper disable once ClassNeverInstantiated.Global
-public class BinaryInfoDto : IBinaryInfo
+public class BinaryInfoTcDto : IBinaryInfo
 {
     /// <inheritdoc />
     public string ContentType { get; set; } = null!;

@@ -9,17 +9,17 @@ using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 ///     Defines an entity
 /// </summary>
-public class RtEntityDto : RtTypeWithAttributesDto
+public class RtEntityTcDto : RtTypeWithAttributesTcDto
 {
     /// <summary>
-    ///     Creates a new instance of <see cref="RtEntityDto" />
+    ///     Creates a new instance of <see cref="RtEntityTcDto" />
     /// </summary>
-    public RtEntityDto()
+    public RtEntityTcDto()
     {
     }
 
@@ -69,5 +69,5 @@ public class RtEntityDto : RtTypeWithAttributesDto
     [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<RtAssociationDto>? Associations { get; set; }
+    public List<RtAssociationTcDto>? Associations { get; set; }
 }

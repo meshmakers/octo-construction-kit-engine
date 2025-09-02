@@ -1,13 +1,13 @@
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
-using Meshmakers.Octo.Runtime.Engine.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Engine.TransportContainer;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -43,7 +43,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IImportRtModelCommand, ImportRtModelCommand>();
 
         // Add converters
-        services.AddTransient<IRtEntityToDtoConverter, RtEntityToDtoConverter>();
+        services.AddTransient<IRtEntityToTcDtoConverter, RtEntityToTcDtoConverter>();
 
         return new RuntimeEngineBuilder(services);
     }

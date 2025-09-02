@@ -1,6 +1,6 @@
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using YamlDotNet.Core;
 using YamlDotNet.Core.Events;
 using YamlDotNet.Serialization;
@@ -24,7 +24,7 @@ internal class RtRecordConverter : IYamlTypeConverter
 
     public object ReadYaml(IParser parser, Type type, ObjectDeserializer rootDeserializer)
     {
-        var rtRecord = new RtRecordDto();
+        var rtRecord = new RtRecordTcDto();
 
         parser.Consume<MappingStart>();
 
@@ -47,21 +47,21 @@ internal class RtRecordConverter : IYamlTypeConverter
                     while (!parser.TryConsume<MappingEnd>(out _))
                     {
                         var key = parser.Consume<Scalar>();
-                        if (key.Value != nameof(RtAttributeDto.Id).ToCamelCase())
+                        if (key.Value != nameof(RtAttributeTcDto.Id).ToCamelCase())
                         {
-                            throw RuntimeModelParseException.KeyExpectedDuringDeserialization(nameof(RtAttributeDto.Id));
+                            throw RuntimeModelParseException.KeyExpectedDuringDeserialization(nameof(RtAttributeTcDto.Id));
                         }
 
                         var idValue = parser.Consume<Scalar>();
                         key = parser.Consume<Scalar>();
-                        if (key.Value != nameof(RtAttributeDto.Value).ToCamelCase())
+                        if (key.Value != nameof(RtAttributeTcDto.Value).ToCamelCase())
                         {
-                            throw RuntimeModelParseException.KeyExpectedDuringDeserialization(nameof(RtAttributeDto.Value));
+                            throw RuntimeModelParseException.KeyExpectedDuringDeserialization(nameof(RtAttributeTcDto.Value));
                         }
 
                         var value = parser.Consume<Scalar>();
 
-                        rtRecord.Attributes.Add(new RtAttributeDto
+                        rtRecord.Attributes.Add(new RtAttributeTcDto
                         {
                             Id = idValue.Value,
                             Value = value.Value

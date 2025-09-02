@@ -4,17 +4,17 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 // ReSharper disable CollectionNeverQueried.Global
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 ///     Defines a record
 /// </summary>
-public class RtRecordDto : RtTypeWithAttributesDto
+public class RtRecordTcDto : RtTypeWithAttributesTcDto
 {
     /// <summary>
-    ///     Creates a new instance of <see cref="RtRecordDto" />
+    ///     Creates a new instance of <see cref="RtRecordTcDto" />
     /// </summary>
-    public RtRecordDto()
+    public RtRecordTcDto()
     {
     }
 

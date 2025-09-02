@@ -5,8 +5,8 @@ using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Messages;
 using JsonException = System.Text.Json.JsonException;
 using JsonSerializer = System.Text.Json.JsonSerializer;
@@ -39,7 +39,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
     }
 
     /// <inheritdoc />
-    public async Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto)
+    public async Task SerializeAsync(StreamWriter streamWriter, RtModelRootTcDto modelRootDto)
     {
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, modelRootDto, _options).ConfigureAwait(false);
     }
@@ -55,11 +55,11 @@ internal class RtJsonSerializer : IRtJsonSerializer
     }
 
     /// <inheritdoc />
-    public async Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public async Task<RtModelRootTcDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         try
         {
-            var ckMetaDto = await JsonSerializer.DeserializeAsync<RtModelRootDto>(stream, _options).ConfigureAwait(false);
+            var ckMetaDto = await JsonSerializer.DeserializeAsync<RtModelRootTcDto>(stream, _options).ConfigureAwait(false);
             return ckMetaDto ?? throw RuntimeModelParseException.CannotDeserializeModel(operationResult);
         }
         catch (JsonException e)
@@ -70,7 +70,7 @@ internal class RtJsonSerializer : IRtJsonSerializer
     }
 
     /// <inheritdoc />
-    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
+    public async Task<RtModelRootTcDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);

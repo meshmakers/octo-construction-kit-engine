@@ -1,4 +1,4 @@
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 
@@ -11,7 +11,7 @@ public class RtDeserializeEventArgs : EventArgs
     ///     Creates a new instance of <see cref="RtDeserializeEventArgs" />.
     /// </summary>
     /// <param name="deserializedEntities"></param>
-    public RtDeserializeEventArgs(IEnumerable<RtEntityDto> deserializedEntities)
+    public RtDeserializeEventArgs(IEnumerable<RtEntityTcDto> deserializedEntities)
     {
         DeserializedEntities = deserializedEntities;
     }
@@ -19,7 +19,7 @@ public class RtDeserializeEventArgs : EventArgs
     /// <summary>
     ///     Gets the current list of entities. When handled, set <see cref="IsHandled" /> to true.
     /// </summary>
-    public IEnumerable<RtEntityDto> DeserializedEntities { get; }
+    public IEnumerable<RtEntityTcDto> DeserializedEntities { get; }
 
     /// <summary>
     ///     Set to true when the event has been handled.

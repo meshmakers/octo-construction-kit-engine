@@ -2,8 +2,8 @@ using System.Collections.Concurrent;
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Newtonsoft.Json;
 
 namespace Meshmakers.Octo.Runtime.Engine.Serialization;
@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 internal class RtDeserializeStream : IRtDeserializeStream
 {
     private readonly List<CkModelId> _dependencies;
-    private readonly ConcurrentDictionary<OctoObjectId, RtEntityDto> _deserializedEntities = new();
+    private readonly ConcurrentDictionary<OctoObjectId, RtEntityTcDto> _deserializedEntities = new();
     private readonly int _maxCount;
     private readonly JsonTextReader _reader;
     private readonly JsonSerializer _serializer;
@@ -39,7 +39,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
 
     public async Task ReadAsync(CancellationToken? cancellationToken = null)
     {
-        if (_reader.TokenType != JsonToken.PropertyName || !Equals(_reader.Value, nameof(RtModelRootDto.Entities).ToCamelCase()))
+        if (_reader.TokenType != JsonToken.PropertyName || !Equals(_reader.Value, nameof(RtModelRootTcDto.Entities).ToCamelCase()))
         {
             throw RuntimeModelParseException.InvalidPosition();
         }
@@ -64,7 +64,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
 
             if (_reader.TokenType == JsonToken.StartObject)
             {
-                var c = _serializer.Deserialize<RtEntityDto>(_reader);
+                var c = _serializer.Deserialize<RtEntityTcDto>(_reader);
                 if (c == null)
                 {
                     throw RuntimeModelParseException.CannotDeserializeEntity(_reader.LineNumber);
@@ -79,7 +79,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
     {
     }
 
-    private void AddEntity(RtEntityDto rtEntityDto)
+    private void AddEntity(RtEntityTcDto rtEntityDto)
     {
         if (!_deserializedEntities.TryAdd(rtEntityDto.RtId, rtEntityDto))
         {
@@ -123,11 +123,11 @@ internal class RtDeserializeStream : IRtDeserializeStream
 
             cancellationToken?.ThrowIfCancellationRequested();
 
-            if (_reader.TokenType == JsonToken.PropertyName && Equals(_reader.Value, nameof(RtModelRootDto.Dependencies).ToCamelCase()))
+            if (_reader.TokenType == JsonToken.PropertyName && Equals(_reader.Value, nameof(RtModelRootTcDto.Dependencies).ToCamelCase()))
             {
                 await ReadDependencies().ConfigureAwait(false);
             }
-            else if (_reader.TokenType == JsonToken.PropertyName && Equals(_reader.Value, nameof(RtModelRootDto.Entities).ToCamelCase()))
+            else if (_reader.TokenType == JsonToken.PropertyName && Equals(_reader.Value, nameof(RtModelRootTcDto.Entities).ToCamelCase()))
             {
                 return; // Positioning on entities array done
             }

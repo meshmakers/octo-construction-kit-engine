@@ -2,8 +2,8 @@ using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -68,7 +68,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
     }
 
     /// <inheritdoc />
-    public Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto)
+    public Task SerializeAsync(StreamWriter streamWriter, RtModelRootTcDto modelRootDto)
     {
         _serializer.Serialize(streamWriter, modelRootDto);
         return Task.CompletedTask;
@@ -81,7 +81,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
     }
 
     /// <inheritdoc />
-    public async Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
+    public async Task<RtModelRootTcDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
@@ -89,7 +89,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
     }
 
     /// <inheritdoc />
-    public Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
+    public Task<RtModelRootTcDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult)
     {
         _rtSchemaValidator.ValidateModelInYaml(stream, locationReference, operationResult);
         if (operationResult.HasFatalErrors)
@@ -99,7 +99,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
 
 
         using var streamReader = new StreamReader(stream);
-        var rtModelRootDto = _deserializer.Deserialize<RtModelRootDto>(streamReader);
+        var rtModelRootDto = _deserializer.Deserialize<RtModelRootTcDto>(streamReader);
         return Task.FromResult(rtModelRootDto);
     }
 }

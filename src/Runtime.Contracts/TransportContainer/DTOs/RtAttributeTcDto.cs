@@ -5,12 +5,12 @@ using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 ///     Defines an attribute of an entity
 /// </summary>
-public class RtAttributeDto
+public class RtAttributeTcDto
 {
     /// <summary>
     ///     Gets or sets the id of the attribute.

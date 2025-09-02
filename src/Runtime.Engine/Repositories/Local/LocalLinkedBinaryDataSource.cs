@@ -1,9 +1,9 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
@@ -11,7 +11,7 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
     : LinkedBinaryDataSource
 {
     private readonly string _largeBinaryDirectoryPath = Path.Combine(directoryPath, "largeBinaries");
-    private readonly IDataSourceCollection<OctoObjectId, BinaryInfo> _largeBinaries = new LocalDataSourceCollection<OctoObjectId, BinaryInfo, BinaryInfoDto>(tenantId,
+    private readonly IDataSourceCollection<OctoObjectId, BinaryInfo> _largeBinaries = new LocalDataSourceCollection<OctoObjectId, BinaryInfo, BinaryInfoTcDto>(tenantId,
         Path.Combine(directoryPath, "largeBinaries.json"),
         new BinaryInfoDataSourceMapper(tenantId, rtSerializer));
 

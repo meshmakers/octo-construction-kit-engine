@@ -5,11 +5,11 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core;
 
@@ -58,7 +58,7 @@ internal class ImportRtModelCommand(
         }
     }
 
-    public async Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootDto rtModelRoot,
+    public async Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRoot,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
     {
         logger.LogInformation("Importing RT entities using text started");
@@ -155,7 +155,7 @@ internal class ImportRtModelCommand(
         }
     }
 
-    private async Task ImportEntityAsync(IOctoSession session, IEnumerable<RtEntityDto> modelRtEntities,
+    private async Task ImportEntityAsync(IOctoSession session, IEnumerable<RtEntityTcDto> modelRtEntities,
         IRuntimeRepository runtimeRepository, ImportStrategy importStrategy)
     {
 #if NETSTANDARD2_0
@@ -231,7 +231,7 @@ internal class ImportRtModelCommand(
     }
 
     private void AssignAttributes<TKey>(IRuntimeRepository runtimeRepository,
-        RtTypeWithAttributesDto rtTypeWithAttributesDto,
+        RtTypeWithAttributesTcDto rtTypeWithAttributesDto,
         CkTypeWithAttributesGraph ckTypeWithAttributesGraph, RtTypeWithAttributes rtTypeWithAttributes,
         string elementType, CkId<TKey> ckId)
         where TKey : IComparable<TKey>, ICkKey
@@ -250,7 +250,7 @@ internal class ImportRtModelCommand(
 
             if (typeAttributeGraph.ValueType == AttributeValueTypesDto.Record)
             {
-                if (modelAttribute.Value is RtRecordDto rtRecordDto)
+                if (modelAttribute.Value is RtRecordTcDto rtRecordDto)
                 {
                     var ckRecordGraph = cacheService.GetCkRecord(runtimeRepository.TenantId, rtRecordDto.CkRecordId);
                     if (ckRecordGraph == null)
@@ -277,7 +277,7 @@ internal class ImportRtModelCommand(
                 var rtRecords = new List<RtRecord>();
                 if (modelAttribute.Value is IEnumerable rtRecordDtoList)
                 {
-                    foreach (RtRecordDto record in rtRecordDtoList)
+                    foreach (RtRecordTcDto record in rtRecordDtoList)
                     {
                         var ckRecordGraph = cacheService.GetCkRecord(runtimeRepository.TenantId, record.CkRecordId);
                         if (ckRecordGraph == null)

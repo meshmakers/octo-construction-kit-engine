@@ -105,12 +105,6 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException($"Invalid token type '{token.Type}' for token '{token.Value}'.");
     }
 
-    internal static Exception InvalidRuntimeType(RtTypeWithAttributes valueRtTypeWithAttribute, PathTerm token)
-    {
-        return new InvalidPathException(
-            $"Invalid runtime type '{valueRtTypeWithAttribute}' for token '{token.Value}'.");
-    }
-
     internal static Exception InvalidPathTermTargetCkTypeIdMissing(IEnumerable<PathTerm> path, PathTerm currentToken)
     {
         return new InvalidPathException(
@@ -172,11 +166,7 @@ public class InvalidPathException : PersistenceException
             $"CkEnumId is not set for path '{pathTupleTerm.Value}' of runtime type '{rtTypeWithAttributes}'. Ensure that the CkEnumId is defined and set correctly.");
     }
 
-    internal static Exception EnumValueNotFound(CkId<CkEnumId> valueCkEnumId, string strValue)
-    {
-        return new InvalidPathException(
-            $"Enum value '{strValue}' not found for CkEnumId '{valueCkEnumId}'. Ensure that the value is defined in the CkEnum.");
-    }
+
 
     internal static Exception InvalidEnumValueType(CkId<CkEnumId> valueCkEnumId, string name)
     {

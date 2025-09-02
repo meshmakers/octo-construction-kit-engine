@@ -1,5 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 
@@ -12,9 +12,9 @@ public interface IRtSerializer
     ///     Serializes the model to the stream.
     /// </summary>
     /// <param name="streamWriter">A stream ready to write used for serialization</param>
-    /// <param name="modelRootDto">Model to serialize</param>
+    /// <param name="modelRootTcDto">Model to serialize</param>
     /// <returns></returns>
-    Task SerializeAsync(StreamWriter streamWriter, RtModelRootDto modelRootDto);
+    Task SerializeAsync(StreamWriter streamWriter, RtModelRootTcDto modelRootTcDto);
 
     /// <summary>
     ///     Deserializes the runtime model from the stream, optimized for huge files.
@@ -38,7 +38,7 @@ public interface IRtSerializer
     ///     validation errors too.
     /// </param>
     /// <returns></returns>
-    Task<RtModelRootDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult);
+    Task<RtModelRootTcDto> DeserializeAsync(Stream stream, string locationReference, OperationResult operationResult);
 
     /// <summary>
     ///     Deserializes the runtime model from a string.
@@ -50,5 +50,5 @@ public interface IRtSerializer
     ///     validation errors too.
     /// </param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
-    Task<RtModelRootDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult);
+    Task<RtModelRootTcDto> DeserializeAsync(string s, string locationReference, OperationResult operationResult);
 }

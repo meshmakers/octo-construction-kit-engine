@@ -6,12 +6,12 @@ using YamlDotNet.Serialization;
 
 // ReSharper disable UnusedMember.Global
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 ///     Defines an association between two entities
 /// </summary>
-public class RtAssociationDto : RtTypeWithAttributesDto
+public class RtAssociationTcDto : RtTypeWithAttributesTcDto
 {
     /// <summary>
     ///     Gets or sets the role id of the association.

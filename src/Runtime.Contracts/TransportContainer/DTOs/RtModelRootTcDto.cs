@@ -7,13 +7,13 @@ using YamlDotNet.Serialization;
 // ReSharper disable CollectionNeverQueried.Global
 // ReSharper disable CollectionNeverUpdated.Global
 
-namespace Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+namespace Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 /// <summary>
 ///     Defines an entity in the runtime model
 /// </summary>
 [OctoJsonSchema(typeof(RtSchema), nameof(RtSchema.GetRuntimeSchema))]
-public class RtModelRootDto
+public class RtModelRootTcDto
 {
     /// <summary>
     ///     The URI of the schema for the CK meta.
@@ -21,12 +21,12 @@ public class RtModelRootDto
     public const string RtSchemaUri = "https://schemas.meshmakers.cloud/runtime-model.schema.json";
 
     /// <summary>
-    ///     Creates a new instance of <see cref="RtModelRootDto" />.
+    ///     Creates a new instance of <see cref="RtModelRootTcDto" />.
     /// </summary>
-    public RtModelRootDto()
+    public RtModelRootTcDto()
     {
         Dependencies = new List<CkModelId>();
-        Entities = new List<RtEntityDto>();
+        Entities = new List<RtEntityTcDto>();
     }
 
     /// <summary>
@@ -45,5 +45,5 @@ public class RtModelRootDto
     /// <summary>
     ///     Gets a list of entities in the runtime model.
     /// </summary>
-    public List<RtEntityDto> Entities { get; set; }
+    public List<RtEntityTcDto> Entities { get; set; }
 }

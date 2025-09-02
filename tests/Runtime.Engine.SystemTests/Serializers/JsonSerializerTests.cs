@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 using RandomFriendlyNameGenerator;
@@ -28,7 +28,7 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
 
         await using var streamWriter = new StreamWriter(filePath);
 
-        var modelRootDto = new RtModelRootDto();
+        var modelRootDto = new RtModelRootTcDto();
         modelRootDto.Dependencies.Add("System");
         modelRootDto.Dependencies.Add("Sample1");
 
@@ -39,30 +39,30 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
             MaxDegreeOfParallelism = 16
         };
 
-        List<RtEntityDto> globalList = new();
+        List<RtEntityTcDto> globalList = new();
 
         for (var j = 0; j < 200; j++)
         {
-            var entities = new ConcurrentStack<RtEntityDto>();
+            var entities = new ConcurrentStack<RtEntityTcDto>();
             var testCount = 0;
             _testOutputHelper.WriteLine($"========= next {j}");
 
             Parallel.For(0, 10_000, options, i =>
             {
-                var rtEntity = new RtEntityDto
+                var rtEntity = new RtEntityTcDto
                 {
                     CkTypeId = "Sample1/SampleType3",
                     RtId = OctoObjectId.GenerateNewId()
                 };
-                rtEntity.Attributes.Add(new RtAttributeDto { Id = "System/Name", Value = NameGenerator.Identifiers.Get() });
-                rtEntity.Attributes.Add(new RtAttributeDto { Id = "System/Enabled", Value = i % 2 == 0 });
+                rtEntity.Attributes.Add(new RtAttributeTcDto { Id = "System/Name", Value = NameGenerator.Identifiers.Get() });
+                rtEntity.Attributes.Add(new RtAttributeTcDto { Id = "System/Enabled", Value = i % 2 == 0 });
 
                 var entitiesCount = testCount;
                 if (entitiesCount > 1)
                 {
                     var next = random.Next(0, entitiesCount - 1);
                     var rtAssocEntity = entities.ElementAt(next);
-                    rtEntity.Associations = new List<RtAssociationDto>
+                    rtEntity.Associations = new List<RtAssociationTcDto>
                         { new() { RoleId = "Sample1/Testing", TargetCkTypeId = rtAssocEntity.CkTypeId, TargetRtId = rtAssocEntity.RtId } };
                 }
 

@@ -2,17 +2,17 @@ using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 
 /// <summary>
 ///     Implementation of <see cref="IDataSourceMapper{TKey,TDocument,TDto}" /> for <see cref="RtEntity" />
 /// </summary>
-public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectId, TDocument, RtEntityDto> where TDocument : RtEntity, new()
+public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectId, TDocument, RtEntityTcDto> where TDocument : RtEntity, new()
 {
     private readonly ICkCacheService _ckCacheService;
     private readonly IRtRepositorySerializer _rtSerializer;
@@ -32,7 +32,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     }
 
     /// <inheritdoc />
-    public OctoObjectId GetId(RtEntityDto dto)
+    public OctoObjectId GetId(RtEntityTcDto dto)
     {
         return dto.RtId;
     }
@@ -44,13 +44,13 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     }
 
     /// <inheritdoc />
-    public TDocument MapToDocument(RtEntityDto dto)
+    public TDocument MapToDocument(RtEntityTcDto dto)
     {
         throw new NotImplementedException();
     }
 
     /// <inheritdoc />
-    public RtEntityDto MapToDto(TDocument document)
+    public RtEntityTcDto MapToDto(TDocument document)
     {
         throw new NotImplementedException();
     }

@@ -1,6 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.Tests.sampleData.models;
 
@@ -41,7 +41,7 @@ public class JsonSerializerTests
         var filePath = "sampleData/files/entity-ok.json";
         var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        var entities = new List<RtEntityDto>();
+        var entities = new List<RtEntityTcDto>();
 
         var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream);
         rtDeserializeStream.BulkDeserialized += (sender, args) =>

@@ -18,7 +18,8 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
     /// </summary>
     /// <param name="logger">Logger for this class.</param>
     /// <param name="ckModelRepositories">List of construction kit model repositories.</param>
-    public CkModelRepositoryManager(ILogger<CkModelRepositoryManager> logger, IEnumerable<ICkModelRepository> ckModelRepositories)
+    public CkModelRepositoryManager(ILogger<CkModelRepositoryManager> logger,
+        IEnumerable<ICkModelRepository> ckModelRepositories)
     {
         _logger = logger;
         _ckModelRepositories = ckModelRepositories;
@@ -37,7 +38,8 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 continue;
             }
 
-            _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}", ckModelRepository.RepositoryName, ckModelId);
+            _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}",
+                ckModelRepository.RepositoryName, ckModelId);
 
             var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier)
                 .ConfigureAwait(false);
@@ -46,6 +48,35 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier)
                     .ConfigureAwait(false);
             }
+        }
+
+        throw ModelRepositoryException.ModelNotFoundInRepositories(ckModelId);
+    }
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId,
+        OperationResult operationResult,
+        CancellationToken? cancellationToken = null)
+    {
+        _logger.LogInformation("Looking up CK model with id {CkModelId} in repository {RepositoryName}", ckModelId,
+            repositoryName);
+
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}",
+            ckModelRepository.RepositoryName, ckModelId);
+
+        var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId)
+            .ConfigureAwait(false);
+        if (hasBeenFound)
+        {
+            return await ckModelRepository.GetModelAsync(ckModelId, operationResult)
+                .ConfigureAwait(false);
         }
 
         throw ModelRepositoryException.ModelNotFoundInRepositories(ckModelId);

@@ -93,6 +93,7 @@ internal static class Program
         services.AddTransient<ICommand, ConfigCommand>();
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, CompileCommand>();
+        services.AddTransient<ICommand, GetCommand>();
         services.AddTransient<ICommand, GetReposCommand>();
         services.AddTransient<ICommand, PublishCommand>();
         services.AddTransient<ICommand, FindCommand>();

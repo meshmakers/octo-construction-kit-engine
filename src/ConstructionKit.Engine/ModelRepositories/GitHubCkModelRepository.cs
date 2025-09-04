@@ -1,3 +1,4 @@
+using System.Net.Http;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
@@ -46,13 +47,34 @@ public class GitHubCkModelRepository : ICkModelRepository
     /// <inheritdoc />
     public async Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
+        // Try GitHub Pages first if enabled
+        if (IsGitHubPagesEnabled())
+        {
+            var httpClient = CreateHttpClient();
+            var pagesUrl = CreatePath(modelId);
+            try
+            {
+                var response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, pagesUrl))
+                    .ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+                    return true;
+                }
+            }
+            catch
+            {
+                // Fall back to GitHub API if Pages request fails
+            }
+        }
+
+        // Fall back to GitHub API
         var contents = await GetContentAsync(modelId).ConfigureAwait(false);
         return contents.Count > 0;
     }
 
     private async Task<IReadOnlyList<RepositoryContent>> GetContentAsync(CkModelId modelId)
     {
-        var gitHubClient = CreateClient(false);
+        var gitHubClient = CreateGitHubClient(false);
 
         var filePath = CreatePath(modelId);
 
@@ -76,12 +98,50 @@ public class GitHubCkModelRepository : ICkModelRepository
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
+        // Try GitHub Pages first if enabled
+        if (IsGitHubPagesEnabled())
+        {
+            var httpClient = CreateHttpClient();
+            var pagesUrl = CreatePath(modelId);
+            try
+            {
+                var response = await httpClient.GetAsync(pagesUrl, cancellationToken ?? CancellationToken.None)
+                    .ConfigureAwait(false);
+                if (response.IsSuccessStatusCode)
+                {
+#if NETSTANDARD2_0
+                        using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#else
+                    await using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+#endif
+                    var pagesCompiledModelRoot = await _ckJsonSerializer
+                        .DeserializeCompiledModelRootAsync(stream, "", operationResult).ConfigureAwait(false);
+                    if (operationResult.HasErrors)
+                    {
+                        throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName,
+                            operationResult);
+                    }
+
+                    return pagesCompiledModelRoot;
+                }
+            }
+            catch (HttpRequestException)
+            {
+                // Fall back to GitHub API if Pages request fails
+            }
+            catch (TaskCanceledException)
+            {
+                // Fall back to GitHub API if request times out
+            }
+        }
+
+        // Fall back to GitHub API
         if (!await IsModelIdExistingAsync(modelId, sourceIdentifier).ConfigureAwait(false))
         {
             throw ModelRepositoryException.ModelNotFound(modelId, RepositoryName);
         }
 
-        var gitHubClient = CreateClient(false);
+        var gitHubClient = CreateGitHubClient(false);
 
         var filePath = CreatePath(modelId);
 
@@ -94,19 +154,19 @@ public class GitHubCkModelRepository : ICkModelRepository
             throw ModelRepositoryException.DownloadError(modelId, RepositoryName);
         }
 
-        // Convert the Base64 content to byte array
+        // Convert the Base64 content to a byte array
         byte[] data = Convert.FromBase64String(contents[0].EncodedContent);
 
         // Create a MemoryStream from the byte array
         using MemoryStream memoryStream = new MemoryStream(data);
-        var compiledModelRoot = await _ckJsonSerializer
+        var apiCompiledModelRoot = await _ckJsonSerializer
             .DeserializeCompiledModelRootAsync(memoryStream, "", operationResult).ConfigureAwait(false);
         if (operationResult.HasErrors)
         {
             throw ModelRepositoryException.ErrorDuringModelLoad(modelId, RepositoryName, operationResult);
         }
 
-        return compiledModelRoot;
+        return apiCompiledModelRoot;
     }
 
     /// <inheritdoc />
@@ -116,7 +176,7 @@ public class GitHubCkModelRepository : ICkModelRepository
     {
         try
         {
-            var gitHubClient = CreateClient(true);
+            var gitHubClient = CreateGitHubClient(true);
 
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
             string filePath = CreatePath(ckCompiledModel.ModelId);
@@ -181,14 +241,14 @@ public class GitHubCkModelRepository : ICkModelRepository
         return content;
     }
 
-    private IGitHubClient CreateClient(bool isWrite)
+    private IGitHubClient CreateGitHubClient(bool isWrite)
     {
         var gitHubClient = new GitHubClient(new ProductHeaderValue("OctoMeshCompiler"));
         if (!string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
         {
             gitHubClient.Credentials = new Credentials(_gitHubOptions.Value.GitHubApiToken);
         }
-        
+
         if (isWrite && string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken))
         {
             throw ModelRepositoryException.GitHubTokenMissing();
@@ -204,5 +264,28 @@ public class GitHubCkModelRepository : ICkModelRepository
                + ckModelId.ModelId + "/"
                + ckModelId.ModelVersion.Major
                + "/ck-" + ckModelId.SemanticVersionedFullName.ToLower() + ".json";
+    }
+
+    private HttpClient CreateHttpClient()
+    {
+        if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubPagesUri) ||
+            _gitHubOptions.Value.GitHubPagesUri == null)
+        {
+            throw ModelRepositoryException.GitHubPagesUriMissing();
+        }
+
+        var baseUri = _gitHubOptions.Value.GitHubPagesUri.TrimEnd('/');
+
+        var httpClient = new HttpClient
+        {
+            BaseAddress = new Uri($"{baseUri}")
+        };
+
+        return httpClient;
+    }
+
+    private bool IsGitHubPagesEnabled()
+    {
+        return !string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubPagesUri);
     }
 }

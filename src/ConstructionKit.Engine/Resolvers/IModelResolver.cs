@@ -15,7 +15,9 @@ public interface IModelResolver
     /// </summary>
     /// <param name="ckModelIds">List of model ids</param>
     /// <param name="operationResult">Operation result</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
     Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult, object? sourceIdentifier = null);
 
@@ -25,7 +27,9 @@ public interface IModelResolver
     /// <param name="ckModelIds">List of model ids</param>
     /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
     Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null);
@@ -36,7 +40,9 @@ public interface IModelResolver
     /// <param name="compiledModel">Instance of the compiled model</param>
     /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
     Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver, 
         OperationResult operationResult, object? sourceIdentifier = null);
 }

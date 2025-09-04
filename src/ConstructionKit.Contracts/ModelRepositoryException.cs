@@ -81,4 +81,9 @@ public class ModelRepositoryException : CkModelException
     {
         return new ModelRepositoryException("GitHub token is missing.");
     }
+
+    internal static Exception GitHubPagesUriMissing()
+    {
+        return new ModelRepositoryException("GitHub Pages URI is missing.");
+    }
 }

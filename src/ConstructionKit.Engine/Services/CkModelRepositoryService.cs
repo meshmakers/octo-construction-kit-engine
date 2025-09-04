@@ -51,6 +51,14 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             .ConfigureAwait(false);
     }
 
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId, OperationResult operationResult,
+        CancellationToken? cancellationToken = null)
+    {
+        return await _ckModelRepositoryManager
+            .LookupCkModelAsync(repositoryName, ckModelId, operationResult, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public IEnumerable<Tuple<string, string>> GetRepositoryList(object? sourceIdentifier = null)
     {
         return _ckModelRepositoryManager.GetRepositoryList(sourceIdentifier);

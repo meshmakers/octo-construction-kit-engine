@@ -11,13 +11,11 @@ public class GitHubOptions
     public GitHubOptions()
     {
         GitHubRepositoryOwner = "meshmakers";
-        GitHubRepositoryName = "construction-kit-libraries";
+        GitHubRepositoryName = "meshmakers.github.io";
         GitHubRepositoryBranch = "main";
-
-        // This is a token to read from public GitHub repositories
-        GitHubApiToken = "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";
+        GitHubPagesUri = "https://meshmakers.github.io/";
     }
-    
+
     /// <summary>
     /// API Token for GitHub
     /// </summary>
@@ -37,4 +35,10 @@ public class GitHubOptions
     /// GitHub repository branch
     /// </summary>
     public string GitHubRepositoryBranch { get; set; }
+
+    /// <summary>
+    /// The uri to the GitHub pages site where the construction kit models are stored.
+    /// If null or empty, the repository will use GitHub API for reading models.
+    /// </summary>
+    public string? GitHubPagesUri { get; set; }
 }

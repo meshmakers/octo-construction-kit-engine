@@ -16,6 +16,7 @@ internal class ConfigCommand : Command<OctoToolOptions>
     private readonly IArgument _gitHubRepositoryName;
     private readonly IArgument _gitHubRepositoryBranch;
     private readonly IArgument _gitHubApiToken;
+    private readonly IArgument _gitHubPagesUri;
 
     public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options, IOptions<GitHubOptions> githubOptions,
         IConfigWriter configWriter)
@@ -34,6 +35,8 @@ internal class ConfigCommand : Command<OctoToolOptions>
             ["GitHub Repository Branch to publish to a GitHub Repository"], false, 1);
         _gitHubApiToken = CommandArgumentValue.AddArgument("gt", "gitHubApiToken",
             ["GitHub API token to publish to a GitHub Repository"], false, 1);
+        _gitHubPagesUri = CommandArgumentValue.AddArgument("gp", "gitHubPagesUri",
+            ["GitHub Pages URI to read models from a GitHub Pages site"], false, 1);
     }
 
     public override Task Execute()
@@ -57,6 +60,11 @@ internal class ConfigCommand : Command<OctoToolOptions>
         if (CommandArgumentValue.IsArgumentUsed(_gitHubRepositoryBranch))
         {
             _githubOptions.Value.GitHubRepositoryBranch = CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubRepositoryBranch).ToLower();
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_gitHubPagesUri))
+        {
+            _githubOptions.Value.GitHubPagesUri = CommandArgumentValue.GetArgumentScalarValue<string>(_gitHubPagesUri).ToLower();
         }
         
         _githubOptions.Value.GitHubApiToken = CommandArgumentValue.IsArgumentUsed(_gitHubApiToken)

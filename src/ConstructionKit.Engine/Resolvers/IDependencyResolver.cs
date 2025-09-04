@@ -16,7 +16,9 @@ internal interface IDependencyResolver
     /// <param name="ckModelGraph">Full model graph</param>
     /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
-    /// <param name="sourceIdentifier">An object that describes the source which the repository should search, set it to null to use default</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
     Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null);

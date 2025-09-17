@@ -57,6 +57,11 @@ public class RtEntity : RtTypeWithAttributes
     ///     Returns the last change date time
     /// </summary>
     public DateTime? RtChangedDateTime { get; set; }
+    
+    /// <summary>
+    ///     Returns the time the entity was deleted
+    /// </summary>
+    public DateTime? RtDeletedDateTime { get; set; }
 
     /// <summary>
     ///     Gets or sets the construction kit id
@@ -72,6 +77,11 @@ public class RtEntity : RtTypeWithAttributes
     ///     Gets or sets the runtime version, which is used to detect changes of the entity
     /// </summary>
     public ulong RtVersion { get; set; }
+    
+    /// <summary>
+    ///     Gets or sets the state of the entity
+    /// </summary>
+    public RtEntityState? RtState { get; set; }
 
     /// <inheritdoc />
     protected override string GetLocation()

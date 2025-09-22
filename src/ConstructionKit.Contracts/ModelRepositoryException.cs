@@ -22,7 +22,7 @@ public class ModelRepositoryException : CkModelException
 
     internal static Exception ModelNotFoundInRepositories(CkModelId ckModelId)
     {
-        return new ModelRepositoryException($"Model '{ckModelId}' not found in one of the defined model repositories.");
+        return new ModelRepositoryException($"Model '{ckModelId}' not found in one of the registered model repositories.");
     }
 
     /// <summary>

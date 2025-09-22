@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
@@ -7,23 +6,17 @@ using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
-internal class DependencyResolver : IDependencyResolver
+internal class DependencyResolver(
+    ILogger<DependencyResolver> logger,
+    Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
+    : IDependencyResolver
 {
-    private readonly Lazy<ICkModelRepositoryManager> _ckModelRepositoryManagerLazy;
-    private readonly ILogger<DependencyResolver> _logger;
-
-    public DependencyResolver(ILogger<DependencyResolver> logger, Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
-    {
-        _logger = logger;
-        _ckModelRepositoryManagerLazy = ckModelRepositoryManagerLazy;
-    }
-
     public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
-        _logger.LogDebug("Starting resolving dependencies");
+        logger.LogDebug("Starting resolving dependencies");
         await Resolve(dependencies, ckModelGraph, originFileResolver, sourceIdentifier, operationResult).ConfigureAwait(false);
-        _logger.LogDebug("Resolving dependencies completed");
+        logger.LogDebug("Resolving dependencies completed");
 
         return ckModelGraph;
     }
@@ -37,8 +30,8 @@ internal class DependencyResolver : IDependencyResolver
         {
             var ckDependency = dependencies[i];
 
-            _logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
-            var ckDependencyRootModel = await _ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
+            logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
+            var ckDependencyRootModel = await ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
             if (ckDependencyRootModel == null)
             {
@@ -52,13 +45,13 @@ internal class DependencyResolver : IDependencyResolver
                 {
                     if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) && !dependencies.Contains(ckChildDependency))
                     {
-                        _logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
+                        logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
                         dependencies.Add(ckChildDependency);
                     }
                 }
             }
 
-            _logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph", ckDependencyRootModel.ModelId);
+            logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph", ckDependencyRootModel.ModelId);
             ckModelGraph.AppendModel(ckDependencyRootModel);
         }
     }

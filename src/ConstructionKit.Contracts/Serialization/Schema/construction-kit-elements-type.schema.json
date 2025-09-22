@@ -41,7 +41,9 @@
                 "enum": [
                   "None",
                   "Ascending",
-                  "Text"
+                  "Text",
+                  "Unique",
+                  "UniqueNotDeleted"
                 ]
               },
               "language": {
@@ -156,7 +158,9 @@
                 "enum": [
                   "None",
                   "Ascending",
-                  "Text"
+                  "Text",
+                  "Unique",
+                  "UniqueNotDeleted"
                 ]
               },
               "language": {

@@ -1,0 +1,28 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: IndexTestEntity
+    derivedFromCkTypeId: System/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${thisModel}/Designation
+        name: Designation
+        isOptional: false
+      - id: ${thisModel}/Location
+        name: Location
+        isOptional: false
+      - id: ${thisModel}/ConnectionState
+        name: ConnectionState
+        isOptional: false
+      - id: ${thisModel}/DataCount
+        name: DataCount
+        isOptional: true
+    indexes:
+      - indexType: Unique
+        fields:
+          - attributePaths:
+              - Designation
+      - indexType: UniqueNotDeleted
+        fields:
+          - attributePaths:
+              - Location

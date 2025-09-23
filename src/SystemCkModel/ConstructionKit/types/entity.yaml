@@ -6,3 +6,13 @@ types:
     associations:
     - id: ${thisModel}/Related
       targetCkTypeId: ${thisModel}/Entity
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - RtWellKnownName
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - CkTypeId
+              - _id

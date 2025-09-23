@@ -88,5 +88,7 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
             await _mermaidGenerator.GenerateMermaidDiagram(resolvedTypes, outputPath, compiledModelRoot.ModelId, outputFile, 
                 linkPath);
         }
+
+        Logger.LogInformation("Documentation created in {OutputPath}", outputPath);
     }
 }

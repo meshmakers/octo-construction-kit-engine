@@ -48,7 +48,7 @@ internal class ElementResolver : IElementResolver
                 if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
                     && ckAttribute.ValueCkRecordId != null)
                 {
-                    ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.ToString());
+                    ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.FullName);
                 }
 
                 if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: null })
@@ -59,7 +59,7 @@ internal class ElementResolver : IElementResolver
                 
                 if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: not null })
                 {
-                    ckAttribute.ValueCkEnumId = variableResolver.Resolve(ckAttribute.ValueCkEnumId.ToString());
+                    ckAttribute.ValueCkEnumId = variableResolver.Resolve(ckAttribute.ValueCkEnumId.FullName);
                 }
 
                 ckModelGraph.GetOrCreateAttribute(ckAttributeId, ckAttribute);
@@ -111,7 +111,7 @@ internal class ElementResolver : IElementResolver
                     
                     foreach (var ckTypeAttributeDto in ckAssociationRole.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
                     }
                 }
 
@@ -138,7 +138,7 @@ internal class ElementResolver : IElementResolver
 
                 if (ckType.DerivedFromCkTypeId != null)
                 {
-                    ckType.DerivedFromCkTypeId = variableResolver.Resolve(ckType.DerivedFromCkTypeId.ToString());
+                    ckType.DerivedFromCkTypeId = variableResolver.Resolve(ckType.DerivedFromCkTypeId.FullName);
                 }
 
                 if (ckType.Attributes != null)
@@ -167,7 +167,7 @@ internal class ElementResolver : IElementResolver
 
                     foreach (var ckTypeAttributeDto in ckType.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
                     }
                 }
 
@@ -175,8 +175,8 @@ internal class ElementResolver : IElementResolver
                 {
                     foreach (var ckTypeAssociationDto in ckType.Associations)
                     {
-                        ckTypeAssociationDto.CkRoleId = variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.ToString());
-                        ckTypeAssociationDto.TargetCkTypeId = variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.ToString());
+                        ckTypeAssociationDto.CkRoleId = variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.FullName);
+                        ckTypeAssociationDto.TargetCkTypeId = variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.FullName);
                     }
                 }
 
@@ -204,7 +204,7 @@ internal class ElementResolver : IElementResolver
                 
                 if (ckRecord.DerivedFromCkRecordId != null)
                 {
-                    ckRecord.DerivedFromCkRecordId = variableResolver.Resolve(ckRecord.DerivedFromCkRecordId.ToString());
+                    ckRecord.DerivedFromCkRecordId = variableResolver.Resolve(ckRecord.DerivedFromCkRecordId.FullName);
                 }
 
                 if (ckRecord.Attributes != null)
@@ -232,7 +232,7 @@ internal class ElementResolver : IElementResolver
                     
                     foreach (var ckTypeAttributeDto in ckRecord.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.ToString());
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
                     }
                 }
 

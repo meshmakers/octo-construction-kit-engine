@@ -6,7 +6,7 @@ records:
     attributes:
       - id: ${thisModel}/LoginProvider
         name: LoginProvider
-      - id: System/Name
+      - id: ${System}/Name
         name: Name
       - id: ${thisModel}/UserId
         name: UserId

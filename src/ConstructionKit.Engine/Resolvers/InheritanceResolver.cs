@@ -140,8 +140,14 @@ internal class InheritanceResolver : IInheritanceResolver
 
             foreach (var typeAttribute in baseCkType.DefinedAttributes)
             {
-                var ckTypeAttributeGraph = baseCkType.AllAttributes[typeAttribute.CkAttributeId];
-                // Here is checked if the attribute id already exists on the type (e. g. defined at type or inherited from another base type)
+                if (!baseCkType.AllAttributes.TryGetValue(typeAttribute.CkAttributeId, out var ckTypeAttributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtType(originFileResolver.Resolve(baseCkType.CkTypeId),
+                        typeAttribute.CkAttributeId, baseCkType.CkTypeId));
+                    continue;
+                }
+                // Here is checked if the attribute id already exists on the type
+                // (e.g. defined at type or inherited from another base type)
                 if (!originTypeGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
                     operationResult.AddMessage(
@@ -252,7 +258,8 @@ internal class InheritanceResolver : IInheritanceResolver
 
             foreach (var typeAttribute in baseCkRecord.DefinedAttributes)
             {
-                // Here is checked if the attribute id already exists on the record (e. g. defined at record or inherited from another base record)
+                // Here is checked if the attribute id already exists on the record
+                // (e.g. defined at record or inherited from another base record)
                 var ckTypeAttributeGraph = baseCkRecord.AllAttributes[typeAttribute.CkAttributeId];
                 if (!originRecordGraph.TryAddAttribute(ckTypeAttributeGraph))
                 {
@@ -371,7 +378,7 @@ internal class InheritanceResolver : IInheritanceResolver
         while (currentCkTypeId != null &&
                modelGraph.Types.TryGetValue(currentCkTypeId, out var currentCkType))
         {
-            var baseCkTypeId = currentCkType.DerivedFromCkTypeId;
+            var baseCkTypeId =  currentCkType.DerivedFromCkTypeId;
 
             if (i != 0)
             {

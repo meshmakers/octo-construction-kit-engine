@@ -1,7 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: User
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${System}/Entity
     isFinal: true
     isAbstract: false
     attributes:
@@ -21,7 +21,7 @@ types:
         name: LastName
         isOptional: true
 
-      - id: System/Description
+      - id: ${System}/Description
         name: Description
         isOptional: true
 

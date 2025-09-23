@@ -25,8 +25,8 @@ public class RtModelRootTcDto
     /// </summary>
     public RtModelRootTcDto()
     {
-        Dependencies = new List<CkModelId>();
-        Entities = new List<RtEntityTcDto>();
+        Dependencies = [];
+        Entities = [];
     }
 
     /// <summary>

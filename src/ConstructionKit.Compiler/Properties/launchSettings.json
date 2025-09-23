@@ -1,5 +1,13 @@
 {
   "profiles": {
+    "CompilerCompileSystem": {
+      "commandName": "Project",
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)src/SystemCkModel/ConstructionKit\" -o \"$(OctoRepoRootPath)/test/system\""
+    },
+    "CompilerPublishSystem": {
+      "commandName": "Project",
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)/test/system/ck-system.yaml\" -r -rep \"LocalRepository\""
+    },
     "CompilerCompileSdkDemo": {
       "commandName": "Project",
       "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Demo/ConstructionKit\" -o \"$(OctoRepoRootPath)/test"
@@ -12,7 +20,10 @@
       "commandName": "Project",
       "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)tests/TestCkModel/ConstructionKit\" -o \"$(OctoRepoRootPath)/test"
     },
-    "CompilerGenerateDocSdkDemo": {
+    "CompilerPublishTestCkModel": {
+      "commandName": "Project",
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.testidentity.yaml\" -r -rep \"LocalRepository\""
+    },"CompilerGenerateDocSdkDemo": {
       "commandName": "Project",
       "commandLineArgs": "-c generateDocs -f \"$(OctoRepoRootPath)/test/ck-octosdkdemo.yaml\" -o \"$(OctoRepoRootPath)/test/docs\" -l \"/docs/technologyGuide/constructionKits/libraries/\""
     }

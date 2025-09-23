@@ -28,7 +28,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
         };
 
         _maxCount = maxCount;
-        _dependencies = new List<CkModelId>();
+        _dependencies = [];
         Dependencies = _dependencies;
     }
 

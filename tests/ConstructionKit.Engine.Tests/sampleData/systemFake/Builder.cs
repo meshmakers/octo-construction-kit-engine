@@ -10,22 +10,22 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("System", "1.0.0"),
-            Types = new List<CkCompiledTypeDto>
-            {
+            Types =
+            [
                 new()
                 {
                     TypeId = "Entity",
                     IsAbstract = true
                 }
-            },
-            AssociationRoles = new List<CkAssociationRoleDto>
-            {
+            ],
+            AssociationRoles =
+            [
                 new()
                 {
                     AssociationRoleId = "ParentChild", InboundMultiplicity = MultiplicitiesDto.One,
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Parent", OutboundName = "Children"
                 }
-            }
+            ]
         };
     }
 }

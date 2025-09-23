@@ -51,7 +51,8 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             .ConfigureAwait(false);
     }
 
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId, OperationResult operationResult,
+    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId,
+        OperationResult operationResult,
         CancellationToken? cancellationToken = null)
     {
         return await _ckModelRepositoryManager
@@ -115,7 +116,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
     {
         ArgumentValidation.ValidateExistingFile(nameof(modelConfigurationFilePath), modelConfigurationFilePath);
         ArgumentValidation.ValidateDirectoryPath(nameof(outputPath), outputPath);
-        
+
         modelConfigurationFilePath = MmPath.NormalizePath(modelConfigurationFilePath);
         outputPath = MmPath.NormalizePath(outputPath);
         if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
@@ -149,14 +150,23 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             Directory.CreateDirectory(outputPath);
         }
 
-        List<CompileResult> compileResults = new();
-        foreach (var ckModelId in ckModelConfigDto.Imports)
+        List<CompileResult> compileResults = [];
+        foreach (var ckModelIdVersionRange in ckModelConfigDto.Imports)
         {
-            var compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.yaml";
+            var ckModelExistingResult = await _ckModelRepositoryManager
+                .IsCkModelExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+
+            if (!ckModelExistingResult.Exists || ckModelExistingResult.ModelId == null)
+            {
+                operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckModelIdVersionRange), ckModelIdVersionRange));
+                continue;
+            }
+
+            var compiledModelFile = $"ck-{ckModelExistingResult.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
             var compiledModelFilePath = Path.Combine(outputPath, compiledModelFile);
 
 #if NETSTANDARD2_0
-        if (string.IsNullOrWhiteSpace(createCacheFilePath) || createCacheFilePath == null)
+            if (string.IsNullOrWhiteSpace(createCacheFilePath) || createCacheFilePath == null)
 #else
             if (string.IsNullOrWhiteSpace(createCacheFilePath))
 #endif
@@ -165,11 +175,13 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
                 continue;
             }
 
-            var compiledModelRoot = await _ckModelRepositoryManager.LookupCkModelAsync(ckModelId, operationResult)
+
+
+            var compiledModelRoot = await _ckModelRepositoryManager.LookupCkModelAsync(ckModelExistingResult.ModelId, operationResult)
                 .ConfigureAwait(false);
             if (operationResult.HasErrors || operationResult.HasFatalErrors || compiledModelRoot == null)
             {
-                _logger.LogError("Error loading model \'{ModelId}\'", ckModelId);
+                _logger.LogError("Error loading model \'{ModelId}\'", ckModelExistingResult.ModelId);
                 throw CompilerException.OperationResultWithErrors(operationResult);
             }
 
@@ -184,7 +196,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
                 .ValidateAsync(compiledModelRoot, originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
 
-            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, ckModelId, createCacheFilePath)
+            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, ckModelExistingResult.ModelId, createCacheFilePath)
                 .ConfigureAwait(false);
 
             compileResults.Add(new CompileResult(compiledModelFilePath, compiledModelCacheFilePath));

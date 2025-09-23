@@ -66,7 +66,7 @@ public class CompilerService : ICompilerService
         var modelDto = new CkMetaRootDto
         {
             ModelId = "Sample1",
-            Dependencies = new List<CkModelId> { new("System") }
+            Dependencies = [new("System", "[1.0,)")]
         };
 #if NETSTANDARD2_0
         using var streamWriter = new StreamWriter(Path.Combine(rootPath, CompilerStatics.MetadataFile));
@@ -79,22 +79,21 @@ public class CompilerService : ICompilerService
         var ckTypeDto = new CkTypeDto
         {
             TypeId = "SampleType1",
-            DerivedFromCkTypeId = "System/Entity",
+            DerivedFromCkTypeId = "${System}/Entity",
             Attributes =
-                new List<CkTypeAttributeDto>
-                {
-                    new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" },
-                    new() { CkAttributeId = "${thisModel}/SampleAttribute2", AttributeName = "MyRecord" },
-                    new() { CkAttributeId = "${thisModel}/SampleAttribute3", AttributeName = "MyEnum" }
-                },
-            Associations = new List<CkTypeAssociationDto> { new() { CkRoleId = "${thisModel}/Testing", TargetCkTypeId = "System/Entity" } }
+            [
+                new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" },
+                new() { CkAttributeId = "${thisModel}/SampleAttribute2", AttributeName = "MyRecord" },
+                new() { CkAttributeId = "${thisModel}/SampleAttribute3", AttributeName = "MyEnum" }
+            ],
+            Associations = [new() { CkRoleId = "${thisModel}/Testing", TargetCkTypeId = "${System}/Entity" }]
         };
 #if NETSTANDARD2_0
         using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
 #else
         await using var streamWriterEntity = new StreamWriter(Path.Combine(typesDirectory, CompilerStatics.Sample1Entity));
 #endif
-        await _ckSerializer.SerializeAsync(streamWriterEntity, new CkElementsRootDto { Types = new List<CkTypeDto> { ckTypeDto } })
+        await _ckSerializer.SerializeAsync(streamWriterEntity, new CkElementsRootDto { Types = [ckTypeDto] })
             .ConfigureAwait(false);
 
         var ckAttributeDto = new CkAttributeDto
@@ -123,14 +122,14 @@ public class CompilerService : ICompilerService
         {
             RecordId = "SampleRecord",
             Attributes =
-                new List<CkTypeAttributeDto> { new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" } }
+                [new() { CkAttributeId = "${thisModel}/SampleAttribute1", AttributeName = "MyAttribute" }]
         };
 #if NETSTANDARD2_0
         using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));
 #else
         await using var streamWriterRecord = new StreamWriter(Path.Combine(recordsDirectory, CompilerStatics.Sample1Record));
 #endif
-        await _ckSerializer.SerializeAsync(streamWriterRecord, new CkElementsRootDto { Records = new List<CkRecordDto> { ckRecordDto } })
+        await _ckSerializer.SerializeAsync(streamWriterRecord, new CkElementsRootDto { Records = [ckRecordDto] })
             .ConfigureAwait(false);
 
         // Write Enum
@@ -150,7 +149,7 @@ public class CompilerService : ICompilerService
 #else
         await using var streamWriterEnum = new StreamWriter(Path.Combine(enumsDirectory, CompilerStatics.Sample1Enum));
 #endif
-        await _ckSerializer.SerializeAsync(streamWriterEnum, new CkElementsRootDto { Enums = new List<CkEnumDto> { ckEnumDto } })
+        await _ckSerializer.SerializeAsync(streamWriterEnum, new CkElementsRootDto { Enums = [ckEnumDto] })
             .ConfigureAwait(false);
 
         // Write Association
@@ -171,7 +170,7 @@ public class CompilerService : ICompilerService
             new StreamWriter(Path.Combine(associationsDirectory, CompilerStatics.Sample1Association));
 #endif
         await _ckSerializer.SerializeAsync(streamWriterAssociations,
-            new CkElementsRootDto { AssociationRoles = new List<CkAssociationRoleDto> { ckAssociationRoleDto } }).ConfigureAwait(false);
+            new CkElementsRootDto { AssociationRoles = [ckAssociationRoleDto] }).ConfigureAwait(false);
 
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
@@ -195,6 +194,7 @@ public class CompilerService : ICompilerService
         // Ensure that the paths are normalized (We do not want to mix separators because it leads to issues)
         outputPath = MmPath.NormalizePath(outputPath);
         rootPath = MmPath.NormalizePath(rootPath);
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
         {
             createCacheFilePath = MmPath.NormalizePath(createCacheFilePath);
@@ -492,7 +492,7 @@ public class CompilerService : ICompilerService
         await using var streamWriterAttribute = new StreamWriter(Path.Combine(attributesDirectory, attributeFileName));
 #endif
         await _ckSerializer.SerializeAsync(streamWriterAttribute,
-            new CkElementsRootDto { Attributes = new List<CkAttributeDto> { ckAttributeDto } }).ConfigureAwait(false);
+            new CkElementsRootDto { Attributes = [ckAttributeDto] }).ConfigureAwait(false);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

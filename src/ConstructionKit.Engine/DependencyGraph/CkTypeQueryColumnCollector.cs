@@ -22,7 +22,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
     {
         return GetColumns(ckTypeId, ignoreNavigationProperties,
-            new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>());
+            []);
     }
 
 
@@ -165,7 +165,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         throw DependencyGraphException.RecordNotFound(attributeGraph.ValueCkRecordId);
                     }
 
-                    recordColumns = new List<CkTypeQueryColumn>();
+                    recordColumns = [];
                     CollectTypeColumns(recordGraph, recordColumns);
 
                     columns.AddRange(recordColumns.Select(c =>

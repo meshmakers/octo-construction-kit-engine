@@ -75,10 +75,10 @@ public class OctoValidatingJsonConverterFactory : JsonConverterFactory
             return serializerOptions;
         };
         object[] objArray =
-        {
+        [
             jsonSchemaAttribute.Schema,
             func
-        };
+        ];
 
         var instance = (JsonConverter?)Activator.CreateInstance(type, objArray);
         var validatingJsonConverter = (IOctoValidatingJsonConverter?)instance;

@@ -21,7 +21,7 @@ public class CkModelConfigDto
     /// </summary>
     public CkModelConfigDto()
     {
-        Imports = new List<CkModelId>();
+        Imports = [];
     }
 
     /// <summary>
@@ -35,5 +35,5 @@ public class CkModelConfigDto
     ///     Gets or sets the imports of the model.
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
-    public List<CkModelId>? Imports { get; set; }
+    public List<CkModelIdVersionRange>? Imports { get; set; }
 }

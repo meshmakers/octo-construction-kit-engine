@@ -2,7 +2,7 @@ namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 
 public class TemporaryDirectoryFixture : ServiceCollectionFixture, IDisposable
 {
-    private readonly List<string> _tempDirectoryList = new();
+    private readonly List<string> _tempDirectoryList = [];
 
     public virtual void Dispose()
     {

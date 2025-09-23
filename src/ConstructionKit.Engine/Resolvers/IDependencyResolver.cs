@@ -1,5 +1,4 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
@@ -21,6 +20,6 @@ internal interface IDependencyResolver
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
-    Task ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, IVariableResolver variableResolver,
+    Task ResolveDependenciesAsync(ICollection<CkModelIdVersionRange> dependencies, CkModelGraph ckModelGraph, IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null);
 }

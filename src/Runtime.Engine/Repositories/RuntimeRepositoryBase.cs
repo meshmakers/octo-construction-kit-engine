@@ -627,7 +627,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         ICollection<TEntity> rtEntities)
         where TEntity : RtEntity, new()
     {
-        List<EntityUpdateInfo<TEntity>> entitiesUpdate = new();
+        List<EntityUpdateInfo<TEntity>> entitiesUpdate = [];
         foreach (var rtEntity in rtEntities)
         {
             rtEntity.CkTypeId = ckTypeId;

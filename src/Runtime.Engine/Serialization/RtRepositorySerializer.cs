@@ -149,7 +149,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
             {
                 var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
+                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? []);
                 operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
             }
         }

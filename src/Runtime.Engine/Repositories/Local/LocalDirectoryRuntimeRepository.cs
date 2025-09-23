@@ -65,7 +65,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var savedEntities =
             queryable.Where(CombineFilterExpressions<TEntity>(fieldFilterCriteria, ckTypeGraph));
 
-        List<EntityUpdateInfo<RtEntity>> entitiesUpdate = new();
+        List<EntityUpdateInfo<RtEntity>> entitiesUpdate = [];
         foreach (var savedEntity in savedEntities)
         {
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateUpdate(savedEntity.ToRtEntityId(), rtEntity));
@@ -200,7 +200,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         var rtEntities = queryable
             .Where(CombineFilterExpressions<TEntity>(fieldFilterCriteria, ckTypeGraph));
 
-        List<EntityUpdateInfo<RtEntity>> entitiesUpdate = new();
+        List<EntityUpdateInfo<RtEntity>> entitiesUpdate = [];
         foreach (var rtEntity in rtEntities)
         {
             entitiesUpdate.Add(EntityUpdateInfo<RtEntity>.CreateDelete(rtEntity.ToRtEntityId()));

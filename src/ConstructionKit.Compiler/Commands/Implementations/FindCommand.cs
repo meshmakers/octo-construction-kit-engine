@@ -18,7 +18,7 @@ internal class FindCommand : Command<OctoToolOptions>
         _ckModelRepositoryService = ckModelRepositoryService;
 
         _modelIdArgument = CommandArgumentValue.AddArgument("mid", "modelId",
-            new[] { "Model Id of construction kit to find" }, true, 1);
+            ["Model Id of construction kit to find"], true, 1);
     }
 
     public override async Task Execute()

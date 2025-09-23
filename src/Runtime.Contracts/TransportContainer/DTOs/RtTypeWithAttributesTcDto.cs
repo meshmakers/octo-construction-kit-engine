@@ -16,7 +16,7 @@ public class RtTypeWithAttributesTcDto
     // ReSharper disable once MemberCanBeProtected.Global
     public RtTypeWithAttributesTcDto()
     {
-        Attributes = new List<RtAttributeTcDto>();
+        Attributes = [];
     }
 
     /// <summary>

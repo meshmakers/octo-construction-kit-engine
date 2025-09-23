@@ -10,92 +10,97 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("sample1", "1.0.0"),
-            Dependencies = new List<CkModelId> { new("System", "1.0.0") },
-            AssociationRoles = new List<CkAssociationRoleDto>
-            {
+            Dependencies = [new("System", "1.0.0")],
+            AssociationRoles =
+            [
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
                 }
-            },
-            Attributes = new List<CkAttributeDto>
-            {
+            ],
+            Attributes =
+            [
                 new()
                 {
                     AttributeId = "attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute5",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute6",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute7",
                     ValueType = AttributeValueTypesDto.String
                 }
-            },
-            Types = new List<CkCompiledTypeDto>
-            {
+            ],
+            Types =
+            [
                 new()
                 {
                     TypeId = "Demo1",
                     DerivedFromCkTypeId = "System/Entity",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
                         new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
                         new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
-                    }
+                    ]
                 },
+
                 new()
                 {
                     TypeId = "Demo2",
                     DerivedFromCkTypeId = "sample1/Demo1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
                         new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
                         new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
-                    },
-                    Associations = new List<CkTypeAssociationDto>
-                    {
-                        new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" }
-                    }
+                    ],
+                    Associations = [new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" }]
                 },
+
                 new()
                 {
                     TypeId = "Demo3",
                     DerivedFromCkTypeId = "sample1/Demo2",
-                    Associations = new List<CkTypeAssociationDto>
-                    {
+                    Associations =
+                    [
                         new() { CkRoleId = "sample1/Related", TargetCkTypeId = "System/Entity" },
                         new() { CkRoleId = "sample1/Related", TargetCkTypeId = "System/Entity" }
-                    }
+                    ]
                 }
-            }
+            ]
         };
     }
 }

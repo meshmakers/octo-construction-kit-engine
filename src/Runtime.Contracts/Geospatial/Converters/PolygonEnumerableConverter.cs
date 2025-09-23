@@ -45,7 +45,7 @@ public class PolygonEnumerableConverter : JsonConverter
                 .Select(lines => new Polygon(lines))
                 .ToList();
 
-        return polygons ?? new List<Polygon>();
+        return polygons ?? [];
     }
 
     /// <summary>

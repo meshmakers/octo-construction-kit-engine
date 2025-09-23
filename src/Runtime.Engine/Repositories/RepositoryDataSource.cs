@@ -63,7 +63,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         var associations = new Dictionary<RtEntityId, List<RtAssociation>>();
         foreach (var rtEntityId in rtEntityIds)
         {
-            associations.Add(rtEntityId, new List<RtAssociation>());
+            associations.Add(rtEntityId, []);
         }
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
 

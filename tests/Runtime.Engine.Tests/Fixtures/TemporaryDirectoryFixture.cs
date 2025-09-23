@@ -6,7 +6,7 @@ public class TemporaryDirectoryFixture : ServiceCollectionFixture, IDisposable
 
     public TemporaryDirectoryFixture()
     {
-        _tempDirectoryList = new List<string>();
+        _tempDirectoryList = [];
     }
 
     public void Dispose()

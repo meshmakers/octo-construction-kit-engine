@@ -28,8 +28,8 @@ internal class InheritanceResolver : IInheritanceResolver
     {
         _logger.LogDebug("Starting resolving inheritance");
 
-        HashSet<CkId<CkRecordId>> handledRecordHashSet = new();
-        HashSet<CkId<CkTypeId>> handledTypesHashSet = new();
+        HashSet<CkId<CkRecordId>> handledRecordHashSet = [];
+        HashSet<CkId<CkTypeId>> handledTypesHashSet = [];
 
         foreach (var ckTypeKeyValue in modelGraph.Types)
         {
@@ -306,7 +306,7 @@ internal class InheritanceResolver : IInheritanceResolver
         var handledInheritanceHashSet = new HashSet<Tuple<CkId<CkTypeId>, CkId<CkTypeId>>>();
         foreach (var graphType in modelGraph.Types)
         {
-            List<CkTypeGraph> baseList = new();
+            List<CkTypeGraph> baseList = [];
             foreach (var ckGraphTypeInheritance in graphType.Value.BaseTypes.Reverse())
             {
                 var baseGraphType = modelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];

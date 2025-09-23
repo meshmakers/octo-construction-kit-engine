@@ -1,7 +1,6 @@
 using System.Text.RegularExpressions;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
@@ -36,14 +35,14 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
-    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds, OperationResult operationResult,
         object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
         return ResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
     }
 
-    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds,
+    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds,
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {

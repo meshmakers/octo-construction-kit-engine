@@ -7,63 +7,51 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests;
 
-public class CkCacheServiceTests : IClassFixture<TemporaryDirectoryFixture>
+public class CkCacheServiceTests(TemporaryDirectoryFixture fixture)
+    : IClassFixture<TemporaryDirectoryFixture>
 {
-    private readonly TemporaryDirectoryFixture _fixture;
-    private readonly ITestOutputHelper _testOutputHelper;
-
-    public CkCacheServiceTests(TemporaryDirectoryFixture fixture, ITestOutputHelper testOutputHelper)
-    {
-        _fixture = fixture;
-        _testOutputHelper = testOutputHelper;
-    }
-
     [Fact]
     public async Task LoadCkModelAsync_ok()
     {
-        await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
-        {
-            var operationResult = new OperationResult();
-            OriginFileResolver originFileResolver = new("TEST");
-            var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
-            var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
-            ckCacheService.CreateTenant("test1");
+        await using var serviceProvider = fixture.Services.BuildServiceProvider();
+        var operationResult = new OperationResult();
+        OriginFileResolver originFileResolver = new("TEST");
+        var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
+        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+        ckCacheService.CreateTenant("test1");
 
-            var ckModelGraph = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
-            ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
+        var ckModelGraph = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
-            Assert.NotNull(ckCacheService.GetCkType("test1", "sample1/Demo1"));
-        }
+        Assert.NotNull(ckCacheService.GetCkType("test1", "sample1/Demo1"));
     }
 
     [Fact]
     public async Task LoadSaveAndRestore_ok()
     {
-        await using (var serviceProvider = _fixture.Services.BuildServiceProvider())
+        await using var serviceProvider = fixture.Services.BuildServiceProvider();
+        var tempDirectory = fixture.CreateTempDirectory();
+        var filePath = Path.Combine(tempDirectory, "test.cache.json");
+
+        var operationResult = new OperationResult();
+        OriginFileResolver originFileResolver = new("TEST");
+        var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
+        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+
+        ckCacheService.CreateTenant("test1");
+
+        var ckModelGraph = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
+
+        await using (var streamWriter = File.OpenWrite(filePath))
         {
-            var tempDirectory = _fixture.CreateTempDirectory();
-            var filePath = Path.Combine(tempDirectory, "test.cache.json");
-
-            var operationResult = new OperationResult();
-            OriginFileResolver originFileResolver = new("TEST");
-            var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
-            var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
-
-            ckCacheService.CreateTenant("test1");
-
-            var ckModelGraph = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
-            ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
-
-            await using (var streamWriter = File.OpenWrite(filePath))
-            {
-                await ckCacheService.SaveCacheAsync("test1", streamWriter);
-            }
-
-            ckCacheService.CreateTenant("test2");
-            await using var stream = File.OpenRead(filePath);
-            await ckCacheService.RestoreCacheAsync("test2", stream);
-
-            Assert.NotNull(ckCacheService.GetCkType("test2", "sample1/Demo1"));
+            await ckCacheService.SaveCacheAsync("test1", streamWriter);
         }
+
+        ckCacheService.CreateTenant("test2");
+        await using var stream = File.OpenRead(filePath);
+        await ckCacheService.RestoreCacheAsync("test2", stream);
+
+        Assert.NotNull(ckCacheService.GetCkType("test2", "sample1/Demo1"));
     }
 }

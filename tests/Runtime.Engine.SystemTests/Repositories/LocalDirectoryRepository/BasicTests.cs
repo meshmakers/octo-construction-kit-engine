@@ -249,8 +249,8 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        List<EntityUpdateInfo<RtEntity>> entityUpdateInfos = new();
-        List<AssociationUpdateInfo> associationUpdateInfos = new();
+        List<EntityUpdateInfo<RtEntity>> entityUpdateInfos = [];
+        List<AssociationUpdateInfo> associationUpdateInfos = [];
         var rtZone = await localDirectoryRepository.CreateTransientRtEntityAsync<RtZone>();
         rtZone.Designation = "MyZone";
         entityUpdateInfos.Add(EntityUpdateInfo<RtEntity>.CreateInsert(rtZone));

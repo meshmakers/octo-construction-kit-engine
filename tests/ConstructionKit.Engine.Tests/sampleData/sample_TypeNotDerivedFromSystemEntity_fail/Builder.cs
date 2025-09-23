@@ -10,34 +10,31 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("sample1", "1.0.0"),
-            Dependencies = new List<CkModelId> { new("System", "1.0.0") },
-            AssociationRoles = new List<CkAssociationRoleDto>
-            {
+            Dependencies = [new("System", "1.0.0")],
+            AssociationRoles =
+            [
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
                 }
-            },
-            Attributes = new List<CkAttributeDto>
-            {
+            ],
+            Attributes =
+            [
                 new()
                 {
                     AttributeId = "attribute1",
                     ValueType = AttributeValueTypesDto.String
                 }
-            },
-            Types = new List<CkCompiledTypeDto>
-            {
+            ],
+            Types =
+            [
                 new()
                 {
                     TypeId = "Demo1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
-                        new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" }
-                    }
+                    Attributes = [new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" }]
                 }
-            }
+            ]
         };
     }
 }

@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
@@ -43,6 +42,85 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
     {
         return sourceIdentifier == null;
+    }
+
+    /// <inheritdoc />
+    public Task<ModelExistingResult> IsModelIdExistingAsync(CkModelIdVersionRange modelIdVersionRange, object? sourceIdentifier = null)
+    {
+        var rootPath = _options.Value.RootPath;
+        var modelPath = Path.Combine(rootPath, "ck-models", modelIdVersionRange.ModelId);
+
+        if (!Directory.Exists(modelPath))
+        {
+            return Task.FromResult(new ModelExistingResult { Exists = false });
+        }
+
+        // Get all major version directories
+        var majorVersionDirectories = Directory.GetDirectories(modelPath)
+            .Where(dir => int.TryParse(Path.GetFileName(dir), out _))
+            .ToList();
+
+        if (!majorVersionDirectories.Any())
+        {
+            return Task.FromResult(new ModelExistingResult { Exists = false });
+        }
+
+        var availableVersions = new List<CkModelId>();
+
+        // Scan each major version directory for versioned model files
+        foreach (var majorVersionDir in majorVersionDirectories)
+        {
+            // Look for versioned model files: ck-{modelid}-{version}.json
+            var modelFiles = Directory.GetFiles(majorVersionDir, $"ck-{modelIdVersionRange.ModelId.ToLower()}-*.json");
+
+            foreach (var modelFile in modelFiles)
+            {
+                var fileName = Path.GetFileNameWithoutExtension(modelFile);
+                // Extract version from filename: ck-{modelid}-{version}.json
+                var prefix = $"ck-{modelIdVersionRange.ModelId.ToLower()}-";
+                if (fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var versionPart = fileName.Substring(prefix.Length);
+                    try
+                    {
+                        // Validate version format
+                        _ = new CkVersion(versionPart);
+                        var modelId = new CkModelId(modelIdVersionRange.ModelId, versionPart);
+                        availableVersions.Add(modelId);
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        // Skip invalid version strings
+                    }
+                }
+            }
+        }
+
+        if (!availableVersions.Any())
+        {
+            return Task.FromResult(new ModelExistingResult { Exists = false });
+        }
+
+        // Find the latest version that satisfies the version range
+        var satisfiedVersions = availableVersions
+            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.ModelVersion))
+            .ToList();
+
+        if (!satisfiedVersions.Any())
+        {
+            return Task.FromResult(new ModelExistingResult { Exists = false });
+        }
+
+        // Return the latest satisfied version
+        var latestSatisfiedVersion = satisfiedVersions
+            .OrderByDescending(modelId => modelId.ModelVersion)
+            .First();
+
+        return Task.FromResult(new ModelExistingResult
+        {
+            Exists = true,
+            ModelId = latestSatisfiedVersion
+        });
     }
 
     /// <inheritdoc />
@@ -145,7 +223,8 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
         var rootPath = _options.Value.RootPath;
         var modelPath = Path.Combine(rootPath, "ck-models", ckModelId.ModelId);
         var modelVersionPath = Path.Combine(modelPath, ckModelId.ModelVersion.Major.ToString());
-        var compiledModelFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.json";
+        // Include full version in filename: ck-{modelid}-{version}.json
+        var compiledModelFile = $"ck-{ckModelId.ModelId.ToLower()}-{ckModelId.ModelVersion}.json";
         var compiledModelFilePath = Path.Combine(modelVersionPath, compiledModelFile);
         return compiledModelFilePath;
     }

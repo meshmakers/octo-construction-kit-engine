@@ -21,7 +21,7 @@ public class CkMetaRootDto : CkModelPropertiesDto
     /// </summary>
     public CkMetaRootDto()
     {
-        Dependencies = new List<CkModelId>();
+        Dependencies = [];
     }
 
     /// <summary>
@@ -35,5 +35,5 @@ public class CkMetaRootDto : CkModelPropertiesDto
     ///     Gets or sets the dependencies of the model.
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
-    public List<CkModelId>? Dependencies { get; set; }
+    public List<CkModelIdVersionRange>? Dependencies { get; set; }
 }

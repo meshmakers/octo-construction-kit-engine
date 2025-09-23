@@ -173,8 +173,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
         await ckModelRepository.CustomizeCkEnumAsync(ckEnumId, ckEnumUpdates, sourceIdentifier).ConfigureAwait(false);
     }
 
-    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId,
-        object? sourceIdentifier = null)
+    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null)
     {
         var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
             repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
@@ -184,5 +183,25 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
         }
 
         return await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+    }
+
+    public async Task<ModelExistingResult> IsCkModelExistingAsync(CkModelIdVersionRange ckModelIdVersionRange,
+        object? sourceIdentifier = null)
+    {
+        foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x => x.Order))
+        {
+            if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+            {
+                continue;
+            }
+
+            var modelExistingResult = await ckModelRepository.IsModelIdExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+            if (modelExistingResult.Exists)
+            {
+                return modelExistingResult;
+            }
+        }
+
+        return new ModelExistingResult { Exists = false  };
     }
 }

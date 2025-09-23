@@ -7,7 +7,7 @@ public class ServiceCollectionFixture
 {
     public ServiceCollectionFixture()
     {
-        Services = new ServiceCollection();
+        Services = [];
         Services.AddRuntimeEngine()
             .AddLocalRuntimeRepository();
         Services.AddLogging(loggingBuilder =>

@@ -38,6 +38,15 @@ public interface ICkModelRepository
     /// <summary>
     ///     Checks if a model exists in this repository
     /// </summary>
+    /// <param name="modelIdVersionRange">The construction kit model id with version range</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
+    /// set it to null to use default</param>
+    /// <returns>A result indicating if the model exists and if yes, which version</returns>
+    Task<ModelExistingResult> IsModelIdExistingAsync(CkModelIdVersionRange modelIdVersionRange, object? sourceIdentifier = null);
+
+    /// <summary>
+    ///     Checks if a model exists in this repository
+    /// </summary>
     /// <param name="modelId">The construction kit model id</param>
     /// <param name="sourceIdentifier">An object, which describes the source which the repository should search,
     /// set it to null to use default</param>

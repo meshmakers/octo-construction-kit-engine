@@ -22,7 +22,7 @@ internal class ImportRtModelCommand(
     IRtJsonSerializer rtJsonSerializer)
     : IImportRtModelCommand
 {
-    private readonly HashSet<OctoObjectId> _entityImportIds = new();
+    private readonly HashSet<OctoObjectId> _entityImportIds = [];
     private readonly ConcurrentQueue<RtAssociation> _importAssociationQueue = new();
 
     private readonly ConcurrentQueue<RtEntity> _importEntityQueue = new();

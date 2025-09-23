@@ -14,7 +14,7 @@ public class OperationResult
     /// </summary>
     public OperationResult()
     {
-        Messages = new List<OperationMessage>();
+        Messages = [];
     }
 
     /// <summary>

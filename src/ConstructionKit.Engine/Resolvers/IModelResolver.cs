@@ -19,7 +19,7 @@ public interface IModelResolver
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
-    Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds, OperationResult operationResult, object? sourceIdentifier = null);
+    Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult, object? sourceIdentifier = null);
 
     /// <summary>
     ///     Resolves a list of model ids
@@ -31,7 +31,7 @@ public interface IModelResolver
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
-    Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds, IOriginFileResolver originFileResolver,
+    Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null);
 
     /// <summary>

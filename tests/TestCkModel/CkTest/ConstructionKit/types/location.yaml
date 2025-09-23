@@ -1,7 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Location
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${System}/Entity
     isFinal: false
     isAbstract: true
     attributes:
@@ -36,17 +36,17 @@ types:
       - id: Test/RecordArrayTests
         name: RecordArrayTests
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/Continent
-      - id: System/ParentChild
-        targetCkTypeId: Test/Ocean        
+      - id: ${System}/ParentChild
+        targetCkTypeId: Test/Ocean
 
   - typeId: Region
     derivedFromCkTypeId: Test/LocationWithSensor
     isFinal: true
     isAbstract: false
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/Country
 
   - typeId: City
@@ -54,7 +54,7 @@ types:
     isFinal: true
     isAbstract: false
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/Region
 
   - typeId: District
@@ -62,7 +62,7 @@ types:
     isFinal: true
     isAbstract: false
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/City
 
   - typeId: Zone
@@ -70,11 +70,11 @@ types:
     isFinal: true
     isAbstract: false
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/District
 
   - typeId: Sensor
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${System}/Entity
     isFinal: true
     isAbstract: false
     attributes:
@@ -105,5 +105,5 @@ types:
         name: RecordArrayTests
         isOptional: true
     associations:
-      - id: System/ParentChild
+      - id: ${System}/ParentChild
         targetCkTypeId: Test/LocationWithSensor

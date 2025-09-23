@@ -13,10 +13,9 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
-    public CkModelGraph Resolve(CkCompiledModelRoot ckCompiledModelRoot, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
+    public void Resolve(CkCompiledModelRoot ckCompiledModelRoot, CkModelGraph ckModelGraph, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
-        var ckModelGraph = new CkModelGraph();
         ckModelGraph.GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
 
         if (ckCompiledModelRoot.Attributes != null)
@@ -300,7 +299,5 @@ internal class ElementResolver : IElementResolver
                 ckModelGraph.GetOrCreateEnum(ckEnumId, ckEnum);
             }
         }
-
-        return ckModelGraph;
     }
 }

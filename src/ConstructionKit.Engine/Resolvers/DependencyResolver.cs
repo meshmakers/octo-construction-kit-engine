@@ -11,17 +11,20 @@ internal class DependencyResolver(
     Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
     : IDependencyResolver
 {
-    public async Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
+    public async Task ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
+        IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
         logger.LogDebug("Starting resolving dependencies");
-        await Resolve(dependencies, ckModelGraph, originFileResolver, sourceIdentifier, operationResult).ConfigureAwait(false);
+        await Resolve(dependencies, ckModelGraph, variableResolver, originFileResolver, sourceIdentifier,
+                operationResult)
+            .ConfigureAwait(false);
         logger.LogDebug("Resolving dependencies completed");
-
-        return ckModelGraph;
     }
 
-    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph, IOriginFileResolver originFileResolver, 
+    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph,
+        IVariableResolver variableResolver,
+        IOriginFileResolver originFileResolver,
         object? sourceIdentifier, OperationResult operationResult)
     {
         List<CkModelId> dependencies = [..ckRootDependencies];
@@ -31,19 +34,24 @@ internal class DependencyResolver(
             var ckDependency = dependencies[i];
 
             logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
-            var ckDependencyRootModel = await ckModelRepositoryManagerLazy.Value.LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
+            var ckDependencyRootModel = await ckModelRepositoryManagerLazy.Value
+                .LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
             if (ckDependencyRootModel == null)
             {
-                operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency), ckDependency));
+                operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
+                    ckDependency));
                 continue;
             }
+
+            variableResolver.SetVariable(ckDependencyRootModel.ModelId.ModelId, ckDependencyRootModel.ModelId.FullName);
 
             if (ckDependencyRootModel.Dependencies != null)
             {
                 foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)
                 {
-                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) && !dependencies.Contains(ckChildDependency))
+                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) &&
+                        !dependencies.Contains(ckChildDependency))
                     {
                         logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
                         dependencies.Add(ckChildDependency);
@@ -51,7 +59,8 @@ internal class DependencyResolver(
                 }
             }
 
-            logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph", ckDependencyRootModel.ModelId);
+            logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph",
+                ckDependencyRootModel.ModelId);
             ckModelGraph.AppendModel(ckDependencyRootModel);
         }
     }

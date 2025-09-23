@@ -2,4 +2,4 @@
 modelId: "System.TestIdentity-1.0.0"
 description: "Test Identity construction kit model"
 dependencies:
-  - "System-1.0.0"
+  - "System-1.0.1"

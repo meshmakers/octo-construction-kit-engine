@@ -1,11 +1,11 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Client
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${System}/Entity
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System/Enabled
+      - id: ${System}/Enabled
         name: Enabled
 
       - id: ${thisModel}/ClientId
@@ -20,11 +20,11 @@ types:
       - id: ${thisModel}/RequireClientSecret
         name: RequireClientSecret
 
-      - id: System/Name
+      - id: ${System}/Name
         name: ClientName
         isOptional: true
 
-      - id: System/Description
+      - id: ${System}/Description
         name: Description
         isOptional: true
 

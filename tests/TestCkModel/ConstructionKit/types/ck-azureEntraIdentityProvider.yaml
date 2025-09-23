@@ -5,7 +5,7 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: System/TenantId
+      - id: ${System}/TenantId
         name: TenantId
 
       - id: ${thisModel}/Authority

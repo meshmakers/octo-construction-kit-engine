@@ -1,7 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: PersistedGrant
-    derivedFromCkTypeId: System/Entity
+    derivedFromCkTypeId: ${System}/Entity
     isFinal: true
     isAbstract: false
     attributes:
@@ -20,7 +20,7 @@ types:
       - id: ${thisModel}/ClientId
         name: ClientId
 
-      - id: System/Description
+      - id: ${System}/Description
         name: Description
 
       - id: ${thisModel}/CreationDateTime

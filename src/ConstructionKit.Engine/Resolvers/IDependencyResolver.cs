@@ -13,13 +13,14 @@ internal interface IDependencyResolver
     ///     Resolves the dependencies of the given construction kit model ids
     /// </summary>
     /// <param name="dependencies">Dependencies to resolve</param>
-    /// <param name="ckModelGraph">Full model graph</param>
+    /// <param name="ckModelGraph">The model graph to add the resolved dependencies to</param>
+    /// <param name="variableResolver">Service for resolving variables</param>
     /// <param name="originFileResolver">Resolver for the original file location</param>
     /// <param name="operationResult">Operation result</param>
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     /// <returns></returns>
-    Task<CkModelGraph> ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
+    Task ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null);
 }

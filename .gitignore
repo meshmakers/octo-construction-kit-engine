@@ -6,6 +6,7 @@
 **/copilot.*.xml
 **/.DS_Store
 .config/
+test/
 
 # User-specific files
 *.rsuser

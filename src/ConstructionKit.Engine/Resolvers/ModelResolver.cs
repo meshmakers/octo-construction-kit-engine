@@ -35,19 +35,20 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
-    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds, OperationResult operationResult,
+    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
         object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
         return ResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
     }
 
-    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelIdVersionRange> ckModelIds,
+    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds,
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
         var modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds, modelGraph, _variableResolver,
+        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds.Select(id => id.ToVersionRange()).ToList(),
+                modelGraph, _variableResolver,
                 originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
 

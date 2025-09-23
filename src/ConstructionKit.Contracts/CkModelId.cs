@@ -249,5 +249,13 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
             return hash;
         }
     }
-    
+
+    /// <summary>
+    /// Converts to a version range
+    /// </summary>
+    /// <returns></returns>
+    public CkModelIdVersionRange ToVersionRange()
+    {
+        return new CkModelIdVersionRange(ModelId, ModelVersion.ToString());
+    }
 }

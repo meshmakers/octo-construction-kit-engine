@@ -10,119 +10,124 @@ public class Builder
         return new CkCompiledModelRoot
         {
             ModelId = new CkModelId("sample1", "1.0.0"),
-            Dependencies = new List<CkModelId> { new("System", "1.0.0") },
-            AssociationRoles = new List<CkAssociationRoleDto>
-            {
+            Dependencies = [new("System", "1.0.0")],
+            AssociationRoles =
+            [
                 new()
                 {
                     AssociationRoleId = "Related", InboundMultiplicity = MultiplicitiesDto.N,
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related"
                 }
-            },
-            Attributes = new List<CkAttributeDto>
-            {
+            ],
+            Attributes =
+            [
                 new()
                 {
                     AttributeId = "attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute5",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute6",
                     ValueType = AttributeValueTypesDto.String
                 },
+
                 new()
                 {
                     AttributeId = "attribute7",
                     ValueType = AttributeValueTypesDto.String
                 }
-            },
-            Types = new List<CkCompiledTypeDto>
-            {
+            ],
+            Types =
+            [
                 new()
                 {
                     TypeId = "Alpha1",
                     DerivedFromCkTypeId = "System/Entity",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
                         new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
                         new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
-                    }
+                    ]
                 },
+
                 new()
                 {
                     TypeId = "Alpha2",
                     DerivedFromCkTypeId = "sample1/Alpha1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
                         new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
                         new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
-                    }
+                    ]
                 },
+
                 new()
                 {
                     TypeId = "Alpha3",
                     DerivedFromCkTypeId = "sample1/Alpha2",
-                    Associations = new List<CkTypeAssociationDto>
-                    {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Alpha1" } // here
-                    }
+                    Associations = [new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Alpha1" }]
                 },
+
 
                 new()
                 {
                     TypeId = "Beta1",
                     DerivedFromCkTypeId = "System/Entity",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
                         new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
                         new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
-                    }
+                    ]
                 },
+
                 new()
                 {
                     TypeId = "Beta2",
                     DerivedFromCkTypeId = "sample1/Beta1",
-                    Attributes = new List<CkTypeAttributeDto>
-                    {
+                    Attributes =
+                    [
                         new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
                         new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
                         new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
-                    }
+                    ]
                 },
+
                 new()
                 {
                     TypeId = "Beta3",
                     DerivedFromCkTypeId = "sample1/Beta2",
-                    Associations = new List<CkTypeAssociationDto>
-                    {
-                        new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Beta2" } // here
-                    }
+                    Associations = [new() { CkRoleId = "sample1/Related", TargetCkTypeId = "sample1/Beta2" }]
                 }
-            }
+            ]
         };
     }
 }

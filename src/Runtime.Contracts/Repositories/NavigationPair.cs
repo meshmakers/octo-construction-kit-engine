@@ -61,7 +61,7 @@ public record NavigationPair : FieldFilterCriteria
         CkRoleId = ckRoleId;
         Direction = direction;
         TargetCkTypeId = targetCkTypeId;
-        InnerNavigationPairs = new List<NavigationPair>();
+        InnerNavigationPairs = [];
     }
 
     /// <summary>

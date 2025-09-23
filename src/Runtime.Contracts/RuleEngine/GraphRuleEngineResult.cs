@@ -14,8 +14,8 @@ public record GraphRuleEngineResult
     /// </summary>
     public GraphRuleEngineResult()
     {
-        RtAssociationsToCreate = new List<RtAssociation>();
-        RtAssociationsToDelete = new List<RtAssociation>();
+        RtAssociationsToCreate = [];
+        RtAssociationsToDelete = [];
     }
 
     /// <summary>

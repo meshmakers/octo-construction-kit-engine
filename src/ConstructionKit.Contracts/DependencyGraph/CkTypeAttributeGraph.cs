@@ -22,7 +22,7 @@ public class CkTypeAttributeGraph
     {
         CkAttributeId = ckAttributeId;
         AttributeName = ckTypeAttributeDto.AttributeName;
-        AutoCompleteValues = ckTypeAttributeDto.AutoCompleteValues ?? ckTypeAttributeDto.AutoCompleteValues ?? new List<object>();
+        AutoCompleteValues = ckTypeAttributeDto.AutoCompleteValues ?? ckTypeAttributeDto.AutoCompleteValues ?? [];
         AutoIncrementReference = ckTypeAttributeDto.AutoIncrementReference;
         ValueType = ckAttributeGraph.ValueType;
         ValueCkRecordId = ckAttributeGraph.ValueCkRecordId;

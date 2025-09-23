@@ -39,7 +39,7 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
             MaxDegreeOfParallelism = 16
         };
 
-        List<RtEntityTcDto> globalList = new();
+        List<RtEntityTcDto> globalList = [];
 
         for (var j = 0; j < 200; j++)
         {
@@ -62,8 +62,14 @@ public class JsonSerializerTests : IClassFixture<TemporaryDirectoryFixture>
                 {
                     var next = random.Next(0, entitiesCount - 1);
                     var rtAssocEntity = entities.ElementAt(next);
-                    rtEntity.Associations = new List<RtAssociationTcDto>
-                        { new() { RoleId = "Sample1/Testing", TargetCkTypeId = rtAssocEntity.CkTypeId, TargetRtId = rtAssocEntity.RtId } };
+                    rtEntity.Associations =
+                    [
+                        new()
+                        {
+                            RoleId = "Sample1/Testing", TargetCkTypeId = rtAssocEntity.CkTypeId,
+                            TargetRtId = rtAssocEntity.RtId
+                        }
+                    ];
                 }
 
                 entities.Push(rtEntity);

@@ -16,11 +16,11 @@ public class AggregationInput
     /// </summary>
     public AggregationInput()
     {
-        _countAttributePaths = new List<string>();
-        _minAttributePaths = new List<string>();
-        _maxAttributePaths = new List<string>();
-        _avgAttributePaths = new List<string>();
-        _sumAttributePaths = new List<string>();
+        _countAttributePaths = [];
+        _minAttributePaths = [];
+        _maxAttributePaths = [];
+        _avgAttributePaths = [];
+        _sumAttributePaths = [];
     }
 
     /// <summary>

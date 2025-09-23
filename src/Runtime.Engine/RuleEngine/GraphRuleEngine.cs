@@ -172,7 +172,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 var originCkTypeGraphs = inboundTypeAssociationGraphs.Select(ckType =>
                     ckCache.GetCkType(repositoryDataSource.TenantId, ckType.OriginCkTypeId)).ToArray();
 
-                List<CkId<CkTypeId>> originCkTypeGraphList = new();
+                List<CkId<CkTypeId>> originCkTypeGraphList = [];
                 originCkTypeGraphList.AddRange(originCkTypeGraphs.Select(x => x.CkTypeId));
                 originCkTypeGraphList.AddRange(
                     originCkTypeGraphs.SelectMany(x => x.DerivedTypes.Select(y => y.InheritorCkTypeId)));
@@ -287,7 +287,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 var targetCkTypeGraphs = outboundTypeAssociationGraphs.Select(g =>
                     ckCache.GetCkType(repositoryDataSource.TenantId, g.TargetCkTypeId)).ToArray();
 
-                List<CkId<CkTypeId>> targetCkTypeGraphList = new();
+                List<CkId<CkTypeId>> targetCkTypeGraphList = [];
                 targetCkTypeGraphList.AddRange(targetCkTypeGraphs.Select(x => x.CkTypeId));
                 targetCkTypeGraphList.AddRange(
                     targetCkTypeGraphs.SelectMany(x => x.DerivedTypes.Select(y => y.InheritorCkTypeId)));

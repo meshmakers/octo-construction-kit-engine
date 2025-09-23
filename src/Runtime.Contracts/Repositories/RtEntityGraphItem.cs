@@ -47,7 +47,7 @@ public class RtEntityGraphItem : RtEntity
     /// </summary>
     public RtEntityGraphItem()
     {
-        Associations = new List<NavigationEnd>();
+        Associations = [];
     }
 
     /// <summary>
@@ -58,7 +58,7 @@ public class RtEntityGraphItem : RtEntity
     public RtEntityGraphItem(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
         : base(ckTypeId, rtId)
     {
-        Associations = new List<NavigationEnd>();
+        Associations = [];
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ public class RtEntityGraphItem : RtEntity
         IReadOnlyDictionary<string, object?> attributes)
         : base(ckTypeId, rtId, attributes)
     {
-        Associations = new List<NavigationEnd>();
+        Associations = [];
     }
 
     /// <summary>

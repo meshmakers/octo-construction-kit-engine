@@ -33,12 +33,12 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IsCollectionRoot = ckTypeDto.IsCollectionRoot;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         Description = ckTypeDto.Description;
-        _baseTypes = new List<CkGraphTypeInheritance>();
-        _derivedTypes = new List<CkGraphTypeInheritance>();
+        _baseTypes = [];
+        _derivedTypes = [];
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
         DerivedTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_derivedTypes);
-        Associations = new CkGraphDirectedAssociations(ckTypeDto.Associations ?? new List<CkTypeAssociationDto>());
-        _indexes = new List<CkTypeIndexDto>(ckTypeDto.Indexes ?? new List<CkTypeIndexDto>());
+        Associations = new CkGraphDirectedAssociations(ckTypeDto.Associations ?? []);
+        _indexes = new List<CkTypeIndexDto>(ckTypeDto.Indexes ?? []);
         Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
     }
 

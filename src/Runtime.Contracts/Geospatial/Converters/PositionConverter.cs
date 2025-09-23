@@ -59,7 +59,7 @@ public class PositionConverter : JsonConverter<IPosition>, IYamlTypeConverter
         }
         else
         {
-            List<double> coordinates = new List<double>();
+            List<double> coordinates = [];
             while (reader.Read())
             {
                 if (reader.TokenType == JsonTokenType.EndArray)

@@ -20,7 +20,7 @@ public abstract class CkTypeWithAttributesGraph
     {
         _allAttributes = new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>();
         _allAttributesByName = new Dictionary<string, CkTypeAttributeGraph>();
-        DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeWithAttributesDto.Attributes ?? new List<CkTypeAttributeDto>());
+        DefinedAttributes = new ReadOnlyCollection<CkTypeAttributeDto>(ckTypeWithAttributesDto.Attributes ?? []);
         AllAttributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>(_allAttributes);
         AllAttributesByName = new ReadOnlyDictionary<string, CkTypeAttributeGraph>(_allAttributesByName);
     }

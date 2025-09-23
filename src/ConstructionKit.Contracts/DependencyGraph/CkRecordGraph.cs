@@ -30,8 +30,8 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
         IsFinal = ckRecordDto.IsFinal;
         DerivedFromCkRecordId = ckRecordDto.DerivedFromCkRecordId;
         Description = ckRecordDto.Description;
-        _baseRecords = new List<CkGraphRecordInheritance>();
-        _derivedRecords = new List<CkGraphRecordInheritance>();
+        _baseRecords = [];
+        _derivedRecords = [];
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
         DerivedRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_derivedRecords);
     }

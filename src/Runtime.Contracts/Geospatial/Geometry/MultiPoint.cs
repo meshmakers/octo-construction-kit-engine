@@ -17,7 +17,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
         /// <param name="coordinates">The coordinates.</param>
         public MultiPoint(IEnumerable<Point>? coordinates)
         {
-            Coordinates = new ReadOnlyCollection<Point>(coordinates?.ToArray() ?? Array.Empty<Point>());
+            Coordinates = new ReadOnlyCollection<Point>(coordinates?.ToArray() ?? []);
         }
         
         /// <summary>

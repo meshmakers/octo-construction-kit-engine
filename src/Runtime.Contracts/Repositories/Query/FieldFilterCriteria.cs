@@ -70,7 +70,7 @@ public record FieldFilterCriteria
             throw new ArgumentNullException(nameof(nestedFilter));
         }
 
-        NestedFilters ??= new List<FieldFilterCriteria>();
+        NestedFilters ??= [];
         NestedFilters.Add(nestedFilter);
     }
 

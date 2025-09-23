@@ -11,7 +11,7 @@ internal class DependencyResolver(
     Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
     : IDependencyResolver
 {
-    public async Task ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,
+    public async Task ResolveDependenciesAsync(ICollection<CkModelIdVersionRange> dependencies, CkModelGraph ckModelGraph,
         IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
@@ -22,20 +22,30 @@ internal class DependencyResolver(
         logger.LogDebug("Resolving dependencies completed");
     }
 
-    private async Task Resolve(ICollection<CkModelId> ckRootDependencies, CkModelGraph ckModelGraph,
+    private async Task Resolve(ICollection<CkModelIdVersionRange> ckRootDependencies, CkModelGraph ckModelGraph,
         IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver,
         object? sourceIdentifier, OperationResult operationResult)
     {
-        List<CkModelId> dependencies = [..ckRootDependencies];
+        List<CkModelIdVersionRange> dependencies = [..ckRootDependencies];
 
         for (var i = 0; i < dependencies.Count; i++)
         {
             var ckDependency = dependencies[i];
 
             logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
+
+            var modelExistingResult = await ckModelRepositoryManagerLazy.Value.IsCkModelExistingAsync(ckDependency, sourceIdentifier)
+                .ConfigureAwait(false);
+            if (!modelExistingResult.Exists || modelExistingResult.ModelId == null)
+            {
+                operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
+                    ckDependency));
+                continue;
+            }
+
             var ckDependencyRootModel = await ckModelRepositoryManagerLazy.Value
-                .LookupCkModelAsync(ckDependency, operationResult, sourceIdentifier)
+                .LookupCkModelAsync(modelExistingResult.ModelId, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
             if (ckDependencyRootModel == null)
             {
@@ -50,7 +60,7 @@ internal class DependencyResolver(
             {
                 foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)
                 {
-                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) &&
+                    if (ckModelGraph.Dependencies.Keys.Any(t=> ckChildDependency.IsSatisfiedBy(t)) &&
                         !dependencies.Contains(ckChildDependency))
                     {
                         logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);

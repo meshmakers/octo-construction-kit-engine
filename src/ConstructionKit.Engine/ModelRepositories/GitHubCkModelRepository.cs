@@ -45,6 +45,93 @@ public class GitHubCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
+    public async Task<ModelExistingResult> IsModelIdExistingAsync(CkModelIdVersionRange modelIdVersionRange, object? sourceIdentifier = null)
+    {
+        var availableVersions = new List<CkModelId>();
+
+        // GitHub repository structure: ck-models/{first_letter}/{ModelId}/{MajorVersion}/
+        var gitHubClient = CreateGitHubClient(false);
+        var basePath = $"ck-models/{modelIdVersionRange.ModelId[0].ToString().ToLower()}/{modelIdVersionRange.ModelId}";
+
+        try
+        {
+            // Get all major version directories
+            var directories = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                basePath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            foreach (var directory in directories.Where(d => d.Type == ContentType.Dir))
+            {
+                // Check if directory name is a valid major version number
+                if (int.TryParse(directory.Name, out _))
+                {
+                    // Get files in this major version directory
+                    var files = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                        _gitHubOptions.Value.GitHubRepositoryOwner,
+                        _gitHubOptions.Value.GitHubRepositoryName,
+                        directory.Path,
+                        _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+                    foreach (var file in files.Where(f => f.Type == ContentType.File && f.Name.EndsWith(".json")))
+                    {
+                        // Extract version from filename: ck-{modelid}-{version}.json
+                        var prefix = $"ck-{modelIdVersionRange.ModelId.ToLower()}-";
+                        var fileName = Path.GetFileNameWithoutExtension(file.Name);
+                        if (fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var versionPart = fileName.Substring(prefix.Length);
+                            try
+                            {
+                                // Validate version format
+                                _ = new CkVersion(versionPart);
+                                var modelId = new CkModelId(modelIdVersionRange.ModelId, versionPart);
+                                availableVersions.Add(modelId);
+                            }
+                            catch (ArgumentOutOfRangeException)
+                            {
+                                // Skip invalid version strings
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Model directory doesn't exist
+            return new ModelExistingResult { Exists = false };
+        }
+
+        if (!availableVersions.Any())
+        {
+            return new ModelExistingResult { Exists = false };
+        }
+
+        // Find the latest version that satisfies the version range
+        var satisfiedVersions = availableVersions
+            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.ModelVersion))
+            .ToList();
+
+        if (!satisfiedVersions.Any())
+        {
+            return new ModelExistingResult { Exists = false };
+        }
+
+        // Return the latest satisfied version
+        var latestSatisfiedVersion = satisfiedVersions
+            .OrderByDescending(modelId => modelId.ModelVersion)
+            .First();
+
+        return new ModelExistingResult
+        {
+            Exists = true,
+            ModelId = latestSatisfiedVersion
+        };
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         // Try GitHub Pages first if enabled
@@ -263,7 +350,7 @@ public class GitHubCkModelRepository : ICkModelRepository
                + ckModelId.ModelId[0].ToString().ToLower() + "/"
                + ckModelId.ModelId + "/"
                + ckModelId.ModelVersion.Major
-               + "/ck-" + ckModelId.SemanticVersionedFullName.ToLower() + ".json";
+               + "/ck-" + ckModelId.ModelId.ToLower() + "-" + ckModelId.ModelVersion + ".json";
     }
 
     private HttpClient CreateHttpClient()

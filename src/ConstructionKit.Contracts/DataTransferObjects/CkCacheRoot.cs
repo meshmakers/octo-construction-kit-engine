@@ -14,41 +14,41 @@ public class CkCacheRoot
     ///     Returns types of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkTypeGraph> Types { get; set; } = new();
+    public List<CkTypeGraph> Types { get; set; } = [];
 
     /// <summary>
     ///     Returns associations of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkAssociationRoleGraph> AssociationRoles { get; set; } = new();
+    public List<CkAssociationRoleGraph> AssociationRoles { get; set; } = [];
 
     /// <summary>
     ///     Returns attributes of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkAttributeGraph> Attributes { get; set; } = new();
+    public List<CkAttributeGraph> Attributes { get; set; } = [];
 
     /// <summary>
     ///     Returns records of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkRecordGraph> Records { get; set; } = new();
+    public List<CkRecordGraph> Records { get; set; } = [];
 
     /// <summary>
     ///     Returns enums of the model
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkEnumGraph> Enums { get; set; } = new();
+    public List<CkEnumGraph> Enums { get; set; } = [];
 
     /// <summary>
     ///     Returns a list of model dependencies of the graph
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public Dictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; set; } = new();
+    public Dictionary<CkModelId, ICollection<CkModelIdVersionRange>> Dependencies { get; set; } = new();
     
     /// <summary>
     ///     Returns a list of models of the graph
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public List<CkModelPropertiesDto> Models { get; set; } = new();
+    public List<CkModelPropertiesDto> Models { get; set; } = [];
 }

@@ -93,7 +93,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
             foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
             {
                 var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? Enumerable.Empty<string>());
+                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? []);
                 
                 // Get detailed information about the failing object
                 var objectDetails = GetObjectDetails(rootNode, evaluationResult.InstanceLocation);

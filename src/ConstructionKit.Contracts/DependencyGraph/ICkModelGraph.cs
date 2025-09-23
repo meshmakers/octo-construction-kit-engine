@@ -35,7 +35,7 @@ public interface ICkModelGraph
     /// <summary>
     ///     Returns a list of model dependencies.
     /// </summary>
-    IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; }
+    IReadOnlyDictionary<CkModelId, ICollection<CkModelIdVersionRange>> Dependencies { get; }
 
     /// <summary>
     ///     Returns a list of model dependencies.

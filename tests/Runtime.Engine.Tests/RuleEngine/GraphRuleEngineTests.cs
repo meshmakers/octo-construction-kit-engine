@@ -1,12 +1,8 @@
-using System.Linq;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
-using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
-using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;

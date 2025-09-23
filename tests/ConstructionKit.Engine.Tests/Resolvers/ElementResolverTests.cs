@@ -153,11 +153,11 @@ public class ElementResolverTests
     public void Resolve_MultipleAssociations_AddsErrorMessage()
     {
         var ckModelRoot = Builder.Build();
-        ckModelRoot.AssociationRoles = new List<CkAssociationRoleDto>
-        {
+        ckModelRoot.AssociationRoles =
+        [
             new() { AssociationRoleId = "Assoc1" },
             new() { AssociationRoleId = "Assoc1" }
-        };
+        ];
 
         var resolver = new ElementResolver();
         var operationResult = new OperationResult();

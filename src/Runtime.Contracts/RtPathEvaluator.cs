@@ -294,7 +294,7 @@ public static class RtPathEvaluator
         CkId<CkTypeId> ckTypeId,
         IEnumerable<string> paths)
     {
-        List<NavigationPair> navigationPairs = new();
+        List<NavigationPair> navigationPairs = [];
         foreach (var path in paths)
         {
             var navigationPair = TokenizeAndGetNavigationPair(ckCacheService, tenantId, ckTypeId, path);
@@ -451,7 +451,7 @@ public static class RtPathEvaluator
 
         var pathTuple = evaluatedPath.Last();
 
-        List<object?> results = new List<object?>();
+        List<object?> results = [];
         foreach (var pathTupleLocator in pathTuple.Locators)
         {
             results.Add(pathTupleLocator.Value);

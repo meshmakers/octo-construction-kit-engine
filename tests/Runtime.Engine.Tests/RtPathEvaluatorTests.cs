@@ -161,11 +161,11 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         private readonly List<object[]> _data =
         [
-            new object[] { "RtId", OctoObjectId.Parse("68259915225146801209c9f1") },
-            new object[] { "RtWellKnownName", "ExpectedWellknownName" },
-            new object[] { "RtVersion", (ulong)5 },
-            new object[] { "RtCreationDateTime", new DateTime(2021, 10, 9, 8, 7, 6) },
-            new object[] { "RtChangedDateTime", new DateTime(2020, 9, 8, 7, 6, 5) }
+            ["RtId", OctoObjectId.Parse("68259915225146801209c9f1")],
+            ["RtWellKnownName", "ExpectedWellknownName"],
+            ["RtVersion", (ulong)5],
+            ["RtCreationDateTime", new DateTime(2021, 10, 9, 8, 7, 6)],
+            ["RtChangedDateTime", new DateTime(2020, 9, 8, 7, 6, 5)]
         ];
 
         public IEnumerator<object[]> GetEnumerator() => _data.GetEnumerator();
@@ -204,11 +204,11 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         private readonly List<object[]> _data =
         [
-            new object[] { "myNavPropName.testSensor->RtId", OctoObjectId.Parse("68259915225146801209c9f1") },
-            new object[] { "myNavPropName.testSensor->RtWellKnownName", "ExpectedWellknownName" },
-            new object[] { "myNavPropName.testSensor->RtVersion", (ulong)867 },
-            new object[] { "myNavPropName.testSensor->RtCreationDateTime", new DateTime(2022, 10, 9, 8, 7, 6) },
-            new object[] { "myNavPropName.testSensor->RtChangedDateTime", new DateTime(2023, 9, 8, 7, 6, 5) }
+            ["myNavPropName.testSensor->RtId", OctoObjectId.Parse("68259915225146801209c9f1")],
+            ["myNavPropName.testSensor->RtWellKnownName", "ExpectedWellknownName"],
+            ["myNavPropName.testSensor->RtVersion", (ulong)867],
+            ["myNavPropName.testSensor->RtCreationDateTime", new DateTime(2022, 10, 9, 8, 7, 6)],
+            ["myNavPropName.testSensor->RtChangedDateTime", new DateTime(2023, 9, 8, 7, 6, 5)]
         ];
 
         public IEnumerator<object[]> GetEnumerator() => _data.GetEnumerator();
@@ -1157,7 +1157,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             "children.testLocationWithSensor->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/LocationWithSensor", r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Inbound, r.Direction);
     }
@@ -1172,7 +1172,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             "parent.testZone->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Zone", r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
     }
@@ -1186,11 +1186,11 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             "parent.testZone->parent.testDistrict->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Zone", r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
         Assert.Single(r.InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/District", r.InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].Direction);
     }
@@ -1204,15 +1204,15 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             "parent.testZone->parent.testDistrict->parent.testCity->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId);
+        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Zone", r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
         Assert.Single(r.InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/District", r.InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].Direction);
         Assert.Single(r.InnerNavigationPairs[0].InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/City", r.InnerNavigationPairs[0].InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].InnerNavigationPairs[0].Direction);
     }
@@ -1233,10 +1233,10 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         ]);
 
         Assert.Equal(2, r.Count);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Zone", r[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].Direction);
-        Assert.Equal("System/ParentChild", r[1].CkRoleId);
+        Assert.Equal("System/ParentChild", r[1].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Region", r[1].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[1].Direction);
     }
@@ -1256,11 +1256,11 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         ]);
 
         Assert.Single(r);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Region", r[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].Direction);
         Assert.Single(r[0].InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r[0].InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal("System/ParentChild", r[0].InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
         Assert.Equal("Test/Country", r[0].InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].InnerNavigationPairs[0].Direction);
         Assert.Equal(2, r[0].SubPathTerms.Count());

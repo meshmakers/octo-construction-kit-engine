@@ -24,7 +24,7 @@ public abstract class AttributeValueList<TValueBase, TValue> : IAttributeValueLi
     /// </summary>
     protected AttributeValueList()
     {
-        InnerList = new List<TValueBase>();
+        InnerList = [];
     }
 
     internal List<TValueBase> InnerList { get; }

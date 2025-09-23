@@ -18,7 +18,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
         public MultiLineString(IEnumerable<LineString>? coordinates)
         {
             Coordinates =new ReadOnlyCollection<LineString>(
-                coordinates?.ToArray() ?? Array.Empty<LineString>());
+                coordinates?.ToArray() ?? []);
         }
 
         /// <summary>

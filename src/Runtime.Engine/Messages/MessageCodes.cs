@@ -96,121 +96,121 @@ internal static class MessageCodes
             "SchemaValidationError",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  1, "Schema validation failed at '{path}'->'{errorMessage}'",
-                 new [] {"path", "errorMessage"})
+                 ["path", "errorMessage"])
         },
         {
             "MandatoryAttributeMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  2, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{reference}' defines no default value or auto increment reference and is therefore missing.",
-                 new [] {"tenantId", "attributeCkAttributeId", "reference"})
+                 ["tenantId", "attributeCkAttributeId", "reference"])
         },
         {
             "CkTypeIdNotFound",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  3, "{tenantId}: CkTypeId '{rtEntityCkTypeId}' not found.",
-                 new [] {"tenantId", "rtEntityCkTypeId"})
+                 ["tenantId", "rtEntityCkTypeId"])
         },
         {
             "CkTypeIdIsAbstract",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  4, "{tenantId}: CkTypeId '{ckTypeId}' is abstract.",
-                 new [] {"tenantId", "ckTypeId"})
+                 ["tenantId", "ckTypeId"])
         },
         {
             "MandatoryAttributeMissingAtUpdate",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  5, "{tenantId}: Mandatory attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is missing.",
-                 new [] {"tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"})
+                 ["tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"])
         },
         {
             "AssociationCardinalityViolationOnCreate",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  6, "{tenantId}: Entity with CkTypeId '{ckTypeId}': Inbound association '{roleId}' has minimum multiplicity of '{multiplicity}'. There is no create statement for creating this association.",
-                 new [] {"tenantId", "ckTypeId", "roleId", "multiplicity"})
+                 ["tenantId", "ckTypeId", "roleId", "multiplicity"])
         },
         {
             "AssociationNotAllowed",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  7, "{tenantId}: '{ckTypeId}@{rtId}': Inbound association '{roleId}' is not allowed.",
-                 new [] {"tenantId", "ckTypeId", "rtId", "roleId"})
+                 ["tenantId", "ckTypeId", "rtId", "roleId"])
         },
         {
             "MissingTargetEntity",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  8, "{tenantId}: Target entity '{ckTypeId}@{rtId}' does not exist.",
-                 new [] {"tenantId", "ckTypeId", "rtId"})
+                 ["tenantId", "ckTypeId", "rtId"])
         },
         {
             "EntityNotFound",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  9, "{tenantId}: Entity '{ckTypeId}@{rtId}' does not exist.",
-                 new [] {"tenantId", "ckTypeId", "rtId"})
+                 ["tenantId", "ckTypeId", "rtId"])
         },
         {
             "MissingOriginEntity",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  10, "{tenantId}: Origin entity '{ckTypeId}@{rtId}' does not exist.",
-                 new [] {"tenantId", "ckTypeId", "rtId"})
+                 ["tenantId", "ckTypeId", "rtId"])
         },
         {
             "InboundAssociationNotAllowedForCkType",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  11, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
-                 new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"})
+                 ["tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"])
         },
         {
             "OutboundAssociationNotAllowedForCkType",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  12, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Outbound association '{roleId}' to CkTypeId '{targetCkTypeId}' is not allowed.",
-                 new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"})
+                 ["tenantId", "originCkTypeId", "originRtId", "roleId", "targetCkTypeId"])
         },
         {
             "AssociationCardinalityViolationOnDelete",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  13, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Association deletion violates the model.",
-                 new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"})
+                 ["tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"])
         },
         {
             "AssociationCardinalityViolationOnModification",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  14, "{tenantId}: Entity '{originCkTypeId}@{originRtId}': Inbound association '{roleId}' has maximum multiplicity of '{multiplicity}'. Adding another association violates the model.",
-                 new [] {"tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"})
+                 ["tenantId", "originCkTypeId", "originRtId", "roleId", "multiplicity"])
         },
         {
             "AssociationDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  15, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}@{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does not exist.",
-                 new [] {"tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"})
+                 ["tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"])
         },
         {
             "AssociationAlreadyExists",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  16, "{tenantId}: Association '{roleId}' from entity '{originCkTypeId}@{originRtId}' to entity '{targetCkTypeId}'->'{targetRtId}' does already exist.",
-                 new [] {"tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"})
+                 ["tenantId", "roleId", "originCkTypeId", "originRtId", "targetCkTypeId", "targetRtId"])
         },
         {
             "RtEntityNeedsToBeDefinedAtUpdateReplace",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  17, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' needs to be defined at update or replace.",
-                 new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
+                 ["tenantId", "rtEntityCkTypeId", "rtId"])
         },
         {
             "RtEntityIdAlreadyExistInUpdateList",
              new OperationMessageTemplate(MessageLevel.Error,
                  18, "{tenantId}: RtEntity '{rtEntityCkTypeId}@{rtId}' already exists in update list.",
-                 new [] {"tenantId", "rtEntityCkTypeId", "rtId"})
+                 ["tenantId", "rtEntityCkTypeId", "rtId"])
         },
         {
             "CkRecordIdNotFound",
              new OperationMessageTemplate(MessageLevel.Error,
                  19, "{tenantId}: CkRecordId '{ckRecordId}' not found.",
-                 new [] {"tenantId", "ckRecordId"})
+                 ["tenantId", "ckRecordId"])
         },
         {
             "RtEntityNeedsToBeDefinedAtInsert",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  20, "{tenantId}: RtEntity of CkTypeId '{rtEntityCkTypeId}' needs to be defined at insert.",
-                 new [] {"tenantId", "rtEntityCkTypeId"})
+                 ["tenantId", "rtEntityCkTypeId"])
         },
     };
 }

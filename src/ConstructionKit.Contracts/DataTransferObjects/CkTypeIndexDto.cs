@@ -16,7 +16,7 @@ public class CkTypeIndexDto
     /// </summary>
     public CkTypeIndexDto()
     {
-        Fields = new List<CkIndexFieldsDto>();
+        Fields = [];
     }
 
     /// <summary>

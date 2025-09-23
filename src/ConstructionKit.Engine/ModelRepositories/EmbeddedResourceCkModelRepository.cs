@@ -39,6 +39,32 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     }
 
     /// <inheritdoc />
+    public Task<ModelExistingResult> IsModelIdExistingAsync(CkModelIdVersionRange modelIdVersionRange, object? sourceIdentifier = null)
+    {
+        // Find all models that satisfy the version range
+        var satisfiedModels = _embeddedModels
+            .Where(m => m.ModelId.ModelId == modelIdVersionRange.ModelId &&
+                        modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(m.ModelId.ModelVersion))
+            .ToList();
+
+        if (!satisfiedModels.Any())
+        {
+            return Task.FromResult(new ModelExistingResult { Exists = false });
+        }
+
+        // Return the latest satisfied version
+        var latestSatisfiedModel = satisfiedModels
+            .OrderByDescending(m => m.ModelId.ModelVersion)
+            .First();
+
+        return Task.FromResult(new ModelExistingResult
+        {
+            Exists = true,
+            ModelId = latestSatisfiedModel.ModelId
+        });
+    }
+
+    /// <inheritdoc />
     public Task<bool> IsModelIdExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         return Task.FromResult(_embeddedModels.Any(m => m.ModelId == modelId));

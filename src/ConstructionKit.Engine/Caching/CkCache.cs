@@ -289,7 +289,7 @@ internal class CkCache : IDisposable
         }
 
         // check if dependent ck models are existing.
-        List<CkModelId> missingModelIds = new();
+        List<CkModelId> missingModelIds = [];
         foreach (var ckModelId in ckModelIds)
         {
             if (!_modelGraph.Dependencies.ContainsKey(ckModelId))

@@ -15,7 +15,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
         /// <summary>
         /// Initializes a new instance of the <see cref="GeometryCollection" /> class.
         /// </summary>
-        public GeometryCollection() : this(Array.Empty<IGeometryObject>())
+        public GeometryCollection() : this([])
         {
         }
 

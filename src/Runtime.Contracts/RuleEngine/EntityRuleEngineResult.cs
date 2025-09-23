@@ -15,10 +15,10 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     /// </summary>
     public EntityRuleEngineResult()
     {
-        RtEntitiesToInsert = new List<TEntity>();
+        RtEntitiesToInsert = [];
         RtEntitiesToUpdate = new Dictionary<RtEntityId, TEntity>();
         RtEntitiesToReplace = new Dictionary<RtEntityId, TEntity>();
-        RtEntitiesToDelete = new List<RtEntityId>();
+        RtEntitiesToDelete = [];
     }
 
     /// <summary>

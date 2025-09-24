@@ -35,9 +35,19 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
     {
         var graphValidationResult = new GraphRuleEngineResult();
 
+        var validatedAssociationUpdateInfoList = new List<AssociationUpdateInfo>();
+        foreach (var associationUpdateInfo in associationUpdateInfoList)
+        {
+            var associationRole =
+                ckCache.GetCkAssociationRole(repositoryDataSource.TenantId, associationUpdateInfo.RoleId);
+
+            validatedAssociationUpdateInfoList.Add(new AssociationUpdateInfo(associationUpdateInfo.Origin,
+                associationUpdateInfo.Target, associationRole.CkRoleId, associationUpdateInfo.ModOption));
+        }
+
         // Validate if the associations are valid to be added/deleted based on the current database content
-        var createAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
-        var deleteAssociations = associationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
+        var createAssociations = validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
+        var deleteAssociations = validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
 
         // Checks if assoc already exists in the repository
         await ValidateAssociationsToCreate(session, repositoryDataSource, createAssociations.ToList(),
@@ -54,7 +64,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
         // Validate the consistency of the construction kit model
         await ValidateCkModel(session, repositoryDataSource, graphValidationResult, entityUpdateInfoList,
-            associationUpdateInfoList,
+            validatedAssociationUpdateInfoList,
             originFileResolver, operationResult).ConfigureAwait(false);
 
         return graphValidationResult;
@@ -77,10 +87,12 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
-        Dictionary<RtEntityId, RtEntity> originEntities = await GetEntitiesAsync(session, repositoryDataSource, entityUpdateInfoList,
+        Dictionary<RtEntityId, RtEntity> originEntities = await GetEntitiesAsync(session, repositoryDataSource,
+                entityUpdateInfoList,
                 associationUpdateInfoList.Select(a => a.Origin).Distinct(), originFileResolver, operationResult)
             .ConfigureAwait(false);
-        Dictionary<RtEntityId, RtEntity> targetEntities = await GetEntitiesAsync(session, repositoryDataSource, entityUpdateInfoList,
+        Dictionary<RtEntityId, RtEntity> targetEntities = await GetEntitiesAsync(session, repositoryDataSource,
+                entityUpdateInfoList,
                 associationUpdateInfoList.Select(a => a.Target).Distinct(), originFileResolver, operationResult)
             .ConfigureAwait(false);
 
@@ -94,7 +106,8 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             .ConfigureAwait(false);
 
         // Ensure that all mandatory associations with multiplicity of One exist when creating an entity
-        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert).AsParallel())
+        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert)
+                     .AsParallel())
         {
             var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
 
@@ -117,7 +130,8 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         }
 
         // Delete all corresponding associations if an entity is deleted  
-        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete).AsParallel())
+        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete)
+                     .AsParallel())
         {
             var rtEntityId = new RtEntityId(entityUpdateInfo.CkTypeId,
                 entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet());
@@ -214,11 +228,11 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     // Check if any of the origin entities being deleted for these associations
                     var isAnyOriginEntityBeingDeleted = associationUpdateInfosByRoleId
                         .Where(a => a.ModOption == AssociationModOptionsDto.Delete)
-                        .Any(assoc => entityUpdateInfoList.Any(e => 
-                            e.ModOption == EntityModOptions.Delete && 
+                        .Any(assoc => entityUpdateInfoList.Any(e =>
+                            e.ModOption == EntityModOptions.Delete &&
                             e.RtId == assoc.Origin.RtId));
-                    
-                    if (!isAnyOriginEntityBeingDeleted && 
+
+                    if (!isAnyOriginEntityBeingDeleted &&
                         currentMultiplicity == CurrentMultiplicity.One &&
                         multiplicity == MultiplicitiesDto.One)
                     {
@@ -328,11 +342,11 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 if (changeDelta < 0)
                 {
                     // Check if origin entity is being deleted - if so, don't validate cardinality
-                    var isOriginEntityBeingDeleted = entityUpdateInfoList.Any(e => 
-                        e.ModOption == EntityModOptions.Delete && 
+                    var isOriginEntityBeingDeleted = entityUpdateInfoList.Any(e =>
+                        e.ModOption == EntityModOptions.Delete &&
                         e.RtId == originEntity.Key.RtId);
-                    
-                    if (!isOriginEntityBeingDeleted && 
+
+                    if (!isOriginEntityBeingDeleted &&
                         currentMultiplicity == CurrentMultiplicity.One &&
                         multiplicity == MultiplicitiesDto.One)
                     {
@@ -481,7 +495,6 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     result.Add(rtEntity, rtEntityValue);
                 }
             }
-
         }
 
         return result;

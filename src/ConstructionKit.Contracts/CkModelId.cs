@@ -7,6 +7,11 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit model id
 /// </summary>
+/// <remarks>
+/// We use a dash ("-") to separate the model id and the version.
+/// The version number of a model allows to manage versioning of models, it is allowed to have
+/// different elements (types, records, etc.) with the same name in different versions of a model.
+/// </remarks>
 [DebuggerDisplay("{" + nameof(ModelId) + "} ({" + nameof(ModelVersion) + "})")]
 [JsonConverter(typeof(CkModelIdConverter))]
 public sealed record CkModelId : IComparable<CkModelId>, ICkKey
@@ -226,7 +231,7 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     /// <inheritdoc />
     public bool Equals(CkModelId? other)
     {
-        return other is not null && ModelId == other.ModelId && ModelVersion.IsCompatible(other.ModelVersion);
+        return other is not null && ModelId == other.ModelId;
     }
 
     /// <summary>
@@ -245,7 +250,6 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
         {
             var hash = 52;
             hash = hash * 12 + ModelId.GetHashCode();
-            hash = hash * 12 + ModelVersion.GetHashCode();
             return hash;
         }
     }

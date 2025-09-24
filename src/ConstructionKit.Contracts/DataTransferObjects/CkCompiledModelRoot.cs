@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     The root object of the compiled version of a CK model.
 /// </summary>
 [OctoJsonSchema(typeof(CkSchema), nameof(CkSchema.GetCompiledModelSchema))]
-public class CkCompiledModelRoot : CkMetaRootDto
+public class CkCompiledModelRoot : CkModelRootBase
 {
     /// <summary>
     ///     The URI of the schema for the compiled CK model.
@@ -24,40 +24,11 @@ public class CkCompiledModelRoot : CkMetaRootDto
     /// </summary>
     [YamlMember(Alias = "$schema")]
     [JsonPropertyName("$schema")]
-    public override string SchemaUri { get; } = CkCompiledModelSchemaUri;
+    public string SchemaUri { get; } = CkCompiledModelSchemaUri;
 
     /// <summary>
-    ///     Returns types of the model
+    ///     Gets or sets the dependencies of the model.
     /// </summary>
-    // ReSharper disable once CollectionNeverUpdated.Global
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkCompiledTypeDto>? Types { get; set; }
-
-    /// <summary>
-    ///     Returns associations of the model
-    /// </summary>
-    // ReSharper disable once CollectionNeverUpdated.Global
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkAssociationRoleDto>? AssociationRoles { get; set; }
-
-    /// <summary>
-    ///     Returns attributes of the model
-    /// </summary>
-    // ReSharper disable once CollectionNeverUpdated.Global
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkAttributeDto>? Attributes { get; set; }
-
-    /// <summary>
-    ///     Returns records of the model that are used for complex attributes
-    /// </summary>
-    // ReSharper disable once CollectionNeverUpdated.Global
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkRecordDto>? Records { get; set; }
-
-    /// <summary>
-    ///     Returns enums of the model used for enum attributes
-    /// </summary>
-    // ReSharper disable once CollectionNeverUpdated.Global
-    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkEnumDto>? Enums { get; set; }
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
+    public List<CkModelId>? Dependencies { get; set; }
 }

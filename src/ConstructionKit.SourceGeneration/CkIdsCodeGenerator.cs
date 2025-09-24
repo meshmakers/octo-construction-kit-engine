@@ -38,7 +38,7 @@ internal class CkIdsCodeGenerator
             foreach (var ckTypeDto in ckTypes.OrderBy(x => x.TypeId.TypeId))
             {
                 sb.AppendLine(
-                    $"    public const string {ckTypeDto.TypeId.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
+                    $"    public const string {ckTypeDto.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
             }
         }
 
@@ -50,7 +50,7 @@ internal class CkIdsCodeGenerator
             foreach (var ckAttributeDto in ckAttributes.OrderBy(x => x.AttributeId.AttributeId))
             {
                 sb.AppendLine(
-                    $"    public const string {ckAttributeDto.AttributeId.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
+                    $"    public const string {ckAttributeDto.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
             }
         }
 
@@ -62,7 +62,7 @@ internal class CkIdsCodeGenerator
                 sb.AppendLine("    // Associations");
 
                 sb.AppendLine(
-                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.RoleId.MakeClassName()} = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
+                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.MakeClassName()} = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
             }
         }
 

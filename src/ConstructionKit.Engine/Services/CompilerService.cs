@@ -412,10 +412,10 @@ public class CompilerService : ICompilerService
             }
         }
 
-        var compiledModelRoot = new CkCompiledModelRoot
+        var compileCandidate = new CkModelCompileCandidate
         {
             ModelId = ckMetaDto.ModelId,
-            Dependencies = ckMetaDto.Dependencies?.OrderBy(x=> x.ModelId).ToList(),
+            DependencyRanges = ckMetaDto.Dependencies?.OrderBy(x=> x.ModelId).ToList(),
             Description = ckMetaDto.Description,
             Types = types.Values.OrderBy(x=> x.TypeId).ToList(),
             Attributes = attributes.OrderBy(x=> x.AttributeId).ToList(),
@@ -424,7 +424,7 @@ public class CompilerService : ICompilerService
             Enums = enums.OrderBy(x=> x.EnumId).ToList(),
         };
 
-        var ckModelGraph = await _ckValidationService.ValidateAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
+        var (ckModelGraph, compiledModelRoot) = await _ckValidationService.ValidateAsync(compileCandidate, originFileResolver, operationResult).ConfigureAwait(false);
 
         foreach (var keyValuePair in ckModelGraph.Types.Where(s => s.Key.ModelId == ckMetaDto.ModelId
                                                                    && s.Value.IsCollectionRoot))
@@ -457,7 +457,7 @@ public class CompilerService : ICompilerService
         if (!string.IsNullOrWhiteSpace(createCacheFilePath))
 #endif
         {
-            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, createCacheFilePath).ConfigureAwait(false);
+            var compiledModelCacheFilePath = await CreateCacheFileAsync(ckModelGraph, compileCandidate.ModelId, createCacheFilePath).ConfigureAwait(false);
             return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
         }
 

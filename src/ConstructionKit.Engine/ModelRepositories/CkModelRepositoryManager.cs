@@ -45,6 +45,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
                 .ConfigureAwait(false);
             if (hasBeenFound)
             {
+                _logger.LogInformation("Found model {CkModelId} in repository {RepositoryName}", ckModelId, ckModelRepository.RepositoryName);
                 return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier)
                     .ConfigureAwait(false);
             }

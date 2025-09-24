@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
@@ -44,5 +43,17 @@ public interface IModelResolver
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel, IOriginFileResolver originFileResolver, 
+        OperationResult operationResult, object? sourceIdentifier = null);
+
+    /// <summary>
+    ///     Loads the compiled model into the resolver.
+    /// </summary>
+    /// <param name="compileCandidate">Instance of the compile candidate</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
+    /// <param name="operationResult">Operation result</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
+    Task<(CkModelGraph, CkCompiledModelRoot)> ResolveAsync(CkModelCompileCandidate compileCandidate, IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null);
 }

@@ -72,6 +72,6 @@ public class CkModelIdTest
     {
         var id1 = new CkModelId("System-1.0.0");
         var id2 = new CkModelId("System-1.0.1");
-        Assert.False(id1.Equals(id2));
+        Assert.True(id1.Equals(id2));
     }
 }

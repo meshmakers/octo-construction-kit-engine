@@ -8,3 +8,13 @@ enums:
         name: Connecting
       - key: 2
         name: Connected
+  - enumId: ConnectionState-2
+    values:
+      - key: 0
+        name: Undefined
+      - key: 1
+        name: Connecting
+      - key: 2
+        name: Connected
+      - key: 3
+        name: Broken

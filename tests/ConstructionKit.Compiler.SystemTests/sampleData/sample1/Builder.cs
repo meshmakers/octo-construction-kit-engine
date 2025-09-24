@@ -5,12 +5,12 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.sampleData.sample
 
 public class Builder
 {
-    public static CkCompiledModelRoot Build()
+    public static CkModelCompileCandidate Build()
     {
-        return new CkCompiledModelRoot
+        return new CkModelCompileCandidate
         {
             ModelId = new CkModelId("sample1", "1.0.0"),
-            Dependencies = [new("System", "[1.0,)")],
+            DependencyRanges = [new("System", "[1.0,)")],
             AssociationRoles =
             [
                 new()

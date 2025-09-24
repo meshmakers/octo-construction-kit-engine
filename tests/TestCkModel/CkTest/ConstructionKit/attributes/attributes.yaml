@@ -7,6 +7,9 @@ attributes:
   - id: ConnectionState
     valueType: Enum
     valueCkEnumId: Test/ConnectionState
+  - id: ConnectionState-2
+    valueType: Enum
+    valueCkEnumId: Test/ConnectionState-2
   - id: DataCount
     valueType: Int
   - id: LocationX
@@ -30,6 +33,8 @@ attributes:
   - id: RecordTest
     valueType: Record
     valueCkRecordId: Test/TestRecord
-
+  - id: RecordTest-2
+    valueType: Record
+    valueCkRecordId: Test/TestRecord-2
   - id: Binary
     valueType: BinaryLinked

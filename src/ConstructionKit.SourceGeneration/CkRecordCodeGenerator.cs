@@ -33,7 +33,7 @@ public class CkRecordCodeGenerator
         if (ckRecord.DerivedFromCkRecordId != null)
         {
             ckBaseType = $" : Rt" +
-                         $"{ckRecord.DerivedFromCkRecordId.Key.RecordId.MakeClassName()}Record";
+                         $"{ckRecord.DerivedFromCkRecordId.Key.MakeClassName()}Record";
         }
 
         StringBuilder sb = new();
@@ -49,16 +49,16 @@ public class CkRecordCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit record {ckRecord.RecordId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public partial class Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record{ckBaseType}");
+        sb.AppendLine($"public partial class Rt{ckRecord.RecordId.MakeClassName()}Record{ckBaseType}");
         sb.AppendLine("{");
         sb.AppendLine();
-        sb.AppendLine($"  public Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record()");
+        sb.AppendLine($"  public Rt{ckRecord.RecordId.MakeClassName()}Record()");
         sb.AppendLine("  {");
         sb.AppendLine($"    CkRecordId = \"{modelId}/{ckRecord.RecordId}\";");
         sb.AppendLine("  }");
         sb.AppendLine();
         sb.AppendLine();
-        sb.AppendLine($"  public Rt{ckRecord.RecordId.RecordId.MakeClassName()}Record(RtRecord rtRecord)");
+        sb.AppendLine($"  public Rt{ckRecord.RecordId.MakeClassName()}Record(RtRecord rtRecord)");
         sb.AppendLine("     : base(rtRecord.CkRecordId, rtRecord.Attributes)");
         sb.AppendLine("  {");
         sb.AppendLine("  }");

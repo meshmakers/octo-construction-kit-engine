@@ -44,7 +44,7 @@ public class CkCacheRoot
     ///     Returns a list of model dependencies of the graph
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global
-    public Dictionary<CkModelId, ICollection<CkModelIdVersionRange>> Dependencies { get; set; } = new();
+    public Dictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; set; } = new();
     
     /// <summary>
     ///     Returns a list of models of the graph

@@ -62,17 +62,8 @@ internal class ModelResolver : IModelResolver
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
-        _variableResolver.SetVariable("thisModel", compiledModel.ModelId.FullName);
-        _variableResolver.SetVariable("this", compiledModel.ModelId.FullName);
-
         var modelGraph = new CkModelGraph();
 
-        // We suppose that the dependent models are already validated, and we can use them.
-        // So we check the current to be validated model against the dependent models.
-
-        // Before the checks, we need to build a cache of the model.
-        // We check if they can retrieve the model from one of the model repository sources (e.g., database).
-        // We combine all entities, attributes and association roles into one list.
         if (compiledModel.Dependencies != null)
         {
             await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph,
@@ -81,24 +72,74 @@ internal class ModelResolver : IModelResolver
                 .ConfigureAwait(false);
         }
 
-        // Check: Ensure that the model forces no circular dependencies.
-        if (modelGraph.Dependencies.Any(x => x.Key.ModelId == compiledModel.ModelId.ModelId))
+        Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
+        return modelGraph;
+    }
+
+
+    public async Task<(CkModelGraph, CkCompiledModelRoot)> ResolveAsync(CkModelCompileCandidate compileCandidate,
+        IOriginFileResolver originFileResolver,
+        OperationResult operationResult, object? sourceIdentifier = null)
+    {
+        var modelGraph = new CkModelGraph();
+        IReadOnlyCollection<CkModelId> resolvedModelIds = [];
+
+        if (compileCandidate.DependencyRanges != null)
         {
-            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == compiledModel.ModelId.ModelId);
+            resolvedModelIds = await _dependencyResolver.ResolveDependenciesAsync(compileCandidate.DependencyRanges, modelGraph,
+                    _variableResolver,
+                    originFileResolver, operationResult, sourceIdentifier)
+                .ConfigureAwait(false);
+        }
+
+        Resolve(compileCandidate, modelGraph, originFileResolver, operationResult);
+
+        var compiledModel = new CkCompiledModelRoot
+        {
+            ModelId = compileCandidate.ModelId,
+            Dependencies = resolvedModelIds.ToList(),
+            Description = compileCandidate.Description,
+            Types = compileCandidate.Types,
+            Attributes = compileCandidate.Attributes,
+            AssociationRoles = compileCandidate.AssociationRoles,
+            Records = compileCandidate.Records,
+            Enums = compileCandidate.Enums
+        };
+
+        return (modelGraph, compiledModel);
+    }
+
+    private void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        _variableResolver.SetVariable("thisModel", modelRootBase.ModelId.FullName);
+        _variableResolver.SetVariable("this", modelRootBase.ModelId.FullName);
+
+        // We suppose that the dependent models are already validated, and we can use them.
+        // So we check the current to be validated model against the dependent models.
+
+        // Before the checks, we need to build a cache of the model.
+        // We check if they can retrieve the model from one of the model repository sources (e.g., database).
+        // We combine all entities, attributes and association roles into one list.
+
+        // Check: Ensure that the model forces no circular dependencies.
+        if (modelGraph.Dependencies.Any(x => x.Key.ModelId == modelRootBase.ModelId.ModelId))
+        {
+            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == modelRootBase.ModelId.ModelId);
 
             operationResult.AddMessage(MessageCodes.CircularDependency(
-                originFileResolver.Resolve(compiledModel.ModelId.ModelId),
-                compiledModel.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
+                originFileResolver.Resolve(modelRootBase.ModelId.ModelId),
+                modelRootBase.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
         }
 
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
-        _elementResolver.Resolve(compiledModel, modelGraph, _variableResolver, originFileResolver, operationResult);
+        _elementResolver.Resolve(modelRootBase, modelGraph, _variableResolver, originFileResolver, operationResult);
 
-        if (!Regex.IsMatch(compiledModel.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
+        if (!Regex.IsMatch(modelRootBase.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
         {
             operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(
-                originFileResolver.Resolve(compiledModel.ModelId.ModelId), compiledModel.ModelId.ModelId));
-            throw ModelValidationException.ModelIdContainsInvalidCharacters(compiledModel.ModelId.ModelId);
+                originFileResolver.Resolve(modelRootBase.ModelId.ModelId), modelRootBase.ModelId.ModelId));
+            throw ModelValidationException.ModelIdContainsInvalidCharacters(modelRootBase.ModelId.ModelId);
         }
 
 
@@ -118,7 +159,5 @@ internal class ModelResolver : IModelResolver
 
         // Check 1-5 is done by inheritance resolver.
         _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-
-        return modelGraph;
     }
 }

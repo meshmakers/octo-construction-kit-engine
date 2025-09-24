@@ -13,16 +13,16 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
-    public void Resolve(CkCompiledModelRoot ckCompiledModelRoot, CkModelGraph ckModelGraph, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
+    public void Resolve(CkModelRootBase modelRootBase, CkModelGraph ckModelGraph, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
-        ckModelGraph.GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
+        ckModelGraph.GetOrCreateModel(modelRootBase.ModelId, modelRootBase.Description);
 
-        if (ckCompiledModelRoot.Attributes != null)
+        if (modelRootBase.Attributes != null)
         {
-            foreach (var ckAttribute in ckCompiledModelRoot.Attributes)
+            foreach (var ckAttribute in modelRootBase.Attributes)
             {
-                var ckAttributeId = new CkId<CkAttributeId>(ckCompiledModelRoot.ModelId, ckAttribute.AttributeId);
+                var ckAttributeId = new CkId<CkAttributeId>(modelRootBase.ModelId, ckAttribute.AttributeId);
 
                 if (!Regex.IsMatch(ckAttribute.AttributeId.AttributeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
@@ -65,11 +65,11 @@ internal class ElementResolver : IElementResolver
             }
         }
 
-        if (ckCompiledModelRoot.AssociationRoles != null)
+        if (modelRootBase.AssociationRoles != null)
         {
-            foreach (var ckAssociationRole in ckCompiledModelRoot.AssociationRoles)
+            foreach (var ckAssociationRole in modelRootBase.AssociationRoles)
             {
-                var ckAssociationId = new CkId<CkAssociationRoleId>(ckCompiledModelRoot.ModelId, ckAssociationRole.AssociationRoleId);
+                var ckAssociationId = new CkId<CkAssociationRoleId>(modelRootBase.ModelId, ckAssociationRole.AssociationRoleId);
                 if (!Regex.IsMatch(ckAssociationRole.AssociationRoleId.RoleId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(
@@ -118,11 +118,11 @@ internal class ElementResolver : IElementResolver
             }
         }
 
-        if (ckCompiledModelRoot.Types != null)
+        if (modelRootBase.Types != null)
         {
-            foreach (var ckType in ckCompiledModelRoot.Types)
+            foreach (var ckType in modelRootBase.Types)
             {
-                var ckTypeId = new CkId<CkTypeId>(ckCompiledModelRoot.ModelId, ckType.TypeId);
+                var ckTypeId = new CkId<CkTypeId>(modelRootBase.ModelId, ckType.TypeId);
                 if (!Regex.IsMatch(ckType.TypeId.TypeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId), ckType.TypeId.TypeId));
@@ -183,11 +183,11 @@ internal class ElementResolver : IElementResolver
             }
         }
 
-        if (ckCompiledModelRoot.Records != null)
+        if (modelRootBase.Records != null)
         {
-            foreach (var ckRecord in ckCompiledModelRoot.Records)
+            foreach (var ckRecord in modelRootBase.Records)
             {
-                var ckRecordId = new CkId<CkRecordId>(ckCompiledModelRoot.ModelId, ckRecord.RecordId);
+                var ckRecordId = new CkId<CkRecordId>(modelRootBase.ModelId, ckRecord.RecordId);
                 if (!Regex.IsMatch(ckRecord.RecordId.RecordId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(originFileResolver.Resolve(ckRecordId),  
@@ -239,11 +239,11 @@ internal class ElementResolver : IElementResolver
             }
         }
 
-        if (ckCompiledModelRoot.Enums != null)
+        if (modelRootBase.Enums != null)
         {
-            foreach (var ckEnum in ckCompiledModelRoot.Enums)
+            foreach (var ckEnum in modelRootBase.Enums)
             {
-                var ckEnumId = new CkId<CkEnumId>(ckCompiledModelRoot.ModelId, ckEnum.EnumId);
+                var ckEnumId = new CkId<CkEnumId>(modelRootBase.ModelId, ckEnum.EnumId);
                 if (!Regex.IsMatch(ckEnum.EnumId.EnumId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId), ckEnum.EnumId.EnumId));

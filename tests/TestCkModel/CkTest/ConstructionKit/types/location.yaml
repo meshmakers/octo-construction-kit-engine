@@ -1,5 +1,14 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
+  - typeId: Location-2
+    derivedFromCkTypeId: ${System}/Entity
+    isFinal: false
+    isAbstract: true
+    attributes:
+      - id: ${System}/Name
+        name: Name
+      - id: ${System}/Description
+        name: Description
   - typeId: Location
     derivedFromCkTypeId: ${System}/Entity
     isFinal: false
@@ -17,6 +26,16 @@ types:
     derivedFromCkTypeId: Test/Location
     isFinal: true
     isAbstract: false
+
+  - typeId: Continent-2
+    derivedFromCkTypeId: ${this}/Location-2
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/RecordTest-2
+        name: RecordTest2
+      - id: ${this}/ConnectionState-2
+        name: ConnectionState2
 
   - typeId: Ocean
     derivedFromCkTypeId: Test/Location

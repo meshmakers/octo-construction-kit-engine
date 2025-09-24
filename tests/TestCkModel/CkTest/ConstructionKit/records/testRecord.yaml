@@ -8,3 +8,11 @@ records:
       - id: Test/DataCount
         name: DataCount
         isOptional: true
+  - recordId: TestRecord-2
+    attributes:
+      - id: Test/Designation
+        name: Designation
+        isOptional: true
+      - id: Test/DataCount
+        name: DataCount
+        isOptional: true

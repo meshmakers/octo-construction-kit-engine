@@ -119,7 +119,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.g.cs", code);
+                    context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.{ckTypeDto.TypeId.Version.Major}.g.cs", code);
                 }
             }
         }
@@ -131,7 +131,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto, tenantId, ckCacheService);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.RecordId}.g.cs", code);
+                    context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.RecordId}.{ckRecordDto.RecordId.Version.Major}.g.cs", code);
                 }
             }
         }
@@ -140,10 +140,10 @@ public class CkSourceGenerator : IIncrementalGenerator
         {
             foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
             {
-                var code = CkEnumCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckEnumDto, tenantId, ckCacheService);
+                var code = CkEnumCodeGenerator.Instance.Generate(ns, ckEnumDto);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.EnumId}.g.cs", code);
+                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.EnumId}.{ckEnumDto.EnumId.Version.Major}.g.cs", code);
                 }
             }
         }

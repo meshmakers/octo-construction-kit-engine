@@ -14,7 +14,7 @@ public class CkModelGraph : ICkModelGraph
     private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
     private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
     private readonly IDictionary<CkModelId, CkModelPropertiesDto> _models;
-    private readonly IDictionary<CkModelId, ICollection<CkModelIdVersionRange>> _dependencies;
+    private readonly IDictionary<CkModelId, ICollection<CkModelId>> _dependencies;
     private readonly IDictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
     private readonly IDictionary<CkId<CkRecordId>, CkRecordGraph> _records;
     private readonly IDictionary<CkId<CkTypeId>, CkTypeGraph> _types;
@@ -29,14 +29,14 @@ public class CkModelGraph : ICkModelGraph
         _associationRoles = new Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
         _records = new Dictionary<CkId<CkRecordId>, CkRecordGraph>();
         _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
-        _dependencies = new Dictionary<CkModelId, ICollection<CkModelIdVersionRange>>();
+        _dependencies = new Dictionary<CkModelId, ICollection<CkModelId>>();
         _models = new Dictionary<CkModelId, CkModelPropertiesDto>();
         Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
         Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
-        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelIdVersionRange>>(_dependencies);
+        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
         Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
     }
 
@@ -58,7 +58,7 @@ public class CkModelGraph : ICkModelGraph
         AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
         Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
         Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
-        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelIdVersionRange>>(_dependencies);
+        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
         Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
     }
 
@@ -90,7 +90,7 @@ public class CkModelGraph : ICkModelGraph
     /// <summary>
     ///     Returns a list of model dependencies.
     /// </summary>
-    public IReadOnlyDictionary<CkModelId, ICollection<CkModelIdVersionRange>> Dependencies { get; }
+    public IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; }
 
     /// <summary>
     ///     Returns a list of model dependencies.

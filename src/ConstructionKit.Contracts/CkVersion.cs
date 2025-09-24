@@ -13,14 +13,18 @@ public readonly struct CkVersion : IComparable<CkVersion>, IEquatable<CkVersion>
     public CkVersion(string version)
     {
         var versionParts = version.Split('.');
-        if (versionParts.Length != 3)
+        if (versionParts.Length <= 0 || versionParts.Length > 3)
         {
             throw new ArgumentOutOfRangeException(nameof(version), "Version must be in the format of 'major.minor.revision'");
         }
+        if (!int.TryParse(versionParts[0], out _))
+        {
+            throw new ArgumentOutOfRangeException(nameof(version), "Major version must be an integer");
+        }
 
         Major = int.Parse(versionParts[0]);
-        Minor = int.Parse(versionParts[1]);
-        Revision = int.Parse(versionParts[2]);
+        Minor = versionParts.Length >= 2 ? int.Parse(versionParts[1]) : 0;
+        Revision = versionParts.Length >= 3 ? int.Parse(versionParts[2]) : 0;
     }
 
 

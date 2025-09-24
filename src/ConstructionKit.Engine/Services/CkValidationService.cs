@@ -2,7 +2,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -28,6 +27,14 @@ public class CkValidationService : ICkValidationService
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
         return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<(ICkModelGraph, CkCompiledModelRoot)> ValidateAsync(CkModelCompileCandidate compileCandidate, IOriginFileResolver originFileResolver,
+        OperationResult operationResult, object? sourceIdentifier = null)
+    {
+        return await _modelResolver.ResolveAsync(compileCandidate, originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
     }
 

@@ -11,32 +11,51 @@ internal class DependencyResolver(
     Lazy<ICkModelRepositoryManager> ckModelRepositoryManagerLazy)
     : IDependencyResolver
 {
-    public async Task ResolveDependenciesAsync(ICollection<CkModelIdVersionRange> dependencies, CkModelGraph ckModelGraph,
+    public async Task<IReadOnlyCollection<CkModelId>> ResolveDependenciesAsync(ICollection<CkModelIdVersionRange> dependencyVersionRanges, CkModelGraph ckModelGraph,
         IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
         logger.LogDebug("Starting resolving dependencies");
-        await Resolve(dependencies, ckModelGraph, variableResolver, originFileResolver, sourceIdentifier,
+        var resolvedModelIds = await Resolve(dependencyVersionRanges, ckModelGraph, variableResolver, originFileResolver, sourceIdentifier,
+                operationResult)
+            .ConfigureAwait(false);
+        logger.LogDebug("Resolving dependencies completed");
+
+        return resolvedModelIds;
+    }
+
+    public async Task ResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph, IVariableResolver variableResolver,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
+    {
+        logger.LogDebug("Starting resolving dependencies");
+        await Resolve(dependencies.Select(d=>d.ToVersionRange()).ToList(), ckModelGraph, variableResolver, originFileResolver, sourceIdentifier,
                 operationResult)
             .ConfigureAwait(false);
         logger.LogDebug("Resolving dependencies completed");
     }
 
-    private async Task Resolve(ICollection<CkModelIdVersionRange> ckRootDependencies, CkModelGraph ckModelGraph,
+    private async Task<IReadOnlyCollection<CkModelId>> Resolve(ICollection<CkModelIdVersionRange> ckRootDependencies, CkModelGraph ckModelGraph,
         IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver,
         object? sourceIdentifier, OperationResult operationResult)
     {
         List<CkModelIdVersionRange> dependencies = [..ckRootDependencies];
+        List<CkModelId> resolvedRootDependencies = [];
 
         for (var i = 0; i < dependencies.Count; i++)
         {
             var ckDependency = dependencies[i];
 
-            logger.LogDebug("Resolving dependency '{CkModelId}'", ckDependency);
+            logger.LogInformation("Resolving dependency '{CkModelId}'", ckDependency);
 
             var modelExistingResult = await ckModelRepositoryManagerLazy.Value.IsCkModelExistingAsync(ckDependency, sourceIdentifier)
                 .ConfigureAwait(false);
+
+            if (ckRootDependencies.Contains(ckDependency) && modelExistingResult is { Exists: true, ModelId: not null })
+            {
+                resolvedRootDependencies.Add(modelExistingResult.ModelId);
+            }
+
             if (!modelExistingResult.Exists || modelExistingResult.ModelId == null)
             {
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
@@ -60,11 +79,11 @@ internal class DependencyResolver(
             {
                 foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)
                 {
-                    if (ckModelGraph.Dependencies.Keys.Any(t=> ckChildDependency.IsSatisfiedBy(t)) &&
-                        !dependencies.Contains(ckChildDependency))
+                    var childDependencyRange = ckChildDependency.ToVersionRange();
+                    if (!ckModelGraph.Dependencies.ContainsKey(ckChildDependency) && !dependencies.Contains(childDependencyRange))
                     {
                         logger.LogDebug("Adding additional dependency '{CkTypeId}'", ckChildDependency);
-                        dependencies.Add(ckChildDependency);
+                        dependencies.Add(childDependencyRange);
                     }
                 }
             }
@@ -73,5 +92,7 @@ internal class DependencyResolver(
                 ckDependencyRootModel.ModelId);
             ckModelGraph.AppendModel(ckDependencyRootModel);
         }
+
+        return resolvedRootDependencies.AsReadOnly();
     }
 }

@@ -13,7 +13,7 @@
         },
         "derivedFromCkTypeId": {
           "type": "string",
-          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
         },
         "isFinal": {
           "type": "boolean"
@@ -86,17 +86,17 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
               },
               "targetCkTypeId": {
                 "type": "string",
-                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
               },
               "targetAttributes": {
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                  "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
                 }
               }
             },
@@ -127,7 +127,7 @@
         },
         "derivedFromCkTypeId": {
           "type": "string",
-          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
         },
         "isFinal": {
           "type": "boolean"
@@ -203,17 +203,17 @@
             "properties": {
               "id": {
                 "type": "string",
-                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
               },
               "targetCkTypeId": {
                 "type": "string",
-                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
               },
               "targetAttributes": {
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9]+\\})/[a-zA-Z0-9-_.]+$"
+                  "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
                 }
               }
             },

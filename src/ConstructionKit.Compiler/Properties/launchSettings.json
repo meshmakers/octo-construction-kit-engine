@@ -10,22 +10,36 @@
     },
     "CompilerCompileSdkDemo": {
       "commandName": "Project",
-      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Demo/ConstructionKit\" -o \"$(OctoRepoRootPath)/test"
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Demo/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
     },
     "CompilerCompileCkTest": {
       "commandName": "Project",
-      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)tests/TestCkModel/CkTest/ConstructionKit\" -o \"$(OctoRepoRootPath)/test"
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)tests/TestCkModel/CkTest/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
     },
     "CompilerCompileTestCkModel": {
       "commandName": "Project",
-      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)tests/TestCkModel/ConstructionKit\" -o \"$(OctoRepoRootPath)/test"
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)tests/TestCkModel/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
     },
     "CompilerPublishTestCkModel": {
       "commandName": "Project",
       "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.testidentity.yaml\" -r -rep \"LocalRepository\""
-    },"CompilerGenerateDocSdkDemo": {
+    },
+    "CompilerGenerateDocSdkDemo": {
       "commandName": "Project",
       "commandLineArgs": "-c generateDocs -f \"$(OctoRepoRootPath)/test/ck-octosdkdemo.yaml\" -o \"$(OctoRepoRootPath)/test/docs\" -l \"/docs/technologyGuide/constructionKits/libraries/\""
+    },
+    "CompilerCompileBasic": {
+      "commandName": "Project",
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Packages.Basic/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
+    },
+    "CompilerCompileIndustryBasic": {
+      "commandName": "Project",
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Packages.Industry.Basic/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
+    },
+    "CompilerCompileIndustryEnergy": {
+      "commandName": "Project",
+      "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Packages.Industry.Energy/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
     }
+
   }
 }

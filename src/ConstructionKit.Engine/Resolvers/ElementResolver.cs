@@ -13,7 +13,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 internal class ElementResolver : IElementResolver
 {
     /// <inheritdoc />
-    public void Resolve(CkModelRootBase modelRootBase, CkModelGraph ckModelGraph, IVariableResolver variableResolver, IOriginFileResolver originFileResolver,
+    public void Resolve(CkModelRootBase modelRootBase, CkModelGraph ckModelGraph, IVariableResolver variableResolver,
+        IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
         ckModelGraph.GetOrCreateModel(modelRootBase.ModelId, modelRootBase.Description);
@@ -26,39 +27,48 @@ internal class ElementResolver : IElementResolver
 
                 if (!Regex.IsMatch(ckAttribute.AttributeId.AttributeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(originFileResolver.Resolve(ckAttributeId),
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(
+                        originFileResolver.Resolve(ckAttributeId),
                         ckAttribute.AttributeId.AttributeId));
                     continue;
                 }
 
                 if (ckModelGraph.Attributes.ContainsKey(ckAttributeId))
                 {
-                    operationResult.AddMessage(MessageCodes.AttributeIdNotUnique(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
+                    operationResult.AddMessage(
+                        MessageCodes.AttributeIdNotUnique(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
 
-                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
+                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record ||
+                     ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
                     && ckAttribute.ValueCkRecordId == null)
                 {
-                    operationResult.AddMessage(MessageCodes.CkRecordIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
+                    operationResult.AddMessage(
+                        MessageCodes.CkRecordIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
                     continue;
                 }
-                
-                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record || ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
+
+                if ((ckAttribute.ValueType == AttributeValueTypesDto.Record ||
+                     ckAttribute.ValueType == AttributeValueTypesDto.RecordArray)
                     && ckAttribute.ValueCkRecordId != null)
                 {
-                    ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.FullName);
+                    ckAttribute.ValueCkRecordId = variableResolver.Resolve(ckAttribute.ValueCkRecordId.FullName,
+                        originFileResolver.Resolve(ckAttributeId), operationResult);
                 }
 
                 if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: null })
                 {
-                    operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(originFileResolver.Resolve(ckAttributeId), ckAttributeId));
+                    operationResult.AddMessage(MessageCodes.CkEnumIdUndefined(originFileResolver.Resolve(ckAttributeId),
+                        ckAttributeId));
                     continue;
                 }
-                
+
                 if (ckAttribute is { ValueType: AttributeValueTypesDto.Enum, ValueCkEnumId: not null })
                 {
-                    ckAttribute.ValueCkEnumId = variableResolver.Resolve(ckAttribute.ValueCkEnumId.FullName);
+                    ckAttribute.ValueCkEnumId =
+                        variableResolver.Resolve(ckAttribute.ValueCkEnumId.FullName,
+                            originFileResolver.Resolve(ckAttributeId), operationResult);
                 }
 
                 ckModelGraph.GetOrCreateAttribute(ckAttributeId, ckAttribute);
@@ -69,18 +79,23 @@ internal class ElementResolver : IElementResolver
         {
             foreach (var ckAssociationRole in modelRootBase.AssociationRoles)
             {
-                var ckAssociationId = new CkId<CkAssociationRoleId>(modelRootBase.ModelId, ckAssociationRole.AssociationRoleId);
-                if (!Regex.IsMatch(ckAssociationRole.AssociationRoleId.RoleId, CompilerStatics.AllowedCharactersInNamesRegex))
+                var ckAssociationId =
+                    new CkId<CkAssociationRoleId>(modelRootBase.ModelId, ckAssociationRole.AssociationRoleId);
+                if (!Regex.IsMatch(ckAssociationRole.AssociationRoleId.RoleId,
+                        CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(
-                        MessageCodes.CkAssociationIdContainsInvalidCharacters(originFileResolver.Resolve(ckAssociationId),
+                        MessageCodes.CkAssociationIdContainsInvalidCharacters(
+                            originFileResolver.Resolve(ckAssociationId),
                             ckAssociationRole.AssociationRoleId.RoleId));
                     continue;
                 }
 
                 if (ckModelGraph.AssociationRoles.ContainsKey(ckAssociationId))
                 {
-                    operationResult.AddMessage(MessageCodes.AssociationRoleIdNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationId));
+                    operationResult.AddMessage(
+                        MessageCodes.AssociationRoleIdNotUnique(originFileResolver.Resolve(ckAssociationId),
+                            ckAssociationId));
                     continue;
                 }
 
@@ -92,7 +107,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
+                            MessageCodes.CkAssociationRoleAttributeIdNotUnique(
+                                originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
                                 string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
@@ -103,14 +119,17 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
+                            MessageCodes.CkAssociationRoleAttributeNameNotUnique(
+                                originFileResolver.Resolve(ckAssociationId), ckAssociationRole.AssociationRoleId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
-                    
+
                     foreach (var ckTypeAttributeDto in ckAssociationRole.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
+                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(
+                            ckTypeAttributeDto.CkAttributeId.FullName, originFileResolver.Resolve(ckAssociationId),
+                            operationResult);
                     }
                 }
 
@@ -125,19 +144,24 @@ internal class ElementResolver : IElementResolver
                 var ckTypeId = new CkId<CkTypeId>(modelRootBase.ModelId, ckType.TypeId);
                 if (!Regex.IsMatch(ckType.TypeId.TypeId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId), ckType.TypeId.TypeId));
+                    operationResult.AddMessage(
+                        MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId),
+                            ckType.TypeId.TypeId));
                     continue;
                 }
 
                 if (ckModelGraph.Types.ContainsKey(ckTypeId))
                 {
-                    operationResult.AddMessage(MessageCodes.TypeIdNotUnique(originFileResolver.Resolve(ckTypeId), ckTypeId));
+                    operationResult.AddMessage(MessageCodes.TypeIdNotUnique(originFileResolver.Resolve(ckTypeId),
+                        ckTypeId));
                     continue;
                 }
 
                 if (ckType.DerivedFromCkTypeId != null)
                 {
-                    ckType.DerivedFromCkTypeId = variableResolver.Resolve(ckType.DerivedFromCkTypeId.FullName);
+                    ckType.DerivedFromCkTypeId =
+                        variableResolver.Resolve(ckType.DerivedFromCkTypeId.FullName,
+                            originFileResolver.Resolve(ckTypeId), operationResult);
                 }
 
                 if (ckType.Attributes != null)
@@ -148,7 +172,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkTypeIdAttributeIdNotUnique(originFileResolver.Resolve(ckTypeId), ckType.TypeId, 
+                            MessageCodes.CkTypeIdAttributeIdNotUnique(originFileResolver.Resolve(ckTypeId),
+                                ckType.TypeId,
                                 string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
@@ -159,14 +184,17 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkTypeIdAttributeNameNotUnique(originFileResolver.Resolve(ckTypeId), ckType.TypeId,
+                            MessageCodes.CkTypeIdAttributeNameNotUnique(originFileResolver.Resolve(ckTypeId),
+                                ckType.TypeId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
 
                     foreach (var ckTypeAttributeDto in ckType.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
+                        ckTypeAttributeDto.CkAttributeId =
+                            variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName,
+                                originFileResolver.Resolve(ckTypeId), operationResult);
                     }
                 }
 
@@ -174,8 +202,12 @@ internal class ElementResolver : IElementResolver
                 {
                     foreach (var ckTypeAssociationDto in ckType.Associations)
                     {
-                        ckTypeAssociationDto.CkRoleId = variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.FullName);
-                        ckTypeAssociationDto.TargetCkTypeId = variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.FullName);
+                        ckTypeAssociationDto.CkRoleId =
+                            variableResolver.Resolve(ckTypeAssociationDto.CkRoleId.FullName,
+                                originFileResolver.Resolve(ckTypeId), operationResult);
+                        ckTypeAssociationDto.TargetCkTypeId =
+                            variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.FullName,
+                                originFileResolver.Resolve(ckTypeId), operationResult);
                     }
                 }
 
@@ -190,20 +222,24 @@ internal class ElementResolver : IElementResolver
                 var ckRecordId = new CkId<CkRecordId>(modelRootBase.ModelId, ckRecord.RecordId);
                 if (!Regex.IsMatch(ckRecord.RecordId.RecordId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(originFileResolver.Resolve(ckRecordId),  
+                    operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(
+                        originFileResolver.Resolve(ckRecordId),
                         ckRecord.RecordId.RecordId));
                     continue;
                 }
 
                 if (ckModelGraph.Records.ContainsKey(ckRecordId))
                 {
-                    operationResult.AddMessage(MessageCodes.RecordIdNotUnique(originFileResolver.Resolve(ckRecordId), ckRecordId));
+                    operationResult.AddMessage(MessageCodes.RecordIdNotUnique(originFileResolver.Resolve(ckRecordId),
+                        ckRecordId));
                     continue;
                 }
-                
+
                 if (ckRecord.DerivedFromCkRecordId != null)
                 {
-                    ckRecord.DerivedFromCkRecordId = variableResolver.Resolve(ckRecord.DerivedFromCkRecordId.FullName);
+                    ckRecord.DerivedFromCkRecordId =
+                        variableResolver.Resolve(ckRecord.DerivedFromCkRecordId.FullName,
+                            originFileResolver.Resolve(ckRecordId), operationResult);
                 }
 
                 if (ckRecord.Attributes != null)
@@ -214,7 +250,8 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeIds.Any())
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkRecordIdAttributeIdNotUnique(originFileResolver.Resolve(ckRecordId), ckRecord.RecordId, string.Join(", ", duplicateAttributeIds)));
+                            MessageCodes.CkRecordIdAttributeIdNotUnique(originFileResolver.Resolve(ckRecordId),
+                                ckRecord.RecordId, string.Join(", ", duplicateAttributeIds)));
                         continue;
                     }
 
@@ -224,14 +261,17 @@ internal class ElementResolver : IElementResolver
                     if (duplicateAttributeNames.Count > 0)
                     {
                         operationResult.AddMessage(
-                            MessageCodes.CkRecordIdAttributeNameNotUnique(originFileResolver.Resolve(ckRecordId), ckRecord.RecordId,
+                            MessageCodes.CkRecordIdAttributeNameNotUnique(originFileResolver.Resolve(ckRecordId),
+                                ckRecord.RecordId,
                                 string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
                         continue;
                     }
-                    
+
                     foreach (var ckTypeAttributeDto in ckRecord.Attributes)
                     {
-                        ckTypeAttributeDto.CkAttributeId = variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName);
+                        ckTypeAttributeDto.CkAttributeId =
+                            variableResolver.Resolve(ckTypeAttributeDto.CkAttributeId.FullName,
+                                originFileResolver.Resolve(ckRecordId), operationResult);
                     }
                 }
 
@@ -246,13 +286,16 @@ internal class ElementResolver : IElementResolver
                 var ckEnumId = new CkId<CkEnumId>(modelRootBase.ModelId, ckEnum.EnumId);
                 if (!Regex.IsMatch(ckEnum.EnumId.EnumId, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
-                    operationResult.AddMessage(MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId), ckEnum.EnumId.EnumId));
+                    operationResult.AddMessage(
+                        MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId),
+                            ckEnum.EnumId.EnumId));
                     continue;
                 }
 
                 if (ckModelGraph.Enums.ContainsKey(ckEnumId))
                 {
-                    operationResult.AddMessage(MessageCodes.EnumIdNotUnique(originFileResolver.Resolve(ckEnumId), ckEnumId));
+                    operationResult.AddMessage(MessageCodes.EnumIdNotUnique(originFileResolver.Resolve(ckEnumId),
+                        ckEnumId));
                     continue;
                 }
 
@@ -261,33 +304,42 @@ internal class ElementResolver : IElementResolver
                 {
                     if (string.IsNullOrWhiteSpace(ckEnumValueDto.Name))
                     {
-                        operationResult.AddMessage(MessageCodes.EnumNameMyNotBeEmpty(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        operationResult.AddMessage(
+                            MessageCodes.EnumNameMyNotBeEmpty(originFileResolver.Resolve(ckEnumId), ckEnumId,
+                                ckEnumValueDto.Key));
                         ignoreEnum = true;
                     }
-                    
+
                     if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.AllowedCharactersInEnumNamesRegex))
                     {
-                        operationResult.AddMessage(MessageCodes.EnumNameMayNotContainWhitespaceSpecialCharacters(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        operationResult.AddMessage(
+                            MessageCodes.EnumNameMayNotContainWhitespaceSpecialCharacters(
+                                originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
                         ignoreEnum = true;
                     }
 
                     if (ckEnumValueDto.Key < 0)
                     {
-                        operationResult.AddMessage(MessageCodes.EnumKeyMayNotBeNegative(originFileResolver.Resolve(ckEnumId), ckEnumId, ckEnumValueDto.Key));
+                        operationResult.AddMessage(
+                            MessageCodes.EnumKeyMayNotBeNegative(originFileResolver.Resolve(ckEnumId), ckEnumId,
+                                ckEnumValueDto.Key));
                         ignoreEnum = true;
                     }
                 }
-                
+
                 foreach (var ckSelectionValueGroup in
                          ckEnum.Values.GroupBy(x => x.Key).Where(x => x.Count() > 1))
                 {
-                    operationResult.AddMessage(MessageCodes.SelectionValueNotUnique(originFileResolver.Resolve(ckEnumId), ckEnumId, ckSelectionValueGroup.Key));
+                    operationResult.AddMessage(MessageCodes.SelectionValueNotUnique(
+                        originFileResolver.Resolve(ckEnumId), ckEnumId, ckSelectionValueGroup.Key));
                     ignoreEnum = true;
                 }
 
                 if (!ckEnum.IsExtensible && ckEnum.Values.Any(x => x.IsExtension))
                 {
-                    operationResult.AddMessage(MessageCodes.EnumIsNotExtensibleButContainsExtension(originFileResolver.Resolve(ckEnumId), ckEnumId));
+                    operationResult.AddMessage(
+                        MessageCodes.EnumIsNotExtensibleButContainsExtension(originFileResolver.Resolve(ckEnumId),
+                            ckEnumId));
                     ignoreEnum = true;
                 }
 

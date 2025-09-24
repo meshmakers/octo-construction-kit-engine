@@ -1,4 +1,4 @@
-﻿//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
 // <auto-generate>
 //     The code was generated from a template.
 //
@@ -208,373 +208,382 @@ internal static class MessageCodes
     internal static OperationMessage AttributeIsRecordButValueIsNotSet(string? location, object ckAttributeId) =>
         GetMessage("AttributeIsRecordButValueIsNotSet", location, ckAttributeId);
 
+    internal static OperationMessage VariableUnknown(string? location, object variableName) =>
+        GetMessage("VariableUnknown", location, variableName);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
             "UnknownCkModel",
              new OperationMessageTemplate(MessageLevel.Error,
                  1, "Repository does not contain construction kit model '{modelId}'.",
-                 ["modelId"])
+                 new [] {"modelId"})
         },
         {
             "UnknownAttributeOfCkTypeIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  2, "CkAttributeId '{ckAttributeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
-                 ["ckAttributeId", "ckTypeId"])
+                 new [] {"ckAttributeId", "ckTypeId"})
         },
         {
             "UnknownCkDerivedIdOfCkTypeIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  3, "Derived CkTypeId '{derivedCkTypeId}' of CkTypeId '{ckTypeId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
-                 ["derivedCkTypeId", "ckTypeId"])
+                 new [] {"derivedCkTypeId", "ckTypeId"})
         },
         {
             "UnknownAssociationRoleOfCkTypeIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  4, "CkTypeId '{ckTypeId}' defines unknown association role '{roleId}'. Please check if you have set dependency to the correct construction kit model.",
-                 ["ckTypeId", "roleId"])
+                 new [] {"ckTypeId", "roleId"})
         },
         {
             "UnknownTargetCkTypeIdOfCkTypeIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  5, "CkTypeId '{ckTypeId}' defines unknown association role target CkTypeId '{targetCkTypeId}'. Please check if you have set dependency to the correct construction kit model.",
-                 ["ckTypeId", "targetCkTypeId"])
+                 new [] {"ckTypeId", "targetCkTypeId"})
         },
         {
             "AttributeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  6, "CkAttributeId '{ckAttributeId}' is not unique.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
         },
         {
             "AssociationRoleIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  7, "CkAssociationRoleId '{ckAssociationId}' is not unique.",
-                 ["ckAssociationId"])
+                 new [] {"ckAssociationId"})
         },
         {
             "TypeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  8, "CkTypeId '{ckTypeId}' is not unique.",
-                 ["ckTypeId"])
+                 new [] {"ckTypeId"})
         },
         {
             "InheritanceMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  9, "CkTypeId '{ckTypeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set.",
-                 ["ckTypeId"])
+                 new [] {"ckTypeId"})
         },
         {
             "CircularDependency",
              new OperationMessageTemplate(MessageLevel.Error,
                  10, "CkModelId '{modelId}' has defined a dependency to '{dependentModelId}' that results to a circular dependencies.",
-                 ["modelId", "dependentModelId"])
+                 new [] {"modelId", "dependentModelId"})
         },
         {
             "UnknownCkTypeIdForInheritance",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  11, "CkTypeId '{ckTypeId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckTypeId"])
+                 new [] {"ckTypeId"})
         },
         {
             "CkTypeIdAttributeIdNotUniqueByInheritance",
              new OperationMessageTemplate(MessageLevel.Error,
                  12, "CkTypeId '{ckTypeId}' defines AttributeId '{ckAttributeId}' that violates at derived CkTypeId '{derivedCkTypeId}' the unique attribute id constraint.",
-                 ["ckTypeId", "ckAttributeId", "derivedCkTypeId"])
+                 new [] {"ckTypeId", "ckAttributeId", "derivedCkTypeId"})
         },
         {
             "CkTypeIdAttributeNameNotUniqueByInheritance",
              new OperationMessageTemplate(MessageLevel.Error,
                  13, "CkTypeId '{ckTypeId}' defines attribute names '{attributeNames}' by inheritance that violates the unique attribute name constraint.",
-                 ["ckTypeId", "attributeNames"])
+                 new [] {"ckTypeId", "attributeNames"})
         },
         {
             "CkTypeIdAssociationNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  14, "CkTypeId '{ckTypeId}' defines AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}' that violates the unique association constraint",
-                 ["ckTypeId", "ckAssociationId", "targetCkTypeId"])
+                 new [] {"ckTypeId", "ckAssociationId", "targetCkTypeId"})
         },
         {
             "CkTypeIdAttributeNameNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  15, "CkTypeId '{ckTypeId}' defines attribute names '{attributeName}' that violates the unique attribute name constraint.",
-                 ["ckTypeId", "attributeName"])
+                 new [] {"ckTypeId", "attributeName"})
         },
         {
             "CkTypeIdAttributeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  16, "CkTypeId '{ckTypeId}' defines AttributeId(s) '{ckAttributeId}' that violates the unique attribute id constraint.",
-                 ["ckTypeId", "ckAttributeId"])
+                 new [] {"ckTypeId", "ckAttributeId"})
         },
         {
             "CkTypeIdOutAssociationNotUniqueByInheritance",
              new OperationMessageTemplate(MessageLevel.Error,
                  17, "CkTypeId '{ckTypeId}' defines an outgoing AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}' by inheritance that violates the unique association role id constraint",
-                 ["ckTypeId", "ckAssociationId", "targetCkTypeId"])
+                 new [] {"ckTypeId", "ckAssociationId", "targetCkTypeId"})
         },
         {
             "CkTypeIdUnknownTargetCkTypeIdForAssociation",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  18, "CkTypeId '{originCkTypeId}' defines a unknown target CkTypeId '{targetCkTypeId}' for role id '{roleId}'. This may happen because a dependency to another construction kit model is missing.",
-                 ["originCkTypeId", "targetCkTypeId", "roleId"])
+                 new [] {"originCkTypeId", "targetCkTypeId", "roleId"})
         },
         {
             "CkTypeIdUnknown",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  19, "CkTypeId '{ckTypeId}' is unknown. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckTypeId"])
+                 new [] {"ckTypeId"})
         },
         {
             "CkTypeIdMultipleOutgoingAssociationRepresentingSameRole",
              new OperationMessageTemplate(MessageLevel.Error,
                  20, "CkTypeId '{ckTypeId}' defines an outgoing AssociationRoleId '{ckAssociationId}' to CkTypeId '{targetCkTypeId}'. This association is also defined between CkTypeId '{otherCkTypeId}' and target CkTypeId '{otherTargetCkTypeId}'.",
-                 ["ckTypeId", "ckAssociationId", "targetCkTypeId", "otherCkTypeId", "otherTargetCkTypeId"])
+                 new [] {"ckTypeId", "ckAssociationId", "targetCkTypeId", "otherCkTypeId", "otherTargetCkTypeId"})
         },
         {
             "DerivedFromCkTypeIdThatIsFinal",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  21, "CkTypeId '{baseCkTypeId}' is final, but CkTypeId '{derivedTypeId}' is derived from it.",
-                 ["baseCkTypeId", "derivedTypeId"])
+                 new [] {"baseCkTypeId", "derivedTypeId"})
         },
         {
             "DirectoryMustBeEmpty",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  22, "Directory must be empty.",
-                 [])
+                 new string[] {})
         },
         {
             "ModelIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  23, "CkModelId '{modelId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["modelId"])
+                 new [] {"modelId"})
         },
         {
             "CkTypeIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  24, "CkTypeId '{ckTypeId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["ckTypeId"])
+                 new [] {"ckTypeId"})
         },
         {
             "CkAttributeIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  25, "CkAttributeId '{ckAttributeId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
         },
         {
             "CkAssociationIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  26, "CkAssociationId '{ckAssociationId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["ckAssociationId"])
+                 new [] {"ckAssociationId"})
         },
         {
             "SchemaValidationError",
              new OperationMessageTemplate(MessageLevel.Error,
                  27, "Schema validation failed at '{path}'->'{errorMessage}'",
-                 ["path", "errorMessage"])
+                 new [] {"path", "errorMessage"})
         },
         {
             "DirectoryDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  28, "Directory does not exist.",
-                 [])
+                 new string[] {})
         },
         {
             "FileDoesNotExist",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  29, "File does not exist.",
-                 [])
+                 new string[] {})
         },
         {
             "SelectionValueNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  30, "CkEnumId '{ckEnumId}' has defined key '{key}' which is used several times.",
-                 ["ckEnumId", "key"])
+                 new [] {"ckEnumId", "key"})
         },
         {
             "CkRecordIdUndefined",
              new OperationMessageTemplate(MessageLevel.Error,
                  31, "CkAttributeId '{ckAttributeId}' is defined as Record, but the ValueCkRecordId is missing.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
         },
         {
             "CkRecordIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  32, "CkRecordId '{ckRecordId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["ckRecordId"])
+                 new [] {"ckRecordId"})
         },
         {
             "RecordIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  33, "RecordId '{ckRecordId}' is not unique.",
-                 ["ckRecordId"])
+                 new [] {"ckRecordId"})
         },
         {
             "CkRecordIdUnknown",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  34, "CkRecordId '{ckRecordId}' is unknown. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckRecordId"])
+                 new [] {"ckRecordId"})
         },
         {
             "UnknownCkRecordIdForInheritance",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  35, "CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckRecordId"])
+                 new [] {"ckRecordId"})
         },
         {
             "DerivedFromCkRecordIdThatIsFinal",
              new OperationMessageTemplate(MessageLevel.FatalError,
                  36, "CkRecordId '{baseCkRecordId}' is final, but CkRecordId '{derivedCkRecordId}' is derived from it.",
-                 ["baseCkRecordId", "derivedCkRecordId"])
+                 new [] {"baseCkRecordId", "derivedCkRecordId"})
         },
         {
             "CkRecordIdAttributeNameNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  37, "CkRecordId '{ckRecordId}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
-                 ["ckRecordId", "attributeName"])
+                 new [] {"ckRecordId", "attributeName"})
         },
         {
             "CkRecordIdAttributeIdNotUniqueByInheritance",
              new OperationMessageTemplate(MessageLevel.Error,
                  38, "CkRecordId '{ckRecordId}' defines AttributeId '{ckAttributeId}' that violates at derived CkRecordId '{derivedCkRecordId}' the unique attribute id constraint.",
-                 ["ckRecordId", "ckAttributeId", "derivedCkRecordId"])
+                 new [] {"ckRecordId", "ckAttributeId", "derivedCkRecordId"})
         },
         {
             "CkRecordIdAttributeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  39, "CkRecordId '{ckRecordId}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint.",
-                 ["ckRecordId", "ckAttributeId"])
+                 new [] {"ckRecordId", "ckAttributeId"})
         },
         {
             "CkRecordIdAttributeNameNotUniqueByInheritance",
              new OperationMessageTemplate(MessageLevel.Error,
                  40, "CkRecordId '{ckRecordId}' defines attribute name '{attributeNames}' by inheritance that violates the unique attribute name constraint.",
-                 ["ckRecordId", "attributeNames"])
+                 new [] {"ckRecordId", "attributeNames"})
         },
         {
             "AttributeUsesUnknownCkRecordId",
              new OperationMessageTemplate(MessageLevel.Error,
                  41, "CkAttributeId '{ckAttributeId}' uses unknown CkRecordId '{ckRecordId}'. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckAttributeId", "ckRecordId"])
+                 new [] {"ckAttributeId", "ckRecordId"})
         },
         {
             "UnknownAttributeOfCkRecordIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  42, "Attribute Id '{ckAttributeId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
-                 ["ckAttributeId", "ckRecordId"])
+                 new [] {"ckAttributeId", "ckRecordId"})
         },
         {
             "UnknownDerivedFromCkRecordIdInSource",
              new OperationMessageTemplate(MessageLevel.Error,
                  43, "Derived CkRecordId '{derivedCkRecordId}' of CkRecordId '{ckRecordId}' does not exist. Please check if you have set dependency to the correct construction kit model.",
-                 ["derivedCkRecordId", "ckRecordId"])
+                 new [] {"derivedCkRecordId", "ckRecordId"})
         },
         {
             "CkEnumIdContainsInvalidCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  44, "CkEnumId '{ckEnumId}' contains invalid characters. Allowed characters are A-Z, a-z, 0-9, . and _.",
-                 ["ckEnumId"])
+                 new [] {"ckEnumId"})
         },
         {
             "EnumIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  45, "CkEnumId '{ckEnumId}' is not unique.",
-                 ["ckEnumId"])
+                 new [] {"ckEnumId"})
         },
         {
             "CkEnumIdUndefined",
              new OperationMessageTemplate(MessageLevel.Error,
                  46, "CkAttributeId '{ckAttributeId}' is defined as Enum, but the ValueCkEnumId is missing.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
         },
         {
             "CkTypeIdUnknownTargetAttributeIdForAssociation",
              new OperationMessageTemplate(MessageLevel.Error,
                  47, "CkTypeId '{originCkTypeId}' defines for role id '{roleId}' an unknown target AttributeId '{targetCkAttributeId}' for CkType '{targetCkTypeId}'.",
-                 ["originCkTypeId", "roleId", "targetCkAttributeId", "targetCkTypeId"])
+                 new [] {"originCkTypeId", "roleId", "targetCkAttributeId", "targetCkTypeId"})
         },
         {
             "CkTypeIdAssociationRoleIdUnknown",
              new OperationMessageTemplate(MessageLevel.Error,
                  48, "CkTypeId '{ckTypeId}' defines AssociationRoleId '{ckAssociationId}' that is unknown. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckTypeId", "ckAssociationId"])
+                 new [] {"ckTypeId", "ckAssociationId"})
         },
         {
             "CkAssociationRoleAttributeNameNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  49, "CkAssociationRole '{ckAssociationRole}' defines attribute name '{attributeName}' that violates the unique attribute name constraint.",
-                 ["ckAssociationRole", "attributeName"])
+                 new [] {"ckAssociationRole", "attributeName"})
         },
         {
             "CkAssociationRoleAttributeIdNotUnique",
              new OperationMessageTemplate(MessageLevel.Error,
                  50, "CkAssociationRole '{ckAssociationRole}' defines AttributeIds '{ckAttributeId}' that violates the unique attribute id constraint.",
-                 ["ckAssociationRole", "ckAttributeId"])
+                 new [] {"ckAssociationRole", "ckAttributeId"})
         },
         {
             "CkAttributeIdNotFoundAtType",
              new OperationMessageTemplate(MessageLevel.Error,
                  51, "CkAttributeId '{ckAttributeId}' defined at type '{ckTypeId}' not found.",
-                 ["ckAttributeId", "ckTypeId"])
+                 new [] {"ckAttributeId", "ckTypeId"})
         },
         {
             "CkAttributeIdNotFoundAtRecord",
              new OperationMessageTemplate(MessageLevel.Error,
                  52, "CkAttributeId '{ckAttributeId}' defined at record '{ckRecordId}' not found.",
-                 ["ckAttributeId", "ckRecordId"])
+                 new [] {"ckAttributeId", "ckRecordId"})
         },
         {
             "FileContainsNoModel",
              new OperationMessageTemplate(MessageLevel.Warning,
                  53, "File does not contain a model. It will be ignored.",
-                 [])
+                 new string[] {})
         },
         {
             "NoImportsFound",
              new OperationMessageTemplate(MessageLevel.Warning,
                  54, "No imports founds in construction kit model configuration file.",
-                 [])
+                 new string[] {})
         },
         {
             "EnumIsNotExtensibleButContainsExtension",
              new OperationMessageTemplate(MessageLevel.Error,
                  55, "Enum '{ckEnumId}' is not extensible but contains an extension.",
-                 ["ckEnumId"])
+                 new [] {"ckEnumId"})
         },
         {
             "EnumNameMayNotContainWhitespaceSpecialCharacters",
              new OperationMessageTemplate(MessageLevel.Error,
                  56, "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters.",
-                 ["ckEnumId", "CKEnumKey"])
+                 new [] {"ckEnumId", "CKEnumKey"})
         },
         {
             "EnumNameMyNotBeEmpty",
              new OperationMessageTemplate(MessageLevel.Error,
                  57, "Enum '{ckEnumId}', key '{CKEnumKey}' name may not contain whitespace or special characters.",
-                 ["ckEnumId", "CKEnumKey"])
+                 new [] {"ckEnumId", "CKEnumKey"})
         },
         {
             "EnumKeyMayNotBeNegative",
              new OperationMessageTemplate(MessageLevel.Error,
                  58, "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative.",
-                 ["ckEnumId", "CKEnumKey"])
+                 new [] {"ckEnumId", "CKEnumKey"})
         },
         {
             "AttributeUsesUnknownCkEnumId",
              new OperationMessageTemplate(MessageLevel.Error,
                  59, "CkAttributeId '{ckAttributeId}' uses unknown CkEnumId '{ckEnumId}'. This may happen because a dependency to another construction kit model is missing.",
-                 ["ckAttributeId", "ckEnumId"])
+                 new [] {"ckAttributeId", "ckEnumId"})
         },
         {
             "AttributeIsEnumButValueIsNotSet",
              new OperationMessageTemplate(MessageLevel.Error,
                  60, "CkAttributeId '{ckAttributeId}' defines an enum but the enum reference (ValueCkEnumId) is not set.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
         },
         {
             "AttributeIsRecordButValueIsNotSet",
              new OperationMessageTemplate(MessageLevel.Error,
                  61, "CkAttributeId '{ckAttributeId}' defines an record or record array but the record reference (ValueCkRecordId) is not set.",
-                 ["ckAttributeId"])
+                 new [] {"ckAttributeId"})
+        },
+        {
+            "VariableUnknown",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 62, "Variable '{variableName}' is undefined.",
+                 new [] {"variableName"})
         },
     };
 }

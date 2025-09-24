@@ -276,7 +276,7 @@ internal static class MessageCodes
         {
             "UnknownCkTypeIdForInheritance",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 11, "CkTypeId '{ckTypeId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.",
+                 11, "CkTypeId '{ckTypeId}' is used as base type but is an unknown CkTypeId. This may happen because a dependency to another construction kit model is missing.",
                  new [] {"ckTypeId"})
         },
         {
@@ -420,7 +420,7 @@ internal static class MessageCodes
         {
             "UnknownCkRecordIdForInheritance",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 35, "CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.",
+                 35, "CkRecordId '{ckRecordId}' is used as base record type but is an unknown CkRecordId. This may happen because a dependency to another construction kit model is missing.",
                  new [] {"ckRecordId"})
         },
         {

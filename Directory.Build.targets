@@ -34,7 +34,7 @@
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
-        <Message Importance="High" Text="Using construction kit compiler located at '$(MSBuildThisFileDirectory)'"/>
+        <Message Importance="High" Text="Location of OctoMesh compiler package: '$(MSBuildThisFileDirectory)'"/>
         <ItemGroup>
             <!-- Define a temporary item group to iterate through -->
             <_ConstructionKitFolder Include="@(ConstructionKitFolder)"/>

@@ -1,13 +1,15 @@
 using System.Text.RegularExpressions;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 internal class VariableResolver : IVariableResolver
 {
-    private const string Pattern = @"\${\s*([\w\d]+)\s*}";
+    private const string Pattern = @"\${\s*([\w\d\._]+)\s*}";
     private readonly Dictionary<string, string> _variables = new();
 
-    public string Resolve(string value)
+    public string Resolve(string value, string location, OperationResult operationResult)
     {
         string result = Regex.Replace(value, Pattern, m =>
         {
@@ -16,6 +18,8 @@ internal class VariableResolver : IVariableResolver
             {
                 return replacementValue;
             }
+
+            operationResult.AddMessage(MessageCodes.VariableUnknown(location, varName));
 
             return m.Value; // No replacement found, return the original match
         });

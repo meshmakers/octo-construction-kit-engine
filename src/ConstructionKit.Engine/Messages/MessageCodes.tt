@@ -1,16 +1,22 @@
 <#@ template debug="true" hostSpecific="true" #>
 <#@ output extension=".cs" #>
-<#@ assembly Name="System.Core" #>
-<#@ assembly name="$(NuGetPackageRoot)\system.memory\4.5.5\lib\net461\System.Memory.dll" #>
-<#@ assembly name="$(NuGetPackageRoot)\system.text.json\8.0.5\lib\net462\System.Text.Json.dll" #>
-<#@ assembly name="$(NuGetPackageRoot)/newtonsoft.json/13.0.3/lib/net45/Newtonsoft.Json.dll" #>
+<#@ assembly Name="System.Core, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" #>
+<#@ assembly Name="System.Runtime, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly Name="System.Collections, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly Name="System.Collections.NonGeneric, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly Name="System.ComponentModel, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly Name="System.Text.RegularExpressions, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly Name="System.Linq, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
+<#@ assembly name="Newtonsoft.Json.dll" #>
+<#@ assembly name="System.CodeDom.dll" #>
+<#@ assembly Name="System.Console, Version=9.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a" #>
 <#@ import namespace="System.Linq" #>
 <#@ import namespace="System.Collections.Generic" #>
-<#@ include file="CodeGenerationGeneric.ttinclude" #><#@ import namespace="System.Text.RegularExpressions" #>
+<#@ include file="CodeGenerationGeneric.ttinclude" #>
+<#@ import namespace="System.Text.RegularExpressions" #>
 <#
     string jsonFilePath = Host.ResolvePath("MessageCodes.json");
 
-    //var rootElement = GetDocument<RootElement>(jsonFilePath);
     string jsonContent = System.IO.File.ReadAllText(jsonFilePath);
     var rootElement = Newtonsoft.Json.JsonConvert.DeserializeObject<GeneratedTextTransformation.RootElement>(jsonContent);
     CreateHeader();

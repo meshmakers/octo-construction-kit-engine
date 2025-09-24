@@ -22,7 +22,7 @@
     </ItemGroup>
     <ItemGroup>
         <None Update="Messages\MessageCodes.tt">
-            <Generator>TextTemplatingFileGenerator</Generator>
+            <Generator>TextTemplatingFilePreprocessor</Generator>
             <LastGenOutput>MessageCodes.cs</LastGenOutput>
         </None>
     </ItemGroup>

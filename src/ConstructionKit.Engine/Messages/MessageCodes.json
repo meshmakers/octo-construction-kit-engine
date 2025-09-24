@@ -365,6 +365,12 @@
       "number": 61,
       "level": "ERROR",
       "text": "CkAttributeId '{ckAttributeId}' defines an record or record array but the record reference (ValueCkRecordId) is not set."
+    },
+    {
+      "key": "VariableUnknown",
+      "number": 62,
+      "level": "FATALERROR",
+      "text": "Variable '{variableName}' is undefined."
     }
   ]
 }

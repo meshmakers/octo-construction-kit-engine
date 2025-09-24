@@ -17,8 +17,8 @@ public class ElementResolverTests
 
         var resolver = new ElementResolver();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver("TEST");
@@ -43,8 +43,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -66,8 +66,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -90,8 +90,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -114,8 +114,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -139,8 +139,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -164,8 +164,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -191,8 +191,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -215,8 +215,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
 
@@ -240,8 +240,8 @@ public class ElementResolverTests
         var originFileResolver = new OriginFileResolver("TEST");
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(ckModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -259,8 +259,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
@@ -276,8 +276,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -295,10 +295,10 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
-        
+
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(15, operationResult.Messages[0].MessageNumber);
@@ -314,8 +314,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
@@ -331,8 +331,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -350,8 +350,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -369,8 +369,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Empty(operationResult.Messages);
@@ -386,8 +386,8 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
 
         Assert.Single(operationResult.Messages);
@@ -405,10 +405,10 @@ public class ElementResolverTests
         var resolver = new ElementResolver();
         var ckModelGraph = new CkModelGraph();
         var variableResolver = A.Fake<IVariableResolver>();
-        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored))
-            .ReturnsLazily((string name) => name);
+        A.CallTo(() => variableResolver.Resolve(A<string>.Ignored, A<string>.Ignored, A<OperationResult>.Ignored))
+            .ReturnsLazily((string name, string _, OperationResult _) => name);
         resolver.Resolve(compiledModelRoot, ckModelGraph, variableResolver, originFileResolver, operationResult);
-        
+
         Assert.Single(operationResult.Messages);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
         Assert.Equal(49, operationResult.Messages[0].MessageNumber);

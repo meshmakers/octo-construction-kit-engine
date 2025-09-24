@@ -23,7 +23,7 @@ public class ModelValidationException : CkModelException
     internal static Exception UnknownCkTypeIdForInheritance(CkId<CkTypeId> ckTypeId)
     {
         return new ModelValidationException(
-            $"CkTypeId '{ckTypeId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.");
+            $"CkTypeId '{ckTypeId}' is used as base type but is an unknown CkTypeId. This may happen because a dependency to another construction kit model is missing.");
     }
 
     internal static Exception UnknownCkTypeId(CkId<CkTypeId> ckTypeId)
@@ -72,7 +72,7 @@ public class ModelValidationException : CkModelException
     internal static Exception UnknownCkRecordIdForInheritance(CkId<CkRecordId> ckRecordId)
     {
         return new ModelValidationException(
-            $"CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing.");
+            $"CkRecordId '{ckRecordId}' is used as base record type but is an unknown CkRecordId. This may happen because a dependency to another construction kit model is missing.");
     }
 
     internal static Exception DuplicateAttributeNamesInCkRecord(CkId<CkRecordId> ckRecordId, IEnumerable<string> select)

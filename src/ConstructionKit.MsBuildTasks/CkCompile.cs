@@ -183,26 +183,37 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                                 var path = MmPath.NormalizePath(OutputPath);
 
-                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+                                await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId,
+                                    ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
 
-                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path, ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), 
+                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
 
                                     CkLinkPath);
                                 await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(), CkLinkPath);
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                    CkLinkPath);
                             }
                         }
 
                         Log.LogMessage(MessageImportance.Normal, "Finished");
+                    }
+                    catch (ModelValidationException)
+                    {
+                        // Left blank intentionally
                     }
                     catch (CompilerException)
                     {

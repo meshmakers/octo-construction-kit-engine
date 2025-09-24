@@ -64,7 +64,7 @@
       "key": "UnknownCkTypeIdForInheritance",
       "number": 11,
       "level": "FATALERROR",
-      "text": "CkTypeId '{ckTypeId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing."
+      "text": "CkTypeId '{ckTypeId}' is used as base type but is an unknown CkTypeId. This may happen because a dependency to another construction kit model is missing."
     },
     {
       "key": "CkTypeIdAttributeIdNotUniqueByInheritance",
@@ -208,7 +208,7 @@
       "key": "UnknownCkRecordIdForInheritance",
       "number": 35,
       "level": "FATALERROR",
-      "text": "CkRecordId '{ckRecordId}' is unknown for inheritance. This may happen because a dependency to another construction kit model is missing."
+      "text": "CkRecordId '{ckRecordId}' is used as base record type but is an unknown CkRecordId. This may happen because a dependency to another construction kit model is missing."
     },
     {
       "key": "DerivedFromCkRecordIdThatIsFinal",

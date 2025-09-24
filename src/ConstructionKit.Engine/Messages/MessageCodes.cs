@@ -216,7 +216,7 @@ internal static class MessageCodes
         {
             "UnknownCkModel",
              new OperationMessageTemplate(MessageLevel.Error,
-                 1, "Repository does not contain construction kit model '{modelId}'.",
+                 1, "'{modelId}' is not a known construction kit model. Please check if you have set dependency to the correct construction kit model.",
                  new [] {"modelId"})
         },
         {

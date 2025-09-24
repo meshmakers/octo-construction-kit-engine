@@ -4,7 +4,7 @@
       "key": "UnknownCkModel",
       "number": 1,
       "level": "ERROR",
-      "text": "Repository does not contain construction kit model '{modelId}'."
+      "text": "'{modelId}' is not a known construction kit model. Please check if you have set dependency to the correct construction kit model."
     },
     {
       "key": "UnknownAttributeOfCkTypeIdInSource",

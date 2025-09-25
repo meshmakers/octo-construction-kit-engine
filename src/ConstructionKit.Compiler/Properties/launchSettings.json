@@ -39,7 +39,14 @@
     "CompilerCompileIndustryEnergy": {
       "commandName": "Project",
       "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)../octo-construction-kit/src/ConstructionKits/Octo.Sdk.Packages.Industry.Energy/ConstructionKit\" -o \"$(OctoRepoRootPath)/test\""
+    },
+    "CompilerRestore": {
+      "commandName": "Project",
+      "commandLineArgs": "-c Restore -f \"$(OctoRepoRootPath)samples/Sample.SourceGenerator/construction-kits.yaml\" -o \"$(OctoRepoRootPath)test\""
+    },
+    "CompilerPublishGitHub": {
+      "commandName": "Project",
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/system/ck-system.yaml\" -r -rep \"PublicGitHubRepository\""
     }
-
   }
 }

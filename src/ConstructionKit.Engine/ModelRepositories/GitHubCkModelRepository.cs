@@ -290,6 +290,12 @@ public class GitHubCkModelRepository : ICkModelRepository
                     new CreateFileRequest($"First commit for {ckCompiledModel.ModelId.FullName}", content,
                         _gitHubOptions.Value.GitHubRepositoryBranch)).ConfigureAwait(false);
             }
+
+            // Update the index file for this major version
+            await UpdateMajorVersionIndexAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
+
+            // Update the overall model index
+            await UpdateModelIndexAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
         }
         catch (ApiValidationException e)
         {
@@ -374,5 +380,392 @@ public class GitHubCkModelRepository : ICkModelRepository
     private bool IsGitHubPagesEnabled()
     {
         return !string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubPagesUri);
+    }
+
+    /// <summary>
+    /// Gets the index for a specific major version of a model
+    /// </summary>
+    /// <param name="modelId">The model ID (without version)</param>
+    /// <param name="majorVersion">The major version number</param>
+    /// <param name="sourceIdentifier">Optional source identifier</param>
+    /// <returns>The major version index content or null if not found</returns>
+    public async Task<string?> GetMajorVersionIndexAsync(string modelId, int majorVersion, object? sourceIdentifier = null)
+    {
+        var indexPath = $"ck-models/{modelId[0].ToString().ToLower()}/{modelId}/{majorVersion}/index.json";
+
+        // Try GitHub Pages first if enabled
+        if (IsGitHubPagesEnabled())
+        {
+            var httpClient = CreateHttpClient();
+            try
+            {
+                var response = await httpClient.GetStringAsync(indexPath).ConfigureAwait(false);
+                return response;
+            }
+            catch (HttpRequestException)
+            {
+                // Fall back to GitHub API
+            }
+        }
+
+        // Use GitHub API
+        var gitHubClient = CreateGitHubClient(false);
+        try
+        {
+            var contents = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                indexPath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            if (contents.Any())
+            {
+                var data = Convert.FromBase64String(contents[0].EncodedContent);
+                return System.Text.Encoding.UTF8.GetString(data);
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Index file doesn't exist
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Gets the overall index for a model showing all major versions
+    /// </summary>
+    /// <param name="modelId">The model ID (without version)</param>
+    /// <param name="sourceIdentifier">Optional source identifier</param>
+    /// <returns>The model index content or null if not found</returns>
+    public async Task<string?> GetModelIndexAsync(string modelId, object? sourceIdentifier = null)
+    {
+        var indexPath = $"ck-models/{modelId[0].ToString().ToLower()}/{modelId}/index.json";
+
+        // Try GitHub Pages first if enabled
+        if (IsGitHubPagesEnabled())
+        {
+            var httpClient = CreateHttpClient();
+            try
+            {
+                var response = await httpClient.GetStringAsync(indexPath).ConfigureAwait(false);
+                return response;
+            }
+            catch (HttpRequestException)
+            {
+                // Fall back to GitHub API
+            }
+        }
+
+        // Use GitHub API
+        var gitHubClient = CreateGitHubClient(false);
+        try
+        {
+            var contents = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                indexPath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            if (contents.Any())
+            {
+                var data = Convert.FromBase64String(contents[0].EncodedContent);
+                return System.Text.Encoding.UTF8.GetString(data);
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Index file doesn't exist
+        }
+
+        return null;
+    }
+
+    private async Task UpdateMajorVersionIndexAsync(CkModelId modelId, IGitHubClient gitHubClient)
+    {
+        // Create index file path for this major version
+        var indexPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/{modelId.ModelVersion.Major}/index.json";
+
+        // Get all files in this major version directory to build the index
+        var majorVersionPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/{modelId.ModelVersion.Major}";
+
+        var versions = new List<VersionIndexEntry>();
+
+        try
+        {
+            // Get all files in the major version directory
+            var files = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                majorVersionPath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            // Extract version information from each model file
+            foreach (var file in files.Where(f => f.Type == ContentType.File && f.Name.EndsWith(".json") && f.Name != "index.json"))
+            {
+                var prefix = $"ck-{modelId.ModelId.ToLower()}-";
+                var fileName = Path.GetFileNameWithoutExtension(file.Name);
+                if (fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var versionPart = fileName.Substring(prefix.Length);
+                    try
+                    {
+                        // Validate version format
+                        _ = new CkVersion(versionPart);
+                        versions.Add(new VersionIndexEntry
+                        {
+                            Version = versionPart,
+                            FileName = file.Name,
+                            PublishedAt = DateTime.UtcNow, // Use current time as GitHub API doesn't provide creation date easily
+                            FilePath = file.Path
+                        });
+                    }
+                    catch (ArgumentOutOfRangeException)
+                    {
+                        // Skip invalid version strings
+                    }
+                }
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Directory doesn't exist yet, will be created with the first file
+        }
+
+        // Sort versions in descending order (latest first)
+        versions = versions.OrderByDescending(v => new CkVersion(v.Version)).ToList();
+
+        // Create index content
+        var index = new MajorVersionIndex
+        {
+            ModelId = modelId.ModelId,
+            MajorVersion = modelId.ModelVersion.Major,
+            LatestVersion = versions.FirstOrDefault()?.Version,
+            Versions = versions,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Serialize index to JSON
+        var indexContent = System.Text.Json.JsonSerializer.Serialize(index, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+
+        // Check if index file exists
+        try
+        {
+            var existingIndex = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                indexPath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            if (existingIndex.Any())
+            {
+                // Update existing index
+                await gitHubClient.Repository.Content.UpdateFile(
+                    _gitHubOptions.Value.GitHubRepositoryOwner,
+                    _gitHubOptions.Value.GitHubRepositoryName,
+                    indexPath,
+                    new UpdateFileRequest($"Update index for {modelId.ModelId} v{modelId.ModelVersion.Major}", indexContent, existingIndex.First().Sha))
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                // This shouldn't happen but handle it anyway
+                await CreateIndexFile(gitHubClient, indexPath, indexContent, modelId).ConfigureAwait(false);
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Create new index file
+            await CreateIndexFile(gitHubClient, indexPath, indexContent, modelId).ConfigureAwait(false);
+        }
+    }
+
+    private async Task CreateIndexFile(IGitHubClient gitHubClient, string indexPath, string indexContent, CkModelId modelId)
+    {
+        await gitHubClient.Repository.Content.CreateFile(
+            _gitHubOptions.Value.GitHubRepositoryOwner,
+            _gitHubOptions.Value.GitHubRepositoryName,
+            indexPath,
+            new CreateFileRequest($"Create index for {modelId.ModelId} v{modelId.ModelVersion.Major}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
+            .ConfigureAwait(false);
+    }
+
+    private class MajorVersionIndex
+    {
+        public string ModelId { get; set; } = string.Empty;
+        public int MajorVersion { get; set; }
+        public string? LatestVersion { get; set; }
+        public List<VersionIndexEntry> Versions { get; set; } = new();
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private class VersionIndexEntry
+    {
+        public string Version { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string FilePath { get; set; } = string.Empty;
+        public DateTime PublishedAt { get; set; }
+    }
+
+    private async Task UpdateModelIndexAsync(CkModelId modelId, IGitHubClient gitHubClient)
+    {
+        // Create index file path for the model
+        var indexPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/index.json";
+        var modelBasePath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}";
+
+        var majorVersions = new List<MajorVersionEntry>();
+
+        try
+        {
+            // Get all major version directories
+            var directories = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                modelBasePath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            foreach (var directory in directories.Where(d => d.Type == ContentType.Dir))
+            {
+                // Check if directory name is a valid major version number
+                if (int.TryParse(directory.Name, out var majorVersionNumber))
+                {
+                    var versions = new List<string>();
+
+                    // Get all files in this major version directory
+                    var files = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                        _gitHubOptions.Value.GitHubRepositoryOwner,
+                        _gitHubOptions.Value.GitHubRepositoryName,
+                        directory.Path,
+                        _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+                    foreach (var file in files.Where(f => f.Type == ContentType.File && f.Name.EndsWith(".json") && f.Name != "index.json"))
+                    {
+                        var prefix = $"ck-{modelId.ModelId.ToLower()}-";
+                        var fileName = Path.GetFileNameWithoutExtension(file.Name);
+                        if (fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            var versionPart = fileName.Substring(prefix.Length);
+                            try
+                            {
+                                // Validate version format
+                                _ = new CkVersion(versionPart);
+                                versions.Add(versionPart);
+                            }
+                            catch (ArgumentOutOfRangeException)
+                            {
+                                // Skip invalid version strings
+                            }
+                        }
+                    }
+
+                    if (versions.Any())
+                    {
+                        // Sort versions to get the latest
+                        var latestVersion = versions
+                            .OrderByDescending(v => new CkVersion(v))
+                            .FirstOrDefault();
+
+                        majorVersions.Add(new MajorVersionEntry
+                        {
+                            MajorVersion = majorVersionNumber,
+                            LatestVersion = latestVersion,
+                            AvailableVersionsCount = versions.Count,
+                            IndexPath = $"{directory.Path}/index.json"
+                        });
+                    }
+                }
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Model directory doesn't exist yet
+            return;
+        }
+
+        if (!majorVersions.Any())
+        {
+            // No versions found
+            return;
+        }
+
+        // Sort major versions in descending order
+        majorVersions = majorVersions.OrderByDescending(v => v.MajorVersion).ToList();
+
+        // Create overall index content
+        var modelIndex = new ModelIndex
+        {
+            ModelId = modelId.ModelId,
+            LatestVersion = majorVersions.FirstOrDefault()?.LatestVersion,
+            MajorVersions = majorVersions,
+            UpdatedAt = DateTime.UtcNow
+        };
+
+        // Serialize index to JSON
+        var indexContent = System.Text.Json.JsonSerializer.Serialize(modelIndex, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+        });
+
+        // Check if index file exists
+        try
+        {
+            var existingIndex = await gitHubClient.Repository.Content.GetAllContentsByRef(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                indexPath,
+                _gitHubOptions.Value.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            if (existingIndex.Any())
+            {
+                // Update existing index
+                await gitHubClient.Repository.Content.UpdateFile(
+                    _gitHubOptions.Value.GitHubRepositoryOwner,
+                    _gitHubOptions.Value.GitHubRepositoryName,
+                    indexPath,
+                    new UpdateFileRequest($"Update model index for {modelId.ModelId}", indexContent, existingIndex.First().Sha))
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                // Create new index file
+                await gitHubClient.Repository.Content.CreateFile(
+                    _gitHubOptions.Value.GitHubRepositoryOwner,
+                    _gitHubOptions.Value.GitHubRepositoryName,
+                    indexPath,
+                    new CreateFileRequest($"Create model index for {modelId.ModelId}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
+                    .ConfigureAwait(false);
+            }
+        }
+        catch (NotFoundException)
+        {
+            // Create new index file
+            await gitHubClient.Repository.Content.CreateFile(
+                _gitHubOptions.Value.GitHubRepositoryOwner,
+                _gitHubOptions.Value.GitHubRepositoryName,
+                indexPath,
+                new CreateFileRequest($"Create model index for {modelId.ModelId}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
+                .ConfigureAwait(false);
+        }
+    }
+
+    private class ModelIndex
+    {
+        public string ModelId { get; set; } = string.Empty;
+        public string? LatestVersion { get; set; }
+        public List<MajorVersionEntry> MajorVersions { get; set; } = new();
+        public DateTime UpdatedAt { get; set; }
+    }
+
+    private class MajorVersionEntry
+    {
+        public int MajorVersion { get; set; }
+        public string? LatestVersion { get; set; }
+        public int AvailableVersionsCount { get; set; }
+        public string IndexPath { get; set; } = string.Empty;
     }
 }

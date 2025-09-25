@@ -92,10 +92,10 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             .ConfigureAwait(false);
     }
 
-    public async Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId,
+    public async Task<ModelExistingResult> IsCkModelExistingAsync(string repositoryName, CkModelIdVersionRange ckModelIdVersionRange,
         object? sourceIdentifier = null)
     {
-        return await _ckModelRepositoryManager.IsCkModelExistingAsync(repositoryName, ckModelId, sourceIdentifier)
+        return await _ckModelRepositoryManager.IsCkModelExistingAsync(repositoryName, ckModelIdVersionRange, sourceIdentifier)
             .ConfigureAwait(false);
     }
 

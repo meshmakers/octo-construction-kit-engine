@@ -47,6 +47,10 @@
     "CompilerPublishGitHub": {
       "commandName": "Project",
       "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/system/ck-system.yaml\" -r -rep \"PublicGitHubRepository\""
+    },
+    "CompilerFindGitHub": {
+      "commandName": "Project",
+      "commandLineArgs": "-c find -id \"System-[1.0,)\""
     }
   }
 }

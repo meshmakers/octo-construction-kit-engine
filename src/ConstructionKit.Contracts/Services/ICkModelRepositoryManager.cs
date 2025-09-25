@@ -92,12 +92,12 @@ public interface ICkModelRepositoryService
     ///     Returns true if the model exists in a given repository
     /// </summary>
     /// <param name="repositoryName">Name of Repository.</param>
-    /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="ckModelIdVersionRange">The construction kit model id with optional version range</param>
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the repository should search set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in a given repository</returns>
-    Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null);
+    Task<ModelExistingResult> IsCkModelExistingAsync(string repositoryName, CkModelIdVersionRange ckModelIdVersionRange, object? sourceIdentifier = null);
 
     /// <summary>
     /// Restores construction kit models based on a construction kit model configuration file.

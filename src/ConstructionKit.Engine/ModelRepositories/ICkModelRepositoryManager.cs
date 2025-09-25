@@ -108,4 +108,15 @@ internal interface ICkModelRepositoryManager
     /// which the repository should search set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in a given repository</returns>
     Task<ModelExistingResult> IsCkModelExistingAsync(CkModelIdVersionRange ckModelIdVersionRange, object? sourceIdentifier = null);
+
+    /// <summary>
+    ///     Returns true if the model within the version range exists in a given repository
+    /// </summary>
+    /// <param name="repositoryName">Name of Repository.</param>
+    /// <param name="ckModelIdVersionRange">The construction kit model id with version range</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
+    /// <returns>The task that returns true if the model exists in a given repository</returns>
+    Task<ModelExistingResult> IsCkModelExistingAsync(string repositoryName, CkModelIdVersionRange ckModelIdVersionRange, object? sourceIdentifier = null);
 }

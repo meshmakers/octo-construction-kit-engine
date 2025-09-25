@@ -205,4 +205,17 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
 
         return new ModelExistingResult { Exists = false  };
     }
+
+    public async Task<ModelExistingResult> IsCkModelExistingAsync(string repositoryName, CkModelIdVersionRange ckModelIdVersionRange,
+        object? sourceIdentifier = null)
+    {
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        return await ckModelRepository.IsModelIdExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+    }
 }

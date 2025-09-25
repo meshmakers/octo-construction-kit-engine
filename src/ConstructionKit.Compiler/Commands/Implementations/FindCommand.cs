@@ -17,8 +17,8 @@ internal class FindCommand : Command<OctoToolOptions>
     {
         _ckModelRepositoryService = ckModelRepositoryService;
 
-        _modelIdArgument = CommandArgumentValue.AddArgument("mid", "modelId",
-            ["Model Id of construction kit to find"], true, 1);
+        _modelIdArgument = CommandArgumentValue.AddArgument("id", "modelId",
+            ["Model Id of construction kit to find, including version ranges"], true, 1);
     }
 
     public override async Task Execute()
@@ -32,9 +32,14 @@ internal class FindCommand : Command<OctoToolOptions>
         foreach (var repository in repositoryList)
         {
             var r = await _ckModelRepositoryService.IsCkModelExistingAsync(repository.Item1, modelId);
-            if (r)
+            if (r.Exists)
             {
-                Logger.LogInformation("Found model in repository '{Repository}'", repository.Item1);
+                Logger.LogInformation("Found model {ModelId} in repository '{Repository}'", r.ModelId,
+                    repository.Item1);
+            }
+            else
+            {
+                Logger.LogInformation("Model not found in repository '{Repository}'", repository.Item1);
             }
         }
 

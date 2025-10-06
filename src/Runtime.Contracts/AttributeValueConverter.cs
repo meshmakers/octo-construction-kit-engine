@@ -90,7 +90,7 @@ public static class AttributeValueConverter
                             return jsonElementList.GetString();
                         }
 
-                        return Convert.ToString(x);
+                        return Convert.ToString(x, CultureInfo.InvariantCulture);
                     }).ToList();
                 }
 
@@ -101,7 +101,7 @@ public static class AttributeValueConverter
                     return value;
                 }
 
-                return value.ToString();
+                return Convert.ToString(value, CultureInfo.InvariantCulture);
             case AttributeValueTypesDto.Double:
                 if (value is double)
                 {

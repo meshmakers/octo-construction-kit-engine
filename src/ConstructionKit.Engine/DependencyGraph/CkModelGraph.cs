@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -11,13 +10,20 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 /// </summary>
 public class CkModelGraph : ICkModelGraph
 {
-    private readonly IDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
-    private readonly IDictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
-    private readonly IDictionary<CkModelId, CkModelPropertiesDto> _models;
-    private readonly IDictionary<CkModelId, ICollection<CkModelId>> _dependencies;
-    private readonly IDictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
-    private readonly IDictionary<CkId<CkRecordId>, CkRecordGraph> _records;
-    private readonly IDictionary<CkId<CkTypeId>, CkTypeGraph> _types;
+    private readonly Dictionary<CkModelId, CkModelPropertiesDto> _models;
+    private readonly Dictionary<CkModelId, ICollection<CkModelId>> _dependencies;
+
+    private readonly Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRoles;
+    private readonly Dictionary<CkId<CkAttributeId>, CkAttributeGraph> _attributes;
+    private readonly Dictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
+    private readonly Dictionary<CkId<CkRecordId>, CkRecordGraph> _records;
+    private readonly Dictionary<CkId<CkTypeId>, CkTypeGraph> _types;
+
+    private readonly Dictionary<RtCkId<CkTypeId>, CkTypeGraph> _typesByRtCk;
+    private readonly Dictionary<RtCkId<CkAttributeId>, CkAttributeGraph> _attributesByRtCk;
+    private readonly Dictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRolesByRtCk;
+    private readonly Dictionary<RtCkId<CkRecordId>, CkRecordGraph> _recordsByRtCk;
+    private readonly Dictionary<RtCkId<CkEnumId>, CkEnumGraph> _enumsByRtCk;
 
     /// <summary>
     ///     Creates a new instance of <see cref="CkModelGraph" />.
@@ -31,13 +37,12 @@ public class CkModelGraph : ICkModelGraph
         _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
         _dependencies = new Dictionary<CkModelId, ICollection<CkModelId>>();
         _models = new Dictionary<CkModelId, CkModelPropertiesDto>();
-        Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
-        Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
-        AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
-        Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
-        Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
-        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
-        Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
+
+        _typesByRtCk = new Dictionary<RtCkId<CkTypeId>, CkTypeGraph>();
+        _attributesByRtCk = new Dictionary<RtCkId<CkAttributeId>, CkAttributeGraph>();
+        _associationRolesByRtCk = new Dictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
+        _recordsByRtCk = new Dictionary<RtCkId<CkRecordId>, CkRecordGraph>();
+        _enumsByRtCk = new Dictionary<RtCkId<CkEnumId>, CkEnumGraph>();
     }
 
     /// <summary>
@@ -53,49 +58,76 @@ public class CkModelGraph : ICkModelGraph
         _enums = ckCacheRoot.Enums.ToDictionary(k => k.CkEnumId, v => v);
         _dependencies = ckCacheRoot.Dependencies.ToDictionary(k => k.Key, v => v.Value);
         _models = ckCacheRoot.Models.ToDictionary(k => k.ModelId, v => v);
-        Types = new ReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph>(_types);
-        Attributes = new ReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph>(_attributes);
-        AssociationRoles = new ReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>(_associationRoles);
-        Records = new ReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph>(_records);
-        Enums = new ReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph>(_enums);
-        Dependencies = new ReadOnlyDictionary<CkModelId, ICollection<CkModelId>>(_dependencies);
-        Models = new ReadOnlyDictionary<CkModelId, CkModelPropertiesDto>(_models);
+
+        _typesByRtCk =
+            new Dictionary<RtCkId<CkTypeId>, CkTypeGraph>(
+                _types.Values.ToDictionary(k => k.CkTypeId.ToRtCkId(), v => v));
+        _attributesByRtCk =
+            new Dictionary<RtCkId<CkAttributeId>, CkAttributeGraph>(
+                _attributes.Values.ToDictionary(k => k.CkAttributeId.ToRtCkId(), v => v));
+        _associationRolesByRtCk =
+            new Dictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph>(
+                _associationRoles.Values.ToDictionary(k => k.CkRoleId.ToRtCkId(), v => v));
+        _recordsByRtCk =
+            new Dictionary<RtCkId<CkRecordId>, CkRecordGraph>(
+                _records.Values.ToDictionary(k => k.CkRecordId.ToRtCkId(), v => v));
+        _enumsByRtCk =
+            new Dictionary<RtCkId<CkEnumId>, CkEnumGraph>(
+                _enums.Values.ToDictionary(k => k.CkEnumId.ToRtCkId(), v => v));
     }
 
     /// <summary>
     ///     Returns the types of the model.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph> Types { get; }
+    public IReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph> Types => _types;
 
     /// <summary>
     ///     Returns the attributes of the model.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph> Attributes { get; }
+    public IReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph> Attributes => _attributes;
 
     /// <summary>
     ///     Returns the association roles of the model.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRoles { get; }
+    public IReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRoles =>
+        _associationRoles;
 
     /// <summary>
     ///     Returns the records of the model.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph> Records { get; }
+    public IReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph> Records => _records;
 
     /// <summary>
     ///     Returns the enums of the model.
     /// </summary>
-    public IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums { get; }
+    public IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums => _enums;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkTypeId>, CkTypeGraph> TypesByRtCk => _typesByRtCk;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkAttributeId>, CkAttributeGraph> AttributesByRtCk =>
+        _attributesByRtCk;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRolesByRtCk =>
+        _associationRolesByRtCk;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkRecordId>, CkRecordGraph> RecordsByRtCk => _recordsByRtCk;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkEnumId>, CkEnumGraph> EnumsByRtCk => _enumsByRtCk;
 
     /// <summary>
     ///     Returns a list of model dependencies.
     /// </summary>
-    public IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies { get; }
+    public IReadOnlyDictionary<CkModelId, ICollection<CkModelId>> Dependencies => _dependencies;
 
     /// <summary>
     ///     Returns a list of model dependencies.
     /// </summary>
-    public IReadOnlyDictionary<CkModelId, CkModelPropertiesDto> Models { get; }
+    public IReadOnlyDictionary<CkModelId, CkModelPropertiesDto> Models => _models;
 
     /// <summary>
     ///     Returns the root object of the compiled version of a CK model.
@@ -130,6 +162,7 @@ public class CkModelGraph : ICkModelGraph
 
         ckAttributeGraph = new CkAttributeGraph(ckAttributeId, ckAttributeDto);
         _attributes.Add(ckAttributeId, ckAttributeGraph);
+        _attributesByRtCk.Add(ckAttributeId.ToRtCkId(), ckAttributeGraph);
         return ckAttributeGraph;
     }
 
@@ -148,6 +181,7 @@ public class CkModelGraph : ICkModelGraph
 
         ckTypeGraph = new CkTypeGraph(ckTypeId, ckTypeDto);
         _types.Add(ckTypeId, ckTypeGraph);
+        _typesByRtCk.Add(ckTypeId.ToRtCkId(), ckTypeGraph);
 
         return ckTypeGraph;
     }
@@ -168,6 +202,7 @@ public class CkModelGraph : ICkModelGraph
 
         ckAssociationRoleGraph = new CkAssociationRoleGraph(ckAssociationId, ckAssociationRole);
         _associationRoles.Add(ckAssociationId, ckAssociationRoleGraph);
+        _associationRolesByRtCk.Add(ckAssociationId.ToRtCkId(), ckAssociationRoleGraph);
         return ckAssociationRoleGraph;
     }
 
@@ -186,6 +221,7 @@ public class CkModelGraph : ICkModelGraph
 
         ckRecordGraph = new CkRecordGraph(ckRecordId, ckRecordDto);
         _records.Add(ckRecordId, ckRecordGraph);
+        _recordsByRtCk.Add(ckRecordId.ToRtCkId(), ckRecordGraph);
         return ckRecordGraph;
     }
 
@@ -204,9 +240,10 @@ public class CkModelGraph : ICkModelGraph
 
         ckEnumGraph = new CkEnumGraph(ckEnumId, ckEnumDto);
         _enums.Add(ckEnumId, ckEnumGraph);
+        _enumsByRtCk.Add(ckEnumId.ToRtCkId(), ckEnumGraph);
         return ckEnumGraph;
     }
-    
+
     /// <summary>
     /// Gets or creates a new model.
     /// </summary>
@@ -281,7 +318,7 @@ public class CkModelGraph : ICkModelGraph
             }
         }
     }
-    
+
     /// <summary>
     /// Gets all Types of a given ckModelGraph
     /// </summary>
@@ -331,7 +368,8 @@ public class CkModelGraph : ICkModelGraph
     ///     Returns a list of all query column attribute paths for the given construction kit type
     /// </summary>
     /// <returns></returns>
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
+        bool ignoreNavigationProperties)
     {
         var collector = new CkTypeQueryColumnCollector(this);
         return collector.GetColumns(ckTypeId, ignoreNavigationProperties);

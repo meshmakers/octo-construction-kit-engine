@@ -1,4 +1,5 @@
-﻿using YamlDotNet.Serialization;
+﻿using System.Diagnostics;
+using YamlDotNet.Serialization;
 using System.Text.Json.Serialization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -6,6 +7,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 /// <summary>
 /// Represents the properties of a CK model
 /// </summary>
+[DebuggerDisplay("{" + nameof(ModelId) + "}")]
 public class CkModelPropertiesDto
 {
     /// <summary>

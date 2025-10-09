@@ -23,9 +23,9 @@ public static class StringExtensions
     public static string MakeClassName(this CkTypeId ckTypeId)
     {
         string version = "";
-        if (ckTypeId.Version.Major > 1)
+        if (ckTypeId.Version > 1)
         {
-            version = $"{ckTypeId.Version.Major}";
+            version = $"{ckTypeId.Version}";
         }
 
 
@@ -40,9 +40,9 @@ public static class StringExtensions
     public static string MakeClassName(this CkAttributeId ckAttributeId)
     {
         string version = "";
-        if (ckAttributeId.Version.Major > 1)
+        if (ckAttributeId.Version > 1)
         {
-            version = $"{ckAttributeId.Version.Major}";
+            version = $"{ckAttributeId.Version}";
         }
 
         return ckAttributeId.Name.MakeClassName() + version;
@@ -56,9 +56,9 @@ public static class StringExtensions
     public static string MakeClassName(this CkAssociationRoleId ckAssociationRoleId)
     {
         string version = "";
-        if (ckAssociationRoleId.Version.Major > 1)
+        if (ckAssociationRoleId.Version > 1)
         {
-            version = $"{ckAssociationRoleId.Version.Major}";
+            version = $"{ckAssociationRoleId.Version}";
         }
 
         return ckAssociationRoleId.RoleId.MakeClassName() + version;
@@ -72,9 +72,9 @@ public static class StringExtensions
     public static string MakeClassName(this CkEnumId ckEnumId)
     {
         string version = "";
-        if (ckEnumId.Version.Major > 1)
+        if (ckEnumId.Version > 1)
         {
-            version = $"{ckEnumId.Version.Major}";
+            version = $"{ckEnumId.Version}";
         }
 
         return ckEnumId.Name.MakeClassName() + version;
@@ -88,9 +88,9 @@ public static class StringExtensions
     public static string MakeClassName(this CkRecordId ckRecordId)
     {
         string version = "";
-        if (ckRecordId.Version.Major > 1)
+        if (ckRecordId.Version > 1)
         {
-            version = $"{ckRecordId.Version.Major}";
+            version = $"{ckRecordId.Version}";
         }
 
         return ckRecordId.Name.MakeClassName() + version;

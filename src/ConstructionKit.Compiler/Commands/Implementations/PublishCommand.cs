@@ -9,33 +9,27 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class PublishCommand : CkcCommand
 {
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
+    private readonly ICatalogService _catalogService;
     private readonly ICkSerializer _ckSerializer;
-    private readonly ICkValidationService _ckValidationService;
     private readonly IArgument _forceArg;
-    private readonly IArgument _publishExtensionsArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _repositoryArg;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryService ckModelRepositoryService, ICkSerializer ckSerializer, ICkValidationService ckValidationService)
-        : base(logger, "Publish", "Publish a compiled construction kit to a repository", options)
+        ICatalogService catalogService, ICkSerializer ckSerializer)
+        : base(logger, "Publish", "Publish a compiled construction kit to a catalog", options)
     {
-        _ckModelRepositoryService = ckModelRepositoryService;
+        _catalogService = catalogService;
         _ckSerializer = ckSerializer;
-        _ckValidationService = ckValidationService;
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);
 
-        _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
-            ["Name of the construction kit repository. By default 'LocalRepository' is used."], 1);
+        _repositoryArg = CommandArgumentValue.AddArgument("c", "catalog",
+            ["Name of the construction kit catalog. By default 'LocalFileSystemCatalog' is used."], 1);
 
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
             ["Replaces construction kits models that may exists in repo."], 0);
-        
-        _publishExtensionsArg = CommandArgumentValue.AddArgument("pe", "publishExtensions",
-            ["Publish custom extensions, e.g. custom enum values."], 0);
     }
 
     public override async Task Execute()
@@ -48,7 +42,6 @@ internal class PublishCommand : CkcCommand
         var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
                              "LocalRepository";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
-        var publishExtensions = CommandArgumentValue.IsArgumentUsed(_publishExtensionsArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
         Logger.LogInformation("Repository '{Repository}'", repositoryName);
 
@@ -66,15 +59,7 @@ internal class PublishCommand : CkcCommand
                 return;
             }
 
-            await _ckValidationService.ValidateAsync(ckCompiledModelRoot, originFileResolver, operationResult);
-            if (operationResult.HasErrors)
-            {
-                Logger.LogError("Error validating model \'{FilePath}\'", filePath);
-                operationResult.WriteMessagesToLogger(Logger);
-                return;
-            }
-
-            await _ckModelRepositoryService.PublishModelAsync(repositoryName, ckCompiledModelRoot, isForced, publishExtensions);
+            await _catalogService.PublishAsync(repositoryName, ckCompiledModelRoot, originFileResolver, isForced);
 
             Logger.LogInformation("Construction kit model published");
         }

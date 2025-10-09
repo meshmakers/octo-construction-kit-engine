@@ -20,18 +20,18 @@ public class CkClassMappingService : ICkClassMappingService
     }
 
     /// <inheritdoc />
-    public Type? GetCkTypeClass(CkId<CkTypeId> ckTypeId)
+    public Type? GetCkTypeClass(RtCkId<CkTypeId> rtCkTypeId)
     {
-        var map = _ckClassMaps.FirstOrDefault(m => m.ModelId == ckTypeId.ModelId);
+        var map = _ckClassMaps.FirstOrDefault(m => m.ModelId == rtCkTypeId.ModelId);
 
-        return map?.GetCkTypeClass(ckTypeId.Key);
+        return map?.GetCkTypeClass(rtCkTypeId.ElementId);
     }
 
     /// <inheritdoc />
-    public Type? GetCkRecordClass(CkId<CkRecordId> ckRecordId)
+    public Type? GetCkRecordClass(RtCkId<CkRecordId> rtCkRecordId)
     {
-        var map = _ckClassMaps.FirstOrDefault(m => m.ModelId == ckRecordId.ModelId);
+        var map = _ckClassMaps.FirstOrDefault(m => m.ModelId == rtCkRecordId.ModelId);
 
-        return map?.GetCkRecordClass(ckRecordId.Key);
+        return map?.GetCkRecordClass(rtCkRecordId.ElementId);
     }
 }

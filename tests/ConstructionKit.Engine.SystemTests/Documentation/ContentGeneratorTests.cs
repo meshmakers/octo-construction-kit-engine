@@ -3,14 +3,14 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Xunit;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ConstructionKit.Engine.SystemTests.Documentation;
 
 public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFixture<TemporaryDirectoryFixture>
 {
-    private async Task<(IContentGenerator contentGenerator, string rootPath, CkModelGraph resolvedTypes, CkModelId modelId)>
+    private async Task<(IContentGenerator contentGenerator, string rootPath, CkModelGraph ckModelGraph, CkModelId modelId)>
             SetupTestAsync(string relativePath)
         {
             await using var stream = File.OpenRead(relativePath);
@@ -21,14 +21,14 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
             var ckYamlSerializer = serviceProvider.GetRequiredService<ICkYamlSerializer>();
             var compiledModelRoot = await ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, relativePath, operationResult);
             var originFileResolver = new OriginFileResolver(relativePath);
-            var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
-            var resolvedTypes = await modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult);
+            var modelResolver = serviceProvider.GetRequiredService<ICatalogModelResolver>();
+            var ckModelGraph = await modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
             var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
             var rootPath = fixture.CreateTempDirectory();
             var modelId = new CkModelId("System");
 
-            return (contentGenerator, rootPath, resolvedTypes, modelId);
+            return (contentGenerator, rootPath, ckModelGraph, modelId);
         }
 
         [Fact]

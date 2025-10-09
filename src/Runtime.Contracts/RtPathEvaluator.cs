@@ -18,6 +18,7 @@ namespace Meshmakers.Octo.Runtime.Contracts;
 /// </summary>
 public static class RtPathEvaluator
 {
+    // ReSharper disable once NotResolvedInText
     [DebuggerDisplay("Term = {Term} (Locator Count = {Locators.Count})")]
     private record PathTuple(PathTerm? Term, List<PathLocator> Locators);
 
@@ -388,9 +389,9 @@ public static class RtPathEvaluator
                 var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
                 pathTerms.Add(targetTypeProperty);
                 var roleIdDirectionPair = new NavigationPair(pathTerms,
-                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId,
+                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId.ToRtCkId(),
                     GraphDirections.Inbound,
-                    realTargetCkTypeId);
+                    realTargetCkTypeId.ToRtCkId());
 
                 if (currentNavigationPair != null)
                 {
@@ -410,9 +411,9 @@ public static class RtPathEvaluator
                 var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
                 pathTerms.Add(targetTypeProperty);
                 var roleIdDirectionPair = new NavigationPair(pathTerms,
-                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId,
+                    [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId.ToRtCkId(),
                     GraphDirections.Outbound,
-                    realTargetCkTypeId);
+                    realTargetCkTypeId.ToRtCkId());
 
                 if (currentNavigationPair != null)
                 {
@@ -495,7 +496,7 @@ public static class RtPathEvaluator
 
                             lastRecord = new RtRecord
                             {
-                                CkRecordId = tupleLocator.CkTypeAttributeGraph.ValueCkRecordId,
+                                CkRecordId = tupleLocator.CkTypeAttributeGraph.ValueCkRecordId.ToRtCkId(),
                             };
                             tupleLocator.RtTypeWithAttributes.SetAttributeValue(
                                 tupleLocator.CkTypeAttributeGraph.AttributeName, AttributeValueTypesDto.Record,
@@ -673,11 +674,10 @@ public static class RtPathEvaluator
                         {
                             if (rtEntityGraphItem.CkTypeId != null)
                             {
-                                var ckTypeGraph = ckCacheService.GetCkType(tenantId, rtEntityGraphItem.CkTypeId);
+                                var ckTypeGraph = ckCacheService.GetRtCkType(tenantId, rtEntityGraphItem.CkTypeId);
                                 if (ckTypeGraph == null)
                                 {
-                                    throw InvalidPathException.CkTypeIdNotFound(tenantId,
-                                        rtEntityGraphItem.CkTypeId);
+                                    throw InvalidPathException.RtCkTypeIdNotFound(tenantId, rtEntityGraphItem.CkTypeId);
                                 }
 
                                 var ckTypeAssociationGraphs = ckTypeGraph.Associations.Out.All
@@ -810,7 +810,7 @@ public static class RtPathEvaluator
                     switch (valueRtTypeWithAttribute)
                     {
                         case RtEntity rtEntity
-                            when ckCacheService.TryGetCkType(tenantId, rtEntity.GetCkTypeId(), out var ckTypeGraph)
+                            when ckCacheService.TryGetRtCkType(tenantId, rtEntity.GetRtCkTypeId(), out var ckTypeGraph)
                                  // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                                  && ckTypeGraph != null &&
                                  ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
@@ -822,7 +822,7 @@ public static class RtPathEvaluator
                                     entityValue, attributeValueResolveFlags)));
                             continue;
                         case RtRecord rtRecord
-                            when ckCacheService.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
+                            when ckCacheService.TryGetRtCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
                                  // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
                                  && ckRecordGraph != null &&
                                  ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),

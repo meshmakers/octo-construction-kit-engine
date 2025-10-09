@@ -9,162 +9,61 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 ///     Resolver that resolves the elements of a compiled model.
 /// </summary>
-internal class ModelResolver : IModelResolver
+internal abstract class ModelResolver : IModelResolver
 {
-    private readonly IDependencyResolver _dependencyResolver;
-    private readonly IElementResolver _elementResolver;
-    private readonly IInheritanceResolver _inheritanceResolver;
-    private readonly IReferenceResolver _referenceResolver;
-    private readonly IVariableResolver _variableResolver;
+    protected readonly IElementResolver _elementResolver;
+    protected readonly IInheritanceResolver _inheritanceResolver;
+    protected readonly IReferenceResolver _referenceResolver;
+    protected readonly IVariableResolver _variableResolver;
 
     /// <summary>
     ///     Creates a new instance of <see cref="ModelResolver" />.
     /// </summary>
-    /// <param name="dependencyResolver"></param>
     /// <param name="inheritanceResolver"></param>
     /// <param name="elementResolver"></param>
     /// <param name="referenceResolver"></param>
     /// <param name="variableResolver"></param>
-    public ModelResolver(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
+    protected ModelResolver(
+        IInheritanceResolver inheritanceResolver,
         IElementResolver elementResolver, IReferenceResolver referenceResolver, IVariableResolver variableResolver)
     {
-        _dependencyResolver = dependencyResolver;
         _inheritanceResolver = inheritanceResolver;
         _elementResolver = elementResolver;
         _referenceResolver = referenceResolver;
         _variableResolver = variableResolver;
     }
+    //
+    // public Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    //     object? sourceIdentifier = null)
+    // {
+    //     var originFileResolver = new OriginFileResolver("-");
+    //     return HardResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+    // }
+    //
+    // public abstract Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
+    //
+    // public Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    //     object? sourceIdentifier = null)
+    // {
+    //     var originFileResolver = new OriginFileResolver("-");
+    //     return SoftResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+    // }
+    //
+    // public abstract Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds,
+    //     IOriginFileResolver originFileResolver, OperationResult operationResult,
+    //     object? sourceIdentifier = null);
+    //
+    // public abstract Task<ModelResolveResult> SoftResolveAsync(CkCompiledModelRoot compiledModel,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
+    //
+    // public abstract Task<CkModelGraph> HardResolveAsync(CkCompiledModelRoot compiledModel,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
 
-    public Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
-        object? sourceIdentifier = null)
-    {
-        var originFileResolver = new OriginFileResolver("-");
-        return HardResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
-    }
-
-    public async Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-        await _dependencyResolver.HardResolveDependenciesAsync(ckModelIds.Select(id => id.ToVersionRange()).ToList(),
-                modelGraph, _variableResolver,
-                originFileResolver, operationResult, sourceIdentifier)
-            .ConfigureAwait(false);
-
-        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-
-        return modelGraph;
-    }
-
-    public Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
-        object? sourceIdentifier = null)
-    {
-        var originFileResolver = new OriginFileResolver("-");
-        return SoftResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
-    }
-
-    public async Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver, OperationResult operationResult,
-        object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-
-        var dependencyResolveResult = await _dependencyResolver.SoftResolveDependenciesAsync(ckModelIds,
-                modelGraph, _variableResolver,
-                originFileResolver, operationResult, sourceIdentifier)
-            .ConfigureAwait(false);
-
-        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-
-        return new ModelResolveResult
-        {
-            CkModelGraph = modelGraph,
-            SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
-            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? []
-        };
-    }
-
-    public async Task<ModelResolveResult> SoftResolveAsync(CkCompiledModelRoot compiledModel,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-
-        DependencyResolveResult? dependencyResolveResult = null;
-        if (compiledModel.Dependencies != null)
-        {
-            dependencyResolveResult = await _dependencyResolver.SoftResolveDependenciesAsync(
-                    compiledModel.Dependencies, modelGraph,
-                    _variableResolver,
-                    originFileResolver, operationResult, sourceIdentifier)
-                .ConfigureAwait(false);
-        }
-
-        Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
-        return new ModelResolveResult
-        {
-            CkModelGraph = modelGraph, SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
-            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? []
-        };
-    }
-
-
-    public async Task<(CkModelGraph, CkCompiledModelRoot)> HardResolveAsync(CkModelCompileCandidate compileCandidate,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-        IReadOnlyCollection<CkModelId> resolvedModelIds = [];
-
-        if (compileCandidate.DependencyRanges != null)
-        {
-            resolvedModelIds = await _dependencyResolver.HardResolveDependenciesAsync(compileCandidate.DependencyRanges,
-                    modelGraph,
-                    _variableResolver,
-                    originFileResolver, operationResult, sourceIdentifier)
-                .ConfigureAwait(false);
-        }
-
-        Resolve(compileCandidate, modelGraph, originFileResolver, operationResult);
-
-        var compiledModel = new CkCompiledModelRoot
-        {
-            ModelId = compileCandidate.ModelId,
-            Dependencies = resolvedModelIds.ToList(),
-            Description = compileCandidate.Description,
-            Types = compileCandidate.Types,
-            Attributes = compileCandidate.Attributes,
-            AssociationRoles = compileCandidate.AssociationRoles,
-            Records = compileCandidate.Records,
-            Enums = compileCandidate.Enums
-        };
-
-        return (modelGraph, compiledModel);
-    }
-
-    public async Task<CkModelGraph> HardResolveAsync(CkCompiledModelRoot compiledModel,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-
-        if (compiledModel.Dependencies != null)
-        {
-            await _dependencyResolver.HardResolveDependenciesAsync(
-                    compiledModel.Dependencies, modelGraph,
-                    _variableResolver,
-                    originFileResolver, operationResult, sourceIdentifier)
-                .ConfigureAwait(false);
-        }
-
-        Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
-
-        return modelGraph;
-    }
-
-    private void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
+    protected void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         _variableResolver.SetVariable("thisModel", modelRootBase.ModelId.FullName);

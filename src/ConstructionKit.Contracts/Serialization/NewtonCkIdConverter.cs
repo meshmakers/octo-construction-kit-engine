@@ -30,7 +30,7 @@ public class NewtonCkAssociationRoleIdConverter : NewtonCkIdConverter<CkAssociat
 /// <summary>
 ///     Converter for <see cref="CkId{TKey}"/> to JSON using Newtonsoft.Json
 /// </summary>
-public class NewtonCkIdConverter<TKey> : JsonConverter where TKey : IComparable<TKey>, ICkKey
+public class NewtonCkIdConverter<TKey> : JsonConverter where TKey : IComparable<TKey>, ICkElementId
 {
     /// <inheritdoc />
     public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)

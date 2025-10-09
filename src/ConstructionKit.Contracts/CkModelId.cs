@@ -12,9 +12,9 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// The version number of a model allows to manage versioning of models, it is allowed to have
 /// different elements (types, records, etc.) with the same name in different versions of a model.
 /// </remarks>
-[DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
+[DebuggerDisplay("{" + nameof(Name) + "}-{" + nameof(Version) + "}")]
 [JsonConverter(typeof(CkModelIdConverter))]
-public sealed record CkModelId : IComparable<CkModelId>, ICkKey
+public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
 {
     private readonly string? _modelId;
 
@@ -43,6 +43,17 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     /// <param name="modelId"></param>
     /// <param name="version"></param>
     public CkModelId(string modelId, string version)
+    {
+        _modelId = modelId;
+        Version = version;
+    }
+
+    /// <summary>
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="modelId" /> and <paramref name="version" />.
+    /// </summary>
+    /// <param name="modelId"></param>
+    /// <param name="version"></param>
+    public CkModelId(string modelId, CkVersion version)
     {
         _modelId = modelId;
         Version = version;
@@ -231,7 +242,7 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     /// <inheritdoc />
     public bool Equals(CkModelId? other)
     {
-        return other is not null && Name == other.Name;
+        return other is not null && Name == other.Name && Version == other.Version;
     }
 
     /// <summary>

@@ -29,6 +29,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" />
+        <ProjectReference Include="..\..\src\SystemCkModel\SystemCkModel.csproj" />
         <ProjectReference Include="..\TestCkModel\TestCkModel.csproj" />
     </ItemGroup>
 

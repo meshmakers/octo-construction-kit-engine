@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(RoleId) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkAssociationRoleIdConverter))]
-public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICkKey
+public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICkElementId
 {
     /// <summary>
     ///     Creates a new <see cref="CkAssociationRoleId" /> from the given <paramref name="roleId" />.
@@ -22,12 +22,17 @@ public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICk
         if (typeIndex < 0)
         {
             RoleId = roleId;
-            Version = "1.0.0";
+            Version = 1;
         }
         else
         {
             RoleId = roleId.Substring(0, typeIndex);
-            Version = roleId.Substring(typeIndex + 1);
+            if (!uint.TryParse(roleId.Substring(typeIndex + 1), out uint version))
+            {
+                throw new ArgumentOutOfRangeException(nameof(roleId), roleId, $"{nameof(roleId)} must contain a valid version number");
+            }
+
+            Version = version;
         }
 
         if (string.IsNullOrWhiteSpace(RoleId))
@@ -42,7 +47,7 @@ public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICk
     /// </summary>
     /// <param name="roleId"></param>
     /// <param name="associationRoleVersion"></param>
-    public CkAssociationRoleId(string roleId, string associationRoleVersion = "1.0.0")
+    public CkAssociationRoleId(string roleId, uint associationRoleVersion = 1)
     {
         RoleId = roleId;
         Version = associationRoleVersion;
@@ -59,17 +64,17 @@ public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICk
     }
 
     /// <summary>
-    ///     Defines the name of the association, e. g. "ParentChild"
+    ///     Defines the name of the association, e.g. "ParentChild"
     /// </summary>
     public string RoleId { get; }
 
     /// <summary>
-    ///     Returns the version of the association role, e. g. "1.0.0"
+    ///     Returns the version of the association role, e.g. "1.0.0"
     /// </summary>
-    public CkVersion Version { get; }
+    public uint Version { get; }
 
     /// <summary>
-    ///     Returns the full name of the association role, e. g. "ParentChild-1.0.0"
+    ///     Returns the full name of the association role, e.g. "ParentChild-1"
     /// </summary>
     public string FullName => IsEmpty ? "" : $"{RoleId}-{Version}";
 
@@ -84,9 +89,9 @@ public sealed record CkAssociationRoleId : IComparable<CkAssociationRoleId>, ICk
             }
 
             var s = RoleId;
-            if (Version.Major > 1)
+            if (Version > 1)
             {
-                s += $"-{Version.Major}";
+                s += $"-{Version}";
             }
 
             return s;

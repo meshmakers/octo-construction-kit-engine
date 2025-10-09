@@ -35,6 +35,11 @@ public class CkCacheException : CkModelException
         return new CkCacheException($"CkTypeId '{ckTypeId}' not found in CkCache for tenant '{tenantId}'.");
     }
 
+    internal static Exception RtCkTypeIdNotFound(string tenantId, RtCkId<CkTypeId> rtCkTypeId)
+    {
+        return new CkCacheException($"RtCkTypeId '{rtCkTypeId}' not found in CkCache for tenant '{tenantId}'.");
+    }
+
     internal static Exception CkAttributeIdNotFound(string tenantId, CkId<CkAttributeId> ckAttributeId)
     {
         return new CkCacheException($"CkAttributeId '{ckAttributeId}' not found in CkCache for tenant '{tenantId}'.");
@@ -58,5 +63,25 @@ public class CkCacheException : CkModelException
     internal static Exception CkEnumNotFound(string tenantId, CkId<CkEnumId> ckEnumId)
     {
         return new CkCacheException($"CkEnumId '{ckEnumId}' not found in CkCache for tenant '{tenantId}'.");
+    }
+
+    internal static Exception RtCkAttributeIdNotFound(string tenantId, RtCkId<CkAttributeId> rtCkAttributeId)
+    {
+        return new CkCacheException($"RtCkAttributeId '{rtCkAttributeId}' not found in CkCache for tenant '{tenantId}'.");
+    }
+
+    internal static Exception RtCkAssociationRoleNotFound(string tenantId, RtCkId<CkAssociationRoleId> rtCkAssociationRoleId)
+    {
+        return new CkCacheException($"RtCkAssociationRoleId '{rtCkAssociationRoleId}' not found in CkCache for tenant '{tenantId}'.");
+    }
+
+    internal static Exception RtCkRecordNotFound(string tenantId, RtCkId<CkRecordId> rtCkRecordId)
+    {
+        return new CkCacheException($"RtCkRecordId '{rtCkRecordId}' not found in CkCache for tenant '{tenantId}'.");
+    }
+
+    internal static Exception RtCkEnumNotFound(string tenantId, RtCkId<CkEnumId> rtCkEnumId)
+    {
+        return new CkCacheException($"RtCkEnumId '{rtCkEnumId}' not found in CkCache for tenant '{tenantId}'.");
     }
 }

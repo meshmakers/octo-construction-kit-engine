@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.Fixtures;
 using Meshmakers.Octo.ConstructionKit.Compiler.SystemTests.sampleData.sample1;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.SystemTests;
@@ -17,10 +17,10 @@ public class CkCacheServiceTests(TemporaryDirectoryFixture fixture)
         var operationResult = new OperationResult();
         OriginFileResolver originFileResolver = new("TEST");
         var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
-        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+        var modelResolver = serviceProvider.GetRequiredService<ICatalogModelResolver>();
         ckCacheService.CreateTenant("test1");
 
-        var (ckModelGraph, _) = await modelResolver.HardResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        var (ckModelGraph, _) = await modelResolver.CompileAsync(Builder.Build(), originFileResolver, operationResult);
         ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
         Assert.NotNull(ckCacheService.GetCkType("test1", "sample1/Demo1"));
@@ -36,11 +36,11 @@ public class CkCacheServiceTests(TemporaryDirectoryFixture fixture)
         var operationResult = new OperationResult();
         OriginFileResolver originFileResolver = new("TEST");
         var ckCacheService = serviceProvider.GetRequiredService<ICkCacheService>();
-        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+        var modelResolver = serviceProvider.GetRequiredService<ICatalogModelResolver>();
 
         ckCacheService.CreateTenant("test1");
 
-        var (ckModelGraph, _) = await modelResolver.HardResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        var (ckModelGraph, _) = await modelResolver.CompileAsync(Builder.Build(), originFileResolver, operationResult);
         ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
         await using (var streamWriter = File.OpenWrite(filePath))

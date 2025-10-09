@@ -51,7 +51,7 @@ internal class ContentGenerator(
     private async Task DrawAttributeTables(CkModelGraph modelGraph, CkModelId ckModelId, string directoryPath,
         StreamWriter outputFile)
     {
-        foreach (var attribute in modelGraph.GetAttributes().OrderBy(a => a.CkAttributeId.Key))
+        foreach (var attribute in modelGraph.GetAttributes().OrderBy(a => a.CkAttributeId.ElementId))
         {
             //Checks for If the Attributes Model ID is the Same as the one that was given
             if (!MatchesModelId(attribute, ckModelId))
@@ -59,7 +59,7 @@ internal class ContentGenerator(
                 continue;
             }
 
-            await AddTitle(outputFile, null, attribute.CkAttributeId.Key.SemanticVersionedFullName)
+            await AddTitle(outputFile, null, attribute.CkAttributeId.ElementId.SemanticVersionedFullName)
                 .ConfigureAwait(false);
 
             if (attribute.Description != null)
@@ -162,7 +162,7 @@ internal class ContentGenerator(
         foreach (var @enum in modelGraph.GetEnums())
         {
             if (!MatchesModelId(@enum, ckModelId)) continue;
-            await AddTitle(outputFile, null, @enum.CkEnumId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+            await AddTitle(outputFile, null, @enum.CkEnumId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
 
             if (@enum.Description != null)
             {
@@ -217,7 +217,7 @@ internal class ContentGenerator(
         {
             if (!MatchesModelId(record, ckModelId)) continue;
 
-            await AddTitle(outputFile, null, record.CkRecordId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+            await AddTitle(outputFile, null, record.CkRecordId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
 
             await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
 
@@ -280,7 +280,7 @@ internal class ContentGenerator(
                 continue;
             }
 
-            await AddTitle(outputFile, null, type.CkTypeId.Key.SemanticVersionedFullName).ConfigureAwait(false);
+            await AddTitle(outputFile, null, type.CkTypeId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
             await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
             if (type.Description != null)
             {
@@ -399,9 +399,9 @@ internal class ContentGenerator(
                 await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
             }
 
-            foreach (var associationRole in ckAssociationRoleGraphs.OrderBy(a => a.CkRoleId.Key))
+            foreach (var associationRole in ckAssociationRoleGraphs.OrderBy(a => a.CkRoleId.ElementId))
             {
-                await AddTitle(outputFile, null, associationRole.CkRoleId.Key.SemanticVersionedFullName)
+                await AddTitle(outputFile, null, associationRole.CkRoleId.ElementId.SemanticVersionedFullName)
                     .ConfigureAwait(false);
 
                 if (associationRole.Description != null)

@@ -19,7 +19,7 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
         AttributeValueResolveFlags attributeValueResolveFlags = AttributeValueResolveFlags.Default)
     {
         var ckTypeGraph =
-            ckCacheService.GetCkType(tenantId, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
+            ckCacheService.GetRtCkType(tenantId, rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
 
         var entityDto = new RtEntityTcDto
         {
@@ -90,7 +90,7 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
             CkRecordId = rtRecord.CkRecordId
         };
 
-        var ckRecordGraph = ckCacheService.GetCkRecord(tenantId, rtRecord.CkRecordId);
+        var ckRecordGraph = ckCacheService.GetRtCkRecord(tenantId, rtRecord.CkRecordId);
         ConvertAttributes(tenantId, ckRecordGraph, rtRecord, rtRecordDto, attributeValueResolveFlags);
         return rtRecordDto;
     }

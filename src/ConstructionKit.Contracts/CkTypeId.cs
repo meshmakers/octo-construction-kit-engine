@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// </summary>
 [DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkTypeIdConverter))]
-public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
+public sealed record CkTypeId : IComparable<CkTypeId>, ICkElementId
 {
     /// <summary>
     ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="name" />.
@@ -22,12 +22,17 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
         if (typeIndex < 0)
         {
             Name = name;
-            Version = "1.0.0";
+            Version = 1;
         }
         else
         {
             Name = name.Substring(0, typeIndex);
-            Version = new CkVersion(name.Substring(typeIndex + 1));
+            if (!uint.TryParse(name.Substring(typeIndex + 1), out uint version))
+            {
+                throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a valid version number");
+            }
+
+            Version = version;
         }
 
         if (string.IsNullOrWhiteSpace(Name))
@@ -47,14 +52,14 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
     }
 
     /// <summary>
-    ///     Defines the name of the type, e. g. "Person"
+    ///     Defines the name of the type, e.g. "Person"
     /// </summary>
     public string Name { get; }
 
     /// <summary>
-    ///     Returns the version of the type, e. g. "1.0.0"
+    ///     Returns the version of the type, e.g. 1
     /// </summary>
-    public CkVersion Version { get; }
+    public uint Version { get; }
 
     /// <inheritdoc />
     public string FullName => IsEmpty ? "" : $"{Name}-{Version}";
@@ -70,9 +75,9 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
             }
 
             var s = Name;
-            if (Version.Major > 1)
+            if (Version > 1)
             {
-                s += $"-{Version.Major}";
+                s += $"-{Version}";
             }
 
             return s;
@@ -103,7 +108,7 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
     /// <inheritdoc />
     public bool Equals(CkTypeId? other)
     {
-        return other is not null && Name == other.Name && Version.IsCompatible(other.Version);
+        return other is not null && Name == other.Name && Version == other.Version;
     }
 
     /// <inheritdoc />

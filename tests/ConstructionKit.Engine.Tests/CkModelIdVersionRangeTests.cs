@@ -11,7 +11,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithCompleteString_ParsesCorrectly()
     {
         var range = new CkModelIdVersionRange("System-1.0.0");
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("1.0.0", range.ModelVersionRange.ToString());
     }
 
@@ -19,7 +19,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithVersionRange_ParsesCorrectly()
     {
         var range = new CkModelIdVersionRange("System-[1.0.0,2.0.0)");
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("[1.0.0,2.0.0)", range.ModelVersionRange.ToString());
     }
 
@@ -27,7 +27,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithoutVersion_DefaultsTo100()
     {
         var range = new CkModelIdVersionRange("System");
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("1.0.0", range.ModelVersionRange.ToString());
     }
 
@@ -35,7 +35,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithTwoParameters_SetsCorrectly()
     {
         var range = new CkModelIdVersionRange("System", "[1.0.0,2.0.0)");
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("[1.0.0,2.0.0)", range.ModelVersionRange.ToString());
     }
 
@@ -43,7 +43,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithEmptyModelId_CreatesEmptyInstance()
     {
         var range = new CkModelIdVersionRange("", "1.0.0");
-        Assert.Equal("", range.ModelId);
+        Assert.Equal("", range.Name);
         Assert.True(range.IsEmpty);
     }
 
@@ -51,7 +51,7 @@ public class CkModelIdVersionRangeTests
     public void Constructor_WithNullModelId_CreatesEmptyInstance()
     {
         var range = new CkModelIdVersionRange(null!, "1.0.0");
-        Assert.Equal("", range.ModelId);
+        Assert.Equal("", range.Name);
         Assert.True(range.IsEmpty);
     }
 
@@ -63,7 +63,7 @@ public class CkModelIdVersionRangeTests
     public void ImplicitOperator_FromString_CreatesInstance()
     {
         CkModelIdVersionRange range = "System-1.0.0";
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("1.0.0", range.ModelVersionRange.ToString());
     }
 
@@ -71,7 +71,7 @@ public class CkModelIdVersionRangeTests
     public void ImplicitOperator_WithVersionRange_CreatesInstance()
     {
         CkModelIdVersionRange range = "System-[1.0,2.0)";
-        Assert.Equal("System", range.ModelId);
+        Assert.Equal("System", range.Name);
         Assert.Equal("[1.0,2.0)", range.ModelVersionRange.ToString());
     }
 
@@ -543,7 +543,7 @@ public class CkModelIdVersionRangeTests
         foreach (var (input, expectedId, expectedRange) in testCases)
         {
             var range = new CkModelIdVersionRange(input);
-            Assert.Equal(expectedId, range.ModelId);
+            Assert.Equal(expectedId, range.Name);
             Assert.Equal(expectedRange, range.ModelVersionRange.ToString());
         }
     }

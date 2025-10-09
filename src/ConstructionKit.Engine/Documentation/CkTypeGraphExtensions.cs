@@ -8,7 +8,7 @@ internal static class CkTypeGraphExtensions
 {
     private static string GetClassName(this CkId<CkTypeId> ckTypeGraph)
     {
-        var fullName = ckTypeGraph.Key.SemanticVersionedFullName;
+        var fullName = ckTypeGraph.ElementId.SemanticVersionedFullName;
 
         var sanitizedFullName = GetName(ckTypeGraph) + "[\"" + fullName + "\"]";
 
@@ -17,7 +17,7 @@ internal static class CkTypeGraphExtensions
 
     private static string GetName(this CkId<CkTypeId> ckTypeGraph)
     {
-        var fullName = ckTypeGraph.Key.SemanticVersionedFullName;
+        var fullName = ckTypeGraph.ElementId.SemanticVersionedFullName;
 
         var sanitizedFullName = fullName.Replace(".", "");
 
@@ -170,7 +170,7 @@ internal static class CkTypeGraphExtensions
 
     private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
     {
-        return ckTypeGraph.CkTypeId.Key.Name.ToLower();
+        return ckTypeGraph.CkTypeId.ElementId.Name.ToLower();
     }
     
     public static async Task DrawExternal(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)

@@ -175,7 +175,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, FirstElement) + Separator + c.Path, l,
-                            true, c.ValueType);
+                            true);
                     }));
 
                     columns.AddRange(recordColumns.Select(c =>
@@ -185,7 +185,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, AllElements) + Separator + c.Path, l,
-                            true, c.ValueType);
+                            true);
                     }));
 
                     break;

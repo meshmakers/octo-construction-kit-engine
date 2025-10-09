@@ -8,7 +8,7 @@ public interface ICkClassMap
     /// <summary>
     /// Returns the model id the mapping is for
     /// </summary>
-    public CkModelId ModelId { get; }
+    public string ModelId { get; }
     
     /// <summary>
     /// Returns the class type for the given type id

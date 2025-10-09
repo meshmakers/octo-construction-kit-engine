@@ -34,7 +34,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
 #endif
         {
-            if (!ckCache.TryGetCkType(tenantId, info.CkTypeId, out var ckTypeGraph))
+            if (!ckCache.TryGetRtCkType(tenantId, info.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                     info.CkTypeId));
@@ -51,7 +51,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 return;
             }
 #endif
-            
+
             if (ckTypeGraph.IsAbstract)
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId),
@@ -184,7 +184,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 #else
             return ValueTask.CompletedTask;
         }).ConfigureAwait(false);
-#endif          
+#endif
 
         var entityValidatorResult =
             new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
@@ -196,10 +196,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         return Task.FromResult(entityValidatorResult);
 #else
         return entityValidatorResult;
-#endif          
+#endif
     }
 
-    private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType,
+    private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs,
+        RtTypeWithAttributes rtType,
         IOriginFileResolver originFileResolver, OperationResult operationResult, string reference)
     {
         var isInError = false;
@@ -215,7 +216,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         case AttributeValueTypesDto.IntArray:
                         case AttributeValueTypesDto.RecordArray:
                         case AttributeValueTypesDto.StringArray:
-                            rtType.SetAttributeValue(attribute.AttributeName, attribute.ValueType, attribute.DefaultValues);
+                            rtType.SetAttributeValue(attribute.AttributeName, attribute.ValueType,
+                                attribute.DefaultValues);
                             break;
                         default:
                             rtType.SetAttributeValue(attribute.AttributeName, attribute.ValueType,
@@ -227,7 +229,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 // otherwise the attribute is missing
                 else if (string.IsNullOrWhiteSpace(attribute.AutoIncrementReference))
                 {
-                    operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(originFileResolver.Resolve(tenantId), tenantId,
+                    operationResult.AddMessage(MessageCodes.MandatoryAttributeMissing(
+                        originFileResolver.Resolve(tenantId), tenantId,
                         attribute.CkAttributeId, reference));
                     isInError = true;
                 }
@@ -243,14 +246,17 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         foreach (var o in t)
                         {
                             var rtRecord = (RtRecord)o;
-                            if (!ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                            if (!ckCache.TryGetRtCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph) ||
+                                ckRecordGraph == null)
                             {
-                                operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
+                                operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(
+                                    originFileResolver.Resolve(tenantId), tenantId,
                                     rtRecord.CkRecordId));
                                 continue;
                             }
 
-                            isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph!.AllAttributes.Values.ToList(), rtRecord,
+                            isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(),
+                                rtRecord,
                                 originFileResolver,
                                 operationResult, reference + $"/{attribute.AttributeName}");
                         }
@@ -261,14 +267,17 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                     var rtRecord = (RtRecord?)rtType.Attributes[attribute.AttributeName];
                     if (rtRecord != null)
                     {
-                        if (!ckCache.TryGetCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph))
+                        if (!ckCache.TryGetRtCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph) ||
+                            ckRecordGraph == null)
                         {
-                            operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
+                            operationResult.AddMessage(MessageCodes.CkRecordIdNotFound(
+                                originFileResolver.Resolve(tenantId), tenantId,
                                 rtRecord.CkRecordId));
                             continue;
                         }
 
-                        isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph!.AllAttributes.Values.ToList(), rtRecord,
+                        isInError |= SetDefaultValuesOnInsert(tenantId, ckRecordGraph.AllAttributes.Values.ToList(),
+                            rtRecord,
                             originFileResolver,
                             operationResult, reference + $"/{attribute.AttributeName}");
                     }

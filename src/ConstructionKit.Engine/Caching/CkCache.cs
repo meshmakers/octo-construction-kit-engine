@@ -267,6 +267,7 @@ internal class CkCache : IDisposable
         options.Converters.Add(new CkIdTypeIdConverter());
         options.Converters.Add(new CkIdRecordIdConverter());
         options.Converters.Add(new CkIdEnumIdConverter());
+
         options.Converters.Add(new CkModelIdConverter());
         return options;
     }
@@ -317,5 +318,138 @@ internal class CkCache : IDisposable
         }
 
         return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
+    }
+
+    public CkTypeGraph GetRtCkType(RtCkId<CkTypeId> rtCkTypeId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.TypesByRtCk.TryGetValue(rtCkTypeId, out var ckTypeGraph))
+        {
+            throw CkCacheException.RtCkTypeIdNotFound(TenantId, rtCkTypeId);
+        }
+
+        return ckTypeGraph;
+    }
+
+#if NETSTANDARD2_0
+    public bool TryGetRtCkType(RtCkId<CkTypeId> rtCkTypeId, out CkTypeGraph ckTypeGraph)
+#else
+    public bool TryGetRtCkType(RtCkId<CkTypeId> rtCkTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
+#endif
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.TypesByRtCk.TryGetValue(rtCkTypeId, out ckTypeGraph))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+#if NETSTANDARD2_0
+    public bool TryGetRtCkRecord(RtCkId<CkRecordId> rtCkRecordId, out CkRecordGraph ckRecordGraph)
+#else
+    public bool TryGetRtCkRecord(RtCkId<CkRecordId> rtCkRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
+#endif
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.RecordsByRtCk.TryGetValue(rtCkRecordId, out ckRecordGraph))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+
+#if NETSTANDARD2_0
+    public bool TryGetRtCkEnum(RtCkId<CkEnumId> rtCkEnumId, out CkEnumGraph? ckEnumGraph)
+#else
+    public bool TryGetRtCkEnum(RtCkId<CkEnumId> rtCkEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph)
+#endif
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.EnumsByRtCk.TryGetValue(rtCkEnumId, out ckEnumGraph))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    public CkAttributeGraph GetRtCkAttribute(RtCkId<CkAttributeId> rtCkAttributeId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.AttributesByRtCk.TryGetValue(rtCkAttributeId, out var ckAttributeGraph))
+        {
+            throw CkCacheException.RtCkAttributeIdNotFound(TenantId, rtCkAttributeId);
+        }
+
+        return ckAttributeGraph;
+    }
+
+    public CkAssociationRoleGraph GetRtCkAssociationRole(RtCkId<CkAssociationRoleId> rtCkAssociationRoleId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.AssociationRolesByRtCk.TryGetValue(rtCkAssociationRoleId, out var ckAssociationRoleGraph))
+        {
+            throw CkCacheException.RtCkAssociationRoleNotFound(TenantId, rtCkAssociationRoleId);
+        }
+
+        return ckAssociationRoleGraph;
+    }
+
+    public CkRecordGraph GetRtCkRecord(RtCkId<CkRecordId> rtCkRecordId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.RecordsByRtCk.TryGetValue(rtCkRecordId, out var ckRecordGraph))
+        {
+            throw CkCacheException.RtCkRecordNotFound(TenantId, rtCkRecordId);
+        }
+
+        return ckRecordGraph;
+    }
+
+    public CkEnumGraph GetRtCkEnum(RtCkId<CkEnumId> rtCkEnumId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.EnumsByRtCk.TryGetValue(rtCkEnumId, out var ckEnumGraph))
+        {
+            throw CkCacheException.RtCkEnumNotFound(TenantId, rtCkEnumId);
+        }
+
+        return ckEnumGraph;
     }
 }

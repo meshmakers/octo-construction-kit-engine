@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 
@@ -9,7 +10,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 /// </summary>
 public class YamlToMermaidGeneration
 {
-    private readonly IModelResolver _modelResolver;
+    private readonly IRepositoryModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IMermaidGenerator _mermaidGenerator;
 
@@ -19,7 +20,7 @@ public class YamlToMermaidGeneration
     /// <param name="modelResolver"></param>
     /// <param name="ckYamlSerializer"></param>
     /// <param name="mermaidGenerator"></param>
-    public YamlToMermaidGeneration(IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer, IMermaidGenerator mermaidGenerator)
+    public YamlToMermaidGeneration(IRepositoryModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer, IMermaidGenerator mermaidGenerator)
     {
         _modelResolver = modelResolver;
         _ckYamlSerializer = ckYamlSerializer;
@@ -45,9 +46,9 @@ public class YamlToMermaidGeneration
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var resolveResult = await _modelResolver.SoftResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
+        var ckModelGraph = await _modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
         
-        await _mermaidGenerator.GenerateMermaidDiagram(resolveResult.CkModelGraph, outputPath).ConfigureAwait(false);
+        await _mermaidGenerator.GenerateMermaidDiagram(ckModelGraph, outputPath).ConfigureAwait(false);
 
     }
 }

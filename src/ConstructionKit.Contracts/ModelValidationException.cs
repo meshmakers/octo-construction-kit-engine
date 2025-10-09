@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
@@ -86,5 +88,11 @@ public class ModelValidationException : CkModelException
     {
         var attributeIds = string.Join(", ", duplicateAttributeIds);
         return new ModelValidationException($"CkRecordId '{ckRecordId}' has duplicate attribute IDs: '{attributeIds}'");
+    }
+
+    internal static Exception UnknownCkModel(CkModelIdVersionRange ckDependency)
+    {
+        return new ModelValidationException(
+            $"Dependency '{ckDependency}' is an unknown construction kit model library. This may happen because a dependency to another construction kit model is missing.");
     }
 }

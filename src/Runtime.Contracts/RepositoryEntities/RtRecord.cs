@@ -21,7 +21,7 @@ public class RtRecord : RtTypeWithAttributes
     /// </summary>
     /// <param name="ckRecordId">Construction kit record id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtRecord(CkId<CkRecordId> ckRecordId, IReadOnlyDictionary<string, object?> attributes)
+    public RtRecord(RtCkId<CkRecordId> ckRecordId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
         CkRecordId = ckRecordId;
@@ -30,7 +30,7 @@ public class RtRecord : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the construction kit id
     /// </summary>
-    public CkId<CkRecordId> CkRecordId { get; set; } = null!;
+    public RtCkId<CkRecordId> CkRecordId { get; set; } = null!;
 
     /// <inheritdoc />
     protected override string GetLocation()

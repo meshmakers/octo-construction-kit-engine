@@ -6,7 +6,11 @@
     },
     "CompilerPublishSystem": {
       "commandName": "Project",
-      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)/test/system/ck-system.yaml\" -r -rep \"LocalRepository\""
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)/test/system/ck-system.yaml\" -r -c \"LocalFileSystemCatalog\""
+    },
+    "CompilerPublishGitHubSystem": {
+      "commandName": "Project",
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)/test/system/ck-system.yaml\" -r -c \"PublicGitHubCatalog\""
     },
     "CompilerCompileSdkDemo": {
       "commandName": "Project",
@@ -22,7 +26,7 @@
     },
     "CompilerPublishTestCkModel": {
       "commandName": "Project",
-      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.testidentity.yaml\" -r -rep \"LocalRepository\""
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.testidentity.yaml\" -r -c \"LocalFileSystemCatalog\""
     },
     "CompilerGenerateDocSdkDemo": {
       "commandName": "Project",
@@ -43,10 +47,6 @@
     "CompilerRestore": {
       "commandName": "Project",
       "commandLineArgs": "-c Restore -f \"$(OctoRepoRootPath)samples/Sample.SourceGenerator/construction-kits.yaml\" -o \"$(OctoRepoRootPath)test\""
-    },
-    "CompilerPublishGitHub": {
-      "commandName": "Project",
-      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/system/ck-system.yaml\" -r -rep \"PublicGitHubRepository\""
     },
     "CompilerFindGitHub": {
       "commandName": "Project",

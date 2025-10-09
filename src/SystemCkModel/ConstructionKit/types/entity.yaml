@@ -4,8 +4,8 @@ types:
     isFinal: false
     isAbstract: true
     associations:
-    - id: ${thisModel}/Related
-      targetCkTypeId: ${thisModel}/Entity
+    - id: ${this}/Related
+      targetCkTypeId: ${this}/Entity
     indexes:
       - indexType: "Ascending"
         fields:

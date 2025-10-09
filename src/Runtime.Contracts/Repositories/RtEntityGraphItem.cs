@@ -55,7 +55,7 @@ public class RtEntityGraphItem : RtEntity
     /// </summary>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
-    public RtEntityGraphItem(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    public RtEntityGraphItem(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
         : base(ckTypeId, rtId)
     {
         Associations = [];
@@ -67,7 +67,7 @@ public class RtEntityGraphItem : RtEntity
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtEntityGraphItem(CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    public RtEntityGraphItem(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         IReadOnlyDictionary<string, object?> attributes)
         : base(ckTypeId, rtId, attributes)
     {
@@ -81,7 +81,7 @@ public class RtEntityGraphItem : RtEntity
     /// <param name="rtId">Object id</param>
     /// <param name="attributes">List of attributes</param>
     /// <param name="associations">List of associations</param>
-    public RtEntityGraphItem(CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    public RtEntityGraphItem(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         IReadOnlyDictionary<string, object?> attributes, List<NavigationEnd> associations)
         : base(ckTypeId, rtId, attributes)
     {

@@ -8,14 +8,14 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class FindCommand : Command<OctoToolOptions>
 {
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
+    private readonly ICatalogService _catalogService;
     private readonly IArgument _modelIdArgument;
 
     public FindCommand(ILogger<FindCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryService ckModelRepositoryService)
+        ICatalogService catalogService)
         : base(logger, "Find", "Lists repositories a construction kit model has been found.", options)
     {
-        _ckModelRepositoryService = ckModelRepositoryService;
+        _catalogService = catalogService;
 
         _modelIdArgument = CommandArgumentValue.AddArgument("id", "modelId",
             ["Model Id of construction kit to find, including version ranges"], true, 1);
@@ -28,10 +28,10 @@ internal class FindCommand : Command<OctoToolOptions>
         var modelId = CommandArgumentValue.GetArgumentScalarValue<string>(_modelIdArgument);
         Logger.LogInformation("Name: {Name}", modelId);
 
-        var repositoryList = _ckModelRepositoryService.GetRepositoryList();
+        var repositoryList = _catalogService.GetCatalogList();
         foreach (var repository in repositoryList)
         {
-            var r = await _ckModelRepositoryService.IsCkModelExistingAsync(repository.Item1, modelId);
+            var r = await _catalogService.IsExistingAsync(repository.Item1, modelId);
             if (r.Exists)
             {
                 Logger.LogInformation("Found model {Name} in repository '{Repository}'", r.ModelId,

@@ -5,16 +5,16 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/Designation
+      - id: ${this}/Designation
         name: Designation
         isOptional: false
-      - id: ${thisModel}/Location
+      - id: ${this}/Location
         name: Location
         isOptional: false
-      - id: ${thisModel}/ConnectionState
+      - id: ${this}/ConnectionState
         name: ConnectionState
         isOptional: false
-      - id: ${thisModel}/DataCount
+      - id: ${this}/DataCount
         name: DataCount
         isOptional: true
     indexes:

@@ -5,6 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -87,10 +88,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         var serviceProvider = services.BuildServiceProvider();
 
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
-        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
+        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICatalogService>();
         var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
 
-        var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
+        var modelResolver = serviceProvider.GetRequiredService<ICatalogModelResolver>();
         var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
         var mermaidGenerator = serviceProvider.GetRequiredService<IMermaidGenerator>();
 
@@ -130,6 +131,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                             if (PublishCkModel)
                             {
+                                OriginFileResolver originFileResolver = new(compileResult.CompiledModelFile);
                                 Log.LogMessage(MessageImportance.High,
                                     "Publishing construction kit model from '{0}' to 'LocalRepository'",
                                     constructionKitFolderPath);
@@ -150,8 +152,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
-                                await ckModelRepositoryService.PublishModelAsync("LocalRepository", ckCompiledModelRoot,
-                                    true, false);
+                                await ckModelRepositoryService.PublishAsync("LocalRepository", ckCompiledModelRoot,
+                                    originFileResolver, true, false);
                                 Log.LogMessage(MessageImportance.High,
                                     "Construction kit model published to 'LocalRepository'");
                             }

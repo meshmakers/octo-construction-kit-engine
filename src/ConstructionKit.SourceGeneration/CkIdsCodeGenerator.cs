@@ -41,9 +41,11 @@ internal class CkIdsCodeGenerator
             foreach (var ckTypeDto in ckTypes.OrderBy(x => x.TypeId.Name))
             {
                 sb.AppendLine(
-                    $"    public const string {ckTypeDto.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
+                    $"    public static readonly RtCkId<CkTypeId> RtCk{ckTypeDto.TypeId.MakeClassName()}TypeId = new RtCkId<CkTypeId>(ModelIdName, \"{ckTypeDto.TypeId.FullName}\");");
                 sb.AppendLine(
                     $"    public static readonly CkId<CkTypeId> Ck{ckTypeDto.TypeId.MakeClassName()}TypeId = new CkId<CkTypeId>(CkModelId, \"{ckTypeDto.TypeId.FullName}\");");
+                sb.AppendLine(
+                    $"    public const string RtCk{ckTypeDto.TypeId.MakeClassName()}TypeIdString = \"{ckModelId.Name}/{ckTypeDto.TypeId.FullName}\";");
             }
         }
 
@@ -67,7 +69,7 @@ internal class CkIdsCodeGenerator
             foreach (var ckAssociationRoleDto in ckAssociationRoles.OrderBy(x => x.AssociationRoleId.RoleId))
             {
                 sb.AppendLine(
-                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.MakeClassName()}RoleId = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
+                    $"    public static readonly RtCkId<CkAssociationRoleId> RtCk{ckAssociationRoleDto.AssociationRoleId.MakeClassName()}RoleId = new RtCkId<CkAssociationRoleId>(ModelIdName, \"{ckAssociationRoleDto.AssociationRoleId.FullName}\");");
             sb.AppendLine(
                 $"    public static readonly CkId<CkAssociationRoleId> Ck{ckAssociationRoleDto.AssociationRoleId.MakeClassName()}RoleId = new CkId<CkAssociationRoleId>(CkModelId, \"{ckAssociationRoleDto.AssociationRoleId.FullName}\");");
             }

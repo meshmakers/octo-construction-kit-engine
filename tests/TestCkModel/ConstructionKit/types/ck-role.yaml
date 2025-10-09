@@ -9,19 +9,19 @@ types:
         name: Name
         isOptional: true
 
-      - id: ${thisModel}/NormalizedName
+      - id: ${this}/NormalizedName
         name: NormalizedName
         isOptional: true
 
-      - id: ${thisModel}/ConcurrencyStamp
+      - id: ${this}/ConcurrencyStamp
         name: ConcurrencyStamp
 
-      - id: ${thisModel}/SubjectIds
+      - id: ${this}/SubjectIds
         name: SubjectIds
 
-      - id: ${thisModel}/IdentityRoleIds
+      - id: ${this}/IdentityRoleIds
         name: IdentityRoleIds
 
-      - id: ${thisModel}/RoleClaims
+      - id: ${this}/RoleClaims
         name: Claims
         isOptional: true

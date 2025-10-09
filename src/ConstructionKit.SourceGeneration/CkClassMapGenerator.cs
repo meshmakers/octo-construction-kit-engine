@@ -57,7 +57,7 @@ public class CkClassMapGenerator
         sb.AppendLine("        };");
         sb.AppendLine("    }");
         sb.AppendLine();
-        sb.AppendLine($"    public CkModelId ModelId => new CkModelId(\"{ckModelId.FullName}\");");
+        sb.AppendLine($"    public string ModelId => \"{ckModelId.Name}\";");
         sb.AppendLine();
         sb.AppendLine("    public Type? GetCkTypeClass(CkTypeId ckTypeId)");
         sb.AppendLine("    {");

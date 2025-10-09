@@ -40,11 +40,19 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationRoleIdConverter())
+
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
+
+            .WithTypeConverter(new RtCkIdAttributeIdConverter())
+            .WithTypeConverter(new RtCkIdTypeIdConverter())
+            .WithTypeConverter(new RtCkIdRecordIdConverter())
+            .WithTypeConverter(new RtCkIdEnumIdConverter())
+            .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
+
             .Build();
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)
@@ -55,12 +63,18 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationRoleIdConverter())
+
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
-         //   .WithTypeConverter(new ObjectCollectionConverter())
+
+            .WithTypeConverter(new RtCkIdAttributeIdConverter())
+            .WithTypeConverter(new RtCkIdTypeIdConverter())
+            .WithTypeConverter(new RtCkIdRecordIdConverter())
+            .WithTypeConverter(new RtCkIdEnumIdConverter())
+            .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

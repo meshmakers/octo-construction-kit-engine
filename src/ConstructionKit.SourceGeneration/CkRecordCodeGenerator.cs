@@ -33,7 +33,7 @@ public class CkRecordCodeGenerator
         if (ckRecord.DerivedFromCkRecordId != null)
         {
             ckBaseType = $" : Rt" +
-                         $"{ckRecord.DerivedFromCkRecordId.Key.MakeClassName()}Record";
+                         $"{ckRecord.DerivedFromCkRecordId.ElementId.MakeClassName()}Record";
         }
 
         StringBuilder sb = new();
@@ -54,7 +54,7 @@ public class CkRecordCodeGenerator
         sb.AppendLine();
         sb.AppendLine($"  public Rt{ckRecord.RecordId.MakeClassName()}Record()");
         sb.AppendLine("  {");
-        sb.AppendLine($"    CkRecordId = \"{modelId}/{ckRecord.RecordId}\";");
+        sb.AppendLine($"    CkRecordId = \"{modelId.Name}/{ckRecord.RecordId.SemanticVersionedFullName}\";");
         sb.AppendLine("  }");
         sb.AppendLine();
         sb.AppendLine();

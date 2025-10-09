@@ -24,7 +24,7 @@ public class RtEntity : RtTypeWithAttributes
     /// </summary>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
-    public RtEntity(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    public RtEntity(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
         CkTypeId = ckTypeId;
         RtId = rtId;
@@ -36,7 +36,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtEntity(CkId<CkTypeId> ckTypeId, OctoObjectId rtId, IReadOnlyDictionary<string, object?> attributes)
+    public RtEntity(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
         CkTypeId = ckTypeId;
@@ -66,7 +66,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the construction kit id
     /// </summary>
-    public CkId<CkTypeId>? CkTypeId { get; set; }
+    public RtCkId<CkTypeId>? CkTypeId { get; set; }
 
     /// <summary>
     ///     Returns the well-known name to access well-known entities in a faster way

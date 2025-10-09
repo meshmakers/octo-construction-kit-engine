@@ -5,19 +5,19 @@ types:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/UserName
+      - id: ${this}/UserName
         name: UserName
         isOptional: true
 
-      - id: ${thisModel}/NormalizedUserName
+      - id: ${this}/NormalizedUserName
         name: NormalizedUserName
         isOptional: true
 
-      - id: ${thisModel}/FirstName
+      - id: ${this}/FirstName
         name: FirstName
         isOptional: true
 
-      - id: ${thisModel}/LastName
+      - id: ${this}/LastName
         name: LastName
         isOptional: true
 
@@ -25,64 +25,64 @@ types:
         name: Description
         isOptional: true
 
-      - id: ${thisModel}/Email
+      - id: ${this}/Email
         name: Email
         isOptional: true
 
-      - id: ${thisModel}/NormalizedEmail
+      - id: ${this}/NormalizedEmail
         name: NormalizedEmail
         isOptional: true
 
-      - id: ${thisModel}/EmailConfirmed
+      - id: ${this}/EmailConfirmed
         name: EmailConfirmed
 
-      - id: ${thisModel}/PasswordHash
+      - id: ${this}/PasswordHash
         name: PasswordHash
         isOptional: true
 
-      - id: ${thisModel}/SecurityStamp
+      - id: ${this}/SecurityStamp
         name: SecurityStamp
         isOptional: true
 
-      - id: ${thisModel}/ConcurrencyStamp
+      - id: ${this}/ConcurrencyStamp
         name: ConcurrencyStamp
 
-      - id: ${thisModel}/PhoneNumber
+      - id: ${this}/PhoneNumber
         name: PhoneNumber
         isOptional: true
 
-      - id: ${thisModel}/PhoneNumberConfirmed
+      - id: ${this}/PhoneNumberConfirmed
         name: PhoneNumberConfirmed
 
-      - id: ${thisModel}/TwoFactorEnabled
+      - id: ${this}/TwoFactorEnabled
         name: TwoFactorEnabled
 
-      - id: ${thisModel}/LockoutEnd
+      - id: ${this}/LockoutEnd
         name: LockoutEnd
         isOptional: true
 
-      - id: ${thisModel}/LockoutEnabled
+      - id: ${this}/LockoutEnabled
         name: LockoutEnabled
 
-      - id: ${thisModel}/AccessFailedCount
+      - id: ${this}/AccessFailedCount
         name: AccessFailedCount
 
-      - id: ${thisModel}/ResetPasswordOnLogin
+      - id: ${this}/ResetPasswordOnLogin
         name: ResetPasswordOnLogin
 
-      - id: ${thisModel}/RoleIds
+      - id: ${this}/RoleIds
         name: RoleIds
         isOptional: true
 
-      - id: ${thisModel}/UserClaims
+      - id: ${this}/UserClaims
         name: Claims
         isOptional: true
 
-      - id: ${thisModel}/UserLogins
+      - id: ${this}/UserLogins
         name: UserLogins
         isOptional: true
 
-      - id: ${thisModel}/UserTokens
+      - id: ${this}/UserTokens
         name: UserTokens
         isOptional: true
     

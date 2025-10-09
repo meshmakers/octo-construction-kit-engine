@@ -4,11 +4,11 @@ attributes:
     valueType: String
   - id: EnvironmentMode
     valueType: Enum
-    valueCkEnumId: ${thisModel}/EnvironmentModes
+    valueCkEnumId: ${this}/EnvironmentModes
     defaultValues:
       - 0
   - id: MaintenanceLevel
     valueType: Enum
-    valueCkEnumId: ${thisModel}/MaintenanceLevels
+    valueCkEnumId: ${this}/MaintenanceLevels
     defaultValues:
       - 0

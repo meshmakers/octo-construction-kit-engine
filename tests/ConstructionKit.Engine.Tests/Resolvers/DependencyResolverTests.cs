@@ -227,11 +227,11 @@ public class DependencyResolverTests
 
         // Assert
         Assert.NotNull(result);
-        Assert.Single(result.RootDependencyModelIds);
-        Assert.Contains(ckModelIdA, result.RootDependencyModelIds);
+        Assert.Empty(result.RootDependencyModelIds);
         Assert.Single(result.UnresolvedDependencyModelIds);
         Assert.Contains(ckModelIdC.ToVersionRange(), result.UnresolvedDependencyModelIds);
-        Assert.Single(result.SkippedModelIds);
+        Assert.Equal(2, result.SkippedModelIds.Count);
+        Assert.Contains(ckModelIdA, result.SkippedModelIds);
         Assert.Contains(ckModelIdB, result.SkippedModelIds);
     }
 

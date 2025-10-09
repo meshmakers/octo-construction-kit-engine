@@ -22,7 +22,7 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
             var compiledModelRoot = await ckYamlSerializer.DeserializeCompiledModelRootAsync(stream, relativePath, operationResult);
             var originFileResolver = new OriginFileResolver(relativePath);
             var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
-            var resolvedTypes = await modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
+            var resolvedTypes = await modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
             var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
             var rootPath = fixture.CreateTempDirectory();

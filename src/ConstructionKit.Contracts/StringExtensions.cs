@@ -29,7 +29,7 @@ public static class StringExtensions
         }
 
 
-        return ckTypeId.TypeId.MakeClassName() + version;
+        return ckTypeId.Name.MakeClassName() + version;
     }
 
     /// <summary>
@@ -45,7 +45,7 @@ public static class StringExtensions
             version = $"{ckAttributeId.Version.Major}";
         }
 
-        return ckAttributeId.AttributeId.MakeClassName() + version;
+        return ckAttributeId.Name.MakeClassName() + version;
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public static class StringExtensions
             version = $"{ckEnumId.Version.Major}";
         }
 
-        return ckEnumId.EnumId.MakeClassName() + version;
+        return ckEnumId.Name.MakeClassName() + version;
     }
 
     /// <summary>
@@ -93,6 +93,6 @@ public static class StringExtensions
             version = $"{ckRecordId.Version.Major}";
         }
 
-        return ckRecordId.RecordId.MakeClassName() + version;
+        return ckRecordId.Name.MakeClassName() + version;
     }
 }

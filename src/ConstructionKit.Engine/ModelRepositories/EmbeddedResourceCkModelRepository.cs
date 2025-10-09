@@ -43,8 +43,8 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
     {
         // Find all models that satisfy the version range
         var satisfiedModels = _embeddedModels
-            .Where(m => m.ModelId.ModelId == modelIdVersionRange.ModelId &&
-                        modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(m.ModelId.ModelVersion))
+            .Where(m => m.ModelId.Name == modelIdVersionRange.ModelId &&
+                        modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(m.ModelId.Version))
             .ToList();
 
         if (!satisfiedModels.Any())
@@ -54,7 +54,7 @@ public class EmbeddedResourceCkModelRepository : ICkModelRepository
 
         // Return the latest satisfied version
         var latestSatisfiedModel = satisfiedModels
-            .OrderByDescending(m => m.ModelId.ModelVersion)
+            .OrderByDescending(m => m.ModelId.Version)
             .First();
 
         return Task.FromResult(new ModelExistingResult

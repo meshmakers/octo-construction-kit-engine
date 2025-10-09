@@ -476,7 +476,7 @@ internal class ContentGenerator(
         }
         else if (ckModelId != null)
         {
-            titlePrefix = $" {ckModelId.ModelId} ";
+            titlePrefix = $" {ckModelId.Name} ";
         }
         else
         {

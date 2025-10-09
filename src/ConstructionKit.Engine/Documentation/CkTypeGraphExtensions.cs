@@ -158,7 +158,7 @@ internal static class CkTypeGraphExtensions
 
     private static async Task GetNamespaceName(CkTypeGraph ckTypeGraph, StreamWriter outputFile)
     {
-        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.ModelId.Replace(".", "")} {{").ConfigureAwait(false);
+        await outputFile.WriteLineAsync($"namespace {ckTypeGraph.CkTypeId.ModelId.Name.Replace(".", "")} {{").ConfigureAwait(false);
     }
 
     public static async Task LinkToType(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)
@@ -170,7 +170,7 @@ internal static class CkTypeGraphExtensions
 
     private static string CreateAnchor(this CkTypeGraph ckTypeGraph)
     {
-        return ckTypeGraph.CkTypeId.Key.TypeId.ToLower();
+        return ckTypeGraph.CkTypeId.Key.Name.ToLower();
     }
     
     public static async Task DrawExternal(this CkTypeGraph ckTypeGraph, StreamWriter outputFile, string baseRelativePath, ILinkHelpers linkHelpers)

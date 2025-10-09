@@ -12,7 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// The version number of a model allows to manage versioning of models, it is allowed to have
 /// different elements (types, records, etc.) with the same name in different versions of a model.
 /// </remarks>
-[DebuggerDisplay("{" + nameof(ModelId) + "} ({" + nameof(ModelVersion) + "})")]
+[DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkModelIdConverter))]
 public sealed record CkModelId : IComparable<CkModelId>, ICkKey
 {
@@ -28,24 +28,24 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
         if (versionIndex > 0)
         {
             _modelId = ckModelId.Substring(0, versionIndex);
-            ModelVersion = ckModelId.Substring(versionIndex + 1);
+            Version = ckModelId.Substring(versionIndex + 1);
         }
         else
         {
             _modelId = ckModelId;
-            ModelVersion = "1.0.0";
+            Version = "1.0.0";
         }
     }
 
     /// <summary>
-    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="modelId" /> and <paramref name="modelVersion" />.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="modelId" /> and <paramref name="version" />.
     /// </summary>
     /// <param name="modelId"></param>
-    /// <param name="modelVersion"></param>
-    public CkModelId(string modelId, string modelVersion)
+    /// <param name="version"></param>
+    public CkModelId(string modelId, string version)
     {
         _modelId = modelId;
-        ModelVersion = modelVersion;
+        Version = version;
     }
 
     /// <summary>
@@ -61,18 +61,18 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     /// <summary>
     ///     Returns the id of the model, e. g. "System"
     /// </summary>
-    public string ModelId => _modelId ?? "";
+    public string Name => _modelId ?? "";
 
     /// <summary>
     ///     Returns the version of the model, e. g. "1.0.0"
     /// </summary>
-    public CkVersion ModelVersion { get; }
+    public CkVersion Version { get; }
 
     /// <summary>
     ///     Returns the full name of the model, e. g. "System-1.0.0"
     /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
-    public string FullName => IsEmpty ? "" : ModelId.StartsWith("$") ? ModelId : $"{ModelId}-{ModelVersion}";
+    public string FullName => IsEmpty ? "" : Name.StartsWith("$") ? Name : $"{Name}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -84,10 +84,10 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
                 return "";
             }
 
-            var s = ModelId;
-            if (ModelVersion.Major > 1)
+            var s = Name;
+            if (Version.Major > 1)
             {
-                s += $"-{ModelVersion.Major}";
+                s += $"-{Version.Major}";
             }
 
             return s;
@@ -95,7 +95,7 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(ModelId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name);
 
     /// <inheritdoc />
     public TypeCode GetTypeCode()
@@ -219,19 +219,19 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
         {
             return 1;
         }
-        var result = string.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
+        var result = string.Compare(Name, other.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
         }
 
-        return ModelVersion.CompareTo(other.ModelVersion);
+        return Version.CompareTo(other.Version);
     }
 
     /// <inheritdoc />
     public bool Equals(CkModelId? other)
     {
-        return other is not null && ModelId == other.ModelId;
+        return other is not null && Name == other.Name;
     }
 
     /// <summary>
@@ -249,7 +249,7 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
         unchecked
         {
             var hash = 52;
-            hash = hash * 12 + ModelId.GetHashCode();
+            hash = hash * 12 + Name.GetHashCode();
             return hash;
         }
     }
@@ -260,6 +260,6 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkKey
     /// <returns></returns>
     public CkModelIdVersionRange ToVersionRange()
     {
-        return new CkModelIdVersionRange(ModelId, ModelVersion.ToString());
+        return new CkModelIdVersionRange(Name, $"[{Version.ToString()}]");
     }
 }

@@ -25,20 +25,25 @@ internal class CkIdsCodeGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Generated from construction kit model {ckModelId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public static class {ckModelId.ModelId.MakeClassName()}CkIds");
+        sb.AppendLine($"public static class {ckModelId.Name.MakeClassName()}CkIds");
         sb.AppendLine("{");
 
-        sb.AppendLine($"    public const string ModelId = \"{ckModelId.SemanticVersionedFullName}\";");
+        sb.AppendLine($"    public const string ModelIdName = \"{ckModelId.Name}\";");
+        sb.AppendLine($"    public const string ModelIdVersion = \"{ckModelId.Version.ToString()}\";");
+        sb.AppendLine(
+            $"    public static readonly CkModelId CkModelId = new CkModelId(\"{ckModelId.Name}\", \"{ckModelId.Version}\");");
 
         if (ckTypes != null)
         {
             sb.AppendLine();
             sb.AppendLine("    // Types");
 
-            foreach (var ckTypeDto in ckTypes.OrderBy(x => x.TypeId.TypeId))
+            foreach (var ckTypeDto in ckTypes.OrderBy(x => x.TypeId.Name))
             {
                 sb.AppendLine(
                     $"    public const string {ckTypeDto.TypeId.MakeClassName()}TypeId = \"{ckTypeDto.TypeId.SemanticVersionedFullName}\";");
+                sb.AppendLine(
+                    $"    public static readonly CkId<CkTypeId> Ck{ckTypeDto.TypeId.MakeClassName()}TypeId = new CkId<CkTypeId>(CkModelId, \"{ckTypeDto.TypeId.FullName}\");");
             }
         }
 
@@ -47,7 +52,7 @@ internal class CkIdsCodeGenerator
             sb.AppendLine();
             sb.AppendLine("    // Attributes");
 
-            foreach (var ckAttributeDto in ckAttributes.OrderBy(x => x.AttributeId.AttributeId))
+            foreach (var ckAttributeDto in ckAttributes.OrderBy(x => x.AttributeId.Name))
             {
                 sb.AppendLine(
                     $"    public const string {ckAttributeDto.AttributeId.MakeClassName()}Attribute = \"{ckAttributeDto.AttributeId.SemanticVersionedFullName}\";");
@@ -56,13 +61,15 @@ internal class CkIdsCodeGenerator
 
         if (ckAssociationRoles != null)
         {
+            sb.AppendLine();
+            sb.AppendLine("    // Associations");
+
             foreach (var ckAssociationRoleDto in ckAssociationRoles.OrderBy(x => x.AssociationRoleId.RoleId))
             {
-                sb.AppendLine();
-                sb.AppendLine("    // Associations");
-
                 sb.AppendLine(
-                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.MakeClassName()} = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
+                    $"    public const string {ckAssociationRoleDto.AssociationRoleId.MakeClassName()}RoleId = \"{ckAssociationRoleDto.AssociationRoleId.SemanticVersionedFullName}\";");
+            sb.AppendLine(
+                $"    public static readonly CkId<CkAssociationRoleId> Ck{ckAssociationRoleDto.AssociationRoleId.MakeClassName()}RoleId = new CkId<CkAssociationRoleId>(CkModelId, \"{ckAssociationRoleDto.AssociationRoleId.FullName}\");");
             }
         }
 

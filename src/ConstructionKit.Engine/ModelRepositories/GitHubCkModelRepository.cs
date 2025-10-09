@@ -101,14 +101,14 @@ public class GitHubCkModelRepository : ICkModelRepository
                     {
                         // Find the latest version that satisfies the version range
                         var satisfiedVersions = availableVersions
-                            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.ModelVersion))
+                            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.Version))
                             .ToList();
 
                         if (satisfiedVersions.Any())
                         {
                             // Return the latest satisfied version
                             var latestSatisfiedVersion = satisfiedVersions
-                                .OrderByDescending(modelId => modelId.ModelVersion)
+                                .OrderByDescending(modelId => modelId.Version)
                                 .First();
 
                             return new ModelExistingResult
@@ -134,7 +134,7 @@ public class GitHubCkModelRepository : ICkModelRepository
 
         // Find the latest version that satisfies the version range
         var satisfiedVersionList = availableVersions
-            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.ModelVersion))
+            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.Version))
             .ToList();
 
         if (!satisfiedVersionList.Any())
@@ -144,7 +144,7 @@ public class GitHubCkModelRepository : ICkModelRepository
 
         // Return the latest satisfied version
         var latestSatisfied = satisfiedVersionList
-            .OrderByDescending(modelId => modelId.ModelVersion)
+            .OrderByDescending(modelId => modelId.Version)
             .First();
 
         return new ModelExistingResult
@@ -376,10 +376,10 @@ public class GitHubCkModelRepository : ICkModelRepository
     private string CreatePath(CkModelId ckModelId)
     {
         return "ck-models/"
-               + ckModelId.ModelId[0].ToString().ToLower() + "/"
-               + ckModelId.ModelId + "/"
-               + ckModelId.ModelVersion.Major
-               + "/ck-" + ckModelId.ModelId.ToLower() + "-" + ckModelId.ModelVersion + ".json";
+               + ckModelId.Name[0].ToString().ToLower() + "/"
+               + ckModelId.Name + "/"
+               + ckModelId.Version.Major
+               + "/ck-" + ckModelId.Name.ToLower() + "-" + ckModelId.Version + ".json";
     }
 
     private HttpClient CreateHttpClient()
@@ -507,7 +507,7 @@ public class GitHubCkModelRepository : ICkModelRepository
     private async Task UpdateMajorVersionIndexAsync(CkModelId modelId, IGitHubClient gitHubClient)
     {
         // Create index file path for this major version
-        var indexPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/{modelId.ModelVersion.Major}/index.json";
+        var indexPath = $"ck-models/{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/index.json";
 
         MajorVersionIndex? existingIndexData = null;
         string? existingIndexSha = null;
@@ -549,12 +549,12 @@ public class GitHubCkModelRepository : ICkModelRepository
         }
 
         // Check if the current version already exists in the index
-        var currentVersionString = modelId.ModelVersion.ToString();
+        var currentVersionString = modelId.Version.ToString();
         if (!versionDict.ContainsKey(currentVersionString))
         {
             // Add the new version only if it doesn't exist
-            var fileName = $"ck-{modelId.ModelId.ToLower()}-{currentVersionString}.json";
-            var filePath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/{modelId.ModelVersion.Major}/{fileName}";
+            var fileName = $"ck-{modelId.Name.ToLower()}-{currentVersionString}.json";
+            var filePath = $"ck-models/{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{fileName}";
 
             versionDict[currentVersionString] = new VersionIndexEntry
             {
@@ -573,8 +573,8 @@ public class GitHubCkModelRepository : ICkModelRepository
         // Create updated index
         var index = new MajorVersionIndex
         {
-            ModelId = modelId.ModelId,
-            MajorVersion = modelId.ModelVersion.Major,
+            ModelId = modelId.Name,
+            MajorVersion = modelId.Version.Major,
             LatestVersion = sortedVersions.FirstOrDefault()?.Version,
             Versions = sortedVersions,
             UpdatedAt = existingIndexData?.UpdatedAt ?? DateTime.UtcNow // Preserve original creation time if exists
@@ -601,7 +601,7 @@ public class GitHubCkModelRepository : ICkModelRepository
                 _gitHubOptions.Value.GitHubRepositoryOwner,
                 _gitHubOptions.Value.GitHubRepositoryName,
                 indexPath,
-                new UpdateFileRequest($"Update index for {modelId.ModelId} v{modelId.ModelVersion.Major}", indexContent, existingIndexSha))
+                new UpdateFileRequest($"Update index for {modelId.Name} v{modelId.Version.Major}", indexContent, existingIndexSha))
                 .ConfigureAwait(false);
         }
         else
@@ -611,7 +611,7 @@ public class GitHubCkModelRepository : ICkModelRepository
                 _gitHubOptions.Value.GitHubRepositoryOwner,
                 _gitHubOptions.Value.GitHubRepositoryName,
                 indexPath,
-                new CreateFileRequest($"Create index for {modelId.ModelId} v{modelId.ModelVersion.Major}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
+                new CreateFileRequest($"Create index for {modelId.Name} v{modelId.Version.Major}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
                 .ConfigureAwait(false);
         }
     }
@@ -637,7 +637,7 @@ public class GitHubCkModelRepository : ICkModelRepository
     private async Task UpdateModelIndexAsync(CkModelId modelId, IGitHubClient gitHubClient)
     {
         // Create index file path for the model
-        var indexPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/index.json";
+        var indexPath = $"ck-models/{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/index.json";
 
         ModelIndex? existingIndexData = null;
         string? existingIndexSha = null;
@@ -669,7 +669,7 @@ public class GitHubCkModelRepository : ICkModelRepository
         }
 
         // Check or update the entry for the current major version
-        var currentMajor = modelId.ModelVersion.Major;
+        var currentMajor = modelId.Version.Major;
         var majorVersionEntry = existingIndexData?.MajorVersions?.FirstOrDefault(m => m.MajorVersion == currentMajor);
 
         if (majorVersionEntry == null)
@@ -688,7 +688,7 @@ public class GitHubCkModelRepository : ICkModelRepository
             if (existingEntry != null)
             {
                 // Update the existing entry
-                existingEntry.LatestVersion = modelId.ModelVersion.ToString();
+                existingEntry.LatestVersion = modelId.Version.ToString();
                 existingEntry.AvailableVersionsCount++; // Increment count
             }
             else
@@ -697,9 +697,9 @@ public class GitHubCkModelRepository : ICkModelRepository
                 majorVersions.Add(new MajorVersionEntry
                 {
                     MajorVersion = currentMajor,
-                    LatestVersion = modelId.ModelVersion.ToString(),
+                    LatestVersion = modelId.Version.ToString(),
                     AvailableVersionsCount = 1,
-                    IndexPath = $"ck-models/{modelId.ModelId[0].ToString().ToLower()}/{modelId.ModelId}/{currentMajor}/index.json"
+                    IndexPath = $"ck-models/{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{currentMajor}/index.json"
                 });
             }
 
@@ -709,7 +709,7 @@ public class GitHubCkModelRepository : ICkModelRepository
             // Create updated index
             var modelIndex = new ModelIndex
             {
-                ModelId = modelId.ModelId,
+                ModelId = modelId.Name,
                 LatestVersion = majorVersions.FirstOrDefault()?.LatestVersion,
                 MajorVersions = majorVersions,
                 UpdatedAt = originalCreatedAt ?? DateTime.UtcNow
@@ -736,7 +736,7 @@ public class GitHubCkModelRepository : ICkModelRepository
                     _gitHubOptions.Value.GitHubRepositoryOwner,
                     _gitHubOptions.Value.GitHubRepositoryName,
                     indexPath,
-                    new UpdateFileRequest($"Update model index for {modelId.ModelId}", indexContent, existingIndexSha))
+                    new UpdateFileRequest($"Update model index for {modelId.Name}", indexContent, existingIndexSha))
                     .ConfigureAwait(false);
             }
             else
@@ -746,20 +746,20 @@ public class GitHubCkModelRepository : ICkModelRepository
                     _gitHubOptions.Value.GitHubRepositoryOwner,
                     _gitHubOptions.Value.GitHubRepositoryName,
                     indexPath,
-                    new CreateFileRequest($"Create model index for {modelId.ModelId}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
+                    new CreateFileRequest($"Create model index for {modelId.Name}", indexContent, _gitHubOptions.Value.GitHubRepositoryBranch))
                     .ConfigureAwait(false);
             }
         }
         else
         {
             // Major version already exists, just check if we need to update the latest version
-            var currentVersionObj = new CkVersion(modelId.ModelVersion.ToString());
+            var currentVersionObj = new CkVersion(modelId.Version.ToString());
             var existingLatestObj = new CkVersion(majorVersionEntry.LatestVersion ?? "0.0.0");
 
             if (currentVersionObj.CompareTo(existingLatestObj) > 0)
             {
                 // Current version is newer, update the index
-                majorVersionEntry.LatestVersion = modelId.ModelVersion.ToString();
+                majorVersionEntry.LatestVersion = modelId.Version.ToString();
 
                 // Check if we need to update the overall latest version
                 var overallLatest = existingIndexData!.MajorVersions
@@ -769,7 +769,7 @@ public class GitHubCkModelRepository : ICkModelRepository
 
                 var modelIndex = new ModelIndex
                 {
-                    ModelId = modelId.ModelId,
+                    ModelId = modelId.Name,
                     LatestVersion = overallLatest,
                     MajorVersions = existingIndexData.MajorVersions,
                     UpdatedAt = DateTime.UtcNow
@@ -787,7 +787,7 @@ public class GitHubCkModelRepository : ICkModelRepository
                     _gitHubOptions.Value.GitHubRepositoryOwner,
                     _gitHubOptions.Value.GitHubRepositoryName,
                     indexPath,
-                    new UpdateFileRequest($"Update model index for {modelId.ModelId}", indexContent, existingIndexSha!))
+                    new UpdateFileRequest($"Update model index for {modelId.Name}", indexContent, existingIndexSha!))
                     .ConfigureAwait(false);
             }
         }

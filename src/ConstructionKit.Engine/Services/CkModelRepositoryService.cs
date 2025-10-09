@@ -99,6 +99,11 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
             .ConfigureAwait(false);
     }
 
+    public async Task<bool> IsCkModelExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)
+    {
+        return await _ckModelRepositoryManager.IsCkModelExistingAsync(ckModelId, sourceIdentifier)
+            .ConfigureAwait(false);
+    }
 
     /// <inheritdoc />
     public async Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath,
@@ -181,7 +186,7 @@ internal class CkModelRepositoryService : ICkModelRepositoryService
                 .ConfigureAwait(false);
             if (operationResult.HasErrors || operationResult.HasFatalErrors || compiledModelRoot == null)
             {
-                _logger.LogError("Error loading model \'{ModelId}\'", ckModelExistingResult.ModelId);
+                _logger.LogError("Error loading model \'{Name}\'", ckModelExistingResult.ModelId);
                 throw CompilerException.OperationResultWithErrors(operationResult);
             }
 

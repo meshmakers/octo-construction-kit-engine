@@ -103,7 +103,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
         // Find the latest version that satisfies the version range
         var satisfiedVersions = availableVersions
-            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.ModelVersion))
+            .Where(modelId => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(modelId.Version))
             .ToList();
 
         if (!satisfiedVersions.Any())
@@ -113,7 +113,7 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
 
         // Return the latest satisfied version
         var latestSatisfiedVersion = satisfiedVersions
-            .OrderByDescending(modelId => modelId.ModelVersion)
+            .OrderByDescending(modelId => modelId.Version)
             .First();
 
         return Task.FromResult(new ModelExistingResult
@@ -221,10 +221,10 @@ public class LocalFileSystemCkModelRepository : ICkModelRepository
     private string CreatePath(CkModelId ckModelId)
     {
         var rootPath = _options.Value.RootPath;
-        var modelPath = Path.Combine(rootPath, "ck-models", ckModelId.ModelId);
-        var modelVersionPath = Path.Combine(modelPath, ckModelId.ModelVersion.Major.ToString());
+        var modelPath = Path.Combine(rootPath, "ck-models", ckModelId.Name);
+        var modelVersionPath = Path.Combine(modelPath, ckModelId.Version.Major.ToString());
         // Include full version in filename: ck-{modelid}-{version}.json
-        var compiledModelFile = $"ck-{ckModelId.ModelId.ToLower()}-{ckModelId.ModelVersion}.json";
+        var compiledModelFile = $"ck-{ckModelId.Name.ToLower()}-{ckModelId.Version}.json";
         var compiledModelFilePath = Path.Combine(modelVersionPath, compiledModelFile);
         return compiledModelFilePath;
     }

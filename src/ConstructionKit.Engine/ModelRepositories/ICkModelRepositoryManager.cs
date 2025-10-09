@@ -10,6 +10,32 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelRepositories;
 internal interface ICkModelRepositoryManager
 {
     /// <summary>
+    ///     Tries to look up a model by its id
+    /// </summary>
+    /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="operationResult">Operation results
+    /// that contain validation messages occured during deserialization.</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>If existing the deserialized and validated construction kit model</returns>
+    public Task<CkCompiledModelRoot?> TryLookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+    
+    /// <summary>
+    ///     Tries to look up a model by its id in a specific repository
+    /// </summary>
+    /// <param name="repositoryName">Name of Repository.</param>
+    /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="operationResult">Operation results
+    /// that contain validation messages occured during deserialization.</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>If existing the deserialized and validated construction kit model</returns>
+    public Task<CkCompiledModelRoot?> TryLookupCkModelAsync(string repositoryName, CkModelId ckModelId, OperationResult operationResult,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
     ///     Looks up a model by its id
     /// </summary>
     /// <param name="ckModelId">The construction kit model id</param>
@@ -20,9 +46,9 @@ internal interface ICkModelRepositoryManager
     /// which the repository should search set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns>If existing the deserialized and validated construction kit model</returns>
-    public Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+    public Task<CkCompiledModelRoot> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
-    
+
     /// <summary>
     ///     Looks up a model by its id in a specific repository
     /// </summary>
@@ -32,7 +58,7 @@ internal interface ICkModelRepositoryManager
     /// that contain validation messages occured during deserialization.</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
     /// <returns>If existing the deserialized and validated construction kit model</returns>
-    public Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId, OperationResult operationResult,
+    public Task<CkCompiledModelRoot> LookupCkModelAsync(string repositoryName, CkModelId ckModelId, OperationResult operationResult,
         CancellationToken? cancellationToken = null);
 
     /// <summary>
@@ -98,6 +124,16 @@ internal interface ICkModelRepositoryManager
     /// which the repository should search set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in a given repository</returns>
     Task<bool> IsCkModelExistingAsync(string repositoryName, CkModelId ckModelId, object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Returns true if the model exists in a given repository
+    /// </summary>
+    /// <param name="ckModelId">The construction kit model id</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
+    /// <returns></returns>
+    Task<bool> IsCkModelExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null);
 
     /// <summary>
     ///     Returns true if the model within the version range exists in a given repository

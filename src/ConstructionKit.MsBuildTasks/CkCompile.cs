@@ -177,34 +177,34 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 }
 
                                 var originFileResolver = new OriginFileResolver(compileResult.CompiledModelFile);
-                                var resolvedTypes = await modelResolver.ResolveAsync(ckCompiledModelRoot,
+                                var modelGraph = await modelResolver.HardResolveAsync(ckCompiledModelRoot,
                                     originFileResolver,
                                     operationResult);
 
                                 var path = MmPath.NormalizePath(OutputPath);
 
-                                await mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await mermaidGenerator.GenerateMermaidTextOutput(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
                                 await contentGenerator.GenerateVersionHistory(path, ckCompiledModelRoot.ModelId,
-                                    ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                    ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
 
-                                await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateAttributesMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateEnumsMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateRecordsMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
-                                await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateTypesMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
 
                                     CkLinkPath);
-                                await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, path,
-                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.ModelVersion.ToString(),
+                                await contentGenerator.GenerateAssociationRolesMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
                             }
                         }

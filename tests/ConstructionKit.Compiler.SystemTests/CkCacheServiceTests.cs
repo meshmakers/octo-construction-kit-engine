@@ -20,7 +20,7 @@ public class CkCacheServiceTests(TemporaryDirectoryFixture fixture)
         var modelResolver = serviceProvider.GetRequiredService<IModelResolver>();
         ckCacheService.CreateTenant("test1");
 
-        var (ckModelGraph, _) = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        var (ckModelGraph, _) = await modelResolver.HardResolveAsync(Builder.Build(), originFileResolver, operationResult);
         ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
         Assert.NotNull(ckCacheService.GetCkType("test1", "sample1/Demo1"));
@@ -40,7 +40,7 @@ public class CkCacheServiceTests(TemporaryDirectoryFixture fixture)
 
         ckCacheService.CreateTenant("test1");
 
-        var (ckModelGraph, _) = await modelResolver.ResolveAsync(Builder.Build(), originFileResolver, operationResult);
+        var (ckModelGraph, _) = await modelResolver.HardResolveAsync(Builder.Build(), originFileResolver, operationResult);
         ckCacheService.LoadCkModelGraph("test1", ckModelGraph);
 
         await using (var streamWriter = File.OpenWrite(filePath))

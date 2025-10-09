@@ -26,16 +26,16 @@ public class CkEmbeddedModelDiGenerator
         sb.AppendLine(
             $"/// Extension methods for adding a embedded version of construction kit model {ckModelId.FullName} to the DI container.");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public static class ServiceCollection{ckModelId.ModelId.MakeClassName()}Extensions");
+        sb.AppendLine($"public static class ServiceCollection{ckModelId.Name.MakeClassName()}Extensions");
         sb.AppendLine("{");
         sb.AppendLine();
-        sb.AppendLine($"   public static IServiceCollection AddCkModel{ckModelId.ModelId.MakeClassName()}(");
+        sb.AppendLine($"   public static IServiceCollection AddCkModel{ckModelId.Name.MakeClassName()}(");
         sb.AppendLine("        this IServiceCollection services)");
         sb.AppendLine("    {");
-        sb.AppendLine($"        services.AddTransient<ICkEmbeddedModel, {ckModelId.ModelId.MakeClassName()}CkEmbeddedModel>();");
+        sb.AppendLine($"        services.AddTransient<ICkEmbeddedModel, {ckModelId.Name.MakeClassName()}CkEmbeddedModel>();");
         if (createCkTypeMap)
         {
-            sb.AppendLine($"        services.AddTransient<ICkClassMap, {ckModelId.ModelId.MakeClassName()}CkTypeMap>();");
+            sb.AppendLine($"        services.AddTransient<ICkClassMap, {ckModelId.Name.MakeClassName()}CkTypeMap>();");
         }
         sb.AppendLine();
         sb.AppendLine("        return services;");

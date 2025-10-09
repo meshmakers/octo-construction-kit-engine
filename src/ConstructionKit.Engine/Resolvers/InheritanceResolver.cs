@@ -407,12 +407,12 @@ internal class InheritanceResolver : IInheritanceResolver
 
         if (!ckTypeIds.Any())
         {
-            if (!CompilerStatics.WhiteListedCkTypeIds.Any(x => x.ModelId.ModelId == ckTypeId.ModelId.ModelId
-                                                               && x.Key.TypeId == ckTypeId.Key.TypeId))
+            if (!CompilerStatics.WhiteListedCkTypeIds.Any(x => x.ModelId.Name == ckTypeId.ModelId.Name
+                                                               && x.Key.Name == ckTypeId.Key.Name))
             {
                 operationResult.AddMessage(
-                    MessageCodes.InheritanceMissing(originFileResolver.Resolve(ckTypeId), ckTypeId.Key.TypeId));
-                throw ModelValidationException.InheritanceMissing(ckTypeId.Key.TypeId);
+                    MessageCodes.InheritanceMissing(originFileResolver.Resolve(ckTypeId), ckTypeId.Key.Name));
+                throw ModelValidationException.InheritanceMissing(ckTypeId.Key.Name);
             }
         }
 

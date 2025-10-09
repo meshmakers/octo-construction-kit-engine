@@ -35,19 +35,19 @@ internal class ModelResolver : IModelResolver
         _variableResolver = variableResolver;
     }
 
-    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    public Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
         object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
-        return ResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+        return HardResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
     }
 
-    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds,
+    public async Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
         var modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds.Select(id => id.ToVersionRange()).ToList(),
+        await _dependencyResolver.HardResolveDependenciesAsync(ckModelIds.Select(id => id.ToVersionRange()).ToList(),
                 modelGraph, _variableResolver,
                 originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
@@ -58,26 +58,60 @@ internal class ModelResolver : IModelResolver
         return modelGraph;
     }
 
-    public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel,
+    public Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+        object? sourceIdentifier = null)
+    {
+        var originFileResolver = new OriginFileResolver("-");
+        return SoftResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+    }
+
+    public async Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver, OperationResult operationResult,
+        object? sourceIdentifier = null)
+    {
+        var modelGraph = new CkModelGraph();
+
+        var dependencyResolveResult = await _dependencyResolver.SoftResolveDependenciesAsync(ckModelIds,
+                modelGraph, _variableResolver,
+                originFileResolver, operationResult, sourceIdentifier)
+            .ConfigureAwait(false);
+
+        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
+        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
+
+        return new ModelResolveResult
+        {
+            CkModelGraph = modelGraph,
+            SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
+            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? []
+        };
+    }
+
+    public async Task<ModelResolveResult> SoftResolveAsync(CkCompiledModelRoot compiledModel,
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
         var modelGraph = new CkModelGraph();
 
+        DependencyResolveResult? dependencyResolveResult = null;
         if (compiledModel.Dependencies != null)
         {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph,
+            dependencyResolveResult = await _dependencyResolver.SoftResolveDependenciesAsync(
+                    compiledModel.Dependencies, modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
         }
 
         Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
-        return modelGraph;
+        return new ModelResolveResult
+        {
+            CkModelGraph = modelGraph, SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
+            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? []
+        };
     }
 
 
-    public async Task<(CkModelGraph, CkCompiledModelRoot)> ResolveAsync(CkModelCompileCandidate compileCandidate,
+    public async Task<(CkModelGraph, CkCompiledModelRoot)> HardResolveAsync(CkModelCompileCandidate compileCandidate,
         IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
@@ -86,7 +120,8 @@ internal class ModelResolver : IModelResolver
 
         if (compileCandidate.DependencyRanges != null)
         {
-            resolvedModelIds = await _dependencyResolver.ResolveDependenciesAsync(compileCandidate.DependencyRanges, modelGraph,
+            resolvedModelIds = await _dependencyResolver.HardResolveDependenciesAsync(compileCandidate.DependencyRanges,
+                    modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
@@ -109,6 +144,26 @@ internal class ModelResolver : IModelResolver
         return (modelGraph, compiledModel);
     }
 
+    public async Task<CkModelGraph> HardResolveAsync(CkCompiledModelRoot compiledModel,
+        IOriginFileResolver originFileResolver,
+        OperationResult operationResult, object? sourceIdentifier = null)
+    {
+        var modelGraph = new CkModelGraph();
+
+        if (compiledModel.Dependencies != null)
+        {
+            await _dependencyResolver.HardResolveDependenciesAsync(
+                    compiledModel.Dependencies, modelGraph,
+                    _variableResolver,
+                    originFileResolver, operationResult, sourceIdentifier)
+                .ConfigureAwait(false);
+        }
+
+        Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
+
+        return modelGraph;
+    }
+
     private void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
@@ -123,23 +178,23 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
 
         // Check: Ensure that the model forces no circular dependencies.
-        if (modelGraph.Dependencies.Any(x => x.Key.ModelId == modelRootBase.ModelId.ModelId))
+        if (modelGraph.Dependencies.Any(x => x.Key.Name == modelRootBase.ModelId.Name))
         {
-            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == modelRootBase.ModelId.ModelId);
+            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.Name == modelRootBase.ModelId.Name);
 
             operationResult.AddMessage(MessageCodes.CircularDependency(
-                originFileResolver.Resolve(modelRootBase.ModelId.ModelId),
-                modelRootBase.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
+                originFileResolver.Resolve(modelRootBase.ModelId.Name),
+                modelRootBase.ModelId.Name, dependentModels.Select(x => x.Name).ToList()));
         }
 
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
         _elementResolver.Resolve(modelRootBase, modelGraph, _variableResolver, originFileResolver, operationResult);
 
-        if (!Regex.IsMatch(modelRootBase.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
+        if (!Regex.IsMatch(modelRootBase.ModelId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
         {
             operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(
-                originFileResolver.Resolve(modelRootBase.ModelId.ModelId), modelRootBase.ModelId.ModelId));
-            throw ModelValidationException.ModelIdContainsInvalidCharacters(modelRootBase.ModelId.ModelId);
+                originFileResolver.Resolve(modelRootBase.ModelId.Name), modelRootBase.ModelId.Name));
+            throw ModelValidationException.ModelIdContainsInvalidCharacters(modelRootBase.ModelId.Name);
         }
 
 

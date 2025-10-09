@@ -26,7 +26,65 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+    public async Task<CkCompiledModelRoot?> TryLookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        _logger.LogInformation("Looking up CK model with id {CkModelId} in repositories", ckModelId);
+
+        foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x => x.Order))
+        {
+            if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+            {
+                continue;
+            }
+
+            _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}",
+                ckModelRepository.RepositoryName, ckModelId);
+
+            var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier)
+                .ConfigureAwait(false);
+            if (hasBeenFound)
+            {
+                _logger.LogInformation("Found model {CkModelId} in repository {RepositoryName}", ckModelId, ckModelRepository.RepositoryName);
+                return await ckModelRepository.GetModelAsync(ckModelId, operationResult, sourceIdentifier)
+                    .ConfigureAwait(false);
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot?> TryLookupCkModelAsync(string repositoryName, CkModelId ckModelId,
+        OperationResult operationResult,
+        CancellationToken? cancellationToken = null)
+    {
+        _logger.LogInformation("Looking up CK model with id {CkModelId} in repository {RepositoryName}", ckModelId,
+            repositoryName);
+
+        var ckModelRepository = _ckModelRepositories.FirstOrDefault(x => string.Compare(x.RepositoryName,
+            repositoryName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (ckModelRepository == null)
+        {
+            throw ModelRepositoryException.ModelRepositoryNotFound(repositoryName);
+        }
+
+        _logger.LogInformation("Checking repository {RepositoryName} for model {CkModelId}",
+            ckModelRepository.RepositoryName, ckModelId);
+
+        var hasBeenFound = await ckModelRepository.IsModelIdExistingAsync(ckModelId)
+            .ConfigureAwait(false);
+        if (hasBeenFound)
+        {
+            return await ckModelRepository.GetModelAsync(ckModelId, operationResult)
+                .ConfigureAwait(false);
+        }
+
+        return null;
+    }
+
+        /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> LookupCkModelAsync(CkModelId ckModelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         _logger.LogInformation("Looking up CK model with id {CkModelId} in repositories", ckModelId);
@@ -55,7 +113,7 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot?> LookupCkModelAsync(string repositoryName, CkModelId ckModelId,
+    public async Task<CkCompiledModelRoot> LookupCkModelAsync(string repositoryName, CkModelId ckModelId,
         OperationResult operationResult,
         CancellationToken? cancellationToken = null)
     {
@@ -184,6 +242,25 @@ internal class CkModelRepositoryManager : ICkModelRepositoryManager
         }
 
         return await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+    }
+
+    public async Task<bool> IsCkModelExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null)
+    {
+        foreach (var ckModelRepository in _ckModelRepositories.OrderBy(x => x.Order))
+        {
+            if (!ckModelRepository.IsSupportingSourceIdentifier(sourceIdentifier))
+            {
+                continue;
+            }
+
+            var isExisting = await ckModelRepository.IsModelIdExistingAsync(ckModelId, sourceIdentifier).ConfigureAwait(false);
+            if (isExisting)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public async Task<ModelExistingResult> IsCkModelExistingAsync(CkModelIdVersionRange ckModelIdVersionRange,

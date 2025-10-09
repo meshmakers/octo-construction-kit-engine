@@ -7,48 +7,48 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit type id
 /// </summary>
-[DebuggerDisplay("{" + nameof(EnumId) + "} ({" + nameof(Version) + "})")]
+[DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkEnumIdConverter))]
 public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
 {
     /// <summary>
-    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="enumId" />.
+    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="name" />.
     /// </summary>
-    /// <param name="enumId"></param>
+    /// <param name="name"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkEnumId(string enumId)
+    public CkEnumId(string name)
     {
-        var typeIndex = enumId.IndexOf("-", StringComparison.Ordinal);
+        var typeIndex = name.IndexOf("-", StringComparison.Ordinal);
         if (typeIndex < 0)
         {
-            EnumId = enumId;
+            Name = name;
             Version = "1.0.0";
         }
         else
         {
-            EnumId = enumId.Substring(0, typeIndex);
-            Version = enumId.Substring(typeIndex + 1);
+            Name = name.Substring(0, typeIndex);
+            Version = name.Substring(typeIndex + 1);
         }
 
-        if (string.IsNullOrWhiteSpace(EnumId))
+        if (string.IsNullOrWhiteSpace(Name))
         {
-            throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
+            throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a enum id");
         }
     }
 
     /// <summary>
-    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="enumId" /> and <paramref name="version" />.
+    ///     Creates a new <see cref="CkEnumId" /> from the given <paramref name="name" /> and <paramref name="version" />.
     /// </summary>
-    /// <param name="enumId"></param>
+    /// <param name="name"></param>
     /// <param name="version"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkEnumId(string enumId, string version = "1.0.0")
+    public CkEnumId(string name, string version = "1.0.0")
     {
-        EnumId = enumId;
+        Name = name;
         Version = version;
-        if (string.IsNullOrWhiteSpace(EnumId))
+        if (string.IsNullOrWhiteSpace(Name))
         {
-            throw new ArgumentOutOfRangeException(nameof(enumId), enumId, $"{nameof(enumId)} must contain a enum id");
+            throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a enum id");
         }
     }
 
@@ -65,7 +65,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
     /// <summary>
     ///     Defines the name of the type, e. g. "Person"
     /// </summary>
-    public string EnumId { get; }
+    public string Name { get; }
 
     /// <summary>
     ///     Returns the version of the type, e. g. "1.0.0"
@@ -73,7 +73,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
     public CkVersion Version { get; }
 
     /// <inheritdoc />
-    public string FullName => IsEmpty ? "" : $"{EnumId}-{Version}";
+    public string FullName => IsEmpty ? "" : $"{Name}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -85,7 +85,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
                 return "";
             }
 
-            var s = EnumId;
+            var s = Name;
             if (Version.Major > 1)
             {
                 s += $"-{Version.Major}";
@@ -96,7 +96,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(EnumId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name);
 
 
     /// <inheritdoc />
@@ -106,7 +106,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
         {
             return 1;
         }
-        var result = string.Compare(EnumId, other.EnumId, StringComparison.Ordinal);
+        var result = string.Compare(Name, other.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -118,7 +118,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
     /// <inheritdoc />
     public bool Equals(CkEnumId? other)
     {
-        return other is not null && EnumId == other.EnumId && Equals(Version, other.Version);
+        return other is not null && Name == other.Name && Equals(Version, other.Version);
     }
 
     /// <inheritdoc />
@@ -251,7 +251,7 @@ public sealed record CkEnumId : IComparable<CkEnumId>, ICkKey
         unchecked
         {
             var hash = 17;
-            hash = hash * 23 + EnumId.GetHashCode();
+            hash = hash * 23 + Name.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }

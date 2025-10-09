@@ -14,9 +14,9 @@ public class CkIdTests
 
     private void test(CkId<CkTypeId> ckTypeId)
     {
-        Assert.Equal("System", ckTypeId.ModelId.ModelId);
-        Assert.Equal("Designation", ckTypeId.Key.TypeId);
-        Assert.Equal("1.0.0", ckTypeId.ModelId.ModelVersion);
+        Assert.Equal("System", ckTypeId.ModelId.Name);
+        Assert.Equal("Designation", ckTypeId.Key.Name);
+        Assert.Equal("1.0.0", ckTypeId.ModelId.Version);
         Assert.Equal("1.0.0", ckTypeId.Key.Version);
     }
 }

@@ -8,7 +8,7 @@ public class CkAttributeIdTests
     public void Create_CkAttributeId_Complete()
     {
         var attributeId = new CkAttributeId("Designation-1.0.0");
-        Assert.Equal("Designation", attributeId.AttributeId);
+        Assert.Equal("Designation", attributeId.Name);
         Assert.Equal("1.0.0", attributeId.Version);
     }
 
@@ -16,7 +16,7 @@ public class CkAttributeIdTests
     public void Create_CkAttributeId_WithoutVersion()
     {
         var attributeId = new CkAttributeId("Designation");
-        Assert.Equal("Designation", attributeId.AttributeId);
+        Assert.Equal("Designation", attributeId.Name);
         Assert.Equal("1.0.0", attributeId.Version);
     }
 
@@ -24,7 +24,7 @@ public class CkAttributeIdTests
     public void Create_CkAttributeId_FromString()
     {
         CkAttributeId attributeId = "Designation-1.0.0";
-        Assert.Equal("Designation", attributeId.AttributeId);
+        Assert.Equal("Designation", attributeId.Name);
         Assert.Equal("1.0.0", attributeId.Version);
     }
 

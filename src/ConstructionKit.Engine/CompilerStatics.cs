@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Engine.Tests")]
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.SystemTests")]
-
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 namespace Meshmakers.Octo.ConstructionKit.Engine;
 
 internal static class CompilerStatics

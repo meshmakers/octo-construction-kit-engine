@@ -8,7 +8,7 @@ public class CkTypeIdTests
     public void Create_CkTypeId_Complete()
     {
         var ckTypeId = new CkTypeId("TestEntity-1.0.0");
-        Assert.Equal("TestEntity", ckTypeId.TypeId);
+        Assert.Equal("TestEntity", ckTypeId.Name);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
 
@@ -16,7 +16,7 @@ public class CkTypeIdTests
     public void Create_CkTypeId_WithoutVersion()
     {
         var ckTypeId = new CkTypeId("TestEntity");
-        Assert.Equal("TestEntity", ckTypeId.TypeId);
+        Assert.Equal("TestEntity", ckTypeId.Name);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
 
@@ -24,7 +24,7 @@ public class CkTypeIdTests
     public void Create_CkTypeId_FromString()
     {
         CkTypeId ckTypeId = "TestEntity-1.0.0";
-        Assert.Equal("TestEntity", ckTypeId.TypeId);
+        Assert.Equal("TestEntity", ckTypeId.Name);
         Assert.Equal("1.0.0", ckTypeId.Version);
     }
 

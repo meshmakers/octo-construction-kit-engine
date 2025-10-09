@@ -26,15 +26,17 @@ public class CkValidationService : ICkValidationService
     public async Task<ICkModelGraph> ValidateAsync(CkCompiledModelRoot compiledModel,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
     {
-        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
+        var r = await _modelResolver.HardResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
+
+        return r;
     }
 
     /// <inheritdoc />
     public async Task<(ICkModelGraph, CkCompiledModelRoot)> ValidateAsync(CkModelCompileCandidate compileCandidate, IOriginFileResolver originFileResolver,
         OperationResult operationResult, object? sourceIdentifier = null)
     {
-        return await _modelResolver.ResolveAsync(compileCandidate, originFileResolver, operationResult, sourceIdentifier)
+        return await _modelResolver.HardResolveAsync(compileCandidate, originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
     }
 
@@ -43,7 +45,7 @@ public class CkValidationService : ICkValidationService
         object? sourceIdentifier = null)
     {
         var originFileResolver = new OriginFileResolver("-");
-        return await _modelResolver.ResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
+        return await _modelResolver.HardResolveAsync(compiledModel, originFileResolver, operationResult, sourceIdentifier)
             .ConfigureAwait(false);
     }
 }

@@ -25,11 +25,11 @@ internal class ElementResolver : IElementResolver
             {
                 var ckAttributeId = new CkId<CkAttributeId>(modelRootBase.ModelId, ckAttribute.AttributeId);
 
-                if (!Regex.IsMatch(ckAttribute.AttributeId.AttributeId, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckAttribute.AttributeId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(
                         originFileResolver.Resolve(ckAttributeId),
-                        ckAttribute.AttributeId.AttributeId));
+                        ckAttribute.AttributeId.Name));
                     continue;
                 }
 
@@ -142,11 +142,11 @@ internal class ElementResolver : IElementResolver
             foreach (var ckType in modelRootBase.Types)
             {
                 var ckTypeId = new CkId<CkTypeId>(modelRootBase.ModelId, ckType.TypeId);
-                if (!Regex.IsMatch(ckType.TypeId.TypeId, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckType.TypeId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId),
-                            ckType.TypeId.TypeId));
+                            ckType.TypeId.Name));
                     continue;
                 }
 
@@ -220,11 +220,11 @@ internal class ElementResolver : IElementResolver
             foreach (var ckRecord in modelRootBase.Records)
             {
                 var ckRecordId = new CkId<CkRecordId>(modelRootBase.ModelId, ckRecord.RecordId);
-                if (!Regex.IsMatch(ckRecord.RecordId.RecordId, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckRecord.RecordId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(
                         originFileResolver.Resolve(ckRecordId),
-                        ckRecord.RecordId.RecordId));
+                        ckRecord.RecordId.Name));
                     continue;
                 }
 
@@ -284,11 +284,11 @@ internal class ElementResolver : IElementResolver
             foreach (var ckEnum in modelRootBase.Enums)
             {
                 var ckEnumId = new CkId<CkEnumId>(modelRootBase.ModelId, ckEnum.EnumId);
-                if (!Regex.IsMatch(ckEnum.EnumId.EnumId, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckEnum.EnumId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId),
-                            ckEnum.EnumId.EnumId));
+                            ckEnum.EnumId.Name));
                     continue;
                 }
 

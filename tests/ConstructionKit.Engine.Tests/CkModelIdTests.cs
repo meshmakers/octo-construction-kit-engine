@@ -8,24 +8,24 @@ public class CkModelIdTest
     public void Create_CkModelId_Complete()
     {
         var modelId = new CkModelId("System-1.0.0");
-        Assert.Equal("System", modelId.ModelId);
-        Assert.Equal("1.0.0", modelId.ModelVersion);
+        Assert.Equal("System", modelId.Name);
+        Assert.Equal("1.0.0", modelId.Version);
     }
 
     [Fact]
     public void Create_CkModelId_WithoutVersion()
     {
         var modelId = new CkModelId("System");
-        Assert.Equal("System", modelId.ModelId);
-        Assert.Equal("1.0.0", modelId.ModelVersion);
+        Assert.Equal("System", modelId.Name);
+        Assert.Equal("1.0.0", modelId.Version);
     }
 
     [Fact]
     public void Create_CkModelId_FromString()
     {
         CkModelId modelId = "System-1.0.0";
-        Assert.Equal("System", modelId.ModelId);
-        Assert.Equal("1.0.0", modelId.ModelVersion);
+        Assert.Equal("System", modelId.Name);
+        Assert.Equal("1.0.0", modelId.Version);
     }
 
     [Fact]

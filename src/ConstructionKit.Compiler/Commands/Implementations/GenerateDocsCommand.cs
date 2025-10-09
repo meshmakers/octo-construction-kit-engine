@@ -59,27 +59,27 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
+        var resolvedTypes = await _modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
         //Docusaurus
         if (_modeSelectionOptions.DocumentationMode)
         {
             //ID Determines Position in File Tree   
-            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
 
-            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(),
+            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(),
                 linkPath);
-            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
             await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath,
-                compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), linkPath);
+                compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), linkPath);
         }
         //ASP Net
         else

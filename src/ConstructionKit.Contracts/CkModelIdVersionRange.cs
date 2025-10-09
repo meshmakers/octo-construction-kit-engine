@@ -251,13 +251,13 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
     /// <returns>True if the version is within the range, false otherwise</returns>
     public bool IsSatisfiedBy(CkModelId version)
     {
-        var result = string.Compare(ModelId, version.ModelId, StringComparison.Ordinal);
+        var result = string.Compare(ModelId, version.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return false;
         }
 
-        return ModelVersionRange.IsSatisfiedBy(version.ModelVersion);
+        return ModelVersionRange.IsSatisfiedBy(version.Version);
     }
     
 }

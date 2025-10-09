@@ -26,7 +26,7 @@ internal class FindCommand : Command<OctoToolOptions>
         Logger.LogInformation("Finding construction kit model");
 
         var modelId = CommandArgumentValue.GetArgumentScalarValue<string>(_modelIdArgument);
-        Logger.LogInformation("ModelId: {ModelId}", modelId);
+        Logger.LogInformation("Name: {Name}", modelId);
 
         var repositoryList = _ckModelRepositoryService.GetRepositoryList();
         foreach (var repository in repositoryList)
@@ -34,7 +34,7 @@ internal class FindCommand : Command<OctoToolOptions>
             var r = await _ckModelRepositoryService.IsCkModelExistingAsync(repository.Item1, modelId);
             if (r.Exists)
             {
-                Logger.LogInformation("Found model {ModelId} in repository '{Repository}'", r.ModelId,
+                Logger.LogInformation("Found model {Name} in repository '{Repository}'", r.ModelId,
                     repository.Item1);
             }
             else

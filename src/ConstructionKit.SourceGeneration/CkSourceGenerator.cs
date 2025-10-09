@@ -105,13 +105,13 @@ public class CkSourceGenerator : IIncrementalGenerator
         }
 
         var ns =
-            $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.ModelId}.v{ckCompiledModelRoot.ModelId.ModelVersion.Major.ToString()}";
+            $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.Name}.v{ckCompiledModelRoot.ModelId.Version.Major.ToString()}";
 
         if (ckCompiledModelRoot.Types != null)
         {
             foreach (var ckTypeDto in ckCompiledModelRoot.Types)
             {
-                if (ckCompiledModelRoot.ModelId.ModelId == "System" && ckTypeDto.TypeId.TypeId == "Entity")
+                if (ckCompiledModelRoot.ModelId.Name == "System" && ckTypeDto.TypeId.Name == "Entity")
                 {
                     continue;
                 }
@@ -119,7 +119,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId, ckCacheService);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.{ckTypeDto.TypeId.TypeId}.{ckTypeDto.TypeId.Version.Major}.g.cs", code);
+                    context.AddSource($"{ns}.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version.Major}.g.cs", code);
                 }
             }
         }
@@ -131,7 +131,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto, tenantId, ckCacheService);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.RecordId}.{ckRecordDto.RecordId.Version.Major}.g.cs", code);
+                    context.AddSource($"{ns}.Record.{ckRecordDto.RecordId.Name}.{ckRecordDto.RecordId.Version.Major}.g.cs", code);
                 }
             }
         }
@@ -143,7 +143,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                 var code = CkEnumCodeGenerator.Instance.Generate(ns, ckEnumDto);
                 if (!string.IsNullOrWhiteSpace(code))
                 {
-                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.EnumId}.{ckEnumDto.EnumId.Version.Major}.g.cs", code);
+                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.Name}.{ckEnumDto.EnumId.Version.Major}.g.cs", code);
                 }
             }
         }

@@ -45,9 +45,9 @@ public class YamlToMermaidGeneration
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
+        var resolveResult = await _modelResolver.SoftResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
         
-        await _mermaidGenerator.GenerateMermaidDiagram(resolvedTypes, outputPath).ConfigureAwait(false);
+        await _mermaidGenerator.GenerateMermaidDiagram(resolveResult.CkModelGraph, outputPath).ConfigureAwait(false);
 
     }
 }

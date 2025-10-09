@@ -115,12 +115,12 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     public TKey Key { get; }
 
     /// <summary>
-    ///     Returns the full name of the element, e. g. "System-1.0.0/Person-1.0.0"
+    ///     Returns the full name of the element, e.g. "System-1.0.0/Person-1.0.0"
     /// </summary>
     public string FullName => IsEmpty ? "" : $"{ModelId.FullName}/{Key}";
 
     /// <summary>
-    ///     Returns the semantic versioned name of the element, e. g. "System/Person-2"
+    ///     Returns the semantic versioned name of the element, e.g. "System/Person-2"
     /// </summary>
     public string SemanticVersionedFullName => IsEmpty ? "" : $"{ModelId.SemanticVersionedFullName}/{Key.SemanticVersionedFullName}";
 

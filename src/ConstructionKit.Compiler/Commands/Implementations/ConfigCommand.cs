@@ -27,15 +27,15 @@ internal class ConfigCommand : Command<OctoToolOptions>
         _configWriter = configWriter;
 
         _localCatalogPath = CommandArgumentValue.AddArgument("lcp", "localCatalogPath",
-            ["Path of the local Construction Kit Model Repository"], false, 1);
+            ["Path of the local Construction Kit Library catalog"], false, 1);
         _gitHubRepositoryOwner = CommandArgumentValue.AddArgument("go", "gitHubRepositoryOwner",
-            ["GitHub Repository Owner to publish to a GitHub Repository"], false, 1);
+            ["GitHub Repository Owner to publish to a GitHub catalog"], false, 1);
         _gitHubRepositoryName = CommandArgumentValue.AddArgument("gr", "gitHubRepositoryName",
-            ["GitHub Repository to publish to a GitHub Repository"], false, 1);
+            ["GitHub Repository to publish to a GitHub catalog"], false, 1);
         _gitHubRepositoryBranch = CommandArgumentValue.AddArgument("gb", "gitHubRepositoryBranch",
-            ["GitHub Repository Branch to publish to a GitHub Repository"], false, 1);
+            ["GitHub Repository Branch to publish to a GitHub catalog"], false, 1);
         _gitHubApiToken = CommandArgumentValue.AddArgument("gt", "gitHubApiToken",
-            ["GitHub API token to publish to a GitHub Repository"], false, 1);
+            ["GitHub API token to publish to a GitHub catalog"], false, 1);
         _gitHubPagesUri = CommandArgumentValue.AddArgument("gp", "gitHubPagesUri",
             ["GitHub Pages URI to read models from a GitHub Pages site"], false, 1);
     }

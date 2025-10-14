@@ -18,13 +18,13 @@ internal class GetCommand : Command<OctoToolOptions>
 
     public GetCommand(ILogger<GetCommand> logger, IOptions<OctoToolOptions> options,
         ICatalogService catalogService, ICkSerializer ckSerializer)
-        : base(logger, "Get", "Gets a construction kit library model from the given Construction Kit Repository", options)
+        : base(logger, "Get", "Gets a construction kit library model from the given Construction Kit catalog", options)
     {
         _catalogService = catalogService;
         _ckSerializer = ckSerializer;
 
-        _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
-            ["Name of the construction kit repository. By default 'LocalRepository' is used."], true, 1);
+        _repositoryArg = CommandArgumentValue.AddArgument("c", "catalog",
+            ["Name of the construction kit catalog. By default 'LocalFileSystemCatalog' is used."], true, 1);
         _ckModelNameArg = CommandArgumentValue.AddArgument("n", "name",
             ["Name of the construction kit model to get."], true, 1);
         _filePathArg = CommandArgumentValue.AddArgument("f", "file",

@@ -5,20 +5,20 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
-internal class GetReposCommand : Command<OctoToolOptions>
+internal class GetCatalogsCommand : Command<OctoToolOptions>
 {
     private readonly ICatalogService _catalogService;
 
-    public GetReposCommand(ILogger<GetReposCommand> logger, IOptions<OctoToolOptions> options,
+    public GetCatalogsCommand(ILogger<GetCatalogsCommand> logger, IOptions<OctoToolOptions> options,
         ICatalogService catalogService)
-        : base(logger, "GetRepos", "Gets a list of known Construction Kit Repositories", options)
+        : base(logger, "GetCatalogs", "Gets a list of known Construction Kit catalogs", options)
     {
         _catalogService = catalogService;
     }
 
     public override Task Execute()
     {
-        Logger.LogInformation("Construction Kit Model Repositories:");
+        Logger.LogInformation("Construction Kit Library catalogs:");
 
         var list = _catalogService.GetCatalogList();
         foreach (var tuple in list)

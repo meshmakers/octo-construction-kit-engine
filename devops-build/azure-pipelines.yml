@@ -77,7 +77,7 @@ stages:
       - template: handle-artifacts.yml
         parameters:
           constructionKitLibraryPaths:
-            - 'bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'       
+            - 'src/SystemCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'
           apiDocumentationPaths:
-            - '$(Build.SourcesDirectory)/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation'
+            - '$(Build.SourcesDirectory)src/SystemCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation'
       - template: push-nuget-package.yml             

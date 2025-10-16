@@ -170,7 +170,17 @@ public abstract class CachedCatalog(
             }
         }
 
+#if NETSTANDARD2_0
         using var streamReader = new FileStream(
+            cachePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite, // Allow other processes to read/write while we read
+            bufferSize: 4096,
+            useAsync: true
+        );
+#else
+        await using var streamReader = new FileStream(
             cachePath,
             FileMode.Open,
             FileAccess.Read,
@@ -178,6 +188,8 @@ public abstract class CachedCatalog(
             bufferSize: 4096,
             useAsync: true
         );
+#endif
+
         var r = await System.Text.Json.JsonSerializer
             .DeserializeAsync<CacheTypes.CacheCatalog>(streamReader,
                 new System.Text.Json.JsonSerializerOptions
@@ -185,6 +197,7 @@ public abstract class CachedCatalog(
                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
                     Converters = { new CkVersionConverter() }
                 }).ConfigureAwait(false);
+        streamReader.Close();
 
         return r ?? new CacheTypes.CacheCatalog();
     }
@@ -198,7 +211,11 @@ public abstract class CachedCatalog(
     {
         var tempFileName = Path.GetTempFileName();
 
+#if NETSTANDARD2_0
         using var streamWriter = File.Create(tempFileName);
+#else
+        await using var streamWriter = File.Create(tempFileName);
+#endif
         await System.Text.Json.JsonSerializer
             .SerializeAsync(streamWriter, cacheCatalog,
                 new System.Text.Json.JsonSerializerOptions
@@ -206,16 +223,19 @@ public abstract class CachedCatalog(
                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
                     Converters = { new CkVersionConverter() }
                 }).ConfigureAwait(false);
+        streamWriter.Close();
 
         if (!Directory.Exists(catalogOptions.CacheDirectory))
         {
             Directory.CreateDirectory(catalogOptions.CacheDirectory);
         }
+
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
         if (File.Exists(cachePath))
         {
             File.Delete(cachePath);
         }
+
         File.Move(tempFileName, cachePath);
     }
 }

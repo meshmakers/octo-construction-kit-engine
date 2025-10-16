@@ -14,12 +14,11 @@
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" PrivateAssets="all"
                           ReferenceOutputAssembly="false"
+                          ExcludeAssets="runtime"
+
                           OutputItemType="Analyzer">
-            <Private>False</Private>
-            <CopyLocalSatelliteAssemblies>False</CopyLocalSatelliteAssemblies>
-            <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
         </ProjectReference>
-        <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" PrivateAssets="all" />
+        <ProjectReference Include="..\..\src\Runtime.Contracts\Runtime.Contracts.csproj"/>
     </ItemGroup>
 
     <ItemGroup>

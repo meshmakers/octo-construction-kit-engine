@@ -46,6 +46,11 @@
         </None>
     </ItemGroup>
 
+    <ItemGroup>
+      <Content Update="build\Meshmakers.Octo.ConstructionKit.SourceGeneration.targets">
+        <PackagePath>build\</PackagePath>
+      </Content>
+    </ItemGroup>
 
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
@@ -69,7 +74,7 @@
         <ItemGroup>
             <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false" />
+            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" PackagePath="analyzers/dotnet/cs" />
         </ItemGroup>
     </Target>
-
 </Project>

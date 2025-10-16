@@ -37,7 +37,7 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <param name="rtId"></param>
     [Newtonsoft.Json.JsonConstructor]
     [JsonConstructor]
-    public RtEntityId(CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    public RtEntityId(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
         CkTypeId = ckTypeId;
         RtId = rtId;
@@ -46,12 +46,12 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <summary>
     ///     Creates a new instance of <see cref="RtEntityId" />.
     /// </summary>
-    /// <param name="ckModelId"></param>
+    /// <param name="ckModelIdName"></param>
     /// <param name="ckTypeId"></param>
     /// <param name="rtId"></param>
-    public RtEntityId(CkModelId ckModelId, CkTypeId ckTypeId, OctoObjectId rtId)
+    public RtEntityId(string ckModelIdName, CkTypeId ckTypeId, OctoObjectId rtId)
     {
-        CkTypeId = new CkId<CkTypeId>(ckModelId, ckTypeId);
+        CkTypeId = new RtCkId<CkTypeId>(ckModelIdName, ckTypeId);
         RtId = rtId;
     }
     
@@ -68,8 +68,8 @@ public readonly struct RtEntityId : IComparable<RtEntityId>, IEquatable<RtEntity
     /// <summary>
     ///     The construction kit type id.
     /// </summary>
-    [JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> CkTypeId { get; }
+    [JsonConverter(typeof(RtCkIdTypeIdConverter))]
+    public RtCkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     The runtime id.

@@ -33,15 +33,15 @@ public class ExchangeException : PersistenceException
     }
 
     internal static Exception AttributeNotFound<TKey>(CkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)
-        where TKey : IComparable<TKey>, ICkKey
+        where TKey : IComparable<TKey>, ICkElementId
     {
         return new ExchangeException($"Attribute '{modelAttributeId}' does not exist at {elementType} '{ckId}'.");
     }
 
-    internal static Exception RecordNotFound<TKey>(CkId<CkRecordId> ckRecordId, string elementType,  CkId<TKey> ckId)
-        where TKey : IComparable<TKey>, ICkKey
+    internal static Exception RecordNotFound<TKey>(RtCkId<CkRecordId> rtCkRecordId, string elementType,  CkId<TKey> ckId)
+        where TKey : IComparable<TKey>, ICkElementId
     {
-        return new ExchangeException($"Record '{ckRecordId}' does not exist at {elementType} '{ckId}'.");
+        return new ExchangeException($"Record '{rtCkRecordId}' does not exist at {elementType} '{ckId}'.");
     }
 
     internal static Exception CkEnumIdNotDefined(CkTypeAttributeGraph ckTypeAttributeGraph)

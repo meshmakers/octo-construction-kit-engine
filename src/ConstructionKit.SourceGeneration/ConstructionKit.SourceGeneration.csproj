@@ -21,7 +21,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.12.0" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="4.14.0" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10" PrivateAssets="all" />
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all" />
 
         <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
@@ -46,6 +46,7 @@
         </None>
     </ItemGroup>
 
+
     <Target Name="CopyProjectReferencesToPackage" DependsOnTargets="ResolveReferences">
         <ItemGroup>
             <!-- The dependencies of your MSBuild task must be packaged inside the package, they cannot be expressed as normal PackageReferences -->
@@ -68,7 +69,6 @@
         <ItemGroup>
             <TargetPathWithTargetPlatformMoniker Include="@(ResolvedCompileFileDefinitions)" IncludeRuntimeDependency="false" />
             <TargetPathWithTargetPlatformMoniker Include="$(ProjectDir)$(OutputPath)\*.dll" IncludeRuntimeDependency="false" />
-            <None Include="@(ResolvedCompileFileDefinitions)" Pack="true" CopyToOutputDirectory="PreserveNewest" PackagePath="analyzers/dotnet/cs" Visible="false" />
         </ItemGroup>
     </Target>
 

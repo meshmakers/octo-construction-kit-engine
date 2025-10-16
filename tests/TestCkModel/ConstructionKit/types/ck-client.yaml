@@ -8,16 +8,16 @@ types:
       - id: ${System}/Enabled
         name: Enabled
 
-      - id: ${thisModel}/ClientId
+      - id: ${this}/ClientId
         name: ClientId
 
-      - id: ${thisModel}/ProtocolType
+      - id: ${this}/ProtocolType
         name: ProtocolType
 
-      - id: ${thisModel}/Secrets
+      - id: ${this}/Secrets
         name: ClientSecrets
 
-      - id: ${thisModel}/RequireClientSecret
+      - id: ${this}/RequireClientSecret
         name: RequireClientSecret
 
       - id: ${System}/Name
@@ -28,121 +28,121 @@ types:
         name: Description
         isOptional: true
 
-      - id: ${thisModel}/ClientUri
+      - id: ${this}/ClientUri
         name: ClientUri
         isOptional: true
 
-      - id: ${thisModel}/LogoUri
+      - id: ${this}/LogoUri
         name: LogoUri
         isOptional: true
 
-      - id: ${thisModel}/RequireConsent
+      - id: ${this}/RequireConsent
         name: RequireConsent
         isOptional: true
 
-      - id: ${thisModel}/AllowRememberConsent
+      - id: ${this}/AllowRememberConsent
         name: AllowRememberConsent
 
-      - id: ${thisModel}/AllowedGrantTypes
+      - id: ${this}/AllowedGrantTypes
         name: AllowedGrantTypes
 
-      - id: ${thisModel}/RequirePkce
+      - id: ${this}/RequirePkce
         name: RequirePkce
 
-      - id: ${thisModel}/AllowPlainTextPkce
+      - id: ${this}/AllowPlainTextPkce
         name: AllowPlainTextPkce
 
-      - id: ${thisModel}/RequireRequestObject
+      - id: ${this}/RequireRequestObject
         name: RequireRequestObject
 
-      - id: ${thisModel}/AllowAccessTokensViaBrowser
+      - id: ${this}/AllowAccessTokensViaBrowser
         name: AllowAccessTokensViaBrowser
 
-      - id: ${thisModel}/RequireDPoP
+      - id: ${this}/RequireDPoP
         name: RequireDPoP
 
-      - id: ${thisModel}/DPoPValidationMode
+      - id: ${this}/DPoPValidationMode
         name: DPoPValidationMode
 
-      - id: ${thisModel}/DPoPClockSkew
+      - id: ${this}/DPoPClockSkew
         name: DPoPClockSkew
-      - id: ${thisModel}/RedirectUris
+      - id: ${this}/RedirectUris
         name: RedirectUris
 
-      - id: ${thisModel}/PostLogoutRedirectUris
+      - id: ${this}/PostLogoutRedirectUris
         name: PostLogoutRedirectUris
-      - id: ${thisModel}/FrontChannelLogoutUri
+      - id: ${this}/FrontChannelLogoutUri
         name: FrontChannelLogoutUri
         isOptional: true
-      - id: ${thisModel}/FrontChannelLogoutSessionRequired
+      - id: ${this}/FrontChannelLogoutSessionRequired
         name: FrontChannelLogoutSessionRequired
-      - id: ${thisModel}/BackChannelLogoutUri
+      - id: ${this}/BackChannelLogoutUri
         name: BackChannelLogoutUri
         isOptional: true
-      - id: ${thisModel}/BackChannelLogoutSessionRequired
+      - id: ${this}/BackChannelLogoutSessionRequired
         name: BackChannelLogoutSessionRequired
-      - id: ${thisModel}/AllowOfflineAccess
+      - id: ${this}/AllowOfflineAccess
         name: AllowOfflineAccess
-      - id: ${thisModel}/AllowedScopes
+      - id: ${this}/AllowedScopes
         name: AllowedScopes
-      - id: ${thisModel}/AlwaysIncludeUserClaimsInIdToken
+      - id: ${this}/AlwaysIncludeUserClaimsInIdToken
         name: AlwaysIncludeUserClaimsInIdToken
-      - id: ${thisModel}/IdentityTokenLifetime
+      - id: ${this}/IdentityTokenLifetime
         name: IdentityTokenLifetime
-      - id: ${thisModel}/AllowedIdentityTokenSigningAlgorithms
+      - id: ${this}/AllowedIdentityTokenSigningAlgorithms
         name: AllowedIdentityTokenSigningAlgorithms
-      - id: ${thisModel}/AccessTokenLifetime
+      - id: ${this}/AccessTokenLifetime
         name: AccessTokenLifetime
-      - id: ${thisModel}/AuthorizationCodeLifetime
+      - id: ${this}/AuthorizationCodeLifetime
         name: AuthorizationCodeLifetime
-      - id: ${thisModel}/AbsoluteRefreshTokenLifetime
+      - id: ${this}/AbsoluteRefreshTokenLifetime
         name: AbsoluteRefreshTokenLifetime
-      - id: ${thisModel}/SlidingRefreshTokenLifetime
+      - id: ${this}/SlidingRefreshTokenLifetime
         name: SlidingRefreshTokenLifetime
-      - id: ${thisModel}/ConsentLifetime
+      - id: ${this}/ConsentLifetime
         name: ConsentLifetime
         isOptional: true
-      - id: ${thisModel}/UpdateAccessTokenClaimsOnRefresh
+      - id: ${this}/UpdateAccessTokenClaimsOnRefresh
         name: UpdateAccessTokenClaimsOnRefresh
-      - id: ${thisModel}/RefreshTokenExpiration
+      - id: ${this}/RefreshTokenExpiration
         name: RefreshTokenExpiration
-      - id: ${thisModel}/AccessTokenType
+      - id: ${this}/AccessTokenType
         name: AccessTokenType
-      - id: ${thisModel}/EnableLocalLogin
+      - id: ${this}/EnableLocalLogin
         name: EnableLocalLogin
-      - id: ${thisModel}/IdentityProviderRestrictions
+      - id: ${this}/IdentityProviderRestrictions
         name: IdentityProviderRestrictions
-      - id: ${thisModel}/IncludeJwtId
+      - id: ${this}/IncludeJwtId
         name: IncludeJwtId
-      - id: ${thisModel}/ClientClaims
+      - id: ${this}/ClientClaims
         name: ClientClaims
-      - id: ${thisModel}/AlwaysSendClientClaims
+      - id: ${this}/AlwaysSendClientClaims
         name: AlwaysSendClientClaims
-      - id: ${thisModel}/ClientClaimsPrefix
+      - id: ${this}/ClientClaimsPrefix
         name: ClientClaimsPrefix
         isOptional: true
-      - id: ${thisModel}/PairWiseSubjectSalt
+      - id: ${this}/PairWiseSubjectSalt
         name: PairWiseSubjectSalt
         isOptional: true
-      - id: ${thisModel}/UserSsoLifetime
+      - id: ${this}/UserSsoLifetime
         name: UserSsoLifetime
         isOptional: true
-      - id: ${thisModel}/UserCodeType
+      - id: ${this}/UserCodeType
         name: UserCodeType
         isOptional: true
-      - id: ${thisModel}/DeviceCodeLifetime
+      - id: ${this}/DeviceCodeLifetime
         name: DeviceCodeLifetime
-      - id: ${thisModel}/CibaLifetime
+      - id: ${this}/CibaLifetime
         name: CibaLifetime
         isOptional: true
-      - id: ${thisModel}/PollingInterval
+      - id: ${this}/PollingInterval
         name: PollingInterval
         isOptional: true
-      - id: ${thisModel}/CoordinateLifetimeWithUserSession
+      - id: ${this}/CoordinateLifetimeWithUserSession
         name: CoordinateLifetimeWithUserSession
         isOptional: true
-      - id: ${thisModel}/AllowedCorsOrigins
+      - id: ${this}/AllowedCorsOrigins
         name: AllowedCorsOrigins
-      - id: ${thisModel}/InitiateLoginUri
+      - id: ${this}/InitiateLoginUri
         name: InitiateLoginUri
         isOptional: true

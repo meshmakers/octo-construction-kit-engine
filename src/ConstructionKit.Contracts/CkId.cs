@@ -3,18 +3,18 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit element id
 /// </summary>
-/// <typeparam name="TKey">The key type that is managed with a model id</typeparam>
-public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparable<TKey>, ICkKey
+/// <typeparam name="TElementId">The key type that is managed with a model id</typeparam>
+public sealed record CkId<TElementId> : IComparable<CkId<TElementId>> where TElementId : IComparable<TElementId>, ICkElementId
 {
     /// <summary>
-    ///     Creates a new <see cref="CkId{TKey}" /> from the given <paramref name="modelId" /> and <paramref name="key" />.
+    ///     Creates a new <see cref="CkId{TKey}" /> from the given <paramref name="modelId" /> and <paramref name="elementId" />.
     /// </summary>
     /// <param name="modelId"></param>
-    /// <param name="key"></param>
-    public CkId(CkModelId modelId, TKey key)
+    /// <param name="elementId"></param>
+    public CkId(CkModelId modelId, TElementId elementId)
     {
         ModelId = modelId;
-        Key = key;
+        ElementId = elementId;
     }
 
     /// <summary>
@@ -27,7 +27,7 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
         if (string.IsNullOrWhiteSpace(ckId))
         {
             ModelId = null!;
-            Key = default!;
+            ElementId = default!;
             return;
         }
         var modelIndex = ckId.IndexOf("/", StringComparison.Ordinal);
@@ -44,14 +44,14 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
             throw new ArgumentOutOfRangeException(nameof(ckId), ckId, $"'{nameof(ckId)}' must contain a key");
         }
 
-        var value = Activator.CreateInstance(typeof(TKey), typeId);
+        var value = Activator.CreateInstance(typeof(TElementId), typeId);
         if (value != null)
         {
-            Key = (TKey)value;
+            ElementId = (TElementId)value;
         }
         else
         {
-            throw new ArgumentOutOfRangeException(nameof(ckId), ckId, $"Cannot create key of type '{typeof(TKey)}'");
+            throw new ArgumentOutOfRangeException(nameof(ckId), ckId, $"Cannot create key of type '{typeof(TElementId)}'");
         }
     }
 
@@ -60,19 +60,29 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     /// </summary>
     /// <param name="value"></param>
     /// <returns></returns>
-    public static implicit operator CkId<TKey>(string value)
+    public static implicit operator CkId<TElementId>(string value)
     {
-        return new CkId<TKey>(value);
+        return new CkId<TElementId>(value);
     }
 
     /// <inheritdoc />
-    public bool Equals(CkId<TKey>? other)
+    public bool Equals(CkId<TElementId>? other)
     {
-        return other is not null && ModelId.Equals(other.ModelId) && Key.Equals(other.Key);
+        return other is not null && ModelId.Equals(other.ModelId) && ElementId.Equals(other.ElementId);
+    }
+
+    /// <summary>
+    /// Indicates whether the current object is equal to another object of the same type, ignoring the model version.
+    /// </summary>
+    /// <param name="other">The object to compare with this object.</param>
+    /// <returns>>true if the current object is equal to the other parameter; otherwise, false.</returns>
+    public bool Equals(RtCkId<TElementId>? other)
+    {
+        return other is not null && ModelId.Name.Equals(other.ModelId, StringComparison.Ordinal) && ElementId.Equals(other.ElementId);
     }
 
     /// <inheritdoc />
-    public int CompareTo(CkId<TKey>? other)
+    public int CompareTo(CkId<TElementId>? other)
     {
         if (other == null)
         {
@@ -84,7 +94,7 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
             return result;
         }
 
-        return Key.CompareTo(other.Key);
+        return ElementId.CompareTo(other.ElementId);
     }
 
     /// <inheritdoc />
@@ -95,11 +105,11 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
         {
             int hash = 17;
             hash = hash * 24 + ModelId.GetHashCode();
-            hash = hash * 24 + Key.GetHashCode();
+            hash = hash * 24 + ElementId.GetHashCode();
             return hash;
         }
 #else
-        return HashCode.Combine(ModelId, Key);
+        return HashCode.Combine(ModelId, ElementId);
 #endif
     }
 
@@ -112,22 +122,22 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     /// <summary>
     ///     Returns the element key
     /// </summary>
-    public TKey Key { get; }
+    public TElementId ElementId { get; }
 
     /// <summary>
-    ///     Returns the full name of the element, e. g. "System-1.0.0/Person-1.0.0"
+    ///     Returns the full name of the element, e.g. "System-1.0.0/Person-1"
     /// </summary>
-    public string FullName => IsEmpty ? "" : $"{ModelId.FullName}/{Key}";
+    public string FullName => IsEmpty ? "" : $"{ModelId.FullName}/{ElementId}";
 
     /// <summary>
-    ///     Returns the semantic versioned name of the element, e. g. "System/Person-2"
+    ///     Returns the semantic versioned name of the element, e.g. "System/Person-2"
     /// </summary>
-    public string SemanticVersionedFullName => IsEmpty ? "" : $"{ModelId.SemanticVersionedFullName}/{Key.SemanticVersionedFullName}";
+    public string SemanticVersionedFullName => IsEmpty ? "" : $"{ModelId.SemanticVersionedFullName}/{ElementId.SemanticVersionedFullName}";
 
     /// <summary>
     ///     Returns true if the model id and key is empty
     /// </summary>
-    public bool IsEmpty => ModelId.IsEmpty && Key.IsEmpty;
+    public bool IsEmpty => ModelId.IsEmpty && ElementId.IsEmpty;
 
     /// <summary>
     ///     Returns a string representation of the value.
@@ -135,6 +145,15 @@ public sealed record CkId<TKey> : IComparable<CkId<TKey>> where TKey : IComparab
     /// <returns></returns>
     public override string ToString()
     {
-        return SemanticVersionedFullName;
+        return FullName;
+    }
+
+    /// <summary>
+    /// Gets the runtime construction kit id
+    /// </summary>
+    /// <returns>The runtime construction kit id</returns>
+    public RtCkId<TElementId> ToRtCkId()
+    {
+        return new RtCkId<TElementId>(ModelId.Name, ElementId);
     }
 }

@@ -192,11 +192,11 @@ public class InheritanceResolverTests
 
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
-        Assert.Contains("sample1/Demo2", operationResult.Messages[0].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo2-1", operationResult.Messages[0].MessageText);
         Assert.Equal(13, operationResult.Messages[0].MessageNumber);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[1].MessageLevel);
         Assert.Equal(13, operationResult.Messages[1].MessageNumber);
-        Assert.Contains("sample1/Demo3", operationResult.Messages[1].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo3-1", operationResult.Messages[1].MessageText);
     }
 
     [Fact]
@@ -215,13 +215,13 @@ public class InheritanceResolverTests
 
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
-        Assert.Contains("sample1/Demo1", operationResult.Messages[0].MessageText);
-        Assert.Contains("sample1/Demo2", operationResult.Messages[0].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo1-1", operationResult.Messages[0].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo1-1", operationResult.Messages[0].MessageText);
         Assert.Equal(12, operationResult.Messages[0].MessageNumber);
         Assert.Equal(MessageLevel.Error, operationResult.Messages[1].MessageLevel);
         Assert.Equal(12, operationResult.Messages[1].MessageNumber);
-        Assert.Contains("sample1/Demo2", operationResult.Messages[1].MessageText);
-        Assert.Contains("sample1/Demo3", operationResult.Messages[1].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo2-1", operationResult.Messages[1].MessageText);
+        Assert.Contains("sample1-1.0.0/Demo3-1", operationResult.Messages[1].MessageText);
     }
 
     [Fact]

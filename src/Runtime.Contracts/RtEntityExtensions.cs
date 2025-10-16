@@ -15,7 +15,7 @@ public static class RtEntityExtensions
     /// <returns></returns>
     public static RtEntityId ToRtEntityId(this RtEntity rtEntity)
     {
-        var ckTypeId = rtEntity.GetCkTypeId();
+        var ckTypeId = rtEntity.GetRtCkTypeId();
         return new RtEntityId(ckTypeId, rtEntity.RtId);
     }
 
@@ -25,7 +25,7 @@ public static class RtEntityExtensions
     /// <param name="rtEntity"></param>
     /// <typeparam name="TEntity"></typeparam>
     /// <returns></returns>
-    public static CkId<CkTypeId> GetCkTypeId<TEntity>(this TEntity rtEntity)
+    public static RtCkId<CkTypeId> GetRtCkTypeId<TEntity>(this TEntity rtEntity)
         where TEntity : RtEntity
     {
         if (rtEntity.CkTypeId != null)
@@ -33,24 +33,24 @@ public static class RtEntityExtensions
             return rtEntity.CkTypeId;
         }
 
-        return GetCkTypeId(rtEntity.GetType());
+        return GetRtCkTypeId(rtEntity.GetType());
     }
 
     /// <summary>
-    ///     Returns the corresponding <see cref="CkId{T}" /> of the <see cref="RtEntity" />.
+    ///     Returns the corresponding <see cref="RtCkId{T}" /> of the <see cref="RtEntity" />.
     /// </summary>
     /// <remarks>
-    ///     See also <see cref="CkIdAttribute" />, this attribute is used to determine the CkTypeId of the entity.
+    ///     See also <see cref="RtCkIdAttribute" />, this attribute is used to determine the CkTypeId of the entity.
     /// </remarks>
     /// <typeparam name="TEntity"></typeparam>
     /// <returns></returns>
-    public static CkId<CkTypeId> GetCkTypeId<TEntity>()
+    public static RtCkId<CkTypeId> GetRtCkTypeId<TEntity>()
         where TEntity : RtEntity
     {
-        return GetCkTypeId(typeof(TEntity));
+        return GetRtCkTypeId(typeof(TEntity));
     }
 
-    private static CkId<CkTypeId> GetCkTypeId(Type type)
+    private static RtCkId<CkTypeId> GetRtCkTypeId(Type type)
     {
         var ckTypeId = TryGetGetCkTypeId(type);
         if (ckTypeId == null)
@@ -61,15 +61,15 @@ public static class RtEntityExtensions
         return ckTypeId;
     }
     
-    private static CkId<CkTypeId>? TryGetGetCkTypeId(Type type)
+    private static RtCkId<CkTypeId>? TryGetGetCkTypeId(Type type)
     {
-        var customAttribute = Attribute.GetCustomAttribute(type, typeof(CkIdAttribute));
+        var customAttribute = Attribute.GetCustomAttribute(type, typeof(RtCkIdAttribute));
         if (customAttribute == null)
         {
             return null;
         }
 
-        var ckIdAttribute = (CkIdAttribute)customAttribute;
-        return ckIdAttribute.CkId;
+        var ckIdAttribute = (RtCkIdAttribute)customAttribute;
+        return ckIdAttribute.RtCkId;
     }
 }

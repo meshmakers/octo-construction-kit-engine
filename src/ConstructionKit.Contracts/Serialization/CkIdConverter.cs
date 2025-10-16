@@ -35,7 +35,7 @@ public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>;
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{TKey}" />
 /// </summary>
 /// <typeparam name="TKey"></typeparam>
-public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter where TKey : IComparable<TKey>, ICkKey
+public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter where TKey : IComparable<TKey>, ICkElementId
 {
     /// <inheritdoc />
     public bool Accepts(Type type)
@@ -64,6 +64,7 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
             ? reader.GetString()
             : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType, nameof(JsonTokenType.PropertyName));
 
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         return !string.IsNullOrEmpty(str) && str != null
             ? new CkId<TKey>(str)
             : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));
@@ -81,6 +82,7 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
         var str = reader.TokenType == JsonTokenType.String
             ? reader.GetString()
             : throw ModelParseException.UnexpectedToken(nameof(CkModelId), reader.TokenType, nameof(JsonTokenType.String));
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         return !string.IsNullOrEmpty(str) && str != null
             ? new CkId<TKey>(str)
             : throw ModelParseException.ValueCannotBeEmpty(nameof(CkModelId));

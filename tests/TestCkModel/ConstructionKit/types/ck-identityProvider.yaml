@@ -9,7 +9,7 @@ types:
         name: Name
       - id: ${System}/Enabled
         name: Enabled
-      - id: ${thisModel}/IdentityProviderType
+      - id: ${this}/IdentityProviderType
         name: Type
       - id: ${System}/DisplayName
         name: DisplayName

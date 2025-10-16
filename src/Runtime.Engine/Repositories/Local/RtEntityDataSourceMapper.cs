@@ -58,7 +58,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
     /// <inheritdoc />
     public void Apply(TDocument savedDocument, TDocument documentToApply)
     {
-        var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, savedDocument.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
+        var ckTypeGraph = _ckCacheService.GetRtCkType(_tenantId, savedDocument.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
         foreach (var attributeToApply in documentToApply.Attributes)
         {
             if (ckTypeGraph.AllAttributesByName.TryGetValue(attributeToApply.Key, out var ckTypeAttributeGraph))
@@ -91,7 +91,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 
         Parallel.ForEach(existingDocuments, (modelRtEntity, _) =>
         {
-            var ckTypeGraph = _ckCacheService.GetCkType(_tenantId, modelRtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
+            var ckTypeGraph = _ckCacheService.GetRtCkType(_tenantId, modelRtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet());
 
             var entity = new TDocument
             {

@@ -36,13 +36,13 @@ public class RuntimeRepositoryException : PersistenceException
     internal static Exception CkTypeIdMissingForType(Type type)
     {
         return new RuntimeRepositoryException($"No Construction Kit Id for type '{type.FullName}'" +
-                                              $" is defined. Is attribute '{typeof(CkIdAttribute).FullName}' missing?");
+                                              $" is defined. Is attribute '{typeof(RtCkIdAttribute).FullName}' missing?");
     }
 
-    internal static Exception CkTypeIdDoesNotExistInCache(CkId<CkTypeId> ckTypeId)
+    internal static Exception RtCkTypeIdDoesNotExistInCache(RtCkId<CkTypeId> rtCkTypeId)
     {
-        return new RuntimeRepositoryException($"Construction Kit Id '{ckTypeId}' was not found in model cache." +
-                                              " Wrong CkTypeId used?");
+        return new RuntimeRepositoryException($"RtCkTypeId '{rtCkTypeId}' was not found in model cache." +
+                                              " Wrong RtCkTypeId used?");
     }
 
     internal static Exception DocumentAlreadyAdded(string tenantId, object key)

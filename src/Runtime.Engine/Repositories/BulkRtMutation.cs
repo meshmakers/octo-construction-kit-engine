@@ -92,7 +92,7 @@ internal class BulkRtMutation(
         var rtEntities = rtEntityList.ToList();
         rtEntities.ForEach(x => x.RtCreationDateTime = DateTime.Now);
         rtEntities.ForEach(x => x.RtChangedDateTime = x.RtCreationDateTime);
-        rtEntities.ForEach(x => { x.CkTypeId ??= x.GetCkTypeId(); });
+        rtEntities.ForEach(x => { x.CkTypeId ??= x.GetRtCkTypeId(); });
 
         if (!options.DisablePreDocumentModifications)
         {
@@ -103,7 +103,7 @@ internal class BulkRtMutation(
             }
         }
 
-        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.GetCkTypeId()))
+        foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.GetRtCkTypeId()))
         {
             if (string.IsNullOrWhiteSpace(rtEntityGrouping.Key.FullName))
             {
@@ -112,7 +112,7 @@ internal class BulkRtMutation(
 
             var ckTypeId = rtEntityGrouping.Key;
 
-            var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
+            var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
             await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityGrouping.ToList())
                 .ConfigureAwait(false);
 
@@ -172,9 +172,9 @@ internal class BulkRtMutation(
 
     private async Task UpdateRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
+        RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
     {
-        var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
+        var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
 
         foreach (var keyValuePair in rtEntityGrouping)
@@ -228,10 +228,10 @@ internal class BulkRtMutation(
 
     private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        CkId<CkTypeId> ckTypeId, IGrouping<CkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
+        RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
         BulkRtMutationOptions options)
     {
-        var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
+        var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
 
         foreach (var keyValuePair in rtEntityGrouping)
@@ -280,10 +280,10 @@ internal class BulkRtMutation(
 
     private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        CkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
+        RtCkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
         where TEntity : RtEntity, new()
     {
-        var ckTypeGraph = ckCacheService.GetCkType(repositoryDataSource.TenantId, ckTypeId);
+        var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
         foreach (var rtEntityId in rtEntityIds.AsParallel())

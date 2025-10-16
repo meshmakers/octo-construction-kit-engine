@@ -1,17 +1,17 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: OpenLdapIdentityProvider
-    derivedFromCkTypeId: ${thisModel}/IdentityProvider
+    derivedFromCkTypeId: ${this}/IdentityProvider
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/HostAddress
+      - id: ${this}/HostAddress
         name: HostAddress
-      - id: ${thisModel}/UseTls
+      - id: ${this}/UseTls
         name: UseTls
-      - id: ${thisModel}/HostPort
+      - id: ${this}/HostPort
         name: HostPort
-      - id: ${thisModel}/UserBaseDn
+      - id: ${this}/UserBaseDn
         name: UserBaseDn
-      - id: ${thisModel}/UserNameAttribute
+      - id: ${this}/UserNameAttribute
         name: UserNameAttribute

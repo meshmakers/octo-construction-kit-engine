@@ -6,19 +6,19 @@ attributes:
     valueType: String
   - id: Query.Sorting
     valueType: RecordArray
-    valueCkRecordId: ${thisModel}/SortOrderItem
+    valueCkRecordId: ${this}/SortOrderItem
   - id: Query.FieldFilter
     valueType: RecordArray
-    valueCkRecordId: ${thisModel}/FieldFilter
+    valueCkRecordId: ${this}/FieldFilter
   - id: Query.TextSearchFilter
     valueType: Record
-    valueCkRecordId: ${thisModel}/TextSearchFilter
+    valueCkRecordId: ${this}/TextSearchFilter
   - id: Query.AttributeSearchFilter
     valueType: Record
-    valueCkRecordId: ${thisModel}/AttributeSearchFilter
+    valueCkRecordId: ${this}/AttributeSearchFilter
   - id: Query.Types
     valueType: Enum
-    valueCkEnumId: ${thisModel}/QueryTypes
+    valueCkEnumId: ${this}/QueryTypes
     defaultValues:
       - 0
   - id: AttributePath
@@ -27,9 +27,9 @@ attributes:
     valueType: StringArray    
   - id: FieldFilter.Operator
     valueType: Enum
-    valueCkEnumId: ${thisModel}/FieldFilterOperator
+    valueCkEnumId: ${this}/FieldFilterOperator
   - id: ComparisonValue
     valueType: String
   - id: SortOrder
     valueType: Enum
-    valueCkEnumId: ${thisModel}/SortOrders
+    valueCkEnumId: ${this}/SortOrders

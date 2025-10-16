@@ -18,7 +18,7 @@ public record NavigationPair : FieldFilterCriteria
     /// <summary>
     /// Gets the association role id.
     /// </summary>
-    public CkId<CkAssociationRoleId> CkRoleId { get; }
+    public RtCkId<CkAssociationRoleId> CkRoleId { get; }
 
     /// <summary>
     /// Gets the direction of the association.
@@ -28,7 +28,7 @@ public record NavigationPair : FieldFilterCriteria
     /// <summary>
     /// Gets the target construction kit type id.
     /// </summary>
-    public CkId<CkTypeId> TargetCkTypeId { get; }
+    public RtCkId<CkTypeId> TargetCkTypeId { get; }
 
     /// <summary>
     /// Gets the path terms to the navigation pair.
@@ -52,9 +52,9 @@ public record NavigationPair : FieldFilterCriteria
     public NavigationPair(
         IEnumerable<PathTerm> pathTerms,
         IEnumerable<IEnumerable<PathTerm>> subPathTerms,
-        CkId<CkAssociationRoleId> ckRoleId,
+        RtCkId<CkAssociationRoleId> ckRoleId,
         GraphDirections direction,
-        CkId<CkTypeId> targetCkTypeId)
+        RtCkId<CkTypeId> targetCkTypeId)
     {
         PathTerms = pathTerms;
         SubPathTerms = subPathTerms;
@@ -76,9 +76,9 @@ public record NavigationPair : FieldFilterCriteria
     public NavigationPair(
         IEnumerable<PathTerm> pathTerms,
         IEnumerable<IEnumerable<PathTerm>> subPathTerms,
-        CkId<CkAssociationRoleId> ckRoleId,
+        RtCkId<CkAssociationRoleId> ckRoleId,
         GraphDirections direction,
-        CkId<CkTypeId> targetCkTypeId,
+        RtCkId<CkTypeId> targetCkTypeId,
         IEnumerable<NavigationPair> innerNavigationPairs)
         : this(pathTerms, subPathTerms, ckRoleId, direction, targetCkTypeId)
     {

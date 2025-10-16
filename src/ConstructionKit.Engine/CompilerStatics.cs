@@ -3,7 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Engine.Tests")]
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.SystemTests")]
-
+[assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 namespace Meshmakers.Octo.ConstructionKit.Engine;
 
 internal static class CompilerStatics
@@ -25,6 +25,6 @@ internal static class CompilerStatics
     public const string Sample1Attribute3 = "sampleAttribute3.yaml";
     public const string Sample1Association = "sampleAssocation1.yaml";
 
-    public static IEnumerable<CkId<CkTypeId>> WhiteListedCkTypeIds { get; } =
-        [new("System/Entity")];
+    public static IEnumerable<CkIdVersionRange<CkTypeId>> WhiteListedCkTypeIds { get; } =
+        [new("System-1.0.0/Entity")];
 }

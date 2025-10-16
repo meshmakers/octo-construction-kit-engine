@@ -8,4 +8,4 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 /// <param name="Origin">Origin</param>
 /// <param name="Target">Target</param>
 /// <param name="AssociationRoleId">Association role identifier</param>
-public record RtOriginTargetPair(RtEntityId Origin, RtEntityId Target, CkId<CkAssociationRoleId> AssociationRoleId);
+public record RtOriginTargetPair(RtEntityId Origin, RtEntityId Target, RtCkId<CkAssociationRoleId> AssociationRoleId);

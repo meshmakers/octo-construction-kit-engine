@@ -63,7 +63,7 @@ public interface IRuntimeRepository
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
-    Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null);
 
@@ -90,7 +90,7 @@ public interface IRuntimeRepository
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null);
 
@@ -129,7 +129,7 @@ public interface IRuntimeRepository
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
     Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, RtEntityId rtEntityId,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     /// Gets associations for multiple runtime entities of a specific role
@@ -142,7 +142,7 @@ public interface IRuntimeRepository
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Gets an association by its origin, target and role id.
@@ -154,7 +154,7 @@ public interface IRuntimeRepository
     /// <returns></returns>
     Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
         RtEntityId targetRtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId);
+        RtCkId<CkAssociationRoleId> ckRoleId);
 
     /// <summary>
     ///     Returns the data source access object for the given entity type
@@ -182,7 +182,7 @@ public interface IRuntimeRepository
     /// <param name="skip"></param>
     /// <param name="take"></param>
     /// <returns></returns>
-    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, ICollection<NavigationPair> roleIdDirectionPairs,
         int? skip = null, int? take = null);
 
@@ -197,7 +197,7 @@ public interface IRuntimeRepository
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
-    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds,
         DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
         int? take = null);
@@ -213,13 +213,20 @@ public interface IRuntimeRepository
     /// <param name="ckRoleId">Construction kit role id of the association</param>
     /// <param name="targetRtEntityId">Runtime id of the target entity</param>
     /// <returns>A transient version of a role, need to be stored.</returns>
-    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
+    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,
         RtEntityId targetRtEntityId);
 
     /// <summary>
     ///     Creates an instance of a runtime entity
     /// </summary>
-    /// <param name="ckTypeId"></param>
+    /// <param name="rtCkTypeId">The model version independent construction kit type id</param>
+    /// <returns>Instance of the given construction kit type</returns>
+    Task<RtEntity> CreateTransientRtEntityByRtCkIdAsync(RtCkId<CkTypeId> rtCkTypeId);
+
+    /// <summary>
+    /// Creates an instance of a runtime entity
+    /// </summary>
+    /// <param name="ckTypeId">The model version specific construction kit type id</param>
     /// <returns>Instance of the given construction kit type</returns>
     Task<RtEntity> CreateTransientRtEntityAsync(CkId<CkTypeId> ckTypeId);
 
@@ -241,7 +248,7 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtEntity">Object to insert</param>
     /// <returns></returns>
-    Task InsertOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, RtEntity rtEntity);
+    Task InsertOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, RtEntity rtEntity);
 
     /// <summary>
     ///     Inserts a single runtime entity
@@ -259,7 +266,7 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtEntities">Objects to insert</param>
     /// <returns></returns>
-    Task InsertManyRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, ICollection<RtEntity> rtEntities);
+    Task InsertManyRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, ICollection<RtEntity> rtEntities);
 
     /// <summary>
     ///     Inserts multiple runtime entities
@@ -279,7 +286,7 @@ public interface IRuntimeRepository
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task ReplaceOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    Task ReplaceOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         RtEntity rtEntity);
 
     /// <summary>
@@ -322,7 +329,7 @@ public interface IRuntimeRepository
     /// <param name="rtId">Runtime object id</param>
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <returns></returns>
-    Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    Task UpdateOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         RtEntity rtEntity);
 
     /// <summary>
@@ -383,7 +390,7 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId"></param>
     /// <returns></returns>
-    Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId);
+    Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId);
 
     /// <summary>
     ///     Deletes a single runtime entity by its runtime id
@@ -402,7 +409,7 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <returns></returns>
-    Task DeleteOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, FieldFilterCriteria fieldFilterCriteria);
+    Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, FieldFilterCriteria fieldFilterCriteria);
 
     /// <summary>
     ///     Deletes a single runtime entity by the given filter options
@@ -421,7 +428,7 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <returns></returns>
-    Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    Task DeleteManyRtEntitiesAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria);
 
     /// <summary>
@@ -588,5 +595,5 @@ public interface IRuntimeRepository
     /// <param name="ckTypeId">The ck type id</param>
     /// <returns></returns>
     /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
-    Task<CkTypeGraph> GetCkTypeGraphAsync(CkId<CkTypeId> ckTypeId);
+    Task<CkTypeGraph> GetCkTypeGraphAsync(RtCkId<CkTypeId> ckTypeId);
 }

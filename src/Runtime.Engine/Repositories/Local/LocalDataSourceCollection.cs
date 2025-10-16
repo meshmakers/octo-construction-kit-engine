@@ -157,7 +157,6 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
             throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
         }
 
-
         await SaveAsync().ConfigureAwait(false);
     }
 
@@ -172,6 +171,20 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
 
         await SaveAsync().ConfigureAwait(false);
         return true;
+    }
+
+    public async Task<bool> TryDeleteOneAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        var result = _rtEntities.Values.AsQueryable().FirstOrDefault(expression);
+        if (result == null)
+        {
+            return false;
+        }
+
+        var key = dataSourceMapper.GetId(result);
+        return _rtEntities.TryRemove(key, out _);
     }
 
     public async Task DeleteManyAsync(IOctoSession session, IEnumerable<TKey> keys)

@@ -26,12 +26,12 @@ public class CkClassMapGenerator
         sb.AppendLine("/// <summary>");
         sb.AppendLine($"/// Represents a map of construction kit types and class types for model {ckModelId.FullName}");
         sb.AppendLine("/// </summary>");
-        sb.AppendLine($"public class {ckModelId.ModelId.MakeClassName()}CkTypeMap : ICkClassMap");
+        sb.AppendLine($"public class {ckModelId.Name.MakeClassName()}CkTypeMap : ICkClassMap");
         sb.AppendLine("{");
         sb.AppendLine("   private readonly Dictionary<CkTypeId, Type> _typeMappings;");
         sb.AppendLine("   private readonly Dictionary<CkRecordId, Type> _recordMappings;");
         sb.AppendLine();
-        sb.AppendLine($"   public {ckModelId.ModelId.MakeClassName()}CkTypeMap()");
+        sb.AppendLine($"   public {ckModelId.Name.MakeClassName()}CkTypeMap()");
         sb.AppendLine("   {");
         sb.AppendLine("        _typeMappings = new()");
         sb.AppendLine("        {");
@@ -39,7 +39,7 @@ public class CkClassMapGenerator
         {
             foreach (var typeDto in types)
             {
-                sb.AppendLine($"            {{ \"{typeDto.TypeId.TypeId}\", typeof(Rt{typeDto.TypeId.TypeId.MakeClassName()}) }},");
+                sb.AppendLine($"            {{ \"{typeDto.TypeId.Name}\", typeof(Rt{typeDto.TypeId.Name.MakeClassName()}) }},");
             }
         }
         sb.AppendLine("        };");
@@ -51,13 +51,13 @@ public class CkClassMapGenerator
             foreach (var ckRecordDto in records)
             {
                 sb.AppendLine(
-                    $"            {{ \"{ckRecordDto.RecordId.RecordId}\", typeof(Rt{ckRecordDto.RecordId.RecordId.MakeClassName()}Record) }},");
+                    $"            {{ \"{ckRecordDto.RecordId.Name}\", typeof(Rt{ckRecordDto.RecordId.Name.MakeClassName()}Record) }},");
             }
         }
         sb.AppendLine("        };");
         sb.AppendLine("    }");
         sb.AppendLine();
-        sb.AppendLine($"    public CkModelId ModelId => new CkModelId(\"{ckModelId.FullName}\");");
+        sb.AppendLine($"    public string ModelId => \"{ckModelId.Name}\";");
         sb.AppendLine();
         sb.AppendLine("    public Type? GetCkTypeClass(CkTypeId ckTypeId)");
         sb.AppendLine("    {");

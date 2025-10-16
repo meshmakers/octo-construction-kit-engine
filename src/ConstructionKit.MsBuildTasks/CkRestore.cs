@@ -56,7 +56,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         services.AddConstructionKit();
         var serviceProvider = services.BuildServiceProvider();
 
-        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICkModelRepositoryService>();
+        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICatalogService>();
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();

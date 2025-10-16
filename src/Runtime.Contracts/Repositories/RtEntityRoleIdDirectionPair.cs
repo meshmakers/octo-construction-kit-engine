@@ -8,4 +8,4 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 /// <param name="RtEntityId">Runtime entity id</param>
 /// <param name="CkRoleId">Association role id</param>
 /// <param name="Direction">>Direction of the association</param>
-public record RtEntityRoleIdDirectionPair(RtEntityId RtEntityId, CkId<CkAssociationRoleId> CkRoleId, GraphDirections Direction);
+public record RtEntityRoleIdDirectionPair(RtEntityId RtEntityId, RtCkId<CkAssociationRoleId> CkRoleId, GraphDirections Direction);

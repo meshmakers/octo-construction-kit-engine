@@ -74,7 +74,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public virtual async Task<TEntity?> GetRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         var ckTypeGraph = await GetCkTypeGraphAsync(ckTypeId).ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
@@ -82,7 +82,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null)
     {
@@ -96,14 +96,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         return await GetRtEntitiesByIdAsync<TEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, int? skip = null,
         int? take = null)
     {
@@ -116,7 +116,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         return await GetRtEntitiesByTypeAsync<TEntity>(session, ckTypeId, dataQueryOperation, skip, take)
             .ConfigureAwait(false);
@@ -143,7 +143,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public virtual async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null,
         int? take = null)
     {
         return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, direction, roleId)
@@ -152,7 +152,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        RtEntityId rtEntityId, GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null,
+        RtEntityId rtEntityId, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null,
         int? take = null)
     {
         var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], direction, roleId)
@@ -164,7 +164,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
-        RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
+        RtEntityId targetRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId)
     {
         return await RepositoryDataSource
             .GetRtAssociationOrDefaultAsync(session, originRtEntityId, targetRtEntityId, ckRoleId)
@@ -175,7 +175,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task<IQueryable<TEntity>> AsQueryableAsync<TEntity>(IOctoSession? session = null)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         var ckTypeGraph = await GetCkTypeGraphAsync(ckTypeId).ConfigureAwait(false);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
@@ -185,7 +185,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public IQueryable<TEntity> AsQueryable<TEntity>(IOctoSession? session = null) where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         var t = GetCkTypeGraphAsync(ckTypeId);
         t.Wait();
@@ -197,20 +197,28 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session,
-        CkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
+        RtCkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
         ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null);
 
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session,
-        CkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
+        RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
         DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
         int? take = null);
 
     /// <inheritdoc />
-    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
+    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,
         RtEntityId targetRtEntityId)
     {
         return RepositoryDataSource.CreateTransientRtAssociation(originRtEntityId, ckRoleId, targetRtEntityId);
+    }
+
+    /// <inheritdoc />
+    public async Task<RtEntity> CreateTransientRtEntityByRtCkIdAsync(RtCkId<CkTypeId> rtCkTypeId)
+    {
+        var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+        var ckTypeGraph = cacheService.GetRtCkType(TenantId, rtCkTypeId);
+        return CreateTransientRtEntity<RtEntity>(ckTypeGraph);
     }
 
     /// <inheritdoc />
@@ -224,37 +232,37 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public async Task<TEntity> CreateTransientRtEntityAsync<TEntity>() where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         if (string.IsNullOrWhiteSpace(ckTypeId.FullName))
         {
             throw RuntimeRepositoryException.CkTypeIdMissingForType(typeof(TEntity));
         }
 
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
         if (ckTypeGraph == null)
         {
-            throw RuntimeRepositoryException.CkTypeIdDoesNotExistInCache(ckTypeId);
+            throw RuntimeRepositoryException.RtCkTypeIdDoesNotExistInCache(ckTypeId);
         }
 
         return CreateTransientRtEntity<TEntity>(ckTypeGraph);
     }
 
     /// <inheritdoc />
-    public virtual async Task InsertOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, RtEntity rtEntity)
+    public virtual async Task InsertOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, RtEntity rtEntity)
     {
-        await InsertOneRtEntityAsync<RtEntity>(session, rtEntity.GetCkTypeId(), rtEntity).ConfigureAwait(false);
+        await InsertOneRtEntityAsync<RtEntity>(session, rtEntity.GetRtCkTypeId(), rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        await InsertOneRtEntityAsync(session, rtEntity.GetCkTypeId(), rtEntity).ConfigureAwait(false);
+        await InsertOneRtEntityAsync(session, rtEntity.GetRtCkTypeId(), rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task InsertManyRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    public async Task InsertManyRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         ICollection<RtEntity> rtEntities)
     {
         await InsertManyRtEntityAsync<RtEntity>(session, ckTypeId, rtEntities).ConfigureAwait(false);
@@ -264,15 +272,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, ICollection<TEntity> rtEntities)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         await InsertManyRtEntityAsync(session, ckTypeId, rtEntities).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task ReplaceOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    public async Task ReplaceOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         RtEntity rtEntity)
     {
-        await ReplaceOneRtEntityByIdAsync<RtEntity>(session, rtEntity.GetCkTypeId(), rtId, rtEntity)
+        await ReplaceOneRtEntityByIdAsync<RtEntity>(session, rtEntity.GetRtCkTypeId(), rtId, rtEntity)
             .ConfigureAwait(false);
     }
 
@@ -280,7 +288,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        await ReplaceOneRtEntityByIdAsync(session, rtEntity.GetCkTypeId(), rtId, rtEntity).ConfigureAwait(false);
+        await ReplaceOneRtEntityByIdAsync(session, rtEntity.GetRtCkTypeId(), rtId, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -297,13 +305,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         await ReplaceOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task UpdateOneRtEntityByIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+    public async Task UpdateOneRtEntityByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
         RtEntity rtEntity)
     {
         await UpdateOneRtEntityByIdAsync<RtEntity>(session, ckTypeId, rtId, rtEntity).ConfigureAwait(false);
@@ -313,7 +321,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId, TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         await UpdateOneRtEntityByIdAsync(session, ckTypeId, rtId, rtEntity).ConfigureAwait(false);
     }
 
@@ -331,7 +339,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         await UpdateOneRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
@@ -350,13 +358,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         await UpdateManyRtEntityAsync(session, ckTypeId, fieldFilterCriteria, rtEntity).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, CkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    public async Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
@@ -369,7 +377,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
@@ -378,7 +386,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    public async Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria)
     {
         await DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
@@ -388,13 +396,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         await DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteManyRtEntitiesAsync(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    public async Task DeleteManyRtEntitiesAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria)
     {
         await DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
@@ -404,7 +412,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
         where TEntity : RtEntity, new()
     {
-        var ckTypeId = RtEntityExtensions.GetCkTypeId<TEntity>();
+        var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
         await DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
     }
@@ -508,13 +516,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="ckTypeId">The ck type id</param>
     /// <returns></returns>
     /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
-    public async Task<CkTypeGraph> GetCkTypeGraphAsync(CkId<CkTypeId> ckTypeId)
+    public async Task<CkTypeGraph> GetCkTypeGraphAsync(RtCkId<CkTypeId> ckTypeId)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var ckTypeGraph = cacheService.GetCkType(TenantId, ckTypeId);
+        var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
         if (ckTypeGraph == null)
         {
-            throw RuntimeRepositoryException.CkTypeIdDoesNotExistInCache(ckTypeId);
+            throw RuntimeRepositoryException.RtCkTypeIdDoesNotExistInCache(ckTypeId);
         }
 
         return ckTypeGraph;
@@ -551,7 +559,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var rtEntity = new TEntity
         {
             RtId = OctoObjectId.GenerateNewId(),
-            CkTypeId = ckTypeGraph.CkTypeId
+            CkTypeId = ckTypeGraph.CkTypeId.ToRtCkId()
         };
         foreach (var ckTypeAttributeDto in ckTypeGraph.AllAttributes.Values)
         {
@@ -591,7 +599,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns>Returns a result set of the given type</returns>
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session,
-        CkId<CkTypeId> ckTypeId,
+        RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
         int? skip = null, int? take = null) where TEntity : RtEntity, new();
 
@@ -603,7 +611,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Object to insert</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected virtual async Task InsertOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
     {
@@ -623,7 +631,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntities">Objects to insert</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected virtual async Task InsertManyRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         ICollection<TEntity> rtEntities)
         where TEntity : RtEntity, new()
     {
@@ -648,7 +656,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected abstract Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected abstract Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -659,7 +667,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected abstract Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected abstract Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -671,7 +679,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected abstract Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected abstract Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -683,7 +691,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected virtual async Task UpdateOneRtEntityByIdAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         OctoObjectId rtId,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
@@ -705,7 +713,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected abstract Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected abstract Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -717,7 +725,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Runtime entity object as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected abstract Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected abstract Task ReplaceOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -729,7 +737,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    protected virtual async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, CkId<CkTypeId> ckTypeId,
+    protected virtual async Task ReplaceOneRtEntityByIdAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         OctoObjectId rtId,
         TEntity rtEntity)
         where TEntity : RtEntity, new()
@@ -752,7 +760,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
-        CkId<CkTypeId> ckTypeId,
+        RtCkId<CkTypeId> ckTypeId,
         DataQueryOperation dataQueryOperation, int? skip = null, int? take = null) where TEntity : RtEntity, new();
 
 

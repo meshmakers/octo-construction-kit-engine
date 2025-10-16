@@ -9,107 +9,61 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 /// <summary>
 ///     Resolver that resolves the elements of a compiled model.
 /// </summary>
-internal class ModelResolver : IModelResolver
+internal abstract class ModelResolver : IModelResolver
 {
-    private readonly IDependencyResolver _dependencyResolver;
-    private readonly IElementResolver _elementResolver;
-    private readonly IInheritanceResolver _inheritanceResolver;
-    private readonly IReferenceResolver _referenceResolver;
-    private readonly IVariableResolver _variableResolver;
+    protected readonly IElementResolver _elementResolver;
+    protected readonly IInheritanceResolver _inheritanceResolver;
+    protected readonly IReferenceResolver _referenceResolver;
+    protected readonly IVariableResolver _variableResolver;
 
     /// <summary>
     ///     Creates a new instance of <see cref="ModelResolver" />.
     /// </summary>
-    /// <param name="dependencyResolver"></param>
     /// <param name="inheritanceResolver"></param>
     /// <param name="elementResolver"></param>
     /// <param name="referenceResolver"></param>
     /// <param name="variableResolver"></param>
-    public ModelResolver(IDependencyResolver dependencyResolver, IInheritanceResolver inheritanceResolver,
+    protected ModelResolver(
+        IInheritanceResolver inheritanceResolver,
         IElementResolver elementResolver, IReferenceResolver referenceResolver, IVariableResolver variableResolver)
     {
-        _dependencyResolver = dependencyResolver;
         _inheritanceResolver = inheritanceResolver;
         _elementResolver = elementResolver;
         _referenceResolver = referenceResolver;
         _variableResolver = variableResolver;
     }
+    //
+    // public Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    //     object? sourceIdentifier = null)
+    // {
+    //     var originFileResolver = new OriginFileResolver("-");
+    //     return HardResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+    // }
+    //
+    // public abstract Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
+    //
+    // public Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
+    //     object? sourceIdentifier = null)
+    // {
+    //     var originFileResolver = new OriginFileResolver("-");
+    //     return SoftResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
+    // }
+    //
+    // public abstract Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds,
+    //     IOriginFileResolver originFileResolver, OperationResult operationResult,
+    //     object? sourceIdentifier = null);
+    //
+    // public abstract Task<ModelResolveResult> SoftResolveAsync(CkCompiledModelRoot compiledModel,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
+    //
+    // public abstract Task<CkModelGraph> HardResolveAsync(CkCompiledModelRoot compiledModel,
+    //     IOriginFileResolver originFileResolver,
+    //     OperationResult operationResult, object? sourceIdentifier = null);
 
-    public Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
-        object? sourceIdentifier = null)
-    {
-        var originFileResolver = new OriginFileResolver("-");
-        return ResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
-    }
-
-    public async Task<CkModelGraph> ResolveAsync(ICollection<CkModelId> ckModelIds,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-        await _dependencyResolver.ResolveDependenciesAsync(ckModelIds.Select(id => id.ToVersionRange()).ToList(),
-                modelGraph, _variableResolver,
-                originFileResolver, operationResult, sourceIdentifier)
-            .ConfigureAwait(false);
-
-        _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-
-        return modelGraph;
-    }
-
-    public async Task<CkModelGraph> ResolveAsync(CkCompiledModelRoot compiledModel,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-
-        if (compiledModel.Dependencies != null)
-        {
-            await _dependencyResolver.ResolveDependenciesAsync(compiledModel.Dependencies, modelGraph,
-                    _variableResolver,
-                    originFileResolver, operationResult, sourceIdentifier)
-                .ConfigureAwait(false);
-        }
-
-        Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
-        return modelGraph;
-    }
-
-
-    public async Task<(CkModelGraph, CkCompiledModelRoot)> ResolveAsync(CkModelCompileCandidate compileCandidate,
-        IOriginFileResolver originFileResolver,
-        OperationResult operationResult, object? sourceIdentifier = null)
-    {
-        var modelGraph = new CkModelGraph();
-        IReadOnlyCollection<CkModelId> resolvedModelIds = [];
-
-        if (compileCandidate.DependencyRanges != null)
-        {
-            resolvedModelIds = await _dependencyResolver.ResolveDependenciesAsync(compileCandidate.DependencyRanges, modelGraph,
-                    _variableResolver,
-                    originFileResolver, operationResult, sourceIdentifier)
-                .ConfigureAwait(false);
-        }
-
-        Resolve(compileCandidate, modelGraph, originFileResolver, operationResult);
-
-        var compiledModel = new CkCompiledModelRoot
-        {
-            ModelId = compileCandidate.ModelId,
-            Dependencies = resolvedModelIds.ToList(),
-            Description = compileCandidate.Description,
-            Types = compileCandidate.Types,
-            Attributes = compileCandidate.Attributes,
-            AssociationRoles = compileCandidate.AssociationRoles,
-            Records = compileCandidate.Records,
-            Enums = compileCandidate.Enums
-        };
-
-        return (modelGraph, compiledModel);
-    }
-
-    private void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
+    protected void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         _variableResolver.SetVariable("thisModel", modelRootBase.ModelId.FullName);
@@ -123,23 +77,23 @@ internal class ModelResolver : IModelResolver
         // We combine all entities, attributes and association roles into one list.
 
         // Check: Ensure that the model forces no circular dependencies.
-        if (modelGraph.Dependencies.Any(x => x.Key.ModelId == modelRootBase.ModelId.ModelId))
+        if (modelGraph.Dependencies.Any(x => x.Key.Name == modelRootBase.ModelId.Name))
         {
-            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.ModelId == modelRootBase.ModelId.ModelId);
+            var dependentModels = modelGraph.Dependencies.Keys.Where(x => x.Name == modelRootBase.ModelId.Name);
 
             operationResult.AddMessage(MessageCodes.CircularDependency(
-                originFileResolver.Resolve(modelRootBase.ModelId.ModelId),
-                modelRootBase.ModelId.ModelId, dependentModels.Select(x => x.ModelId).ToList()));
+                originFileResolver.Resolve(modelRootBase.ModelId.Name),
+                modelRootBase.ModelId.Name, dependentModels.Select(x => x.Name).ToList()));
         }
 
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
         _elementResolver.Resolve(modelRootBase, modelGraph, _variableResolver, originFileResolver, operationResult);
 
-        if (!Regex.IsMatch(modelRootBase.ModelId.ModelId, CompilerStatics.AllowedCharactersInNamesRegex))
+        if (!Regex.IsMatch(modelRootBase.ModelId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
         {
             operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(
-                originFileResolver.Resolve(modelRootBase.ModelId.ModelId), modelRootBase.ModelId.ModelId));
-            throw ModelValidationException.ModelIdContainsInvalidCharacters(modelRootBase.ModelId.ModelId);
+                originFileResolver.Resolve(modelRootBase.ModelId.Name), modelRootBase.ModelId.Name));
+            throw ModelValidationException.ModelIdContainsInvalidCharacters(modelRootBase.ModelId.Name);
         }
 
 

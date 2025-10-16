@@ -8,11 +8,11 @@ types:
       - id: ${System}/Name
         name: Name
 
-      - id: ${thisModel}/RoleId
+      - id: ${this}/RoleId
         name: RoleId
 
-      - id: ${thisModel}/SubjectIds
+      - id: ${this}/SubjectIds
         name: SubjectIds
 
-      - id: ${thisModel}/IdentityRoleIds
+      - id: ${this}/IdentityRoleIds
         name: IdentityRoleIds

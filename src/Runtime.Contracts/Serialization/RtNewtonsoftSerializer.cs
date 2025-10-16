@@ -22,6 +22,13 @@ public static class RtNewtonsoftSerializer
             new NewtonCkRecordIdConverter(),
             new NewtonCkAttributeIdConverter(),
             new NewtonCkAssociationRoleIdConverter(),
+
+            new NewtonRtCkTypeIdConverter(),
+            new NewtonRtCkEnumIdConverter(),
+            new NewtonRtCkRecordIdConverter(),
+            new NewtonRtCkAttributeIdConverter(),
+            new NewtonRtCkAssociationRoleIdConverter(),
+            
             new RtNewtonsoftAttributesConverter()
         }
     };

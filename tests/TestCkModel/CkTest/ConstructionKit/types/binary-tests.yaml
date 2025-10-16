@@ -3,7 +3,7 @@ types:
   - typeId: BinaryEntity
     derivedFromCkTypeId: ${System}/Entity
     attributes:
-      - id: ${thisModel}/Binary
+      - id: ${this}/Binary
         name: Binary
-      - id: ${thisModel}/DataCount
+      - id: ${this}/DataCount
         name: DataCount

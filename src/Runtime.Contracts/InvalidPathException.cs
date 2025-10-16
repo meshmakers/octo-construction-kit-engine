@@ -116,6 +116,11 @@ public class InvalidPathException : PersistenceException
         return new InvalidPathException($"CkTypeId '{ckTypeId}' not found for tenant '{tenantId}'.");
     }
 
+    internal static Exception RtCkTypeIdNotFound(string tenantId, RtCkId<CkTypeId> rtCkTypeId)
+    {
+        return new InvalidPathException($"RtCkTypeId '{rtCkTypeId}' not found for tenant '{tenantId}'.");
+    }
+
     internal static Exception AssociationNotFound(IEnumerable<PathTerm> path, PathTerm navigationProperty,
         PathTerm targetTypeProperty)
     {
@@ -148,10 +153,10 @@ public class InvalidPathException : PersistenceException
     }
 
 
-    internal static Exception CannotMergeFieldFilterToNavigationPair(string fieldFilterAttributePath, CkId<CkTypeId> ckTypeId, CkId<CkAssociationRoleId> candidateCkRoleId, CkId<CkTypeId> candidateTargetCkTypeId)
+    internal static Exception CannotMergeFieldFilterToNavigationPair(string fieldFilterAttributePath, CkId<CkTypeId> ckTypeId, RtCkId<CkAssociationRoleId> candidateCkRoleId, RtCkId<CkTypeId> candidateTargetCkTypeId)
     {
         return new InvalidPathException(
-            $"Cannot merge field filter '{fieldFilterAttributePath}' to navigation pair with CkTypeId '{ckTypeId}', CkRoleId '{candidateCkRoleId}' and target CkTypeId '{candidateTargetCkTypeId}'. Ensure that the field filter is compatible with the navigation pair.");
+            $"Cannot merge field filter '{fieldFilterAttributePath}' to navigation pair with CkTypeId '{ckTypeId}', RtCkRoleId '{candidateCkRoleId}' and target CkTypeId '{candidateTargetCkTypeId}'. Ensure that the field filter is compatible with the navigation pair.");
     }
 
     internal static Exception CannotMergeFieldFilterToNavigationPairInvalidPath(string fieldFilterAttributePath, CkId<CkTypeId> ckTypeId)

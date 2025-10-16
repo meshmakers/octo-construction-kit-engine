@@ -13,5 +13,10 @@ public enum ModelState
     /// <summary>
     /// The model is available
     /// </summary>
-    Available = 1
+    Available = 1,
+
+    /// <summary>
+    /// The model failed to resolve because of missing dependencies
+    /// </summary>
+    ResolveFailed = 2
 }

@@ -4,7 +4,6 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Caching;
-using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -107,6 +106,17 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+    public CkTypeGraph GetRtCkType(string tenantId, RtCkId<CkTypeId> rtCkTypeId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkType(rtCkTypeId);
+    }
+
+    /// <inheritdoc />
 #if NETSTANDARD2_0
     public bool TryGetCkType(string tenantId, CkId<CkTypeId> ckTypeId, out CkTypeGraph? ckTypeGraph)
 #else
@@ -120,6 +130,22 @@ public class CkCacheService : ICkCacheService
         }
 
         return ckCache.TryGetCkType(ckTypeId, out ckTypeGraph);
+    }
+
+    /// <inheritdoc />
+#if NETSTANDARD2_0
+    public bool TryGetRtCkType(string tenantId, RtCkId<CkTypeId> rtCkTypeId, out CkTypeGraph? ckTypeGraph)
+#else
+    public bool TryGetRtCkType(string tenantId, RtCkId<CkTypeId> rtCkTypeId, [NotNullWhen(true)] out CkTypeGraph? ckTypeGraph)
+#endif
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckTypeGraph = null;
+            return false;
+        }
+
+        return ckCache.TryGetRtCkType(rtCkTypeId, out ckTypeGraph);
     }
 
     /// <inheritdoc />
@@ -151,6 +177,22 @@ public class CkCacheService : ICkCacheService
 
     /// <inheritdoc />
 #if NETSTANDARD2_0
+    public bool TryGetRtCkRecord(string tenantId, RtCkId<CkRecordId> rtCkRecordId, out CkRecordGraph? ckRecordGraph)
+#else
+    public bool TryGetRtCkRecord(string tenantId, RtCkId<CkRecordId> rtCkRecordId, [NotNullWhen(true)] out CkRecordGraph? ckRecordGraph)
+#endif
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckRecordGraph = null;
+            return false;
+        }
+
+        return ckCache.TryGetRtCkRecord(rtCkRecordId, out ckRecordGraph);
+    }
+
+    /// <inheritdoc />
+#if NETSTANDARD2_0
     public bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, out CkEnumGraph? ckEnumGraph)
 #else
     public bool TryGetCkEnum(string tenantId, CkId<CkEnumId> ckEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph)
@@ -166,6 +208,22 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+#if NETSTANDARD2_0
+    public bool TryGetRtCkEnum(string tenantId, RtCkId<CkEnumId> rtCkEnumId, out CkEnumGraph? ckEnumGraph)
+#else
+    public bool TryGetRtCkEnum(string tenantId, RtCkId<CkEnumId> rtCkEnumId, [NotNullWhen(true)] out CkEnumGraph? ckEnumGraph)
+#endif
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            ckEnumGraph = null;
+            return false;
+        }
+
+        return ckCache.TryGetRtCkEnum(rtCkEnumId, out ckEnumGraph);
+    }
+
+    /// <inheritdoc />
     public CkAttributeGraph GetCkAttribute(string tenantId, CkId<CkAttributeId> ckAttributeId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -174,6 +232,17 @@ public class CkCacheService : ICkCacheService
         }
 
         return ckCache.GetCkAttribute(ckAttributeId);
+    }
+
+    /// <inheritdoc />
+    public CkAttributeGraph GetRtCkAttribute(string tenantId, RtCkId<CkAttributeId> rtCkAttributeId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkAttribute(rtCkAttributeId);
     }
 
     /// <inheritdoc />
@@ -188,6 +257,17 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+    public CkAssociationRoleGraph GetRtCkAssociationRole(string tenantId, RtCkId<CkAssociationRoleId> rtCkAssociationRoleId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkAssociationRole(rtCkAssociationRoleId);
+    }
+
+    /// <inheritdoc />
     public CkRecordGraph GetCkRecord(string tenantId, CkId<CkRecordId> ckRecordId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
@@ -196,6 +276,17 @@ public class CkCacheService : ICkCacheService
         }
 
         return ckCache.GetCkRecord(ckRecordId);
+    }
+
+    /// <inheritdoc />
+    public CkRecordGraph GetRtCkRecord(string tenantId, RtCkId<CkRecordId> rtCkRecordId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkRecord(rtCkRecordId);
     }
 
     /// <inheritdoc />
@@ -218,6 +309,17 @@ public class CkCacheService : ICkCacheService
         }
 
         return ckCache.GetCkEnum(ckEnumId);
+    }
+
+    /// <inheritdoc />
+    public CkEnumGraph GetRtCkEnum(string tenantId, RtCkId<CkEnumId> rtCkEnumId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkEnum(rtCkEnumId);
     }
 
     /// <inheritdoc />
@@ -251,6 +353,18 @@ public class CkCacheService : ICkCacheService
         }
 
         ckCache.RestoreCache(jsonText);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(string tenantId, RtCkId<CkTypeId> rtCkTypeId,
+        bool ignoreNavigationProperties = false)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
     }
 
     /// <inheritdoc />

@@ -17,8 +17,8 @@ public class RtAssociationTcDto : RtTypeWithAttributesTcDto
     ///     Gets or sets the role id of the association.
     /// </summary>
     [JsonRequired]
-    [JsonConverter(typeof(CkIdAssociationRoleIdConverter))]
-    public CkId<CkAssociationRoleId> RoleId { get; set; } = null!;
+    [JsonConverter(typeof(RtCkIdAssociationRoleIdConverter))]
+    public RtCkId<CkAssociationRoleId> RoleId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the target rt id.
@@ -32,12 +32,12 @@ public class RtAssociationTcDto : RtTypeWithAttributesTcDto
     ///     Gets or sets the target ck type id.
     /// </summary>
     [JsonRequired]
-    [JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
+    [JsonConverter(typeof(RtCkIdTypeIdConverter))]
+    public RtCkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public List<CkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
+    public List<RtCkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
 }

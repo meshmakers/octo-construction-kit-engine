@@ -7,32 +7,37 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit type id
 /// </summary>
-[DebuggerDisplay("{" + nameof(TypeId) + "} ({" + nameof(Version) + "})")]
+[DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkTypeIdConverter))]
-public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
+public sealed record CkTypeId : IComparable<CkTypeId>, ICkElementId
 {
     /// <summary>
-    ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="typeId" />.
+    ///     Creates a new <see cref="CkTypeId" /> from the given <paramref name="name" />.
     /// </summary>
-    /// <param name="typeId"></param>
+    /// <param name="name"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkTypeId(string typeId)
+    public CkTypeId(string name)
     {
-        var typeIndex = typeId.IndexOf("-", StringComparison.Ordinal);
+        var typeIndex = name.IndexOf("-", StringComparison.Ordinal);
         if (typeIndex < 0)
         {
-            TypeId = typeId;
-            Version = "1.0.0";
+            Name = name;
+            Version = 1;
         }
         else
         {
-            TypeId = typeId.Substring(0, typeIndex);
-            Version = new CkVersion(typeId.Substring(typeIndex + 1));
+            Name = name.Substring(0, typeIndex);
+            if (!uint.TryParse(name.Substring(typeIndex + 1), out uint version))
+            {
+                throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a valid version number");
+            }
+
+            Version = version;
         }
 
-        if (string.IsNullOrWhiteSpace(TypeId))
+        if (string.IsNullOrWhiteSpace(Name))
         {
-            throw new ArgumentOutOfRangeException(nameof(typeId), typeId, $"{nameof(typeId)} must contain a type id");
+            throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a type id");
         }
     }
     
@@ -47,17 +52,17 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
     }
 
     /// <summary>
-    ///     Defines the name of the type, e. g. "Person"
+    ///     Defines the name of the type, e.g. "Person"
     /// </summary>
-    public string TypeId { get; }
+    public string Name { get; }
 
     /// <summary>
-    ///     Returns the version of the type, e. g. "1.0.0"
+    ///     Returns the version of the type, e.g. 1
     /// </summary>
-    public CkVersion Version { get; }
+    public uint Version { get; }
 
     /// <inheritdoc />
-    public string FullName => IsEmpty ? "" : $"{TypeId}-{Version}";
+    public string FullName => IsEmpty ? "" : $"{Name}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -69,10 +74,10 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
                 return "";
             }
 
-            var s = TypeId;
-            if (Version.Major > 1)
+            var s = Name;
+            if (Version > 1)
             {
-                s += $"-{Version.Major}";
+                s += $"-{Version}";
             }
 
             return s;
@@ -80,7 +85,7 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(TypeId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name);
 
 
     /// <inheritdoc />
@@ -91,7 +96,7 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
             return 1;
         }
         
-        var result = string.Compare(TypeId, other.TypeId, StringComparison.Ordinal);
+        var result = string.Compare(Name, other.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -103,7 +108,7 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
     /// <inheritdoc />
     public bool Equals(CkTypeId? other)
     {
-        return other is not null && TypeId == other.TypeId && Version.IsCompatible(other.Version);
+        return other is not null && Name == other.Name && Version == other.Version;
     }
 
     /// <inheritdoc />
@@ -236,7 +241,7 @@ public sealed record CkTypeId : IComparable<CkTypeId>, ICkKey
         unchecked
         {
             var hash = 17;
-            hash = hash * 23 + TypeId.GetHashCode();
+            hash = hash * 23 + Name.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }

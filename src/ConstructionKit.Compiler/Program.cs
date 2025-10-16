@@ -3,6 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Common.Shared.Services;
 using Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Microsoft.Extensions.Configuration;
@@ -61,7 +62,7 @@ internal static class Program
 
         services.Configure<OctoToolOptions>(options =>
             config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
-        services.Configure<GitHubOptions>(options => 
+        services.Configure<GitHubCatalogOptions>(options => 
             config.GetSection(Constants.OctoToolGitHubRootNode).Bind(options));
         
         // Add Options for Running in ASP Net
@@ -86,7 +87,7 @@ internal static class Program
             configWriter.AddOptions(Constants.OctoToolOptionsRootNode,
                 provider.GetRequiredService<IOptions<OctoToolOptions>>());
             configWriter.AddOptions(Constants.OctoToolGitHubRootNode,
-                provider.GetRequiredService<IOptions<GitHubOptions>>());
+                provider.GetRequiredService<IOptions<GitHubCatalogOptions>>());
             return configWriter;
         });
 
@@ -94,7 +95,7 @@ internal static class Program
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, CompileCommand>();
         services.AddTransient<ICommand, GetCommand>();
-        services.AddTransient<ICommand, GetReposCommand>();
+        services.AddTransient<ICommand, GetCatalogsCommand>();
         services.AddTransient<ICommand, PublishCommand>();
         services.AddTransient<ICommand, FindCommand>();
         services.AddTransient<ICommand, GenerateDocsCommand>();

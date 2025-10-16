@@ -8,29 +8,56 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 public interface ICkModelGraph
 {
     /// <summary>
-    ///     Returns the types of the model.
+    ///     Returns the types of the graph.
     /// </summary>
     IReadOnlyDictionary<CkId<CkTypeId>, CkTypeGraph> Types { get; }
 
     /// <summary>
-    ///     Returns the attributes of the model.
+    ///     Returns the attributes of the graph.
     /// </summary>
     IReadOnlyDictionary<CkId<CkAttributeId>, CkAttributeGraph> Attributes { get; }
 
     /// <summary>
-    ///     Returns the association roles of the model.
+    ///     Returns the association roles of the graph.
     /// </summary>
     IReadOnlyDictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRoles { get; }
 
     /// <summary>
-    ///     Returns the records of the model.
+    ///     Returns the records of the graph.
     /// </summary>
     IReadOnlyDictionary<CkId<CkRecordId>, CkRecordGraph> Records { get; }
 
     /// <summary>
-    ///     Returns the enums of the model.
+    ///     Returns the enums of the graph.
     /// </summary>
     IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums { get; }
+
+
+    /// <summary>
+    ///     Returns the types of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkTypeId>, CkTypeGraph> TypesByRtCk { get; }
+
+    /// <summary>
+    ///     Returns the attributes of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkAttributeId>, CkAttributeGraph> AttributesByRtCk { get; }
+
+    /// <summary>
+    ///     Returns the association roles of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph> AssociationRolesByRtCk { get; }
+
+    /// <summary>
+    ///     Returns the records of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkRecordId>, CkRecordGraph> RecordsByRtCk { get; }
+
+    /// <summary>
+    ///     Returns the enums of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkEnumId>, CkEnumGraph> EnumsByRtCk { get; }
+
 
     /// <summary>
     ///     Returns a list of model dependencies.
@@ -138,4 +165,9 @@ public interface ICkModelGraph
     /// </summary>
     /// <returns></returns>
     IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties);
+
+    /// <summary>
+    /// Returns a list of all query column attribute paths for the given runtime construction kit type
+    /// </summary>
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties);
 }

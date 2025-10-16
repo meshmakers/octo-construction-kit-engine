@@ -12,7 +12,7 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
 {
     [Newtonsoft.Json.JsonConstructor]
     [System.Text.Json.Serialization.JsonConstructor]
-    private EntityUpdateInfo(OctoObjectId? rtId, CkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption)
+    private EntityUpdateInfo(OctoObjectId? rtId, RtCkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption)
     {
         RtId = rtId;
         CkTypeId = ckTypeId;
@@ -26,7 +26,7 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         RtEntity = rtEntity;
     }
     
-    private EntityUpdateInfo(CkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
+    private EntityUpdateInfo(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
     {
         CkTypeId = ckTypeId;
         RtEntity = rtEntity;
@@ -47,7 +47,7 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     public OctoObjectId? RtId { get; }
     
     /// <inheritdoc />
-    public CkId<CkTypeId> CkTypeId { get; }
+    public RtCkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     MOD option.
@@ -72,7 +72,7 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     /// <param name="ckTypeId">Type identifier of the construction kit</param>
     /// <param name="rtEntity">Runtime entity to insert</param>
     /// <returns></returns>
-    public static EntityUpdateInfo<TEntity> CreateInsert(CkId<CkTypeId> ckTypeId, TEntity rtEntity)
+    public static EntityUpdateInfo<TEntity> CreateInsert(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity)
     {
         return new EntityUpdateInfo<TEntity>(ckTypeId, rtEntity, EntityModOptions.Insert);
     }

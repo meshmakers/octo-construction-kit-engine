@@ -16,5 +16,5 @@ $nugetGlobalPackages = Join-Path $userProfile ".nuget/packages"
 Write-Host "NuGet global packages path: $nugetGlobalPackages"
 
 
-t4 -P="$includePath" -P="$nugetGlobalPackages/system.codedom/9.0.9/lib/net9.0" ./MessageCodes.tt
+t4 -P="$includePath" -P="$nugetGlobalPackages/system.codedom/9.0.10/lib/net9.0" ./MessageCodes.tt
 Write-Host "Generated MessageCodes.cs"

@@ -45,8 +45,7 @@ public class CkTypeQueryColumn
     /// <param name="path">Path to the column within a type query.</param>
     /// <param name="accessPathList">Access paths to the column as a list of single properties.</param>
     /// <param name="isArray">Whether the column is an array.</param>
-    /// <param name="valueType">Type of the column.</param>
-    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, bool isArray, AttributeValueTypesDto valueType)
+    public CkTypeQueryColumn(string path, IEnumerable<PathTerm> accessPathList, bool isArray)
     {
         Path = path;
         AccessPathList = accessPathList;

@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
@@ -55,12 +57,12 @@ public class ModelValidationException : CkModelException
 
     internal static Exception InheritanceMissing(string typeId)
     {
-        return new ModelValidationException($"TypeId '{typeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set.");
+        return new ModelValidationException($"Name '{typeId}' has no inheritance definition. Ensure that attribute ckDerivedId is set.");
     }
 
     internal static Exception ModelIdContainsInvalidCharacters(string modelId)
     {
-        return new ModelValidationException($"ModelId '{modelId}' contains invalid characters. Only a-z, A-Z, 0-9, _ and . are allowed.");
+        return new ModelValidationException($"Name '{modelId}' contains invalid characters. Only a-z, A-Z, 0-9, _ and . are allowed.");
     }
 
     internal static Exception DerivedFromCkRecordIdThatIsFinal(CkId<CkRecordId> currentCkRecordId, CkId<CkRecordId> lastCkRecordId)
@@ -86,5 +88,11 @@ public class ModelValidationException : CkModelException
     {
         var attributeIds = string.Join(", ", duplicateAttributeIds);
         return new ModelValidationException($"CkRecordId '{ckRecordId}' has duplicate attribute IDs: '{attributeIds}'");
+    }
+
+    internal static Exception UnknownCkModel(CkModelIdVersionRange ckDependency)
+    {
+        return new ModelValidationException(
+            $"Dependency '{ckDependency}' is an unknown construction kit model library. This may happen because a dependency to another construction kit model is missing.");
     }
 }

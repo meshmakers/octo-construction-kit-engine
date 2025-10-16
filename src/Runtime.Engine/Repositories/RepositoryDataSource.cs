@@ -48,7 +48,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId> roleId,
+        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId,
         int? skip = null,
         int? take = null)
     {
@@ -56,7 +56,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     private async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsInternalAsync(IOctoSession session,
-        ICollection<RtEntityId> rtEntityIds, GraphDirections direction, CkId<CkAssociationRoleId>? roleId,
+        ICollection<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId>? roleId,
         int? skip = null,
         int? take = null)
     {
@@ -137,7 +137,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public async Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
-        RtEntityId targetRtEntityId, CkId<CkAssociationRoleId> ckRoleId)
+        RtEntityId targetRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId)
     {
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
         return queryable
@@ -152,7 +152,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         IEnumerable<RtOriginTargetPair> rtOriginTargetPair);
 
     /// <inheritdoc />
-    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
+    public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,
         RtEntityId targetRtEntityId)
     {
         return new RtAssociation

@@ -53,8 +53,8 @@
             <!-- Define a temporary item group to iterate through -->
             <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
         </ItemGroup>
-        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to repo $(OctoPublishCkModelRepo)"/>
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -rep $(OctoPublishCkModelRepo) -r">
+        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r">
         </Exec>
         
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 

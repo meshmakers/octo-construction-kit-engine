@@ -10,21 +10,21 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class GetCommand : Command<OctoToolOptions>
 {
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
+    private readonly ICatalogService _catalogService;
     private readonly IArgument _repositoryArg;
     private readonly IArgument _ckModelNameArg;
     private readonly IArgument _filePathArg;
     private readonly ICkSerializer _ckSerializer;
 
     public GetCommand(ILogger<GetCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryService ckModelRepositoryService, ICkSerializer ckSerializer)
-        : base(logger, "Get", "Gets a construction kit library model from the given Construction Kit Repository", options)
+        ICatalogService catalogService, ICkSerializer ckSerializer)
+        : base(logger, "Get", "Gets a construction kit library model from the given Construction Kit catalog", options)
     {
-        _ckModelRepositoryService = ckModelRepositoryService;
+        _catalogService = catalogService;
         _ckSerializer = ckSerializer;
 
-        _repositoryArg = CommandArgumentValue.AddArgument("rep", "repository",
-            ["Name of the construction kit repository. By default 'LocalRepository' is used."], true, 1);
+        _repositoryArg = CommandArgumentValue.AddArgument("c", "catalog",
+            ["Name of the construction kit catalog. By default 'LocalFileSystemCatalog' is used."], true, 1);
         _ckModelNameArg = CommandArgumentValue.AddArgument("n", "name",
             ["Name of the construction kit model to get."], true, 1);
         _filePathArg = CommandArgumentValue.AddArgument("f", "file",
@@ -41,7 +41,7 @@ internal class GetCommand : Command<OctoToolOptions>
         Logger.LogInformation("Repository '{Repository}'", repositoryName);
         Logger.LogInformation("Construction Kit Model '{CkModelId}'", ckModelId);
         OperationResult operationResult = new();
-        var result = await _ckModelRepositoryService.LookupCkModelAsync(repositoryName, ckModelId, operationResult);
+        var result = await _catalogService.GetAsync(repositoryName, ckModelId, operationResult);
 
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {

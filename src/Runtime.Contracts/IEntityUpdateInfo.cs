@@ -22,7 +22,7 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     /// <summary>
     ///     Construction Kit Type Identifier of entity to be modified.
     /// </summary>
-    public CkId<CkTypeId> CkTypeId { get; }
+    public RtCkId<CkTypeId> CkTypeId { get; }
 
     /// <summary>
     ///     MOD option.

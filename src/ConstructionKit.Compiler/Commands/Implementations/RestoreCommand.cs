@@ -9,16 +9,16 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 public class RestoreCommand : Command<OctoToolOptions>
 {
-    private readonly ICkModelRepositoryService _ckModelRepositoryService;
+    private readonly ICatalogService _catalogService;
     private readonly IArgument _pathArg;
     private readonly IArgument _outputPathArg;
     private readonly IArgument _cachePathArg;
 
     public RestoreCommand(ILogger<RestoreCommand> logger, IOptions<OctoToolOptions> options,
-        ICkModelRepositoryService ckModelRepositoryService)
+        ICatalogService catalogService)
         : base(logger, "Restore", "Restores construction kits based on a construction kit model file.", options)
     {
-        _ckModelRepositoryService = ckModelRepositoryService;
+        _catalogService = catalogService;
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of the model configuration file"], true, 1);
         _outputPathArg = CommandArgumentValue.AddArgument("o", "outputPath",
@@ -46,7 +46,7 @@ public class RestoreCommand : Command<OctoToolOptions>
         try
         {
             var operationResult = new OperationResult();
-            await _ckModelRepositoryService.RestoreConstructionKitModelsAsync(filePath, outputPath, cacheFilePath,
+            await _catalogService.RestoreConstructionKitModelsAsync(filePath, outputPath, cacheFilePath,
                 operationResult);
             if (operationResult.HasErrors || operationResult.HasFatalErrors)
             {

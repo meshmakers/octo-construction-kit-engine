@@ -2,5 +2,5 @@ $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
 - recordId: TextSearchFilter
   attributes:
-    - id: ${thisModel}/ComparisonValue
+    - id: ${this}/ComparisonValue
       name: SearchValue

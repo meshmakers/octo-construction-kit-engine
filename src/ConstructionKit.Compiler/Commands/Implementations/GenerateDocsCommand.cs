@@ -3,7 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class GenerateDocsCommand : Command<OctoToolOptions>
 {
-    private readonly IModelResolver _modelResolver;
+    private readonly IRepositoryModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IArgument _modelSourcePathArg;
     private readonly IArgument _outputPathArg;
@@ -21,7 +21,7 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _linkPathArg;
 
 
-    public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
+    public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IRepositoryModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator, 
         IOptions<ModeSelectionOptions> modeSelectionOptions)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
@@ -59,27 +59,27 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var resolvedTypes = await _modelResolver.ResolveAsync(compiledModelRoot, originFileResolver, operationResult);
+        var resolvedTypes = await _modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult);
 
         //Docusaurus
         if (_modeSelectionOptions.DocumentationMode)
         {
             //ID Determines Position in File Tree   
-            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _mermaidGenerator.GenerateMermaidTextOutput(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateVersionHistory(outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
 
-            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(),
+            await _contentGenerator.GenerateEnumsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(),
                 linkPath);
-            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateRecordsMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
-            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), 
+            await _contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, outputPath, compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), 
                 linkPath);
             await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath,
-                compiledModelRoot.ModelId, compiledModelRoot.ModelId.ModelVersion.ToString(), linkPath);
+                compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), linkPath);
         }
         //ASP Net
         else

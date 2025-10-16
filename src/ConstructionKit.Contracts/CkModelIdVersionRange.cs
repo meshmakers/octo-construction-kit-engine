@@ -7,39 +7,39 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit model id
 /// </summary>
-[DebuggerDisplay("{" + nameof(ModelId) + "} {" + nameof(ModelVersionRange) + "}")]
+[DebuggerDisplay("{" + nameof(Name) + "}-{" + nameof(ModelVersionRange) + "}")]
 [JsonConverter(typeof(CkModelIdVersionRangeConverter))]
-public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>, ICkKey
+public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>, ICkElementId
 {
-    private readonly string? _modelId;
+    private readonly string? _name;
 
     /// <summary>
-    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="ckModelId" />.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="ckName" />.
     /// </summary>
-    /// <param name="ckModelId"></param>
-    public CkModelIdVersionRange(string ckModelId)
+    /// <param name="ckName"></param>
+    public CkModelIdVersionRange(string ckName)
     {
-        var versionIndex = ckModelId.IndexOf("-", StringComparison.Ordinal);
+        var versionIndex = ckName.IndexOf("-", StringComparison.Ordinal);
         if (versionIndex > 0)
         {
-            _modelId = ckModelId.Substring(0, versionIndex);
-            ModelVersionRange = ckModelId.Substring(versionIndex + 1);
+            _name = ckName.Substring(0, versionIndex);
+            ModelVersionRange = ckName.Substring(versionIndex + 1);
         }
         else
         {
-            _modelId = ckModelId;
+            _name = ckName;
             ModelVersionRange = "1.0.0";
         }
     }
 
     /// <summary>
-    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="modelId" /> and <paramref name="modelVersionRange" />.
+    ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="name" /> and <paramref name="modelVersionRange" />.
     /// </summary>
-    /// <param name="modelId"></param>
+    /// <param name="name"></param>
     /// <param name="modelVersionRange"></param>
-    public CkModelIdVersionRange(string modelId, string modelVersionRange)
+    public CkModelIdVersionRange(string name, string modelVersionRange)
     {
-        _modelId = modelId;
+        _name = name;
         ModelVersionRange = modelVersionRange;
     }
 
@@ -56,7 +56,7 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
     /// <summary>
     ///     Returns the id of the model, e. g. "System"
     /// </summary>
-    public string ModelId => _modelId ?? "";
+    public string Name => _name ?? "";
 
     /// <summary>
     ///     Returns the version range of the model (e.g. "1.0.0" or "[1.0,)")
@@ -67,7 +67,7 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
     ///     Returns the full name of the model, e. g. "System-1.0.0"
     /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
-    public string FullName => IsEmpty ? "" : ModelId.StartsWith("$") ? ModelId : $"{ModelId}-{ModelVersionRange}";
+    public string FullName => IsEmpty ? "" : Name.StartsWith("$") ? Name : $"{Name}-{ModelVersionRange}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -79,12 +79,12 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
                 return "";
             }
 
-            return $"{ModelId}-{ModelVersionRange}";
+            return $"{Name}-{ModelVersionRange}";
         }
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(ModelId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name);
 
     /// <inheritdoc />
     public TypeCode GetTypeCode()
@@ -208,7 +208,7 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
         {
             return 1;
         }
-        var result = string.Compare(ModelId, other.ModelId, StringComparison.Ordinal);
+        var result = string.Compare(Name, other.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -220,7 +220,7 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
     /// <inheritdoc />
     public bool Equals(CkModelIdVersionRange? other)
     {
-        return other is not null && ModelId == other.ModelId && ModelVersionRange.Overlaps(other.ModelVersionRange);
+        return other is not null && Name == other.Name && ModelVersionRange.Overlaps(other.ModelVersionRange);
     }
 
     /// <summary>
@@ -238,7 +238,7 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
         unchecked
         {
             var hash = 52;
-            hash = hash * 12 + ModelId.GetHashCode();
+            hash = hash * 12 + Name.GetHashCode();
             hash = hash * 12 + ModelVersionRange.GetHashCode();
             return hash;
         }
@@ -251,13 +251,13 @@ public sealed record CkModelIdVersionRange : IComparable<CkModelIdVersionRange>,
     /// <returns>True if the version is within the range, false otherwise</returns>
     public bool IsSatisfiedBy(CkModelId version)
     {
-        var result = string.Compare(ModelId, version.ModelId, StringComparison.Ordinal);
+        var result = string.Compare(Name, version.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return false;
         }
 
-        return ModelVersionRange.IsSatisfiedBy(version.ModelVersion);
+        return ModelVersionRange.IsSatisfiedBy(version.Version);
     }
     
 }

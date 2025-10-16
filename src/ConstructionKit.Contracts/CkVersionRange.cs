@@ -4,15 +4,41 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 ///     Represents a construction kit dependency version range
 /// </summary>
 /// <remarks>
+/// <para>
 /// Version range syntax:
-/// - 1.0 or [1.0,) - Minimum version, inclusive (x &gt;= 1.0)
-/// - (1.0,) - Minimum version, exclusive (x &gt; 1.0)
-/// - [1.0] - Exact version match (x == 1.0)
-/// - (,1.0] - Maximum version, inclusive (x &lt;= 1.0)
-/// - (,1.0) - Maximum version, exclusive (x &lt; 1.0)
-/// - [1.0,2.0] - Exact range, inclusive (1.0 &lt;= x &lt;= 2.0)
-/// - (1.0,2.0) - Exact range, exclusive (1.0 &lt; x &lt; 2.0)
-/// - [1.0,2.0) - Mixed inclusive minimum and exclusive maximum (1.0 &lt;= x &lt; 2.0)
+/// </para>
+/// <para>
+/// <b>Simple version strings (without brackets):</b>
+/// </para>
+/// <list type="bullet">
+/// <item>1.0 or 1.0.0 - Creates an open-ended minimum version range, inclusive (x &gt;= 1.0.0)</item>
+/// <item>This means "1.0.0" includes ALL versions from 1.0.0 onwards (1.0.0, 1.0.1, 1.1.0, 2.0.0, etc.)</item>
+/// </list>
+/// <para>
+/// <b>Exact version matching:</b>
+/// </para>
+/// <list type="bullet">
+/// <item>[1.0] or [1.0.0] - Exact version match only (x == 1.0.0)</item>
+/// <item>This matches ONLY the specified version, nothing else</item>
+/// </list>
+/// <para>
+/// <b>Range specifications:</b>
+/// </para>
+/// <list type="bullet">
+/// <item>[1.0,) - Minimum version, inclusive (x &gt;= 1.0.0) - same as simple "1.0"</item>
+/// <item>(1.0,) - Minimum version, exclusive (x &gt; 1.0.0)</item>
+/// <item>(,1.0] - Maximum version, inclusive (x &lt;= 1.0.0)</item>
+/// <item>(,1.0) - Maximum version, exclusive (x &lt; 1.0.0)</item>
+/// <item>[1.0,2.0] - Bounded range, inclusive (1.0.0 &lt;= x &lt;= 2.0.0)</item>
+/// <item>(1.0,2.0) - Bounded range, exclusive (1.0.0 &lt; x &lt; 2.0.0)</item>
+/// <item>[1.0,2.0) - Mixed inclusive minimum and exclusive maximum (1.0.0 &lt;= x &lt; 2.0.0)</item>
+/// </list>
+/// <para>
+/// <b>Important note on overlapping:</b>
+/// Two ranges overlap if there exists at least one version that satisfies both ranges.
+/// For example, "1.0.0" (which means &gt;= 1.0.0) and "1.0.1" (which means &gt;= 1.0.1) DO overlap
+/// because all versions &gt;= 1.0.1 satisfy both ranges.
+/// </para>
 /// </remarks>
 public readonly struct CkVersionRange : IEquatable<CkVersionRange>, IComparable<CkVersionRange>
 {
@@ -25,7 +51,13 @@ public readonly struct CkVersionRange : IEquatable<CkVersionRange>, IComparable<
     /// <summary>
     ///     Creates a new instance of <see cref="CkVersionRange" />
     /// </summary>
-    /// <param name="versionRange">Version range as string, e.g. "[1.0.0,2.0.0)"</param>
+    /// <param name="versionRange">Version range as string. Examples:
+    /// <list type="bullet">
+    /// <item>"1.0.0" - Creates range [1.0.0,) meaning version &gt;= 1.0.0</item>
+    /// <item>"[1.0.0]" - Exact version 1.0.0 only</item>
+    /// <item>"[1.0.0,2.0.0)" - Range from 1.0.0 inclusive to 2.0.0 exclusive</item>
+    /// </list>
+    /// </param>
     /// <exception cref="ArgumentException">Thrown when the version range format is invalid</exception>
     public CkVersionRange(string versionRange)
     {
@@ -199,7 +231,17 @@ public readonly struct CkVersionRange : IEquatable<CkVersionRange>, IComparable<
     ///     Checks if another version range overlaps with this one
     /// </summary>
     /// <param name="other">The other version range</param>
-    /// <returns>True if the ranges overlap, false otherwise</returns>
+    /// <returns>True if there exists at least one version that satisfies both ranges, false otherwise</returns>
+    /// <remarks>
+    /// Two ranges overlap if there is any version that would be accepted by both ranges.
+    /// For example:
+    /// <list type="bullet">
+    /// <item>"1.0.0" (meaning &gt;= 1.0.0) and "1.0.1" (meaning &gt;= 1.0.1) DO overlap because both ranges share versions like 1.0.1, 1.0.2, 1.1.0, etc. Note: "1.0.1" does NOT include 1.0.0, but the ranges still overlap via their shared versions.</item>
+    /// <item>"[1.0.0]" (exactly 1.0.0) and "[1.0.1]" (exactly 1.0.1) do NOT overlap - no version satisfies both</item>
+    /// <item>"[1.0.0,2.0.0]" and "[1.5.0,3.0.0]" DO overlap - versions 1.5.0 to 2.0.0 satisfy both</item>
+    /// <item>"[1.0.0,2.0.0)" and "[2.0.0,3.0.0]" do NOT overlap - no version satisfies both (2.0.0 is excluded from first, included in second)</item>
+    /// </list>
+    /// </remarks>
     public bool Overlaps(CkVersionRange other)
     {
         // Check if this range's max is less than other's min
@@ -272,7 +314,7 @@ public readonly struct CkVersionRange : IEquatable<CkVersionRange>, IComparable<
         }
         else if (other._minVersion == null)
         {
-            // Other has no minimum (earlier), this has minimum
+            // Other has no minimum (earlier), this has a minimum
             return 1;
         }
         else

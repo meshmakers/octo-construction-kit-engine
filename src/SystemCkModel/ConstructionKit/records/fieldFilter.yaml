@@ -2,10 +2,10 @@ $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
 - recordId: FieldFilter
   attributes:
-    - id: ${thisModel}/AttributePath
+    - id: ${this}/AttributePath
       name: AttributePath
-    - id: ${thisModel}/FieldFilter.Operator
+    - id: ${this}/FieldFilter.Operator
       name: Operator
-    - id: ${thisModel}/ComparisonValue
+    - id: ${this}/ComparisonValue
       name: ComparisonValue
       isOptional: true

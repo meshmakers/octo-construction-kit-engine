@@ -57,7 +57,7 @@ public interface IRepositoryDataSource
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, CkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity
@@ -79,7 +79,7 @@ public interface IRepositoryDataSource
     /// <returns>An association object or null if not found</returns>
     Task<RtAssociation?> GetRtAssociationOrDefaultAsync(IOctoSession session, RtEntityId originRtEntityId,
         RtEntityId targetRtEntityId,
-        CkId<CkAssociationRoleId> ckRoleId);
+        RtCkId<CkAssociationRoleId> ckRoleId);
 
     /// <summary>
     /// Gets associations by origin, target and role id for multiple pairs.
@@ -97,7 +97,7 @@ public interface IRepositoryDataSource
     /// <param name="ckRoleId">Construction kit role id of the association</param>
     /// <param name="targetRtEntityId">Runtime id of the target entity</param>
     /// <returns>A transient version of a role, need to be stored.</returns>
-    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, CkId<CkAssociationRoleId> ckRoleId,
+    RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,
         RtEntityId targetRtEntityId);
 
     /// <summary>

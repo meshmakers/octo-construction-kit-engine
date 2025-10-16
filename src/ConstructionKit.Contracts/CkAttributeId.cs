@@ -7,43 +7,48 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 /// <summary>
 ///     Represents a versioned construction kit attribute id
 /// </summary>
-[DebuggerDisplay("{" + nameof(AttributeId) + "} ({" + nameof(Version) + "})")]
+[DebuggerDisplay("{" + nameof(Name) + "} ({" + nameof(Version) + "})")]
 [JsonConverter(typeof(CkAttributeIdConverter))]
-public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
+public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkElementId
 {
     /// <summary>
-    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="attributeId" />.
+    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="name" />.
     /// </summary>
-    /// <param name="attributeId"></param>
+    /// <param name="name"></param>
     /// <exception cref="ArgumentOutOfRangeException"></exception>
-    public CkAttributeId(string attributeId)
+    public CkAttributeId(string name)
     {
-        var typeIndex = attributeId.IndexOf("-", StringComparison.Ordinal);
+        var typeIndex = name.IndexOf("-", StringComparison.Ordinal);
         if (typeIndex < 0)
         {
-            AttributeId = attributeId;
-            Version = "1.0.0";
+            Name = name;
+            Version = 1;
         }
         else
         {
-            AttributeId = attributeId.Substring(0, typeIndex);
-            Version = attributeId.Substring(typeIndex + 1);
+            Name = name.Substring(0, typeIndex);
+            if (!uint.TryParse(name.Substring(typeIndex + 1), out uint version))
+            {
+                throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a valid version number");
+            }
+
+            Version = version;
         }
 
-        if (string.IsNullOrWhiteSpace(AttributeId))
+        if (string.IsNullOrWhiteSpace(Name))
         {
-            throw new ArgumentOutOfRangeException(nameof(attributeId), attributeId, $"{nameof(attributeId)} must contain a type id");
+            throw new ArgumentOutOfRangeException(nameof(name), name, $"{nameof(name)} must contain a type id");
         }
     }
 
     /// <summary>
-    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="attributeId" /> and <paramref name="attributeVersion" />.
+    ///     Creates a new <see cref="CkAttributeId" /> from the given <paramref name="name" /> and <paramref name="attributeVersion" />.
     /// </summary>
-    /// <param name="attributeId"></param>
+    /// <param name="name"></param>
     /// <param name="attributeVersion"></param>
-    public CkAttributeId(string attributeId, string attributeVersion = "1.0.0")
+    public CkAttributeId(string name, uint attributeVersion = 1)
     {
-        AttributeId = attributeId;
+        Name = name;
         Version = attributeVersion;
     }
 
@@ -58,19 +63,19 @@ public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
     }
 
     /// <summary>
-    ///     Defines the name of the attribute, e. g. "Designation"
+    ///     Defines the name of the attribute, e.g. "Designation"
     /// </summary>
-    public string AttributeId { get; }
+    public string Name { get; }
 
     /// <summary>
-    ///     Returns the version of the attribute, e. g. "1.0.0"
+    ///     Returns the version of the attribute, e.g. 1
     /// </summary>
-    public CkVersion Version { get; }
+    public uint Version { get; }
 
     /// <summary>
-    ///     Returns the full name of the attribute, e. g. "Designation-1.0.0"
+    ///     Returns the full name of the attribute, e.g. "Designation-1"
     /// </summary>
-    public string FullName => IsEmpty ? "" : $"{AttributeId}-{Version}";
+    public string FullName => IsEmpty ? "" : $"{Name}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -82,10 +87,10 @@ public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
                 return "";
             }
 
-            var s = AttributeId;
-            if (Version.Major > 1)
+            var s = Name;
+            if (Version > 1)
             {
-                s += $"-{Version.Major}";
+                s += $"-{Version}";
             }
 
             return s;
@@ -93,7 +98,7 @@ public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
     }
 
     /// <inheritdoc />
-    public bool IsEmpty => string.IsNullOrWhiteSpace(AttributeId);
+    public bool IsEmpty => string.IsNullOrWhiteSpace(Name);
 
     /// <inheritdoc />
     public int CompareTo(CkAttributeId? other)
@@ -103,7 +108,7 @@ public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
             return 1;
         }
         
-        var result = string.Compare(AttributeId, other.AttributeId, StringComparison.Ordinal);
+        var result = string.Compare(Name, other.Name, StringComparison.Ordinal);
         if (result != 0)
         {
             return result;
@@ -243,19 +248,19 @@ public sealed record CkAttributeId : IComparable<CkAttributeId>, ICkKey
         unchecked
         {
             int hash = 17;
-            hash = hash * 23 + AttributeId.GetHashCode();
+            hash = hash * 23 + Name.GetHashCode();
             hash = hash * 23 + Version.GetHashCode();
             return hash;
         }
 #else
-        return HashCode.Combine(AttributeId, Version);
+        return HashCode.Combine(Name, Version);
 #endif
     }
 
     /// <inheritdoc />
     public bool Equals(CkAttributeId? other)
     {
-        return other is not null && AttributeId == other.AttributeId && Version.Equals(other.Version);
+        return other is not null && Name == other.Name && Version.Equals(other.Version);
     }
 
 

@@ -1,16 +1,16 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: ApiResource
-    derivedFromCkTypeId: ${thisModel}/Resource
+    derivedFromCkTypeId: ${this}/Resource
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/RequireResourceIndicator
+      - id: ${this}/RequireResourceIndicator
         name: RequireResourceIndicator
-      - id: ${thisModel}/Secrets
+      - id: ${this}/Secrets
         name: ApiSecrets
-      - id: ${thisModel}/Scopes
+      - id: ${this}/Scopes
         name: Scopes
-      - id: ${thisModel}/AllowedAccessTokenSigningAlgorithms
+      - id: ${this}/AllowedAccessTokenSigningAlgorithms
         name: AllowedAccessTokenSigningAlgorithms        
   

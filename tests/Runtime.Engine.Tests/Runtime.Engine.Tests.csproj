@@ -11,11 +11,11 @@
 
     <ItemGroup>
         <PackageReference Include="FakeItEasy" Version="8.3.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.9" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.9" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.9" />
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4">
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.10" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.10" />
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
@@ -23,11 +23,12 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="xunit.v3" Version="3.0.1" />
+        <PackageReference Include="xunit.v3" Version="3.1.0" />
     </ItemGroup>
     
     <ItemGroup>
         <ProjectReference Include="..\..\src\Runtime.Engine\Runtime.Engine.csproj" />
+        <ProjectReference Include="..\..\src\SystemCkModel\SystemCkModel.csproj" />
         <ProjectReference Include="..\TestCkModel\TestCkModel.csproj" />
     </ItemGroup>
 

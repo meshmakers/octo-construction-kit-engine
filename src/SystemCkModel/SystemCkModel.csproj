@@ -9,7 +9,6 @@
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
         <TargetFrameworks>net9.0;netstandard2.0</TargetFrameworks>
-        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
         <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net9.0'">true</OctoPublishCkModel>
         <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net9.0'">true</OctoGenerateCkDocumentation>
     </PropertyGroup>
@@ -31,7 +30,11 @@
     <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
 
     <ItemGroup>
-        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false"/>
+        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          ExcludeAssets="runtime"
+                          OutputItemType="Analyzer">
+        </ProjectReference>
         <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
     </ItemGroup>
 

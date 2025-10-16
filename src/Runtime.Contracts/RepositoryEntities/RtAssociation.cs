@@ -20,7 +20,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <param name="associationRoleId">Construction kit association role id</param>
     /// <param name="associationId">Object id</param>
     /// <param name="attributes">List of attributes</param>
-    public RtAssociation(CkId<CkAssociationRoleId> associationRoleId, OctoObjectId associationId,
+    public RtAssociation(RtCkId<CkAssociationRoleId> associationRoleId, OctoObjectId associationId,
         IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
@@ -41,7 +41,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the origin ck type id.
     /// </summary>
-    public CkId<CkTypeId> OriginCkTypeId { get; set; } = null!;
+    public RtCkId<CkTypeId> OriginCkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the object id of the target runtime entity
@@ -51,17 +51,17 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the target ck type id.
     /// </summary>
-    public CkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
+    public RtCkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
     
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes
     /// </summary>
-    public List<CkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
+    public List<RtCkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
 
     /// <summary>
     ///     Gets or sets the association role id of the association role
     /// </summary>
-    public CkId<CkAssociationRoleId>? AssociationRoleId { get; set; }
+    public RtCkId<CkAssociationRoleId>? AssociationRoleId { get; set; }
 
     /// <inheritdoc />
     protected override string GetLocation()

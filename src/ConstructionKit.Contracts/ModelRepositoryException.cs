@@ -25,28 +25,6 @@ public class ModelRepositoryException : CkModelException
         return new ModelRepositoryException($"Model '{ckModelId}' not found in one of the registered model repositories.");
     }
 
-    /// <summary>
-    ///     Creates an exception that indicates that a model was not found in a specific repository.
-    /// </summary>
-    /// <param name="ckModelId"></param>
-    /// <param name="repositoryName"></param>
-    /// <returns></returns>
-    public static Exception ModelNotFound(CkModelId ckModelId, string repositoryName)
-    {
-        return new ModelRepositoryException($"Model '{ckModelId}' not found in repository '{repositoryName}'.");
-    }
-
-    internal static Exception ErrorDuringModelLoad(CkModelId ckModelId, string repositoryName, OperationResult operationResult)
-    {
-        return new ModelRepositoryException(
-            $"Error loading model '{ckModelId}' from repository '{repositoryName}'.{Environment.NewLine}{operationResult.GetMessages()}");
-    }
-
-    internal static Exception ModelAlreadyExists(CkModelId ckModelId, string repositoryName)
-    {
-        return new ModelRepositoryException($"Model '{ckModelId}' already exists in repository '{repositoryName}'.");
-    }
-
     internal static Exception ModelRepositoryNotFound(string repositoryName)
     {
         return new ModelRepositoryException($"Model repository '{repositoryName}' not found.");
@@ -67,23 +45,10 @@ public class ModelRepositoryException : CkModelException
         return new ModelRepositoryException($"Error downloading model '{modelId}' from repository '{repositoryName}'.");
     }
 
-    internal static Exception PublishFailed(CkModelId modelId, string repositoryName, Exception exception)
-    {
-        return new ModelRepositoryException($"Publishing model '{modelId}' to repository '{repositoryName}' failed.", exception);
-    }
-
     internal static Exception CustomizationNotSupported(string repositoryName)
     {
         return new ModelRepositoryException($"Customization is not supported by repository '{repositoryName}'.");
     }
 
-    internal static Exception GitHubTokenMissing()
-    {
-        return new ModelRepositoryException("GitHub token is missing.");
-    }
 
-    internal static Exception GitHubPagesUriMissing()
-    {
-        return new ModelRepositoryException("GitHub Pages URI is missing.");
-    }
 }

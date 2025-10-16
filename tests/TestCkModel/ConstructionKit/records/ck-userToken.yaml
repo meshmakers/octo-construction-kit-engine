@@ -4,12 +4,12 @@ records:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/LoginProvider
+      - id: ${this}/LoginProvider
         name: LoginProvider
       - id: ${System}/Name
         name: Name
-      - id: ${thisModel}/UserId
+      - id: ${this}/UserId
         name: UserId
-      - id: ${thisModel}/Value
+      - id: ${this}/Value
         name: Value
         isOptional: true

@@ -22,6 +22,6 @@ public class RtRecordTcDto : RtTypeWithAttributesTcDto
     ///     Gets or sets the ck type id of the record
     /// </summary>
     [System.Text.Json.Serialization.JsonRequired]
-    [System.Text.Json.Serialization.JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkRecordId> CkRecordId { get; set; } = null!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(RtCkIdTypeIdConverter))]
+    public RtCkId<CkRecordId> CkRecordId { get; set; } = null!;
 }

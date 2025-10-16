@@ -14,7 +14,7 @@ public record AssociationUpdateInfo
     /// <param name="target"></param>
     /// <param name="roleId"></param>
     /// <param name="modOption"></param>
-    public AssociationUpdateInfo(RtEntityId origin, RtEntityId target, CkId<CkAssociationRoleId> roleId,
+    public AssociationUpdateInfo(RtEntityId origin, RtEntityId target, RtCkId<CkAssociationRoleId> roleId,
         AssociationModOptionsDto modOption)
     {
         Origin = origin;
@@ -36,7 +36,7 @@ public record AssociationUpdateInfo
     /// <summary>
     ///     Role of the association.
     /// </summary>
-    public CkId<CkAssociationRoleId> RoleId { get; }
+    public RtCkId<CkAssociationRoleId> RoleId { get; }
 
     /// <summary>
     ///     Mod option.
@@ -45,13 +45,13 @@ public record AssociationUpdateInfo
     public AssociationModOptionsDto ModOption { get; }
     
     /// <summary>
-    /// Creates an association update info for creating an association.
+    /// Creates an association update info for inserting an association.
     /// </summary>
     /// <param name="origin">Runtime entity identifier of the origin entity.</param>
     /// <param name="target">Runtime entity identifier of the target entity.</param>
     /// <param name="roleId">Role identifier of the association.</param>
     /// <returns>Create association update info.</returns>
-    public static AssociationUpdateInfo CreateCreate(RtEntityId origin, RtEntityId target, CkId<CkAssociationRoleId> roleId)
+    public static AssociationUpdateInfo CreateInsert(RtEntityId origin, RtEntityId target, RtCkId<CkAssociationRoleId> roleId)
     {
         return new AssociationUpdateInfo(origin, target, roleId, AssociationModOptionsDto.Create);
     }
@@ -63,7 +63,7 @@ public record AssociationUpdateInfo
     /// <param name="target">Runtime entity identifier of the target entity.</param>
     /// <param name="roleId">Role identifier of the association.</param>
     /// <returns>Create association update info.</returns>
-    public static AssociationUpdateInfo CreateDelete(RtEntityId origin, RtEntityId target, CkId<CkAssociationRoleId> roleId)
+    public static AssociationUpdateInfo CreateDelete(RtEntityId origin, RtEntityId target, RtCkId<CkAssociationRoleId> roleId)
     {
         return new AssociationUpdateInfo(origin, target, roleId, AssociationModOptionsDto.Delete);
     }

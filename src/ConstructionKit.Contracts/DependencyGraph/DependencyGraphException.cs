@@ -19,6 +19,11 @@ public class DependencyGraphException : CkModelException
         return new DependencyGraphException($"CkTypeId '{ckTypeId}' not found.");
     }
 
+    internal static Exception RtCkTypeIdNotFound(RtCkId<CkTypeId> rtCkTypeId)
+    {
+        return new DependencyGraphException($"RtCkTypeId '{rtCkTypeId}' not found.");
+    }
+
     internal static Exception CkRecordIdNotDefined(CkId<CkAttributeId> ckAttributeId)
     {
         return new DependencyGraphException($"CkRecordId not defined for attribute '{ckAttributeId}'.");

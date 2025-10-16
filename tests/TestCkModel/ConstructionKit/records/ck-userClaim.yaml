@@ -4,10 +4,10 @@ records:
     isFinal: true
     isAbstract: false
     attributes:
-      - id: ${thisModel}/ClaimType
+      - id: ${this}/ClaimType
         name: ClaimType
-      - id: ${thisModel}/ClaimValue
+      - id: ${this}/ClaimValue
         name: ClaimValue
-      - id: ${thisModel}/UserId
+      - id: ${this}/UserId
         name: UserId
     

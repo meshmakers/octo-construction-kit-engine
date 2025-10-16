@@ -164,14 +164,14 @@ internal class ImportRtModelCommand(
         await Parallel.ForEachAsync(modelRtEntities, async (modelRtEntity, token) =>
 #endif
         {
-            var ckTypeGraph = cacheService.GetCkType(runtimeRepository.TenantId, modelRtEntity.CkTypeId);
+            var ckTypeGraph = cacheService.GetRtCkType(runtimeRepository.TenantId, modelRtEntity.CkTypeId);
 
 #if NETSTANDARD2_0
-            var createTask = runtimeRepository.CreateTransientRtEntityAsync(modelRtEntity.CkTypeId);
+            var createTask = runtimeRepository.CreateTransientRtEntityByRtCkIdAsync(modelRtEntity.CkTypeId);
             createTask.Wait();
             var rtEntity = createTask.Result;
 #else
-            var rtEntity = await runtimeRepository.CreateTransientRtEntityAsync(modelRtEntity.CkTypeId)
+            var rtEntity = await runtimeRepository.CreateTransientRtEntityByRtCkIdAsync(modelRtEntity.CkTypeId)
                 .ConfigureAwait(false);
 #endif
             rtEntity.RtId = modelRtEntity.RtId;
@@ -201,7 +201,7 @@ internal class ImportRtModelCommand(
                 foreach (var association in modelRtEntity.Associations)
                 {
                     var ckAssociationRoleGraph =
-                        cacheService.GetCkAssociationRole(runtimeRepository.TenantId, association.RoleId);
+                        cacheService.GetRtCkAssociationRole(runtimeRepository.TenantId, association.RoleId);
 
                     var rtAssociation = new RtAssociation
                     {
@@ -234,7 +234,7 @@ internal class ImportRtModelCommand(
         RtTypeWithAttributesTcDto rtTypeWithAttributesDto,
         CkTypeWithAttributesGraph ckTypeWithAttributesGraph, RtTypeWithAttributes rtTypeWithAttributes,
         string elementType, CkId<TKey> ckId)
-        where TKey : IComparable<TKey>, ICkKey
+        where TKey : IComparable<TKey>, ICkElementId
     {
         foreach (var modelAttribute in rtTypeWithAttributesDto.Attributes)
         {
@@ -252,17 +252,9 @@ internal class ImportRtModelCommand(
             {
                 if (modelAttribute.Value is RtRecordTcDto rtRecordDto)
                 {
-                    var ckRecordGraph = cacheService.GetCkRecord(runtimeRepository.TenantId, rtRecordDto.CkRecordId);
-                    if (ckRecordGraph == null)
-                    {
-                        logger.LogError(
-                            "'{ModelAttributeId}' defines unknown record '{CkRecordId}' at type '{CkTypeId}'",
-                            modelAttribute.Id,
-                            rtRecordDto.CkRecordId, ckId);
-                        throw ExchangeException.RecordNotFound(rtRecordDto.CkRecordId, elementType, ckId);
-                    }
+                    var ckRecordGraph = cacheService.GetRtCkRecord(runtimeRepository.TenantId, rtRecordDto.CkRecordId);
 
-                    var rtRecord = new RtRecord { CkRecordId = ckRecordGraph.CkRecordId };
+                    var rtRecord = new RtRecord { CkRecordId = ckRecordGraph.CkRecordId.ToRtCkId() };
                     AssignAttributes(runtimeRepository, rtRecordDto, ckRecordGraph, rtRecord, elementType, ckId);
 
                     rtTypeWithAttributes.SetAttributeValue(typeAttributeGraph.AttributeName,
@@ -279,17 +271,9 @@ internal class ImportRtModelCommand(
                 {
                     foreach (RtRecordTcDto record in rtRecordDtoList)
                     {
-                        var ckRecordGraph = cacheService.GetCkRecord(runtimeRepository.TenantId, record.CkRecordId);
-                        if (ckRecordGraph == null)
-                        {
-                            logger.LogError(
-                                "'{ModelAttributeId}' defines unknown record '{CkRecordId}' at type '{CkTypeId}'",
-                                modelAttribute.Id,
-                                record.CkRecordId, ckId);
-                            throw ExchangeException.RecordNotFound(record.CkRecordId, elementType, ckId);
-                        }
+                        var ckRecordGraph = cacheService.GetRtCkRecord(runtimeRepository.TenantId, record.CkRecordId);
 
-                        var rtRecord = new RtRecord { CkRecordId = ckRecordGraph.CkRecordId };
+                        var rtRecord = new RtRecord { CkRecordId = ckRecordGraph.CkRecordId.ToRtCkId() };
                         AssignAttributes(runtimeRepository, record, ckRecordGraph, rtRecord, elementType, ckId);
 
                         rtRecords.Add(rtRecord);
@@ -313,15 +297,6 @@ internal class ImportRtModelCommand(
                 }
 
                 var ckEnumGraph = cacheService.GetCkEnum(runtimeRepository.TenantId, typeAttributeGraph.ValueCkEnumId);
-
-                if (ckEnumGraph == null)
-                {
-                    logger.LogError(
-                        "'{ModelAttributeId}' defines unknown enum '{CkEnumId}' at type '{CkTypeId}'",
-                        modelAttribute.Id,
-                        typeAttributeGraph.ValueCkEnumId, ckId);
-                    throw ExchangeException.CkEnumIdNotFound(typeAttributeGraph);
-                }
 
                 if (modelAttribute.Value == null)
                 {

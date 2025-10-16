@@ -119,6 +119,17 @@ public class CkVersionRangeTests
         Assert.Equal(originalRange, range.ToString());
     }
 
+
+    [Fact]
+    public void Overlaps_Should_DifferentSingleVersionsDoNotOverlap()
+    {
+        var range1 = new CkVersionRange("[1.0.0]");
+        var range2 = new CkVersionRange("[1.0.1]");
+
+        Assert.False(range1.Overlaps(range2));
+        Assert.False(range2.Overlaps(range1));
+    }
+
     [Fact]
     public void Overlaps_Should_DetectOverlappingRanges()
     {

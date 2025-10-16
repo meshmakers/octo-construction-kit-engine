@@ -39,10 +39,10 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         foreach (var associationUpdateInfo in associationUpdateInfoList)
         {
             var associationRole =
-                ckCache.GetCkAssociationRole(repositoryDataSource.TenantId, associationUpdateInfo.RoleId);
+                ckCache.GetRtCkAssociationRole(repositoryDataSource.TenantId, associationUpdateInfo.RoleId);
 
             validatedAssociationUpdateInfoList.Add(new AssociationUpdateInfo(associationUpdateInfo.Origin,
-                associationUpdateInfo.Target, associationRole.CkRoleId, associationUpdateInfo.ModOption));
+                associationUpdateInfo.Target, associationRole.CkRoleId.ToRtCkId(), associationUpdateInfo.ModOption));
         }
 
         // Validate if the associations are valid to be added/deleted based on the current database content
@@ -109,11 +109,11 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert)
                      .AsParallel())
         {
-            var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
+            var ckTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
 
             var inputAssociationGraphs =
                 ckTypeGraph.Associations.Out.All.Where(a =>
-                    a.Multiplicity == MultiplicitiesDto.One).GroupBy(x => x.CkRoleId);
+                    a.Multiplicity == MultiplicitiesDto.One).GroupBy(x => x.CkRoleId.ToRtCkId());
             foreach (var inputAssociationGraphGrouping in inputAssociationGraphs)
             {
                 if (!associationUpdateInfoList.Any(x =>
@@ -158,12 +158,12 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         var storedTargetAssociationList = await repositoryDataSource.GetRtAssociationsMultiplicityAsync(
             session, rtEntityRoleIdDirectionPairs).ConfigureAwait(false);
         var storedTargetAssociations = storedTargetAssociationList.ToDictionary(a =>
-                new Tuple<RtEntityId, CkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
+                new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
         foreach (var targetEntity in targetEntities.AsParallel())
         {
-            var targetCkTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, targetEntity.Key.CkTypeId);
+            var targetCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, targetEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Target == targetEntity.Key)
@@ -171,7 +171,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             {
                 var inboundTypeAssociationGraphs =
                     targetCkTypeGraph.Associations.In.All.Where(a =>
-                        a.CkRoleId == associationUpdateInfosByRoleId.Key).ToArray();
+                        a.CkRoleId.ToRtCkId() == associationUpdateInfosByRoleId.Key).ToArray();
                 if (!inboundTypeAssociationGraphs.Any())
                 {
                     operationResult.AddMessage(MessageCodes.OutboundAssociationNotAllowedForCkType(
@@ -196,7 +196,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     if (originEntities.TryGetValue(associationUpdateInfo.Origin, out var originEntity))
                     {
                         var originTypeGraph =
-                            ckCache.GetCkType(repositoryDataSource.TenantId, originEntity.GetCkTypeId());
+                            ckCache.GetRtCkType(repositoryDataSource.TenantId, originEntity.GetRtCkTypeId());
 
                         if (!originCkTypeGraphList.Contains(originTypeGraph.CkTypeId))
                         {
@@ -210,7 +210,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 var currentMultiplicity = CurrentMultiplicity.Zero;
                 if (storedTargetAssociations.TryGetValue(
-                        new Tuple<RtEntityId, CkId<CkAssociationRoleId>>(targetEntity.Key,
+                        new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(targetEntity.Key,
                             associationUpdateInfosByRoleId.Key),
                         out var multiplicityValue))
                 {
@@ -273,19 +273,19 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         var storedOriginAssociationList = await repositoryDataSource.GetRtAssociationsMultiplicityAsync(
             session, rtEntityRoleIdDirectionPairs).ConfigureAwait(false);
         var storedOriginAssociations = storedOriginAssociationList.ToDictionary(a =>
-                new Tuple<RtEntityId, CkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
+                new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
         foreach (var originEntity in originEntities.AsParallel())
         {
-            var originCkTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, originEntity.Key.CkTypeId);
+            var originCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, originEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Origin == originEntity.Key)
                          .GroupBy(a => a.RoleId).AsParallel())
             {
                 var outboundTypeAssociationGraphs =
-                    originCkTypeGraph.Associations.Out.All.Where(a => a.CkRoleId == associationUpdateInfosByRoleId.Key)
+                    originCkTypeGraph.Associations.Out.All.Where(a => a.CkRoleId.ToRtCkId() == associationUpdateInfosByRoleId.Key)
                         .ToArray();
                 if (!outboundTypeAssociationGraphs.Any())
                 {
@@ -311,7 +311,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     if (targetEntities.TryGetValue(associationUpdateInfo.Origin, out var targetEntity))
                     {
                         var targetTypeGraph =
-                            ckCache.GetCkType(repositoryDataSource.TenantId, targetEntity.GetCkTypeId());
+                            ckCache.GetRtCkType(repositoryDataSource.TenantId, targetEntity.GetRtCkTypeId());
 
                         if (!targetCkTypeGraphList.Contains(targetTypeGraph.CkTypeId))
                         {
@@ -326,7 +326,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 var currentMultiplicity = CurrentMultiplicity.Zero;
                 if (storedOriginAssociations.TryGetValue(
-                        new Tuple<RtEntityId, CkId<CkAssociationRoleId>>(originEntity.Key,
+                        new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(originEntity.Key,
                             associationUpdateInfosByRoleId.Key),
                         out var multiplicityValue))
                 {
@@ -341,7 +341,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 if (changeDelta < 0)
                 {
-                    // Check if origin entity is being deleted - if so, don't validate cardinality
+                    // Check if the origin entity is being deleted - if so, don't validate cardinality
                     var isOriginEntityBeingDeleted = entityUpdateInfoList.Any(e =>
                         e.ModOption == EntityModOptions.Delete &&
                         e.RtId == originEntity.Key.RtId);
@@ -475,7 +475,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
         foreach (var rtEntityIdGrouping in dbRequests.GroupBy(x => x.CkTypeId))
         {
-            var ckTypeGraph = ckCache.GetCkType(repositoryDataSource.TenantId, rtEntityIdGrouping.Key);
+            var ckTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, rtEntityIdGrouping.Key);
             var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
             var rtEntities = await collection.DocumentsAsync(session, rtEntityIdGrouping.Select(x => x.RtId))
                 .ConfigureAwait(false);

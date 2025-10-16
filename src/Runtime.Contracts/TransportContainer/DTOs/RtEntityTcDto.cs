@@ -51,8 +51,8 @@ public class RtEntityTcDto : RtTypeWithAttributesTcDto
     ///     Gets or sets the ck type id of the entity
     /// </summary>
     [System.Text.Json.Serialization.JsonRequired]
-    [System.Text.Json.Serialization.JsonConverter(typeof(CkIdTypeIdConverter))]
-    public CkId<CkTypeId> CkTypeId { get; set; } = null!;
+    [System.Text.Json.Serialization.JsonConverter(typeof(RtCkIdTypeIdConverter))]
+    public RtCkId<CkTypeId> CkTypeId { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the well known name of the entity

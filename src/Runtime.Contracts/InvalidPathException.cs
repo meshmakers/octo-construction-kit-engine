@@ -162,7 +162,7 @@ public class InvalidPathException : PersistenceException
     internal static Exception CannotMergeFieldFilterToNavigationPairInvalidPath(string fieldFilterAttributePath, CkId<CkTypeId> ckTypeId)
     {
         return new InvalidPathException(
-            $"Cannot merge field filter '{fieldFilterAttributePath}' to navigation pair with RtCkTypeId '{ckTypeId}'. Ensure that the field filter is compatible with the navigation pair and that the path is valid.");
+            $"Cannot merge field filter '{fieldFilterAttributePath}' to navigation pair with CkTypeId '{ckTypeId}'. Ensure that the field filter is compatible with the navigation pair and that the path is valid.");
     }
 
     internal static Exception CkEnumIdNotSet(RtTypeWithAttributes rtTypeWithAttributes, PathTerm pathTupleTerm)

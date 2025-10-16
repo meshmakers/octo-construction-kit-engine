@@ -133,7 +133,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             {
                                 OriginFileResolver originFileResolver = new(compileResult.CompiledModelFile);
                                 Log.LogMessage(MessageImportance.High,
-                                    "Publishing construction kit model from '{0}' to 'LocalRepository'",
+                                    "Publishing construction kit model from '{0}' to 'LocalFileSystemCatalog'",
                                     constructionKitFolderPath);
 #if NETSTANDARD2_0
                                 using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
@@ -152,10 +152,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
-                                await ckModelRepositoryService.PublishAsync("LocalRepository", ckCompiledModelRoot,
-                                    originFileResolver, true, false);
+                                await ckModelRepositoryService.PublishAsync("LocalFileSystemCatalog", ckCompiledModelRoot,
+                                    originFileResolver, true);
                                 Log.LogMessage(MessageImportance.High,
-                                    "Construction kit model published to 'LocalRepository'");
+                                    "Construction kit model published to 'LocalFileSystemCatalog'");
                             }
 
                             if (GenerateCkDocumentation)

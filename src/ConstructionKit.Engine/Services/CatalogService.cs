@@ -82,12 +82,12 @@ internal class CatalogService : ICatalogService
             .ConfigureAwait(false);
     }
 
-    public async Task<CkCompiledModelRoot?> GetAsync(string repositoryName, CkModelId ckModelId,
+    public async Task<CkCompiledModelRoot?> GetAsync(string catalogName, CkModelId ckModelId,
         OperationResult operationResult,
         CancellationToken? cancellationToken = null)
     {
         return await _catalogManager
-            .GetAsync(repositoryName, ckModelId, operationResult, cancellationToken)
+            .GetAsync(catalogName, ckModelId, operationResult, cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -96,7 +96,7 @@ internal class CatalogService : ICatalogService
         return _catalogManager.GetCatalogList(sourceIdentifier);
     }
 
-    public async Task PublishAsync(string repositoryName, CkCompiledModelRoot ckCompiledModel,
+    public async Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel,
         OriginFileResolver originFileResolver, bool isForced,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
@@ -110,7 +110,7 @@ internal class CatalogService : ICatalogService
         }
 
         await _catalogManager
-            .PublishAsync(repositoryName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken)
+            .PublishAsync(catalogName, ckCompiledModel, isForced, sourceIdentifier, cancellationToken)
             .ConfigureAwait(false);
     }
 

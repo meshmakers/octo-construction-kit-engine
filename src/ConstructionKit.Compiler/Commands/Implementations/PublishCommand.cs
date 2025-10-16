@@ -40,7 +40,7 @@ internal class PublishCommand : CkcCommand
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
         var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
-                             "LocalRepository";
+                             "LocalFileSystemCatalog";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
         Logger.LogInformation("Repository '{Repository}'", repositoryName);

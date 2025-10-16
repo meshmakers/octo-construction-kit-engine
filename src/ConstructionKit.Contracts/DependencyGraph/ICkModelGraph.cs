@@ -165,4 +165,9 @@ public interface ICkModelGraph
     /// </summary>
     /// <returns></returns>
     IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties);
+
+    /// <summary>
+    /// Returns a list of all query column attribute paths for the given runtime construction kit type
+    /// </summary>
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties);
 }

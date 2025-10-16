@@ -271,6 +271,14 @@ public interface ICkCacheService
     ///     Returns the construction kit model library ids for a tenant.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
+    /// <param name="rtCkTypeId">The construction kit type id</param>
+    /// <param name="ignoreNavigationProperties">When true, the navigation properties are ignored</param>
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(string tenantId, RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties = false);
+
+    /// <summary>
+    ///     Returns the construction kit model library ids for a tenant.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance</param>
     /// <param name="ckTypeId">The construction kit type id</param>
     /// <param name="ignoreNavigationProperties">When true, the navigation properties are ignored</param>
     IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false);

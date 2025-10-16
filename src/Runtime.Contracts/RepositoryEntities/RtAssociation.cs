@@ -56,7 +56,7 @@ public class RtAssociation : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes
     /// </summary>
-    public List<CkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
+    public List<RtCkId<CkAttributeId>>? TargetCkAttributeIds { get; set; }
 
     /// <summary>
     ///     Gets or sets the association role id of the association role

@@ -25,21 +25,45 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             []);
     }
 
+    public List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties = false)
+    {
+        return GetColumnsByRtCkId(rtCkTypeId, ignoreNavigationProperties,
+            []);
+    }
+
+    private List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+    {
+
+        if (!ckModelGraph.TypesByRtCk.TryGetValue(rtCkTypeId, out var ckTypeGraph))
+        {
+            throw DependencyGraphException.RtCkTypeIdNotFound(rtCkTypeId);
+        }
+
+        return GetColumns(ckTypeGraph, ignoreNavigationProperties, ignoredNavigations);
+    }
 
     private List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties,
         HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
     {
-        var columns = new List<CkTypeQueryColumn>();
 
-        if (!ckModelGraph.Types.TryGetValue(ckTypeId, out var type))
+        if (!ckModelGraph.Types.TryGetValue(ckTypeId, out var ckTypeGraph))
         {
             throw DependencyGraphException.CkTypeIdNotFound(ckTypeId);
         }
 
-        CollectTypeColumns(type, columns);
+        return GetColumns(ckTypeGraph, ignoreNavigationProperties, ignoredNavigations);
+    }
+
+    private List<CkTypeQueryColumn> GetColumns(CkTypeGraph ckTypeGraph, bool ignoreNavigationProperties,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+    {
+        var columns = new List<CkTypeQueryColumn>();
+
+        CollectTypeColumns(ckTypeGraph, columns);
         if (!ignoreNavigationProperties)
         {
-            CollectNavigationColumns(type, columns, ignoredNavigations);
+            CollectNavigationColumns(ckTypeGraph, columns, ignoredNavigations);
         }
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(),

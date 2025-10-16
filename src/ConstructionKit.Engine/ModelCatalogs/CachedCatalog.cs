@@ -1,3 +1,4 @@
+using JetBrains.Annotations;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
@@ -169,7 +170,14 @@ public abstract class CachedCatalog(
             }
         }
 
-        using var streamReader = File.OpenRead(cachePath);
+        using var streamReader = new FileStream(
+            cachePath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite,  // Allow other processes to read/write while we read
+            bufferSize: 4096,
+            useAsync: true
+        );
         var r = await System.Text.Json.JsonSerializer
             .DeserializeAsync<CacheTypes.CacheCatalog>(streamReader,
                 new System.Text.Json.JsonSerializerOptions
@@ -188,13 +196,9 @@ public abstract class CachedCatalog(
     /// <returns>A task representing the asynchronous operation.</returns>
     protected async Task WriteCacheAsync(CacheTypes.CacheCatalog cacheCatalog)
     {
-        if (!Directory.Exists(catalogOptions.CacheDirectory))
-        {
-            Directory.CreateDirectory(catalogOptions.CacheDirectory);
-        }
+        var tempFileName = Path.GetTempFileName();
 
-        var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-        using var streamWriter = File.Create(cachePath);
+        using var streamWriter = File.Create(tempFileName);
         await System.Text.Json.JsonSerializer
             .SerializeAsync(streamWriter, cacheCatalog,
                 new System.Text.Json.JsonSerializerOptions
@@ -202,5 +206,16 @@ public abstract class CachedCatalog(
                     PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
                     Converters = { new CkVersionConverter() }
                 }).ConfigureAwait(false);
+
+        if (!Directory.Exists(catalogOptions.CacheDirectory))
+        {
+            Directory.CreateDirectory(catalogOptions.CacheDirectory);
+        }
+        var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
+        if (File.Exists(cachePath))
+        {
+            File.Delete(cachePath);
+        }
+        File.Move(tempFileName, cachePath);
     }
 }

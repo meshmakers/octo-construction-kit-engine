@@ -288,6 +288,22 @@ public static class RtPathEvaluator
     /// </summary>
     /// <param name="ckCacheService">The cache service</param>
     /// <param name="tenantId">Tenant id</param>
+    /// <param name="rtCkTypeId">Runtime construction kit type id the association belongs to</param>
+    /// <param name="paths">List of paths to be evaluated</param>
+    /// <returns>A list of navigation pairs, an empty list is returned if no navigation property has been used</returns>
+    public static List<NavigationPair> TokenizeAndGetNavigationPairsByRtCkId(ICkCacheService ckCacheService, string tenantId,
+        RtCkId<CkTypeId> rtCkTypeId,
+        IEnumerable<string> paths)
+    {
+        var ckTypeGraph = ckCacheService.GetRtCkType(tenantId, rtCkTypeId);
+        return TokenizeAndGetNavigationPairs(ckCacheService, tenantId, ckTypeGraph.CkTypeId, paths);
+    }
+
+    /// <summary>
+    /// Tokenizes a list of paths into a list of traversal navigation pairs
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
     /// <param name="ckTypeId">Construction kit type id the association belongs to</param>
     /// <param name="paths">List of paths to be evaluated</param>
     /// <returns>A list of navigation pairs, an empty list is returned if no navigation property has been used</returns>
@@ -318,6 +334,21 @@ public static class RtPathEvaluator
         }
 
         return navigationPairs;
+    }
+
+    /// <summary>
+    /// Tokenizes a path into a traversable navigation pair
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="rtCkTypeId">Runtime construction kit type id the association belongs to</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <returns>If navigation is used, the corresponding navigation pair is returned</returns>
+    public static NavigationPair? TokenizeAndGetNavigationPairByRtCkId(ICkCacheService ckCacheService, string tenantId,
+        RtCkId<CkTypeId> rtCkTypeId, IEnumerable<PathTerm> path)
+    {
+        var ckTypeGraph = ckCacheService.GetRtCkType(tenantId, rtCkTypeId);
+        return TokenizeAndGetNavigationPair(ckCacheService, tenantId, ckTypeGraph.CkTypeId, path);
     }
 
     /// <summary>
@@ -427,6 +458,21 @@ public static class RtPathEvaluator
         }
 
         return navigationPair;
+    }
+
+    /// <summary>
+    /// Tokenizes a path into a traversable navigation pair
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="rtCkTypeId">Construction kit type id the association belongs to</param>
+    /// <param name="path">Path of attributes to be evaluated</param>
+    /// <returns>If navigation is used, the corresponding navigation pair is returned</returns>
+    public static NavigationPair? TokenizeAndGetNavigationPairByRtCkId(ICkCacheService ckCacheService, string tenantId,
+        RtCkId<CkTypeId> rtCkTypeId, string path)
+    {
+        var tokens = TokenizePath(path);
+        return TokenizeAndGetNavigationPairByRtCkId(ckCacheService, tenantId, rtCkTypeId, tokens);
     }
 
     /// <summary>

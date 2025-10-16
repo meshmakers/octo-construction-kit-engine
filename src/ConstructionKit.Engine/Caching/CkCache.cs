@@ -302,13 +302,6 @@ internal class CkCache : IDisposable
         return missingModelIds;
     }
 
-    /// <summary>
-    /// Get the query column paths for a CK type.
-    /// </summary>
-    /// <param name="ckTypeId">The CK type ID</param>
-    /// <param name="ignoreNavigationProperties">Whether to ignore navigation properties</param>
-    /// <returns></returns>
-    /// <exception cref="CkCacheException">Thrown if the cache is not loaded</exception>
     public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
         bool ignoreNavigationProperties)
     {
@@ -318,6 +311,16 @@ internal class CkCache : IDisposable
         }
 
         return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
+    }
+
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
     }
 
     public CkTypeGraph GetRtCkType(RtCkId<CkTypeId> rtCkTypeId)
@@ -452,4 +455,6 @@ internal class CkCache : IDisposable
 
         return ckEnumGraph;
     }
+
+
 }

@@ -364,14 +364,17 @@ public class CkModelGraph : ICkModelGraph
         return AssociationRoles.Select(x => x.Value);
     }
 
-    /// <summary>
-    ///     Returns a list of all query column attribute paths for the given construction kit type
-    /// </summary>
-    /// <returns></returns>
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
-        bool ignoreNavigationProperties)
+    /// <inheritdoc />
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
     {
         var collector = new CkTypeQueryColumnCollector(this);
         return collector.GetColumns(ckTypeId, ignoreNavigationProperties);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties)
+    {
+        var collector = new CkTypeQueryColumnCollector(this);
+        return collector.GetColumnsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
     }
 }

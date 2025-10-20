@@ -64,7 +64,7 @@
         </CkRestore>
     </Target>
     
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild" >
+    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="CoreCompile" >
         <ItemGroup>
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
@@ -92,30 +92,13 @@
         </ItemGroup>
     </Target>
 
-    <ItemGroup>
-        <_OctoCompilerResourceFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
-        <EmbeddedResource Include="@(_OctoCompilerResourceFiles)">
-            <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
-            <Visible>False</Visible>
-            <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
-        </EmbeddedResource>
-    </ItemGroup>
+    <!--
+        Note: Static ItemGroups for EmbeddedResource and AdditionalFiles have been removed.
+        These are now added dynamically in the CkIncludeFiles target, which runs after
+        CkCompile/CkRestore and before CoreCompile. This ensures:
+        1. Files exist before being added to the build
+        2. AdditionalFiles are available for SourceGenerators during CoreCompile
+        3. Incremental builds work correctly
+    -->
 
-    <ItemGroup>
-        <AdditionalFiles Include="$(OctoCkCompileCacheCompileFolder)/*.json" />
-    </ItemGroup>
-
-    <ItemGroup>
-        <_OctoImportResourceFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml" />
-        <EmbeddedResource Include="@(_OctoImportResourceFiles)">
-            <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
-            <Visible>False</Visible>
-            <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
-        </EmbeddedResource>
-    </ItemGroup>
-
-    <ItemGroup>
-        <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
-    </ItemGroup>
-    
 </Project>

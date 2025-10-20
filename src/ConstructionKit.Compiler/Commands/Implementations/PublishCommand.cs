@@ -13,7 +13,7 @@ internal class PublishCommand : CkcCommand
     private readonly ICkSerializer _ckSerializer;
     private readonly IArgument _forceArg;
     private readonly IArgument _pathArg;
-    private readonly IArgument _repositoryArg;
+    private readonly IArgument _catalogArg;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
         ICatalogService catalogService, ICkSerializer ckSerializer)
@@ -25,7 +25,7 @@ internal class PublishCommand : CkcCommand
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);
 
-        _repositoryArg = CommandArgumentValue.AddArgument("c", "catalog",
+        _catalogArg = CommandArgumentValue.AddArgument("c", "catalog",
             ["Name of the construction kit catalog. By default 'LocalFileSystemCatalog' is used."], 1);
 
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
@@ -39,11 +39,11 @@ internal class PublishCommand : CkcCommand
         Logger.LogInformation("Publish construction kit model");
 
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
-        var repositoryName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_repositoryArg) ??
+        var catalogName = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_catalogArg) ??
                              "LocalFileSystemCatalog";
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
-        Logger.LogInformation("Repository '{Repository}'", repositoryName);
+        Logger.LogInformation("Catalog '{CatalogName}'", catalogName);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver(filePath);
@@ -59,7 +59,7 @@ internal class PublishCommand : CkcCommand
                 return;
             }
 
-            await _catalogService.PublishAsync(repositoryName, ckCompiledModelRoot, originFileResolver, isForced);
+            await _catalogService.PublishAsync(catalogName, ckCompiledModelRoot, originFileResolver, isForced);
 
             Logger.LogInformation("Construction kit model published");
         }

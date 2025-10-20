@@ -175,4 +175,11 @@ public interface ICatalogService
     Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath,
         string outputPath, string? createCacheFilePath, OperationResult operationResult,
         object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Refreshes the cache of a specific catalog, e.g., by reloading from disk or fetching from a remote source.
+    /// </summary>
+    /// <param name="catalogName">Name of the catalog</param>
+    /// <returns></returns>
+    Task RefreshCatalogCacheAsync(string catalogName);
 }

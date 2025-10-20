@@ -26,8 +26,13 @@
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
-    <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
-            DependsOnTargets="GatherCompileFiles">
+    <Target Name="CkCompile"
+            AfterTargets="ResolveProjectReferences"
+            BeforeTargets="CoreCompile"
+            Inputs="@(ConstructionKitFolderInputCompileFiles)"
+            Outputs="@(ConstructionKitFolderOutCompileFiles)"
+            DependsOnTargets="GatherCompileFiles"
+            Condition="'@(ConstructionKitFolder)' != '' AND ('$(OctoPublishCkModel)' == 'true' OR '$(OctoCompileCkModel)' == 'true')">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework)) -> $(OctoCkCompileOutputCompilerFolder)" />
         <Message Importance="High" Text="Location of OctoMesh compiler package: '$(MSBuildThisFileDirectory)'"/>
@@ -44,8 +49,11 @@
         </CkCompile>
     </Target>
 
-    <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
-            DependsOnTargets="GatherImportFiles">
+    <Target Name="CkRestore"
+            AfterTargets="ResolveProjectReferences"
+            BeforeTargets="CoreCompile"
+            DependsOnTargets="GatherImportFiles"
+            Condition="'@(ConstructionKitConfigFile)' != '' OR '@(ConstructionKitFolder)' != ''">
         <!--Calling our custom task-->
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"

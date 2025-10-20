@@ -101,7 +101,8 @@ internal static class Program
         services.AddTransient<ICommand, GenerateDocsCommand>();
         services.AddTransient<ICommand, RestoreCommand>();
         services.AddTransient<ICommand, VersionCommand>();
-        
+        services.AddTransient<ICommand, RefreshCommand>();
+
         services.AddDocumentationService();
         
         

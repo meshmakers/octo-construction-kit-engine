@@ -51,11 +51,11 @@ internal class CatalogService : ICatalogService
             cancellationToken);
     }
 
-    public Task<ModelSearchResult> SearchAsync(string repositoryName, string searchTerm, int skip, int take,
+    public Task<ModelSearchResult> SearchAsync(string catalogName, string searchTerm, int skip, int take,
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        return _catalogManager.SearchAsync(repositoryName, searchTerm, skip, take, sourceIdentifier,
+        return _catalogManager.SearchAsync(catalogName, searchTerm, skip, take, sourceIdentifier,
             cancellationToken);
     }
 
@@ -66,10 +66,10 @@ internal class CatalogService : ICatalogService
             cancellationToken);
     }
 
-    public Task<ModelListResult> ListAsync(string repositoryName, int skip, int take, object? sourceIdentifier = null,
+    public Task<ModelListResult> ListAsync(string catalogName, int skip, int take, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        return _catalogManager.ListAsync(repositoryName, skip, take, sourceIdentifier,
+        return _catalogManager.ListAsync(catalogName, skip, take, sourceIdentifier,
             cancellationToken);
     }
 
@@ -114,11 +114,11 @@ internal class CatalogService : ICatalogService
             .ConfigureAwait(false);
     }
 
-    public async Task<ModelExistingResult> IsExistingAsync(string repositoryName,
+    public async Task<ModelExistingResult> IsExistingAsync(string catalogName,
         CkModelIdVersionRange ckModelIdVersionRange,
         object? sourceIdentifier = null)
     {
-        return await _catalogManager.IsExistingAsync(repositoryName, ckModelIdVersionRange, sourceIdentifier)
+        return await _catalogManager.IsExistingAsync(catalogName, ckModelIdVersionRange, sourceIdentifier)
             .ConfigureAwait(false);
     }
 
@@ -233,6 +233,11 @@ internal class CatalogService : ICatalogService
         }
 
         return compileResults;
+    }
+
+    public Task RefreshCatalogCacheAsync(string catalogName)
+    {
+        return _catalogManager.RefreshCatalogCacheAsync(catalogName);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

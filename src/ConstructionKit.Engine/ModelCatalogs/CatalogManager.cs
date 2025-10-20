@@ -411,4 +411,16 @@ internal class CatalogManager : ICatalogManager
 
         return await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
     }
+
+    public async Task RefreshCatalogCacheAsync(string catalogName)
+    {
+        var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
+            catalogName, StringComparison.OrdinalIgnoreCase) == 0);
+        if (catalog == null)
+        {
+            throw ModelCatalogException.ModelCatalogNotFound(catalogName);
+        }
+
+        await catalog.RefreshCatalogAsync().ConfigureAwait(false);
+    }
 }

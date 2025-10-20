@@ -35,55 +35,55 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override async Task RefreshCatalogAsync()
     {
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
-        if (catalog == null)
-        {
-            return;
-        }
 
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
             UpdatedAt = DateTime.UtcNow
         };
 
-        foreach (var rootCatalogEntry in catalog.Models)
+        if (catalog != null)
         {
-            var modelLibraryCatalog =
-                await GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath).ConfigureAwait(false);
 
-            if (modelLibraryCatalog == null)
+            foreach (var rootCatalogEntry in catalog.Models)
             {
-                continue;
-            }
+                var modelLibraryCatalog =
+                    await GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath).ConfigureAwait(false);
 
-            var modelEntry = new CacheTypes.CacheModelEntry
-            {
-                ModelId = modelLibraryCatalog.ModelId,
-                Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
-            };
-            cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
-
-            foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
-            {
-                var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(
-                    rootCatalogEntry.ModelName,
-                    modelLibraryCatalogEntry.MajorVersion).ConfigureAwait(false);
-
-                if (versionsCatalog == null)
+                if (modelLibraryCatalog == null)
                 {
                     continue;
                 }
 
-                foreach (var modelLibraryVersionsCatalogEntry in versionsCatalog.Versions)
+                var modelEntry = new CacheTypes.CacheModelEntry
                 {
-                    var ckVersion = new CkVersion(modelLibraryVersionsCatalogEntry.Version);
-                    if (!modelEntry.Versions.ContainsKey(ckVersion.ToString()))
+                    ModelId = modelLibraryCatalog.ModelId,
+                    Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
+                };
+                cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+
+                foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
+                {
+                    var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(
+                        rootCatalogEntry.ModelName,
+                        modelLibraryCatalogEntry.MajorVersion).ConfigureAwait(false);
+
+                    if (versionsCatalog == null)
                     {
-                        modelEntry.Versions.Add(ckVersion.ToString(), new CacheTypes.CacheModelVersionEntry
+                        continue;
+                    }
+
+                    foreach (var modelLibraryVersionsCatalogEntry in versionsCatalog.Versions)
+                    {
+                        var ckVersion = new CkVersion(modelLibraryVersionsCatalogEntry.Version);
+                        if (!modelEntry.Versions.ContainsKey(ckVersion.ToString()))
                         {
-                            Version = ckVersion,
-                            Description = versionsCatalog.Description,
-                            FilePath = modelLibraryVersionsCatalogEntry.FilePath
-                        });
+                            modelEntry.Versions.Add(ckVersion.ToString(), new CacheTypes.CacheModelVersionEntry
+                            {
+                                Version = ckVersion,
+                                Description = versionsCatalog.Description,
+                                FilePath = modelLibraryVersionsCatalogEntry.FilePath
+                            });
+                        }
                     }
                 }
             }

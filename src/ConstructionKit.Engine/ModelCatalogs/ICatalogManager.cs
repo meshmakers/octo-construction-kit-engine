@@ -186,4 +186,11 @@ internal interface ICatalogManager
     /// which the catalog should search set it to null to use default</param>
     /// <returns>The task that returns true if the model exists in a given catalog</returns>
     Task<ModelExistingResult> IsExistingAsync(string catalogName, CkModelIdVersionRange ckModelIdVersionRange, object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Refreshes the catalog cache for a specific catalog
+    /// </summary>
+    /// <param name="catalogName">Name of catalog.</param>
+    /// <returns></returns>
+    Task RefreshCatalogCacheAsync(string catalogName);
 }

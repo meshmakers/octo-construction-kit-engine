@@ -11,4 +11,28 @@ internal static class DiagnosticsDescriptors
             "Construction Kit", // category
             DiagnosticSeverity.Error,
             true);
+
+    public static readonly DiagnosticDescriptor GeneratorInfo
+        = new("OM1001", // id
+            "Source Generator Information", // title
+            "{0}", // message
+            "Construction Kit", // category
+            DiagnosticSeverity.Info,
+            true);
+
+    public static readonly DiagnosticDescriptor GeneratorWarning
+        = new("OM1002", // id
+            "Source Generator Warning", // title
+            "{0}", // message
+            "Construction Kit", // category
+            DiagnosticSeverity.Warning,
+            true);
+
+    public static readonly DiagnosticDescriptor GeneratorError
+        = new("OM1003", // id
+            "Source Generator Error", // title
+            "{0}", // message
+            "Construction Kit", // category
+            DiagnosticSeverity.Error,
+            true);
 }

@@ -1,6 +1,3 @@
-using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 

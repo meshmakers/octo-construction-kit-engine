@@ -31,6 +31,7 @@ internal class RepositoryDependencyResolver(
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
             }
+            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds);
         }
 
         return resolveResult.RootDependencyModelIds;
@@ -125,7 +126,7 @@ internal class RepositoryDependencyResolver(
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
 
-                continue;
+                throw ModelValidationException.UnknownCkModel(ckDependency);
             }
 
             variableResolver.SetVariable(ckDependencyRootModel.ModelId.Name, ckDependencyRootModel.ModelId.FullName);

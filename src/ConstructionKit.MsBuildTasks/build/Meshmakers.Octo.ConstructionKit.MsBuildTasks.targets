@@ -28,7 +28,7 @@
     <!--It is generated a target which is executed before the compilation-->
     <Target Name="CkCompile"
             AfterTargets="ResolveProjectReferences"
-            BeforeTargets="CoreCompile"
+            BeforeTargets="CoreCompile;CoreGenerateMSBuildEditorConfigFileShouldRun"
             Inputs="@(ConstructionKitFolderInputCompileFiles)"
             Outputs="@(ConstructionKitFolderOutCompileFiles)"
             DependsOnTargets="GatherCompileFiles"
@@ -37,7 +37,7 @@
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework)) -> $(OctoCkCompileOutputCompilerFolder)" />
         <Message Importance="High" Text="Location of OctoMesh compiler package: '$(MSBuildThisFileDirectory)'"/>
         <!--Calling our custom task-->
-        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)" 
+        <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)"
                    OutputPath="$(OctoCkCompileOutputCompilerFolder)"
                    CacheFilePath="$(OctoCkCompileCacheCompileFolder)"
                    Compile="$(OctoCompileCkModel)"
@@ -47,11 +47,27 @@
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
         </CkCompile>
+
+        <!-- Add AdditionalFiles immediately after compilation -->
+        <ItemGroup>
+            <AdditionalFiles Include="$(OctoCkCompileCacheCompileFolder)/*.json" />
+        </ItemGroup>
+
+        <!-- Add EmbeddedResource files immediately after compilation -->
+        <ItemGroup>
+            <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
+            <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
+                <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
+                <Visible>False</Visible>
+                <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
+            </EmbeddedResource>
+            <_OctoCompilerResourceFiles Include="@(_OctoCompilerResourceFilesNew)" />
+        </ItemGroup>
     </Target>
 
     <Target Name="CkRestore"
             AfterTargets="ResolveProjectReferences"
-            BeforeTargets="CoreCompile"
+            BeforeTargets="CoreCompile;CoreGenerateMSBuildEditorConfigFileShouldRun"
             DependsOnTargets="GatherImportFiles"
             Condition="'@(ConstructionKitConfigFile)' != '' OR '@(ConstructionKitFolder)' != ''">
         <!--Calling our custom task-->
@@ -62,22 +78,13 @@
             <Output TaskParameter="CompiledModelFiles" ItemName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" ItemName="CacheFiles" />
         </CkRestore>
-    </Target>
-    
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="CoreCompile" >
+
+        <!-- Add AdditionalFiles immediately after restore -->
         <ItemGroup>
-            <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
-            <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
-                <LogicalName>$(RootNamespace).%(Filename)%(Extension)</LogicalName>
-                <Visible>False</Visible>
-                <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
-            </EmbeddedResource>
+            <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
         </ItemGroup>
 
-        <ItemGroup>
-            <AdditionalFiles Include="$(OctoCkCompileCacheCompileFolder)/*.json" />
-        </ItemGroup>
-
+        <!-- Add EmbeddedResource files immediately after restore -->
         <ItemGroup>
             <_OctoImportResourceFilesNew Include="$(OctoCkCompileOutputImportFolder)/*.yaml" Exclude="@(_OctoImportResourceFiles)" />
             <EmbeddedResource Include="@(_OctoImportResourceFilesNew)">
@@ -85,20 +92,17 @@
                 <Visible>False</Visible>
                 <GenerateCkModelServiceClass>$(OctoGenerateCkModelServiceClass)</GenerateCkModelServiceClass>
             </EmbeddedResource>
-        </ItemGroup>
-
-        <ItemGroup>
-            <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
+            <_OctoImportResourceFiles Include="@(_OctoImportResourceFilesNew)" />
         </ItemGroup>
     </Target>
 
     <!--
-        Note: Static ItemGroups for EmbeddedResource and AdditionalFiles have been removed.
-        These are now added dynamically in the CkIncludeFiles target, which runs after
-        CkCompile/CkRestore and before CoreCompile. This ensures:
+        Note: EmbeddedResource and AdditionalFiles are now added directly in CkCompile and CkRestore targets
+        immediately after the files are created. This ensures:
         1. Files exist before being added to the build
         2. AdditionalFiles are available for SourceGenerators during CoreCompile
-        3. Incremental builds work correctly
+        3. Items are added before Source Generators are initialized
+        4. Incremental builds work correctly
     -->
 
 </Project>

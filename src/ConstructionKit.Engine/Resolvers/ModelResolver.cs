@@ -32,36 +32,6 @@ internal abstract class ModelResolver : IModelResolver
         _referenceResolver = referenceResolver;
         _variableResolver = variableResolver;
     }
-    //
-    // public Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
-    //     object? sourceIdentifier = null)
-    // {
-    //     var originFileResolver = new OriginFileResolver("-");
-    //     return HardResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
-    // }
-    //
-    // public abstract Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
-    //     IOriginFileResolver originFileResolver,
-    //     OperationResult operationResult, object? sourceIdentifier = null);
-    //
-    // public Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds, OperationResult operationResult,
-    //     object? sourceIdentifier = null)
-    // {
-    //     var originFileResolver = new OriginFileResolver("-");
-    //     return SoftResolveAsync(ckModelIds, originFileResolver, operationResult, sourceIdentifier);
-    // }
-    //
-    // public abstract Task<ModelResolveResult> SoftResolveAsync(ICollection<CkModelId> ckModelIds,
-    //     IOriginFileResolver originFileResolver, OperationResult operationResult,
-    //     object? sourceIdentifier = null);
-    //
-    // public abstract Task<ModelResolveResult> SoftResolveAsync(CkCompiledModelRoot compiledModel,
-    //     IOriginFileResolver originFileResolver,
-    //     OperationResult operationResult, object? sourceIdentifier = null);
-    //
-    // public abstract Task<CkModelGraph> HardResolveAsync(CkCompiledModelRoot compiledModel,
-    //     IOriginFileResolver originFileResolver,
-    //     OperationResult operationResult, object? sourceIdentifier = null);
 
     protected void Resolve(CkModelRootBase modelRootBase, CkModelGraph modelGraph,
         IOriginFileResolver originFileResolver, OperationResult operationResult)

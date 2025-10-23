@@ -3,7 +3,7 @@ using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class GenerateDocsCommand : Command<OctoToolOptions>
 {
-    private readonly IRepositoryModelResolver _modelResolver;
+    private readonly ICatalogModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IArgument _modelSourcePathArg;
     private readonly IArgument _outputPathArg;
@@ -21,7 +21,7 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
     private readonly IArgument _linkPathArg;
 
 
-    public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, IRepositoryModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
+    public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, ICatalogModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
         IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator, 
         IOptions<ModeSelectionOptions> modeSelectionOptions)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)

@@ -1,4 +1,5 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+
+using System.Globalization;
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -94,5 +95,13 @@ public class ModelValidationException : CkModelException
     {
         return new ModelValidationException(
             $"Dependency '{ckDependency}' is an unknown construction kit model library. This may happen because a dependency to another construction kit model is missing.");
+    }
+
+    internal static Exception UnknownCkModels(IReadOnlyCollection<CkModelIdVersionRange> resolveResultUnresolvedDependencyModelIds)
+    {
+        var modelIds = string.Join(", ",
+            resolveResultUnresolvedDependencyModelIds.Select(d => d.ToString(CultureInfo.InvariantCulture)));
+        return new ModelValidationException(
+            $"Dependencies '{modelIds}' are unknown construction kit model libraries. This may happen because dependencies to other construction kit models are missing.");
     }
 }

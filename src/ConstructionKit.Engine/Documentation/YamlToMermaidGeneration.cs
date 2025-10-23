@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
@@ -10,19 +11,19 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 /// </summary>
 public class YamlToMermaidGeneration
 {
-    private readonly IRepositoryModelResolver _modelResolver;
+    private readonly ICatalogModelResolver _catalogModelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
     private readonly IMermaidGenerator _mermaidGenerator;
 
     /// <summary>
     /// DI For necessary Elements
     /// </summary>
-    /// <param name="modelResolver"></param>
+    /// <param name="catalogModelResolver"></param>
     /// <param name="ckYamlSerializer"></param>
     /// <param name="mermaidGenerator"></param>
-    public YamlToMermaidGeneration(IRepositoryModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer, IMermaidGenerator mermaidGenerator)
+    public YamlToMermaidGeneration(ICatalogModelResolver catalogModelResolver, ICkYamlSerializer ckYamlSerializer, IMermaidGenerator mermaidGenerator)
     {
-        _modelResolver = modelResolver;
+        _catalogModelResolver = catalogModelResolver;
         _ckYamlSerializer = ckYamlSerializer;
         _mermaidGenerator = mermaidGenerator;
     }
@@ -46,7 +47,7 @@ public class YamlToMermaidGeneration
 
         // Resolves Dependencies
         var originFileResolver = new OriginFileResolver(filePath);
-        var ckModelGraph = await _modelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
+        var ckModelGraph = await _catalogModelResolver.HardResolveAsync(compiledModelRoot, originFileResolver, operationResult).ConfigureAwait(false);
         
         await _mermaidGenerator.GenerateMermaidDiagram(ckModelGraph, outputPath).ConfigureAwait(false);
 

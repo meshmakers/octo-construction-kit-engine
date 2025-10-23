@@ -30,8 +30,8 @@ internal class CatalogDependencyResolver(
             {
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
-                throw ModelValidationException.UnknownCkModel(ckDependency);
             }
+            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds);
         }
 
         return resolveResult.RootDependencyModelIds;

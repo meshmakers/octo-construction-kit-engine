@@ -12,17 +12,42 @@ namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 public class CkSourceGenerator : IIncrementalGenerator
 {
     private readonly ServiceProvider _serviceProvider;
+    private SourceProductionContext? _currentContext;
 
     public CkSourceGenerator()
     {
         var services = new ServiceCollection();
+        
+        // Configure logging for source generator environment
+        // We need to add logging services because the Engine services depend on ILogger<T>
+        // but we use a NullLoggerProvider so it doesn't try to write to console/files
         services.AddLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
+            loggingBuilder.AddProvider(Microsoft.Extensions.Logging.Abstractions.NullLoggerProvider.Instance);
             loggingBuilder.SetMinimumLevel(LogLevel.Trace);
         });
+        
         services.AddConstructionKit();
         _serviceProvider = services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Logs diagnostic information during source generation.
+    /// This is the proper way to log in source generators instead of using ILogger.
+    /// </summary>
+    private void LogDiagnostic(DiagnosticSeverity severity, string message, Location? location = null)
+    {
+        if (_currentContext == null) return;
+
+        var descriptor = severity switch
+        {
+            DiagnosticSeverity.Error => DiagnosticsDescriptors.GeneratorError,
+            DiagnosticSeverity.Warning => DiagnosticsDescriptors.GeneratorWarning,
+            _ => DiagnosticsDescriptors.GeneratorInfo
+        };
+
+        _currentContext.Value.ReportDiagnostic(Diagnostic.Create(descriptor, location, message));
     }
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -67,109 +92,145 @@ public class CkSourceGenerator : IIncrementalGenerator
 
     private void GenerateCode(SourceProductionContext context, FileOptions fileOptions)
     {
-        var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
-        var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
+        // Set the current context for diagnostic logging
+        _currentContext = context;
 
-        var tenantId = fileOptions.GroupedFile.MainFile.File.Path;
-
-        ckCacheService.CreateTenant(tenantId);
-        fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);
-        var sourceText = cacheFile.GetText();
-        if (sourceText == null)
+        try
         {
-            var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
-                null,
-                fileOptions.GroupedFile.CacheFile.File.Path);
-            context.ReportDiagnostic(error);
-            return;
-        }
+            LogDiagnostic(DiagnosticSeverity.Info, 
+                $"Starting code generation for model: {fileOptions.GroupedFile.MainFile.File.Path}");
 
-        ckCacheService.RestoreCache(tenantId, sourceText.ToString());
+            var ckCacheService = _serviceProvider.GetRequiredService<ICkCacheService>();
+            var ckSerializer = _serviceProvider.GetRequiredService<ICkYamlSerializer>();
 
-        fileOptions.GroupedFile.MainFile.Deconstruct(out var mainFile, out _);
-        sourceText = mainFile.GetText();
-        if (sourceText == null)
-        {
-            var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
-                null,
-                fileOptions.GroupedFile.MainFile.File.Path);
-            context.ReportDiagnostic(error);
-            return;
-        }
+            var tenantId = fileOptions.GroupedFile.MainFile.File.Path;
 
-        var operationResult = new OperationResult();
-        var ckCompiledModelRoot =
-            ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), mainFile.Path, operationResult);
-        if (operationResult.Messages.Any())
-        {
-            ReportOperationResults(context, operationResult);
-            return;
-        }
-
-        var ns =
-            $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.Name}.v{ckCompiledModelRoot.ModelId.Version.Major.ToString()}";
-
-        if (ckCompiledModelRoot.Types != null)
-        {
-            foreach (var ckTypeDto in ckCompiledModelRoot.Types)
+            ckCacheService.CreateTenant(tenantId);
+            fileOptions.GroupedFile.CacheFile.Deconstruct(out var cacheFile, out _);
+            var sourceText = cacheFile.GetText();
+            if (sourceText == null)
             {
-                if (ckCompiledModelRoot.ModelId.Name == "System" && ckTypeDto.TypeId.Name == "Entity")
-                {
-                    continue;
-                }
+                var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
+                    null,
+                    fileOptions.GroupedFile.CacheFile.File.Path);
+                context.ReportDiagnostic(error);
+                return;
+            }
 
-                var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId,
-                    ckCacheService);
-                if (!string.IsNullOrWhiteSpace(code))
+            LogDiagnostic(DiagnosticSeverity.Info, "Restoring cache from cache file");
+            ckCacheService.RestoreCache(tenantId, sourceText.ToString());
+
+            fileOptions.GroupedFile.MainFile.Deconstruct(out var mainFile, out _);
+            sourceText = mainFile.GetText();
+            if (sourceText == null)
+            {
+                var error = Diagnostic.Create(DiagnosticsDescriptors.EmptyFile,
+                    null,
+                    fileOptions.GroupedFile.MainFile.File.Path);
+                context.ReportDiagnostic(error);
+                return;
+            }
+
+            LogDiagnostic(DiagnosticSeverity.Info, "Deserializing compiled model root");
+            var operationResult = new OperationResult();
+            var ckCompiledModelRoot =
+                ckSerializer.DeserializeCompiledModelRoot(sourceText.ToString(), mainFile.Path, operationResult);
+            if (operationResult.Messages.Any())
+            {
+                ReportOperationResults(context, operationResult);
+                return;
+            }
+
+            var ns =
+                $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.Name}.v{ckCompiledModelRoot.ModelId.Version.Major.ToString()}";
+
+            LogDiagnostic(DiagnosticSeverity.Info, 
+                $"Generating code for model {ckCompiledModelRoot.ModelId.Name} v{ckCompiledModelRoot.ModelId.Version} in namespace {ns}");
+
+            if (ckCompiledModelRoot.Types != null)
+            {
+                LogDiagnostic(DiagnosticSeverity.Info, $"Generating {ckCompiledModelRoot.Types.Count()} type(s)");
+                foreach (var ckTypeDto in ckCompiledModelRoot.Types)
                 {
-                    context.AddSource($"{ns}.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version}.g.cs", code);
+                    if (ckCompiledModelRoot.ModelId.Name == "System" && ckTypeDto.TypeId.Name == "Entity")
+                    {
+                        continue;
+                    }
+
+                    var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId,
+                        ckCacheService);
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        var fileName = $"{ns}.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version}.g.cs";
+                        context.AddSource(fileName, code);
+                        LogDiagnostic(DiagnosticSeverity.Info, $"Generated type: {ckTypeDto.TypeId.Name}");
+                    }
                 }
             }
-        }
 
-        if (ckCompiledModelRoot.Records != null)
-        {
-            foreach (var ckRecordDto in ckCompiledModelRoot.Records)
+            if (ckCompiledModelRoot.Records != null)
             {
-                var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto,
-                    tenantId, ckCacheService);
-                if (!string.IsNullOrWhiteSpace(code))
+                LogDiagnostic(DiagnosticSeverity.Info, $"Generating {ckCompiledModelRoot.Records.Count()} record(s)");
+                foreach (var ckRecordDto in ckCompiledModelRoot.Records)
                 {
-                    context.AddSource(
-                        $"{ns}.Record.{ckRecordDto.RecordId.Name}.{ckRecordDto.RecordId.Version}.g.cs", code);
+                    var code = CkRecordCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckRecordDto,
+                        tenantId, ckCacheService);
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        var fileName = $"{ns}.Record.{ckRecordDto.RecordId.Name}.{ckRecordDto.RecordId.Version}.g.cs";
+                        context.AddSource(fileName, code);
+                        LogDiagnostic(DiagnosticSeverity.Info, $"Generated record: {ckRecordDto.RecordId.Name}");
+                    }
                 }
             }
-        }
 
-        if (ckCompiledModelRoot.Enums != null)
-        {
-            foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
+            if (ckCompiledModelRoot.Enums != null)
             {
-                var code = CkEnumCodeGenerator.Instance.Generate(ns, ckEnumDto);
-                if (!string.IsNullOrWhiteSpace(code))
+                LogDiagnostic(DiagnosticSeverity.Info, $"Generating {ckCompiledModelRoot.Enums.Count()} enum(s)");
+                foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
                 {
-                    context.AddSource($"{ns}.Enum.{ckEnumDto.EnumId.Name}.{ckEnumDto.EnumId.Version}.g.cs", code);
+                    var code = CkEnumCodeGenerator.Instance.Generate(ns, ckEnumDto);
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        var fileName = $"{ns}.Enum.{ckEnumDto.EnumId.Name}.{ckEnumDto.EnumId.Version}.g.cs";
+                        context.AddSource(fileName, code);
+                        LogDiagnostic(DiagnosticSeverity.Info, $"Generated enum: {ckEnumDto.EnumId.Name}");
+                    }
                 }
             }
+
+            LogDiagnostic(DiagnosticSeverity.Info, "Generating common infrastructure files");
+            
+            var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
+                ckCompiledModelRoot.Types,
+                ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
+            context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);
+
+            generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace,
+                ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
+            context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
+
+            generatedCode =
+                CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
+                    ckCompiledModelRoot.Types != null);
+            context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
+
+            generatedCode = CkClassMapGenerator.Instance.Generate(ns, ckCompiledModelRoot.Types,
+                ckCompiledModelRoot.Records, ckCompiledModelRoot.ModelId);
+            context.AddSource($"{ns}.Common.CkTypeMap.g.cs", generatedCode);
+
+            LogDiagnostic(DiagnosticSeverity.Info, 
+                $"Code generation completed successfully for model {ckCompiledModelRoot.ModelId.Name}");
         }
-
-        var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
-            ckCompiledModelRoot.Types,
-            ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles);
-        context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);
-
-        generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace,
-            ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
-        context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
-
-        generatedCode =
-            CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
-                ckCompiledModelRoot.Types != null);
-        context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
-
-        generatedCode = CkClassMapGenerator.Instance.Generate(ns, ckCompiledModelRoot.Types,
-            ckCompiledModelRoot.Records, ckCompiledModelRoot.ModelId);
-        context.AddSource($"{ns}.Common.CkTypeMap.g.cs", generatedCode);
+        catch (Exception ex)
+        {
+            LogDiagnostic(DiagnosticSeverity.Error, 
+                $"Code generation failed with exception: {ex.GetType().Name}: {ex.Message}\nStack trace: {ex.StackTrace}");
+        }
+        finally
+        {
+            _currentContext = null;
+        }
     }
 
     private static void ReportOperationResults(SourceProductionContext context, OperationResult operationResult)

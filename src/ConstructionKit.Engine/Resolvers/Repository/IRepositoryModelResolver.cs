@@ -10,6 +10,20 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 public interface IRepositoryModelResolver :IModelResolver
 {
     /// <summary>
+    /// Resolves a list of model ids,
+    /// all dependencies must be available otherwise an error is reported in the operation result.
+    /// </summary>
+    /// <param name="ckModelIds">List of model ids</param>
+    /// <param name="originFileResolver">Resolver for the original file location</param>
+    /// <param name="operationResult">Operation result</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the repository should search set it to null to use default</param>
+    /// <returns>A resolved model graph</returns>
+    Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds, IOriginFileResolver originFileResolver,
+        OperationResult operationResult, object? sourceIdentifier = null);
+
+    /// <summary>
     ///     Loads the compiled model into the resolver. This method tries to resolve as much as possible and reports unresolved references in the result.
     /// </summary>
     /// <param name="compiledModel">Instance of the compiled model</param>

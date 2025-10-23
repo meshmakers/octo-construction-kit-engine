@@ -95,7 +95,7 @@ public class RepositoryDependencyResolverTests
     }
 
     [Fact]
-    public async Task HardResolveDependenciesAsync_WithUnresolvableDependency_AddsErrorMessage()
+    public async Task HardResolveDependenciesAsync_WithUnresolvableDependency_AddsErrorMessageAndThrows()
     {
         // Arrange
         var dependencyVersionRange = new CkModelIdVersionRange("NonExistentModel-1.0.0");
@@ -108,12 +108,11 @@ public class RepositoryDependencyResolverTests
             .Returns("test-file.yaml");
 
         // Act
-        var result = await _resolver.HardResolveDependenciesAsync(
+        await Assert.ThrowsAsync<ModelValidationException>(async ()=> await _resolver.HardResolveDependenciesAsync(
             dependencyVersionRanges, _modelGraph, _variableResolver,
-            _originFileResolver, _operationResult);
+            _originFileResolver, _operationResult));
 
         // Assert
-        Assert.Empty(result);
         Assert.Single(_operationResult.Messages);
         Assert.Equal(1, _operationResult.Messages.First().MessageNumber);
     }
@@ -521,7 +520,7 @@ public class RepositoryDependencyResolverTests
     }
 
     [Fact]
-    public async Task HardResolveDependenciesAsync_WithNullModelFromRepository_ContinuesProcessing()
+    public async Task HardResolveDependenciesAsync_WithNullModelFromRepository_ThrowException()
     {
         // Arrange
         var dependencyVersionRange = new CkModelIdVersionRange("TestModel-1.0.0");
@@ -538,12 +537,11 @@ public class RepositoryDependencyResolverTests
             .Returns("test-file.yaml");
 
         // Act
-        var result = await _resolver.HardResolveDependenciesAsync(
+        await Assert.ThrowsAsync<ModelValidationException>(async ()=> await _resolver.HardResolveDependenciesAsync(
             dependencyVersionRanges, _modelGraph, _variableResolver,
-            _originFileResolver, _operationResult);
+            _originFileResolver, _operationResult));
 
         // Assert
-        Assert.Empty(result);
         Assert.Single(_operationResult.Messages);
         Assert.Equal(1, _operationResult.Messages.First().MessageNumber);
     }

@@ -16,20 +16,29 @@ public class CkSourceGenerator : IIncrementalGenerator
 
     public CkSourceGenerator()
     {
-        var services = new ServiceCollection();
-        
-        // Configure logging for source generator environment
-        // We need to add logging services because the Engine services depend on ILogger<T>
-        // but we use a NullLoggerProvider so it doesn't try to write to console/files
-        services.AddLogging(loggingBuilder =>
+        try
         {
-            loggingBuilder.ClearProviders();
-            loggingBuilder.AddProvider(Microsoft.Extensions.Logging.Abstractions.NullLoggerProvider.Instance);
-            loggingBuilder.SetMinimumLevel(LogLevel.Trace);
-        });
-        
-        services.AddConstructionKit();
-        _serviceProvider = services.BuildServiceProvider();
+            var services = new ServiceCollection();
+
+            // Configure logging for source generator environment
+            // We need to add logging services because the Engine services depend on ILogger<T>
+            // but we use a NullLoggerProvider so it doesn't try to write to console/files
+            services.AddLogging(loggingBuilder =>
+            {
+                loggingBuilder.ClearProviders();
+                loggingBuilder.AddProvider(Microsoft.Extensions.Logging.Abstractions.NullLoggerProvider.Instance);
+                loggingBuilder.SetMinimumLevel(LogLevel.Trace);
+            });
+
+            services.AddConstructionKit();
+            _serviceProvider = services.BuildServiceProvider();
+        }
+        catch (Exception e)
+        {
+            LogDiagnostic(DiagnosticSeverity.Info,
+                $"Cannot create instance of type {nameof(CkSourceGenerator)}: {e.Message}");
+            throw;
+        }
     }
 
     /// <summary>

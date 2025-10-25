@@ -16,8 +16,8 @@ public class RtAttributeTcDto
     ///     Gets or sets the id of the attribute.
     /// </summary>
     [JsonRequired]
-    [JsonConverter(typeof(CkIdAttributeIdConverter))]
-    public CkId<CkAttributeId> Id { get; set; } = null!;
+    [JsonConverter(typeof(RtCkIdAttributeIdConverter))]
+    public RtCkId<CkAttributeId> Id { get; set; } = null!;
 
     /// <summary>
     ///     Gets or sets the value of the attribute.

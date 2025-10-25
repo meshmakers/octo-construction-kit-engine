@@ -76,7 +76,7 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
 
             var rtEntityAttributeDto = new RtAttributeTcDto
             {
-                Id = ckTypeAttributeGraph.CkAttributeId,
+                Id = ckTypeAttributeGraph.CkAttributeId.ToRtCkId(),
                 Value = value
             };
             rtTypeWithAttributesDto.Attributes.Add(rtEntityAttributeDto);

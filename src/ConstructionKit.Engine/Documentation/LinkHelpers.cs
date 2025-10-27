@@ -22,6 +22,14 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Documentation
         public string FormatAnchor(string unformattedAnchor)
         {
             var anchor = unformattedAnchor.Replace(".", "").ToLower();
+
+            var hyphenIndex = anchor.IndexOf('-');
+            if (hyphenIndex >= 0)
+            {
+                anchor = anchor.Substring(0, hyphenIndex);
+            }
+            
+            
             return anchor;
         }
 

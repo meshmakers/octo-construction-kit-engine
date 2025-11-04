@@ -9,7 +9,12 @@ public record BulkOperationOptions
     /// <summary>
     /// Defines the strategy for bulk insert operations.
     /// </summary>
-    public BulkInsertStrategy InsertStrategy { get; init; } = BulkInsertStrategy.InsertOnly;
+    public BulkInsertStrategies InsertStrategy { get; init; } = BulkInsertStrategies.InsertOnly;
+
+    /// <summary>
+    /// Defines the strategy for delete operations
+    /// </summary>
+    public DeleteStrategies DeleteStrategy  { get; init; } = DeleteStrategies.Archive;
 
     /// <summary>
     /// Returns the default options for bulk operations.

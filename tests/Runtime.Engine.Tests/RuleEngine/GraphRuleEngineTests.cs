@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v1;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
@@ -290,8 +291,8 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         };
 
         A.CallTo(() =>
-                dataSource.GetRtAssociationsAsync(session, new[] { entity.ToRtEntityId() }, GraphDirections.Any, null,
-                    null))
+                dataSource.GetRtAssociationsAsync(session, new[] { entity.ToRtEntityId() },
+                    A<RtAssociationQueryOptions>._))
             .Returns(new AssociationMultipleOriginResultSet(dict));
 
         // Act
@@ -440,7 +441,8 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
 
     private static void SetupEmptyAssociations(IRepositoryDataSource dataSource)
     {
-        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._))
+        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._,
+                A<RtAssociationQueryOptions>._))
             .Returns(new List<RtAssociation>());
     }
 
@@ -457,7 +459,8 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         RtEntity origin, RtEntity target, RtCkId<CkAssociationRoleId> roleId)
     {
         var association = CreateAssociation(origin, target, roleId);
-        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._))
+        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._,
+                A<RtAssociationQueryOptions>._))
             .Returns([association]);
     }
 

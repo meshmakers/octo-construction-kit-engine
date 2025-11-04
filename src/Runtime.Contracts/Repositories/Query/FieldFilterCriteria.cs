@@ -11,7 +11,7 @@ public record FieldFilterCriteria
     /// Creates a new instance of <see cref="FieldFilterCriteria" />
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
-    protected FieldFilterCriteria(LogicalOperator logicalOperator = LogicalOperator.And)
+    protected FieldFilterCriteria(LogicalOperators logicalOperator = LogicalOperators.And)
     {
         Operator = logicalOperator;
     }
@@ -19,7 +19,7 @@ public record FieldFilterCriteria
     /// <summary>
     ///     Gets the logical operator for combining field filters
     /// </summary>
-    public LogicalOperator Operator { get; }
+    public LogicalOperators Operator { get; }
 
     /// <summary>
     ///     Represents field filters for specific attributes with different comparison operators.
@@ -88,7 +88,7 @@ public record FieldFilterCriteria
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
     /// <returns>New instance of <see cref="FieldFilterCriteria" /></returns>
-    public static FieldFilterCriteria Create(LogicalOperator logicalOperator)
+    public static FieldFilterCriteria Create(LogicalOperators logicalOperator)
     {
         return new FieldFilterCriteria(logicalOperator);
     }

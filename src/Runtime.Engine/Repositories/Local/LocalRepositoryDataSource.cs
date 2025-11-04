@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
@@ -81,14 +82,15 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
     }
 
     public override async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair)
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions)
     {
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
-
+        bool includeArchived = associationQueryOptions.GlobalFilter?.IncludeArchived ?? false;
         var associations = new List<RtAssociation>();
         foreach (var pair in rtOriginTargetPair)
         {
             var association = queryable.FirstOrDefault(a =>
+                includeArchived || a.RtState != RtState.Deleted &&
                 a.OriginRtId == pair.Origin.RtId && a.OriginCkTypeId == pair.Origin.CkTypeId &&
                 a.TargetRtId == pair.Target.RtId && a.TargetCkTypeId == pair.Target.CkTypeId &&
                 a.AssociationRoleId == pair.AssociationRoleId);

@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Messages;
@@ -46,8 +47,10 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         }
 
         // Validate if the associations are valid to be added/deleted based on the current database content
-        var createAssociations = validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
-        var deleteAssociations = validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
+        var createAssociations =
+            validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Create);
+        var deleteAssociations =
+            validatedAssociationUpdateInfoList.Where(x => x.ModOption == AssociationModOptionsDto.Delete);
 
         // Checks if assoc already exists in the repository
         await ValidateAssociationsToCreate(session, repositoryDataSource, createAssociations.ToList(),
@@ -136,8 +139,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             var rtEntityId = new RtEntityId(entityUpdateInfo.CkTypeId,
                 entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet());
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                [rtEntityId],
-                GraphDirections.Any).ConfigureAwait(false);
+                [rtEntityId], RtAssociationQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
             if (result.TryGetValue(rtEntityId, out var value))
             {
                 graphRuleEngineResult.RtAssociationsToDelete.AddRange(value.Items);
@@ -285,7 +287,8 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                          .GroupBy(a => a.RoleId).AsParallel())
             {
                 var outboundTypeAssociationGraphs =
-                    originCkTypeGraph.Associations.Out.All.Where(a => a.CkRoleId.ToRtCkId() == associationUpdateInfosByRoleId.Key)
+                    originCkTypeGraph.Associations.Out.All
+                        .Where(a => a.CkRoleId.ToRtCkId() == associationUpdateInfosByRoleId.Key)
                         .ToArray();
                 if (!outboundTypeAssociationGraphs.Any())
                 {
@@ -415,7 +418,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             a.RoleId)).ToList();
 
         var rtAssociation = await repositoryDataSource.GetRtAssociationsAsync(session,
-            rtOriginTargetPairs).ConfigureAwait(false);
+            rtOriginTargetPairs, RtAssociationQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
 
         var rtAssociationDictionary = rtAssociation.ToDictionary(x => new RtOriginTargetPair(
             new RtEntityId(x.OriginCkTypeId, x.OriginRtId),

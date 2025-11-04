@@ -27,6 +27,7 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
             RtChangedDateTime = rtEntity.RtChangedDateTime,
             RtCreationDateTime = rtEntity.RtCreationDateTime,
             RtWellKnownName = rtEntity.RtWellKnownName,
+            RtState = rtEntity.RtState,
             CkTypeId = rtEntity.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet()
         };
 

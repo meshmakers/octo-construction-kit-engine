@@ -3,16 +3,16 @@ using Meshmakers.Octo.Runtime.Contracts.Geospatial.Geometry;
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
-///     Represents a data query operation.
+///     Represents query options for runtime queries.
 /// </summary>
-public record DataQueryOperation : FieldFilterCriteria
+public record RtEntityQueryOptions : FieldFilterCriteria
 {
     /// <summary>
     ///     Constructor
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
     /// <param name="language">The language to use for text search. This text has to be the two-letter ISO language name.</param>
-    private DataQueryOperation(LogicalOperator logicalOperator = LogicalOperator.And, string language = "en")
+    private RtEntityQueryOptions(LogicalOperators logicalOperator = LogicalOperators.And, string language = "en")
      : base(logicalOperator)
     {
         Language = language;
@@ -22,7 +22,14 @@ public record DataQueryOperation : FieldFilterCriteria
     ///     The language to use for text search. This text has to be
     ///     the two-letter ISO language name.
     /// </summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public string Language { get; private set; }
+
+    /// <summary>
+    ///     Represents global filter settings for the query.
+    /// </summary>
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
+    public GlobalRtEntityFilter? GlobalFilter { get; private set; }
 
     /// <summary>
     ///     Represents full text search function for configured attributes (dependent of data source type)
@@ -55,14 +62,14 @@ public record DataQueryOperation : FieldFilterCriteria
     public ICollection<GeospatialFilter>? GeospatialFilters { get; internal set; }
 
     /// <summary>
-    ///     Creates a new instance of <see cref="DataQueryOperation" />.
+    ///     Creates a new instance of <see cref="RtEntityQueryOptions" />.
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
     /// <param name="language">The language to use for text search. This text has to be the two-letter ISO language name.</param>
     /// <returns></returns>
-    public static DataQueryOperation Create(LogicalOperator logicalOperator = LogicalOperator.And, string language = "en")
+    public static RtEntityQueryOptions Create(LogicalOperators logicalOperator = LogicalOperators.And, string language = "en")
     {
-        return new DataQueryOperation(logicalOperator, language);
+        return new RtEntityQueryOptions(logicalOperator, language);
     }
 
     /// <summary>
@@ -70,7 +77,7 @@ public record DataQueryOperation : FieldFilterCriteria
     /// </summary>
     /// <param name="language">The language to use for text search. This text has to be the two letter ISO language name.</param>
     /// <returns></returns>
-    public DataQueryOperation UseLanguage(string language)
+    public RtEntityQueryOptions UseLanguage(string language)
     {
         Language = language;
         return this;
@@ -81,7 +88,7 @@ public record DataQueryOperation : FieldFilterCriteria
     /// </summary>
     /// <param name="attributePath">Path of attribute to sort</param>
     /// <param name="sortOrder">Sort order</param>
-    public DataQueryOperation SortOrder(string attributePath, SortOrders sortOrder)
+    public RtEntityQueryOptions SortOrder(string attributePath, SortOrders sortOrder)
     {
         SortOrders ??= new List<SortOrderItem>();
 
@@ -91,10 +98,21 @@ public record DataQueryOperation : FieldFilterCriteria
     }
 
     /// <summary>
+    /// Defines global filter settings for runtime entity queries
+    /// </summary>
+    /// <param name="includeArchived">When true, archived entities are returned by the data operation, otherwise not</param>
+    public RtEntityQueryOptions Global(bool includeArchived)
+    {
+        GlobalFilter = new GlobalRtEntityFilter(includeArchived);
+
+        return this;
+    }
+
+    /// <summary>
     ///     Sets the text search filter.
     /// </summary>
     /// <param name="searchTerm">Search term for full text search.</param>
-    public DataQueryOperation TextSearch(object searchTerm)
+    public RtEntityQueryOptions TextSearch(object searchTerm)
     {
         TextSearchFilter = new TextSearchFilter(searchTerm);
 
@@ -106,7 +124,7 @@ public record DataQueryOperation : FieldFilterCriteria
     /// </summary>
     /// <param name="attributePaths">List of attribute paths for full text search</param>
     /// <param name="searchTerm">Search term for full text search.</param>
-    public DataQueryOperation AttributeSearch(IEnumerable<string> attributePaths, object searchTerm)
+    public RtEntityQueryOptions AttributeSearch(IEnumerable<string> attributePaths, object searchTerm)
     {
         AttributeSearchFilter = new AttributeSearchFilter(attributePaths, searchTerm);
 
@@ -143,7 +161,7 @@ public record DataQueryOperation : FieldFilterCriteria
     /// <param name="point">Point to search for</param>
     /// <param name="minDistance">The minimum distance from the center point that the documents can be.</param>
     /// <param name="maxDistance">The maximum distance from the center point that the documents can be.</param>
-    public DataQueryOperation NearGeospatialFilter(string attributeName, Point point, double? minDistance, double? maxDistance)
+    public RtEntityQueryOptions NearGeospatialFilter(string attributeName, Point point, double? minDistance, double? maxDistance)
     {
         GeospatialFilters ??= new List<GeospatialFilter>();
 

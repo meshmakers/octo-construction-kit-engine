@@ -3,7 +3,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 /// <summary>
 /// Defines options for bulk insert operations.
 /// </summary>
-public enum BulkInsertStrategy
+public enum BulkInsertStrategies
 {
     /// <summary>
     /// Insert new entities only, do not replace existing ones.

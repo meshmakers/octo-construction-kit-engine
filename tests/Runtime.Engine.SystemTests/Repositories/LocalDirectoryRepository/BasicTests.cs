@@ -228,7 +228,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             FieldFilterCriteria.Create().FieldEquals(TestCkIds.DesignationAttribute, "TestSensor0"),
             updateEntity);
 
-        var dataQueryOperation = DataQueryOperation.Create()
+        var dataQueryOperation = RtEntityQueryOptions.Create()
             .FieldFilter(TestCkIds.DesignationAttribute, FieldFilterOperator.Equals, "TestSensor154737");
 
         var copy = await localDirectoryRepository.GetRtEntitiesByTypeAsync<RtOcean>(new LocalSession(),
@@ -275,8 +275,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
 
         var rtAssociations =
             await localDirectoryRepository.GetRtAssociationsAsync(new LocalSession(),
-                rtZone.ToRtEntityId(),
-                GraphDirections.Inbound);
+                rtZone.ToRtEntityId(), RtAssociationQueryOptions.Create(GraphDirections.Inbound));
 
         var associations = rtAssociations.Items.ToList();
         Assert.Single(associations);

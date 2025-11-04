@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
 using TestCkModel.Generated.Test.v1;
@@ -42,7 +43,7 @@ public class LinkedBinariesTests(CacheServiceFixture fixture) : IClassFixture<Ca
 
         var (session, binaryEntity) = await InsertCustomers(localDirectoryRepository);
 
-        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtBinaryEntity>(session, binaryEntity.RtId);
+        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtBinaryEntity>(session, binaryEntity.RtId, DeleteOptions.Default);
 
         await session.CommitTransactionAsync();
     }

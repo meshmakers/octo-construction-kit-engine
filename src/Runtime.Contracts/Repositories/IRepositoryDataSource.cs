@@ -39,25 +39,21 @@ public interface IRepositoryDataSource
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="direction">Direction of associations to get</param>
-    /// <param name="skip">Number of items to skip</param>
-    /// <param name="take">Number of items to take</param>
+    /// <param name="associationQueryOptions">Options of the association query</param>
     /// <returns></returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, int? skip = null, int? take = null);
+        RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">The construction kit role to get</param>
-    /// <param name="skip">Number of items to skip</param>
-    /// <param name="take">Number of items to take</param>
+    /// <param name="associationQueryOptions">Options of the association query</param>
     /// <returns></returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity
@@ -86,9 +82,10 @@ public interface IRepositoryDataSource
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtOriginTargetPair">Pairs of origin and target runtime entity identifiers</param>
+    /// <param name="associationQueryOptions">Options of the association query</param>
     /// <returns>The list of associations</returns>
     Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair);
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Creates an instance of a runtime association

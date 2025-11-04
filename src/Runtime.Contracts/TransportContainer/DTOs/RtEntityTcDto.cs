@@ -1,6 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Newtonsoft.Json;
 using YamlDotNet.Serialization;
@@ -62,6 +63,14 @@ public class RtEntityTcDto : RtTypeWithAttributesTcDto
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? RtWellKnownName { get; set; }
 
+    /// <summary>
+    /// Gets or sets the state of the entity.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
+    public RtState? RtState {get; set;}
 
     /// <summary>
     ///     Gets or sets the associations of the entity

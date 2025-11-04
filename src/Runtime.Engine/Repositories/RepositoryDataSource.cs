@@ -39,40 +39,42 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, int? skip = null,
-        int? take = null)
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions)
     {
-        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), direction, null, skip, take);
+        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), null, associationQueryOptions);
     }
 
 
     /// <inheritdoc />
     public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId,
-        int? skip = null,
-        int? take = null)
+        IEnumerable<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId> roleId,
+        RtAssociationQueryOptions associationQueryOptions)
     {
-        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), direction, roleId, skip, take);
+        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), roleId, associationQueryOptions);
     }
 
     private async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsInternalAsync(IOctoSession session,
-        ICollection<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId>? roleId,
-        int? skip = null,
-        int? take = null)
+        ICollection<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId>? roleId,
+        RtAssociationQueryOptions options)
     {
         var associations = new Dictionary<RtEntityId, List<RtAssociation>>();
         foreach (var rtEntityId in rtEntityIds)
         {
             associations.Add(rtEntityId, []);
         }
-        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
 
-        if (direction == GraphDirections.Any || direction == GraphDirections.Inbound)
+        var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
+        bool includeArchived = options.GlobalFilter?.IncludeArchived ?? false;
+
+        if (options.Direction == GraphDirections.Any ||
+            options.Direction == GraphDirections.Inbound)
         {
             foreach (var rtAssociation in queryable.Where(x =>
-                         rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
-                                                       rtEntityId.CkTypeId == x.TargetCkTypeId &&
-                                                       roleId == null || x.AssociationRoleId == roleId)))
+                             (includeArchived || x.RtState != RtState.Deleted) &&
+                             (roleId == null || x.AssociationRoleId == roleId) &&
+                             rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
+                                                           rtEntityId.CkTypeId == x.TargetCkTypeId
+                             )))
             {
                 // Add the association to the dictionary if it does not already exist
                 var rtEntityId = new RtEntityId(rtAssociation.TargetCkTypeId, rtAssociation.TargetRtId);
@@ -87,12 +89,15 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             }
         }
 
-        if (direction == GraphDirections.Any || direction == GraphDirections.Outbound)
+        if (options.Direction == GraphDirections.Any ||
+            options.Direction == GraphDirections.Outbound)
         {
-            foreach (var rtAssociation in queryable.Where(x => rtEntityIds.Any(rtEntityId =>
-                             rtEntityId.RtId == x.OriginRtId &&
-                             rtEntityId.CkTypeId == x.OriginCkTypeId &&
-                             roleId == null || x.AssociationRoleId == roleId)))
+            foreach (var rtAssociation in queryable.Where(x =>
+                         (includeArchived || x.RtState != RtState.Deleted) &&
+                         (roleId == null || x.AssociationRoleId == roleId) &&
+                         rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.OriginRtId &&
+                                                       rtEntityId.CkTypeId == x.OriginCkTypeId
+                         )))
             {
                 // Add the association to the dictionary if it does not already exist
                 var rtEntityId = new RtEntityId(rtAssociation.OriginCkTypeId, rtAssociation.OriginRtId);
@@ -111,19 +116,19 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         var multipleResult =
             associations.ToDictionary(kvp => kvp.Key,
                 kvp => new ResultSet<RtAssociation>(kvp.Value, kvp.Value.Count, null, null));
-        if (skip.HasValue)
+        if (options.Skip.HasValue)
         {
             foreach (var resultSetValue in multipleResult.Values)
             {
-                resultSetValue.Skip(skip.Value);
+                resultSetValue.Skip(options.Skip.Value);
             }
         }
 
-        if (take.HasValue)
+        if (options.Take.HasValue)
         {
             foreach (var resultSetValue in multipleResult.Values)
             {
-                resultSetValue.Take(take.Value);
+                resultSetValue.Take(options.Take.Value);
             }
         }
 
@@ -149,7 +154,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public abstract Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair);
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions);
 
     /// <inheritdoc />
     public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,
@@ -214,7 +219,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
-    public Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken)
+    public Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime,
+        CancellationToken cancellationToken)
     {
         return BinaryDataSource.DeleteExpiredTemporaryLargeBinariesAsync(session, expiryDateTime, cancellationToken);
     }

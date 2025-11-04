@@ -62,7 +62,7 @@ internal class BulkRtMutation(
         if (entityRuleEngineResult.RtEntitiesToDelete.Any())
         {
             await DeleteRtEntityAsync(session, repositoryDataSource, ckCacheService,
-                entityRuleEngineResult.RtEntitiesToDelete).ConfigureAwait(false);
+                entityRuleEngineResult.RtEntitiesToDelete, options).ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
@@ -223,7 +223,7 @@ internal class BulkRtMutation(
         }
 
 
-        await collection.UpdateManyAsync(session, rtEntities).ConfigureAwait(false);
+        await collection.UpdateOneAsync(session, rtEntities).ConfigureAwait(false);
     }
 
     private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
@@ -263,7 +263,7 @@ internal class BulkRtMutation(
 
     private async Task DeleteRtEntityAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        IReadOnlyList<RtEntityId> rtEntityIds)
+        IReadOnlyList<RtEntityId> rtEntityIds, BulkRtMutationOptions options)
     {
         foreach (var rtEntityGrouping in rtEntityIds.GroupBy(x => x.CkTypeId))
         {
@@ -273,26 +273,57 @@ internal class BulkRtMutation(
             }
 
             await DeleteRtEntityAsync<RtEntity>(session, repositoryDataSource, ckCacheService, rtEntityGrouping.Key,
-                    rtEntityGrouping)
+                    rtEntityGrouping, options)
                 .ConfigureAwait(false);
         }
     }
 
     private async Task DeleteRtEntityAsync<TEntity>(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        RtCkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds)
+        RtCkId<CkTypeId> ckTypeId, IEnumerable<RtEntityId> rtEntityIds, BulkRtMutationOptions options)
         where TEntity : RtEntity, new()
     {
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
-        foreach (var rtEntityId in rtEntityIds.AsParallel())
+        if (options.DeleteStrategy == DeleteStrategies.Archive)
         {
-            // Delete the entity from the database
-            await collection.DeleteOneAsync(session, rtEntityId.RtId).ConfigureAwait(false);
-            // We need to delete the binary data from the file system if it is a linked binary
-            await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityId)
-                .ConfigureAwait(false);
+            // This case only set the state to delete.
+            List<TEntity> updatedEntities = new List<TEntity>();
+            foreach (var rtEntityId in rtEntityIds)
+            {
+                updatedEntities.Add(new TEntity
+                {
+                    RtId = rtEntityId.RtId,
+                    CkTypeId = ckTypeId,
+                    RtChangedDateTime = DateTime.UtcNow,
+                    RtState = RtState.Deleted
+                });
+
+                await repositoryDataSource.RtAssociations.UpdateManyAsync(session,
+                    a => (a.OriginCkTypeId == ckTypeId && a.OriginRtId == rtEntityId.RtId) ||
+                         (a.TargetCkTypeId == ckTypeId && a.TargetRtId == rtEntityId.RtId), new RtAssociation
+                    {
+                        RtState = RtState.Deleted
+                    }).ConfigureAwait(false);
+            }
+
+            await collection.UpdateOneAsync(session, updatedEntities).ConfigureAwait(false);
+        }
+        else
+        {
+            foreach (var rtEntityId in rtEntityIds.AsParallel())
+            {
+                // Delete the entity from the database
+                await collection.DeleteOneAsync(session, rtEntityId.RtId).ConfigureAwait(false);
+                // We need to delete the binary data from the file system if it is a linked binary
+                await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityId)
+                    .ConfigureAwait(false);
+                // Delete the assocation too.
+                await repositoryDataSource.RtAssociations.DeleteManyAsync(session, a =>
+                    (a.OriginCkTypeId == ckTypeId && a.OriginRtId == rtEntityId.RtId) ||
+                    (a.TargetCkTypeId == ckTypeId && a.TargetRtId == rtEntityId.RtId)).ConfigureAwait(false);
+            }
         }
     }
 
@@ -321,7 +352,7 @@ internal class BulkRtMutation(
     private async Task DeleteRtAssociationsAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         IEnumerable<RtAssociation> rtAssociations)
     {
-        await repositoryDataSource.RtAssociations.DeleteManyAsync(session, rtAssociations.Select(x => x.AssociationId))
+        await repositoryDataSource.RtAssociations.DeleteOneAsync(session, rtAssociations.Select(x => x.AssociationId))
             .ConfigureAwait(false);
     }
 

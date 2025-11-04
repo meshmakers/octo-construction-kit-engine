@@ -11,9 +11,11 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
     : LinkedBinaryDataSource
 {
     private readonly string _largeBinaryDirectoryPath = Path.Combine(directoryPath, "largeBinaries");
-    private readonly IDataSourceCollection<OctoObjectId, BinaryInfo> _largeBinaries = new LocalDataSourceCollection<OctoObjectId, BinaryInfo, BinaryInfoTcDto>(tenantId,
-        Path.Combine(directoryPath, "largeBinaries.json"),
-        new BinaryInfoDataSourceMapper(tenantId, rtSerializer));
+
+    private readonly IDataSourceCollection<OctoObjectId, BinaryInfo> _largeBinaries =
+        new LocalDataSourceCollection<OctoObjectId, BinaryInfo, BinaryInfoTcDto>(tenantId,
+            Path.Combine(directoryPath, "largeBinaries.json"),
+            new BinaryInfoDataSourceMapper(tenantId, rtSerializer));
 
     public override async Task DeleteAllFileSystemBinariesAsync(IOctoSession session, RtEntityId rtEntityId,
         CancellationToken cancellationToken = default)
@@ -21,8 +23,11 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         EnsureLargeBinaryDirectory();
 
         var binaryInfos = await _largeBinaries
-            .FindManyAsync(session, info => info.RtEntityId == rtEntityId && info.BinaryType == BinaryType.FileSystem)
+            .FindManyAsync(session,
+                info => info.RtEntityId == rtEntityId &&
+                        info.BinaryType == BinaryType.FileSystem)
             .ConfigureAwait(false);
+
 
         foreach (var binaryInfo in binaryInfos)
         {
@@ -31,6 +36,7 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
             {
                 File.Delete(filePath);
             }
+
             await _largeBinaries.DeleteOneAsync(session, binaryInfo.BinaryId).ConfigureAwait(false);
         }
     }
@@ -56,7 +62,8 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         await _largeBinaries.DeleteOneAsync(session, largeBinaryId).ConfigureAwait(false);
     }
 
-    public override async Task<IDownloadStreamHandler> DownloadBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
+    public override async Task<IDownloadStreamHandler> DownloadBinaryAsync(IOctoSession session,
+        OctoObjectId largeBinaryId,
         CancellationToken cancellationToken = default)
     {
         EnsureLargeBinaryDirectory();
@@ -89,23 +96,27 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         return binaryInfo;
     }
 
-    public override async Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName, CancellationToken cancellationToken = default)
+    public override async Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, string fileName,
+        CancellationToken cancellationToken = default)
     {
         EnsureLargeBinaryDirectory();
 
         var binaryInfo = await _largeBinaries
-            .FindSingleOrDefaultAsync(session, info => info.Filename == fileName && info.BinaryType == BinaryType.Temporary)
+            .FindSingleOrDefaultAsync(session,
+                info => info.Filename == fileName && info.BinaryType == BinaryType.Temporary)
             .ConfigureAwait(false);
 
         return binaryInfo;
     }
 
-    public override async Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken)
+    public override async Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime,
+        CancellationToken cancellationToken)
     {
         EnsureLargeBinaryDirectory();
 
         var binaryInfos = await _largeBinaries
-            .FindManyAsync(session, info => info.ExpiryDateTime < expiryDateTime && info.BinaryType == BinaryType.Temporary)
+            .FindManyAsync(session,
+                info => info.ExpiryDateTime < expiryDateTime && info.BinaryType == BinaryType.Temporary)
             .ConfigureAwait(false);
 
         foreach (var binaryInfo in binaryInfos)
@@ -121,7 +132,8 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         }
     }
 
-    public override async Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken)
+    public override async Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session,
+        CancellationToken cancellationToken)
     {
         EnsureLargeBinaryDirectory();
 
@@ -142,7 +154,8 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         }
     }
 
-    protected override async Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
+    protected override async Task<OctoObjectId> UploadLargeBinaryAsync(IOctoSession session, string filename,
+        string contentType, BinaryType binaryType,
         RtEntityId? rtEntityId, DateTime? expiryDateTime, Stream stream, CancellationToken cancellationToken = default)
     {
         EnsureLargeBinaryDirectory();
@@ -170,7 +183,8 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         return largeBinaryId;
     }
 
-    protected override async Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename, string contentType, BinaryType binaryType,
+    protected override async Task<OctoObjectId> ReplaceLargeBinaryAsync(IOctoSession session, string filename,
+        string contentType, BinaryType binaryType,
         OctoObjectId? binaryId, Stream stream, CancellationToken cancellationToken = default)
     {
         EnsureLargeBinaryDirectory();
@@ -179,7 +193,9 @@ internal class LocalLinkedBinaryDataSource(string tenantId, string directoryPath
         if (binaryId == null)
         {
             binaryInfo = await _largeBinaries
-                .FindSingleOrDefaultAsync(session, info => info.Filename == filename && info.BinaryType == binaryType)
+                .FindSingleOrDefaultAsync(session,
+                    info => info.Filename == filename &&
+                            info.BinaryType == binaryType)
                 .ConfigureAwait(false);
             if (binaryInfo == null)
             {

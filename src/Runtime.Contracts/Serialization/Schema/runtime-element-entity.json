@@ -26,6 +26,13 @@
         "rtWellKnownName": {
           "type": "string"
         },
+        "rtState": {
+          "type": "string",
+          "enum": [
+            "Active",
+            "Deleted"
+          ]
+        },
         "attributes": {
           "type": "array",
           "items": {

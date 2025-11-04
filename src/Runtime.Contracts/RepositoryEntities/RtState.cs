@@ -1,9 +1,9 @@
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 /// <summary>
-/// The State of an RtEntity
+/// The State of a RtEntity or RtAssociation
 /// </summary>
-public enum RtEntityState
+public enum RtState
 {
     /// <summary>
     /// Default state of the entity

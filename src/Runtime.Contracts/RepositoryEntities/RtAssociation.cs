@@ -34,6 +34,11 @@ public class RtAssociation : RtTypeWithAttributes
     public OctoObjectId AssociationId { get; set; }
 
     /// <summary>
+    ///     Gets or sets the state of the association
+    /// </summary>
+    public RtState? RtState { get; set; }
+
+    /// <summary>
     ///     Gets or sets the object id of the origin runtime entity
     /// </summary>
     public OctoObjectId OriginRtId { get; set; }

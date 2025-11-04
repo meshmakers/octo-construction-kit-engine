@@ -59,26 +59,26 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
     Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, int? skip = null, int? take = null);
+        RtEntityQueryOptions rtEntityQueryOptions, int? skip = null, int? take = null);
 
     /// <summary>
     ///     Gets entities based on the query options.
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns>Returns a result set of the given type</returns>
     Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session, IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, int? skip = null, int? take = null)
+        RtEntityQueryOptions rtEntityQueryOptions, int? skip = null, int? take = null)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -86,63 +86,68 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
     Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation,
+        RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null);
 
     /// <summary>
     /// </summary>
     /// <param name="session">The session object</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
-        DataQueryOperation dataQueryOperation,
+        RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null) where TEntity : RtEntity, new();
+
+    /// <summary>
+    /// Gets associations for a runtime entity
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtEntityId">Runtime entity identifier to get associations for</param>
+    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <returns>Result set with available associations</returns>
+    Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        RtEntityId rtEntityId, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Gets associations for a runtime entity.
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="direction">Direction of associations to get</param>
-    /// <param name="skip">Number of items to skip</param>
-    /// <param name="take">Number of items to take</param>
-    /// <returns></returns>
-    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, int? skip = null, int? take = null);
+    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <returns>Result set with available associations</returns>
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Gets associations for a runtime entity of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityId">Runtime entity identifier to get associations for</param>
-    /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">Association role</param>
-    /// <param name="skip">Number of items to skip</param>
-    /// <param name="take">Number of items to take</param>
-    /// <returns></returns>
+    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <returns>Result set with available associations</returns>
     Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, RtEntityId rtEntityId,
-        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     /// Gets associations for multiple runtime entities of a specific role
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="direction">Direction of associations to get</param>
     /// <param name="roleId">Association role</param>
-    /// <param name="skip">Number of items to skip</param>
-    /// <param name="take">Number of items to take</param>
-    /// <returns></returns>
-    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null, int? take = null);
+    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <returns>Multiple result set with available associations grouped by origin runtime entity identifier</returns>
+    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
+        IEnumerable<RtEntityId> rtEntityIds,
+        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Gets an association by its origin, target and role id.
@@ -177,13 +182,13 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session"></param>
     /// <param name="ckTypeId"></param>
-    /// <param name="dataQueryOperation"></param>
+    /// <param name="rtEntityQueryOptions"></param>
     /// <param name="roleIdDirectionPairs"></param>
     /// <param name="skip"></param>
     /// <param name="take"></param>
     /// <returns></returns>
     Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation, ICollection<NavigationPair> roleIdDirectionPairs,
+        RtEntityQueryOptions rtEntityQueryOptions, ICollection<NavigationPair> roleIdDirectionPairs,
         int? skip = null, int? take = null);
 
     /// <summary>
@@ -192,14 +197,14 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="roleIdDirectionPairs">>Role id direction pairs that are loaded with this request</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns>Returns a result set of the given type</returns>
     Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
         IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
+        RtEntityQueryOptions rtEntityQueryOptions, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
         int? take = null);
 
     #endregion Data query (simple)
@@ -360,7 +365,8 @@ public interface IRuntimeRepository
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity)
+    Task UpdateOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        TEntity rtEntity)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -380,7 +386,8 @@ public interface IRuntimeRepository
     /// <param name="rtEntity">Runtime object that is used as replacement</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria, TEntity rtEntity)
+    Task UpdateManyRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        TEntity rtEntity)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -388,18 +395,22 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="rtId"></param>
+    /// <param name="rtId">Runtime identifier of the entity</param>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <returns></returns>
-    Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId);
+    Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        DeleteOptions deleteOptions);
 
     /// <summary>
     ///     Deletes a single runtime entity by its runtime id
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="rtId">Runtime object id</param>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId)
+    Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId,
+        DeleteOptions deleteOptions)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -408,17 +419,22 @@ public interface IRuntimeRepository
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <returns></returns>
-    Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, FieldFilterCriteria fieldFilterCriteria);
+    Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
+        FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions);
 
     /// <summary>
     ///     Deletes a single runtime entity by the given filter options
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
-    Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
+    Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions)
         where TEntity : RtEntity, new();
 
     /// <summary>
@@ -427,9 +443,11 @@ public interface IRuntimeRepository
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <returns></returns>
     Task DeleteManyRtEntitiesAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria);
+        FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions);
 
     /// <summary>
     ///     Deletes all entities with the given filter options
@@ -437,8 +455,10 @@ public interface IRuntimeRepository
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
+    /// <param name="deleteOptions">Option to control the delete operation</param>
     /// <returns></returns>
-    Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
+    Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions)
         where TEntity : RtEntity, new();
 
     #endregion Modification (simple)
@@ -524,7 +544,8 @@ public interface IRuntimeRepository
     /// <param name="expiryDateTime">Expiry date time to filter expired binaries</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
     /// <returns></returns>
-    Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken = default);
+    Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes all temporary large binaries from the repository
@@ -576,7 +597,8 @@ public interface IRuntimeRepository
     /// <param name="options">Bulk operation options for the import</param>
     /// <returns>Aggregated result of the bulk import operation</returns>
     Task<AggregatedBulkImportResult>
-        BulkInsertRtEntitiesAsync(IOctoSession session, IEnumerable<RtEntity> rtEntityList, BulkOperationOptions options);
+        BulkInsertRtEntitiesAsync(IOctoSession session, IEnumerable<RtEntity> rtEntityList,
+            BulkOperationOptions options);
 
     /// <summary>
     /// Imports a list of runtime entities in bulk.
@@ -585,7 +607,8 @@ public interface IRuntimeRepository
     /// <param name="rtAssociations">List of runtime associations to import</param>
     /// <param name="options">Bulk operation options for the import</param>
     /// <returns>Aggregated result of the bulk import operation</returns>
-    Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session, IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options);
+    Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session, IEnumerable<RtAssociation> rtAssociations,
+        BulkOperationOptions options);
 
     #endregion Advanced functionality
 

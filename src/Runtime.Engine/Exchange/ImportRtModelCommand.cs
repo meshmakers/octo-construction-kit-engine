@@ -175,9 +175,10 @@ internal class ImportRtModelCommand(
                 .ConfigureAwait(false);
 #endif
             rtEntity.RtId = modelRtEntity.RtId;
-            rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime;
-            rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime;
+            rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime ?? DateTime.UtcNow;
+            rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? DateTime.UtcNow;
             rtEntity.RtWellKnownName = modelRtEntity.RtWellKnownName;
+            rtEntity.RtState = modelRtEntity.RtState;
 
             if (_entityImportIds.Contains(rtEntity.RtId))
             {
@@ -206,6 +207,7 @@ internal class ImportRtModelCommand(
                     var rtAssociation = new RtAssociation
                     {
                         AssociationRoleId = association.RoleId,
+                        RtState = rtEntity.RtState, // We take over the state of the entity.
                         OriginRtId = rtEntity.RtId,
                         OriginCkTypeId = rtEntity.CkTypeId!,
                         TargetRtId = association.TargetRtId,
@@ -368,8 +370,8 @@ internal class ImportRtModelCommand(
             }
 
             var bulkInsertStrategy = importStrategy == ImportStrategy.Insert
-                ? BulkInsertStrategy.InsertOnly
-                : BulkInsertStrategy.Upsert;
+                ? BulkInsertStrategies.InsertOnly
+                : BulkInsertStrategies.Upsert;
 
             if (importEntities.Any())
             {

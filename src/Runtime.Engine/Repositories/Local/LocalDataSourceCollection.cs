@@ -33,7 +33,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
             var key = dataSourceMapper.GetId(document);
             if (!_rtEntities.TryAdd(key, document))
             {
-                if (options.InsertStrategy == BulkInsertStrategy.Upsert &&
+                if (options.InsertStrategy == BulkInsertStrategies.Upsert &&
                     _rtEntities.TryGetValue(key, out var comparisionDocument))
                 {
                     if (!_rtEntities.TryUpdate(key, document, comparisionDocument))
@@ -90,7 +90,7 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         await SaveAsync().ConfigureAwait(false);
     }
 
-    public async Task UpdateManyAsync(IOctoSession session, IEnumerable<TDocument> documents)
+    public async Task UpdateOneAsync(IOctoSession session, IEnumerable<TDocument> documents)
     {
         await LoadAsync().ConfigureAwait(false);
 
@@ -105,6 +105,21 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
                 throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
             }
 
+            dataSourceMapper.Apply(savedDocument, document);
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task UpdateManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
+        TDocument document)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        var result = _rtEntities.Values.AsQueryable().Where(expression);
+
+        foreach (var savedDocument in result)
+        {
             dataSourceMapper.Apply(savedDocument, document);
         }
 
@@ -187,12 +202,30 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         return _rtEntities.TryRemove(key, out _);
     }
 
-    public async Task DeleteManyAsync(IOctoSession session, IEnumerable<TKey> keys)
+    public async Task DeleteOneAsync(IOctoSession session, IEnumerable<TKey> keys)
     {
         await LoadAsync().ConfigureAwait(false);
 
         foreach (var key in keys)
         {
+            if (!_rtEntities.TryRemove(key, out _))
+            {
+                throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));
+            }
+        }
+
+        await SaveAsync().ConfigureAwait(false);
+    }
+
+    public async Task DeleteManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression)
+    {
+        await LoadAsync().ConfigureAwait(false);
+
+        var result = _rtEntities.Values.AsQueryable().Where(expression);
+        foreach (var document in result)
+        {
+            var key = dataSourceMapper.GetId(document);
+
             if (!_rtEntities.TryRemove(key, out _))
             {
                 throw RuntimeRepositoryException.DocumentDoesNotExist(tenantId, key, typeof(TDocument));

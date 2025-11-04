@@ -83,50 +83,51 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public async Task<IResultSet<RtEntity>> GetRtEntitiesByIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        IReadOnlyList<OctoObjectId> rtIds, RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null)
     {
-        return await GetRtEntitiesByIdAsync<RtEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take)
+        return await GetRtEntitiesByIdAsync<RtEntity>(session, ckTypeId, rtIds, rtEntityQueryOptions, skip, take)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session,
         IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation,
+        RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        return await GetRtEntitiesByIdAsync<TEntity>(session, ckTypeId, rtIds, dataQueryOperation, skip, take)
+        return await GetRtEntitiesByIdAsync<TEntity>(session, ckTypeId, rtIds, rtEntityQueryOptions, skip, take)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<IResultSet<RtEntity>> GetRtEntitiesByTypeAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation, int? skip = null,
+        RtEntityQueryOptions rtEntityQueryOptions, int? skip = null,
         int? take = null)
     {
-        return await GetRtEntitiesByTypeAsync<RtEntity>(session, ckTypeId, dataQueryOperation, skip, take)
+        return await GetRtEntitiesByTypeAsync<RtEntity>(session, ckTypeId, rtEntityQueryOptions, skip, take)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
-        DataQueryOperation dataQueryOperation,
+        RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        return await GetRtEntitiesByTypeAsync<TEntity>(session, ckTypeId, dataQueryOperation, skip, take)
+        return await GetRtEntitiesByTypeAsync<TEntity>(session, ckTypeId, rtEntityQueryOptions, skip, take)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        RtEntityId rtEntityId, GraphDirections direction, int? skip = null, int? take = null)
+        RtEntityId rtEntityId,
+        RtAssociationQueryOptions associationQueryOptions)
     {
-        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], direction).ConfigureAwait(false);
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], associationQueryOptions).ConfigureAwait(false);
 
         return r.Values.FirstOrDefault() ??
                new ResultSet<RtAssociation>(new List<RtAssociation>(), 0, null, null);
@@ -134,28 +135,27 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, int? skip = null,
-        int? take = null)
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, direction, skip, take)
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, associationQueryOptions)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null,
-        int? take = null)
+        IEnumerable<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId> roleId,
+        RtAssociationQueryOptions associationQueryOptions)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, direction, roleId)
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, roleId, associationQueryOptions)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        RtEntityId rtEntityId, GraphDirections direction, RtCkId<CkAssociationRoleId> roleId, int? skip = null,
-        int? take = null)
+        RtEntityId rtEntityId, RtCkId<CkAssociationRoleId> roleId,
+        RtAssociationQueryOptions associationQueryOptions)
     {
-        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], direction, roleId)
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], roleId, associationQueryOptions)
             .ConfigureAwait(false);
 
         return r.Values.FirstOrDefault() ??
@@ -197,13 +197,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session,
-        RtCkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
+        RtCkId<CkTypeId> ckTypeId, RtEntityQueryOptions rtEntityQueryOptions,
         ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null);
 
     /// <inheritdoc />
     public abstract Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
+        RtEntityQueryOptions rtEntityQueryOptions, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
         int? take = null);
 
     /// <inheritdoc />
@@ -364,57 +364,60 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    public async Task DeleteOneRtEntityByRtIdAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId,
+        DeleteOptions deleteOptions)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.Default)
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId)
-        where TEntity : RtEntity, new()
+    public async Task DeleteOneRtEntityByRtIdAsync<TEntity>(IOctoSession session, OctoObjectId rtId,
+        DeleteOptions deleteOptions) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
-                [], BulkRtMutationOptions.Default)
+                [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria)
+    public Task DeleteOneRtEntityAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
+        FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions)
     {
-        await DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
+        return DeleteOneRtEntityAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
     }
 
     /// <inheritdoc />
-    public async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
-        where TEntity : RtEntity, new()
+    public Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        await DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
+        return DeleteOneRtEntityAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
     }
 
     /// <inheritdoc />
-    public async Task DeleteManyRtEntitiesAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria)
+    public Task DeleteManyRtEntitiesAsync(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
+        FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions)
     {
-        await DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
+        return DeleteManyRtEntitiesAsync<RtEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
     }
 
     /// <inheritdoc />
-    public async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria)
-        where TEntity : RtEntity, new()
+    public Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, FieldFilterCriteria fieldFilterCriteria,
+        DeleteOptions deleteOptions) where TEntity : RtEntity, new()
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
 
-        await DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria).ConfigureAwait(false);
+        return DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
     }
 
     /// <inheritdoc />
@@ -475,14 +478,16 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
-    public async Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime, CancellationToken cancellationToken = default)
+    public async Task DeleteExpiredTemporaryLargeBinariesAsync(IOctoSession session, DateTime expiryDateTime,
+        CancellationToken cancellationToken = default)
     {
         await RepositoryDataSource.DeleteExpiredTemporaryLargeBinariesAsync(session, expiryDateTime, cancellationToken)
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken = default)
+    public async Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session,
+        CancellationToken cancellationToken = default)
     {
         await RepositoryDataSource.DeleteAllTemporaryLargeBinariesAsync(session, cancellationToken)
             .ConfigureAwait(false);
@@ -593,14 +598,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtIds">Object ids of the runtime entities</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns>Returns a result set of the given type</returns>
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId,
-        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        IReadOnlyList<OctoObjectId> rtIds, RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null) where TEntity : RtEntity, new();
 
     /// <summary>
@@ -654,10 +659,11 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
+    /// <param name="deleteOptions">Options of the delete operation</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria, DeleteOptions deleteOptions) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Deletes a single runtime entity by the given filter options
@@ -665,10 +671,11 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="session">Session object for transaction handling</param>
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="fieldFilterCriteria">Object that contains the filter criteria</param>
+    /// <param name="deleteOptions">Options of the delete operation</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     /// <returns></returns>
     protected abstract Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria) where TEntity : RtEntity, new();
+        FieldFilterCriteria fieldFilterCriteria, DeleteOptions deleteOptions) where TEntity : RtEntity, new();
 
     /// <summary>
     ///     Updates a single runtime entity by the given filter options
@@ -755,13 +762,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="ckTypeId">Construction kit type id</param>
-    /// <param name="dataQueryOperation">Query options for data query</param>
+    /// <param name="rtEntityQueryOptions">Query options for data query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <typeparam name="TEntity">The type of entity derived from <see cref="RtEntity" /></typeparam>
     protected abstract Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation, int? skip = null, int? take = null) where TEntity : RtEntity, new();
+        RtEntityQueryOptions rtEntityQueryOptions, int? skip = null, int? take = null) where TEntity : RtEntity, new();
 
 
     #region Advanced functionality
@@ -791,7 +798,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session,
         IEnumerable<RtAssociation> rtAssociations, BulkOperationOptions options)
     {
-        return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, rtAssociations, options).ConfigureAwait(false);
+        return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, rtAssociations, options)
+            .ConfigureAwait(false);
     }
 
     #endregion Advanced functionality

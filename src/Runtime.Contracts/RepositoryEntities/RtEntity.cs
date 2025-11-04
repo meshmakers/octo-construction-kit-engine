@@ -81,7 +81,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <summary>
     ///     Gets or sets the state of the entity
     /// </summary>
-    public RtEntityState? RtState { get; set; }
+    public RtState? RtState { get; set; }
 
     /// <inheritdoc />
     protected override string GetLocation()

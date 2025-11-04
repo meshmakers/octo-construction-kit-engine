@@ -42,7 +42,17 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <param name="documents">A list of documents to update</param>
     /// <returns></returns>
-    Task UpdateManyAsync(IOctoSession session, IEnumerable<TDocument> documents);
+    Task UpdateOneAsync(IOctoSession session, IEnumerable<TDocument> documents);
+
+    /// <summary>
+    /// Updates multiple documents in the collection based on a filter expression
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="expression">Filter expression to filter for documents that need to be updated</param>
+    /// <param name="document">Document template with new values</param>
+    /// <returns></returns>
+    Task UpdateManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
+        TDocument document);
 
     /// <summary>
     ///     Replaces multiple documents in the collection
@@ -91,7 +101,15 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     /// <param name="session">The session object</param>
     /// <param name="keys">A list of unique keys of the documents</param>
     /// <returns></returns>
-    Task DeleteManyAsync(IOctoSession session, IEnumerable<TKey> keys);
+    Task DeleteOneAsync(IOctoSession session, IEnumerable<TKey> keys);
+
+    /// <summary>
+    /// Deletes all documents matching the given expression
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="expression">Filter expression</param>
+    /// <returns></returns>
+    Task DeleteManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression);
 
     /// <summary>
     ///     Gets the document with the given key

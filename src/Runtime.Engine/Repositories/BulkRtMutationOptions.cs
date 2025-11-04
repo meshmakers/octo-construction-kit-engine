@@ -21,10 +21,30 @@ public record BulkRtMutationOptions
     /// <summary>
     /// Defines the strategy for bulk insert operations.
     /// </summary>
-    public BulkInsertStrategy BulkInsertStrategy { get; init; } = BulkInsertStrategy.InsertOnly;
+    public BulkInsertStrategies BulkInsertStrategy { get; init; } = BulkInsertStrategies.InsertOnly;
+
+    /// <summary>
+    /// Defines the strategy for bulk delete operations.
+    /// </summary>
+    public DeleteStrategies DeleteStrategy { get; init; } = DeleteStrategies.Archive;
+
+    /// <summary>
+    /// Gets delete options
+    /// </summary>
+    /// <returns></returns>
+    public DeleteOptions ToDeleteOptions() => new DeleteOptions{ Strategy = DeleteStrategy };
 
     /// <summary>
     /// Returns the default bulk runtime mutation options.
     /// </summary>
+    /// <returns>New options objects</returns>
     public static BulkRtMutationOptions Default => new();
+
+    /// <summary>
+    /// Creates a bulk mutation options object from a delete strategy
+    /// </summary>
+    /// <param name="deleteOptions">The delete options object.</param>
+    /// <returns>New options objects</returns>
+    public static BulkRtMutationOptions FromDeleteOptions(DeleteOptions deleteOptions) =>
+        new() { DeleteStrategy = deleteOptions.Strategy };
 }

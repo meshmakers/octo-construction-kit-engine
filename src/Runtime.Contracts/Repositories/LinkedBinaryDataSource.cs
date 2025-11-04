@@ -9,31 +9,39 @@ namespace Meshmakers.Octo.Runtime.Contracts.Repositories;
 public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
 {
     /// <inheritdoc />
-    public Task<OctoObjectId> UploadFileSystemBinaryAsync(IOctoSession session, RtEntityId rtEntityId, string filename, string contentType,
+    public Task<OctoObjectId> UploadFileSystemBinaryAsync(IOctoSession session, RtEntityId rtEntityId, string filename,
+        string contentType,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return UploadLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, rtEntityId, null, stream, cancellationToken);
+        return UploadLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, rtEntityId, null, stream,
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType, DateTime expiryDateTime,
+    public Task<OctoObjectId> UploadTemporaryBinaryAsync(IOctoSession session, string filename, string contentType,
+        DateTime expiryDateTime,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return UploadLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, expiryDateTime, stream, cancellationToken);
+        return UploadLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, expiryDateTime,
+            stream, cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename, string contentType,
+    public Task ReplaceFileSystemBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId, string filename,
+        string contentType,
         Stream stream, CancellationToken cancellationToken = default)
     {
-        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, largeBinaryId, stream, cancellationToken);
+        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.FileSystem, largeBinaryId, stream,
+            cancellationToken);
     }
 
     /// <inheritdoc />
-    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename, string contentType, Stream stream,
+    public Task<OctoObjectId> ReplaceTemporaryLargeBinaryAsync(IOctoSession session, string filename,
+        string contentType, Stream stream,
         CancellationToken cancellationToken = default)
     {
-        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, stream, cancellationToken);
+        return ReplaceLargeBinaryAsync(session, filename, contentType, BinaryType.Temporary, null, stream,
+            cancellationToken);
     }
 
     /// <inheritdoc />
@@ -68,7 +76,8 @@ public abstract class LinkedBinaryDataSource : ILinkedBinaryDataSource
         CancellationToken cancellationToken);
 
     /// <inheritdoc />
-    public abstract Task DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken);
+    public abstract Task
+        DeleteAllTemporaryLargeBinariesAsync(IOctoSession session, CancellationToken cancellationToken);
 
     /// <summary>
     /// Uploads a large binary file to the repository

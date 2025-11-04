@@ -39,7 +39,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     }
 
     public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByTypeAsync(IOctoSession session,
-        RtCkId<CkTypeId> ckTypeId, DataQueryOperation dataQueryOperation,
+        RtCkId<CkTypeId> ckTypeId, RtEntityQueryOptions rtEntityQueryOptions,
         ICollection<NavigationPair> roleIdDirectionPairs, int? skip = null, int? take = null)
     {
         throw new NotImplementedException();
@@ -47,7 +47,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
 
     public override Task<IResultSet<RtEntityGraphItem>> GetRtEntitiesGraphByIdAsync(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
-        DataQueryOperation dataQueryOperation, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
+        RtEntityQueryOptions rtEntityQueryOptions, IEnumerable<NavigationPair> roleIdDirectionPairs, int? skip = null,
         int? take = null)
     {
         throw new NotImplementedException();
@@ -98,36 +98,36 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
 
     protected override async Task<IResultSet<TEntity>> GetRtEntitiesByTypeAsync<TEntity>(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId,
-        DataQueryOperation dataQueryOperation, int? skip = null,
+        RtEntityQueryOptions rtEntityQueryOptions, int? skip = null,
         int? take = null)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
         var rtCollection = RepositoryDataSource.GetRtCollection<TEntity>(ckTypeGraph);
 
-        if (dataQueryOperation.AttributeSearchFilter != null)
+        if (rtEntityQueryOptions.AttributeSearchFilter != null)
         {
             throw RuntimeRepositoryException.AttributeFilterNotSupportedByDataSource(
                 typeof(LocalDirectoryRuntimeRepository));
         }
 
-        if (dataQueryOperation.TextSearchFilter != null)
+        if (rtEntityQueryOptions.TextSearchFilter != null)
         {
             throw RuntimeRepositoryException.TextFilterNotSupportedByDataSource(
                 typeof(LocalDirectoryRuntimeRepository));
         }
 
-        if (dataQueryOperation.SortOrders != null)
+        if (rtEntityQueryOptions.SortOrders != null)
         {
             throw RuntimeRepositoryException.SortOrderNotSupportedByDataSource(typeof(LocalDirectoryRuntimeRepository));
         }
 
 
         var queryable = await rtCollection.AsQueryableAsync(session).ConfigureAwait(false);
-        if (dataQueryOperation.FieldFilters != null)
+        if (rtEntityQueryOptions.FieldFilters != null)
         {
             queryable = queryable.Where(
-                CombineFilterExpressions<TEntity>(dataQueryOperation, ckTypeGraph));
+                CombineFilterExpressions<TEntity>(rtEntityQueryOptions, ckTypeGraph));
         }
 
         if (skip != null)
@@ -166,7 +166,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
 
     protected override async Task<IResultSet<TEntity>> GetRtEntitiesByIdAsync<TEntity>(IOctoSession session,
         RtCkId<CkTypeId> ckTypeId,
-        IReadOnlyList<OctoObjectId> rtIds, DataQueryOperation dataQueryOperation,
+        IReadOnlyList<OctoObjectId> rtIds, RtEntityQueryOptions rtEntityQueryOptions,
         int? skip = null, int? take = null)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
@@ -191,7 +191,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
     }
 
     protected override async Task DeleteManyRtEntitiesAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria)
+        FieldFilterCriteria fieldFilterCriteria, DeleteOptions deleteOptions)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
@@ -207,12 +207,12 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
         }
 
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
-                BulkRtMutationOptions.Default)
+                BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
 
     protected override async Task DeleteOneRtEntityAsync<TEntity>(IOctoSession session, RtCkId<CkTypeId> ckTypeId,
-        FieldFilterCriteria fieldFilterCriteria)
+        FieldFilterCriteria fieldFilterCriteria, DeleteOptions deleteOptions)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
@@ -227,7 +227,7 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(rtEntity.ToRtEntityId()) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate, [],
-                BulkRtMutationOptions.Default)
+                BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
 
@@ -265,11 +265,11 @@ internal class LocalDirectoryRuntimeRepository : RuntimeRepositoryBase, ILocalRu
             var filterExpression = FilterExpression<TEntity>(filter, attribute);
 
             // Combine the current filter with the existing predicate using the specified logical operator
-            if (fieldFilterCriteria.Operator == LogicalOperator.And)
+            if (fieldFilterCriteria.Operator == LogicalOperators.And)
             {
                 combinedPredicate = combinedPredicate.And(filterExpression);
             }
-            else if (fieldFilterCriteria.Operator == LogicalOperator.Or)
+            else if (fieldFilterCriteria.Operator == LogicalOperators.Or)
             {
                 combinedPredicate = combinedPredicate.OrElse(filterExpression);
             }

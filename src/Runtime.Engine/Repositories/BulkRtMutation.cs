@@ -297,6 +297,7 @@ internal class BulkRtMutation(
                     RtId = rtEntityId.RtId,
                     CkTypeId = ckTypeId,
                     RtChangedDateTime = DateTime.UtcNow,
+                    RtDeletedDateTime = DateTime.UtcNow,
                     RtState = RtState.Deleted
                 });
 

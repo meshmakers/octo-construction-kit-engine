@@ -311,7 +311,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
 
                 foreach (var associationUpdateInfo in associationUpdateInfosByRoleId)
                 {
-                    if (targetEntities.TryGetValue(associationUpdateInfo.Origin, out var targetEntity))
+                    if (targetEntities.TryGetValue(associationUpdateInfo.Target, out var targetEntity))
                     {
                         var targetTypeGraph =
                             ckCache.GetRtCkType(repositoryDataSource.TenantId, targetEntity.GetRtCkTypeId());

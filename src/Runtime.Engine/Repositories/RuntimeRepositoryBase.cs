@@ -127,7 +127,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         RtEntityId rtEntityId,
         RtAssociationQueryOptions associationQueryOptions)
     {
-        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], associationQueryOptions).ConfigureAwait(false);
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], associationQueryOptions)
+            .ConfigureAwait(false);
 
         return r.Values.FirstOrDefault() ??
                new ResultSet<RtAssociation>(new List<RtAssociation>(), 0, null, null);
@@ -155,7 +156,8 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         RtEntityId rtEntityId, RtCkId<CkAssociationRoleId> roleId,
         RtAssociationQueryOptions associationQueryOptions)
     {
-        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], roleId, associationQueryOptions)
+        var r = await RepositoryDataSource
+            .GetRtAssociationsAsync(session, [rtEntityId], roleId, associationQueryOptions)
             .ConfigureAwait(false);
 
         return r.Values.FirstOrDefault() ??
@@ -424,31 +426,50 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     public async Task ApplyChangesAsync(IOctoSession session,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        DeleteOptions deleteOptions,
         OperationResult operationResult)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
-                associationUpdateInfoList, BulkRtMutationOptions.Default)
+                associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
-    public async Task ApplyChangesAsync(IOctoSession session,
+    public Task ApplyChangesAsync(IOctoSession session,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
         OperationResult operationResult)
     {
-        await ApplyChangesAsync(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList,
-                operationResult)
-            .ConfigureAwait(false);
+        return ApplyChangesAsync(session, entityUpdateInfoList, associationUpdateInfoList, DeleteOptions.Default,
+            operationResult);
     }
 
     /// <inheritdoc />
-    public async Task ApplyChangesAsync(IOctoSession session,
+    public Task ApplyChangesAsync(IOctoSession session,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        OperationResult operationResult)
+    {
+        return ApplyChangesAsync(session, new List<IEntityUpdateInfo<RtEntity>>(), associationUpdateInfoList,
+            operationResult);
+    }
+
+    /// <inheritdoc />
+    public Task ApplyChangesAsync(IOctoSession session,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
         OperationResult operationResult)
     {
-        await ApplyChangesAsync(session, entityUpdateInfoList, new List<AssociationUpdateInfo>(), operationResult)
-            .ConfigureAwait(false);
+        return ApplyChangesAsync(session, entityUpdateInfoList,
+            new List<AssociationUpdateInfo>(), operationResult);
+    }
+
+    /// <inheritdoc />
+    public Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        DeleteOptions deleteOptions,
+        OperationResult operationResult)
+    {
+        return ApplyChangesAsync(session, entityUpdateInfoList,
+            new List<AssociationUpdateInfo>(), deleteOptions, operationResult);
     }
 
     /// <inheritdoc />

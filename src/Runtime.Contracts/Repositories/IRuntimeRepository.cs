@@ -480,6 +480,20 @@ public interface IRuntimeRepository
     ///     Applies changes to the runtime repository
     /// </summary>
     /// <param name="session">Session object for transaction handling</param>
+    /// <param name="entityUpdateInfoList">List of runtime entity updates</param>
+    /// <param name="associationUpdateInfoList">List of runtime association updates</param>
+    /// <param name="deleteOptions">The default delete operation when there are entities to delete</param>
+    /// <param name="operationResult">Result of the operation</param>
+    /// <returns></returns>
+    Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        DeleteOptions deleteOptions,
+        OperationResult operationResult);
+
+    /// <summary>
+    ///     Applies changes to the runtime repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
     /// <param name="associationUpdateInfoList">List of runtime association updates</param>
     /// <param name="operationResult">Result of the operation</param>
     /// <returns></returns>
@@ -494,6 +508,18 @@ public interface IRuntimeRepository
     /// <param name="operationResult">Result of the operation</param>
     /// <returns></returns>
     Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        OperationResult operationResult);
+
+    /// <summary>
+    ///     Applies changes to the runtime repository
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="entityUpdateInfoList">List of runtime entity updates</param>
+    /// <param name="deleteOptions">The default delete operation when there are entities to delete</param>
+    /// <param name="operationResult">Result of the operation</param>
+    /// <returns></returns>
+    Task ApplyChangesAsync(IOctoSession session, IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        DeleteOptions deleteOptions,
         OperationResult operationResult);
 
     #endregion Modification (bulk)

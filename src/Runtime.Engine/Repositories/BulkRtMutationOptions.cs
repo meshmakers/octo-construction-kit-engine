@@ -32,7 +32,7 @@ public record BulkRtMutationOptions
     /// Gets delete options
     /// </summary>
     /// <returns></returns>
-    public DeleteOptions ToDeleteOptions() => new DeleteOptions{ Strategy = DeleteStrategy };
+    public DeleteOptions ToDeleteOptions() => new() { Strategy = DeleteStrategy };
 
     /// <summary>
     /// Returns the default bulk runtime mutation options.

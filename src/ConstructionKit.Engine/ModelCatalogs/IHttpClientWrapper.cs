@@ -19,11 +19,4 @@ public interface IHttpClientWrapper
     /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
     /// <returns>The response message.</returns>
     Task<HttpResponseMessage> GetAsync(string? requestUri, CancellationToken cancellationToken);
-
-    /// <summary>
-    /// Sends an HTTP request asynchronously.
-    /// </summary>
-    /// <param name="request">Request message to send.</param>
-    /// <returns>The response message.</returns>
-    Task<HttpResponseMessage> SendAsync(HttpRequestMessage request);
 }

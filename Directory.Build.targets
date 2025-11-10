@@ -45,6 +45,7 @@
         </Exec>
 
         <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c config -lce $(OctoLocalCatalogIsEnabled)" />
         <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o  $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" ItemName="CompiledModelFiles" />
         </Exec>

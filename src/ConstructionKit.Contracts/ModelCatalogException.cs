@@ -122,4 +122,10 @@ public class ModelCatalogException : Exception
         return new ModelCatalogException(
             $"Cannot read existing model library for model '{modelId}' from catalog '{catalogName}' at path '{catalogPath}'.");
     }
+
+    internal static Exception CatalogNotEnabledToRead(string catalogName)
+    {
+        return new ModelCatalogException(
+            $"Model catalog '{catalogName}' is not enabled for read operations.");
+    }
 }

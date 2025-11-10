@@ -43,6 +43,7 @@
                    Compile="$(OctoCompileCkModel)"
                    PublishCkModel="$(OctoPublishCkModel)"
                    PublishCatalogName="$(OctoPublishCatalog)"
+                   IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
                    CkLinkPath="$(OctoCkLinkPath)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
@@ -74,6 +75,7 @@
         <!--Calling our custom task-->
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"
+                   IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    OutputPath="$(OctoCkCompileOutputImportFolder)"
                    CacheFilePath="$(OctoCkCompileCacheImportFolder)">
             <Output TaskParameter="CompiledModelFiles" ItemName="CompiledModelFiles" />

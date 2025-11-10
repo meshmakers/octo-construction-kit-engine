@@ -29,6 +29,11 @@ public interface ICatalog
     bool CanWrite { get; }
 
     /// <summary>
+    /// Returns true if the catalog can be used to read models, otherwise false.
+    /// </summary>
+    bool CanRead { get; }
+
+    /// <summary>
     /// Refreshes the catalog of the catalog, e.g., by reloading from disk or fetching from a remote source.
     /// </summary>
     /// <returns></returns>

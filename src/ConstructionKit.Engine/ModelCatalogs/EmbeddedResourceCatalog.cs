@@ -34,6 +34,9 @@ public class EmbeddedResourceCatalog : ICatalog
     public bool CanWrite => false;
 
     /// <inheritdoc />
+    public bool CanRead => true;
+
+    /// <inheritdoc />
     public Task RefreshCatalogAsync()
     {
         // Embedded resources are static, nothing to refresh

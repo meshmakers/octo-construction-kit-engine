@@ -28,9 +28,9 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
     public PrivateGitHubCatalogOptions() : base("private-github-catalog-cache.json")
     {
         GitHubRepositoryOwner = "meshmakers";
-        GitHubRepositoryName = "construction-kit-libraries";
+        GitHubRepositoryName = "construction-kit-libraries-build";
         GitHubRepositoryBranch = "main";
-        GitHubPagesUri = "https://meshmakers.github.io/construction-kit-libraries/";
+        GitHubPagesUri = "https://meshmakers.github.io/construction-kit-libraries-build/";
     }
 }
 

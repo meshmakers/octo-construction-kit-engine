@@ -30,7 +30,7 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <param name="ckJsonSerializer"></param>
     public LocalFileSystemCatalog(IOptions<LocalFileSystemCatalogOptions> options,
         ICkJsonSerializer ckJsonSerializer) : base(10, Name,
-        $"Local file system catalog at '{options.Value.RootPath}'", true, options.Value)
+        $"Local file system catalog at '{options.Value.RootPath}'", true, options.Value.IsEnabled, options.Value)
     {
         _options = options;
         _ckJsonSerializer = ckJsonSerializer;
@@ -39,6 +39,11 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <inheritdoc />
     public override async Task RefreshCatalogAsync()
     {
+        if (!_options.Value.IsEnabled)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
 
         CacheTypes.CacheCatalog cacheCatalog = new()
@@ -48,7 +53,6 @@ public class LocalFileSystemCatalog : CachedCatalog
 
         if (catalog != null)
         {
-
             foreach (var rootCatalogEntry in catalog.Models)
             {
                 var modelLibraryCatalog =
@@ -100,6 +104,11 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <inheritdoc />
     public override bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
     {
+        if (!_options.Value.IsEnabled)
+        {
+            return false;
+        }
+
         return sourceIdentifier == null;
     }
 
@@ -107,6 +116,11 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override async Task<CkCompiledModelRoot> GetAsync(CkModelId modelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
+        if (!_options.Value.IsEnabled)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         if (!TryGetExistingModelPath(modelId, out var compiledModelFilePath) || compiledModelFilePath == null)
         {
             throw ModelCatalogException.ModelNotFound(modelId, CatalogName);
@@ -132,6 +146,11 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override async Task PublishAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
+        if (!_options.Value.IsEnabled)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(Name);
+        }
+
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
         if (File.Exists(compiledModelFilePath) && !force)
         {

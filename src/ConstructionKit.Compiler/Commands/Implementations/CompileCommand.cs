@@ -1,4 +1,5 @@
 ﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,15 +9,18 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 internal class CompileCommand : CkcCommand
 {
     private readonly IArgument _cachePathArg;
+    private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
     private readonly ICompilerService _compilerService;
     private readonly IArgument _pathArg;
     private readonly IArgument _outputPathArg;
     private readonly IArgument _compileResultArg;
+    private readonly IArgument _localCatalogEnabled;
 
-    public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options,
+    public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options, IOptions<LocalFileSystemCatalogOptions> localCatalogOptions,
         ICompilerService compilerService)
         : base(logger, "Compile", "Validates and creates output files for a construction kit model directory", options)
     {
+        _localCatalogOptions = localCatalogOptions;
         _compilerService = compilerService;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
@@ -33,6 +37,9 @@ internal class CompileCommand : CkcCommand
 
         _compileResultArg = CommandArgumentValue.AddArgument("cr", "compileResult",
             ["If used, the file path of compiled files is written to output"], false);
+
+        _localCatalogEnabled = CommandArgumentValue.AddArgument("lce", "localCatalogEnabled",
+            ["Enable or disable the local Construction Kit Library catalog"], false, 1);
     }
 
     public override async Task Execute()
@@ -48,6 +55,15 @@ internal class CompileCommand : CkcCommand
         {
             cacheFilePath = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_cachePathArg);
         }
+
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogEnabled))
+        {
+            var isEnabled = CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_localCatalogEnabled);
+
+            Logger.LogInformation("Local Construction Kit catalog is {Status}", isEnabled ? "enabled" : "disabled");
+            SetLocalCatalogEnabled(isEnabled);
+        }
+
 
         bool writeCompileResult = CommandArgumentValue.IsArgumentUsed(_compileResultArg);
 
@@ -73,5 +89,10 @@ internal class CompileCommand : CkcCommand
         }
 
         Logger.LogInformation("Construction kit model directory compiled");
+    }
+
+    private void SetLocalCatalogEnabled(bool isEnabled)
+    {
+        _localCatalogOptions.Value.IsEnabled = isEnabled;
     }
 }

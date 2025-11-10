@@ -128,4 +128,10 @@ public class ModelCatalogException : Exception
         return new ModelCatalogException(
             $"Model catalog '{catalogName}' is not enabled for read operations.");
     }
+
+    internal static Exception CatalogNotEnabledToWrite(string catalogName)
+    {
+        return new ModelCatalogException(
+            $"Model catalog '{catalogName}' is not enabled for write operations.");
+    }
 }

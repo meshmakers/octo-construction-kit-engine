@@ -8,7 +8,7 @@ public class PublicGitHubCatalogOptions : GitHubCatalogOptions
     /// <summary>
     /// Initializes a new instance of the <see cref="PublicGitHubCatalogOptions"/> class.
     /// </summary>
-    public PublicGitHubCatalogOptions()
+    public PublicGitHubCatalogOptions() : base("public-github-catalog-cache.json")
     {
         GitHubRepositoryOwner = "meshmakers";
         GitHubRepositoryName = "meshmakers.github.io";
@@ -25,7 +25,7 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
     /// <summary>
     /// Initializes a new instance of the <see cref="PublicGitHubCatalogOptions"/> class.
     /// </summary>
-    public PrivateGitHubCatalogOptions()
+    public PrivateGitHubCatalogOptions() : base("private-github-catalog-cache.json")
     {
         GitHubRepositoryOwner = "meshmakers";
         GitHubRepositoryName = "construction-kit-libraries";
@@ -37,7 +37,7 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
 /// <summary>
 /// Defines the GitHub Options for GitHub construction kit catalog
 /// </summary>
-public abstract class GitHubCatalogOptions() : CatalogOptions("github-catalog-cache.json")
+public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOptions(cacheFileName)
 {
     /// <summary>
     /// API Token for GitHub

@@ -64,6 +64,16 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public string PublishCatalogName { get; set; } = LocalFileSystemCatalog.Name;
 
     /// <summary>
+    /// Defines the Public GitHub API Key for accessing public GitHub catalogs
+    /// </summary>
+    public string? PublicGitHubApiKey { get; set; }
+
+    /// <summary>
+    /// Defines the Private GitHub API Key for accessing private GitHub catalogs
+    /// </summary>
+    public string? PrivateGitHubApiKey { get; set; }
+
+    /// <summary>
     /// Gets or sets the output path
     /// </summary>
     [Required]
@@ -102,6 +112,22 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         {
             options.IsEnabled = IsLocalCatalogEnabled;
         });
+
+        if (!string.IsNullOrWhiteSpace(PublicGitHubApiKey))
+        {
+            services.Configure<PublicGitHubCatalogOptions>(options =>
+            {
+                options.GitHubApiToken = PublicGitHubApiKey;
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(PrivateGitHubApiKey))
+        {
+            services.Configure<PrivateGitHubCatalogOptions>(options =>
+            {
+                options.GitHubApiToken = PrivateGitHubApiKey;
+            });
+        }
 
         var serviceProvider = services.BuildServiceProvider();
 

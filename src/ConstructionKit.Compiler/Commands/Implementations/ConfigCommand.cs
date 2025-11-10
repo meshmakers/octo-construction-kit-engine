@@ -101,9 +101,11 @@ internal class ConfigCommand : Command<OctoToolOptions>
             _privateGithubOptions.Value.GitHubPagesUri = CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubPagesUri).ToLower();
         }
 
-        _privateGithubOptions.Value.GitHubApiToken = CommandArgumentValue.IsArgumentUsed(_privateGitHubApiToken)
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubApiToken)
-            : null;
+        if (CommandArgumentValue.IsArgumentUsed(_privateGitHubApiToken))
+        {
+            _privateGithubOptions.Value.GitHubApiToken =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubApiToken);
+        }
     }
 
     private void ConfigurePublicGitHubCatalog()
@@ -128,8 +130,10 @@ internal class ConfigCommand : Command<OctoToolOptions>
             _publicGithubOptions.Value.GitHubPagesUri = CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubPagesUri).ToLower();
         }
 
-        _publicGithubOptions.Value.GitHubApiToken = CommandArgumentValue.IsArgumentUsed(_publicGitHubApiToken)
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubApiToken)
-            : null;
+        if (CommandArgumentValue.IsArgumentUsed(_publicGitHubApiToken))
+        {
+            _publicGithubOptions.Value.GitHubApiToken =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubApiToken);
+        }
     }
 }

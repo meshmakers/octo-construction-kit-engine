@@ -31,7 +31,7 @@
   - DebugL: 999.0.0
   - Private server: 0.1.*
   - Public: 3.2.*
-- `MeshmakerVersion`: 4.1.22 (999.0.0 in DebugL)
+- `MeshmakerVersion`: 4.1.26 (999.0.0 in DebugL)
 
 ### Package Sources
 - `OctoNugetPrivateServer`: Private NuGet feed URL

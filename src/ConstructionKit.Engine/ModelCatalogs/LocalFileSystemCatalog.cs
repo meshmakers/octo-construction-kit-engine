@@ -104,11 +104,6 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <inheritdoc />
     public override bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
     {
-        if (!_options.Value.IsEnabled)
-        {
-            return false;
-        }
-
         return sourceIdentifier == null;
     }
 

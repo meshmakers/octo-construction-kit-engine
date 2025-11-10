@@ -62,9 +62,11 @@ internal static class Program
 
         services.Configure<OctoToolOptions>(options =>
             config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
-        services.Configure<GitHubCatalogOptions>(options => 
-            config.GetSection(Constants.OctoToolGitHubRootNode).Bind(options));
-        
+        services.Configure<PublicGitHubCatalogOptions>(options =>
+            config.GetSection(Constants.OctoToolPublicGitHubRootNode).Bind(options));
+        services.Configure<PrivateGitHubCatalogOptions>(options =>
+            config.GetSection(Constants.OctoToolPrivateGitHubRootNode).Bind(options));
+
         // Add Options for Running in ASP Net
         services.Configure<ModeSelectionOptions>(options => 
             config.GetSection(ModeSelectionOptions.ModeSelection).Bind(options));
@@ -86,8 +88,10 @@ internal static class Program
             var configWriter = new ConfigWriter();
             configWriter.AddOptions(Constants.OctoToolOptionsRootNode,
                 provider.GetRequiredService<IOptions<OctoToolOptions>>());
-            configWriter.AddOptions(Constants.OctoToolGitHubRootNode,
-                provider.GetRequiredService<IOptions<GitHubCatalogOptions>>());
+            configWriter.AddOptions(Constants.OctoToolPublicGitHubRootNode,
+                provider.GetRequiredService<IOptions<PublicGitHubCatalogOptions>>());
+            configWriter.AddOptions(Constants.OctoToolPrivateGitHubRootNode,
+                provider.GetRequiredService<IOptions<PrivateGitHubCatalogOptions>>());
             return configWriter;
         });
 

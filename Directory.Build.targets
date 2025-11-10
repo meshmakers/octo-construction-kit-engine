@@ -54,9 +54,10 @@
             <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
         </ItemGroup>
         <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r">
-        </Exec>
-        
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey)" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r" />
+
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
                  Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>
         <Exec Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" 

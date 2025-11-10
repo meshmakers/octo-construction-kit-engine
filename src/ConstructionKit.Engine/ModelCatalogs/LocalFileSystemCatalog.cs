@@ -12,6 +12,11 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 /// </summary>
 public class LocalFileSystemCatalog : CachedCatalog
 {
+    /// <summary>
+    /// Defines the name of the catalog for local construction kit models.
+    /// </summary>
+    public const string Name = "LocalFileSystemCatalog";
+
     private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
 
@@ -24,7 +29,7 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <param name="options"></param>
     /// <param name="ckJsonSerializer"></param>
     public LocalFileSystemCatalog(IOptions<LocalFileSystemCatalogOptions> options,
-        ICkJsonSerializer ckJsonSerializer) : base(10, "LocalFileSystemCatalog",
+        ICkJsonSerializer ckJsonSerializer) : base(10, Name,
         $"Local file system catalog at '{options.Value.RootPath}'", true, options.Value)
     {
         _options = options;

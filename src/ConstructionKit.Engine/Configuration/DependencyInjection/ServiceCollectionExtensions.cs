@@ -30,7 +30,8 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddConstructionKit(
         this IServiceCollection services)
     {
-        services.AddOptions<GitHubCatalogOptions>();
+        services.AddOptions<PublicGitHubCatalogOptions>();
+        services.AddOptions<PrivateGitHubCatalogOptions>();
 
         services.AddTransient<IHttpClientFactory, HttpClientFactory>();
         services.AddTransient<IGitHubClientFactory, GitHubClientFactory>();
@@ -69,7 +70,8 @@ public static class ServiceCollectionExtensions
         // Add here sources of Ck model repositories
         services.AddTransient<ICatalog, LocalFileSystemCatalog>();
         services.AddTransient<ICatalog, EmbeddedResourceCatalog>();
-        services.AddTransient<ICatalog, GitHubCatalog>();
+        services.AddTransient<ICatalog, PrivateGitHubCatalog>();
+        services.AddTransient<ICatalog, PublicGitHubCatalog>();
 
         return services;
     }

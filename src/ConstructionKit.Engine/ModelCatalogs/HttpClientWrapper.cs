@@ -1,3 +1,5 @@
+using Meshmakers.Common.Shared;
+
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
 internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
@@ -6,7 +8,8 @@ internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
 
     public async Task<string?> GetStringAsync(string? requestUri)
     {
-        var response = await _client.GetAsync(requestUri, CancellationToken.None).ConfigureAwait(false);
+        var uri = baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
+        var response = await _client.GetAsync(uri, CancellationToken.None).ConfigureAwait(false);
         if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
             return null;
@@ -17,11 +20,9 @@ internal class HttpClientWrapper(Uri baseUri) : IHttpClientWrapper
 
     public async Task<HttpResponseMessage> GetAsync(string? requestUri, CancellationToken cancellationToken)
     {
-        return await _client.GetAsync(requestUri, cancellationToken).ConfigureAwait(false);
+        var uri = baseUri.AbsolutePath.EnsureEndsWith("/") + requestUri;
+        return await _client.GetAsync(uri, cancellationToken).ConfigureAwait(false);
     }
 
-    public async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request)
-    {
-        return await _client.SendAsync(request).ConfigureAwait(false);
-    }
+
 }

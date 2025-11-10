@@ -30,7 +30,7 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <param name="ckJsonSerializer"></param>
     public LocalFileSystemCatalog(IOptions<LocalFileSystemCatalogOptions> options,
         ICkJsonSerializer ckJsonSerializer) : base(10, Name,
-        $"Local file system catalog at '{options.Value.RootPath}'", true, options.Value.IsEnabled, options.Value)
+        $"Local file system catalog at '{options.Value.RootPath}'", options.Value.IsEnabled, options.Value.IsEnabled, options.Value)
     {
         _options = options;
         _ckJsonSerializer = ckJsonSerializer;
@@ -111,7 +111,7 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override async Task<CkCompiledModelRoot> GetAsync(CkModelId modelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        if (!_options.Value.IsEnabled)
+        if (!CanRead)
         {
             throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
         }
@@ -141,9 +141,9 @@ public class LocalFileSystemCatalog : CachedCatalog
     public override async Task PublishAsync(CkCompiledModelRoot ckCompiledModel, bool force = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        if (!_options.Value.IsEnabled)
+        if (!CanWrite)
         {
-            throw ModelCatalogException.CatalogNotEnabledToRead(Name);
+            throw ModelCatalogException.CatalogNotEnabledToWrite(Name);
         }
 
         var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);

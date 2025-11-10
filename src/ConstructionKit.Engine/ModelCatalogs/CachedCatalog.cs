@@ -1,4 +1,3 @@
-using JetBrains.Annotations;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
@@ -14,12 +13,14 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 /// <param name="catalogName">Name of the catalog</param>
 /// <param name="description">Description of the catalog</param>
 /// <param name="canWrite">When true, the catalog can be used to publish or update models</param>
+/// <param name="canRead">When true, the catalog is enabled and read or write operations are possible</param>
 /// <param name="catalogOptions">Options for the catalog</param>
 public abstract class CachedCatalog(
     int order,
     string catalogName,
     string description,
     bool canWrite,
+    bool canRead,
     CatalogOptions catalogOptions) : ICatalog
 {
     /// <inheritdoc />
@@ -34,6 +35,8 @@ public abstract class CachedCatalog(
     /// <inheritdoc />
     public bool CanWrite { get; } = canWrite;
 
+    /// <inheritdoc />
+    public bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
     public abstract Task RefreshCatalogAsync();
@@ -45,6 +48,11 @@ public abstract class CachedCatalog(
     public async Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange modelIdVersionRange,
         object? sourceIdentifier = null)
     {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         var catalog = await ReadCacheAsync().ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
@@ -83,6 +91,11 @@ public abstract class CachedCatalog(
     /// <inheritdoc />
     public async Task<bool> IsExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         var catalog = await ReadCacheAsync().ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
@@ -111,6 +124,11 @@ public abstract class CachedCatalog(
     /// <inheritdoc />
     public async IAsyncEnumerable<CatalogResultItem> ListAsync(object? sourceIdentifier)
     {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         var catalog = await ReadCacheAsync().ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
@@ -130,6 +148,11 @@ public abstract class CachedCatalog(
     /// <inheritdoc />
     public async IAsyncEnumerable<CatalogResultItem> SearchAsync(string searchTerm, object? sourceIdentifier)
     {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
         searchTerm = searchTerm?.Trim() ?? string.Empty;
         var catalog = await ReadCacheAsync().ConfigureAwait(false);
 

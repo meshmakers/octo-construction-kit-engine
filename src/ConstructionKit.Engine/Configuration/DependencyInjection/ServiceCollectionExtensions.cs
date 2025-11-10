@@ -30,6 +30,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddConstructionKit(
         this IServiceCollection services)
     {
+        services.AddOptions<LocalFileSystemCatalogOptions>();
         services.AddOptions<PublicGitHubCatalogOptions>();
         services.AddOptions<PrivateGitHubCatalogOptions>();
 

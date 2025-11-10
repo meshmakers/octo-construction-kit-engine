@@ -20,4 +20,9 @@ public class LocalFileSystemCatalogOptions : CatalogOptions
     ///     The local path where the CK models are stored
     /// </summary>
     public string RootPath { get; set; }
+
+    /// <summary>
+    /// When true, the local catalog in the file system is enabled.
+    /// </summary>
+    public bool IsEnabled { get; set; } = true;
 }

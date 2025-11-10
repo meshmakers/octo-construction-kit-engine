@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
@@ -38,6 +39,11 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// When a directory defined, a cache files are created containing all dependencies
     /// </summary>
     public string? CacheFilePath { get; set; }
+
+    /// <summary>
+    /// When true, the local catalog is enabled.
+    /// </summary>
+    public bool IsLocalCatalogEnabled { get; set; } = true;
 
     /// <summary>
     /// When true, the compiled construction kit model is published to the local catalog
@@ -91,6 +97,11 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         });
         services.AddConstructionKit();
         services.AddDocumentationService();
+
+        services.Configure<LocalFileSystemCatalogOptions>(options =>
+        {
+            options.IsEnabled = IsLocalCatalogEnabled;
+        });
 
         var serviceProvider = services.BuildServiceProvider();
 

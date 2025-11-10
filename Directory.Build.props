@@ -30,6 +30,7 @@
         <RestoreSources Condition="'$(Configuration)'=='DebugL'">$(RestoreSources);$(OctoRepoRootPath)../nuget</RestoreSources>
     </PropertyGroup>
     <PropertyGroup>
+        <OctoLocalCatalogIsEnabled Condition="'$(OctoCompileCkModel)' == ''">false</OctoLocalCatalogIsEnabled>
         <OctoCompileCkModel Condition="'$(OctoCompileCkModel)' == ''">true</OctoCompileCkModel>
         <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>

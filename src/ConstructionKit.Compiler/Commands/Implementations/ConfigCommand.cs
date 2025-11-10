@@ -2,7 +2,6 @@
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Common.Configuration;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
-using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,10 +9,12 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 
 internal class ConfigCommand : Command<OctoToolOptions>
 {
+    private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
     private readonly IOptions<PublicGitHubCatalogOptions> _publicGithubOptions;
     private readonly IOptions<PrivateGitHubCatalogOptions> _privateGithubOptions;
     private readonly IConfigWriter _configWriter;
     private readonly IArgument _localCatalogPath;
+    private readonly IArgument _localCatalogEnabled;
     private readonly IArgument _publicGitHubRepositoryOwner;
     private readonly IArgument _publicGitHubRepositoryName;
     private readonly IArgument _publicGitHubRepositoryBranch;
@@ -27,17 +28,21 @@ internal class ConfigCommand : Command<OctoToolOptions>
     private readonly IArgument _privateGitHubPagesUri;
 
     public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options,
+        IOptions<LocalFileSystemCatalogOptions> localCatalogOptions,
         IOptions<PublicGitHubCatalogOptions> publicGithubOptions,
         IOptions<PrivateGitHubCatalogOptions> privateGithubOptions,
         IConfigWriter configWriter)
         : base(logger, "Config", "Configures the tool.", options)
     {
+        _localCatalogOptions = localCatalogOptions;
         _publicGithubOptions = publicGithubOptions;
         _privateGithubOptions = privateGithubOptions;
         _configWriter = configWriter;
 
         _localCatalogPath = CommandArgumentValue.AddArgument("lcp", "localCatalogPath",
             ["Path of the local Construction Kit Library catalog"], false, 1);
+        _localCatalogEnabled = CommandArgumentValue.AddArgument("lce", "localCatalogEnabled",
+            ["Enable or disable the local Construction Kit Library catalog"], false, 1);
 
         _publicGitHubRepositoryOwner = CommandArgumentValue.AddArgument("pgo", "publicGitHubRepositoryOwner",
             ["GitHub Repository Owner of the private GitHub catalog"], false, 1);
@@ -66,9 +71,16 @@ internal class ConfigCommand : Command<OctoToolOptions>
     {
         Logger.LogInformation("Configuring the tool");
 
-        Options.Value.LocalCatalogPath = CommandArgumentValue.IsArgumentUsed(_localCatalogPath)
-            ? CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogPath).ToLower()
-            : null;
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogPath))
+        {
+            _localCatalogOptions.Value.RootPath =
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogPath).ToLower();
+        }
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogEnabled))
+        {
+            _localCatalogOptions.Value.IsEnabled =
+                CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_localCatalogEnabled);
+        }
 
         ConfigurePublicGitHubCatalog();
 

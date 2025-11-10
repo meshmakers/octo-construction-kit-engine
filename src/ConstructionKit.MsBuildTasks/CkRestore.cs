@@ -1,5 +1,6 @@
 ﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
@@ -34,6 +35,11 @@ public class CkRestore : Microsoft.Build.Utilities.Task
     public string OutputPath { get; set; } = null!;
 
     /// <summary>
+    /// When true, the local catalog is enabled.
+    /// </summary>
+    public bool IsLocalCatalogEnabled { get; set; } = true;
+
+    /// <summary>
     /// A list of compiled models that has been generated
     /// </summary>
     [Output]
@@ -54,6 +60,12 @@ public class CkRestore : Microsoft.Build.Utilities.Task
             loggingBuilder.SetMinimumLevel(LogLevel.Trace);
         });
         services.AddConstructionKit();
+
+        services.Configure<LocalFileSystemCatalogOptions>(options =>
+        {
+            options.IsEnabled = IsLocalCatalogEnabled;
+        });
+
         var serviceProvider = services.BuildServiceProvider();
 
         var ckModelRepositoryService = serviceProvider.GetRequiredService<ICatalogService>();

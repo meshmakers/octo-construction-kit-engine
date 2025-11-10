@@ -34,7 +34,7 @@ internal class CatalogManager : ICatalogManager
 
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -112,7 +112,7 @@ internal class CatalogManager : ICatalogManager
         int taken = 0;
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -201,7 +201,7 @@ internal class CatalogManager : ICatalogManager
 
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -259,7 +259,7 @@ internal class CatalogManager : ICatalogManager
 
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -314,7 +314,7 @@ internal class CatalogManager : ICatalogManager
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -364,7 +364,7 @@ internal class CatalogManager : ICatalogManager
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
@@ -384,7 +384,7 @@ internal class CatalogManager : ICatalogManager
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }

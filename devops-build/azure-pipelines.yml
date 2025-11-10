@@ -46,7 +46,7 @@ stages:
           projects: |
             src/**/*.csproj
             !src/**/Generated*.csproj
-          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(OctoPublishCatalog)" /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
       - task: DotNetCoreCLI@2
         displayName: 'Build samples'
         inputs:

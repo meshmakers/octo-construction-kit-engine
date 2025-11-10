@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Build.Framework;
@@ -39,16 +40,22 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public string? CacheFilePath { get; set; }
 
     /// <summary>
-    /// When true, the compiled construction kit model is published to the local repository
+    /// When true, the compiled construction kit model is published to the local catalog
     /// </summary>
     [Required]
     public bool PublishCkModel { get; set; } = true;
 
     /// <summary>
-    /// When true, the compiled construction kit model is generated as .md files to the local repository
+    /// When true, the compiled construction kit model is generated as .md files
     /// </summary>
     [Required]
     public bool GenerateCkDocumentation { get; set; } = true;
+
+    /// <summary>
+    /// Defines the name of the catalog the model is published.
+    /// </summary>
+    [Required]
+    public string PublishCatalogName { get; set; } = LocalFileSystemCatalog.Name;
 
     /// <summary>
     /// Gets or sets the output path
@@ -152,10 +159,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
-                                await ckModelRepositoryService.PublishAsync("LocalFileSystemCatalog", ckCompiledModelRoot,
+                                await ckModelRepositoryService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
                                     originFileResolver, true);
                                 Log.LogMessage(MessageImportance.High,
-                                    "Construction kit model published to 'LocalFileSystemCatalog'");
+                                    $"Construction kit model published to '{PublishCatalogName}'");
                             }
 
                             if (GenerateCkDocumentation)

@@ -10,17 +10,17 @@ using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.ModelCatalogs;
 
-public class GitHubCatalogTests
+public class PublicGitHubCatalogTests
 {
-    private readonly GitHubCatalog _catalog;
+    private readonly PublicGitHubCatalog _catalog;
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IHttpClientWrapper _httpClientWrapper;
     private readonly IGitHubClientFactory _gitHubClientFactory;
     private readonly IGitHubClientWrapper _gitHubClientWrapper;
-    private readonly GitHubCatalogOptions _catalogOptions;
+    private readonly PublicGitHubCatalogOptions _catalogOptions;
 
-    public GitHubCatalogTests()
+    public PublicGitHubCatalogTests()
     {
         _ckJsonSerializer = A.Fake<ICkJsonSerializer>();
         _gitHubClientFactory = A.Fake<IGitHubClientFactory>();
@@ -31,7 +31,7 @@ public class GitHubCatalogTests
         var tempDirectory = Path.Combine(Path.GetTempPath(), "LocalFileSystemCatalogTests", Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDirectory);
 
-        _catalogOptions = new GitHubCatalogOptions
+        _catalogOptions = new PublicGitHubCatalogOptions
         {
             CacheDirectory = tempDirectory,
             GitHubPagesUri = "https://test.github.io/repo",
@@ -47,7 +47,7 @@ public class GitHubCatalogTests
             .Returns(_gitHubClientWrapper);
 
         var gitHubOptions = Options.Create(_catalogOptions);
-        _catalog = new GitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, gitHubOptions);
+        _catalog = new PublicGitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, gitHubOptions);
     }
 
     private static CkModelId CreateTestModelId(string name = "TestModel", string version = "1.0.0")
@@ -125,7 +125,7 @@ public class GitHubCatalogTests
     [InlineData("   ")]
     public async Task GitHubOptions_WithInvalidPagesUri_ThrowsException(string? pagesUri)
     {
-        var invalidOptions = new GitHubCatalogOptions
+        var invalidOptions = new PublicGitHubCatalogOptions
         {
             GitHubPagesUri = pagesUri!,
             GitHubRepositoryOwner = "testowner",
@@ -134,7 +134,7 @@ public class GitHubCatalogTests
         };
 
         var options = Options.Create(invalidOptions);
-        var repository = new GitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
+        var repository = new PublicGitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
         var model = CreateTestCompiledModel();
 
         await Assert.ThrowsAsync<ModelCatalogException>(() => repository.PublishAsync(model));
@@ -143,7 +143,7 @@ public class GitHubCatalogTests
     [Fact]
     public void GitHubOptions_WithoutApiToken_AllowsReadOperations()
     {
-        var readOnlyOptions = new GitHubCatalogOptions
+        var readOnlyOptions = new PublicGitHubCatalogOptions
         {
             GitHubPagesUri = "https://test.github.io/repo",
             GitHubRepositoryOwner = "testowner",
@@ -153,7 +153,7 @@ public class GitHubCatalogTests
         };
 
         var options = Options.Create(readOnlyOptions);
-        var repository = new GitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
+        var repository = new PublicGitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
 
         // Should not throw for read operations
         Assert.NotNull(repository);
@@ -162,7 +162,7 @@ public class GitHubCatalogTests
     [Fact]
     public async Task PublishAsync_WithoutApiToken_ThrowsException()
     {
-        var readOnlyOptions = new GitHubCatalogOptions
+        var readOnlyOptions = new PublicGitHubCatalogOptions
         {
             GitHubPagesUri = "https://test.github.io/repo",
             GitHubRepositoryOwner = "testowner",
@@ -172,7 +172,7 @@ public class GitHubCatalogTests
         };
 
         var options = Options.Create(readOnlyOptions);
-        var repository = new GitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
+        var repository = new PublicGitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, options);
         var model = CreateTestCompiledModel();
 
         var exception = await Assert.ThrowsAsync<ModelCatalogException>(() => repository.PublishAsync(model));

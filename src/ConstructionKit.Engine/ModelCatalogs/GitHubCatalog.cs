@@ -8,9 +8,29 @@ using Octokit;
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
 /// <summary>
-/// Construction kit model catalog for GitHub
+/// Public catalog on GitHub for construction kit models
 /// </summary>
-public class GitHubCatalog : CachedCatalog
+public class PublicGitHubCatalog(
+    ICkJsonSerializer ckJsonSerializer,
+    IHttpClientFactory httpClientFactory,
+    IGitHubClientFactory gitHubClientFactory,
+    IOptions<PublicGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
+    gitHubClientFactory, gitHubOptions.Value, 20, "PublicGitHubCatalog", "Public GitHub catalog");
+
+/// <summary>
+/// Private catalog on GitHub for construction kit models
+/// </summary>
+public class PrivateGitHubCatalog(
+    ICkJsonSerializer ckJsonSerializer,
+    IHttpClientFactory httpClientFactory,
+    IGitHubClientFactory gitHubClientFactory,
+    IOptions<PrivateGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
+    gitHubClientFactory, gitHubOptions.Value, 21, "PrivateGitHubCatalog", "Private GitHub catalog for development and testing");
+
+/// <summary>
+/// Construction kit model catalog for GitHub base class
+/// </summary>
+public abstract class GitHubCatalog : CachedCatalog
 {
     private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
@@ -18,14 +38,15 @@ public class GitHubCatalog : CachedCatalog
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGitHubClientFactory _gitHubClientFactory;
-    private readonly IOptions<GitHubCatalogOptions> _gitHubOptions;
+    private readonly GitHubCatalogOptions _gitHubOptions;
 
     /// <summary>
-    /// Creates a new instance of the <see cref="GitHubCatalog"/> class.
+    /// Creates a new instance of the <see cref="Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs.GitHubCatalog"/> class.
     /// </summary>
-    public GitHubCatalog(ICkJsonSerializer ckJsonSerializer, IHttpClientFactory httpClientFactory,
+    protected GitHubCatalog(ICkJsonSerializer ckJsonSerializer, IHttpClientFactory httpClientFactory,
         IGitHubClientFactory gitHubClientFactory,
-        IOptions<GitHubCatalogOptions> gitHubOptions) : base(20, "PublicGitHubCatalog", "Public GitHub catalog", true, gitHubOptions.Value)
+        GitHubCatalogOptions gitHubOptions, int order, string catalogName, string description) : base(order,
+        catalogName, description, true, gitHubOptions)
     {
         _ckJsonSerializer = ckJsonSerializer;
         _httpClientFactory = httpClientFactory;
@@ -74,16 +95,16 @@ public class GitHubCatalog : CachedCatalog
             }
 
             throw ModelCatalogException.InvalidGitHubRepository(CatalogName,
-                _gitHubOptions.Value.GitHubPagesUri);
+                _gitHubOptions.GitHubPagesUri);
         }
         catch (HttpRequestException)
         {
-            throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.Value.GitHubPagesUri);
+            throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
         }
         catch (TaskCanceledException)
         {
             throw ModelCatalogException.RequestTimeoutGitHubRepository(CatalogName,
-                _gitHubOptions.Value.GitHubPagesUri);
+                _gitHubOptions.GitHubPagesUri);
         }
     }
 
@@ -162,12 +183,13 @@ public class GitHubCatalog : CachedCatalog
 
     private IGitHubClientWrapper CreateGitHubClient()
     {
-        if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubApiToken) ||
-            _gitHubOptions.Value.GitHubApiToken == null)
+        if (string.IsNullOrWhiteSpace(_gitHubOptions.GitHubApiToken) ||
+            _gitHubOptions.GitHubApiToken == null)
         {
             throw ModelCatalogException.GitHubTokenMissing();
         }
-        return _gitHubClientFactory.CreateClient(_gitHubOptions.Value);
+
+        return _gitHubClientFactory.CreateClient(_gitHubOptions);
     }
 
     private string CreatePath(CkModelId ckModelId)
@@ -181,13 +203,13 @@ public class GitHubCatalog : CachedCatalog
 
     private IHttpClientWrapper CreateHttpClient()
     {
-        if (string.IsNullOrWhiteSpace(_gitHubOptions.Value.GitHubPagesUri) ||
-            _gitHubOptions.Value.GitHubPagesUri == null)
+        if (string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri) ||
+            _gitHubOptions.GitHubPagesUri == null)
         {
             throw ModelCatalogException.GitHubPagesUriMissing();
         }
 
-        var baseUri = _gitHubOptions.Value.GitHubPagesUri.TrimEnd('/');
+        var baseUri = _gitHubOptions.GitHubPagesUri.TrimEnd('/');
 
         return _httpClientFactory.CreateClient(new Uri($"{baseUri}"));
     }
@@ -223,11 +245,12 @@ public class GitHubCatalog : CachedCatalog
         }
         catch (HttpRequestException)
         {
-            throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.Value.GitHubPagesUri);
+            throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
         }
     }
 
-    private async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description, IGitHubClientWrapper gitHubClient)
+    private async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description,
+        IGitHubClientWrapper gitHubClient)
     {
         // Create catalog file path for this major version
         var catalogPath =
@@ -287,11 +310,12 @@ public class GitHubCatalog : CachedCatalog
             catalogData.LatestVersion = sortedVersions.FirstOrDefault()?.Version;
 
             // Serialize catalog to JSON
-            var catalogContent = System.Text.Json.JsonSerializer.Serialize(catalogData, new System.Text.Json.JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-            });
+            var catalogContent = System.Text.Json.JsonSerializer.Serialize(catalogData,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                });
 
             // Update or create the catalog file
             if (isNew)
@@ -306,7 +330,8 @@ public class GitHubCatalog : CachedCatalog
                 var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
                 if (!r.HasValue)
                 {
-                    throw ModelCatalogException.CannotReadExistingModelVersionCatalog(modelId, CatalogName, catalogPath);
+                    throw ModelCatalogException.CannotReadExistingModelVersionCatalog(modelId, CatalogName,
+                        catalogPath);
                 }
 
                 // Update existing catalog
@@ -482,8 +507,10 @@ public class GitHubCatalog : CachedCatalog
                 var existingCatalog = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
                 if (!existingCatalog.HasValue)
                 {
-                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName, catalogPath);
+                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName,
+                        catalogPath);
                 }
+
                 // Update existing catalog
                 await gitHubClient.UpdateFileAsync(
                         catalogPath,
@@ -543,8 +570,10 @@ public class GitHubCatalog : CachedCatalog
                 var existingCatalog = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
                 if (!existingCatalog.HasValue)
                 {
-                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName, catalogPath);
+                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName,
+                        catalogPath);
                 }
+
                 // Update existing catalog
                 await gitHubClient.UpdateFileAsync(
                         catalogPath,
@@ -552,7 +581,6 @@ public class GitHubCatalog : CachedCatalog
                         existingCatalog.Value.Item2)
                     .ConfigureAwait(false);
             }
-
         }
     }
 }

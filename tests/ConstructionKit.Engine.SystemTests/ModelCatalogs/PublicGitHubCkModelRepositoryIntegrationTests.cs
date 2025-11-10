@@ -1,6 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
-using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Microsoft.Extensions.Options;
 using FakeItEasy;
@@ -9,21 +8,21 @@ using Xunit;
 
 namespace ConstructionKit.Engine.SystemTests.ModelCatalogs;
 
-public class GitHubCkModelRepositoryIntegrationTests
+public class PublicGitHubCkModelRepositoryIntegrationTests
 {
-    private readonly GitHubCatalog _repository;
+    private readonly PublicGitHubCatalog _repository;
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IGitHubClientFactory _gitHubClientFactory;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IOptions<GitHubCatalogOptions> _gitHubOptions;
+    private readonly IOptions<PublicGitHubCatalogOptions> _gitHubOptions;
 
-    public GitHubCkModelRepositoryIntegrationTests()
+    public PublicGitHubCkModelRepositoryIntegrationTests()
     {
         _ckJsonSerializer = A.Fake<ICkJsonSerializer>();
         _httpClientFactory = A.Fake<IHttpClientFactory>();
         _gitHubClientFactory = A.Fake<IGitHubClientFactory>();
 
-        var options = new GitHubCatalogOptions
+        var options = new PublicGitHubCatalogOptions
         {
             GitHubPagesUri = "https://meshmakers.github.io/octo-ck-catalog",
             GitHubRepositoryOwner = "meshmakers",
@@ -33,7 +32,7 @@ public class GitHubCkModelRepositoryIntegrationTests
         };
 
         _gitHubOptions = Options.Create(options);
-        _repository = new GitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, _gitHubOptions);
+        _repository = new PublicGitHubCatalog(_ckJsonSerializer, _httpClientFactory, _gitHubClientFactory, _gitHubOptions);
     }
 
     [Fact]

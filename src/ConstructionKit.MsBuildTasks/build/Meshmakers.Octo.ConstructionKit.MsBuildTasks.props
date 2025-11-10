@@ -18,6 +18,7 @@
         <OctoCompileCkModel Condition="'$(OctoCompileCkModel)' == ''">true</OctoCompileCkModel>
         <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>
+        <OctoPublishCatalog Condition="'$(OctoPublishCatalog)' == ''">LocalFileSystemCatalog</OctoPublishCatalog>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
     </PropertyGroup>

@@ -73,11 +73,13 @@ internal class ConfigCommand : Command<OctoToolOptions>
 
         if (CommandArgumentValue.IsArgumentUsed(_localCatalogPath))
         {
+            Logger.LogInformation("Configuring local catalog path");
             _localCatalogOptions.Value.RootPath =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogPath).ToLower();
         }
         if (CommandArgumentValue.IsArgumentUsed(_localCatalogEnabled))
         {
+            Logger.LogInformation("Configuring local catalog enabled state");
             _localCatalogOptions.Value.IsEnabled =
                 CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_localCatalogEnabled);
         }
@@ -95,26 +97,31 @@ internal class ConfigCommand : Command<OctoToolOptions>
     {
         if (CommandArgumentValue.IsArgumentUsed(_privateGitHubRepositoryName))
         {
+            Logger.LogInformation("Configuring private GitHub catalog repository name");
             _privateGithubOptions.Value.GitHubRepositoryName = CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubRepositoryName).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_privateGitHubRepositoryOwner))
         {
+            Logger.LogInformation("Configuring private GitHub catalog repository owner");
             _privateGithubOptions.Value.GitHubRepositoryOwner = CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubRepositoryOwner).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_privateGitHubRepositoryBranch))
         {
+            Logger.LogInformation("Configuring private GitHub catalog repository branch");
             _privateGithubOptions.Value.GitHubRepositoryBranch = CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubRepositoryBranch).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_privateGitHubPagesUri))
         {
+            Logger.LogInformation("Configuring private GitHub catalog pages URI");
             _privateGithubOptions.Value.GitHubPagesUri = CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubPagesUri).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_privateGitHubApiToken))
         {
+            Logger.LogInformation("Configuring private GitHub catalog API token");
             _privateGithubOptions.Value.GitHubApiToken =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubApiToken);
         }
@@ -124,26 +131,31 @@ internal class ConfigCommand : Command<OctoToolOptions>
     {
         if (CommandArgumentValue.IsArgumentUsed(_publicGitHubRepositoryName))
         {
+            Logger.LogInformation("Configuring public GitHub catalog repository name");
             _publicGithubOptions.Value.GitHubRepositoryName = CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubRepositoryName).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_publicGitHubRepositoryOwner))
         {
+            Logger.LogInformation("Configuring public GitHub catalog repository owner");
             _publicGithubOptions.Value.GitHubRepositoryOwner = CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubRepositoryOwner).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_publicGitHubRepositoryBranch))
         {
+            Logger.LogInformation("Configuring public GitHub catalog branch");
             _publicGithubOptions.Value.GitHubRepositoryBranch = CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubRepositoryBranch).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_publicGitHubPagesUri))
         {
+            Logger.LogInformation("Configuring public GitHub catalog pages URI");
             _publicGithubOptions.Value.GitHubPagesUri = CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubPagesUri).ToLower();
         }
 
         if (CommandArgumentValue.IsArgumentUsed(_publicGitHubApiToken))
         {
+            Logger.LogInformation("Configuring public GitHub catalog API token");
             _publicGithubOptions.Value.GitHubApiToken =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_publicGitHubApiToken);
         }

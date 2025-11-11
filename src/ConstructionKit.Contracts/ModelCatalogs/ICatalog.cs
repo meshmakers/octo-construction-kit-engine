@@ -36,8 +36,10 @@ public interface ICatalog
     /// <summary>
     /// Refreshes the catalog of the catalog, e.g., by reloading from disk or fetching from a remote source.
     /// </summary>
+    /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
+    /// set it to null to use default</param>
     /// <returns></returns>
-    Task RefreshCatalogAsync();
+    Task RefreshCatalogAsync(object? sourceIdentifier = null);
 
     /// <summary>
     ///     Returns true, if the defined source identifier ist supported by the catalog.

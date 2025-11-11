@@ -180,6 +180,18 @@ public interface ICatalogService
     /// Refreshes the cache of a specific catalog, e.g., by reloading from disk or fetching from a remote source.
     /// </summary>
     /// <param name="catalogName">Name of the catalog</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
     /// <returns></returns>
-    Task RefreshCatalogCacheAsync(string catalogName);
+    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Refreshes the catalog cache for all catalogs
+    /// </summary>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
+    /// <returns></returns>
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null);
 }

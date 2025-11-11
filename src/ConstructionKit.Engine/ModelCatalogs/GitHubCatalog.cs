@@ -346,7 +346,7 @@ public abstract class GitHubCatalog : CachedCatalog
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override async Task RefreshCatalogAsync()
+    public override async Task RefreshCatalogAsync(object? sourceIdentifier = null)
     {
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
         CacheTypes.CacheCatalog cacheCatalog = new()

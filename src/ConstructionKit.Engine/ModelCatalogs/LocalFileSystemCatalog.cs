@@ -37,7 +37,7 @@ public class LocalFileSystemCatalog : CachedCatalog
     }
 
     /// <inheritdoc />
-    public override async Task RefreshCatalogAsync()
+    public override async Task RefreshCatalogAsync(object? sourceIdentifier = null)
     {
         if (!_options.Value.IsEnabled)
         {

@@ -254,11 +254,26 @@ public abstract class CachedCatalog(
         }
 
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-        if (File.Exists(cachePath))
-        {
-            File.Delete(cachePath);
-        }
 
-        File.Move(tempFileName, cachePath);
+
+        // We retry the move 5 times in case of file locks by other processes
+        const int maxRetries = 5;
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                if (File.Exists(cachePath))
+                {
+                    File.Delete(cachePath);
+                }
+                File.Move(tempFileName, cachePath);
+                break; // Success
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                // Wait a bit before retrying
+                await Task.Delay(200).ConfigureAwait(false);
+            }
+        }
     }
 }

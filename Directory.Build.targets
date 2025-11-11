@@ -56,6 +56,8 @@
         <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey)" />
+        <!-- Publish to both LocalFileSystemCatalog and the specified catalog, so that the build can continue for this repo -->
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c LocalFileSystemCatalog -r" />
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r" />
 
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 

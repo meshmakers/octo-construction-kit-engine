@@ -177,8 +177,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             {
                                 OriginFileResolver originFileResolver = new(compileResult.CompiledModelFile);
                                 Log.LogMessage(MessageImportance.High,
-                                    "Publishing construction kit model from '{0}' to 'LocalFileSystemCatalog'",
-                                    constructionKitFolderPath);
+                                    $"Publishing construction kit model from '{constructionKitFolderPath}' to '{PublishCatalogName}'");
 #if NETSTANDARD2_0
                                 using var streamReader = File.OpenRead(compileResult.CompiledModelFile);
 #else

@@ -44,6 +44,8 @@
                    PublishCkModel="$(OctoPublishCkModel)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
+                   PrivateGitHubApiKey="$(OctoPrivateGitHubApiKey)"
+                   PublicGitHubApiKey="$(OctoPublicGitHubApiKey)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
                    CkLinkPath="$(OctoCkLinkPath)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />

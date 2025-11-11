@@ -32,7 +32,7 @@ public class ModelCatalogException : Exception
 
     internal static Exception PublishFailed(CkModelId modelId, string catalogName, Exception exception)
     {
-        return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed.", exception);
+        return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed: {exception.Message}", exception);
     }
 
     internal static Exception ModelAlreadyExists(CkModelId ckModelId, string catalogName)

@@ -62,9 +62,9 @@ internal static class Program
 
         services.Configure<OctoToolOptions>(options =>
             config.GetSection(Constants.OctoToolOptionsRootNode).Bind(options));
-        services.Configure<PublicGitHubCatalogOptions>(options =>
-            config.GetSection(Constants.OctoToolLocalFileSystemCatalogRootNode).Bind(options));
         services.Configure<LocalFileSystemCatalogOptions>(options =>
+            config.GetSection(Constants.OctoToolLocalFileSystemCatalogRootNode).Bind(options));
+        services.Configure<PublicGitHubCatalogOptions>(options =>
             config.GetSection(Constants.OctoToolPublicGitHubRootNode).Bind(options));
         services.Configure<PrivateGitHubCatalogOptions>(options =>
             config.GetSection(Constants.OctoToolPrivateGitHubRootNode).Bind(options));

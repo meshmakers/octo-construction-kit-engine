@@ -1,5 +1,9 @@
 {
   "profiles": {
+    "CompilerConfigPrivateGitHubToken": {
+      "commandName": "Project",
+      "commandLineArgs": "-c config -gt private"
+    },
     "CompilerCompileSystem": {
       "commandName": "Project",
       "commandLineArgs": "-c Compile -p \"$(OctoRepoRootPath)src/SystemCkModel/ConstructionKit\" -o \"$(OctoRepoRootPath)/test/system\""

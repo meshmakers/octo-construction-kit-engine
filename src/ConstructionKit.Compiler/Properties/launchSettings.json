@@ -28,6 +28,10 @@
       "commandName": "Project",
       "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.testidentity.yaml\" -r -c \"LocalFileSystemCatalog\""
     },
+    "CompilerPublishCommunication": {
+      "commandName": "Project",
+      "commandLineArgs": "-c publish -f \"$(OctoRepoRootPath)test/ck-system.communication.yaml\" -r -c \"LocalFileSystemCatalog\""
+    },
     "CompilerGenerateDocSdkDemo": {
       "commandName": "Project",
       "commandLineArgs": "-c generateDocs -f \"$(OctoRepoRootPath)/test/ck-octosdkdemo.yaml\" -o \"$(OctoRepoRootPath)/test/docs\" -l \"/docs/technologyGuide/constructionKits/libraries/\""

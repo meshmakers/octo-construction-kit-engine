@@ -25,7 +25,8 @@ public class PrivateGitHubCatalog(
     IHttpClientFactory httpClientFactory,
     IGitHubClientFactory gitHubClientFactory,
     IOptions<PrivateGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
-    gitHubClientFactory, gitHubOptions.Value, 21, "PrivateGitHubCatalog", "Private GitHub catalog for development and testing");
+    gitHubClientFactory, gitHubOptions.Value, 21, "PrivateGitHubCatalog",
+    "Private GitHub catalog for development and testing");
 
 /// <summary>
 /// Construction kit model catalog for GitHub base class
@@ -157,7 +158,7 @@ public abstract class GitHubCatalog : CachedCatalog
             cancellationToken?.ThrowIfCancellationRequested();
 
             // Refresh the in-memory catalog
-            await RefreshCatalogAsync().ConfigureAwait(false);
+            await RefreshCatalogAsync(false).ConfigureAwait(false);
         }
         catch (ApiValidationException e)
         {
@@ -219,34 +220,51 @@ public abstract class GitHubCatalog : CachedCatalog
     /// </summary>
     /// <param name="modelName">The model ID (without version)</param>
     /// <param name="majorVersion">The major version number</param>
+    /// <param name="useHttpClient">When true, the HTTP client is used, otherwise the GitHub client is used</param>
     /// <returns>The major version catalog content or null if not found</returns>
     private async Task<SharedCatalogTypes.ModelLibraryVersionsCatalog?> GetModelLibraryVersionsCatalogAsync(
-        string modelName, int majorVersion)
+        string modelName, int majorVersion, bool useHttpClient)
     {
         var catalogPath = $"{RootPath}{modelName[0].ToString().ToLower()}/{modelName}/{majorVersion}/{CatalogFileName}";
 
-        var httpClient = CreateHttpClient();
-        try
+        string? response;
+        if (useHttpClient)
         {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(response) && response != null)
+            var httpClient = CreateHttpClient();
+            try
             {
-                var versionsCatalog = System.Text.Json.JsonSerializer
-                    .Deserialize<SharedCatalogTypes.ModelLibraryVersionsCatalog>(
-                        response,
-                        new System.Text.Json.JsonSerializerOptions
-                            { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+            }
+        }
+        else
+        {
+            var gitHubClient = CreateGitHubClient();
 
-                return versionsCatalog;
+            var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+            if (r == null)
+            {
+                return null;
             }
 
-            return null;
+            response = r.Value.Item1;
         }
-        catch (HttpRequestException)
+
+        if (!string.IsNullOrWhiteSpace(response) && response != null)
         {
-            throw ModelCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+            var versionsCatalog = System.Text.Json.JsonSerializer
+                .Deserialize<SharedCatalogTypes.ModelLibraryVersionsCatalog>(
+                    response,
+                    new System.Text.Json.JsonSerializerOptions
+                        { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+
+            return versionsCatalog;
         }
+
+        return null;
     }
 
     private async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description,
@@ -257,7 +275,7 @@ public abstract class GitHubCatalog : CachedCatalog
             $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{CatalogFileName}";
 
         // Try to load existing catalog first
-        var catalogData = await GetModelLibraryVersionsCatalogAsync(modelId.Name, modelId.Version.Major)
+        var catalogData = await GetModelLibraryVersionsCatalogAsync(modelId.Name, modelId.Version.Major, false)
             .ConfigureAwait(false);
         bool isModified = false;
         bool isNew = catalogData == null;
@@ -346,9 +364,14 @@ public abstract class GitHubCatalog : CachedCatalog
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override async Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
     {
-        var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
+        return RefreshCatalogAsync(true, sourceIdentifier);
+    }
+
+    private async Task RefreshCatalogAsync(bool useHttpClient, object? sourceIdentifier = null)
+    {
+        var catalog = await GetRootCatalogAsync(useHttpClient).ConfigureAwait(false);
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
             UpdatedAt = DateTime.UtcNow
@@ -359,7 +382,7 @@ public abstract class GitHubCatalog : CachedCatalog
             foreach (var rootCatalogEntry in catalog.Models)
             {
                 var modelLibraryCatalog =
-                    await GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath).ConfigureAwait(false);
+                    await GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath, useHttpClient).ConfigureAwait(false);
 
                 if (modelLibraryCatalog == null)
                 {
@@ -377,7 +400,7 @@ public abstract class GitHubCatalog : CachedCatalog
                 {
                     var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(
                         rootCatalogEntry.ModelName,
-                        modelLibraryCatalogEntry.MajorVersion).ConfigureAwait(false);
+                        modelLibraryCatalogEntry.MajorVersion, useHttpClient).ConfigureAwait(false);
 
                     if (versionsCatalog == null)
                     {
@@ -404,55 +427,91 @@ public abstract class GitHubCatalog : CachedCatalog
         await WriteCacheAsync(cacheCatalog).ConfigureAwait(false);
     }
 
-    private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync()
+
+    private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync(bool useHttpClient)
     {
         var catalogPath = $"{RootPath}{CatalogFileName}";
-        var httpClient = CreateHttpClient();
 
-        try
+        string? response;
+        if (useHttpClient)
         {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
-            if (string.IsNullOrEmpty(response) || response == null)
+            var httpClient = CreateHttpClient();
+            try
+            {
+                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // Catalog doesn't exist or couldn't be fetched
+                return null;
+            }
+        }
+        else
+        {
+            var gitHubClient = CreateGitHubClient();
+
+            var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+            if (r == null)
             {
                 return null;
             }
 
-            return System.Text.Json.JsonSerializer.Deserialize<SharedCatalogTypes.RootCatalog>(
-                response,
-                new System.Text.Json.JsonSerializerOptions
-                    { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+            response = r.Value.Item1;
         }
-        catch (HttpRequestException)
+
+        if (string.IsNullOrEmpty(response) || response == null)
         {
-            // Catalog doesn't exist or couldn't be fetched
             return null;
         }
+
+        return System.Text.Json.JsonSerializer.Deserialize<SharedCatalogTypes.RootCatalog>(
+            response,
+            new System.Text.Json.JsonSerializerOptions
+                { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
     }
 
-    private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath)
+    private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath,
+        bool useHttpClient)
     {
-        var httpClient = CreateHttpClient();
-        try
+        string? response;
+        if (useHttpClient)
         {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
-
-            if (!string.IsNullOrWhiteSpace(response) && response != null)
+            var httpClient = CreateHttpClient();
+            try
             {
-                var modelLibraryCatalog = System.Text.Json.JsonSerializer
-                    .Deserialize<SharedCatalogTypes.ModelLibraryCatalog>(
-                        response,
-                        new System.Text.Json.JsonSerializerOptions
-                            { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+            }
+            catch (HttpRequestException)
+            {
+                // Catalog doesn't exist or couldn't be fetched
+                return null;
+            }
+        }
+        else
+        {
+            var gitHubClient = CreateGitHubClient();
 
-                return modelLibraryCatalog;
+            var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+            if (r == null)
+            {
+                return null;
             }
 
-            return null;
+            response = r.Value.Item1;
         }
-        catch (HttpRequestException)
+
+        if (!string.IsNullOrWhiteSpace(response) && response != null)
         {
-            return null;
+            var modelLibraryCatalog = System.Text.Json.JsonSerializer
+                .Deserialize<SharedCatalogTypes.ModelLibraryCatalog>(
+                    response,
+                    new System.Text.Json.JsonSerializerOptions
+                        { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+
+            return modelLibraryCatalog;
         }
+
+        return null;
     }
 
     private async Task UpdateRootCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
@@ -460,7 +519,7 @@ public abstract class GitHubCatalog : CachedCatalog
         var catalogPath = $"{RootPath}{CatalogFileName}";
 
         // Get or create catalog
-        var catalogData = await GetRootCatalogAsync().ConfigureAwait(false);
+        var catalogData = await GetRootCatalogAsync(false).ConfigureAwait(false);
         var isNew = catalogData == null;
 
         catalogData ??= new SharedCatalogTypes.RootCatalog
@@ -527,7 +586,7 @@ public abstract class GitHubCatalog : CachedCatalog
         var catalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}";
 
         // Try to load existing catalog first
-        var catalogData = await GetModelLibraryCatalogAsync(catalogPath).ConfigureAwait(false);
+        var catalogData = await GetModelLibraryCatalogAsync(catalogPath, false).ConfigureAwait(false);
         var isNew = catalogData == null;
 
         catalogData ??= new SharedCatalogTypes.ModelLibraryCatalog

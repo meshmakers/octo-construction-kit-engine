@@ -132,7 +132,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         var serviceProvider = services.BuildServiceProvider();
 
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
-        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICatalogService>();
+        var catalogService = serviceProvider.GetRequiredService<ICatalogService>();
         var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
 
         var modelResolver = serviceProvider.GetRequiredService<ICatalogModelResolver>();
@@ -162,6 +162,9 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                         }
                         else
                         {
+                            Log.LogMessage(MessageImportance.High, "Refreshing construction kit model library cache");
+                            await catalogService.RefreshAllCatalogCachesAsync();
+
                             Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                 constructionKitFolderPath);
                             var compileResult = await compilerService.CompileAsync(
@@ -195,7 +198,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
-                                await ckModelRepositoryService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
+                                await catalogService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
                                     originFileResolver, true);
                                 Log.LogMessage(MessageImportance.High,
                                     $"Construction kit model published to '{PublishCatalogName}'");

@@ -39,7 +39,7 @@ public abstract class CachedCatalog(
     public bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
-    public abstract Task RefreshCatalogAsync();
+    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null);
 
     /// <inheritdoc />
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);

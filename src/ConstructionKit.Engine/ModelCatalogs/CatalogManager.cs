@@ -412,7 +412,7 @@ internal class CatalogManager : ICatalogManager
         return await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
     }
 
-    public async Task RefreshCatalogCacheAsync(string catalogName)
+    public async Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null)
     {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
             catalogName, StringComparison.OrdinalIgnoreCase) == 0);
@@ -422,5 +422,18 @@ internal class CatalogManager : ICatalogManager
         }
 
         await catalog.RefreshCatalogAsync().ConfigureAwait(false);
+    }
+
+    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null)
+    {
+        foreach (var catalog in _catalogs.OrderBy(x => x.Order))
+        {
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
+            {
+                continue;
+            }
+
+            await catalog.RefreshCatalogAsync(sourceIdentifier).ConfigureAwait(false);
+        }
     }
 }

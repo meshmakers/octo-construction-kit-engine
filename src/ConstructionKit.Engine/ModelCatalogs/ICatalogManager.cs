@@ -191,6 +191,18 @@ internal interface ICatalogManager
     /// Refreshes the catalog cache for a specific catalog
     /// </summary>
     /// <param name="catalogName">Name of catalog.</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
     /// <returns></returns>
-    Task RefreshCatalogCacheAsync(string catalogName);
+    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Refreshes the catalog cache for all catalogs
+    /// </summary>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
+    /// <returns></returns>
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null);
 }

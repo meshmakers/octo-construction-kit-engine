@@ -68,7 +68,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task
 
         var serviceProvider = services.BuildServiceProvider();
 
-        var ckModelRepositoryService = serviceProvider.GetRequiredService<ICatalogService>();
+        var catalogService = serviceProvider.GetRequiredService<ICatalogService>();
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
@@ -85,10 +85,13 @@ public class CkRestore : Microsoft.Build.Utilities.Task
 
                         if (File.Exists(ckModelConfigFilePath))
                         {
+                            Log.LogMessage(MessageImportance.High, "Refreshing construction kit model library cache");
+                            await catalogService.RefreshAllCatalogCachesAsync();
+
                             Log.LogMessage(MessageImportance.High,
                                 "Restoring construction kit model libraries in '{0}'",
                                 ckModelConfigFilePath);
-                            var compileResult = await ckModelRepositoryService.RestoreConstructionKitModelsAsync(
+                            var compileResult = await catalogService.RestoreConstructionKitModelsAsync(
                                 ckModelConfigFilePath,
                                 OutputPath, CacheFilePath, operationResult);
                             if (operationResult.HasErrors || operationResult.HasFatalErrors)

@@ -235,9 +235,14 @@ internal class CatalogService : ICatalogService
         return compileResults;
     }
 
-    public Task RefreshCatalogCacheAsync(string catalogName)
+    public Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null)
     {
-        return _catalogManager.RefreshCatalogCacheAsync(catalogName);
+        return _catalogManager.RefreshCatalogCacheAsync(catalogName, sourceIdentifier);
+    }
+
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null)
+    {
+        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

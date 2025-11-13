@@ -297,15 +297,15 @@ internal class BulkRtMutation(
                     RtId = rtEntityId.RtId,
                     CkTypeId = ckTypeId,
                     RtChangedDateTime = DateTime.UtcNow,
-                    RtDeletedDateTime = DateTime.UtcNow,
-                    RtState = RtState.Deleted
+                    RtArchivedDateTime = DateTime.UtcNow,
+                    RtState = RtState.Archived
                 });
 
                 await repositoryDataSource.RtAssociations.UpdateManyAsync(session,
                     a => (a.OriginCkTypeId == ckTypeId && a.OriginRtId == rtEntityId.RtId) ||
                          (a.TargetCkTypeId == ckTypeId && a.TargetRtId == rtEntityId.RtId), new RtAssociation
                     {
-                        RtState = RtState.Deleted
+                        RtState = RtState.Archived
                     }).ConfigureAwait(false);
             }
 

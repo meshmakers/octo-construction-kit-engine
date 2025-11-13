@@ -70,7 +70,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             options.Direction == GraphDirections.Inbound)
         {
             foreach (var rtAssociation in queryable.Where(x =>
-                             (includeArchived || x.RtState != RtState.Deleted) &&
+                             (includeArchived || x.RtState != RtState.Archived) &&
                              (roleId == null || x.AssociationRoleId == roleId) &&
                              rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
                                                            rtEntityId.CkTypeId == x.TargetCkTypeId
@@ -93,7 +93,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             options.Direction == GraphDirections.Outbound)
         {
             foreach (var rtAssociation in queryable.Where(x =>
-                         (includeArchived || x.RtState != RtState.Deleted) &&
+                         (includeArchived || x.RtState != RtState.Archived) &&
                          (roleId == null || x.AssociationRoleId == roleId) &&
                          rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.OriginRtId &&
                                                        rtEntityId.CkTypeId == x.OriginCkTypeId

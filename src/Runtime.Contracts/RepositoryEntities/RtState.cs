@@ -10,7 +10,7 @@ public enum RtState
     /// </summary>
     Active = 0,
     /// <summary>
-    /// The entity is deleted
+    /// The entity is archived
     /// </summary>
-    Deleted = 1,
+    Archived = 1,
 }

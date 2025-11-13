@@ -59,9 +59,9 @@ public class RtEntity : RtTypeWithAttributes
     public DateTime? RtChangedDateTime { get; set; }
     
     /// <summary>
-    ///     Returns the time the entity was deleted
+    ///     Returns the time the entity was archived
     /// </summary>
-    public DateTime? RtDeletedDateTime { get; set; }
+    public DateTime? RtArchivedDateTime { get; set; }
 
     /// <summary>
     ///     Gets or sets the construction kit id

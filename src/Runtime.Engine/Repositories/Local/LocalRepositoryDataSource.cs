@@ -90,7 +90,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
         foreach (var pair in rtOriginTargetPair)
         {
             var association = queryable.FirstOrDefault(a =>
-                includeArchived || a.RtState != RtState.Deleted &&
+                includeArchived || a.RtState != RtState.Archived &&
                 a.OriginRtId == pair.Origin.RtId && a.OriginCkTypeId == pair.Origin.CkTypeId &&
                 a.TargetRtId == pair.Target.RtId && a.TargetCkTypeId == pair.Target.CkTypeId &&
                 a.AssociationRoleId == pair.AssociationRoleId);

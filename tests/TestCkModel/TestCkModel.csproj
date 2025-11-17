@@ -1,11 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net9.0;netstandard2.0</TargetFrameworks>
+        <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
         <AssemblyName>TestCkModel</AssemblyName>
         <RootNamespace>TestCkModel</RootNamespace>
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
-        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net9.0'">true</OctoPublishCkModel>
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0'">true</OctoPublishCkModel>
     </PropertyGroup>
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->

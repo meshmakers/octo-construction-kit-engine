@@ -53,7 +53,7 @@ public abstract class CachedCatalog(
             throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
         }
 
-        var catalog = await ReadCacheAsync().ConfigureAwait(false);
+        var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -96,7 +96,7 @@ public abstract class CachedCatalog(
             throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
         }
 
-        var catalog = await ReadCacheAsync().ConfigureAwait(false);
+        var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -129,7 +129,7 @@ public abstract class CachedCatalog(
             throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
         }
 
-        var catalog = await ReadCacheAsync().ConfigureAwait(false);
+        var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -154,7 +154,7 @@ public abstract class CachedCatalog(
         }
 
         searchTerm = searchTerm?.Trim() ?? string.Empty;
-        var catalog = await ReadCacheAsync().ConfigureAwait(false);
+        var catalog = await ReadCacheAsync(true).ConfigureAwait(false);
 
         foreach (var cacheModelEntry in catalog.Models.Values)
         {
@@ -178,15 +178,20 @@ public abstract class CachedCatalog(
     /// <summary>
     /// Reads the cache catalog from the configured cache file if it exists.
     /// </summary>
+    /// <param name="createCacheIfNotExits">Create cache file if cache not exists.</param>
     /// <returns>A task that represents the asynchronous read operation. The task result contains the cache catalog, or null if the cache file does not exist.</returns>
     // ReSharper disable once MemberCanBePrivate.Global
-    protected async Task<CacheTypes.CacheCatalog> ReadCacheAsync()
+    protected async Task<CacheTypes.CacheCatalog> ReadCacheAsync(bool createCacheIfNotExits)
     {
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
         if (!File.Exists(cachePath))
         {
-            // If the cache file does not exist, refresh the catalog to create it
-            await RefreshCatalogAsync().ConfigureAwait(false);
+            if (createCacheIfNotExits)
+            {
+                // If the cache file does not exist, refresh the catalog to create it
+                await RefreshCatalogAsync().ConfigureAwait(false);
+            }
+
             if (!File.Exists(cachePath))
             {
                 return new CacheTypes.CacheCatalog();
@@ -223,6 +228,23 @@ public abstract class CachedCatalog(
         streamReader.Close();
 
         return r ?? new CacheTypes.CacheCatalog();
+    }
+
+    /// <summary>
+    /// Returns true if the cache file was updated within the given max age.
+    /// </summary>
+    /// <param name="maxAge">The maximum age of the cache file.</param>
+    /// <returns>True if the cache file was updated within the given max age; otherwise, false.</returns>
+    protected bool IsCacheFileRecentlyUpdatedAsync(TimeSpan maxAge)
+    {
+        var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
+        if (!File.Exists(cachePath))
+        {
+            return false;
+        }
+
+        var lastWriteTime = File.GetLastWriteTimeUtc(cachePath);
+        return DateTime.UtcNow - lastWriteTime <= maxAge;
     }
 
     /// <summary>

@@ -19,6 +19,7 @@ public class LocalFileSystemCatalog : CachedCatalog
 
     private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
+    private const int MaxCacheFileAgeSeconds = 60;
 
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IOptions<LocalFileSystemCatalogOptions> _options;
@@ -37,14 +38,31 @@ public class LocalFileSystemCatalog : CachedCatalog
     }
 
     /// <inheritdoc />
-    public override async Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    {
+        return RefreshCatalogAsync(false, sourceIdentifier);
+    }
+
+    private async Task RefreshCatalogAsync(bool forceRefresh, object? sourceIdentifier = null)
     {
         if (!_options.Value.IsEnabled)
         {
             throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
         }
 
+        var maxAge = TimeSpan.FromSeconds(MaxCacheFileAgeSeconds);
+        if (!forceRefresh && IsCacheFileRecentlyUpdatedAsync(maxAge))
+        {
+            return;
+        }
+
+        var cache = await ReadCacheAsync(false).ConfigureAwait(false);
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
+        if (catalog != null && cache.UpdatedAt != null && cache.UpdatedAt.Value == catalog.UpdatedAt)
+        {
+            // No changes in the catalog so we can skip the refresh
+            return;
+        }
 
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
@@ -192,7 +210,7 @@ public class LocalFileSystemCatalog : CachedCatalog
                 await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
 
                 // Refresh the in-memory catalog
-                await RefreshCatalogAsync().ConfigureAwait(false);
+                await RefreshCatalogAsync(true).ConfigureAwait(false);
 
                 return;
             }

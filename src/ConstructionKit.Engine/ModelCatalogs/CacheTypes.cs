@@ -20,7 +20,7 @@ public class CacheTypes
         /// <summary>
         /// Gets or sets the timestamp of the last update of the catalog
         /// </summary>
-        public DateTime UpdatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
 
         /// <summary>
         /// Gets a dictionary of all models in the catalog, keyed by model id

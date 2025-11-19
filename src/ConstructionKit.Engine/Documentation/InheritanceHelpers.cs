@@ -26,7 +26,7 @@ internal class InheritanceHelpers(ILinkHelpers linkHelpers)
 
         var parts = path.Split(separators, StringSplitOptions.None).Select(s => s.Trim()).ToArray();
 
-        var reconstructedHierarchy = parts.Reverse();
+        var reconstructedHierarchy = parts.AsEnumerable().Reverse();
 
         return BuildHierarchyString(reconstructedHierarchy.ToArray(), baseRelativePath);
     }

@@ -15,7 +15,7 @@ variables:
 - group: ApiKeys-mm-cloud
 - group: OctoDefault
 - name: artifactsFrameworkVersion
-  value: 'net9.0'  
+  value: 'net10.0'
 - name: buildConfiguration
   value: 'Release'
 - name: buildPlatform

@@ -35,6 +35,7 @@ public abstract class GitHubCatalog : CachedCatalog
 {
     private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
+    private const int MaxCacheFileAgeSeconds = 60;
 
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -186,7 +187,7 @@ public abstract class GitHubCatalog : CachedCatalog
             cancellationToken?.ThrowIfCancellationRequested();
 
             // Refresh the in-memory catalog
-            await RefreshCatalogAsync(false).ConfigureAwait(false);
+            await RefreshCatalogAsync(true).ConfigureAwait(false);
         }
         catch (ApiValidationException e)
         {
@@ -391,9 +392,27 @@ public abstract class GitHubCatalog : CachedCatalog
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override async Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
     {
+        return RefreshCatalogAsync(false);
+    }
+
+    private async Task RefreshCatalogAsync(bool forceRefresh)
+    {
+        var maxAge = TimeSpan.FromSeconds(MaxCacheFileAgeSeconds);
+        if (!forceRefresh && IsCacheFileRecentlyUpdatedAsync(maxAge))
+        {
+            return;
+        }
+
+        var cache = await ReadCacheAsync(false).ConfigureAwait(false);
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
+        if (catalog != null && cache.UpdatedAt != null && cache.UpdatedAt.Value == catalog.UpdatedAt)
+        {
+            // No changes in the catalog so we can skip the refresh
+            return;
+        }
+
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
             UpdatedAt = DateTime.UtcNow

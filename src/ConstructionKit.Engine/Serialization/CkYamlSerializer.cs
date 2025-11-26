@@ -52,7 +52,7 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new RtCkIdRecordIdConverter())
             .WithTypeConverter(new RtCkIdEnumIdConverter())
             .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
-
+            .WithEventEmitter(next => new MultilineScalarStyleEmitter(next))
             .Build();
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)

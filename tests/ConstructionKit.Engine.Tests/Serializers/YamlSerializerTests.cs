@@ -142,4 +142,35 @@ public class YamlSerializerTests
         Assert.NotNull(yaml);
         Assert.Contains("$schema", yaml);
     }
+
+    [Fact]
+    public async Task SerializeAsync_MultilineString_UsesLiteralBlockScalar()
+    {
+        var ckYamlSerializer = new CkYamlSerializer(new CkSchemaValidator());
+
+        var stream = new MemoryStream();
+        await using var streamWriter = new StreamWriter(stream);
+
+        var ckElementsDto = Builder.Build();
+        // Add a multiline description to a type
+        if (ckElementsDto.Types?.Count > 0)
+        {
+            ckElementsDto.Types[0].Description = "This is a multiline\ndescription that spans\nmultiple lines.";
+        }
+
+        await ckYamlSerializer.SerializeAsync(streamWriter, ckElementsDto);
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
+
+        stream.Position = 0;
+        var streamReader = new StreamReader(stream);
+        var yaml = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        _testOutputHelper.WriteLine("output:");
+        _testOutputHelper.WriteLine(yaml);
+
+        // Verify literal block scalar is used (| followed by content on next line)
+        Assert.Contains("|", yaml);
+        // Verify no escaped newlines in the value (would indicate quoted string style)
+        Assert.DoesNotContain("\\n", yaml);
+    }
 }

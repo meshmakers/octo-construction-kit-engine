@@ -159,4 +159,142 @@ public class YamlSerializerTests
         Assert.NotNull(json);
         Assert.Contains("$schema", json);
     }
+
+    [Fact]
+    public async Task SerializeAsync_MultilineString_UsesLiteralBlockScalar()
+    {
+        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+
+        var stream = new MemoryStream();
+        await using var streamWriter = new StreamWriter(stream);
+
+        var modelRoot = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = OctoObjectId.GenerateNewId(),
+                    CkTypeId = "Sample/Type",
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = "Sample/MultilineAttr",
+                            Value = "line1\nline2\nline3"
+                        }
+                    }
+                }
+            }
+        };
+
+        await rtYamlSerializer.SerializeAsync(streamWriter, modelRoot);
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
+
+        stream.Position = 0;
+        var streamReader = new StreamReader(stream);
+        var yaml = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        _testOutputHelper.WriteLine("output:");
+        _testOutputHelper.WriteLine(yaml);
+
+        // Verify literal block scalar is used (| followed by content on next line)
+        Assert.Contains("|", yaml);
+        // Verify no escaped newlines in the value (would indicate quoted string style)
+        Assert.DoesNotContain("\\n", yaml);
+    }
+
+    [Fact]
+    public async Task SerializeAsync_SingleLineString_DoesNotUseLiteralBlockScalar()
+    {
+        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+
+        var stream = new MemoryStream();
+        await using var streamWriter = new StreamWriter(stream);
+
+        var modelRoot = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = OctoObjectId.GenerateNewId(),
+                    CkTypeId = "Sample/Type",
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = "Sample/SingleLineAttr",
+                            Value = "single line value"
+                        }
+                    }
+                }
+            }
+        };
+
+        await rtYamlSerializer.SerializeAsync(streamWriter, modelRoot);
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
+
+        stream.Position = 0;
+        var streamReader = new StreamReader(stream);
+        var yaml = await streamReader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        _testOutputHelper.WriteLine("output:");
+        _testOutputHelper.WriteLine(yaml);
+
+        // Verify single line strings contain the value directly
+        Assert.Contains("single line value", yaml);
+    }
+
+    [Fact]
+    public async Task SerializeAsync_RoundTrip_MultilineStringPreserved()
+    {
+        var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
+        var originalValue = "line1\nline2\nline3";
+
+        // Serialize
+        var stream = new MemoryStream();
+        await using var streamWriter = new StreamWriter(stream);
+
+        var modelRoot = new RtModelRootTcDto
+        {
+            Dependencies = { new CkModelId("System-1.0.0") },
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = OctoObjectId.GenerateNewId(),
+                    CkTypeId = "System/Test",
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = "System/Name",
+                            Value = originalValue
+                        }
+                    }
+                }
+            }
+        };
+
+        await rtYamlSerializer.SerializeAsync(streamWriter, modelRoot);
+        await streamWriter.FlushAsync(TestContext.Current.CancellationToken);
+
+        // Log the serialized YAML
+        stream.Position = 0;
+        var yamlContent = await new StreamReader(stream).ReadToEndAsync(TestContext.Current.CancellationToken);
+        _testOutputHelper.WriteLine("Serialized YAML:");
+        _testOutputHelper.WriteLine(yamlContent);
+
+        // Reset stream and deserialize
+        stream.Position = 0;
+        var operationResult = new OperationResult();
+        var deserialized = await rtYamlSerializer.DeserializeAsync(stream, "test", operationResult);
+
+        // Verify round-trip preserves the value
+        Assert.NotNull(deserialized);
+        Assert.Single(deserialized.Entities);
+        Assert.Single(deserialized.Entities[0].Attributes);
+        Assert.Equal(originalValue, deserialized.Entities[0].Attributes[0].Value);
+    }
 }

@@ -1,11 +1,12 @@
 ﻿using System.Diagnostics;
 using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
+// ReSharper disable PropertyCanBeMadeInitOnly.Global
 
 namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 
 /// <summary>
-///     Represents a role of an association between two CkEntityTypes
+///     Represents a role of an association between two ck types.
 /// </summary>
 [DebuggerDisplay("{" + nameof(AssociationRoleId) + "}")]
 public class CkAssociationRoleDto : CkTypeWithAttributesDto
@@ -19,13 +20,13 @@ public class CkAssociationRoleDto : CkTypeWithAttributesDto
     public CkAssociationRoleId AssociationRoleId { get; set; } = null!;
 
     /// <summary>
-    ///     Name of the association for inbound references (e. g. Children)
+    ///     Name of the association for inbound references (e.g. Children)
     /// </summary>
     [JsonRequired]
     public string InboundName { get; set; } = null!;
 
     /// <summary>
-    ///     Name of the association for outbound references (e. g. Parent)
+    ///     Name of the association for outbound references (e.g. Parent)
     /// </summary>
     [JsonRequired]
     public string OutboundName { get; set; } = null!;
@@ -48,5 +49,6 @@ public class CkAssociationRoleDto : CkTypeWithAttributesDto
     ///     An optional description of the role
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public string? Description { get; set; }
 }

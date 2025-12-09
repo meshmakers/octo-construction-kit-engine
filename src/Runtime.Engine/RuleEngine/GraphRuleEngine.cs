@@ -139,7 +139,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             var rtEntityId = new RtEntityId(entityUpdateInfo.CkTypeId,
                 entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet());
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                [rtEntityId], RtAssociationQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
+                [rtEntityId], RtAssociationExtendedQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
             if (result.TryGetValue(rtEntityId, out var value))
             {
                 graphRuleEngineResult.RtAssociationsToDelete.AddRange(value.Items);
@@ -418,7 +418,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             a.RoleId)).ToList();
 
         var rtAssociation = await repositoryDataSource.GetRtAssociationsAsync(session,
-            rtOriginTargetPairs, RtAssociationQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
+            rtOriginTargetPairs, RtAssociationExtendedQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
 
         var rtAssociationDictionary = rtAssociation.ToDictionary(x => new RtOriginTargetPair(
             new RtEntityId(x.OriginCkTypeId, x.OriginRtId),

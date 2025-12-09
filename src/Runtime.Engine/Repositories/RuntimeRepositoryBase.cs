@@ -125,9 +125,9 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <inheritdoc />
     public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
         RtEntityId rtEntityId,
-        RtAssociationQueryOptions associationQueryOptions)
+        RtAssociationExtendedQueryOptions associationExtendedQueryOptions)
     {
-        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], associationQueryOptions)
+        var r = await RepositoryDataSource.GetRtAssociationsAsync(session, [rtEntityId], associationExtendedQueryOptions)
             .ConfigureAwait(false);
 
         return r.Values.FirstOrDefault() ??
@@ -136,32 +136,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
     /// <inheritdoc />
     public async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions)
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationExtendedQueryOptions associationExtendedQueryOptions)
     {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, associationQueryOptions)
+        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, associationExtendedQueryOptions)
             .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public virtual async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId> roleId,
-        RtAssociationQueryOptions associationQueryOptions)
-    {
-        return await RepositoryDataSource.GetRtAssociationsAsync(session, rtEntityIds, roleId, associationQueryOptions)
-            .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public virtual async Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        RtEntityId rtEntityId, RtCkId<CkAssociationRoleId> roleId,
-        RtAssociationQueryOptions associationQueryOptions)
-    {
-        var r = await RepositoryDataSource
-            .GetRtAssociationsAsync(session, [rtEntityId], roleId, associationQueryOptions)
-            .ConfigureAwait(false);
-
-        return r.Values.FirstOrDefault() ??
-               new ResultSet<RtAssociation>(new List<RtAssociation>(), 0, null, null);
     }
 
     /// <inheritdoc />

@@ -39,21 +39,10 @@ public interface IRepositoryDataSource
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <param name="associationExtendedQueryOptions">Options of the association query</param>
     /// <returns></returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        RtAssociationQueryOptions associationQueryOptions);
-
-    /// <summary>
-    ///     Gets associations for a runtime entity of a specific role
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="roleId">The construction kit role to get</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
-    /// <returns></returns>
-    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, IEnumerable<RtEntityId> rtEntityIds,
-        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
+        RtAssociationExtendedQueryOptions associationExtendedQueryOptions);
 
     /// <summary>
     ///     Returns the current multiplicity of a runtime association, that means the number of associations that exist for a give runtime entity
@@ -85,7 +74,7 @@ public interface IRepositoryDataSource
     /// <param name="associationQueryOptions">Options of the association query</param>
     /// <returns>The list of associations</returns>
     Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions);
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationBaseQueryOptions associationQueryOptions);
 
     /// <summary>
     ///     Creates an instance of a runtime association

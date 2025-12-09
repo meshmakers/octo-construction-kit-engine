@@ -3,9 +3,9 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 namespace Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 
 /// <summary>
-/// Represents query options for runtime associations.
+/// Represents basic query options for runtime associations
 /// </summary>
-public record RtAssociationQueryOptions
+public record RtAssociationBaseQueryOptions
 {
     /// <summary>
     /// Gets the graph direction of the association.
@@ -22,7 +22,14 @@ public record RtAssociationQueryOptions
     /// </summary>
     public int? Take { get; }
 
-    private RtAssociationQueryOptions(GraphDirections direction, int? skip = null, int? take = null)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="RtAssociationBaseQueryOptions"/> class.
+    /// </summary>
+    /// <param name="direction">The graph direction for query</param>
+    /// <param name="skip">Amount of items to skip</param>
+    /// <param name="take">Amount of items to take</param>
+    protected RtAssociationBaseQueryOptions(GraphDirections direction, int? skip = null,
+        int? take = null)
     {
         Direction = direction;
         Skip = skip;
@@ -39,7 +46,7 @@ public record RtAssociationQueryOptions
     /// Defines global filter settings for runtime association queries
     /// </summary>
     /// <param name="includeArchived">When true, archived associations are returned by the data operation, otherwise not</param>
-    public RtAssociationQueryOptions Global(bool includeArchived)
+    public RtAssociationBaseQueryOptions Global(bool includeArchived)
     {
         GlobalFilter = new GlobalRtAssociationFilter(includeArchived);
 
@@ -47,14 +54,14 @@ public record RtAssociationQueryOptions
     }
 
     /// <summary>
-    ///     Creates a new instance of <see cref="RtAssociationQueryOptions" />.
+    ///     Creates a new instance of <see cref="RtAssociationBaseQueryOptions" />.
     /// </summary>
     /// <param name="direction">The graph direction for query</param>
     /// <param name="skip">Number of items to skip</param>
     /// <param name="take">Number of items to take</param>
     /// <returns></returns>
-    public static RtAssociationQueryOptions Create(GraphDirections direction, int? skip = null, int? take = null)
+    public static RtAssociationBaseQueryOptions Create(GraphDirections direction, int? skip = null, int? take = null)
     {
-        return new RtAssociationQueryOptions(direction, skip, take);
+        return new RtAssociationBaseQueryOptions(direction, skip, take);
     }
 }

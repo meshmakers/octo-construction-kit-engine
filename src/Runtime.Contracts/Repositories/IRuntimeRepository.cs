@@ -111,43 +111,20 @@ public interface IRuntimeRepository
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityId">Runtime entity identifier to get associations for</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <param name="associationExtendedQueryOptions">Options of the association query</param>
     /// <returns>Result set with available associations</returns>
     Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        RtEntityId rtEntityId, RtAssociationQueryOptions associationQueryOptions);
+        RtEntityId rtEntityId, RtAssociationExtendedQueryOptions associationExtendedQueryOptions);
 
     /// <summary>
     ///     Gets associations for a runtime entity.
     /// </summary>
     /// <param name="session">The session object</param>
     /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
+    /// <param name="associationExtendedQueryOptions">Options of the association query</param>
     /// <returns>Result set with available associations</returns>
     Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions);
-
-    /// <summary>
-    ///     Gets associations for a runtime entity of a specific role
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtEntityId">Runtime entity identifier to get associations for</param>
-    /// <param name="roleId">Association role</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
-    /// <returns>Result set with available associations</returns>
-    Task<IResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session, RtEntityId rtEntityId,
-        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
-
-    /// <summary>
-    /// Gets associations for multiple runtime entities of a specific role
-    /// </summary>
-    /// <param name="session">The session object</param>
-    /// <param name="rtEntityIds">Runtime entity identifiers to get associations for</param>
-    /// <param name="roleId">Association role</param>
-    /// <param name="associationQueryOptions">Options of the association query</param>
-    /// <returns>Multiple result set with available associations grouped by origin runtime entity identifier</returns>
-    Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds,
-        RtCkId<CkAssociationRoleId> roleId, RtAssociationQueryOptions associationQueryOptions);
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationExtendedQueryOptions associationExtendedQueryOptions);
 
     /// <summary>
     ///     Gets an association by its origin, target and role id.

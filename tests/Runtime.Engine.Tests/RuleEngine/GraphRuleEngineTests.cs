@@ -292,7 +292,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
 
         A.CallTo(() =>
                 dataSource.GetRtAssociationsAsync(session, new[] { entity.ToRtEntityId() },
-                    A<RtAssociationQueryOptions>._))
+                    A<RtAssociationExtendedQueryOptions>._))
             .Returns(new AssociationMultipleOriginResultSet(dict));
 
         // Act
@@ -442,7 +442,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     private static void SetupEmptyAssociations(IRepositoryDataSource dataSource)
     {
         A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._,
-                A<RtAssociationQueryOptions>._))
+                A<RtAssociationExtendedQueryOptions>._))
             .Returns(new List<RtAssociation>());
     }
 
@@ -460,7 +460,7 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var association = CreateAssociation(origin, target, roleId);
         A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._, A<IEnumerable<RtOriginTargetPair>>._,
-                A<RtAssociationQueryOptions>._))
+                A<RtAssociationExtendedQueryOptions>._))
             .Returns([association]);
     }
 

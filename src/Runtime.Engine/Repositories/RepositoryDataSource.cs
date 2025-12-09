@@ -39,23 +39,15 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, RtAssociationQueryOptions associationQueryOptions)
+        IEnumerable<RtEntityId> rtEntityIds, RtAssociationExtendedQueryOptions associationExtendedQueryOptions)
     {
-        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), null, associationQueryOptions);
+        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), associationExtendedQueryOptions);
     }
 
-
-    /// <inheritdoc />
-    public Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId> roleId,
-        RtAssociationQueryOptions associationQueryOptions)
-    {
-        return GetRtAssociationsInternalAsync(session, rtEntityIds.ToList(), roleId, associationQueryOptions);
-    }
 
     private async Task<IMultipleOriginResultSet<RtAssociation>> GetRtAssociationsInternalAsync(IOctoSession session,
-        ICollection<RtEntityId> rtEntityIds, RtCkId<CkAssociationRoleId>? roleId,
-        RtAssociationQueryOptions options)
+        ICollection<RtEntityId> rtEntityIds,
+        RtAssociationExtendedQueryOptions options)
     {
         var associations = new Dictionary<RtEntityId, List<RtAssociation>>();
         foreach (var rtEntityId in rtEntityIds)
@@ -65,6 +57,9 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
         bool includeArchived = options.GlobalFilter?.IncludeArchived ?? false;
+        var roleId = options.RoleId;
+        var originCkTypeId = options.OriginTypeId;
+        var targetCkTypeId = options.TargetTypeId;
 
         if (options.Direction == GraphDirections.Any ||
             options.Direction == GraphDirections.Inbound)
@@ -72,6 +67,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             foreach (var rtAssociation in queryable.Where(x =>
                              (includeArchived || x.RtState != RtState.Archived) &&
                              (roleId == null || x.AssociationRoleId == roleId) &&
+                             (originCkTypeId == null || x.OriginCkTypeId == originCkTypeId) &&
+                             (targetCkTypeId == null || x.TargetCkTypeId == targetCkTypeId) &&
                              rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
                                                            rtEntityId.CkTypeId == x.TargetCkTypeId
                              )))
@@ -154,7 +151,7 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
 
     /// <inheritdoc />
     public abstract Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions);
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationBaseQueryOptions associationQueryOptions);
 
     /// <inheritdoc />
     public RtAssociation CreateTransientRtAssociation(RtEntityId originRtEntityId, RtCkId<CkAssociationRoleId> ckRoleId,

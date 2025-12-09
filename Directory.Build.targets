@@ -38,7 +38,7 @@
         <ItemGroup>
             <!-- Define a temporary item group to iterate through -->
             <_ConstructionKitFolder Include="@(ConstructionKitFolder)"/>
-        </ItemGroup>
+        </ItemGroup>q
 
         <Message Condition="!Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Create new construction kit library"/>
         <Exec Condition="!Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c new -p %(_ConstructionKitFolder.Identity)">

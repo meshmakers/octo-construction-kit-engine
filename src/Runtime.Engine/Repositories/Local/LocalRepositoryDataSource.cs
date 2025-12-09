@@ -82,7 +82,7 @@ internal class LocalRepositoryDataSource : RepositoryDataSource, ILocalRepositor
     }
 
     public override async Task<IReadOnlyList<RtAssociation>> GetRtAssociationsAsync(IOctoSession session,
-        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationQueryOptions associationQueryOptions)
+        IEnumerable<RtOriginTargetPair> rtOriginTargetPair, RtAssociationBaseQueryOptions associationQueryOptions)
     {
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
         bool includeArchived = associationQueryOptions.GlobalFilter?.IncludeArchived ?? false;

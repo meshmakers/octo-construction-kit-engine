@@ -13,22 +13,23 @@ public record RtAssociationExtendedQueryOptions : RtAssociationBaseQueryOptions
     public RtCkId<CkAssociationRoleId>? RoleId { get; }
 
     /// <summary>
-    /// Gets if defined a value indicating to filter by a specific origin type id
+    /// Gets if defined a value indicating to filter by a specific related type id
     /// </summary>
-    public RtCkId<CkTypeId>? OriginTypeId { get; }
+    public RtCkId<CkTypeId>? RelatedRtCkTypeId { get; }
 
     /// <summary>
-    /// Gets if defined a value indicating to filter by a specific target type id
+    /// Defines if set a value indicating to filter by a specific related runtime entity id
     /// </summary>
-    public RtCkId<CkTypeId>? TargetTypeId { get; }
+    public OctoObjectId? RelatedRtId { get; }
 
-    internal RtAssociationExtendedQueryOptions(GraphDirections direction, RtCkId<CkAssociationRoleId>? roleId = null,
-        RtCkId<CkTypeId>? originTypeId = null, RtCkId<CkTypeId>? targetTypeId = null, int? skip = null,
+    private RtAssociationExtendedQueryOptions(GraphDirections direction, RtCkId<CkAssociationRoleId>? roleId = null,
+        RtCkId<CkTypeId>? relatedRtCkTypeId = null,
+        OctoObjectId? relatedRtId = null, int? skip = null,
         int? take = null) : base(direction, skip, take)
     {
         RoleId = roleId;
-        OriginTypeId = originTypeId;
-        TargetTypeId = targetTypeId;
+        RelatedRtCkTypeId = relatedRtCkTypeId;
+        RelatedRtId = relatedRtId;
     }
 
     /// <summary>
@@ -65,10 +66,30 @@ public record RtAssociationExtendedQueryOptions : RtAssociationBaseQueryOptions
     /// <param name="originTypeId">Filter by origin type id</param>
     /// <returns></returns>
     public static RtAssociationExtendedQueryOptions Create(GraphDirections direction,
-        RtCkId<CkAssociationRoleId>? roleId = null,
+        RtCkId<CkAssociationRoleId>? roleId,
         RtCkId<CkTypeId>? originTypeId = null, RtCkId<CkTypeId>? targetTypeId = null, int? skip = null,
         int? take = null)
     {
-        return new RtAssociationExtendedQueryOptions(direction, roleId, originTypeId, targetTypeId, skip, take);
+        return new RtAssociationExtendedQueryOptions(direction, roleId, targetTypeId, null, skip,
+            take);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="RtAssociationExtendedQueryOptions" />.
+    /// </summary>
+    /// <param name="direction">The graph direction for query</param>
+    /// <param name="relatedRtCkTypeId">Filter by related type id</param>
+    /// <param name="relatedRtId">Filter by related runtime entity id</param>
+    /// <param name="skip">Number of items to skip</param>
+    /// <param name="take">Number of items to take</param>
+    /// <param name="roleId">Filter by role id</param>
+    /// <returns></returns>
+    public static RtAssociationExtendedQueryOptions Create(GraphDirections direction,
+        RtCkId<CkAssociationRoleId>? roleId, RtCkId<CkTypeId>? relatedRtCkTypeId,
+        OctoObjectId? relatedRtId, int? skip = null,
+        int? take = null)
+    {
+        return new RtAssociationExtendedQueryOptions(direction, roleId, relatedRtCkTypeId,
+            relatedRtId, skip, take);
     }
 }

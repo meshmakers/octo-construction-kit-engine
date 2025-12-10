@@ -58,8 +58,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         var queryable = await RtAssociations.AsQueryableAsync(session).ConfigureAwait(false);
         bool includeArchived = options.GlobalFilter?.IncludeArchived ?? false;
         var roleId = options.RoleId;
-        var originCkTypeId = options.OriginTypeId;
-        var targetCkTypeId = options.TargetTypeId;
+        var relatedRtCkTypeId = options.RelatedRtCkTypeId;
+        var relatedRtId = options.RelatedRtId;
 
         if (options.Direction == GraphDirections.Any ||
             options.Direction == GraphDirections.Inbound)
@@ -67,8 +67,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             foreach (var rtAssociation in queryable.Where(x =>
                              (includeArchived || x.RtState != RtState.Archived) &&
                              (roleId == null || x.AssociationRoleId == roleId) &&
-                             (originCkTypeId == null || x.OriginCkTypeId == originCkTypeId) &&
-                             (targetCkTypeId == null || x.TargetCkTypeId == targetCkTypeId) &&
+                             (relatedRtCkTypeId == null || x.OriginCkTypeId == relatedRtCkTypeId) &&
+                             (relatedRtId == null || x.OriginRtId == relatedRtId) &&
                              rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
                                                            rtEntityId.CkTypeId == x.TargetCkTypeId
                              )))
@@ -92,6 +92,8 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
             foreach (var rtAssociation in queryable.Where(x =>
                          (includeArchived || x.RtState != RtState.Archived) &&
                          (roleId == null || x.AssociationRoleId == roleId) &&
+                         (relatedRtCkTypeId == null || x.TargetCkTypeId == relatedRtCkTypeId) &&
+                         (relatedRtId == null || x.TargetRtId == relatedRtId) &&
                          rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.OriginRtId &&
                                                        rtEntityId.CkTypeId == x.OriginCkTypeId
                          )))

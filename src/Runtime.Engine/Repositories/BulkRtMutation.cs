@@ -252,8 +252,9 @@ internal class BulkRtMutation(
 
         if (options.UseBulkMode)
         {
+            // For replace operations, always use Upsert strategy to ensure existing entities are updated
             await collection.BulkImportAsync(session, rtEntities,
-                new BulkOperationOptions { InsertStrategy = options.BulkInsertStrategy }).ConfigureAwait(false);
+                new BulkOperationOptions { InsertStrategy = BulkInsertStrategies.Upsert }).ConfigureAwait(false);
         }
         else
         {
@@ -320,10 +321,6 @@ internal class BulkRtMutation(
                 // We need to delete the binary data from the file system if it is a linked binary
                 await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityId)
                     .ConfigureAwait(false);
-                // Delete the assocation too.
-                await repositoryDataSource.RtAssociations.DeleteManyAsync(session, a =>
-                    (a.OriginCkTypeId == ckTypeId && a.OriginRtId == rtEntityId.RtId) ||
-                    (a.TargetCkTypeId == ckTypeId && a.TargetRtId == rtEntityId.RtId)).ConfigureAwait(false);
             }
         }
     }

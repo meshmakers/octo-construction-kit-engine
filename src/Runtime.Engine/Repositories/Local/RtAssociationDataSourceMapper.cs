@@ -56,7 +56,9 @@ public class RtAssociationDataSourceMapper : IDataSourceMapper<OctoObjectId, RtA
     /// <inheritdoc />
     public void Apply(RtAssociation savedDocument, RtAssociation documentToApply)
     {
-        throw new NotImplementedException();
+        // Apply mutable properties from documentToApply to savedDocument
+        // Primary use case: archiving associations when an entity is deleted
+        savedDocument.RtState = documentToApply.RtState;
     }
 
     /// <inheritdoc />

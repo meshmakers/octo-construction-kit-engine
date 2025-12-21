@@ -23,7 +23,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         Converters =
         {
             new RtCkIdTypeIdConverter(),
-            new RtCkIdAssociationRoleIdConverter()
+            new RtCkIdAssociationRoleIdConverter(),
+            new JsonStringEnumConverter()
         }
     };
 
@@ -35,6 +36,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             CkTypeId = e.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
             RtCreationDateTime = e.RtCreationDateTime,
             RtChangedDateTime = e.RtChangedDateTime,
+            RtArchivedDateTime = e.RtArchivedDateTime,
+            RtState = e.RtState,
             RtWellKnownName = e.RtWellKnownName,
 #if NETSTANDARD2_0
             Attributes = new Dictionary<string, object?>(e.Attributes
@@ -57,6 +60,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             TargetRtId = e.TargetRtId,
             TargetCkTypeId = e.TargetCkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
             AssociationRoleId = e.AssociationRoleId ?? throw PersistenceException.AssociationRoleIdNotSet(),
+            RtState = e.RtState,
 #if NETSTANDARD2_0
             Attributes = new Dictionary<string, object?>(e.Attributes
                 .ToDictionary(k => k.Key, v => v.Value))
@@ -86,7 +90,14 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
 
             return rtEntities.Select(e =>
             {
-                var entity = new RtEntity(e.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), e.RtId, e.Attributes.ToDictionary(k => k.Key.ToPascalCase(), v => v.Value));
+                var entity = new RtEntity(e.CkTypeId ?? throw PersistenceException.CkTypeIdNotSet(), e.RtId, e.Attributes.ToDictionary(k => k.Key.ToPascalCase(), v => v.Value))
+                {
+                    RtCreationDateTime = e.RtCreationDateTime,
+                    RtChangedDateTime = e.RtChangedDateTime,
+                    RtArchivedDateTime = e.RtArchivedDateTime,
+                    RtState = e.RtState,
+                    RtWellKnownName = e.RtWellKnownName
+                };
                 return entity;
             });
         }
@@ -163,6 +174,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         public OctoObjectId RtId { get; set; }
         public DateTime? RtCreationDateTime { get; set; }
         public DateTime? RtChangedDateTime { get; set; }
+        public DateTime? RtArchivedDateTime { get; set; }
+        public RtState? RtState { get; set; }
         public string? RtWellKnownName { get; set; }
         public Dictionary<string, object?> Attributes { get; set; } = new();
     }
@@ -175,6 +188,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         public OctoObjectId TargetRtId { get; set; }
         public RtCkId<CkTypeId> TargetCkTypeId { get; set; } = null!;
         public RtCkId<CkAssociationRoleId> AssociationRoleId { get; set; } = null!;
+        public RtState? RtState { get; set; }
 
         public Dictionary<string, object?> Attributes { get; set; } = new();
     }

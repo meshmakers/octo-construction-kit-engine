@@ -70,6 +70,17 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 
         savedDocument.RtChangedDateTime = documentToApply.RtChangedDateTime;
         savedDocument.RtWellKnownName = documentToApply.RtWellKnownName;
+
+        // Apply state changes for archiving
+        if (documentToApply.RtState.HasValue)
+        {
+            savedDocument.RtState = documentToApply.RtState;
+        }
+
+        if (documentToApply.RtArchivedDateTime.HasValue)
+        {
+            savedDocument.RtArchivedDateTime = documentToApply.RtArchivedDateTime;
+        }
     }
 
     /// <inheritdoc />
@@ -99,7 +110,9 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
                 CkTypeId = modelRtEntity.CkTypeId,
                 RtChangedDateTime = modelRtEntity.RtChangedDateTime,
                 RtCreationDateTime = modelRtEntity.RtCreationDateTime,
-                RtWellKnownName = modelRtEntity.RtWellKnownName
+                RtWellKnownName = modelRtEntity.RtWellKnownName,
+                RtState = modelRtEntity.RtState,
+                RtArchivedDateTime = modelRtEntity.RtArchivedDateTime
             };
 
             foreach (var modelRtAttribute in modelRtEntity.Attributes)

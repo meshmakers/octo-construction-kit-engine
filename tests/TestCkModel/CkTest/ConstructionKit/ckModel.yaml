@@ -1,6 +1,6 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-meta.schema.json"
 modelId: "Test-1.0.0"
 dependencies:
-  - "System-(,2.0]"
+  - "System-(,2.0)"
 
 

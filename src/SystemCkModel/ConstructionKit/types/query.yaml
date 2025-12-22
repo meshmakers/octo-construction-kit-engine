@@ -1,14 +1,22 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
-  - typeId: Query
+  - typeId: SystemQuery
     derivedFromCkTypeId: ${this}/Entity
+    isFinal: false
+    isAbstract: true
+    attributes:
+      - id: ${this}/Name
+        name: Name
+      - id: ${this}/Description
+        name: Description
+        isOptional: true
+      - id: ${this}/Query.CkTypeId
+        name: QueryCkTypeId
+  - typeId: SimpleRtQuery
+    derivedFromCkTypeId: ${this}/SystemQuery
     isFinal: false
     isAbstract: false
     attributes:
-      - id: ${this}/Query.CkTypeId
-        name: QueryCkTypeId
-      - id: ${this}/Query.Types
-        name: QueryType
       - id: ${this}/Query.Columns
         name: Columns
       - id: ${this}/Query.Sorting
@@ -23,5 +31,37 @@ types:
       - id: ${this}/Query.AttributeSearchFilter
         name: AttributeSearchFilter
         isOptional: true
-      - id: ${this}/Name
-        name: Name
+  - typeId: AggregationRtQuery
+    derivedFromCkTypeId: ${this}/SystemQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/AggregationQueryColumn
+        name: Columns
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true
+      - id: ${this}/Query.TextSearchFilter
+        name: TextSearchFilter
+        isOptional: true
+      - id: ${this}/Query.AttributeSearchFilter
+        name: AttributeSearchFilter
+        isOptional: true
+  - typeId: GroupingAggregationRtQuery
+    derivedFromCkTypeId: ${this}/SystemQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/Query.GroupByColumns
+        name: GroupingColumns
+      - id: ${this}/AggregationQueryColumn
+        name: Columns
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true
+      - id: ${this}/Query.TextSearchFilter
+        name: TextSearchFilter
+        isOptional: true
+      - id: ${this}/Query.AttributeSearchFilter
+        name: AttributeSearchFilter
+        isOptional: true

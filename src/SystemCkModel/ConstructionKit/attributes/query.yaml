@@ -2,6 +2,8 @@
 attributes:
   - id: Query.Columns
     valueType: StringArray
+  - id: Query.GroupByColumns
+    valueType: StringArray
   - id: Query.CkTypeId
     valueType: String
   - id: Query.Sorting
@@ -16,11 +18,6 @@ attributes:
   - id: Query.AttributeSearchFilter
     valueType: Record
     valueCkRecordId: ${this}/AttributeSearchFilter
-  - id: Query.Types
-    valueType: Enum
-    valueCkEnumId: ${this}/QueryTypes
-    defaultValues:
-      - 0
   - id: AttributePath
     valueType: String
   - id: AttributePaths
@@ -33,3 +30,9 @@ attributes:
   - id: SortOrder
     valueType: Enum
     valueCkEnumId: ${this}/SortOrders
+  - id: AggregationType
+    valueType: Enum
+    valueCkEnumId: ${this}/AggregationTypes
+  - id: AggregationQueryColumn
+    valueType: Record
+    valueCkRecordId: ${this}/AggregationQueryColumn

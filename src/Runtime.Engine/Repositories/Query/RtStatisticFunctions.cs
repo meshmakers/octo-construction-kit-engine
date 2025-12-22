@@ -1,4 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -80,10 +81,14 @@ public class RtStatisticFunctions<TEntity> where TEntity : RtEntity
             return new List<FieldAggregationResult>();
         }
 
+        var resolveFlags = _fieldAggregation.ResolveEnumValuesToNames
+            ? AttributeValueResolveFlags.ResolveEnumsToNames
+            : AttributeValueResolveFlags.Default;
+
         var groupByPropertiesResult =
             resultList.GroupBy(g =>
                 new Key(_fieldAggregation.GroupByAttributePathList.Select(a =>
-                    g.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, a))));
+                    g.GetAttributeValueByAccessPath(_ckCacheService, _tenantId, a, resolveFlags))));
 
         var calculateGrouping = new List<FieldAggregationResult>();
         foreach (var entityGrouping in groupByPropertiesResult.OrderBy(x => x.Key))

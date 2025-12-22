@@ -4,13 +4,14 @@ using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Xunit;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v2;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ConstructionKit.Engine.SystemTests.Documentation;
 
 public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFixture<TemporaryDirectoryFixture>
 {
-    private async Task<(IContentGenerator contentGenerator, string rootPath, CkModelGraph ckModelGraph, CkModelId modelId)>
+    private async Task<(IContentGenerator contentGenerator, string rootPath, CkModelGraph ckModelGraph)>
             SetupTestAsync(string relativePath)
         {
             await using var stream = File.OpenRead(relativePath);
@@ -26,9 +27,8 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
 
             var contentGenerator = serviceProvider.GetRequiredService<IContentGenerator>();
             var rootPath = fixture.CreateTempDirectory();
-            var modelId = new CkModelId("System");
 
-            return (contentGenerator, rootPath, ckModelGraph, modelId);
+            return (contentGenerator, rootPath, ckModelGraph);
         }
 
         [Fact]
@@ -36,15 +36,15 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         {
             // Arrange
             const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
+            var (contentGenerator, rootPath, resolvedTypes) = await SetupTestAsync(relativePath);
 
             // Act
-            await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, rootPath, modelId, "", "test");
+            await contentGenerator.GenerateAttributesMarkdownTable(resolvedTypes, rootPath, SystemCkIds.CkModelId, "", "test");
 
             // Assert
             Assert.True(Directory.Exists(rootPath));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.True(File.Exists(Path.Combine(rootPath, "System", "Attributes.md")));
+            Assert.True(Directory.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName)));
+            Assert.True(File.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName, "Attributes.md")));
         }
         
         [Fact]
@@ -52,15 +52,15 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         {
             // Arrange
             const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
+            var (contentGenerator, rootPath, resolvedTypes) = await SetupTestAsync(relativePath);
 
             // Act
-            await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, rootPath, modelId, "", "test");
+            await contentGenerator.GenerateTypesMarkdownTable(resolvedTypes, rootPath, SystemCkIds.CkModelId, "", "test");
 
             // Assert
             Assert.True(Directory.Exists(rootPath));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.True(File.Exists(Path.Combine(rootPath, "System", "Types.md")));
+            Assert.True(Directory.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName)));
+            Assert.True(File.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName, "Types.md")));
         }
         
         [Fact]
@@ -68,15 +68,15 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         {
             // Arrange
             const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, resolvedTypes, modelId) = await SetupTestAsync(relativePath);
+            var (contentGenerator, rootPath, resolvedTypes) = await SetupTestAsync(relativePath);
 
             // Act
-            await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, rootPath, modelId, "", "test");
+            await contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, rootPath, SystemCkIds.CkModelId, "", "test");
 
             // Assert
             Assert.True(Directory.Exists(rootPath));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.True(File.Exists(Path.Combine(rootPath, "System", "Associations.md")));
+            Assert.True(Directory.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName)));
+            Assert.True(File.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName, "Associations.md")));
         }
         
         [Fact]
@@ -84,14 +84,14 @@ public class ContentGeneratorTests(TemporaryDirectoryFixture fixture) : IClassFi
         {
             // Arrange
             const string relativePath = "octo-ck-libraries/ConstructionKit.Engine.SystemTests/imports/ck-test.yaml";
-            var (contentGenerator, rootPath, _, modelId) = await SetupTestAsync(relativePath);
+            var (contentGenerator, rootPath, _) = await SetupTestAsync(relativePath);
 
             // Act
-            await contentGenerator.GenerateVersionHistory(rootPath, modelId, "", "test");
+            await contentGenerator.GenerateVersionHistory(rootPath, SystemCkIds.CkModelId, "", "test");
 
             // Assert
             Assert.True(Directory.Exists(rootPath));
-            Assert.True(Directory.Exists(Path.Combine(rootPath, modelId.SemanticVersionedFullName)));
-            Assert.True(File.Exists(Path.Combine(rootPath, "System", "VersionHistory.md")));
+            Assert.True(Directory.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName)));
+            Assert.True(File.Exists(Path.Combine(rootPath, SystemCkIds.CkModelId.SemanticVersionedFullName, "VersionHistory.md")));
         }
 }

@@ -30,6 +30,7 @@
     <ItemGroup>
       <ProjectReference Include="..\..\src\ConstructionKit.Contracts\ConstructionKit.Contracts.csproj" />
       <ProjectReference Include="..\..\src\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
+      <ProjectReference Include="..\..\src\SystemCkModel\SystemCkModel.csproj" />
     </ItemGroup>
 
 </Project>

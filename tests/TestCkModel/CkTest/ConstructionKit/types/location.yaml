@@ -14,16 +14,16 @@ types:
     isFinal: false
     isAbstract: true
     attributes:
-      - id: Test/Designation
+      - id: ${this}/Designation
         name: Designation
 
   - typeId: LocationWithSensor
-    derivedFromCkTypeId: Test/Location
+    derivedFromCkTypeId: ${this}/Location
     isFinal: false
     isAbstract: true
 
   - typeId: Continent
-    derivedFromCkTypeId: Test/Location
+    derivedFromCkTypeId: ${this}/Location
     isFinal: true
     isAbstract: false
 
@@ -38,91 +38,91 @@ types:
         name: ConnectionState2
 
   - typeId: Ocean
-    derivedFromCkTypeId: Test/Location
+    derivedFromCkTypeId: ${this}/Location
     isFinal: true
     isAbstract: false
 
 
   - typeId: Country
-    derivedFromCkTypeId: Test/Location
+    derivedFromCkTypeId: ${this}/Location
     isFinal: true
     isAbstract: false
     attributes:
-      - id: Test/StringArrayTests
+      - id: ${this}/StringArrayTests
         name: StringArrayTests
-      - id: Test/IntArrayTests
+      - id: ${this}/IntArrayTests
         name: IntArrayTests
-      - id: Test/RecordArrayTests
+      - id: ${this}/RecordArrayTests
         name: RecordArrayTests
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/Continent
+        targetCkTypeId: ${this}/Continent
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/Ocean
+        targetCkTypeId: ${this}/Ocean
 
   - typeId: Region
-    derivedFromCkTypeId: Test/LocationWithSensor
+    derivedFromCkTypeId: ${this}/LocationWithSensor
     isFinal: true
     isAbstract: false
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/Country
+        targetCkTypeId: ${this}/Country
 
   - typeId: City
-    derivedFromCkTypeId: Test/Location
+    derivedFromCkTypeId: ${this}/Location
     isFinal: true
     isAbstract: false
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/Region
+        targetCkTypeId: ${this}/Region
 
   - typeId: District
-    derivedFromCkTypeId: Test/LocationWithSensor
+    derivedFromCkTypeId: ${this}/LocationWithSensor
     isFinal: true
     isAbstract: false
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/City
+        targetCkTypeId: ${this}/City
 
   - typeId: Zone
-    derivedFromCkTypeId: Test/LocationWithSensor
+    derivedFromCkTypeId: ${this}/LocationWithSensor
     isFinal: true
     isAbstract: false
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/District
+        targetCkTypeId: ${this}/District
 
   - typeId: Sensor
     derivedFromCkTypeId: ${System}/Entity
     isFinal: true
     isAbstract: false
     attributes:
-      - id: Test/Designation
+      - id: ${this}/Designation
         name: Designation
         isOptional: false
-      - id: Test/ConnectionState
+      - id: ${this}/ConnectionState
         name: ConnectionState
         isOptional: false
-      - id: Test/DataCount
+      - id: ${this}/DataCount
         name: DataCount
         isOptional: true
-      - id: Test/LocationX
+      - id: ${this}/LocationX
         name: LocationX
         isOptional: true
-      - id: Test/IsEnabled
+      - id: ${this}/IsEnabled
         name: IsEnabled
-      - id: Test/RecordTest
+      - id: ${this}/RecordTest
         name: RecordTest
         isOptional: true
-      - id: Test/StringArrayTests
+      - id: ${this}/StringArrayTests
         name: StringArrayTests
         isOptional: true
-      - id: Test/IntArrayTests
+      - id: ${this}/IntArrayTests
         name: IntArrayTests
         isOptional: true
-      - id: Test/RecordArrayTests
+      - id: ${this}/RecordArrayTests
         name: RecordArrayTests
         isOptional: true
     associations:
       - id: ${System}/ParentChild
-        targetCkTypeId: Test/LocationWithSensor
+        targetCkTypeId: ${this}/LocationWithSensor

@@ -6,10 +6,10 @@ attributes:
     valueType: String
   - id: ConnectionState
     valueType: Enum
-    valueCkEnumId: Test/ConnectionState
+    valueCkEnumId: ${this}/ConnectionState
   - id: ConnectionState-2
     valueType: Enum
-    valueCkEnumId: Test/ConnectionState-2
+    valueCkEnumId: ${this}/ConnectionState-2
   - id: DataCount
     valueType: Int
   - id: LocationX
@@ -28,13 +28,13 @@ attributes:
       - 6
   - id: RecordArrayTests
     valueType: RecordArray
-    valueCkRecordId: Test/TestRecord
+    valueCkRecordId: ${this}/TestRecord
 
   - id: RecordTest
     valueType: Record
-    valueCkRecordId: Test/TestRecord
+    valueCkRecordId: ${this}/TestRecord
   - id: RecordTest-2
     valueType: Record
-    valueCkRecordId: Test/TestRecord-2
+    valueCkRecordId: ${this}/TestRecord-2
   - id: Binary
     valueType: BinaryLinked

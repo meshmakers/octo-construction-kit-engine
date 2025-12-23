@@ -1,6 +1,7 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Entity
+    description: "Abstract base type for all entities in the system. Provides common indexing and association capabilities."
     isFinal: false
     isAbstract: true
     associations:

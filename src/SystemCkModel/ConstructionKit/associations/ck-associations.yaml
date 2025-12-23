@@ -1,11 +1,13 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 associationRoles:
   - id: ParentChild
+    description: "Hierarchical parent-child relationship for building tree structures."
     inboundName: Children
     inboundMultiplicity: N
     outboundName: Parent
     outboundMultiplicity: One
   - id: Related
+    description: "Generic many-to-many relationship for linking related entities."
     inboundName: RelatesFrom
     inboundMultiplicity: N
     outboundName: RelatesTo

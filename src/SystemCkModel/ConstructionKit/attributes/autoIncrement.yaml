@@ -1,8 +1,11 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: AutoIncrement.End
+    description: "The upper limit of the auto-increment sequence."
     valueType: Int
   - id: AutoIncrement.CurrentValue
+    description: "The current value of the auto-increment counter."
     valueType: Int
   - id: AutoIncrement.Format
+    description: "Optional format string for generating formatted identifiers (e.g., 'INV-{0:D6}')."
     valueType: String

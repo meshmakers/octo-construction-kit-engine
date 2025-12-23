@@ -1,6 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
 - recordId: SortOrderItem
+  description: "Specifies the sorting configuration for a single attribute in query results."
   attributes:
     - id: ${this}/AttributePath
       name: AttributePath

@@ -1,6 +1,35 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
+  # This is the old Query type kept for backward compatibility
+  # deprecated: true
+  - typeId: Query
+    description: "Legacy query type for backward compatibility. Use SimpleRtQuery, AggregationRtQuery, or GroupingAggregationRtQuery instead."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/Query.CkTypeId
+        name: QueryCkTypeId
+      - id: ${this}/Query.Types
+        name: QueryType
+      - id: ${this}/Query.Columns
+        name: Columns
+      - id: ${this}/Query.Sorting
+        name: Sorting
+        isOptional: true
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true
+      - id: ${this}/Query.TextSearchFilter
+        name: TextSearchFilter
+        isOptional: true
+      - id: ${this}/Query.AttributeSearchFilter
+        name: AttributeSearchFilter
+        isOptional: true
+      - id: ${this}/Name
+        name: Name
   - typeId: SystemQuery
+    description: "Abstract base type for all query types. Defines common query properties like name, description, and target type."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: false
     isAbstract: true
@@ -13,6 +42,7 @@ types:
       - id: ${this}/Query.CkTypeId
         name: QueryCkTypeId
   - typeId: SimpleRtQuery
+    description: "Query type for retrieving rows/tuples from entities with support for column selection, sorting, and filtering."
     derivedFromCkTypeId: ${this}/SystemQuery
     isFinal: false
     isAbstract: false
@@ -32,6 +62,7 @@ types:
         name: AttributeSearchFilter
         isOptional: true
   - typeId: AggregationRtQuery
+    description: "Query type for performing aggregation operations (Count, Min, Max, Avg, Sum) on entity data without grouping."
     derivedFromCkTypeId: ${this}/SystemQuery
     isFinal: false
     isAbstract: false
@@ -48,6 +79,7 @@ types:
         name: AttributeSearchFilter
         isOptional: true
   - typeId: GroupingAggregationRtQuery
+    description: "Query type for performing grouped aggregation operations with GROUP BY functionality on entity data."
     derivedFromCkTypeId: ${this}/SystemQuery
     isFinal: false
     isAbstract: false

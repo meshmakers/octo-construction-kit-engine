@@ -28,7 +28,7 @@ types:
         isOptional: true
       - id: ${this}/Name
         name: Name
-  - typeId: SystemQuery
+  - typeId: PersistentQuery
     description: "Abstract base type for all query types. Defines common query properties like name, description, and target type."
     derivedFromCkTypeId: ${this}/Entity
     isFinal: false
@@ -43,7 +43,7 @@ types:
         name: QueryCkTypeId
   - typeId: SimpleRtQuery
     description: "Query type for retrieving rows/tuples from entities with support for column selection, sorting, and filtering."
-    derivedFromCkTypeId: ${this}/SystemQuery
+    derivedFromCkTypeId: ${this}/PersistentQuery
     isFinal: false
     isAbstract: false
     attributes:
@@ -63,7 +63,7 @@ types:
         isOptional: true
   - typeId: AggregationRtQuery
     description: "Query type for performing aggregation operations (Count, Min, Max, Avg, Sum) on entity data without grouping."
-    derivedFromCkTypeId: ${this}/SystemQuery
+    derivedFromCkTypeId: ${this}/PersistentQuery
     isFinal: false
     isAbstract: false
     attributes:
@@ -80,7 +80,7 @@ types:
         isOptional: true
   - typeId: GroupingAggregationRtQuery
     description: "Query type for performing grouped aggregation operations with GROUP BY functionality on entity data."
-    derivedFromCkTypeId: ${this}/SystemQuery
+    derivedFromCkTypeId: ${this}/PersistentQuery
     isFinal: false
     isAbstract: false
     attributes:

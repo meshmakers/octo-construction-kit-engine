@@ -67,7 +67,7 @@ types:
     isFinal: false
     isAbstract: false
     attributes:
-      - id: ${this}/AggregationQueryColumn
+      - id: ${this}/AggregationQueryColumns
         name: Columns
       - id: ${this}/Query.FieldFilter
         name: FieldFilter
@@ -86,7 +86,7 @@ types:
     attributes:
       - id: ${this}/Query.GroupByColumns
         name: GroupingColumns
-      - id: ${this}/AggregationQueryColumn
+      - id: ${this}/AggregationQueryColumns
         name: Columns
       - id: ${this}/Query.FieldFilter
         name: FieldFilter

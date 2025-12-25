@@ -50,6 +50,10 @@ attributes:
     description: "Defines an aggregation column with its attribute path and aggregation type."
     valueType: Record
     valueCkRecordId: ${this}/AggregationQueryColumn
+  - id: AggregationQueryColumns
+    description: "Defines a set of aggregation columns for the query, with its attribute path and aggregation type."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/AggregationQueryColumn
   # This attribute is kept for backward compatibility
   # deprecated: true
   - id: Query.Types

@@ -46,6 +46,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
+        <ProjectReference Include="..\Runtime.Engine\Runtime.Engine.csproj" />
     </ItemGroup>
 
     <ItemGroup>

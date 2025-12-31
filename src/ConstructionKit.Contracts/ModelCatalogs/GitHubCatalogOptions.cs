@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 
 /// <summary>
@@ -37,7 +39,7 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
 /// <summary>
 /// Defines the GitHub Options for GitHub construction kit catalog
 /// </summary>
-public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOptions(cacheFileName)
+public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOptions(cacheFileName), IGitHubOptions
 {
     /// <summary>
     /// API Token for GitHub

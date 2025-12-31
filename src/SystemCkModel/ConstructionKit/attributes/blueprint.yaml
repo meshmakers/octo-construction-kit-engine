@@ -1,0 +1,11 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: RtBlueprintSource
+    description: "Identifies the blueprint that created this entity (format: 'BlueprintName-Version'). Null if entity was created manually."
+    valueType: String
+  - id: RtBlueprintLocked
+    description: "If true, the entity is managed by the blueprint and will be updated when the blueprint is updated. If false, user modifications are preserved."
+    valueType: Boolean
+  - id: RtBlueprintAppliedAt
+    description: "Timestamp when the blueprint was applied to create or update this entity."
+    valueType: DateTime

@@ -1,7 +1,9 @@
+using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
+using Meshmakers.Octo.Runtime.Engine.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
@@ -44,6 +46,13 @@ public static class ServiceCollectionExtensions
 
         // Add converters
         services.AddTransient<IRtEntityToTcDtoConverter, RtEntityToTcDtoConverter>();
+
+        // Blueprint services
+        services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
+        services.AddSingleton<ITenantBackupService, InMemoryTenantBackupService>();
+        services.AddTransient<IBlueprintService, BlueprintService>();
+        services.AddTransient<IMigrationExecutor, MigrationExecutor>();
+        services.AddTransient<IMigrationParser, MigrationParser>();
 
         return new RuntimeEngineBuilder(services);
     }

@@ -21,7 +21,7 @@ public class YamlSerializerTests
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
         var filePath = "sampleData/files/entity-ok.yaml";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var rtModelRootDto = await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
         Assert.NotNull(rtModelRootDto);
@@ -31,14 +31,14 @@ public class YamlSerializerTests
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_record_ok()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
         var filePath = "sampleData/files/rt-maintenance.yaml";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var rtModelRootDto = await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
         Assert.NotNull(rtModelRootDto);
@@ -47,21 +47,21 @@ public class YamlSerializerTests
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
-        
+
         Assert.Equal(2, rtModelRootDto.Entities[0].Attributes.Count);
         Assert.Equal("Basic/Name", rtModelRootDto.Entities[0].Attributes[0].Id);
         Assert.Equal("Spritzguss 1", rtModelRootDto.Entities[0].Attributes[0].Value);
         Assert.Equal("Basic/NamePlate", rtModelRootDto.Entities[0].Attributes[1].Id);
         Assert.IsType<RtRecordTcDto>(rtModelRootDto.Entities[0].Attributes[1].Value);
     }
-    
+
     [Fact]
     public async Task DeserializeAsync_recordArray_ok()
     {
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
         var filePath = "sampleData/files/rt-maintenanceArray.yaml";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var rtModelRootDto = await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
         Assert.NotNull(rtModelRootDto);
@@ -70,7 +70,7 @@ public class YamlSerializerTests
         Assert.Empty(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
-        
+
         Assert.Equal(2, rtModelRootDto.Entities[0].Attributes.Count);
         Assert.Equal("Basic/Name", rtModelRootDto.Entities[0].Attributes[0].Id);
         Assert.Equal("Spritzguss 1", rtModelRootDto.Entities[0].Attributes[0].Value);
@@ -79,7 +79,7 @@ public class YamlSerializerTests
 
         var x = (List<object>)rtModelRootDto.Entities[0].Attributes[1].Value!;
         Assert.Equal(2, x.Count);
-        
+
         Assert.IsType<RtRecordTcDto>(x[0]);
         Assert.IsType<RtRecordTcDto>(x[1]);
     }
@@ -91,7 +91,7 @@ public class YamlSerializerTests
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
         var filePath = "sampleData/files/noSchema.yaml";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult);
         Assert.Empty(operationResult.Messages);
@@ -105,7 +105,7 @@ public class YamlSerializerTests
         var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
         var filePath = "sampleData/files/noSchema_malformed.yaml";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
             await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
@@ -124,7 +124,7 @@ public class YamlSerializerTests
             var rtYamlSerializer = new RtYamlSerializer(new RtSchemaValidator());
 
             var filePath = "sampleData/files/malformedAttributeValue.yaml";
-            var stream = File.OpenRead(filePath);
+            await using var stream = File.OpenRead(filePath);
             var operationResult = new OperationResult();
             await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
                 await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));

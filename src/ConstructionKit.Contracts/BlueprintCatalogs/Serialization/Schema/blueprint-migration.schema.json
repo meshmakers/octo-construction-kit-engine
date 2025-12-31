@@ -1,0 +1,251 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/blueprint-migration.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blueprint Migration",
+  "description": "Schema for blueprint migration scripts that define how to update from one version to another",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URI of the schema for the migration file"
+    },
+    "sourceVersion": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-]+-[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "The source blueprint version this migration applies from"
+    },
+    "targetVersion": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-]+-[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "The target blueprint version this migration updates to"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this migration does"
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of migration steps to execute",
+      "items": {
+        "$ref": "#/$defs/migrationStep"
+      }
+    },
+    "preConditions": {
+      "type": "array",
+      "description": "Conditions that must be met before the migration can run",
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
+    },
+    "postValidations": {
+      "type": "array",
+      "description": "Validations to run after migration completes",
+      "items": {
+        "$ref": "#/$defs/validation"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "sourceVersion",
+    "targetVersion",
+    "steps"
+  ],
+  "$defs": {
+    "migrationStep": {
+      "type": "object",
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "description": "Unique identifier for this step within the migration"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this step does"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["add", "update", "delete", "rename", "transform"],
+          "description": "The type of action to perform"
+        },
+        "target": {
+          "$ref": "#/$defs/entityTarget",
+          "description": "Target entity or entities for this step"
+        },
+        "data": {
+          "type": "object",
+          "description": "Data to apply (for add/update actions)"
+        },
+        "transform": {
+          "$ref": "#/$defs/transformConfig",
+          "description": "Transform configuration (for transform actions)"
+        },
+        "condition": {
+          "$ref": "#/$defs/condition",
+          "description": "Optional condition that must be true for this step to execute"
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": ["skip", "overwrite", "merge", "fail"],
+          "default": "fail",
+          "description": "How to handle conflicts if entity already exists"
+        },
+        "continueOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to continue with subsequent steps if this step fails"
+        }
+      },
+      "required": ["stepId", "action", "target"],
+      "additionalProperties": false
+    },
+    "entityTarget": {
+      "type": "object",
+      "properties": {
+        "ckTypeId": {
+          "type": "string",
+          "description": "CK type ID to target (e.g., 'System-2.0.0/Entity')"
+        },
+        "rtId": {
+          "type": "string",
+          "description": "Specific runtime entity ID to target"
+        },
+        "rtWellKnownName": {
+          "type": "string",
+          "description": "Well-known name of the entity to target"
+        },
+        "filter": {
+          "$ref": "#/$defs/filterExpression",
+          "description": "Filter expression to match multiple entities"
+        },
+        "blueprintSourceOnly": {
+          "type": "boolean",
+          "default": true,
+          "description": "Only target entities created by this blueprint (rtBlueprintSource matches)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "filterExpression": {
+      "type": "object",
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "description": "Attribute name to filter on"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["eq", "ne", "contains", "startsWith", "endsWith", "exists", "notExists"],
+          "description": "Comparison operator"
+        },
+        "value": {
+          "description": "Value to compare against"
+        },
+        "and": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filterExpression" },
+          "description": "AND combination of filters"
+        },
+        "or": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filterExpression" },
+          "description": "OR combination of filters"
+        }
+      },
+      "additionalProperties": false
+    },
+    "transformConfig": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["rename", "copy", "delete", "setValue", "mapValue"],
+          "description": "Type of transformation"
+        },
+        "sourceAttribute": {
+          "type": "string",
+          "description": "Source attribute name"
+        },
+        "targetAttribute": {
+          "type": "string",
+          "description": "Target attribute name"
+        },
+        "value": {
+          "description": "Static value to set"
+        },
+        "valueMapping": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Map of old values to new values"
+        }
+      },
+      "additionalProperties": false
+    },
+    "condition": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["entityExists", "entityNotExists", "attributeEquals", "custom"],
+          "description": "Type of condition"
+        },
+        "target": {
+          "$ref": "#/$defs/entityTarget",
+          "description": "Entity target for the condition"
+        },
+        "attribute": {
+          "type": "string",
+          "description": "Attribute name for attribute conditions"
+        },
+        "value": {
+          "description": "Expected value for the condition"
+        },
+        "expression": {
+          "type": "string",
+          "description": "Custom expression for complex conditions"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "validationId": {
+          "type": "string",
+          "description": "Unique identifier for this validation"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what is being validated"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["entityCount", "entityExists", "attributeValue", "referenceIntegrity"],
+          "description": "Type of validation"
+        },
+        "target": {
+          "$ref": "#/$defs/entityTarget",
+          "description": "Target for validation"
+        },
+        "expectedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected count (for entityCount validation)"
+        },
+        "expectedValue": {
+          "description": "Expected value (for attributeValue validation)"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning"],
+          "default": "error",
+          "description": "Severity level if validation fails"
+        }
+      },
+      "required": ["validationId", "type"],
+      "additionalProperties": false
+    }
+  }
+}

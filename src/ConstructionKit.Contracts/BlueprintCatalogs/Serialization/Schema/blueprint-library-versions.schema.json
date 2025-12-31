@@ -1,0 +1,53 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/blueprint-library-versions.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blueprint Library Versions",
+  "description": "Schema for blueprint library version index files",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URI of the schema"
+    },
+    "name": {
+      "type": "string",
+      "description": "The name of the blueprint library"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the blueprint library"
+    },
+    "versions": {
+      "type": "array",
+      "description": "List of available versions for this blueprint",
+      "items": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+            "description": "The version number in format 'Major.Minor.Patch'"
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative path to the blueprint package (zip file)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of this specific version"
+          },
+          "releaseDate": {
+            "type": "string",
+            "format": "date",
+            "description": "Release date of this version"
+          }
+        },
+        "required": ["version", "path"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["name", "versions"]
+}

@@ -21,7 +21,7 @@ public class JsonSerializerTests
         var rtJsonSerializer = new RtJsonSerializer();
 
         var filePath = "sampleData/files/entity-ok.json";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
 
         var rtModelRootDto = await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult);
@@ -39,7 +39,7 @@ public class JsonSerializerTests
         var rtJsonSerializer = new RtJsonSerializer();
 
         var filePath = "sampleData/files/entity-ok.json";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var entities = new List<RtEntityTcDto>();
 
@@ -65,7 +65,7 @@ public class JsonSerializerTests
         var rtJsonSerializer = new RtJsonSerializer();
 
         var filePath = "sampleData/files/noSchema.json";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult);
         Assert.Empty(operationResult.Messages);
@@ -79,7 +79,7 @@ public class JsonSerializerTests
         var rtJsonSerializer = new RtJsonSerializer();
 
         var filePath = "sampleData/files/noSchema_malformed.json";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
             await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));
@@ -96,7 +96,7 @@ public class JsonSerializerTests
         var rtJsonSerializer = new RtJsonSerializer();
 
         var filePath = "sampleData/files/malformedAttributeValue.json";
-        var stream = File.OpenRead(filePath);
+        await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
             await rtJsonSerializer.DeserializeAsync(stream, filePath, operationResult));

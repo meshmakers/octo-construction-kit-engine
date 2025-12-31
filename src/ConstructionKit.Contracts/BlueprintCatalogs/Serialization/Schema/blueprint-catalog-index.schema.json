@@ -1,0 +1,39 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/blueprint-catalog-index.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Blueprint Catalog Index",
+  "description": "Schema for blueprint catalog index files (root catalog listing available blueprint libraries)",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URI of the schema"
+    },
+    "blueprintLibraries": {
+      "type": "array",
+      "description": "List of available blueprint libraries in this catalog",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "The name of the blueprint library"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of the blueprint library"
+          },
+          "path": {
+            "type": "string",
+            "description": "Relative path to the library's version index"
+          }
+        },
+        "required": ["name", "path"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": ["blueprintLibraries"]
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/blueprint-catalog-index.schema.json",
+  "blueprintLibraries": [
+    {
+      "name": "Infrastructure"
+    }
+  ]
+}

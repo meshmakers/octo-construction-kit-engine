@@ -9,19 +9,28 @@ namespace Meshmakers.Octo.Runtime.Contracts.Serialization.Schema;
 /// </summary>
 public static class RtSchema
 {
-    private const string SchemaPath = "Meshmakers.Octo.Runtime.Contracts.Serialization.Schema.{0}.json";
+    private const string SchemaPath = "Meshmakers.Octo.Runtime.Contracts.Serialization.Schema.{0}.schema.json";
+
+    // Cached bundled schema - created once during static initialization to avoid race conditions
+    private static readonly Lazy<JsonSchema> RuntimeSchemaLazy = new(CreateBundledRuntimeSchema);
 
     static RtSchema()
     {
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-attribute")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-entity")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-element-association")));
+        // Register sub-schemas first so they are available for $ref resolution
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-attribute")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-entity")));
+        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-association")));
     }
 
     /// <summary>
     ///     Returns the runtime schema
     /// </summary>
     public static JsonSchema GetRuntimeSchema()
+    {
+        return RuntimeSchemaLazy.Value;
+    }
+
+    private static JsonSchema CreateBundledRuntimeSchema()
     {
         var runtimeSchemaInternal = GetSchema(string.Format(SchemaPath, "runtime-model"));
         return runtimeSchemaInternal.Bundle();

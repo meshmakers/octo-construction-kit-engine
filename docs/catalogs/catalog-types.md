@@ -1,25 +1,25 @@
-# Katalog-Typen
+# Catalog Types
 
-## Übersicht
+## Overview
 
-Das System bietet vier Katalog-Implementierungen für unterschiedliche Anwendungsfälle.
+The system provides four catalog implementations for different use cases.
 
 ## EmbeddedResourceCatalog
 
-### Beschreibung
+### Description
 
-Read-only Katalog für CK-Modelle, die als Embedded Resources in der Anwendung eingebettet sind. Wird primär für System-Modelle verwendet.
+Read-only catalog for CK models embedded as resources in the application. Primarily used for system models.
 
-### Eigenschaften
+### Properties
 
-| Eigenschaft | Wert |
-|-------------|------|
-| Order | 0 (höchste Priorität) |
+| Property | Value |
+|----------|-------|
+| Order | 0 (highest priority) |
 | CanRead | true |
 | CanWrite | false |
 | CatalogName | "embedded" |
 
-### Implementierung
+### Implementation
 
 ```csharp
 public class EmbeddedResourceCatalog : ICatalog
@@ -35,9 +35,9 @@ public class EmbeddedResourceCatalog : ICatalog
 }
 ```
 
-### Verwendung
+### Usage
 
-Modelle müssen `ICkEmbeddedModel` implementieren:
+Models must implement `ICkEmbeddedModel`:
 
 ```csharp
 public class SystemCkModel : ICkEmbeddedModel
@@ -57,30 +57,30 @@ public class SystemCkModel : ICkEmbeddedModel
 
 ## LocalFileSystemCatalog
 
-### Beschreibung
+### Description
 
-Dateisystem-basierter Katalog für lokale Entwicklung und Offline-Nutzung. Speichert Modelle im Home-Verzeichnis des Benutzers.
+File system-based catalog for local development and offline use. Stores models in the user's home directory.
 
-### Eigenschaften
+### Properties
 
-| Eigenschaft | Wert |
-|-------------|------|
+| Property | Value |
+|----------|-------|
 | Order | 10 |
-| CanRead | true (konfigurierbar) |
+| CanRead | true (configurable) |
 | CanWrite | true |
 | CatalogName | "local" |
 
-### Speicherstruktur
+### Storage Structure
 
 ```
 ~/.octo/local-catalog/ck-models/v2/
-├── catalog.json                           # Root-Katalog
+├── catalog.json                           # Root catalog
 ├── m/
 │   └── mymodel/
-│       ├── catalog.json                   # Model-Katalog
+│       ├── catalog.json                   # Model catalog
 │       └── 1/
-│           ├── catalog.json               # Version-Katalog
-│           └── mymodel-1.0.0.json         # Kompiliertes Modell
+│           ├── catalog.json               # Version catalog
+│           └── mymodel-1.0.0.json         # Compiled model
 └── s/
     └── system/
         ├── catalog.json
@@ -89,7 +89,7 @@ Dateisystem-basierter Katalog für lokale Entwicklung und Offline-Nutzung. Speic
             └── system-2.0.0.json
 ```
 
-### Katalog-Dateien
+### Catalog Files
 
 **Root catalog.json:**
 ```json
@@ -131,7 +131,7 @@ Dateisystem-basierter Katalog für lokale Entwicklung und Offline-Nutzung. Speic
 }
 ```
 
-### Konfiguration
+### Configuration
 
 ```csharp
 services.Configure<LocalFileSystemCatalogOptions>(options =>
@@ -141,60 +141,60 @@ services.Configure<LocalFileSystemCatalogOptions>(options =>
 });
 ```
 
-### Optionen
+### Options
 
-| Option | Typ | Default | Beschreibung |
-|--------|-----|---------|--------------|
-| RootPath | string | ~/.octo/local-catalog | Wurzelverzeichnis |
-| IsEnabled | bool | true | Aktiviert/deaktiviert Katalog |
-| CacheFileName | string | local-catalog-cache.json | Cache-Dateiname |
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| RootPath | string | ~/.octo/local-catalog | Root directory |
+| IsEnabled | bool | true | Enable/disable catalog |
+| CacheFileName | string | local-catalog-cache.json | Cache file name |
 
 ---
 
 ## PublicGitHubCatalog
 
-### Beschreibung
+### Description
 
-GitHub-basierter Katalog für öffentlich zugängliche CK-Modelle. Nutzt GitHub Pages für schnellen HTTP-Zugriff und die GitHub API für Schreiboperationen.
+GitHub-based catalog for publicly accessible CK models. Uses GitHub Pages for fast HTTP access and the GitHub API for write operations.
 
-### Eigenschaften
+### Properties
 
-| Eigenschaft | Wert |
-|-------------|------|
+| Property | Value |
+|----------|-------|
 | Order | 20 |
 | CanRead | true |
-| CanWrite | true (mit Token) |
+| CanWrite | true (with token) |
 | CatalogName | "github-public" |
 
-### Standard-Repository
+### Default Repository
 
 - **Owner:** meshmakers
 - **Repository:** meshmakers.github.io
 - **Branch:** main
 - **Pages URL:** https://meshmakers.github.io/
 
-### Zugriffsmodi
+### Access Modes
 
-#### Ohne Token (Read-only via HTTP)
+#### Without Token (Read-only via HTTP)
 ```csharp
-// Liest direkt von GitHub Pages
+// Reads directly from GitHub Pages
 var url = "https://meshmakers.github.io/ck-models/v2/catalog.json";
 var catalog = await httpClient.GetStringAsync(url);
 ```
 
-#### Mit Token (Read/Write via API)
+#### With Token (Read/Write via API)
 ```csharp
-// Verwendet Octokit für GitHub API
+// Uses Octokit for GitHub API
 var client = new GitHubClient(new ProductHeaderValue("Octo.CK"));
 client.Credentials = new Credentials(token);
 ```
 
-### Konfiguration
+### Configuration
 
 ```csharp
 services.Configure<PublicGitHubCatalogOptions>(options =>
 {
-    options.GitHubApiToken = "ghp_xxxxx";  // Optional für Schreibzugriff
+    options.GitHubApiToken = "ghp_xxxxx";  // Optional for write access
     options.GitHubRepositoryOwner = "meshmakers";
     options.GitHubRepositoryName = "meshmakers.github.io";
     options.GitHubRepositoryBranch = "main";
@@ -202,67 +202,67 @@ services.Configure<PublicGitHubCatalogOptions>(options =>
 });
 ```
 
-### Optionen
+### Options
 
-| Option | Typ | Default | Beschreibung |
-|--------|-----|---------|--------------|
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
 | GitHubApiToken | string? | null | GitHub Personal Access Token |
-| GitHubRepositoryOwner | string | meshmakers | Repository-Besitzer |
-| GitHubRepositoryName | string | meshmakers.github.io | Repository-Name |
-| GitHubRepositoryBranch | string | main | Branch für Commits |
+| GitHubRepositoryOwner | string | meshmakers | Repository owner |
+| GitHubRepositoryName | string | meshmakers.github.io | Repository name |
+| GitHubRepositoryBranch | string | main | Branch for commits |
 | GitHubPagesUri | Uri | https://meshmakers.github.io/ | GitHub Pages URL |
-| ProductName | string | Meshmakers.Octo.CK.Engine | User-Agent Header |
+| ProductName | string | Meshmakers.Octo.CK.Engine | User-Agent header |
 
 ---
 
 ## PrivateGitHubCatalog
 
-### Beschreibung
+### Description
 
-GitHub-basierter Katalog für private/interne CK-Modelle. Erfordert immer einen API-Token für den Zugriff.
+GitHub-based catalog for private/internal CK models. Always requires an API token for access.
 
-### Eigenschaften
+### Properties
 
-| Eigenschaft | Wert |
-|-------------|------|
+| Property | Value |
+|----------|-------|
 | Order | 21 |
-| CanRead | true (mit Token) |
-| CanWrite | true (mit Token) |
+| CanRead | true (with token) |
+| CanWrite | true (with token) |
 | CatalogName | "github-private" |
 
-### Standard-Repository
+### Default Repository
 
 - **Owner:** meshmakers
 - **Repository:** construction-kit-libraries-build
 - **Branch:** main
 - **Pages URL:** https://meshmakers.github.io/construction-kit-libraries-build/
 
-### Konfiguration
+### Configuration
 
 ```csharp
 services.Configure<PrivateGitHubCatalogOptions>(options =>
 {
-    options.GitHubApiToken = "ghp_xxxxx";  // Erforderlich
+    options.GitHubApiToken = "ghp_xxxxx";  // Required
     options.GitHubRepositoryOwner = "meshmakers";
     options.GitHubRepositoryName = "construction-kit-libraries-build";
 });
 ```
 
-### Unterschiede zum PublicGitHubCatalog
+### Differences from PublicGitHubCatalog
 
-| Aspekt | Public | Private |
+| Aspect | Public | Private |
 |--------|--------|---------|
-| Token erforderlich | Nein (nur lesen) | Ja (immer) |
-| HTTP-Fallback | Ja | Nein |
-| Standard-Order | 20 | 21 |
+| Token required | No (read only) | Yes (always) |
+| HTTP fallback | Yes | No |
+| Default order | 20 | 21 |
 
 ---
 
-## Katalog-Auswahl
+## Catalog Selection
 
-### Prioritätsbasierte Auflösung
+### Priority-based Resolution
 
-Modelle werden in der Reihenfolge der `Order`-Eigenschaft gesucht:
+Models are searched in order of the `Order` property:
 
 ```csharp
 foreach (var catalog in _catalogs.OrderBy(x => x.Order))
@@ -276,22 +276,22 @@ foreach (var catalog in _catalogs.OrderBy(x => x.Order))
 
 ### Source Identifier
 
-Kataloge können über `sourceIdentifier` gefiltert werden:
+Catalogs can be filtered using `sourceIdentifier`:
 
 ```csharp
-// Nur lokalen Katalog verwenden
+// Use only local catalog
 await catalogService.GetAsync(modelId, result,
     sourceIdentifier: new LocalFileSystemSourceIdentifier());
 
-// Nur GitHub verwenden
+// Use only GitHub
 await catalogService.GetAsync(modelId, result,
     sourceIdentifier: new GitHubSourceIdentifier("myorg", "myrepo"));
 ```
 
-### Explizite Katalog-Auswahl
+### Explicit Catalog Selection
 
 ```csharp
-// Direkt aus spezifischem Katalog laden
+// Load directly from specific catalog
 await catalogService.GetAsync("local", modelId, operationResult);
 await catalogService.GetAsync("github-public", modelId, operationResult);
 ```

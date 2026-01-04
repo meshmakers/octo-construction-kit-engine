@@ -1,15 +1,15 @@
-# Erweiterbarkeit
+# Extending the Catalog System
 
-## Eigenen Katalog implementieren
+## Implementing a Custom Catalog
 
-### Grundstruktur
+### Basic Structure
 
-Um einen eigenen Katalog zu implementieren, muss das `ICatalog`-Interface implementiert werden:
+To implement a custom catalog, implement the `ICatalog` interface:
 
 ```csharp
 public class CustomCatalog : ICatalog
 {
-    public int Order => 15; // Priorität zwischen Local (10) und GitHub (20)
+    public int Order => 15; // Priority between Local (10) and GitHub (20)
     public string CatalogName => "custom";
     public string Description => "Custom catalog for special storage";
     public bool CanWrite => true;
@@ -17,7 +17,7 @@ public class CustomCatalog : ICatalog
 
     public Task RefreshCatalogAsync(object? sourceIdentifier = null)
     {
-        // Cache/Index aktualisieren
+        // Refresh cache/index
     }
 
     public bool IsSupportingSourceIdentifier(object? sourceIdentifier = null)
@@ -30,14 +30,14 @@ public class CustomCatalog : ICatalog
         CkModelIdVersionRange modelIdVersionRange,
         object? sourceIdentifier = null)
     {
-        // Prüfen ob Modell existiert
+        // Check if model exists
     }
 
     public Task<bool> IsExistingAsync(
         CkModelId modelId,
         object? sourceIdentifier = null)
     {
-        // Prüfen ob exakte Version existiert
+        // Check if exact version exists
     }
 
     public Task<CkCompiledModelRoot> GetAsync(
@@ -46,7 +46,7 @@ public class CustomCatalog : ICatalog
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        // Modell laden und deserialisieren
+        // Load and deserialize model
     }
 
     public Task PublishAsync(
@@ -55,27 +55,27 @@ public class CustomCatalog : ICatalog
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        // Modell speichern
+        // Save model
     }
 
     public IAsyncEnumerable<CatalogResultItem> ListAsync(
         object? sourceIdentifier)
     {
-        // Alle Modelle auflisten
+        // List all models
     }
 
     public IAsyncEnumerable<CatalogResultItem> SearchAsync(
         string searchTerm,
         object? sourceIdentifier)
     {
-        // Modelle nach Suchbegriff filtern
+        // Filter models by search term
     }
 }
 ```
 
-### CachedCatalog als Basis
+### Using CachedCatalog as Base
 
-Für Kataloge mit Cache-Unterstützung kann `CachedCatalog` als Basisklasse verwendet werden:
+For catalogs with caching support, use `CachedCatalog` as the base class:
 
 ```csharp
 public class CustomCatalog : CachedCatalog
@@ -94,7 +94,7 @@ public class CustomCatalog : CachedCatalog
 
     protected override async Task<CacheCatalog> FetchCatalogAsync()
     {
-        // Remote-Katalog abrufen und in Cache-Format konvertieren
+        // Fetch remote catalog and convert to cache format
         var models = await FetchModelsFromStorageAsync();
 
         return new CacheCatalog
@@ -139,7 +139,7 @@ public class CustomCatalog : CachedCatalog
 
 ---
 
-## Registrierung
+## Registration
 
 ### Via Dependency Injection
 
@@ -162,7 +162,7 @@ public static class ServiceCollectionExtensions
 }
 ```
 
-### Verwendung
+### Usage
 
 ```csharp
 services.AddConstructionKitEngine()
@@ -175,7 +175,7 @@ services.AddConstructionKitEngine()
 
 ---
 
-## Beispiel: Azure Blob Storage Catalog
+## Example: Azure Blob Storage Catalog
 
 ```csharp
 public class AzureBlobCatalog : CachedCatalog
@@ -253,7 +253,7 @@ public class AzureBlobCatalog : CachedCatalog
 
     private async Task UpdateCatalogIndexAsync(CkCompiledModelRoot model)
     {
-        // Katalog-Index aktualisieren
+        // Update catalog index
         var catalogBlob = _containerClient.GetBlobClient("catalog.json");
         // ...
     }
@@ -274,7 +274,7 @@ public class CustomSourceIdentifier
 }
 ```
 
-### Verwendung im Katalog
+### Usage in Catalog
 
 ```csharp
 public class MultiTenantCatalog : ICatalog
@@ -305,7 +305,7 @@ public class MultiTenantCatalog : ICatalog
 
 ## Testing
 
-### Mock-Katalog für Tests
+### Mock Catalog for Tests
 
 ```csharp
 public class InMemoryCatalog : ICatalog
@@ -343,11 +343,11 @@ public class InMemoryCatalog : ICatalog
         throw ModelCatalogException.ModelNotFound(modelId);
     }
 
-    // ... weitere Implementierungen
+    // ... additional implementations
 }
 ```
 
-### Test-Setup
+### Test Setup
 
 ```csharp
 [Fact]
@@ -375,9 +375,9 @@ public async Task Should_find_model_in_custom_catalog()
 
 ## Best Practices
 
-1. **Order sinnvoll wählen**: Lokale Kataloge sollten niedrigere Order haben als Remote-Kataloge
-2. **Caching implementieren**: Für Remote-Kataloge `CachedCatalog` als Basis verwenden
-3. **Fehler korrekt werfen**: `ModelCatalogException` Factory-Methoden verwenden
-4. **Async durchgängig**: Alle I/O-Operationen asynchron implementieren
-5. **Cancellation unterstützen**: `CancellationToken` an alle Downstream-Aufrufe weitergeben
-6. **Logging hinzufügen**: Wichtige Operationen loggen für Debugging
+1. **Choose Order wisely**: Local catalogs should have lower order than remote catalogs
+2. **Implement caching**: Use `CachedCatalog` as base for remote catalogs
+3. **Throw errors correctly**: Use `ModelCatalogException` factory methods
+4. **Use async consistently**: Implement all I/O operations asynchronously
+5. **Support cancellation**: Pass `CancellationToken` to all downstream calls
+6. **Add logging**: Log important operations for debugging

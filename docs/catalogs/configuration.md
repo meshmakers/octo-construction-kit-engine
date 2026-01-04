@@ -1,24 +1,24 @@
-# Konfiguration
+# Configuration
 
 ## Dependency Injection
 
-### Basis-Registrierung
+### Base Registration
 
-Die Katalog-Services werden über Extension Methods registriert:
+Catalog services are registered via extension methods:
 
 ```csharp
 public static IServiceCollection AddConstructionKitEngine(
     this IServiceCollection services)
 {
-    // Manager und Services
+    // Manager and services
     services.AddSingleton<ICatalogManager, CatalogManager>();
     services.AddTransient<ICatalogService, CatalogService>();
 
-    // Resolver
+    // Resolvers
     services.AddTransient<ICatalogDependencyResolver, CatalogDependencyResolver>();
     services.AddTransient<ICatalogModelResolver, CatalogModelResolver>();
 
-    // Katalog-Implementierungen
+    // Catalog implementations
     services.AddTransient<ICatalog, EmbeddedResourceCatalog>();
     services.AddTransient<ICatalog, LocalFileSystemCatalog>();
     services.AddTransient<ICatalog, PublicGitHubCatalog>();
@@ -32,18 +32,18 @@ public static IServiceCollection AddConstructionKitEngine(
 }
 ```
 
-### Service-Lebensdauer
+### Service Lifetime
 
-| Service | Lebensdauer | Begründung |
-|---------|-------------|------------|
-| ICatalogManager | Singleton | Zentrale Verwaltung, Thread-safe |
-| ICatalogService | Transient | Leichtgewichtig, delegiert an Manager |
-| ICatalog | Transient | Ermöglicht Konfigurationsänderungen |
-| Resolver | Transient | Zustandslos |
+| Service | Lifetime | Rationale |
+|---------|----------|-----------|
+| ICatalogManager | Singleton | Central management, thread-safe |
+| ICatalogService | Transient | Lightweight, delegates to manager |
+| ICatalog | Transient | Allows configuration changes |
+| Resolvers | Transient | Stateless |
 
 ---
 
-## Options-Klassen
+## Options Classes
 
 ### LocalFileSystemCatalogOptions
 
@@ -51,32 +51,32 @@ public static IServiceCollection AddConstructionKitEngine(
 public class LocalFileSystemCatalogOptions : CatalogOptions
 {
     /// <summary>
-    /// Wurzelverzeichnis für lokale Modelle.
+    /// Root directory for local models.
     /// Default: ~/.octo/local-catalog
     /// </summary>
     public string RootPath { get; set; }
 
     /// <summary>
-    /// Aktiviert oder deaktiviert den Katalog.
+    /// Enables or disables the catalog.
     /// Default: true
     /// </summary>
     public bool IsEnabled { get; set; } = true;
 }
 ```
 
-### GitHubCatalogOptions (Basis)
+### GitHubCatalogOptions (Base)
 
 ```csharp
 public abstract class GitHubCatalogOptions : CatalogOptions
 {
     /// <summary>
-    /// GitHub Personal Access Token für API-Zugriff.
-    /// Erforderlich für Schreiboperationen und private Repos.
+    /// GitHub Personal Access Token for API access.
+    /// Required for write operations and private repos.
     /// </summary>
     public string? GitHubApiToken { get; set; }
 
     /// <summary>
-    /// GitHub Repository Owner (User oder Organisation).
+    /// GitHub Repository Owner (user or organization).
     /// </summary>
     public string GitHubRepositoryOwner { get; set; }
 
@@ -86,36 +86,36 @@ public abstract class GitHubCatalogOptions : CatalogOptions
     public string GitHubRepositoryName { get; set; }
 
     /// <summary>
-    /// Branch für Commits.
+    /// Branch for commits.
     /// Default: main
     /// </summary>
     public string GitHubRepositoryBranch { get; set; } = "main";
 
     /// <summary>
-    /// GitHub Pages URI für HTTP-Zugriff.
+    /// GitHub Pages URI for HTTP access.
     /// </summary>
     public Uri? GitHubPagesUri { get; set; }
 
     /// <summary>
-    /// Product Name für User-Agent Header.
+    /// Product Name for User-Agent header.
     /// Default: Meshmakers.Octo.ConstructionKit.Engine
     /// </summary>
     public string ProductName { get; set; } = "Meshmakers.Octo.ConstructionKit.Engine";
 }
 ```
 
-### CatalogOptions (Basis)
+### CatalogOptions (Base)
 
 ```csharp
 public class CatalogOptions
 {
     /// <summary>
-    /// Name der Cache-Datei.
+    /// Name of the cache file.
     /// </summary>
     public string CacheFileName { get; }
 
     /// <summary>
-    /// Verzeichnis für Cache-Dateien.
+    /// Directory for cache files.
     /// Default: ~/.octo/ck-catalog/cache
     /// </summary>
     public string CacheDirectory { get; set; }
@@ -124,9 +124,9 @@ public class CatalogOptions
 
 ---
 
-## Konfiguration via appsettings.json
+## Configuration via appsettings.json
 
-### Beispiel-Konfiguration
+### Example Configuration
 
 ```json
 {
@@ -154,7 +154,7 @@ public class CatalogOptions
 }
 ```
 
-### Binding im Startup
+### Binding in Startup
 
 ```csharp
 public void ConfigureServices(IServiceCollection services)
@@ -176,7 +176,7 @@ public void ConfigureServices(IServiceCollection services)
 
 ---
 
-## Umgebungsvariablen
+## Environment Variables
 
 ### GitHub Token
 
@@ -195,7 +195,7 @@ services.Configure<PublicGitHubCatalogOptions>(options =>
 });
 ```
 
-### Benutzerdefinierte Pfade
+### Custom Paths
 
 ```bash
 export OCTO_CATALOG_ROOT="/custom/catalog/path"
@@ -213,11 +213,11 @@ services.Configure<LocalFileSystemCatalogOptions>(options =>
 
 ---
 
-## Cache-Konfiguration
+## Cache Configuration
 
-### Cache-Verzeichnis
+### Cache Directory
 
-Standard: `~/.octo/ck-catalog/cache/`
+Default: `~/.octo/ck-catalog/cache/`
 
 ```csharp
 services.Configure<CatalogOptions>(options =>
@@ -226,21 +226,21 @@ services.Configure<CatalogOptions>(options =>
 });
 ```
 
-### Cache-Dateien
+### Cache Files
 
-| Katalog | Cache-Datei |
-|---------|-------------|
+| Catalog | Cache File |
+|---------|------------|
 | Local | local-catalog-cache.json |
 | GitHub Public | public-github-catalog-cache.json |
 | GitHub Private | private-github-catalog-cache.json |
 
-### Cache-Invalidierung
+### Cache Invalidation
 
 ```csharp
-// Einzelnen Katalog-Cache aktualisieren
+// Refresh single catalog cache
 await catalogService.RefreshCatalogCacheAsync("local");
 
-// Alle Caches aktualisieren
+// Refresh all caches
 await catalogService.RefreshAllCatalogCachesAsync();
 ```
 
@@ -248,7 +248,7 @@ await catalogService.RefreshAllCatalogCachesAsync();
 
 ## Logging
 
-### Logger-Kategorien
+### Logger Categories
 
 ```csharp
 // In appsettings.json
@@ -262,21 +262,21 @@ await catalogService.RefreshAllCatalogCachesAsync();
 }
 ```
 
-### Wichtige Log-Events
+### Important Log Events
 
-| Event | Level | Beschreibung |
-|-------|-------|--------------|
-| Catalog lookup | Information | Modell wird in Katalogen gesucht |
-| Model found | Information | Modell gefunden in Katalog |
-| Cache refresh | Debug | Cache wird aktualisiert |
-| Publish | Information | Modell wird publiziert |
-| Error | Error | Fehler bei Katalog-Operation |
+| Event | Level | Description |
+|-------|-------|-------------|
+| Catalog lookup | Information | Model is being searched in catalogs |
+| Model found | Information | Model found in catalog |
+| Cache refresh | Debug | Cache is being updated |
+| Publish | Information | Model is being published |
+| Error | Error | Error during catalog operation |
 
 ---
 
-## Validierung
+## Validation
 
-### Options-Validierung
+### Options Validation
 
 ```csharp
 services.AddOptions<PrivateGitHubCatalogOptions>()
@@ -284,13 +284,13 @@ services.AddOptions<PrivateGitHubCatalogOptions>()
     {
         if (string.IsNullOrEmpty(options.GitHubApiToken))
         {
-            return false; // Token erforderlich für private Repos
+            return false; // Token required for private repos
         }
         return true;
     }, "GitHub API Token is required for private catalogs");
 ```
 
-### Runtime-Prüfungen
+### Runtime Checks
 
 ```csharp
 // In GitHubCatalog

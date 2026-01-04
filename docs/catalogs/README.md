@@ -1,35 +1,35 @@
 # Construction Kit Model Catalogs
 
-Das Catalog-System ermöglicht das Verwalten, Auffinden und Publizieren von kompilierten Construction Kit Modellen aus verschiedenen Quellen.
+The Catalog system enables managing, discovering, and publishing compiled Construction Kit models from various sources.
 
-## Übersicht
+## Overview
 
-Kataloge sind Speicherorte für kompilierte CK-Modelle. Das System unterstützt mehrere Katalog-Typen mit unterschiedlichen Prioritäten:
+Catalogs are storage locations for compiled CK models. The system supports multiple catalog types with different priorities:
 
-| Katalog | Order | Beschreibung | Lesen | Schreiben |
-|---------|-------|--------------|-------|-----------|
-| EmbeddedResourceCatalog | 0 | Eingebettete System-Modelle | ✓ | ✗ |
-| LocalFileSystemCatalog | 10 | Lokales Dateisystem | ✓ | ✓ |
-| PublicGitHubCatalog | 20 | Öffentliches GitHub Repository | ✓ | ✓ |
-| PrivateGitHubCatalog | 21 | Privates GitHub Repository | ✓ | ✓ |
+| Catalog | Order | Description | Read | Write |
+|---------|-------|-------------|------|-------|
+| EmbeddedResourceCatalog | 0 | Embedded system models | ✓ | ✗ |
+| LocalFileSystemCatalog | 10 | Local file system | ✓ | ✓ |
+| PublicGitHubCatalog | 20 | Public GitHub repository | ✓ | ✓ |
+| PrivateGitHubCatalog | 21 | Private GitHub repository | ✓ | ✓ |
 
-**Hinweis:** Je niedriger die Order, desto höher die Priorität bei der Modell-Auflösung.
+**Note:** The lower the order, the higher the priority during model resolution.
 
-## Schnellstart
+## Quick Start
 
-### Modelle suchen
+### Searching Models
 
 ```csharp
 var catalogService = serviceProvider.GetRequiredService<ICatalogService>();
 
-// In allen Katalogen suchen
+// Search across all catalogs
 var results = await catalogService.SearchAsync("MyModel", skip: 0, take: 10);
 
-// In spezifischem Katalog suchen
+// Search in specific catalog
 var results = await catalogService.SearchAsync("local", "MyModel", skip: 0, take: 10);
 ```
 
-### Modell abrufen
+### Retrieving a Model
 
 ```csharp
 var operationResult = new OperationResult();
@@ -38,7 +38,7 @@ var modelId = new CkModelId("MyModel", new Version(1, 0, 0));
 var model = await catalogService.GetAsync(modelId, operationResult);
 ```
 
-### Modell publizieren
+### Publishing a Model
 
 ```csharp
 await catalogService.PublishAsync(
@@ -49,20 +49,20 @@ await catalogService.PublishAsync(
 );
 ```
 
-## Dokumentation
+## Documentation
 
-- [Architektur](./architecture.md) - Systemarchitektur und Design Patterns
-- [Katalog-Typen](./catalog-types.md) - Detaillierte Beschreibung der Katalog-Implementierungen
-- [Konfiguration](./configuration.md) - Dependency Injection und Options
-- [Erweiterbarkeit](./extending.md) - Eigene Kataloge implementieren
+- [Architecture](./architecture.md) - System architecture and design patterns
+- [Catalog Types](./catalog-types.md) - Detailed description of catalog implementations
+- [Configuration](./configuration.md) - Dependency injection and options
+- [Extending](./extending.md) - Implementing custom catalogs
 
-## Verzeichnisstruktur
+## Directory Structure
 
 ```
 ~/.octo/
-├── local-catalog/              # LocalFileSystemCatalog Speicherort
+├── local-catalog/              # LocalFileSystemCatalog storage location
 │   └── ck-models/v2/
-│       ├── catalog.json        # Root-Katalog
+│       ├── catalog.json        # Root catalog
 │       └── {letter}/
 │           └── {modelname}/
 │               ├── catalog.json
@@ -70,17 +70,17 @@ await catalogService.PublishAsync(
 │                   ├── catalog.json
 │                   └── {model}.json
 └── ck-catalog/
-    └── cache/                  # Katalog-Cache
+    └── cache/                  # Catalog cache
         ├── local-catalog-cache.json
         ├── public-github-catalog-cache.json
         └── private-github-catalog-cache.json
 ```
 
-## Kernkomponenten
+## Core Components
 
 ### ICatalog
 
-Basis-Interface für alle Katalog-Implementierungen:
+Base interface for all catalog implementations:
 
 ```csharp
 public interface ICatalog
@@ -101,7 +101,7 @@ public interface ICatalog
 
 ### ICatalogService
 
-Öffentliche API für den Zugriff auf Kataloge:
+Public API for catalog access:
 
 ```csharp
 public interface ICatalogService
@@ -116,7 +116,7 @@ public interface ICatalogService
 
 ### ICatalogManager
 
-Interne Verwaltung aller registrierten Kataloge:
+Internal management of all registered catalogs:
 
 ```csharp
 internal interface ICatalogManager
@@ -128,7 +128,7 @@ internal interface ICatalogManager
 }
 ```
 
-## Siehe auch
+## See Also
 
-- [ConstructionKit.Contracts](../../src/ConstructionKit.Contracts/) - Contracts und Interfaces
-- [ConstructionKit.Engine](../../src/ConstructionKit.Engine/) - Engine-Implementierung
+- [ConstructionKit.Contracts](../../src/ConstructionKit.Contracts/) - Contracts and interfaces
+- [ConstructionKit.Engine](../../src/ConstructionKit.Engine/) - Engine implementation

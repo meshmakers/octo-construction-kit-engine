@@ -1,94 +1,94 @@
 # Octo Construction Kit Engine
 
-.NET-basiertes Framework zum Erstellen und Verwalten von Datenmodellen mit Construction Kits. Teil der Octo Mesh Plattform, die Rohdaten in aussagekräftige Informationen mit dem richtigen Kontext transformiert.
+.NET-based framework for building and managing data models with Construction Kits. Part of the Octo Mesh platform, which transforms raw data into meaningful information with proper context.
 
-## Projektstruktur
+## Project Structure
 
 ```
 /src
-  /ConstructionKit.Contracts    # Contracts, Interfaces, Serialisierung
-  /ConstructionKit.Engine       # Core Engine für CK-Modelle
-  /ConstructionKit.Compiler     # CLI-Tool zum Kompilieren von CK-Modellen
-  /ConstructionKit.SourceGeneration  # Code-Generierung aus CK-Modellen
-  /Runtime.Engine               # Runtime-Engine für Datenverarbeitung
-  /Runtime.Contracts            # Runtime Contracts und Interfaces
-  /SystemCkModel                # Basis System Construction Kit Modelle
-/tests                          # Test-Projekte
-/samples                        # Beispiel-Implementierungen
-/docs                           # Entwicklerdokumentation
+  /ConstructionKit.Contracts    # Contracts, interfaces, serialization
+  /ConstructionKit.Engine       # Core engine for CK models
+  /ConstructionKit.Compiler     # CLI tool for compiling CK models
+  /ConstructionKit.SourceGeneration  # Code generation from CK models
+  /Runtime.Engine               # Runtime engine for data processing
+  /Runtime.Contracts            # Runtime contracts and interfaces
+  /SystemCkModel                # Base system Construction Kit models
+/tests                          # Test projects
+/samples                        # Example implementations
+/docs                           # Developer documentation
 ```
 
-## Dokumentation
+## Documentation
 
-- [Catalog System](./docs/catalogs/README.md) - Verwaltung und Auflösung von CK-Modellen
+- [Catalog System](./docs/catalogs/README.md) - Managing and resolving CK models
 
 ## Quick Start
 
 ### Build
 
 ```bash
-# Release-Build
+# Release build
 dotnet build --configuration Release
 
-# Debug-Build mit lokalen Paketen
+# Debug build with local packages
 dotnet build --configuration DebugL
 ```
 
 ### Tests
 
 ```bash
-# Alle Tests ausführen (ohne System-Tests)
+# Run all tests (excluding system tests)
 dotnet test --configuration Release --filter "FullyQualifiedName!~SystemTests"
 
-# Alle Tests inkl. System-Tests
+# Run all tests including system tests
 dotnet test --configuration Release
 
-# Spezifisches Test-Projekt
+# Run specific test project
 dotnet test tests/ConstructionKit.Engine.Tests/ConstructionKit.Engine.Tests.csproj
 ```
 
 ### Compiler
 
 ```bash
-# CK-Modell kompilieren
+# Compile CK model
 dotnet run --project src/ConstructionKit.Compiler/ConstructionKit.Compiler.csproj -- \
   -c Compile \
   -p "path/to/ConstructionKit" \
   -o "output/path"
 
-# Dokumentation generieren
+# Generate documentation
 dotnet run --project src/ConstructionKit.Compiler/ConstructionKit.Compiler.csproj -- \
   -c generateDocs \
   -f "path/to/compiled-model.yaml" \
   -o "docs/output/path"
 ```
 
-## Voraussetzungen
+## Requirements
 
 - .NET 9.0 SDK
-- (Optional) GitHub Personal Access Token für CK-Katalog-Zugriff
+- (Optional) GitHub Personal Access Token for CK catalog access
 
-## Konfiguration
+## Configuration
 
-### Build-Konfigurationen
+### Build Configurations
 
-| Konfiguration | Beschreibung |
-|---------------|--------------|
-| Debug | Standard-Debug-Build |
-| Release | Release-Build |
-| DebugL | Lokale Entwicklung mit Version 999.0.0 |
+| Configuration | Description |
+|---------------|-------------|
+| Debug | Standard debug build |
+| Release | Release build |
+| DebugL | Local development with version 999.0.0 |
 
-### MSBuild-Properties
+### MSBuild Properties
 
-| Property | Default | Beschreibung |
-|----------|---------|--------------|
-| OctoCompileCkModel | true | CK-Modell während Build kompilieren |
-| OctoPublishCkModel | false | CK-Modell nach Build publizieren |
-| OctoGenerateCkModelServiceClass | true | Service-Klassen generieren |
+| Property | Default | Description |
+|----------|---------|-------------|
+| OctoCompileCkModel | true | Compile CK model during build |
+| OctoPublishCkModel | false | Publish CK model after build |
+| OctoGenerateCkModelServiceClass | true | Generate service classes |
 
-## Construction Kit Modelle
+## Construction Kit Models
 
-CK-Modelle werden in YAML-Dateien definiert:
+CK models are defined in YAML files:
 
 ```yaml
 modelId: "MyModel-1.0.0"
@@ -96,18 +96,18 @@ dependencies:
   - "System-2.0.0"
 ```
 
-### Modell-Struktur
+### Model Structure
 
 ```
 ConstructionKit/
-├── model.yaml           # Modell-Definition
-├── types/               # Typ-Definitionen
-├── attributes/          # Attribut-Definitionen
-├── enums/               # Enum-Definitionen
-├── records/             # Record-Definitionen
-└── associations/        # Assoziations-Definitionen
+├── model.yaml           # Model definition
+├── types/               # Type definitions
+├── attributes/          # Attribute definitions
+├── enums/               # Enum definitions
+├── records/             # Record definitions
+└── associations/        # Association definitions
 ```
 
-## Lizenz
+## License
 
-Siehe [LICENSE](./LICENSE) für Details.
+See [LICENSE](./LICENSE) for details.

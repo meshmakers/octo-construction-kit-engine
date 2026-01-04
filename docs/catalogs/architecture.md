@@ -1,28 +1,28 @@
-# Catalog-Architektur
+# Catalog Architecture
 
-## Übersicht
+## Overview
 
-Das Catalog-System folgt einer mehrschichtigen Architektur mit klarer Trennung zwischen öffentlicher API, interner Verwaltung und konkreten Implementierungen.
+The Catalog system follows a layered architecture with clear separation between public API, internal management, and concrete implementations.
 
-## Schichtenmodell
+## Layer Model
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    ICatalogService                       │  ← Öffentliche API
+│                    ICatalogService                       │  ← Public API
 │                    (CatalogService)                      │
 └─────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────┐
-│                    ICatalogManager                       │  ← Interne Verwaltung
+│                    ICatalogManager                       │  ← Internal Management
 │                    (CatalogManager)                      │
 └─────────────────────────────────────────────────────────┘
                            │
            ┌───────────────┼───────────────┐
            ▼               ▼               ▼
 ┌─────────────────┐ ┌─────────────┐ ┌─────────────────┐
-│ EmbeddedResource│ │ LocalFile   │ │ GitHub          │    ← Katalog-
-│ Catalog         │ │ SystemCatalog│ │ Catalog         │       Implementierungen
+│ EmbeddedResource│ │ LocalFile   │ │ GitHub          │    ← Catalog
+│ Catalog         │ │ SystemCatalog│ │ Catalog         │       Implementations
 │ (Order: 0)      │ │ (Order: 10) │ │ (Order: 20/21)  │
 └─────────────────┘ └─────────────┘ └─────────────────┘
 ```
@@ -31,7 +31,7 @@ Das Catalog-System folgt einer mehrschichtigen Architektur mit klarer Trennung z
 
 ### Strategy Pattern
 
-Jede Katalog-Implementierung ist eine Strategie für den Zugriff auf CK-Modelle:
+Each catalog implementation is a strategy for accessing CK models:
 
 ```csharp
 public interface ICatalog
@@ -40,14 +40,14 @@ public interface ICatalog
     Task PublishAsync(CkCompiledModelRoot model, ...);
 }
 
-// Konkrete Strategien
+// Concrete strategies
 public class LocalFileSystemCatalog : ICatalog { ... }
 public class PublicGitHubCatalog : ICatalog { ... }
 ```
 
 ### Composite Pattern
 
-Der `CatalogManager` aggregiert mehrere Kataloge und bietet eine einheitliche Schnittstelle:
+The `CatalogManager` aggregates multiple catalogs and provides a unified interface:
 
 ```csharp
 internal class CatalogManager : ICatalogManager
@@ -70,12 +70,12 @@ internal class CatalogManager : ICatalogManager
 
 ### Template Method Pattern
 
-Die `CachedCatalog`-Basisklasse definiert das Grundgerüst für Cache-basierte Kataloge:
+The `CachedCatalog` base class defines the skeleton for cache-based catalogs:
 
 ```csharp
 public abstract class CachedCatalog : ICatalog
 {
-    // Template-Methode für das Caching
+    // Template method for caching
     public async IAsyncEnumerable<CatalogResultItem> ListAsync(...)
     {
         var cache = await LoadOrRefreshCacheAsync();
@@ -85,7 +85,7 @@ public abstract class CachedCatalog : ICatalog
         }
     }
 
-    // Abstrakte Methoden für konkrete Implementierungen
+    // Abstract methods for concrete implementations
     protected abstract Task<CacheCatalog> FetchCatalogAsync();
     protected abstract string GetCacheFilePath();
 }
@@ -93,7 +93,7 @@ public abstract class CachedCatalog : ICatalog
 
 ### Factory Pattern
 
-HTTP- und GitHub-Clients werden über Factories erstellt:
+HTTP and GitHub clients are created through factories:
 
 ```csharp
 public interface IHttpClientFactory
@@ -109,10 +109,10 @@ public interface IGitHubClientFactory
 
 ### Adapter Pattern
 
-Wrapper-Klassen adaptieren externe Bibliotheken:
+Wrapper classes adapt external libraries:
 
 ```csharp
-// Adaptiert HttpClient
+// Adapts HttpClient
 public class HttpClientWrapper : IHttpClientWrapper
 {
     private readonly HttpClient _httpClient;
@@ -126,7 +126,7 @@ public class HttpClientWrapper : IHttpClientWrapper
     }
 }
 
-// Adaptiert Octokit GitHubClient
+// Adapts Octokit GitHubClient
 public class GitHubClientWrapper : IGitHubClientWrapper
 {
     private readonly GitHubClient _client;
@@ -134,9 +134,9 @@ public class GitHubClientWrapper : IGitHubClientWrapper
 }
 ```
 
-## Auflösungsfluss
+## Resolution Flow
 
-### Modell-Lookup
+### Model Lookup
 
 ```
 GetAsync(modelId)
@@ -189,9 +189,9 @@ RestoreConstructionKitModelsAsync()
 └─────────────────────────────────────────┘
 ```
 
-## Caching-Strategie
+## Caching Strategy
 
-### Cache-Hierarchie
+### Cache Hierarchy
 
 ```
 Memory
@@ -203,16 +203,16 @@ Local File Cache (~/.octo/ck-catalog/cache/)
 Remote Source (GitHub Pages / API)
 ```
 
-### Cache-Invalidierung
+### Cache Invalidation
 
-- **Zeitbasiert**: Cache-Dateien haben ein konfigurierbares Ablaufdatum
-- **Explizit**: `RefreshCatalogCacheAsync()` erzwingt Neuladung
-- **Automatisch**: Bei Publish-Operationen wird der lokale Cache aktualisiert
+- **Time-based**: Cache files have a configurable expiration
+- **Explicit**: `RefreshCatalogCacheAsync()` forces reload
+- **Automatic**: Local cache is updated on publish operations
 
 ### Concurrent Access
 
 ```csharp
-// Retry-Logik für File-Locks
+// Retry logic for file locks
 private async Task<string> ReadFileWithRetryAsync(string path)
 {
     for (int i = 0; i < MaxRetries; i++)
@@ -231,11 +231,11 @@ private async Task<string> ReadFileWithRetryAsync(string path)
 }
 ```
 
-## Fehlerbehandlung
+## Error Handling
 
 ### ModelCatalogException
 
-Zentrale Exception-Klasse mit Factory-Methoden:
+Central exception class with factory methods:
 
 ```csharp
 public class ModelCatalogException : Exception
@@ -248,17 +248,17 @@ public class ModelCatalogException : Exception
 }
 ```
 
-### Fehler-Propagation
+### Error Propagation
 
-1. Katalog-spezifische Fehler werden in `ModelCatalogException` gewrappt
-2. Der `CatalogManager` fängt Fehler und versucht den nächsten Katalog
-3. Wenn alle Kataloge fehlschlagen, wird eine aggregierte Exception geworfen
+1. Catalog-specific errors are wrapped in `ModelCatalogException`
+2. The `CatalogManager` catches errors and tries the next catalog
+3. If all catalogs fail, an aggregated exception is thrown
 
-## Thread-Safety
+## Thread Safety
 
-- `CatalogManager` ist Singleton und thread-safe
-- Katalog-Implementierungen verwenden `FileShare.ReadWrite` für concurrent access
-- Lazy-Initialization wird für teure Ressourcen verwendet:
+- `CatalogManager` is a singleton and thread-safe
+- Catalog implementations use `FileShare.ReadWrite` for concurrent access
+- Lazy initialization is used for expensive resources:
 
 ```csharp
 private readonly Lazy<ICatalogManager> _catalogManager;

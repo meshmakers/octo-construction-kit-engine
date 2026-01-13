@@ -34,9 +34,9 @@ public class BlueprintApplicationResult
     public string? TenantId { get; private init; }
 
     /// <summary>
-    /// List of CK models that were loaded
+    /// List of CK models that were loaded (as version ranges)
     /// </summary>
-    public List<CkModelId> LoadedCkModels { get; private init; }
+    public List<CkModelIdVersionRange> LoadedCkModels { get; private init; }
 
     /// <summary>
     /// List of seed data files that were applied
@@ -58,7 +58,7 @@ public class BlueprintApplicationResult
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
     /// <param name="blueprintId">The blueprint id</param>
-    /// <param name="loadedCkModels">List of loaded CK models</param>
+    /// <param name="loadedCkModels">List of loaded CK models (as version ranges)</param>
     /// <param name="appliedSeedDataFiles">List of applied seed data files</param>
     /// <param name="entitiesCreated">Number of entities created</param>
     /// <param name="operationResult">Operation result with messages</param>
@@ -66,7 +66,7 @@ public class BlueprintApplicationResult
     public static BlueprintApplicationResult Success(
         string tenantId,
         BlueprintId blueprintId,
-        List<CkModelId> loadedCkModels,
+        List<CkModelIdVersionRange> loadedCkModels,
         List<string> appliedSeedDataFiles,
         int entitiesCreated,
         OperationResult operationResult)

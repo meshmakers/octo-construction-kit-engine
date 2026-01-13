@@ -127,5 +127,42 @@
     <ItemGroup>
         <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
     </ItemGroup>
-    
+
+    <!--
+        CK Model Migration Files Embedding
+        This target embeds migration YAML files from ConstructionKit/migrations/ folder
+        as embedded resources, making them available via EmbeddedCkMigrationContentProvider.
+    -->
+    <PropertyGroup>
+        <OctoEmbedCkMigrations Condition="'$(OctoEmbedCkMigrations)' == ''">true</OctoEmbedCkMigrations>
+    </PropertyGroup>
+
+    <Target Name="CkEmbedMigrations"
+            AfterTargets="CkCompile"
+            BeforeTargets="BeforeBuild"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoEmbedCkMigrations)' == 'true'">
+
+        <!-- Find migration files in each ConstructionKit folder -->
+        <ItemGroup>
+            <_CkMigrationFilesFromFolder Include="%(ConstructionKitFolder.Identity)/migrations/*.yaml" />
+        </ItemGroup>
+
+        <Message Condition="'@(_CkMigrationFilesFromFolder)' != ''"
+                 Importance="High"
+                 Text="Embedding CK model migration files as resources" />
+
+        <ItemGroup>
+            <_OctoMigrationResourceFilesNew Include="@(_CkMigrationFilesFromFolder)" Exclude="@(_OctoMigrationResourceFiles)" />
+            <EmbeddedResource Include="@(_OctoMigrationResourceFilesNew)">
+                <LogicalName>$(RootNamespace).migrations.%(Filename)%(Extension)</LogicalName>
+                <Visible>False</Visible>
+            </EmbeddedResource>
+            <_OctoMigrationResourceFiles Include="@(_OctoMigrationResourceFilesNew)" />
+        </ItemGroup>
+
+        <Message Condition="'@(_OctoMigrationResourceFilesNew)' != ''"
+                 Importance="High"
+                 Text="Embedded migration files: @(_OctoMigrationResourceFilesNew->'%(Filename)%(Extension)', ', ')" />
+    </Target>
+
 </Project>

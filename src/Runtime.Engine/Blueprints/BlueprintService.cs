@@ -23,6 +23,7 @@ internal class BlueprintService : IBlueprintService
     private readonly IMigrationExecutor _migrationExecutor;
     private readonly IMigrationParser _migrationParser;
     private readonly IRtYamlSerializer _rtYamlSerializer;
+    private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly ILogger<BlueprintService> _logger;
 
     /// <summary>
@@ -37,6 +38,7 @@ internal class BlueprintService : IBlueprintService
         IMigrationExecutor migrationExecutor,
         IMigrationParser migrationParser,
         IRtYamlSerializer rtYamlSerializer,
+        ICkModelUpgradeService ckModelUpgradeService,
         ILogger<BlueprintService> logger)
     {
         _ckCacheService = ckCacheService;
@@ -47,6 +49,7 @@ internal class BlueprintService : IBlueprintService
         _migrationExecutor = migrationExecutor;
         _migrationParser = migrationParser;
         _rtYamlSerializer = rtYamlSerializer;
+        _ckModelUpgradeService = ckModelUpgradeService;
         _logger = logger;
     }
 
@@ -57,7 +60,7 @@ internal class BlueprintService : IBlueprintService
         CancellationToken cancellationToken = default)
     {
         var operationResult = new OperationResult();
-        var loadedCkModels = new List<CkModelId>();
+        var loadedCkModels = new List<CkModelIdVersionRange>();
         var appliedSeedDataFiles = new List<string>();
         var entitiesCreated = 0;
 
@@ -83,14 +86,59 @@ internal class BlueprintService : IBlueprintService
                 _logger.LogDebug("Created tenant {TenantId}", tenantId);
             }
 
-            // 3. Load CK models into tenant cache
+            // 3. Load CK models into tenant cache and execute CK model migrations if needed
             // Note: The actual CK model loading would be done via the dependency resolver
             // For now, we record which models need to be loaded
             foreach (var ckDependency in composedBlueprint.CkModelDependencies)
             {
                 _logger.LogDebug("Blueprint requires CK model: {CkModel}", ckDependency);
+                loadedCkModels.Add(ckDependency);
                 // The actual loading will be delegated to the CK catalog system
                 // This is a placeholder for the integration point
+            }
+
+            // 3b. Execute CK model migrations if upgrading from a previous version
+            if (loadedCkModels.Count > 0)
+            {
+                var migrationOptions = new CkMigrationOptions
+                {
+                    CreateBackup = true,
+                    DryRun = false,
+                    ContinueOnError = false
+                };
+
+                var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
+                    tenantId, loadedCkModels, migrationOptions, null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!upgradeResult.Success)
+                {
+                    foreach (var error in upgradeResult.Errors)
+                    {
+                        operationResult.AddMessage(new OperationMessage(
+                            MessageLevel.Error,
+                            null,
+                            25,
+                            $"CK model migration failed: {error}"));
+                    }
+                    return BlueprintApplicationResult.Failed(operationResult);
+                }
+
+                // Add warnings to result
+                foreach (var warning in upgradeResult.Warnings)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Warning,
+                        null,
+                        26,
+                        $"CK model migration: {warning}"));
+                }
+
+                _logger.LogInformation(
+                    "CK model upgrades completed: {Upgraded} upgraded, {Skipped} skipped, {TotalAffected} entities affected",
+                    upgradeResult.UpgradedModels.Count,
+                    upgradeResult.SkippedModels.Count,
+                    upgradeResult.TotalEntitiesAffected);
             }
 
             // 4. Resolve and apply seed data in order (base -> child)
@@ -584,6 +632,35 @@ internal class BlueprintService : IBlueprintService
                     result.Errors.Add(error.MessageText);
                 }
                 return result;
+            }
+
+            // 5b. Execute CK model migrations if upgrading from a previous version
+            if (composedBlueprint.CkModelDependencies.Count > 0)
+            {
+                var ckMigrationOptions = new CkMigrationOptions
+                {
+                    CreateBackup = options.CreateBackup,
+                    DryRun = options.DryRun,
+                    ContinueOnError = options.ContinueOnError
+                };
+
+                var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
+                    tenantId, composedBlueprint.CkModelDependencies, ckMigrationOptions, null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!upgradeResult.Success)
+                {
+                    result.Success = false;
+                    result.Errors.AddRange(upgradeResult.Errors.Select(e => $"CK model migration: {e}"));
+                    return result;
+                }
+
+                result.Warnings.AddRange(upgradeResult.Warnings.Select(w => $"CK model migration: {w}"));
+
+                _logger.LogInformation(
+                    "CK model upgrades completed during update: {Upgraded} upgraded, {TotalAffected} entities affected",
+                    upgradeResult.UpgradedModels.Count,
+                    upgradeResult.TotalEntitiesAffected);
             }
 
             // 6. Apply update based on mode

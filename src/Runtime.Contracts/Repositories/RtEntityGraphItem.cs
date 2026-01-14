@@ -17,12 +17,12 @@ public class NavigationEnd : RtTypeWithAttributes
     /// <summary>
     /// Gets or sets the target construction kit type id
     /// </summary>
-    public required CkId<CkTypeId> TargetCkTypeId { get; set; }
+    public required RtCkId<CkTypeId> TargetRtCkTypeId { get; set; }
 
     /// <summary>
     ///     Gets or sets the association role id of the association role
     /// </summary>
-    public required CkId<CkAssociationRoleId> AssociationRoleId { get; set; }
+    public required RtCkId<CkAssociationRoleId> RtAssociationRoleId { get; set; }
 
     /// <summary>
     ///     Gets or sets the object id of the association
@@ -36,7 +36,7 @@ public class NavigationEnd : RtTypeWithAttributes
 
     protected override string GetLocation()
     {
-        return $"{nameof(NavigationEnd)}: {AssociationRoleId} -> {AssociationId}";
+        return $"{nameof(NavigationEnd)}: {RtAssociationRoleId} -> {AssociationId}";
     }
 }
 

@@ -1,8 +1,11 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: TenantId
+    description: "Unique identifier for the tenant in the multi-tenant system."
     valueType: String
   - id: ParentTenantId
+    description: "Identifier of the parent tenant for hierarchical tenant structures."
     valueType: String
   - id: DatabaseName
+    description: "Name of the database associated with this tenant."
     valueType: String

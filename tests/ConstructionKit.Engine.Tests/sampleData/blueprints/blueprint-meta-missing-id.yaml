@@ -1,0 +1,4 @@
+$schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+description: A test blueprint without blueprintId
+ckModelDependencies:
+  - System-[2.0,)

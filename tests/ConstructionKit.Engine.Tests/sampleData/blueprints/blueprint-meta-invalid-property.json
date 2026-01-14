@@ -1,0 +1,6 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/blueprint-meta.schema.json",
+  "blueprintId": "TestBlueprint-1.0.0",
+  "description": "A test blueprint with invalid property",
+  "invalidProperty": "this should not be allowed"
+}

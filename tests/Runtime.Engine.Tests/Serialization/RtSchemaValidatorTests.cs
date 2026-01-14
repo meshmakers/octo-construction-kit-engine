@@ -3,7 +3,7 @@ using Meshmakers.Octo.Runtime.Engine.Serialization;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Serialization;
 
-public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
+public class RtSchemaValidatorTests(ITestOutputHelper testOutputHelper)
 {
     [Fact]
     public void ValidateModelInJson_ok()
@@ -11,7 +11,7 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/entity-ok.json";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
         Assert.True(isValid);
@@ -26,7 +26,7 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/malformedAttribute.json";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
         Assert.False(isValid);
@@ -43,14 +43,14 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/malformedAttributeValue.json";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInJson(stream, filePath, operationResult);
         foreach (var operationMessage in operationResult.Messages)
         {
-            _testOutputHelper.WriteLine($"{operationMessage.MessageLevel}{operationMessage.MessageNumber}: {operationMessage.MessageText}");
+            testOutputHelper.WriteLine($"{operationMessage.MessageLevel}{operationMessage.MessageNumber}: {operationMessage.MessageText}");
         }
-                
+
         Assert.False(isValid);
         Assert.Single(operationResult.Messages);
         Assert.False(operationResult.HasErrors);
@@ -65,7 +65,7 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/entity-ok.yaml";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInYaml(stream, filePath, operationResult);
         Assert.True(isValid);
@@ -80,7 +80,7 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/malformedAttribute.yaml";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInYaml(stream, filePath, operationResult);
         Assert.False(isValid);
@@ -97,7 +97,7 @@ public class RtSchemaValidatorTests(ITestOutputHelper _testOutputHelper)
         var schemaValidator = new RtSchemaValidator();
 
         var filePath = "sampleData/files/malformedAttributeValue.yaml";
-        var stream = File.OpenRead(filePath);
+        using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
         var isValid = schemaValidator.ValidateModelInYaml(stream, filePath, operationResult);
         Assert.False(isValid);

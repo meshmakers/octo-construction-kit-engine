@@ -220,7 +220,7 @@ public class CkSourceGenerator : IIncrementalGenerator
             context.AddSource($"{ns}.Common.Service.g.cs", generatedCode);
 
             generatedCode =
-                CkEmbeddedModelDiGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
+                CkEmbeddedModelDiGenerator.Instance.Generate(ns, fileOptions.LocalNamespace, ckCompiledModelRoot.ModelId,
                     ckCompiledModelRoot.Types != null);
             context.AddSource($"{ns}.Common.ServiceDi.g.cs", generatedCode);
 

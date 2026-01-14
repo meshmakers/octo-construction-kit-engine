@@ -24,6 +24,7 @@ Construction Kit models are defined in YAML files following a specific schema:
 - Models have a unique `modelId` (e.g., "System-1.0.1")
 - Models can depend on other models via `dependencies`
 - Model definitions are organized in folders: `types/`, `attributes/`, `enums/`, `records/`, `associations/`
+- Optional: `migrations/` folder for CK model version migrations
 
 ## Build Commands
 
@@ -115,8 +116,43 @@ When modifying CK models:
 /devops-build          # CI/CD pipeline definitions
 ```
 
+## Blueprints and Migrations
+
+The project supports two types of migrations:
+
+### Blueprints
+Blueprints initialize tenants with pre-configured CK models and runtime data. See `docs/blueprints.md` for details.
+
+Key services:
+- `IBlueprintService` - Applies blueprints to tenants
+- `IBlueprintComposer` - Resolves blueprint hierarchies
+- `ITenantBackupService` - Creates/restores backups
+
+### CK Model Migrations
+CK Model Migrations update runtime entities when CK model versions change. See `docs/ck-model-migrations.md` for details.
+
+Key services:
+- `ICkModelMigrationService` - Executes migrations between CK model versions
+- `ICkMigrationContentProvider` - Provides migration scripts (embedded resources or file system)
+- `ICkMigrationParser` - Parses YAML migration scripts
+
+Migration scripts location: `ConstructionKit/migrations/`
+
+MSBuild property to control embedding: `OctoEmbedCkMigrations` (default: true)
+
+## Key Interfaces
+
+| Interface | Description |
+|-----------|-------------|
+| `ICkModelMigrationService` | Executes CK model migrations |
+| `ICkMigrationContentProvider` | Provides migration content (embedded/file system) |
+| `IRuntimeRepositoryProvider` | Provides runtime repositories for tenants |
+| `IBlueprintService` | Applies blueprints to tenants |
+| `ICatalogService` | Manages CK model catalog |
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (devops-build/azure-pipelines.yml)
 - NuGet packages can be published to either public or private feeds depending on configuration
 - Local development uses the DebugL configuration with local package sources
+- Migration YAML files in `ConstructionKit/migrations/` are automatically embedded as resources

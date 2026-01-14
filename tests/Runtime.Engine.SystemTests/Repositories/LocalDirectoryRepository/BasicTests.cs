@@ -1,13 +1,12 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
-using Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v1;
+using Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v2;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Local;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Local;
 using Meshmakers.Octo.Runtime.Engine.SystemTests.Fixtures;
-using TestCkModel.Generated.System.TestIdentity.v1;
 using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.SystemTests.Repositories.LocalDirectoryRepository;
@@ -26,7 +25,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             bulkRtMutation);
 
         await Assert.ThrowsAsync<RuntimeRepositoryException>(async () =>
-            await localDirectoryRepository.CreateTransientRtEntityAsync("Test/LocationWithSensor"));
+            await localDirectoryRepository.CreateTransientRtEntityByRtCkIdAsync("Test/LocationWithSensor"));
     }
 
     [Fact]
@@ -78,7 +77,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Sensor");
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityByRtCkIdAsync("Test/Sensor");
         rtEntity.SetAttributeValue(TestCkIds.DesignationAttribute, AttributeValueTypesDto.String, "TestSensor1");
         rtEntity.SetAttributeValue(TestCkIds.ConnectionStateAttribute, AttributeValueTypesDto.Enum, null);
 
@@ -97,7 +96,7 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
             new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
             bulkRtMutation);
 
-        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityAsync("Test/Ocean");
+        var rtEntity = await localDirectoryRepository.CreateTransientRtEntityByRtCkIdAsync("Test/Ocean");
         rtEntity.SetAttributeValue(TestCkIds.DesignationAttribute, AttributeValueTypesDto.String, "TestSensor1");
 
         await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), "Test/Ocean", rtEntity);

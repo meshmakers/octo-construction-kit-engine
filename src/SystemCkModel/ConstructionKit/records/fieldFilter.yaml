@@ -1,6 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
 - recordId: FieldFilter
+  description: "Defines a filter condition for a specific attribute with an operator and comparison value."
   attributes:
     - id: ${this}/AttributePath
       name: AttributePath

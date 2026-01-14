@@ -1,13 +1,16 @@
+using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
+using Meshmakers.Octo.Runtime.Engine.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.TransportContainer;
+using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -44,6 +47,36 @@ public static class ServiceCollectionExtensions
 
         // Add converters
         services.AddTransient<IRtEntityToTcDtoConverter, RtEntityToTcDtoConverter>();
+
+        // Blueprint services
+        services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
+        services.AddSingleton<ITenantBackupService, InMemoryTenantBackupService>();
+        services.AddTransient<IBlueprintService, BlueprintService>();
+        services.AddTransient<IMigrationExecutor, MigrationExecutor>();
+        services.AddTransient<IMigrationParser, MigrationParser>();
+
+        // CK model migration services
+        services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();
+        services.AddTransient<ICkMigrationParser, CkMigrationParser>();
+
+        // Migration content providers (aggregate by default, allows adding multiple sources)
+        services.AddSingleton<FileSystemCkMigrationContentProvider>();
+        services.AddSingleton<EmbeddedCkMigrationContentProvider>();
+        services.AddSingleton<ICkMigrationContentProvider>(sp =>
+        {
+            var aggregate = new AggregateCkMigrationContentProvider(
+                sp.GetRequiredService<ILogger<AggregateCkMigrationContentProvider>>());
+
+            // Add embedded resources first (higher priority)
+            aggregate.AddProvider(sp.GetRequiredService<EmbeddedCkMigrationContentProvider>());
+            // Then file system as fallback
+            aggregate.AddProvider(sp.GetRequiredService<FileSystemCkMigrationContentProvider>());
+
+            return aggregate;
+        });
+
+        services.AddTransient<ICkModelMigrationService, CkModelMigrationService>();
+        services.AddTransient<ICkModelUpgradeService, CkModelUpgradeService>();
 
         return new RuntimeEngineBuilder(services);
     }

@@ -46,7 +46,8 @@ internal static class Program
     {
         var services = new ServiceCollection();
 
-        services.AddConstructionKit();
+        // AddRuntimeEngine() internally calls AddConstructionKit()
+        services.AddRuntimeEngine();
 
         // Runner is the custom class
         services.AddTransient<Runner>();

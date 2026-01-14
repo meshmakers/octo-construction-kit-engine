@@ -58,7 +58,7 @@
     },
     "CompilerFindGitHub": {
       "commandName": "Project",
-      "commandLineArgs": "-c find -id \"System-[1.0,)\""
+      "commandLineArgs": "-c find -id \"System-[2.0,)\""
     }
   }
 }

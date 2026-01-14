@@ -1,4 +1,4 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
@@ -10,7 +10,7 @@ public interface IGitHubClientFactory
     /// <summary>
     /// Gets a GitHub client instance configured with the specified product name and authentication token.
     /// </summary>
-    /// <param name="gitHubCatalogOptions">The GitHub options containing the product name and authentication token.</param>
-    /// <returns>>An instance of <see cref="IGitHubClientWrapper"/>.</returns>
-    IGitHubClientWrapper CreateClient(GitHubCatalogOptions gitHubCatalogOptions);
+    /// <param name="gitHubOptions">The GitHub options containing the product name and authentication token.</param>
+    /// <returns>An instance of <see cref="IGitHubClientWrapper"/>.</returns>
+    IGitHubClientWrapper CreateClient(IGitHubOptions gitHubOptions);
 }

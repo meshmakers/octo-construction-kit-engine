@@ -1,0 +1,53 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: MigrationHistory
+    description: "Records executed CK model migrations per tenant. Each instance represents one migration execution from a source version to a target version."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/MigrationHistory.CkModelName
+        name: CkModelName
+      - id: ${this}/MigrationHistory.FromVersion
+        name: FromVersion
+      - id: ${this}/MigrationHistory.ToVersion
+        name: ToVersion
+      - id: ${this}/MigrationHistory.ExecutedAt
+        name: ExecutedAt
+      - id: ${this}/MigrationHistory.Success
+        name: Success
+      - id: ${this}/MigrationHistory.EntitiesAffected
+        name: EntitiesAffected
+        isOptional: true
+      - id: ${this}/MigrationHistory.EntitiesAdded
+        name: EntitiesAdded
+        isOptional: true
+      - id: ${this}/MigrationHistory.EntitiesUpdated
+        name: EntitiesUpdated
+        isOptional: true
+      - id: ${this}/MigrationHistory.EntitiesDeleted
+        name: EntitiesDeleted
+        isOptional: true
+      - id: ${this}/MigrationHistory.DurationMs
+        name: DurationMs
+        isOptional: true
+      - id: ${this}/MigrationHistory.Errors
+        name: Errors
+        isOptional: true
+      - id: ${this}/MigrationHistory.Warnings
+        name: Warnings
+        isOptional: true
+      - id: ${this}/MigrationHistory.BackupId
+        name: BackupId
+        isOptional: true
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - CkModelName
+              - ExecutedAt
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - CkModelName
+              - ToVersion

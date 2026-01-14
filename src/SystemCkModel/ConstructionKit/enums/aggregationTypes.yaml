@@ -1,0 +1,20 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: AggregationTypes
+  description: This enum defines the different aggregation types available for queries.
+  values:
+  - key: 0
+    name: Count
+    description: Counts the number of items
+  - key: 1
+    name: Minimum
+    description: Finds the minimum value
+  - key: 2
+    name: Maximum
+    description: Finds the maximum value
+  - key: 3
+    name: Average
+    description: Calculates the average value
+  - key: 4
+    name: Sum
+    description: Calculates the sum of values

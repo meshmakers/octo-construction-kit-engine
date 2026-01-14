@@ -1,5 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 enums:
+  # This is replaced using inheritance at queries, kept here for backwards compatibility
+  # deprecated: true
 - enumId: QueryTypes
   description: The type of query
   values:

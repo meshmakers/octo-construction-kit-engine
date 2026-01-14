@@ -1,13 +1,16 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: ConfigurationValue
+    description: "Stores configuration data such as schema version or identity information."
     valueType: String
   - id: EnvironmentMode
+    description: "Defines the operational mode of the tenant (Development, Testing, Staging, Production)."
     valueType: Enum
     valueCkEnumId: ${this}/EnvironmentModes
     defaultValues:
       - 0
   - id: MaintenanceLevel
+    description: "Defines the maintenance state of the tenant (Off, UserApps, FullSystem)."
     valueType: Enum
     valueCkEnumId: ${this}/MaintenanceLevels
     defaultValues:

@@ -54,6 +54,18 @@
         <EmbeddedResource Include="Serialization\Schema\construction-kit-model-config.schema.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
+        <EmbeddedResource Include="BlueprintCatalogs\Serialization\Schema\blueprint-meta.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="BlueprintCatalogs\Serialization\Schema\blueprint-catalog-index.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="BlueprintCatalogs\Serialization\Schema\blueprint-library-versions.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="BlueprintCatalogs\Serialization\Schema\blueprint-migration.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
     </ItemGroup>
 
     <ItemGroup>

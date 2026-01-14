@@ -38,14 +38,14 @@
 
 
     <ItemGroup>
-      <None Remove="Serialization\Schema\runtime-element-association.json" />
-      <EmbeddedResource Include="Serialization\Schema\runtime-element-association.json" />
-      <None Remove="Serialization\Schema\runtime-element-attribute.json" />
-      <EmbeddedResource Include="Serialization\Schema\runtime-element-attribute.json" />
-      <None Remove="Serialization\Schema\runtime-element-entity.json" />
-      <EmbeddedResource Include="Serialization\Schema\runtime-element-entity.json" />
-      <None Remove="Serialization\Schema\runtime-model.json" />
-      <EmbeddedResource Include="Serialization\Schema\runtime-model.json" />
+      <None Remove="Serialization\Schema\runtime-elements-association.schema.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-elements-association.schema.json" />
+      <None Remove="Serialization\Schema\runtime-elements-attribute.schema.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-elements-attribute.schema.json" />
+      <None Remove="Serialization\Schema\runtime-elements-entity.schema.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-elements-entity.schema.json" />
+      <None Remove="Serialization\Schema\runtime-model.schema.json" />
+      <EmbeddedResource Include="Serialization\Schema\runtime-model.schema.json" />
     </ItemGroup>
 
 

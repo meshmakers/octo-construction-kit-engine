@@ -1,9 +1,11 @@
 using System.Collections;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Models.System.Generated.System.v2;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Engine.Tests.Fixtures;
+using TestCkModel.Generated.Test.v1;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests;
 
@@ -188,7 +190,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
         };
 
         var rtId = OctoObjectId.Parse("68259915225146801209c9f1");
-        var rtEntity = new RtEntity("Test/Sensor", rtId, d)
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, rtId, d)
         {
             RtWellKnownName = "ExpectedWellknownName",
             RtVersion = 5,
@@ -231,7 +233,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -249,12 +251,12 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
                 Targets =
                 [
-                    new RtEntityGraphItem("Test/Sensor", OctoObjectId.Parse("68259915225146801209c9f1"), d2)
+                    new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.Parse("68259915225146801209c9f1"), d2)
                     {
                         RtWellKnownName = "ExpectedWellknownName",
                         RtVersion = 867,
@@ -265,7 +267,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, attributePath);
         Assert.Equal(expectedValue, result);
@@ -281,7 +283,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "Designation");
         Assert.Equal("Test", result);
@@ -297,7 +299,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "IsEnabled");
         Assert.Equal(true, result);
@@ -313,14 +315,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation");
         Assert.Equal("DemoValueInnerString", result);
@@ -337,7 +339,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "DataCount", 42 }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation");
         Assert.Null(result);
@@ -355,7 +357,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString" }
                     })
@@ -363,7 +365,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[0].Designation");
@@ -382,7 +384,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString" }
                     })
@@ -390,7 +392,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         Assert.Throws<InvalidPathException>(() =>
             RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordArrayTests[5].Designation"));
@@ -410,7 +412,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         Assert.Throws<InvalidPathException>(() =>
             RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
@@ -429,15 +431,15 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString0" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString1" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString2" }
                     })
@@ -445,7 +447,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[-1].Designation");
@@ -464,15 +466,15 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString0" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString1" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString2" }
                     })
@@ -480,7 +482,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[*].Designation");
@@ -504,7 +506,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "IntArrayTests[*]");
         Assert.Equal([4, 5, 6, 7], (IEnumerable<object>?)result);
@@ -524,7 +526,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "Designation", "Child item text" },
             { "DataCount", 49 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "Navigation-DemoValueInnerString" }
                 })
@@ -536,14 +538,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensor->RecordTest.Designation");
@@ -560,7 +562,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -578,14 +580,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensor->Designation");
@@ -602,7 +604,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -620,14 +622,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensor->NotExisting"));
@@ -643,7 +645,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -661,14 +663,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropNameNotExisting.testSensor->Designation"));
@@ -684,7 +686,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -697,19 +699,20 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "DataCount", 49 }
         };
 
+
         var associations = new List<NavigationEnd>
         {
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)]
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)]
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensorNotExisting->Designation"));
@@ -725,7 +728,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
@@ -737,14 +740,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
                 NavigationPropertyName = "MyNavPropName",
                 Targets = []
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensor->Designation");
@@ -766,7 +769,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "Designation", "Test" }
         };
 
-        var rtEntity = new RtEntity("Test/City", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCityTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "Designation", "new name of test");
         Assert.Equal("new name of test", rtEntity.GetAttributeStringValue("Designation"));
@@ -782,7 +785,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "IsEnabled", false);
         Assert.False(rtEntity.GetAttributeValue<bool>("IsEnabled"));
@@ -798,14 +801,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "IsEnabled", true },
             { "DataCount", 42 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "DemoValueInnerString" }
                 })
             }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation",
             "new name of inner string value");
@@ -824,7 +827,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "DataCount", 42 }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation",
             "new name of inner string value");
@@ -843,7 +846,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "DataCount", 42 }
         };
 
-        var rtEntity = new RtEntity("Test/Sensor", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordTest.Designation", null);
         Assert.Null(rtEntity.GetAttributeValueByAccessPath(ckCacheService, fixture.TenantId, "RecordTest.Designation"));
@@ -861,7 +864,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString" }
                     })
@@ -869,7 +872,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "RecordArrayTests[0].Designation",
             "new name of inner string value");
@@ -888,7 +891,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString" }
                     })
@@ -896,7 +899,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[5].InnerString", "new_string"));
@@ -912,14 +915,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString" }
                     })
                 }
             }
         };
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[-1].InnerString", "new_string"));
@@ -935,15 +938,15 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString1" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString2" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString3" }
                     })
@@ -951,7 +954,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[-1].Designation", "new_string");
@@ -970,15 +973,15 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             {
                 "RecordArrayTests", new[]
                 {
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString1" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString2" }
                     }),
-                    new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                    new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                     {
                         { "Designation", "DemoValueInnerString3" }
                     })
@@ -986,7 +989,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "RecordArrayTests[*].Designation", "new_string");
@@ -1011,7 +1014,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             }
         };
 
-        var rtEntity = new RtEntity("Test/Country", OctoObjectId.GenerateNewId(), d);
+        var rtEntity = new RtEntity(TestCkIds.RtCkCountryTypeId, OctoObjectId.GenerateNewId(), d);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "IntArrayTests[*]", 5);
         var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity, "IntArrayTests[*]");
@@ -1032,7 +1035,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "Designation", "Child item text" },
             { "DataCount", 49 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "Navigation-DemoValueInnerString" }
                 })
@@ -1044,14 +1047,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "myNavPropName.testSensor->recordTest.Designation", "new name of inner string value");
@@ -1074,7 +1077,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             { "Designation", "Child item text" },
             { "DataCount", 49 },
             {
-                "RecordTest", new RtRecord("Test/TestRecord", new Dictionary<string, object?>
+                "RecordTest", new RtRecord(TestCkIds.RtCkTestRecordRecordId, new Dictionary<string, object?>
                 {
                     { "Designation", "Navigation-DemoValueInnerString" }
                 })
@@ -1086,14 +1089,14 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             new()
             {
                 AssociationId = OctoObjectId.GenerateNewId(),
-                AssociationRoleId = new CkId<CkAssociationRoleId>("System/ParentChild"),
-                TargetCkTypeId = "Test/Sensor",
-                Targets = [new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d2)],
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
+                Targets = [new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d2)],
                 NavigationPropertyName = "MyNavPropName"
             }
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Zone", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity, "myNavPropName.testSensor->Designation",
             "new name of string value");
@@ -1116,7 +1119,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
             Capacity = 0
         };
 
-        var rtEntity = new RtEntityGraphItem("Test/Sensor", OctoObjectId.GenerateNewId(), d, associations);
+        var rtEntity = new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId, OctoObjectId.GenerateNewId(), d, associations);
 
         Assert.Throws<InvalidPathException>(() => RtPathEvaluator.SetValue(ckCacheService, fixture.TenantId, rtEntity,
             "parent.testZone->Designation", "new name of string value"));
@@ -1131,7 +1134,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Zone",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkZoneTypeId,
             "Designation");
 
         Assert.Null(r);
@@ -1142,7 +1145,7 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Zone",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkZoneTypeId,
             "RecordTest.Designation");
 
         Assert.Null(r);
@@ -1153,12 +1156,12 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Zone",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkZoneTypeId,
             "children.testLocationWithSensor->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/LocationWithSensor", r.TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.CkRoleId);
+        Assert.Equal(TestCkIds.RtCkLocationWithSensorTypeId, r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Inbound, r.Direction);
     }
 
@@ -1168,12 +1171,12 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Sensor",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkSensorTypeId,
             "parent.testZone->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.CkRoleId);
+        Assert.Equal(TestCkIds.RtCkZoneTypeId, r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
     }
 
@@ -1182,16 +1185,16 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Sensor",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkSensorTypeId,
             "parent.testZone->parent.testDistrict->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.CkRoleId);
+        Assert.Equal(TestCkIds.RtCkZoneTypeId, r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
         Assert.Single(r.InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/District", r.InnerNavigationPairs[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkDistrictTypeId, r.InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].Direction);
     }
 
@@ -1200,20 +1203,20 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, "Test/Sensor",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkSensorTypeId,
             "parent.testZone->parent.testDistrict->parent.testCity->Designation");
 
         Assert.NotNull(r);
-        Assert.Equal("System/ParentChild", r.CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Zone", r.TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.CkRoleId);
+        Assert.Equal(TestCkIds.RtCkZoneTypeId, r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.Direction);
         Assert.Single(r.InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/District", r.InnerNavigationPairs[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkDistrictTypeId, r.InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].Direction);
         Assert.Single(r.InnerNavigationPairs[0].InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r.InnerNavigationPairs[0].InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/City", r.InnerNavigationPairs[0].InnerNavigationPairs[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.InnerNavigationPairs[0].InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkCityTypeId, r.InnerNavigationPairs[0].InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r.InnerNavigationPairs[0].InnerNavigationPairs[0].Direction);
     }
 
@@ -1226,18 +1229,18 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, TestCkIds.CkSensorTypeId,
         [
             "parent.testZone->parent.testDistrict->parent.testCity->Designation",
             "parent.testRegion->parent.testCountry->Designation"
         ]);
 
         Assert.Equal(2, r.Count);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Zone", r[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkZoneTypeId, r[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].Direction);
-        Assert.Equal("System/ParentChild", r[1].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Region", r[1].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r[1].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkRegionTypeId, r[1].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[1].Direction);
     }
 
@@ -1249,19 +1252,19 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
 
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
-        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, "Test/Sensor",
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPairs(ckCacheService, fixture.TenantId, TestCkIds.CkSensorTypeId,
         [
             "parent.testRegion->parent.testCountry->Designation",
             "parent.testRegion->Designation"
         ]);
 
         Assert.Single(r);
-        Assert.Equal("System/ParentChild", r[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Region", r[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkRegionTypeId, r[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].Direction);
         Assert.Single(r[0].InnerNavigationPairs);
-        Assert.Equal("System/ParentChild", r[0].InnerNavigationPairs[0].CkRoleId.SemanticVersionedFullName);
-        Assert.Equal("Test/Country", r[0].InnerNavigationPairs[0].TargetCkTypeId);
+        Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r[0].InnerNavigationPairs[0].CkRoleId);
+        Assert.Equal(TestCkIds.RtCkCountryTypeId, r[0].InnerNavigationPairs[0].TargetCkTypeId);
         Assert.Equal(GraphDirections.Outbound, r[0].InnerNavigationPairs[0].Direction);
         Assert.Equal(2, r[0].SubPathTerms.Count());
     }

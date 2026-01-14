@@ -2,17 +2,17 @@ $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
   - recordId: TestRecord
     attributes:
-      - id: Test/Designation
+      - id: ${this}/Designation
         name: Designation
         isOptional: true
-      - id: Test/DataCount
+      - id: ${this}/DataCount
         name: DataCount
         isOptional: true
   - recordId: TestRecord-2
     attributes:
-      - id: Test/Designation
+      - id: ${this}/Designation
         name: Designation
         isOptional: true
-      - id: Test/DataCount
+      - id: ${this}/DataCount
         name: DataCount
         isOptional: true

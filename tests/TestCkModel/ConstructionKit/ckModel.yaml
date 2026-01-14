@@ -1,5 +1,5 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-meta.schema.json"
-modelId: "System.TestIdentity-1.0.0"
+modelId: "System.TestIdentity-1.1.0"
 description: "Test Identity construction kit model"
 dependencies:
-  - "System-(,2.0)"
+  - "System-[2.0,)"

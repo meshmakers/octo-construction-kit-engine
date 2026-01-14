@@ -1,0 +1,52 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>octo-bpm</ToolCommandName>
+        <Description>Octo Mesh Blueprint Manager</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.BlueprintManager</PackageId>
+        <AssemblyName>octo-bpm</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.BlueprintManager</RootNamespace>
+        <TargetFramework>net10.0</TargetFramework>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <OutputPath>..\..\bin\$(Configuration)\</OutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Meshmakers.Common.CommandLineParser" Version="$(MeshmakerVersion)" />
+        <PackageReference Include="Meshmakers.Common.Configuration" Version="$(MeshmakerVersion)" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+        <PackageReference Include="NLog" Version="6.0.6" />
+        <PackageReference Include="NLog.Extensions.Logging" Version="6.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath />
+            <Link>LICENSE</Link>
+        </None>
+        <None Update="nlog.config">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
+        <ProjectReference Include="..\Runtime.Engine\Runtime.Engine.csproj" />
+    </ItemGroup>
+
+</Project>

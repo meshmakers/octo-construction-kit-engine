@@ -399,11 +399,11 @@ public static class RtPathEvaluator
             var inAssociations = ckTypeGraph.Associations.In.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
                             ckCacheService.GetCkType(tenantId, a.TargetCkTypeId).GetAllDerivedTypes(true)
-                                .Select(t => t.GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
+                                .Select(t => t.ToRtCkId().GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
             var outAssociations = ckTypeGraph.Associations.Out.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
                             ckCacheService.GetCkType(tenantId, a.TargetCkTypeId).GetAllDerivedTypes(true)
-                                .Select(t => t.GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
+                                .Select(t => t.ToRtCkId().GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
 
             if (inAssociations.Count == 0 && outAssociations.Count == 0)
             {
@@ -414,7 +414,7 @@ public static class RtPathEvaluator
             {
                 var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.TargetCkTypeId)
                     .GetAllDerivedTypes(true)
-                    .First(t => t.GetTypeName() == targetTypeProperty.Value);
+                    .First(t => t.ToRtCkId().GetTypeName() == targetTypeProperty.Value);
                 ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
 
                 var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
@@ -436,7 +436,7 @@ public static class RtPathEvaluator
             {
                 var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.TargetCkTypeId)
                     .GetAllDerivedTypes(true)
-                    .First(t => t.GetTypeName() == targetTypeProperty.Value);
+                    .First(t => t.ToRtCkId().GetTypeName() == targetTypeProperty.Value);
                 ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
 
                 var pathTerms = tokens.TakeWhile(t => t != targetTypeProperty).ToList();
@@ -741,10 +741,10 @@ public static class RtPathEvaluator
                                 {
                                     navigationEnds.Add(new NavigationEnd
                                     {
-                                        AssociationRoleId = ckTypeAssociationGraph.CkRoleId,
+                                        RtAssociationRoleId = ckTypeAssociationGraph.CkRoleId.ToRtCkId(),
                                         AssociationId = OctoObjectId.Empty,
                                         NavigationPropertyName = ckTypeAssociationGraph.NavigationPropertyName,
-                                        TargetCkTypeId = ckTypeAssociationGraph.TargetCkTypeId,
+                                        TargetRtCkTypeId = ckTypeAssociationGraph.TargetCkTypeId.ToRtCkId(),
                                         Targets = new List<RtEntityGraphItem>()
                                     });
                                 }
@@ -776,8 +776,8 @@ public static class RtPathEvaluator
 
                     var filteredNavigationEnds = navigationEnds
                         .Where(ne =>
-                            ckCacheService.GetCkType(tenantId, ne.TargetCkTypeId).GetAllDerivedTypes(true)
-                                .Select(t => t.GetTypeName()).Contains(token.Value)).ToList();
+                            ckCacheService.GetRtCkType(tenantId, ne.TargetRtCkTypeId).GetAllDerivedTypes(true)
+                                .Select(t => t.ToRtCkId().GetTypeName()).Contains(token.Value)).ToList();
 
                     if (filteredNavigationEnds.Count == 0)
                     {
@@ -787,9 +787,9 @@ public static class RtPathEvaluator
                     if (filteredNavigationEnds.Count == 1)
                     {
                         var navigationEnd = navigationEnds.First();
-                        navigationEnd.TargetCkTypeId = ckCacheService
-                            .GetCkType(tenantId, navigationEnd.TargetCkTypeId)
-                            .GetAllDerivedTypes(true).Single(t => t.GetTypeName() == token.Value);
+                        navigationEnd.TargetRtCkTypeId = ckCacheService
+                            .GetRtCkType(tenantId, navigationEnd.TargetRtCkTypeId)
+                            .GetAllDerivedTypes(true).Single(t => t.ToRtCkId().GetTypeName() == token.Value).ToRtCkId();
                         if (navigationEnd.Targets.Count() == 1)
                         {
                             newPathLocators.Add(new PathLocator(navigationEnd.Targets.First(), null,

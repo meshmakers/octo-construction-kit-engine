@@ -155,7 +155,7 @@ internal class RepositoryDependencyResolver(
         {
             var skippedDependency = skippedDependencies[i];
 
-            var dependents = dependencies.Where(x => x.Item2.IsSatisfiedBy(skippedDependency.Name));
+            var dependents = dependencies.Where(x => x.Item2.IsSatisfiedBy(skippedDependency));
             foreach (var dependent in dependents)
             {
                 foreach (var ckOriginModelId in dependent.Item1)

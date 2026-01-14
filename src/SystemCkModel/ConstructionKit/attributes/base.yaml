@@ -1,11 +1,14 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: Name
+    description: "Unique identifier name for the entity."
     valueType: String
   - id: DisplayName
+    description: "Human-readable display name shown in user interfaces."
     valueType: String
   - id: Description
+    description: "Further information on the item."
     valueType: String
-    description: Further information on the item.
   - id: Enabled
+    description: "Indicates whether the entity is active and operational."
     valueType: Boolean

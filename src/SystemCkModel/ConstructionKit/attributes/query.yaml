@@ -1,35 +1,64 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
   - id: Query.Columns
+    description: "Array of attribute paths to include in the query result."
+    valueType: StringArray
+  - id: Query.GroupByColumns
+    description: "Array of attribute paths to group results by in aggregation queries."
     valueType: StringArray
   - id: Query.CkTypeId
+    description: "The Construction Kit type ID that this query targets."
     valueType: String
   - id: Query.Sorting
+    description: "Array of sort specifications defining the order of query results."
     valueType: RecordArray
     valueCkRecordId: ${this}/SortOrderItem
   - id: Query.FieldFilter
+    description: "Array of field filters to apply conditions on specific attributes."
     valueType: RecordArray
     valueCkRecordId: ${this}/FieldFilter
   - id: Query.TextSearchFilter
+    description: "Full-text search filter applied across searchable fields."
     valueType: Record
     valueCkRecordId: ${this}/TextSearchFilter
   - id: Query.AttributeSearchFilter
+    description: "Search filter applied to specific attributes only."
     valueType: Record
     valueCkRecordId: ${this}/AttributeSearchFilter
+  - id: AttributePath
+    description: "Path to an attribute, supporting nested paths with dot notation."
+    valueType: String
+  - id: AttributePaths
+    description: "Array of attribute paths for multi-attribute operations."
+    valueType: StringArray
+  - id: FieldFilter.Operator
+    description: "Comparison operator for field filtering (Equals, Like, GreaterThan, etc.)."
+    valueType: Enum
+    valueCkEnumId: ${this}/FieldFilterOperator
+  - id: ComparisonValue
+    description: "The value to compare against in filter operations."
+    valueType: String
+  - id: SortOrder
+    description: "Sort direction for ordering results (Ascending, Descending, Default)."
+    valueType: Enum
+    valueCkEnumId: ${this}/SortOrders
+  - id: AggregationType
+    description: "Type of aggregation function to apply (Count, Min, Max, Avg, Sum)."
+    valueType: Enum
+    valueCkEnumId: ${this}/AggregationTypes
+  - id: AggregationQueryColumn
+    description: "Defines an aggregation column with its attribute path and aggregation type."
+    valueType: Record
+    valueCkRecordId: ${this}/AggregationQueryColumn
+  - id: AggregationQueryColumns
+    description: "Defines a set of aggregation columns for the query, with its attribute path and aggregation type."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/AggregationQueryColumn
+  # This attribute is kept for backward compatibility
+  # deprecated: true
   - id: Query.Types
+    description: "Legacy query type selector. Deprecated - use specific query types instead."
     valueType: Enum
     valueCkEnumId: ${this}/QueryTypes
     defaultValues:
       - 0
-  - id: AttributePath
-    valueType: String
-  - id: AttributePaths
-    valueType: StringArray    
-  - id: FieldFilter.Operator
-    valueType: Enum
-    valueCkEnumId: ${this}/FieldFilterOperator
-  - id: ComparisonValue
-    valueType: String
-  - id: SortOrder
-    valueType: Enum
-    valueCkEnumId: ${this}/SortOrders

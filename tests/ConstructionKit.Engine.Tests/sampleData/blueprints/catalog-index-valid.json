@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/blueprint-catalog-index.schema.json",
+  "blueprintLibraries": [
+    {
+      "name": "Infrastructure",
+      "description": "Infrastructure management blueprints",
+      "path": "infrastructure/index.json"
+    },
+    {
+      "name": "ECommerce",
+      "description": "E-commerce blueprints",
+      "path": "ecommerce/index.json"
+    }
+  ]
+}

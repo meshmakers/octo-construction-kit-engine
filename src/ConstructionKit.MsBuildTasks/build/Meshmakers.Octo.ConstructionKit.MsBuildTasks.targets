@@ -110,4 +110,48 @@
         4. Incremental builds work correctly
     -->
 
+    <!--
+        CK Model Migration Files Embedding
+        This target embeds migration YAML files from ConstructionKit/migrations/ folder
+        as embedded resources, making them available via EmbeddedCkMigrationContentProvider.
+
+        Migration files are embedded with the logical name pattern:
+        $(RootNamespace).migrations.%(Filename)%(Extension)
+
+        Example: MyApp.CkModel.migrations.migration-meta.yaml
+                 MyApp.CkModel.migrations.1-0-0-to-2-0-0.yaml
+    -->
+    <PropertyGroup>
+        <OctoEmbedCkMigrations Condition="'$(OctoEmbedCkMigrations)' == ''">true</OctoEmbedCkMigrations>
+    </PropertyGroup>
+
+    <Target Name="CkEmbedMigrations"
+            AfterTargets="CkCompile"
+            BeforeTargets="CoreCompile"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoEmbedCkMigrations)' == 'true'">
+
+        <!-- Find migration files in each ConstructionKit folder -->
+        <ItemGroup>
+            <_CkMigrationFilesFromFolder Include="%(ConstructionKitFolder.Identity)/migrations/*.yaml" />
+        </ItemGroup>
+
+        <Message Condition="'@(_CkMigrationFilesFromFolder)' != ''"
+                 Importance="Normal"
+                 Text="Embedding CK model migration files as resources" />
+
+        <!-- Add migration files as EmbeddedResource -->
+        <ItemGroup>
+            <_OctoMigrationResourceFilesNew Include="@(_CkMigrationFilesFromFolder)" Exclude="@(_OctoMigrationResourceFiles)" />
+            <EmbeddedResource Include="@(_OctoMigrationResourceFilesNew)">
+                <LogicalName>$(RootNamespace).migrations.%(Filename)%(Extension)</LogicalName>
+                <Visible>False</Visible>
+            </EmbeddedResource>
+            <_OctoMigrationResourceFiles Include="@(_OctoMigrationResourceFilesNew)" />
+        </ItemGroup>
+
+        <Message Condition="'@(_OctoMigrationResourceFilesNew)' != ''"
+                 Importance="Normal"
+                 Text="Embedded migration files: @(_OctoMigrationResourceFilesNew->'%(Filename)%(Extension)', ', ')" />
+    </Target>
+
 </Project>

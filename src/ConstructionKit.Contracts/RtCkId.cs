@@ -115,7 +115,7 @@ public sealed record RtCkId<TElementId> : IComparable<RtCkId<TElementId>> where 
 
 
     /// <summary>
-    ///     Returns the versioned model id, e. g. "System-1.0.0"
+    ///     Returns the name of the model, e.g. "System"
     /// </summary>
     public string ModelId { get; }
 

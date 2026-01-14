@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/blueprint-meta.schema.json",
+  "blueprintId": "TestBlueprint-1.0.0",
+  "description": "A test blueprint for validation",
+  "ckModelDependencies": [
+    "System-[2.0,)"
+  ],
+  "composedBlueprints": [
+    "BaseBlueprint-[1.0,)"
+  ],
+  "seedDataPath": "seed-data/entities.yaml"
+}

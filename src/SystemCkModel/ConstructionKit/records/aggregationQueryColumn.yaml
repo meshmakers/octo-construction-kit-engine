@@ -1,0 +1,9 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+- recordId: AggregationQueryColumn
+  description: "Defines an aggregation column specifying which attribute to aggregate and how."
+  attributes:
+    - id: ${this}/AttributePath
+      name: AttributePath
+    - id: ${this}/AggregationType
+      name: AggregationType

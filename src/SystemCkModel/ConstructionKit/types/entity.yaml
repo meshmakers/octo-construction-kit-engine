@@ -1,8 +1,19 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
   - typeId: Entity
+    description: "Abstract base type for all entities in the system. Provides common indexing and association capabilities."
     isFinal: false
     isAbstract: true
+    attributes:
+      - id: ${this}/RtBlueprintSource
+        name: RtBlueprintSource
+        isOptional: true
+      - id: ${this}/RtBlueprintLocked
+        name: RtBlueprintLocked
+        isOptional: true
+      - id: ${this}/RtBlueprintAppliedAt
+        name: RtBlueprintAppliedAt
+        isOptional: true
     associations:
     - id: ${this}/Related
       targetCkTypeId: ${this}/Entity
@@ -16,3 +27,7 @@ types:
           - attributePaths:
               - CkTypeId
               - _id
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - RtBlueprintSource

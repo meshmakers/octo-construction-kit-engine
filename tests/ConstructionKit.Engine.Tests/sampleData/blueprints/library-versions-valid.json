@@ -1,0 +1,19 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/blueprint-library-versions.schema.json",
+  "name": "Infrastructure",
+  "description": "Infrastructure management blueprints",
+  "versions": [
+    {
+      "version": "1.0.0",
+      "path": "1.0.0/Infrastructure-1.0.0.zip",
+      "description": "Initial release",
+      "releaseDate": "2024-01-15"
+    },
+    {
+      "version": "1.1.0",
+      "path": "1.1.0/Infrastructure-1.1.0.zip",
+      "description": "Added new features",
+      "releaseDate": "2024-03-20"
+    }
+  ]
+}

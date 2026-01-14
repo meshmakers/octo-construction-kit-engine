@@ -130,11 +130,11 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     {
                         var queryColumn = new CkTypeQueryColumn(
                             ckTypeAssociationGraphGrouping.Key.ToCamelCase() + Separator +
-                            ckTypeAssociationDirectionTuple.CkTypeId.GetTypeName() + NavigationSeparator +
+                            ckTypeAssociationDirectionTuple.CkTypeId.ToRtCkId().GetTypeName() + NavigationSeparator +
                             subColumn.Path,
                             [
                                 new(ckTypeAssociationGraphGrouping.Key, PathType.Navigation),
-                                new(ckTypeAssociationDirectionTuple.CkTypeId.GetTypeName(), PathType.TargetCkTypeId),
+                                new(ckTypeAssociationDirectionTuple.CkTypeId.ToRtCkId().GetTypeName(), PathType.TargetCkTypeId),
                                 ..subColumn.AccessPathList
                             ], subColumn.ValueType, subColumn.AssociationTuple);
                         columns.Add(queryColumn);

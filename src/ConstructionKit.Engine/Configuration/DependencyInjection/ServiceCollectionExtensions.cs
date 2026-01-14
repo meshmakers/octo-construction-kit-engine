@@ -1,7 +1,10 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
+using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Meshmakers.Octo.ConstructionKit.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
@@ -73,6 +76,19 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICatalog, EmbeddedResourceCatalog>();
         services.AddTransient<ICatalog, PrivateGitHubCatalog>();
         services.AddTransient<ICatalog, PublicGitHubCatalog>();
+
+        // Blueprint catalog services
+        services.AddOptions<LocalFileSystemBlueprintCatalogOptions>();
+        services.AddOptions<PublicGitHubBlueprintCatalogOptions>();
+        services.AddOptions<PrivateGitHubBlueprintCatalogOptions>();
+        services.AddSingleton<IBlueprintCatalogManager, BlueprintCatalogManager>();
+        services.AddTransient<IBlueprintCatalog, LocalFileSystemBlueprintCatalog>();
+        services.AddTransient<IBlueprintCatalog, PublicGitHubBlueprintCatalog>();
+        services.AddTransient<IBlueprintCatalog, PrivateGitHubBlueprintCatalog>();
+        services.AddTransient<IBlueprintSerializer, BlueprintYamlSerializer>();
+        services.AddTransient<IBlueprintSchemaValidator, BlueprintSchemaValidator>();
+        services.AddTransient<IBlueprintComposer, BlueprintComposer>();
+        services.AddTransient<IBlueprintCompilerService, BlueprintCompilerService>();
 
         return services;
     }

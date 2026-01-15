@@ -97,11 +97,18 @@ internal class RtJsonSerializer : IRtJsonSerializer
     {
         if (!evaluationResults.IsValid)
         {
-            foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
+            // In JsonSchema.Net 8.0, HasErrors was removed. Check for errors using Errors property.
+            var details = evaluationResults.Details;
+            if (details != null)
             {
-                var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? []);
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
+                foreach (var evaluationResult in details.Where(x => x.Errors != null && x.Errors.Count > 0))
+                {
+                    var path = evaluationResult.InstanceLocation.ToString();
+                    var errorMessages = evaluationResult.Errors != null
+                        ? string.Join(", ", evaluationResult.Errors.Values)
+                        : string.Empty;
+                    operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
+                }
             }
         }
 

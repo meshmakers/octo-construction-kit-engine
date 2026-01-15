@@ -49,7 +49,6 @@
         }
       },
       "additionalProperties": false,
-      "additionalItems": false,
       "required": [
         "rtId",
         "ckTypeId"

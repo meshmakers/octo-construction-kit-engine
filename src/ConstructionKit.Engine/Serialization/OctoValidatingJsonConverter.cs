@@ -28,7 +28,11 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
         JsonSerializerOptions options)
     {
         var reader1 = reader;
-        var evaluationResults = _schema.Evaluate(JsonSerializer.Deserialize<JsonNode>(ref reader1, options), new EvaluationOptions
+        // JsonSchema.Net 8.0 requires JsonElement instead of JsonNode
+        using var document = JsonDocument.ParseValue(ref reader1);
+        var jsonElement = document.RootElement;
+
+        var evaluationResults = _schema.Evaluate(jsonElement, new EvaluationOptions
         {
             OutputFormat = OutputFormat,
             RequireFormatValidation = RequireFormatValidation

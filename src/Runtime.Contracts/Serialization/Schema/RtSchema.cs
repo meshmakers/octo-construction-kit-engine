@@ -14,12 +14,21 @@ public static class RtSchema
     // Cached bundled schema - created once during static initialization to avoid race conditions
     private static readonly Lazy<JsonSchema> RuntimeSchemaLazy = new(CreateBundledRuntimeSchema);
 
-    static RtSchema()
+    // Cache sub-schemas to ensure they are loaded (and auto-registered) before main schema needs them
+    private static readonly Lazy<JsonSchema> AttributeSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "runtime-elements-attribute")));
+    private static readonly Lazy<JsonSchema> EntitySchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "runtime-elements-entity")));
+    private static readonly Lazy<JsonSchema> AssociationSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "runtime-elements-association")));
+
+    /// <summary>
+    ///     Ensures all sub-schemas are loaded and registered before using main schema.
+    ///     In JsonSchema.Net 8.0, schemas are auto-registered when deserialized.
+    /// </summary>
+    private static void EnsureSubSchemasLoaded()
     {
-        // Register sub-schemas first so they are available for $ref resolution
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-attribute")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-entity")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "runtime-elements-association")));
+        // Accessing .Value triggers lazy loading (and auto-registration)
+        _ = AttributeSchemaLazy.Value;
+        _ = EntitySchemaLazy.Value;
+        _ = AssociationSchemaLazy.Value;
     }
 
     /// <summary>
@@ -32,8 +41,10 @@ public static class RtSchema
 
     private static JsonSchema CreateBundledRuntimeSchema()
     {
-        var runtimeSchemaInternal = GetSchema(string.Format(SchemaPath, "runtime-model"));
-        return runtimeSchemaInternal.Bundle();
+        // Note: Bundle() was removed in JsonSchema.Net 8.0. Sub-schemas are auto-registered
+        // when deserialized, so we just need to ensure they're loaded before the main schema.
+        EnsureSubSchemasLoaded();
+        return GetSchema(string.Format(SchemaPath, "runtime-model"));
     }
 
     private static JsonSchema GetSchema(string resourcesStreamPath)

@@ -48,7 +48,6 @@
         }
       },
       "additionalProperties": false,
-      "additionalItems": false,
       "required": [
         "enumId"
       ]

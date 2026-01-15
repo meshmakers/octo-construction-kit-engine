@@ -58,10 +58,11 @@ internal class CkSchemaValidator : ICkSchemaValidator
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
     {
-        var json = JsonNode.Parse(stream);
+        using var document = System.Text.Json.JsonDocument.Parse(stream);
+        var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, json);
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement);
     }
 
     private static bool ValidateModelYaml(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
@@ -81,25 +82,38 @@ internal class CkSchemaValidator : ICkSchemaValidator
         }
         var singleNode = yamlStream.Documents[0].ToJsonNode();
 
-        var evaluationResults = schema.Evaluate(singleNode, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, singleNode);
+        // Convert JsonNode to JsonElement for JsonSchema.Net 8.0
+        var jsonString = singleNode?.ToJsonString() ?? "null";
+        using var document = System.Text.Json.JsonDocument.Parse(jsonString);
+        var jsonElement = document.RootElement;
+
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement);
     }
 
     private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
-        EvaluationResults evaluationResults, JsonNode? rootNode = null)
+        EvaluationResults evaluationResults, System.Text.Json.JsonElement? rootElement = null)
     {
         if (!evaluationResults.IsValid)
         {
-            foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
+            // In JsonSchema.Net 8.0, HasErrors was removed. Check for errors using Errors property.
+            // Details may be null, and Errors is now Dictionary<string, string> (not nullable)
+            var details = evaluationResults.Details;
+            if (details != null)
             {
-                var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? []);
-                
-                // Get detailed information about the failing object
-                var objectDetails = GetObjectDetails(rootNode, evaluationResult.InstanceLocation);
-                var enhancedErrorMessage = string.IsNullOrEmpty(objectDetails) ? errorMessages : $"{errorMessages}. Object details: {objectDetails}";
-                
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, enhancedErrorMessage));
+                foreach (var evaluationResult in details.Where(x => x.Errors != null && x.Errors.Count > 0))
+                {
+                    var path = evaluationResult.InstanceLocation.ToString();
+                    var errorMessages = evaluationResult.Errors != null
+                        ? string.Join(", ", evaluationResult.Errors.Values)
+                        : string.Empty;
+
+                    // Get detailed information about the failing object
+                    var objectDetails = GetObjectDetails(rootElement, evaluationResult.InstanceLocation);
+                    var enhancedErrorMessage = string.IsNullOrEmpty(objectDetails) ? errorMessages : $"{errorMessages}. Object details: {objectDetails}";
+
+                    operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, enhancedErrorMessage));
+                }
             }
         }
 
@@ -109,19 +123,17 @@ internal class CkSchemaValidator : ICkSchemaValidator
     private const int MaxDisplayedProperties = 10;
     private const int MaxDisplayedArrayElements = 5;
 
-    private static string GetObjectDetails(JsonNode? rootNode, JsonPointer instanceLocation)
+    private static string GetObjectDetails(System.Text.Json.JsonElement? rootElement, JsonPointer instanceLocation)
     {
-        if (rootNode == null)
+        if (rootElement == null)
         {
             return string.Empty;
         }
 
         try
         {
-            var rootJson = System.Text.Json.JsonSerializer.Serialize(rootNode);
-            using var document = System.Text.Json.JsonDocument.Parse(rootJson);
-            var targetElement = instanceLocation.Evaluate(document.RootElement);
-            
+            var targetElement = instanceLocation.Evaluate(rootElement.Value);
+
             if (!targetElement.HasValue)
             {
                 return "Target object not found";

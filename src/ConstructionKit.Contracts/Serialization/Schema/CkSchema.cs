@@ -16,15 +16,25 @@ public static class CkSchema
     private static readonly Lazy<JsonSchema> ModelConfigSchemaLazy = new(CreateBundledModelConfigSchema);
     private static readonly Lazy<JsonSchema> CompiledModelSchemaLazy = new(CreateBundledCompiledModelSchema);
 
-    static CkSchema()
+    // Cache sub-schemas to ensure they are loaded (and auto-registered) before main schemas need them
+    private static readonly Lazy<JsonSchema> AttributeSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-attribute.schema")));
+    private static readonly Lazy<JsonSchema> TypeSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-type.schema")));
+    private static readonly Lazy<JsonSchema> AssociationRoleSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-associationRole.schema")));
+    private static readonly Lazy<JsonSchema> RecordSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-record.schema")));
+    private static readonly Lazy<JsonSchema> EnumSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-enum.schema")));
+
+    /// <summary>
+    ///     Ensures all sub-schemas are loaded and registered before using main schemas.
+    ///     In JsonSchema.Net 8.0, schemas are auto-registered when deserialized.
+    /// </summary>
+    private static void EnsureSubSchemasLoaded()
     {
-        // Register sub-schemas first so they are available for $ref resolution
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-attribute.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-type.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-associationRole.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-record.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-elements-enum.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "construction-kit-model-config.schema")));
+        // Accessing .Value triggers lazy loading (and auto-registration)
+        _ = AttributeSchemaLazy.Value;
+        _ = TypeSchemaLazy.Value;
+        _ = AssociationRoleSchemaLazy.Value;
+        _ = RecordSchemaLazy.Value;
+        _ = EnumSchemaLazy.Value;
     }
 
     /// <summary>
@@ -49,26 +59,28 @@ public static class CkSchema
 
     private static JsonSchema CreateBundledElementsSchema()
     {
-        var elementsSchema = GetSchema(string.Format(SchemaPath, "construction-kit-elements.schema"));
-        return elementsSchema.Bundle();
+        // Note: Bundle() was removed in JsonSchema.Net 8.0. Sub-schemas are auto-registered
+        // when deserialized, so we just need to ensure they're loaded before the main schema.
+        EnsureSubSchemasLoaded();
+        return GetSchema(string.Format(SchemaPath, "construction-kit-elements.schema"));
     }
 
     private static JsonSchema CreateBundledMetaSchema()
     {
-        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-meta.schema"));
-        return metaSchemaInternal.Bundle();
+        EnsureSubSchemasLoaded();
+        return GetSchema(string.Format(SchemaPath, "construction-kit-meta.schema"));
     }
 
     private static JsonSchema CreateBundledModelConfigSchema()
     {
-        var modelConfigSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-model-config.schema"));
-        return modelConfigSchemaInternal.Bundle();
+        EnsureSubSchemasLoaded();
+        return GetSchema(string.Format(SchemaPath, "construction-kit-model-config.schema"));
     }
 
     private static JsonSchema CreateBundledCompiledModelSchema()
     {
-        var compiledModelSchemaInternal = GetSchema(string.Format(SchemaPath, "construction-kit-compiled.schema"));
-        return compiledModelSchemaInternal.Bundle();
+        EnsureSubSchemasLoaded();
+        return GetSchema(string.Format(SchemaPath, "construction-kit-compiled.schema"));
     }
 
     private static JsonSchema GetSchema(string resourcesStreamPath)

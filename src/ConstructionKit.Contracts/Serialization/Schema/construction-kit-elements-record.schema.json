@@ -36,7 +36,6 @@
         }
       },
       "additionalProperties": false,
-      "additionalItems": false,
       "required": [
         "recordId"
       ]

@@ -111,7 +111,6 @@
         }
       },
       "additionalProperties": false,
-      "additionalItems": false,
       "required": [
         "typeId"
       ]
@@ -230,8 +229,7 @@
           "type": "boolean"
         }
       },
-      "additionalProperties": false,
-      "additionalItems": false
+      "additionalProperties": false
     }
   }
 }

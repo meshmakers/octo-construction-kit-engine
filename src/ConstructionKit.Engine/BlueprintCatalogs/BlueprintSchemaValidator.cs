@@ -40,9 +40,10 @@ public class BlueprintSchemaValidator : IBlueprintSchemaValidator
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
     {
-        var json = JsonNode.Parse(stream);
+        using var document = System.Text.Json.JsonDocument.Parse(stream);
+        var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(json, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
@@ -63,7 +64,12 @@ public class BlueprintSchemaValidator : IBlueprintSchemaValidator
         }
         var singleNode = yamlStream.Documents[0].ToJsonNode();
 
-        var evaluationResults = schema.Evaluate(singleNode, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        // Convert JsonNode to JsonElement for JsonSchema.Net 8.0
+        var jsonString = singleNode?.ToJsonString() ?? "null";
+        using var document = System.Text.Json.JsonDocument.Parse(jsonString);
+        var jsonElement = document.RootElement;
+
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
@@ -72,11 +78,19 @@ public class BlueprintSchemaValidator : IBlueprintSchemaValidator
     {
         if (!evaluationResults.IsValid)
         {
-            foreach (var evaluationResult in evaluationResults.Details.Where(x => x.HasErrors))
+            // In JsonSchema.Net 8.0, HasErrors was removed. Check for errors using Errors property.
+            // Details may be null, and Errors is now Dictionary<string, string> (not nullable)
+            var details = evaluationResults.Details;
+            if (details != null)
             {
-                var path = evaluationResult.InstanceLocation.ToString();
-                var errorMessages = string.Join(", ", evaluationResult.Errors?.Values ?? []);
-                operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
+                foreach (var evaluationResult in details.Where(x => x.Errors != null && x.Errors.Count > 0))
+                {
+                    var path = evaluationResult.InstanceLocation.ToString();
+                    var errorMessages = evaluationResult.Errors != null
+                        ? string.Join(", ", evaluationResult.Errors.Values)
+                        : string.Empty;
+                    operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, errorMessages));
+                }
             }
         }
 

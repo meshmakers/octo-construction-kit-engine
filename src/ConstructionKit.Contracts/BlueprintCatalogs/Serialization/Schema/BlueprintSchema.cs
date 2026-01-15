@@ -16,13 +16,8 @@ public static class BlueprintSchema
     private static readonly Lazy<JsonSchema> LibraryVersionsSchemaLazy = new(CreateBundledLibraryVersionsSchema);
     private static readonly Lazy<JsonSchema> MigrationSchemaLazy = new(CreateBundledMigrationSchema);
 
-    static BlueprintSchema()
-    {
-        // Register sub-schemas first so they are available for $ref resolution
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "blueprint-catalog-index.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "blueprint-library-versions.schema")));
-        SchemaRegistry.Global.Register(GetSchema(string.Format(SchemaPath, "blueprint-migration.schema")));
-    }
+    // Note: In JsonSchema.Net 8.0, schemas are automatically registered in SchemaRegistry.Global
+    // when deserialized. Manual registration is no longer needed and would cause duplicate registration errors.
 
     /// <summary>
     ///     Returns the blueprint meta schema
@@ -46,26 +41,24 @@ public static class BlueprintSchema
 
     private static JsonSchema CreateBundledMetaSchema()
     {
-        var metaSchemaInternal = GetSchema(string.Format(SchemaPath, "blueprint-meta.schema"));
-        return metaSchemaInternal.Bundle();
+        // Note: Bundle() was removed in JsonSchema.Net 8.0. Since sub-schemas are registered
+        // in SchemaRegistry.Global (in the static constructor), $ref resolution works without bundling.
+        return GetSchema(string.Format(SchemaPath, "blueprint-meta.schema"));
     }
 
     private static JsonSchema CreateBundledCatalogIndexSchema()
     {
-        var catalogIndexSchemaInternal = GetSchema(string.Format(SchemaPath, "blueprint-catalog-index.schema"));
-        return catalogIndexSchemaInternal.Bundle();
+        return GetSchema(string.Format(SchemaPath, "blueprint-catalog-index.schema"));
     }
 
     private static JsonSchema CreateBundledLibraryVersionsSchema()
     {
-        var libraryVersionsSchemaInternal = GetSchema(string.Format(SchemaPath, "blueprint-library-versions.schema"));
-        return libraryVersionsSchemaInternal.Bundle();
+        return GetSchema(string.Format(SchemaPath, "blueprint-library-versions.schema"));
     }
 
     private static JsonSchema CreateBundledMigrationSchema()
     {
-        var migrationSchemaInternal = GetSchema(string.Format(SchemaPath, "blueprint-migration.schema"));
-        return migrationSchemaInternal.Bundle();
+        return GetSchema(string.Format(SchemaPath, "blueprint-migration.schema"));
     }
 
     private static JsonSchema GetSchema(string resourcesStreamPath)

@@ -9,9 +9,10 @@ internal static class CkEnumGraphExtensions
         var counter = 0;
         foreach (var value in ckEnumGraph.Values)
         {
+            var escapedDescription = TextWrapper.EscapeMdxSpecialCharacters(value.Description);
             await outputFile.WriteLineAsync($"| {counter++} | " +
                                             $"{value.Name} | " +
-                                            $"{value.Description} |").ConfigureAwait(false);
+                                            $"{escapedDescription} |").ConfigureAwait(false);
         }
     }
 }

@@ -106,7 +106,8 @@ internal class ContentGenerator(
                 await outputFile.WriteLineAsync("| ----------- |").ConfigureAwait(false);
                 foreach (var value in attribute.DefaultValues)
                 {
-                    await outputFile.WriteLineAsync($"| {value} |").ConfigureAwait(false);
+                    var escapedValue = TextWrapper.EscapeMdxSpecialCharacters(value?.ToString());
+                    await outputFile.WriteLineAsync($"| {escapedValue} |").ConfigureAwait(false);
                 }
             }
 
@@ -117,7 +118,9 @@ internal class ContentGenerator(
                 await outputFile.WriteLineAsync("| ----------- | ----------- |").ConfigureAwait(false);
                 foreach (var metaData in attribute.MetaData)
                 {
-                    await outputFile.WriteLineAsync($"| {metaData.Key} | {metaData.Value} |").ConfigureAwait(false);
+                    var escapedKey = TextWrapper.EscapeMdxSpecialCharacters(metaData.Key);
+                    var escapedMetaValue = TextWrapper.EscapeMdxSpecialCharacters(metaData.Value);
+                    await outputFile.WriteLineAsync($"| {escapedKey} | {escapedMetaValue} |").ConfigureAwait(false);
                 }
             }
 

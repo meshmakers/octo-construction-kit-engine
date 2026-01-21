@@ -8,11 +8,13 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Attribute reference in Pascal Case (e.g., '${this}/Name')"
         },
         "name": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9]*$",
+          "description": "Attribute name in Pascal Case (e.g., 'Name', 'AttributePath')"
         },
         "autoIncrementReference": {
           "type": "string"
@@ -41,7 +43,8 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9-_.]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Attribute identifier in Pascal Case, optionally with namespace and version (e.g., 'Name', 'Query.Filter-1')"
         },
         "valueType": {
           "type": "string",
@@ -66,11 +69,13 @@
         },
         "valueCkRecordId": {
           "type": "string",
-          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Record type reference in Pascal Case (e.g., '${this}/FieldFilter')"
         },
         "valueCkEnumId": {
           "type": "string",
-          "pattern": "^(?:[a-zA-Z0-9-_.]+|\\$\\{[a-zA-Z0-9_.]+\\})/[a-zA-Z0-9-_.]+$"
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Enum type reference in Pascal Case (e.g., '${this}/TokenType')"
         },
         "defaultValues": {
           "type": "array",

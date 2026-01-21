@@ -1,0 +1,29 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Photovoltaic.Module
+    derivedFromCkTypeId: System/Entity
+    isFinal: true
+    attributes:
+      - id: Test/Module_Capacity
+        name: ModuleCapacity
+  - typeId: Photovoltaic.String
+    derivedFromCkTypeId: Test/Photovoltaic.Module
+    isFinal: true
+records:
+  - recordId: Theme.Colors
+    attributes:
+      - id: Test/Primary_Color
+        name: PrimaryColor
+enums:
+  - enumId: Widget.Type
+    values:
+      - key: 0
+        name: Button
+      - key: 1
+        name: TextInput
+associationRoles:
+  - id: Machine_OrderAssignment
+    inboundMultiplicity: N
+    outboundMultiplicity: N
+    inboundName: Machines
+    outboundName: Orders

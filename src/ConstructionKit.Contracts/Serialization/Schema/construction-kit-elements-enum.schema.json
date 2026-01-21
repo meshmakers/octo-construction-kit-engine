@@ -9,7 +9,8 @@
       "properties": {
         "enumId": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9-_.]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Enum identifier in Pascal Case with optional namespace (e.g., 'FieldFilterOperator', 'Widget.Type', 'TokenType-1')"
         },
         "values": {
           "type": "array",
@@ -21,7 +22,8 @@
               },
               "name": {
                 "type": "string",
-                "pattern": "^[a-zA-Z0-9-_.]+$"
+                "pattern": "^[A-Z][a-zA-Z0-9]*$",
+                "description": "Enum value name in Pascal Case (e.g., 'Equals', 'NotEquals')"
               },
               "description": {
                 "type": "string"

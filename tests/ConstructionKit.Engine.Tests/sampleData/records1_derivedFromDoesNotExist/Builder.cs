@@ -23,37 +23,37 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
 
@@ -72,9 +72,9 @@ public class Builder
                     DerivedFromCkRecordId = "Demo/DoesNotExist", // Error here - record does not exist
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "C" }
                     ]
                 }
             ],
@@ -86,10 +86,10 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "c" },
-                        new() { CkAttributeId = "TestRecords/Record1", AttributeName = "record" }
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "C" },
+                        new() { CkAttributeId = "TestRecords/Record1", AttributeName = "Record" }
                     ]
                 }
             ]

@@ -59,7 +59,7 @@ internal abstract class ModelResolver : IModelResolver
         // By creating the model graph, a validation is done if association roles, attributes and entities are unique.
         _elementResolver.Resolve(modelRootBase, modelGraph, _variableResolver, originFileResolver, operationResult);
 
-        if (!Regex.IsMatch(modelRootBase.ModelId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+        if (!Regex.IsMatch(modelRootBase.ModelId.Name, CompilerStatics.AllowedCharactersInModelIdRegex))
         {
             operationResult.AddMessage(MessageCodes.ModelIdContainsInvalidCharacters(
                 originFileResolver.Resolve(modelRootBase.ModelId.Name), modelRootBase.ModelId.Name));

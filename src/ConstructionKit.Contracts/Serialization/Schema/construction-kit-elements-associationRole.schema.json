@@ -7,15 +7,18 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9-_.]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Association role identifier in Pascal Case with optional namespace (e.g., 'ParentChild', 'Machine_OrderAssignment', 'Related-1')"
         },
         "inboundName": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9]*$",
+          "description": "Inbound navigation name in Pascal Case (e.g., 'Children', 'RelatesFrom')"
         },
         "outboundName": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9_]+$"
+          "pattern": "^[A-Z][a-zA-Z0-9]*$",
+          "description": "Outbound navigation name in Pascal Case (e.g., 'Parent', 'RelatesTo')"
         },
         "inboundMultiplicity": {
           "type": "string",

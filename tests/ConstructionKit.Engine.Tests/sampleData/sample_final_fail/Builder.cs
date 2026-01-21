@@ -23,43 +23,43 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute7",
+                    AttributeId = "Attribute7",
                     ValueType = AttributeValueTypesDto.String
                 }
             ],
@@ -71,9 +71,9 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "sample1/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "sample1/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "sample1/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "sample1/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "sample1/Attribute3", AttributeName = "C" }
                     ]
                 },
 
@@ -84,9 +84,9 @@ public class Builder
                     DerivedFromCkTypeId = "sample1/Demo1",
                     Attributes =
                     [
-                        new() { CkAttributeId = "sample1/attribute4", AttributeName = "d" },
-                        new() { CkAttributeId = "sample1/attribute5", AttributeName = "e" },
-                        new() { CkAttributeId = "sample1/attribute6", AttributeName = "f" }
+                        new() { CkAttributeId = "sample1/Attribute4", AttributeName = "D" },
+                        new() { CkAttributeId = "sample1/Attribute5", AttributeName = "E" },
+                        new() { CkAttributeId = "sample1/Attribute6", AttributeName = "F" }
                     ],
                     Associations = [new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "sample1/Demo1" }]
                 },

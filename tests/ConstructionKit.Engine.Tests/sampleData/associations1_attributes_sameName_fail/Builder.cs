@@ -19,9 +19,9 @@ public class Builder
                     OutboundMultiplicity = MultiplicitiesDto.N, InboundName = "Related", OutboundName = "Related",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestAssociations/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestAssociations/attribute2", AttributeName = "a" },
-                        new() { CkAttributeId = "TestAssociations/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "TestAssociations/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestAssociations/Attribute2", AttributeName = "A" },
+                        new() { CkAttributeId = "TestAssociations/Attribute3", AttributeName = "C" }
                     ]
                 },
 
@@ -32,10 +32,10 @@ public class Builder
                     OutboundName = "OutboundTest",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestAssociations/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestAssociations/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestAssociations/attribute3", AttributeName = "c" },
-                        new() { CkAttributeId = "TestAssociations/Record1", AttributeName = "record" }
+                        new() { CkAttributeId = "TestAssociations/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestAssociations/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestAssociations/Attribute3", AttributeName = "C" },
+                        new() { CkAttributeId = "TestAssociations/Record1", AttributeName = "Record" }
                     ]
                 }
             ],
@@ -43,37 +43,37 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
 
@@ -91,9 +91,9 @@ public class Builder
                     RecordId = "Record1",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestAssociations/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestAssociations/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestAssociations/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "TestAssociations/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestAssociations/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestAssociations/Attribute3", AttributeName = "C" }
                     ]
                 }
             ],
@@ -105,10 +105,10 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestAssociations/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestAssociations/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestAssociations/attribute3", AttributeName = "c" },
-                        new() { CkAttributeId = "TestAssociations/Record1", AttributeName = "record" }
+                        new() { CkAttributeId = "TestAssociations/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestAssociations/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestAssociations/Attribute3", AttributeName = "C" },
+                        new() { CkAttributeId = "TestAssociations/Record1", AttributeName = "Record" }
                     ]
                 }
             ]

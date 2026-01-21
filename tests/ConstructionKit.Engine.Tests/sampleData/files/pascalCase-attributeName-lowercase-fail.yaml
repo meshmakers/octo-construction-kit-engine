@@ -1,0 +1,7 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Location
+    derivedFromCkTypeId: System/Entity
+    attributes:
+      - id: Test/Designation
+        name: designation

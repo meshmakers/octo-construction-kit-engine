@@ -23,7 +23,7 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 }
             ],
@@ -32,7 +32,7 @@ public class Builder
                 new()
                 {
                     TypeId = "Demo1",
-                    Attributes = [new() { CkAttributeId = "sample1/attribute1", AttributeName = "a" }]
+                    Attributes = [new() { CkAttributeId = "sample1/Attribute1", AttributeName = "A" }]
                 }
             ]
         };

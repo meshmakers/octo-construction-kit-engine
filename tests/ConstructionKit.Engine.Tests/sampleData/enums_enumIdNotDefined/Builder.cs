@@ -23,37 +23,37 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
 
@@ -71,9 +71,9 @@ public class Builder
                     EnumId = "Enum1",
                     Values = new List<CkEnumValueDto>
                     {
-                        new() { Key = 0, Name = "a" },
-                        new() { Key = 1, Name = "b" },
-                        new() { Key = 2, Name = "c" }
+                        new() { Key = 0, Name = "ValueA" },
+                        new() { Key = 1, Name = "ValueB" },
+                        new() { Key = 2, Name = "ValueC" }
                     }
                 }
             ],
@@ -85,10 +85,10 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestEnums/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "TestEnums/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "TestEnums/attribute3", AttributeName = "c" },
-                        new() { CkAttributeId = "TestEnums/Enum1", AttributeName = "enum" }
+                        new() { CkAttributeId = "TestEnums/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "TestEnums/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "TestEnums/Attribute3", AttributeName = "C" },
+                        new() { CkAttributeId = "TestEnums/Enum1", AttributeName = "Enum" }
                     ]
                 }
             ]

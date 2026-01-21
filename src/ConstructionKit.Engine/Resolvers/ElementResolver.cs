@@ -25,7 +25,7 @@ internal class ElementResolver : IElementResolver
             {
                 var ckAttributeId = new CkId<CkAttributeId>(modelRootBase.ModelId, ckAttribute.AttributeId);
 
-                if (!Regex.IsMatch(ckAttribute.AttributeId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckAttribute.AttributeId.Name, CompilerStatics.PascalCaseRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkAttributeIdContainsInvalidCharacters(
                         originFileResolver.Resolve(ckAttributeId),
@@ -82,7 +82,7 @@ internal class ElementResolver : IElementResolver
                 var ckAssociationId =
                     new CkId<CkAssociationRoleId>(modelRootBase.ModelId, ckAssociationRole.AssociationRoleId);
                 if (!Regex.IsMatch(ckAssociationRole.AssociationRoleId.RoleId,
-                        CompilerStatics.AllowedCharactersInNamesRegex))
+                        CompilerStatics.PascalCaseRegex))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkAssociationIdContainsInvalidCharacters(
@@ -142,7 +142,7 @@ internal class ElementResolver : IElementResolver
             foreach (var ckType in modelRootBase.Types)
             {
                 var ckTypeId = new CkId<CkTypeId>(modelRootBase.ModelId, ckType.TypeId);
-                if (!Regex.IsMatch(ckType.TypeId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckType.TypeId.Name, CompilerStatics.PascalCaseRegex))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkTypeIdContainsInvalidCharacters(originFileResolver.Resolve(ckTypeId),
@@ -220,7 +220,7 @@ internal class ElementResolver : IElementResolver
             foreach (var ckRecord in modelRootBase.Records)
             {
                 var ckRecordId = new CkId<CkRecordId>(modelRootBase.ModelId, ckRecord.RecordId);
-                if (!Regex.IsMatch(ckRecord.RecordId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckRecord.RecordId.Name, CompilerStatics.PascalCaseRegex))
                 {
                     operationResult.AddMessage(MessageCodes.CkRecordIdContainsInvalidCharacters(
                         originFileResolver.Resolve(ckRecordId),
@@ -284,7 +284,7 @@ internal class ElementResolver : IElementResolver
             foreach (var ckEnum in modelRootBase.Enums)
             {
                 var ckEnumId = new CkId<CkEnumId>(modelRootBase.ModelId, ckEnum.EnumId);
-                if (!Regex.IsMatch(ckEnum.EnumId.Name, CompilerStatics.AllowedCharactersInNamesRegex))
+                if (!Regex.IsMatch(ckEnum.EnumId.Name, CompilerStatics.PascalCaseRegex))
                 {
                     operationResult.AddMessage(
                         MessageCodes.CkEnumIdContainsInvalidCharacters(originFileResolver.Resolve(ckEnumId),
@@ -310,7 +310,7 @@ internal class ElementResolver : IElementResolver
                         ignoreEnum = true;
                     }
 
-                    if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.AllowedCharactersInEnumNamesRegex))
+                    if (!Regex.IsMatch(ckEnumValueDto.Name, CompilerStatics.PascalCaseRegex))
                     {
                         operationResult.AddMessage(
                             MessageCodes.EnumNameMayNotContainWhitespaceSpecialCharacters(

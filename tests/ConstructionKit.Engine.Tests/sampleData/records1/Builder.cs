@@ -23,37 +23,37 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
 
@@ -71,9 +71,9 @@ public class Builder
                     RecordId = "Record1",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "MyAttributeA" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "MyAttributeB" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "MyAttributeC" }
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "MyAttributeA" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "MyAttributeB" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "MyAttributeC" }
                     ]
                 }
             ],
@@ -85,9 +85,9 @@ public class Builder
                     DerivedFromCkTypeId = "System/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "TestRecords/attribute1", AttributeName = "MyAttributeA" },
-                        new() { CkAttributeId = "TestRecords/attribute2", AttributeName = "MyAttributeB" },
-                        new() { CkAttributeId = "TestRecords/attribute3", AttributeName = "MyAttributeC" },
+                        new() { CkAttributeId = "TestRecords/Attribute1", AttributeName = "MyAttributeA" },
+                        new() { CkAttributeId = "TestRecords/Attribute2", AttributeName = "MyAttributeB" },
+                        new() { CkAttributeId = "TestRecords/Attribute3", AttributeName = "MyAttributeC" },
                         new() { CkAttributeId = "TestRecords/Record1", AttributeName = "MyRecord" }
                     ]
                 }

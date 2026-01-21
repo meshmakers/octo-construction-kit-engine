@@ -49,7 +49,7 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal<object>(
             ["a", "b", "c", "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
             result.Select(x => x.Path));
-        Assert.Equal<object>(["a", "b", "c", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
+        Assert.Equal<object>(["A", "B", "C", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }
 

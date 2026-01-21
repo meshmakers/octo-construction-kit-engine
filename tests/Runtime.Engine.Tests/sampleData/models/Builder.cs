@@ -17,9 +17,9 @@ public class Builder
                     CkTypeId = "Sample2/Sample2Demo2",
                     Attributes =
                     {
-                        new RtAttributeTcDto { Id = "sample1/attribute1", Value = "a" },
-                        new RtAttributeTcDto { Id = "sample2/attributeA", Value = "b" },
-                        new RtAttributeTcDto { Id = "sample3/attributeB", Value = "c" }
+                        new RtAttributeTcDto { Id = "sample1/Attribute1", Value = "a" },
+                        new RtAttributeTcDto { Id = "sample2/AttributeA", Value = "b" },
+                        new RtAttributeTcDto { Id = "sample3/AttributeB", Value = "c" }
                     }
                 },
                 new RtEntityTcDto
@@ -28,9 +28,9 @@ public class Builder
                     CkTypeId = "Sample2/Demo2",
                     Attributes =
                     {
-                        new RtAttributeTcDto { Id = "sample1/attributeC", Value = "d" },
-                        new RtAttributeTcDto { Id = "sample1/attributeD", Value = "e" },
-                        new RtAttributeTcDto { Id = "sample1/attributeE", Value = "f" }
+                        new RtAttributeTcDto { Id = "sample1/AttributeC", Value = "d" },
+                        new RtAttributeTcDto { Id = "sample1/AttributeD", Value = "e" },
+                        new RtAttributeTcDto { Id = "sample1/AttributeE", Value = "f" }
                     }
                 }
             }

@@ -23,57 +23,57 @@ public class Builder
             [
                 new()
                 {
-                    AttributeId = "attribute1",
+                    AttributeId = "Attribute1",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute2",
+                    AttributeId = "Attribute2",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute3",
+                    AttributeId = "Attribute3",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute4",
+                    AttributeId = "Attribute4",
                     ValueType = AttributeValueTypesDto.String
                 },
 
                 new()
                 {
-                    AttributeId = "attribute5",
+                    AttributeId = "Attribute5",
                     ValueType = AttributeValueTypesDto.Int
                 },
 
                 new()
                 {
-                    AttributeId = "attribute6",
+                    AttributeId = "Attribute6",
                     ValueType = AttributeValueTypesDto.Double
                 },
 
                 new()
                 {
-                    AttributeId = "record1",
+                    AttributeId = "Record1",
                     ValueType = AttributeValueTypesDto.Record,
-                    ValueCkRecordId = "records1/record1"
+                    ValueCkRecordId = "records1/Record1"
                 }
             ],
             Records =
             [
                 new()
                 {
-                    RecordId = "record1",
+                    RecordId = "Record1",
                     Attributes =
                     [
-                        new() { CkAttributeId = "records1/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "records1/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "records1/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "records1/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "records1/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "records1/Attribute3", AttributeName = "C" }
                     ]
                 }
             ],
@@ -85,9 +85,9 @@ public class Builder
                     DerivedFromCkTypeId = "${System}/Entity",
                     Attributes =
                     [
-                        new() { CkAttributeId = "records1/attribute1", AttributeName = "a" },
-                        new() { CkAttributeId = "records1/attribute2", AttributeName = "b" },
-                        new() { CkAttributeId = "records1/attribute3", AttributeName = "c" }
+                        new() { CkAttributeId = "records1/Attribute1", AttributeName = "A" },
+                        new() { CkAttributeId = "records1/Attribute2", AttributeName = "B" },
+                        new() { CkAttributeId = "records1/Attribute3", AttributeName = "C" }
                     ]
                 },
 
@@ -95,7 +95,7 @@ public class Builder
                 {
                     TypeId = "Demo2",
                     DerivedFromCkTypeId = "sample1/Demo1",
-                    Attributes = [new() { CkAttributeId = "records1/record1", AttributeName = "record" }]
+                    Attributes = [new() { CkAttributeId = "records1/Record1", AttributeName = "Record" }]
                 }
             ]
         };

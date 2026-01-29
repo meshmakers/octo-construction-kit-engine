@@ -154,7 +154,7 @@ internal static class AttributeCodeGenerator
             case AttributeValueTypesDto.Binary:
                 sb.AppendLine($"  public byte[]? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<byte[]>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeBytesValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.Binary, value);");
                 sb.AppendLine("  }");

@@ -74,7 +74,7 @@ public class BlueprintCompilerService : IBlueprintCompilerService
         var seedDataContent = $"""
             # Seed data for {blueprintName}
             # Add your initial entities here
-            $schema: https://schemas.meshmakers.cloud/rt-model-root.schema.json
+            $schema: https://schemas.meshmakers.cloud/runtime-model.schema.json
             dependencies:
               - System-2.0.0
             entities: []

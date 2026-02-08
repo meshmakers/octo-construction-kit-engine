@@ -12,5 +12,3 @@ attributes:
   - id: Enabled
     description: "Indicates whether the entity is active and operational."
     valueType: Boolean
-    defaultValues:
-      - true

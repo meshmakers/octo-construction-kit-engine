@@ -468,6 +468,10 @@ public class CompilerService : ICompilerService
                 .ConfigureAwait(false);
         }
 
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
+        {
+            throw CompilerException.OperationResultWithErrors(operationResult);
+        }
         if (!Directory.Exists(outputPath))
         {
             Directory.CreateDirectory(outputPath);

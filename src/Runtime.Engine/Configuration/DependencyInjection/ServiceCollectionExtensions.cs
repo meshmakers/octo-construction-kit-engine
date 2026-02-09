@@ -55,8 +55,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
         services.AddSingleton<ITenantBackupService, InMemoryTenantBackupService>();
         services.AddTransient<IBlueprintService, BlueprintService>();
-        services.AddTransient<IMigrationExecutor, MigrationExecutor>();
-        services.AddTransient<IMigrationParser, MigrationParser>();
+        services.AddTransient<IBlueprintMigrationExecutor, BlueprintMigrationExecutor>();
+        services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
 
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();

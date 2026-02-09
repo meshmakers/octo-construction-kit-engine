@@ -3,13 +3,13 @@ using Meshmakers.Octo.Runtime.Engine.Blueprints;
 
 namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
 
-public class MigrationParserTests
+public class BlueprintMigrationParserTests
 {
-    private readonly MigrationParser _sut;
+    private readonly BlueprintMigrationParser _sut;
 
-    public MigrationParserTests()
+    public BlueprintMigrationParserTests()
     {
-        _sut = new MigrationParser();
+        _sut = new BlueprintMigrationParser();
     }
 
     [Fact]

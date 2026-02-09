@@ -20,8 +20,8 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintCatalogManager _blueprintCatalogManager;
     private readonly ITenantBlueprintHistory _blueprintHistory;
     private readonly ITenantBackupService _backupService;
-    private readonly IMigrationExecutor _migrationExecutor;
-    private readonly IMigrationParser _migrationParser;
+    private readonly IBlueprintMigrationExecutor _migrationExecutor;
+    private readonly IBlueprintMigrationParser _migrationParser;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly ILogger<BlueprintService> _logger;
 
@@ -34,8 +34,8 @@ internal class BlueprintService : IBlueprintService
         IBlueprintCatalogManager blueprintCatalogManager,
         ITenantBlueprintHistory blueprintHistory,
         ITenantBackupService backupService,
-        IMigrationExecutor migrationExecutor,
-        IMigrationParser migrationParser,
+        IBlueprintMigrationExecutor migrationExecutor,
+        IBlueprintMigrationParser migrationParser,
         ICkModelUpgradeService ckModelUpgradeService,
         ILogger<BlueprintService> logger)
     {
@@ -677,7 +677,7 @@ internal class BlueprintService : IBlueprintService
                     var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationOptions = new MigrationExecutionOptions
+                    var migrationOptions = new BlueprintMigrationExecutionOptions
                     {
                         DryRun = options.DryRun,
                         ContinueOnError = options.ContinueOnError,

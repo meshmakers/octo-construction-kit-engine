@@ -1,11 +1,12 @@
 using System.Reflection;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
-using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 
 /// <summary>
 /// Embedded resource-based implementation of <see cref="ICkMigrationContentProvider"/>.

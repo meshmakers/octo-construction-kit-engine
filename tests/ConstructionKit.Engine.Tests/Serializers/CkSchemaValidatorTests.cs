@@ -184,6 +184,94 @@ public class CkSchemaValidatorTests
         Assert.Equal(27, operationResult.Messages[0].MessageNumber);
     }
 
+    #region Migration Schema Validation Tests
+
+    [Fact]
+    public void ValidateMigrationMetaInYaml_ValidMeta_ShouldPass()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        var yaml = """
+            ckModelId: TestModel-2.0.0
+            migrations:
+              - fromVersion: "1.0.0"
+                toVersion: "2.0.0"
+                scriptPath: "1.0.0-to-2.0.0.yaml"
+                description: "Migrate from v1 to v2"
+                breaking: false
+            """;
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMigrationMetaInYaml(stream, "migration-meta.yaml", operationResult);
+        Assert.True(isValid, $"Validation failed: {string.Join(", ", operationResult.Messages.Select(m => m.MessageText))}");
+        Assert.False(operationResult.HasErrors);
+    }
+
+    [Fact]
+    public void ValidateMigrationMetaInYaml_InvalidMeta_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Missing required 'migrations' field and has unknown property
+        var yaml = """
+            ckModelId: TestModel-2.0.0
+            unknownField: "should not be here"
+            """;
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMigrationMetaInYaml(stream, "migration-meta.yaml", operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.HasErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ValidateMigrationScriptInYaml_ValidScript_ShouldPass()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        var yaml = """
+            sourceVersion: "1.0.0"
+            targetVersion: "2.0.0"
+            description: "Rename attribute OldName to NewName"
+            steps:
+              - stepId: step-1
+                action: Transform
+                target:
+                  ckTypeId: "${TestModel}/MyType"
+                transform:
+                  type: RenameAttribute
+                  sourceAttribute: OldName
+                  targetAttribute: NewName
+            """;
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMigrationScriptInYaml(stream, "1.0.0-to-2.0.0.yaml", operationResult);
+        Assert.True(isValid, $"Validation failed: {string.Join(", ", operationResult.Messages.Select(m => m.MessageText))}");
+        Assert.False(operationResult.HasErrors);
+    }
+
+    [Fact]
+    public void ValidateMigrationScriptInYaml_InvalidScript_ShouldFail()
+    {
+        var schemaValidator = new CkSchemaValidator();
+
+        // Missing required 'steps' field and has unknown property
+        var yaml = """
+            sourceVersion: "1.0.0"
+            targetVersion: "2.0.0"
+            unknownField: "should not be here"
+            """;
+        var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+        var isValid = schemaValidator.ValidateMigrationScriptInYaml(stream, "1.0.0-to-2.0.0.yaml", operationResult);
+        Assert.False(isValid);
+        Assert.True(operationResult.HasErrors);
+        Assert.Equal(27, operationResult.Messages[0].MessageNumber);
+    }
+
+    #endregion
+
     #region Pascal Case Validation Tests
 
     [Fact]

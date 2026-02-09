@@ -55,6 +55,22 @@
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-enum.schema.json#/definitions/CkEnum"
       }
+    },
+    "migrations": {
+      "type": "object",
+      "properties": {
+        "meta": {
+          "$ref": "https://schemas.meshmakers.cloud/ck-migration-meta.schema.json#/definitions/CkMigrationMeta"
+        },
+        "scripts": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.meshmakers.cloud/ck-migration.schema.json#/definitions/CkMigrationScript"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": ["meta"]
     }
   },
   "additionalProperties": false,

@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 
 /// <summary>
 /// Represents the migration metadata file for a CK model.
@@ -556,4 +556,21 @@ public enum CkMigrationValidationSeverity
     /// Validation failure is a warning
     /// </summary>
     Warning
+}
+
+/// <summary>
+/// Contains migration metadata and all migration scripts for a compiled CK model.
+/// This allows compiled CK model files to be self-contained, carrying their migrations inline.
+/// </summary>
+public class CkCompiledMigrationDataDto
+{
+    /// <summary>
+    /// The migration metadata describing available migrations
+    /// </summary>
+    public required CkMigrationMetaDto Meta { get; set; }
+
+    /// <summary>
+    /// The migration scripts referenced by the metadata
+    /// </summary>
+    public List<CkMigrationScriptDto> Scripts { get; set; } = [];
 }

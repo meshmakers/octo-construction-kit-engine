@@ -7,26 +7,26 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 /// <summary>
 /// Executes blueprint migration scripts
 /// </summary>
-internal class MigrationExecutor : IMigrationExecutor
+internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
 {
-    private readonly ILogger<MigrationExecutor> _logger;
+    private readonly ILogger<BlueprintMigrationExecutor> _logger;
 
     /// <summary>
-    /// Creates a new instance of <see cref="MigrationExecutor"/>
+    /// Creates a new instance of <see cref="BlueprintMigrationExecutor"/>
     /// </summary>
-    public MigrationExecutor(ILogger<MigrationExecutor> logger)
+    public BlueprintMigrationExecutor(ILogger<BlueprintMigrationExecutor> logger)
     {
         _logger = logger;
     }
 
     /// <inheritdoc />
-    public async Task<MigrationExecutionResult> ExecuteAsync(
+    public async Task<BlueprintMigrationExecutionResult> ExecuteAsync(
         string tenantId,
         BlueprintMigrationDto migration,
-        MigrationExecutionOptions? options = null,
+        BlueprintMigrationExecutionOptions? options = null,
         CancellationToken cancellationToken = default)
     {
-        options ??= new MigrationExecutionOptions();
+        options ??= new BlueprintMigrationExecutionOptions();
 
         _logger.LogInformation(
             "Executing migration from {SourceVersion} to {TargetVersion} for tenant {TenantId} (DryRun: {DryRun})",
@@ -35,7 +35,7 @@ internal class MigrationExecutor : IMigrationExecutor
             tenantId,
             options.DryRun);
 
-        var result = new MigrationExecutionResult
+        var result = new BlueprintMigrationExecutionResult
         {
             TotalSteps = migration.Steps.Count
         };
@@ -125,7 +125,7 @@ internal class MigrationExecutor : IMigrationExecutor
     }
 
     /// <inheritdoc />
-    public async Task<MigrationValidationResult> ValidateAsync(
+    public async Task<BlueprintMigrationValidationResult> ValidateAsync(
         string tenantId,
         BlueprintMigrationDto migration,
         CancellationToken cancellationToken = default)
@@ -133,12 +133,12 @@ internal class MigrationExecutor : IMigrationExecutor
         _logger.LogDebug("Validating migration from {SourceVersion} to {TargetVersion}",
             migration.SourceVersion, migration.TargetVersion);
 
-        var result = new MigrationValidationResult { IsValid = true };
+        var result = new BlueprintMigrationValidationResult { IsValid = true };
 
         // Validate version format
         if (!IsValidVersion(migration.SourceVersion))
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = $"Invalid source version format: {migration.SourceVersion}",
                 PropertyPath = "sourceVersion"
@@ -147,7 +147,7 @@ internal class MigrationExecutor : IMigrationExecutor
 
         if (!IsValidVersion(migration.TargetVersion))
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = $"Invalid target version format: {migration.TargetVersion}",
                 PropertyPath = "targetVersion"
@@ -176,7 +176,7 @@ internal class MigrationExecutor : IMigrationExecutor
             {
                 if (string.IsNullOrEmpty(validation.ValidationId))
                 {
-                    result.Errors.Add(new MigrationValidationIssue
+                    result.Errors.Add(new BlueprintMigrationValidationIssue
                     {
                         Message = "Validation ID is required",
                         PropertyPath = "postValidations"
@@ -189,15 +189,15 @@ internal class MigrationExecutor : IMigrationExecutor
         return result;
     }
 
-    private async Task<MigrationStepResult> ExecuteStepAsync(
+    private async Task<BlueprintMigrationStepResult> ExecuteStepAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Executing step {StepId}: {Action}", step.StepId, step.Action);
 
-        var result = new MigrationStepResult { StepId = step.StepId };
+        var result = new BlueprintMigrationStepResult { StepId = step.StepId };
 
         try
         {
@@ -262,7 +262,7 @@ internal class MigrationExecutor : IMigrationExecutor
     private Task<int> ExecuteAddAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Adding entity for step {StepId}", step.StepId);
@@ -287,7 +287,7 @@ internal class MigrationExecutor : IMigrationExecutor
     private Task<int> ExecuteUpdateAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Updating entities for step {StepId}", step.StepId);
@@ -311,7 +311,7 @@ internal class MigrationExecutor : IMigrationExecutor
     private Task<int> ExecuteDeleteAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Deleting entities for step {StepId}", step.StepId);
@@ -335,7 +335,7 @@ internal class MigrationExecutor : IMigrationExecutor
     private Task<int> ExecuteRenameAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Renaming for step {StepId}", step.StepId);
@@ -353,7 +353,7 @@ internal class MigrationExecutor : IMigrationExecutor
     private Task<int> ExecuteTransformAsync(
         string tenantId,
         MigrationStepDto step,
-        MigrationExecutionOptions options,
+        BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Transforming for step {StepId}", step.StepId);
@@ -419,12 +419,12 @@ internal class MigrationExecutor : IMigrationExecutor
 
     private Task ValidateStepAsync(
         MigrationStepDto step,
-        MigrationValidationResult result,
+        BlueprintMigrationValidationResult result,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrEmpty(step.StepId))
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = "Step ID is required",
                 PropertyPath = "steps"
@@ -433,7 +433,7 @@ internal class MigrationExecutor : IMigrationExecutor
 
         if (step.Target == null)
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 StepId = step.StepId,
                 Message = "Target is required for step",
@@ -448,7 +448,7 @@ internal class MigrationExecutor : IMigrationExecutor
                 string.IsNullOrEmpty(step.Target.RtWellKnownName) &&
                 step.Target.Filter == null)
             {
-                result.Warnings.Add(new MigrationValidationIssue
+                result.Warnings.Add(new BlueprintMigrationValidationIssue
                 {
                     StepId = step.StepId,
                     Message = "Target has no selector - may match all entities",
@@ -463,7 +463,7 @@ internal class MigrationExecutor : IMigrationExecutor
             case MigrationActionType.Add:
                 if (step.Data == null)
                 {
-                    result.Errors.Add(new MigrationValidationIssue
+                    result.Errors.Add(new BlueprintMigrationValidationIssue
                     {
                         StepId = step.StepId,
                         Message = "Data is required for Add action",
@@ -475,7 +475,7 @@ internal class MigrationExecutor : IMigrationExecutor
             case MigrationActionType.Transform:
                 if (step.Transform == null)
                 {
-                    result.Errors.Add(new MigrationValidationIssue
+                    result.Errors.Add(new BlueprintMigrationValidationIssue
                     {
                         StepId = step.StepId,
                         Message = "Transform configuration is required for Transform action",
@@ -496,12 +496,12 @@ internal class MigrationExecutor : IMigrationExecutor
 
     private static void ValidateCondition(
         MigrationConditionDto condition,
-        MigrationValidationResult result,
+        BlueprintMigrationValidationResult result,
         string path)
     {
         if (condition.Type == MigrationConditionType.Custom && string.IsNullOrEmpty(condition.Expression))
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = "Expression is required for Custom condition type",
                 PropertyPath = path
@@ -512,7 +512,7 @@ internal class MigrationExecutor : IMigrationExecutor
              condition.Type == MigrationConditionType.EntityNotExists) &&
             condition.Target == null)
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = "Target is required for entity existence conditions",
                 PropertyPath = path
@@ -522,7 +522,7 @@ internal class MigrationExecutor : IMigrationExecutor
         if (condition.Type == MigrationConditionType.AttributeEquals &&
             (string.IsNullOrEmpty(condition.Attribute) || condition.Value == null))
         {
-            result.Errors.Add(new MigrationValidationIssue
+            result.Errors.Add(new BlueprintMigrationValidationIssue
             {
                 Message = "Attribute and Value are required for AttributeEquals condition",
                 PropertyPath = path

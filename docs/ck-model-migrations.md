@@ -30,8 +30,7 @@ MyModel/
 
 ```yaml
 $schema: https://schemas.meshmakers.cloud/ck-migration-meta.schema.json
-ckModelName: MyModel
-latestVersion: "2.0.0"
+ckModelId: MyModel-2.0.0
 
 migrations:
   - fromVersion: "1.0.0"
@@ -302,6 +301,18 @@ embeddedProvider.RegisterMigrationSource(
     "MyCompany.MyModel");
 ```
 
+### Compiled Model
+
+When the CK compiler finds a `migrations/` folder with a `migration-meta.yaml`, it embeds all migration metadata and scripts inline into the compiled `.yaml` model file. This makes compiled models self-contained: they carry their migrations with them, removing the need for a separate NuGet package reference just to provide migration scripts.
+
+At runtime, the CK model import pipeline must call `SetMigrationData()` on the `CompiledModelCkMigrationContentProvider` to populate the provider with the embedded migration data:
+
+```csharp
+// During CK model import, extract migration data from the compiled model
+// and register it with the provider:
+compiledProvider.SetMigrationData(ckModelId, compiledModel.Migrations);
+```
+
 ### File System
 
 For development or external migration scripts:
@@ -317,12 +328,13 @@ fsProvider.RegisterModelSourcePath(
 
 ### Aggregated Provider
 
-By default, an aggregated provider is used that first checks embedded resources, then the file system:
+By default, an aggregated provider chains three sources in priority order:
 
 ```csharp
 // Automatically configured:
-// 1. EmbeddedCkMigrationContentProvider (Priority)
-// 2. FileSystemCkMigrationContentProvider (Fallback)
+// 1. CompiledModelCkMigrationContentProvider (auto-populated during import)
+// 2. EmbeddedCkMigrationContentProvider (NuGet package references)
+// 3. FileSystemCkMigrationContentProvider (local dev fallback)
 ```
 
 ## Migration History
@@ -425,10 +437,23 @@ if (!result.Success)
 │Aggregate-       │  │Mongo-/InMemory-   │
 │ContentProvider  │  │RepositoryProvider │
 └─────────────────┘  └───────────────────┘
-    │         │
-    ▼         ▼
-┌────────┐ ┌────────┐
-│Embedded│ │File-   │
-│Resource│ │System  │
-└────────┘ └────────┘
+    │    │    │
+    ▼    ▼    ▼
+┌──────┐┌──────┐┌──────┐
+│Compi-││Embed-││File- │
+│led   ││ded   ││System│
+│Model ││Rsrc  ││      │
+└──────┘└──────┘└──────┘
 ```
+
+## Namespace Organization
+
+CK migration classes live in dedicated namespaces, separate from Blueprints:
+
+| Layer | Namespace | Key Types |
+|-------|-----------|-----------|
+| **DTOs** | `Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects` | `CkMigrationMetaDto`, `CkMigrationScriptDto`, `CkCompiledMigrationDataDto` |
+| **Contracts** | `Meshmakers.Octo.Runtime.Contracts.CkModelMigrations` | `ICkModelMigrationService`, `ICkMigrationContentProvider`, `ICkModelUpgradeService` |
+| **Contracts** | `Meshmakers.Octo.Runtime.Contracts` | `IRuntimeRepositoryProvider` |
+| **Engine** | `Meshmakers.Octo.Runtime.Engine.CkModelMigrations` | `CkModelMigrationService`, `CkModelUpgradeService`, content providers |
+| **Parser** | `Meshmakers.Octo.ConstructionKit.Engine.Serialization` | `CkMigrationParser`, `ICkMigrationParser` |

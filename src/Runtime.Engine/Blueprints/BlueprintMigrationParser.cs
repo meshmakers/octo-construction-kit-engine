@@ -7,7 +7,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 /// <summary>
 /// Parses blueprint migration scripts from YAML files
 /// </summary>
-public interface IMigrationParser
+public interface IBlueprintMigrationParser
 {
     /// <summary>
     /// Parses a migration script from a file path
@@ -28,14 +28,14 @@ public interface IMigrationParser
 /// <summary>
 /// Parses blueprint migration scripts from YAML files
 /// </summary>
-internal class MigrationParser : IMigrationParser
+internal class BlueprintMigrationParser : IBlueprintMigrationParser
 {
     private readonly IDeserializer _deserializer;
 
     /// <summary>
-    /// Creates a new instance of <see cref="MigrationParser"/>
+    /// Creates a new instance of <see cref="BlueprintMigrationParser"/>
     /// </summary>
-    public MigrationParser()
+    public BlueprintMigrationParser()
     {
         _deserializer = new DeserializerBuilder()
             .WithNamingConvention(CamelCaseNamingConvention.Instance)

@@ -1,6 +1,6 @@
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 
-namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
+namespace Meshmakers.Octo.Runtime.Contracts;
 
 /// <summary>
 /// Provides access to runtime repositories for specific tenants.

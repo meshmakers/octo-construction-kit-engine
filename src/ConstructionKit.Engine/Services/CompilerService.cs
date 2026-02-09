@@ -1,13 +1,13 @@
 using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
-using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
-using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Services;
@@ -20,6 +20,8 @@ public class CompilerService : ICompilerService
     private readonly ICkCacheService _ckCacheService;
     private readonly ICatalogModelResolver _catalogModelResolver;
     private readonly ICkSerializer _ckSerializer;
+    private readonly ICkSchemaValidator _schemaValidator;
+    private readonly ICkMigrationParser _migrationParser;
     private readonly ILogger<CompilerService> _logger;
 
     /// <summary>
@@ -29,13 +31,18 @@ public class CompilerService : ICompilerService
     /// <param name="ckSerializer"></param>
     /// <param name="ckCacheService"></param>
     /// <param name="catalogModelResolver"></param>
+    /// <param name="schemaValidator"></param>
+    /// <param name="migrationParser"></param>
     public CompilerService(ILogger<CompilerService> logger, ICkSerializer ckSerializer,
-        ICkCacheService ckCacheService, ICatalogModelResolver catalogModelResolver)
+        ICkCacheService ckCacheService, ICatalogModelResolver catalogModelResolver,
+        ICkSchemaValidator schemaValidator, ICkMigrationParser migrationParser)
     {
         _logger = logger;
         _ckSerializer = ckSerializer;
         _ckCacheService = ckCacheService;
         _catalogModelResolver = catalogModelResolver;
+        _schemaValidator = schemaValidator;
+        _migrationParser = migrationParser;
     }
 
     /// <inheritdoc />
@@ -456,6 +463,18 @@ public class CompilerService : ICompilerService
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
 
+        // Read and embed migrations if present
+        var migrationsDir = Path.Combine(rootPath, CompilerStatics.MigrationsDirectoryName);
+        if (Directory.Exists(migrationsDir))
+        {
+            compiledModelRoot.Migrations = await ReadMigrationsAsync(migrationsDir, operationResult)
+                .ConfigureAwait(false);
+        }
+
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
+        {
+            throw CompilerException.OperationResultWithErrors(operationResult);
+        }
         if (!Directory.Exists(outputPath))
         {
             Directory.CreateDirectory(outputPath);
@@ -546,5 +565,80 @@ public class CompilerService : ICompilerService
         var compiledModelCacheFile = $"ck-{ckModelId.SemanticVersionedFullName.ToLower()}.cache.json";
         var compiledModelCacheFilePath = Path.Combine(outputPath, compiledModelCacheFile);
         return compiledModelCacheFilePath;
+    }
+
+    private async Task<CkCompiledMigrationDataDto?> ReadMigrationsAsync(
+        string migrationsDirectory, OperationResult operationResult)
+    {
+        var metaFilePath = Path.Combine(migrationsDirectory, CompilerStatics.MigrationMetaFile);
+        if (!File.Exists(metaFilePath))
+        {
+            _logger.LogDebug("No migration meta file found at {MetaFilePath}, skipping migrations", metaFilePath);
+            return null;
+        }
+
+#if NETSTANDARD2_0
+        using var metaValidationStream = File.OpenRead(metaFilePath);
+#else
+        await using var metaValidationStream = File.OpenRead(metaFilePath);
+#endif
+        if (!_schemaValidator.ValidateMigrationMetaInYaml(metaValidationStream, metaFilePath, operationResult))
+        {
+            return null;
+        }
+
+        CkMigrationMetaDto meta;
+        try
+        {
+            meta = await _migrationParser.ParseMetaAsync(metaFilePath).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            operationResult.AddMessage(MessageCodes.MigrationMetaParseError(metaFilePath, ex.Message));
+            return null;
+        }
+
+        var scripts = new List<CkMigrationScriptDto>();
+        foreach (var migrationRef in meta.Migrations)
+        {
+            var scriptPath = Path.Combine(migrationsDirectory, migrationRef.ScriptPath);
+            if (!File.Exists(scriptPath))
+            {
+                _logger.LogWarning(
+                    "Migration script file '{ScriptPath}' referenced in meta but not found",
+                    scriptPath);
+                operationResult.AddMessage(MessageCodes.MigrationScriptNotFound(scriptPath));
+                continue;
+            }
+
+#if NETSTANDARD2_0
+            using var scriptValidationStream = File.OpenRead(scriptPath);
+#else
+            await using var scriptValidationStream = File.OpenRead(scriptPath);
+#endif
+            if (!_schemaValidator.ValidateMigrationScriptInYaml(scriptValidationStream, scriptPath, operationResult))
+            {
+                continue;
+            }
+
+            try
+            {
+                var script = await _migrationParser.ParseScriptAsync(scriptPath).ConfigureAwait(false);
+                scripts.Add(script);
+                _logger.LogInformation(
+                    "Embedded migration script {FromVersion} -> {ToVersion}",
+                    migrationRef.FromVersion, migrationRef.ToVersion);
+            }
+            catch (Exception ex)
+            {
+                operationResult.AddMessage(MessageCodes.MigrationScriptParseError(scriptPath, ex.Message));
+            }
+        }
+
+        return new CkCompiledMigrationDataDto
+        {
+            Meta = meta,
+            Scripts = scripts
+        };
     }
 }

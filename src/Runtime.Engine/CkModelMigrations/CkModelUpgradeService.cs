@@ -1,12 +1,11 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts;
-using Meshmakers.Octo.Runtime.Contracts.Blueprints;
-using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 
 /// <summary>
 /// Service for automatically checking and executing CK model migrations when a new version is loaded

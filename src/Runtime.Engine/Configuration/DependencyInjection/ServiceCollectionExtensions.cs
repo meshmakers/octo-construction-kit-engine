@@ -1,9 +1,12 @@
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
+using Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
@@ -50,16 +53,15 @@ public static class ServiceCollectionExtensions
 
         // Blueprint services
         services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
-        services.AddSingleton<ITenantBackupService, InMemoryTenantBackupService>();
         services.AddTransient<IBlueprintService, BlueprintService>();
-        services.AddTransient<IMigrationExecutor, MigrationExecutor>();
-        services.AddTransient<IMigrationParser, MigrationParser>();
+        services.AddTransient<IBlueprintMigrationExecutor, BlueprintMigrationExecutor>();
+        services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
 
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();
-        services.AddTransient<ICkMigrationParser, CkMigrationParser>();
 
         // Migration content providers (aggregate by default, allows adding multiple sources)
+        services.AddSingleton<CompiledModelCkMigrationContentProvider>();
         services.AddSingleton<FileSystemCkMigrationContentProvider>();
         services.AddSingleton<EmbeddedCkMigrationContentProvider>();
         services.AddSingleton<ICkMigrationContentProvider>(sp =>
@@ -67,9 +69,11 @@ public static class ServiceCollectionExtensions
             var aggregate = new AggregateCkMigrationContentProvider(
                 sp.GetRequiredService<ILogger<AggregateCkMigrationContentProvider>>());
 
-            // Add embedded resources first (higher priority)
+            // Add compiled model migrations first (highest priority, populated during import)
+            aggregate.AddProvider(sp.GetRequiredService<CompiledModelCkMigrationContentProvider>());
+            // Then embedded resources (NuGet package references)
             aggregate.AddProvider(sp.GetRequiredService<EmbeddedCkMigrationContentProvider>());
-            // Then file system as fallback
+            // Then file system as fallback (local dev)
             aggregate.AddProvider(sp.GetRequiredService<FileSystemCkMigrationContentProvider>());
 
             return aggregate;

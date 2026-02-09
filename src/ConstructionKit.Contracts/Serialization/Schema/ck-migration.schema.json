@@ -1,0 +1,309 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/ck-migration.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CK Migration Script",
+  "description": "Schema for CK model migration scripts that define how to update runtime entities from one CK model version to another",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URI of the schema for the migration script file"
+    },
+    "sourceVersion": {
+      "type": "string",
+      "description": "Source CK model version this migration applies from"
+    },
+    "targetVersion": {
+      "type": "string",
+      "description": "Target CK model version this migration updates to"
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of what this migration does"
+    },
+    "preConditions": {
+      "type": "array",
+      "description": "Conditions that must be met before the migration can run",
+      "items": {
+        "$ref": "#/$defs/condition"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "Ordered list of migration steps to execute",
+      "items": {
+        "$ref": "#/$defs/migrationStep"
+      }
+    },
+    "postValidations": {
+      "type": "array",
+      "description": "Validations to run after migration completes",
+      "items": {
+        "$ref": "#/$defs/postValidation"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "sourceVersion",
+    "targetVersion",
+    "steps"
+  ],
+  "definitions": {
+    "CkMigrationScript": {
+      "type": "object",
+      "description": "CK migration script for use in compiled CK models",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sourceVersion": {
+          "type": "string",
+          "description": "Source CK model version this migration applies from"
+        },
+        "targetVersion": {
+          "type": "string",
+          "description": "Target CK model version this migration updates to"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what this migration does"
+        },
+        "preConditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/migrationStep"
+          }
+        },
+        "postValidations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/postValidation"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "sourceVersion",
+        "targetVersion",
+        "steps"
+      ]
+    }
+  },
+  "$defs": {
+    "migrationStep": {
+      "type": "object",
+      "description": "A single step in a CK migration script",
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "description": "Unique identifier for this step within the migration"
+        },
+        "description": {
+          "type": "string",
+          "description": "Human-readable description of what this step does"
+        },
+        "action": {
+          "type": "string",
+          "enum": ["Transform", "Update", "Delete", "Add"],
+          "description": "The type of action to perform"
+        },
+        "target": {
+          "$ref": "#/$defs/migrationTarget",
+          "description": "Target entities for this step"
+        },
+        "transform": {
+          "$ref": "#/$defs/transformConfig",
+          "description": "Transform configuration (for Transform action)"
+        },
+        "data": {
+          "type": "object",
+          "description": "Data to set (for Add/Update actions)"
+        },
+        "condition": {
+          "$ref": "#/$defs/condition",
+          "description": "Optional condition for this step to execute"
+        },
+        "onConflict": {
+          "type": "string",
+          "enum": ["Fail", "Skip", "Overwrite"],
+          "default": "Fail",
+          "description": "How to handle conflicts"
+        },
+        "continueOnError": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to continue with subsequent steps if this step fails"
+        }
+      },
+      "required": ["stepId", "action"],
+      "additionalProperties": false
+    },
+    "migrationTarget": {
+      "type": "object",
+      "description": "Target specification for a CK migration step",
+      "properties": {
+        "ckTypeId": {
+          "type": "string",
+          "description": "CK type ID to target (e.g., 'System/Query')"
+        },
+        "rtId": {
+          "type": "string",
+          "description": "Specific runtime entity ID to target"
+        },
+        "rtWellKnownName": {
+          "type": "string",
+          "description": "Well-known name of the entity to target"
+        },
+        "filter": {
+          "$ref": "#/$defs/filterExpression",
+          "description": "Filter expression to match entities"
+        },
+        "blueprintSourceOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "If false, also include user-created entities (not just blueprint-created)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "filterExpression": {
+      "type": "object",
+      "description": "Filter expression for matching entities",
+      "properties": {
+        "attribute": {
+          "type": "string",
+          "description": "Attribute name to filter on"
+        },
+        "operator": {
+          "type": "string",
+          "enum": ["Eq", "Ne", "Exists", "NotExists", "Contains", "StartsWith"],
+          "description": "Comparison operator"
+        },
+        "value": {
+          "description": "Value to compare against"
+        },
+        "and": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filterExpression" },
+          "description": "AND combination of filters"
+        },
+        "or": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/filterExpression" },
+          "description": "OR combination of filters"
+        }
+      },
+      "additionalProperties": false
+    },
+    "transformConfig": {
+      "type": "object",
+      "description": "Transform configuration for CK migration",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue"],
+          "description": "Type of transformation"
+        },
+        "targetAttribute": {
+          "type": "string",
+          "description": "Target attribute name (for SetValue, Rename, Delete)"
+        },
+        "sourceAttribute": {
+          "type": "string",
+          "description": "Source attribute name (for Rename, Copy)"
+        },
+        "value": {
+          "description": "Value to set (for SetValue)"
+        },
+        "valueMapping": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Value mapping table (for MapValue)"
+        },
+        "newCkTypeId": {
+          "type": "string",
+          "description": "New CK type ID (for ChangeCkType)"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "condition": {
+      "type": "object",
+      "description": "Condition for CK migration execution",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["CkModelVersionInstalled", "EntityExists", "EntityNotExists", "AttributeEquals"],
+          "description": "Type of condition"
+        },
+        "target": {
+          "$ref": "#/$defs/migrationTarget",
+          "description": "Target for entity-based conditions"
+        },
+        "ckModelId": {
+          "type": "string",
+          "description": "CK model ID for version-based conditions"
+        },
+        "version": {
+          "type": "string",
+          "description": "Version for version-based conditions"
+        },
+        "attribute": {
+          "type": "string",
+          "description": "Attribute name for attribute conditions"
+        },
+        "value": {
+          "description": "Expected value for attribute conditions"
+        }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "postValidation": {
+      "type": "object",
+      "description": "Post-migration validation",
+      "properties": {
+        "validationId": {
+          "type": "string",
+          "description": "Unique identifier for this validation"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what is being validated"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["EntityCount", "EntityExists", "NoEntitiesOfType"],
+          "description": "Type of validation"
+        },
+        "target": {
+          "$ref": "#/$defs/migrationTarget",
+          "description": "Target for validation"
+        },
+        "expectedCount": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected count (for EntityCount validation)"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["Error", "Warning"],
+          "default": "Error",
+          "description": "Severity if validation fails"
+        }
+      },
+      "required": ["validationId", "type"],
+      "additionalProperties": false
+    }
+  }
+}

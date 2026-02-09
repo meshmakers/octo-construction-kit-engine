@@ -1,0 +1,92 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/ck-migration-meta.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CK Migration Metadata",
+  "description": "Schema for CK model migration metadata files that list available migrations from previous versions",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "The URI of the schema for the migration metadata file"
+    },
+    "ckModelId": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9-.]+$",
+      "description": "The CK model ID this migration metadata belongs to (e.g., 'System-2.0.0')"
+    },
+    "migrations": {
+      "type": "array",
+      "description": "List of available migrations from previous versions",
+      "items": {
+        "$ref": "#/definitions/CkMigrationReference"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "ckModelId",
+    "migrations"
+  ],
+  "definitions": {
+    "CkMigrationMeta": {
+      "type": "object",
+      "description": "CK migration metadata for use in compiled CK models",
+      "properties": {
+        "$schema": {
+          "type": "string",
+          "format": "uri"
+        },
+        "ckModelId": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9-.]+$",
+          "description": "The CK model ID this migration metadata belongs to"
+        },
+        "migrations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CkMigrationReference"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "ckModelId",
+        "migrations"
+      ]
+    },
+    "CkMigrationReference": {
+      "type": "object",
+      "description": "Reference to a migration script within a CK model",
+      "properties": {
+        "fromVersion": {
+          "type": "string",
+          "description": "Source version this migration applies from"
+        },
+        "toVersion": {
+          "type": "string",
+          "description": "Target version this migration upgrades to"
+        },
+        "scriptPath": {
+          "type": "string",
+          "description": "Path to the migration script file (relative to the migrations folder)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what this migration does"
+        },
+        "breaking": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether this migration contains breaking changes"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "fromVersion",
+        "toVersion",
+        "scriptPath"
+      ]
+    }
+  }
+}

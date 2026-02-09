@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
-using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -22,7 +22,6 @@ internal class BlueprintService : IBlueprintService
     private readonly ITenantBackupService _backupService;
     private readonly IMigrationExecutor _migrationExecutor;
     private readonly IMigrationParser _migrationParser;
-    private readonly IRtYamlSerializer _rtYamlSerializer;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly ILogger<BlueprintService> _logger;
 
@@ -37,7 +36,6 @@ internal class BlueprintService : IBlueprintService
         ITenantBackupService backupService,
         IMigrationExecutor migrationExecutor,
         IMigrationParser migrationParser,
-        IRtYamlSerializer rtYamlSerializer,
         ICkModelUpgradeService ckModelUpgradeService,
         ILogger<BlueprintService> logger)
     {
@@ -48,7 +46,6 @@ internal class BlueprintService : IBlueprintService
         _backupService = backupService;
         _migrationExecutor = migrationExecutor;
         _migrationParser = migrationParser;
-        _rtYamlSerializer = rtYamlSerializer;
         _ckModelUpgradeService = ckModelUpgradeService;
         _logger = logger;
     }

@@ -1,14 +1,16 @@
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
-using Meshmakers.Octo.Runtime.Engine.Blueprints;
+using Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 using Microsoft.Extensions.Logging.Abstractions;
 
-namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.Tests.CkModelMigrations;
 
 public class CkModelMigrationServiceTests
 {

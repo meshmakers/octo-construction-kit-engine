@@ -1,6 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
-namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
+namespace Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 
 /// <summary>
 /// Service for automatically checking and executing CK model migrations when a new version is loaded

@@ -1,7 +1,7 @@
 using System.Text.Json.Serialization;
 using YamlDotNet.Serialization;
 
-namespace Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+namespace Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 
 /// <summary>
 /// Represents the migration metadata file for a CK model.

@@ -1,5 +1,5 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Services;
 using MessageLevel = Meshmakers.Octo.ConstructionKit.Contracts.Messages.MessageLevel;

@@ -131,6 +131,12 @@ Key services:
 ### CK Model Migrations
 CK Model Migrations update runtime entities when CK model versions change. See `docs/ck-model-migrations.md` for details.
 
+CK migration classes live in dedicated namespaces (separate from Blueprints):
+- Contracts: `Runtime.Contracts.CkModelMigrations` (`ICkModelMigrationService`, `ICkMigrationContentProvider`, `ICkModelUpgradeService`)
+- DTOs: `ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects` (`CkMigrationMetaDto`, `CkMigrationScriptDto`, etc.)
+- Engine: `Runtime.Engine.CkModelMigrations` (implementations)
+- `IRuntimeRepositoryProvider` is in top-level `Runtime.Contracts`
+
 Key services:
 - `ICkModelMigrationService` - Executes migrations between CK model versions
 - `ICkMigrationContentProvider` - Provides migration scripts (embedded resources or file system)
@@ -142,13 +148,14 @@ MSBuild property to control embedding: `OctoEmbedCkMigrations` (default: true)
 
 ## Key Interfaces
 
-| Interface | Description |
-|-----------|-------------|
-| `ICkModelMigrationService` | Executes CK model migrations |
-| `ICkMigrationContentProvider` | Provides migration content (embedded/file system) |
-| `IRuntimeRepositoryProvider` | Provides runtime repositories for tenants |
-| `IBlueprintService` | Applies blueprints to tenants |
-| `ICatalogService` | Manages CK model catalog |
+| Interface | Namespace | Description |
+|-----------|-----------|-------------|
+| `ICkModelMigrationService` | `Runtime.Contracts.CkModelMigrations` | Executes CK model migrations |
+| `ICkMigrationContentProvider` | `Runtime.Contracts.CkModelMigrations` | Provides migration content (embedded/file system) |
+| `ICkModelUpgradeService` | `Runtime.Contracts.CkModelMigrations` | Auto-checks and executes CK model upgrades |
+| `IRuntimeRepositoryProvider` | `Runtime.Contracts` | Provides runtime repositories for tenants |
+| `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
+| `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
 
 ## Important Notes
 

@@ -432,3 +432,15 @@ if (!result.Success)
 │Resource│ │System  │
 └────────┘ └────────┘
 ```
+
+## Namespace Organization
+
+CK migration classes live in dedicated namespaces, separate from Blueprints:
+
+| Layer | Namespace | Key Types |
+|-------|-----------|-----------|
+| **DTOs** | `Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects` | `CkMigrationMetaDto`, `CkMigrationScriptDto`, `CkCompiledMigrationDataDto` |
+| **Contracts** | `Meshmakers.Octo.Runtime.Contracts.CkModelMigrations` | `ICkModelMigrationService`, `ICkMigrationContentProvider`, `ICkModelUpgradeService` |
+| **Contracts** | `Meshmakers.Octo.Runtime.Contracts` | `IRuntimeRepositoryProvider` |
+| **Engine** | `Meshmakers.Octo.Runtime.Engine.CkModelMigrations` | `CkModelMigrationService`, `CkModelUpgradeService`, content providers |
+| **Parser** | `Meshmakers.Octo.ConstructionKit.Engine.Serialization` | `CkMigrationParser`, `ICkMigrationParser` |

@@ -1,4 +1,4 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 

@@ -1,9 +1,9 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
-using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 
 /// <summary>
 /// Aggregates multiple <see cref="ICkMigrationContentProvider"/> instances,

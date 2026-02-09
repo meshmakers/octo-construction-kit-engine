@@ -1,7 +1,7 @@
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
-using Meshmakers.Octo.Runtime.Engine.Blueprints;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
-namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.Tests.CkModelMigrations;
 
 public class CkMigrationParserTests
 {
@@ -626,6 +626,71 @@ public class CkMigrationParserTests
 
         // Act & Assert
         await Assert.ThrowsAsync<FileNotFoundException>(() => _sut.ParseScriptAsync(filePath, ct));
+    }
+
+    [Fact]
+    public void ParseScript_WithNoEntitiesOfTypeValidation_ShouldParseValidationType()
+    {
+        // Arrange - matches the real Industry.Basic 2.0.0-to-2.1.0 migration format
+        var yaml = """
+            sourceVersion: "2.0.0"
+            targetVersion: "2.1.0"
+            steps:
+              - stepId: rename-time-to-received
+                description: "Rename Time attribute to Received on Event entities"
+                action: Transform
+                target:
+                  ckTypeId: Industry.Basic/Event
+                transform:
+                  type: RenameAttribute
+                  sourceAttribute: Time
+                  targetAttribute: Received
+            postValidations:
+              - validationId: no-time-attribute-remains
+                description: "Ensure no Event entities have legacy Time attribute"
+                type: NoEntitiesOfType
+                target:
+                  ckTypeId: Industry.Basic/Event
+                  filter:
+                    attribute: Time
+                    operator: Exists
+                severity: Warning
+            """;
+
+        // Act
+        var result = _sut.ParseScript(yaml);
+
+        // Assert
+        Assert.NotNull(result.PostValidations);
+        Assert.Single(result.PostValidations);
+        var validation = result.PostValidations[0];
+        Assert.Equal("no-time-attribute-remains", validation.ValidationId);
+        Assert.Equal(CkMigrationValidationType.NoEntitiesOfType, validation.Type);
+        Assert.Equal(CkMigrationValidationSeverity.Warning, validation.Severity);
+        Assert.NotNull(validation.Target);
+        Assert.Equal("Industry.Basic/Event", validation.Target.CkTypeId);
+        Assert.NotNull(validation.Target.Filter);
+        Assert.Equal("Time", validation.Target.Filter.Attribute);
+        Assert.Equal(CkMigrationFilterOperator.Exists, validation.Target.Filter.Operator);
+    }
+
+    [Fact]
+    public void ParseScript_WithInvalidValidationType_ShouldThrow()
+    {
+        // Arrange - uses the invalid NoEntitiesMatch value that caused the original bug
+        var yaml = """
+            sourceVersion: "2.0.0"
+            targetVersion: "2.1.0"
+            steps: []
+            postValidations:
+              - validationId: check-migration
+                type: NoEntitiesMatch
+                target:
+                  ckTypeId: MyModel/Entity
+            """;
+
+        // Act & Assert
+        Assert.ThrowsAny<Exception>(() => _sut.ParseScript(yaml));
     }
 
     #endregion

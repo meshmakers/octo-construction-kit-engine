@@ -1,7 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
-using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs.DataTransferObjects;
 
-namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
+namespace Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 
 /// <summary>
 /// Provides migration content for CK models.

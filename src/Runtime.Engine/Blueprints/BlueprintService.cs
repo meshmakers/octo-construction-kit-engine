@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
-using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -20,9 +20,8 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintCatalogManager _blueprintCatalogManager;
     private readonly ITenantBlueprintHistory _blueprintHistory;
     private readonly ITenantBackupService _backupService;
-    private readonly IMigrationExecutor _migrationExecutor;
-    private readonly IMigrationParser _migrationParser;
-    private readonly IRtYamlSerializer _rtYamlSerializer;
+    private readonly IBlueprintMigrationExecutor _migrationExecutor;
+    private readonly IBlueprintMigrationParser _migrationParser;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly ILogger<BlueprintService> _logger;
 
@@ -35,9 +34,8 @@ internal class BlueprintService : IBlueprintService
         IBlueprintCatalogManager blueprintCatalogManager,
         ITenantBlueprintHistory blueprintHistory,
         ITenantBackupService backupService,
-        IMigrationExecutor migrationExecutor,
-        IMigrationParser migrationParser,
-        IRtYamlSerializer rtYamlSerializer,
+        IBlueprintMigrationExecutor migrationExecutor,
+        IBlueprintMigrationParser migrationParser,
         ICkModelUpgradeService ckModelUpgradeService,
         ILogger<BlueprintService> logger)
     {
@@ -48,7 +46,6 @@ internal class BlueprintService : IBlueprintService
         _backupService = backupService;
         _migrationExecutor = migrationExecutor;
         _migrationParser = migrationParser;
-        _rtYamlSerializer = rtYamlSerializer;
         _ckModelUpgradeService = ckModelUpgradeService;
         _logger = logger;
     }
@@ -680,7 +677,7 @@ internal class BlueprintService : IBlueprintService
                     var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationOptions = new MigrationExecutionOptions
+                    var migrationOptions = new BlueprintMigrationExecutionOptions
                     {
                         DryRun = options.DryRun,
                         ContinueOnError = options.ContinueOnError,

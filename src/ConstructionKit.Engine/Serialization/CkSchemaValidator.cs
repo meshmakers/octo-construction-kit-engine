@@ -1,4 +1,3 @@
-using System.Text.Json.Nodes;
 using Json.Pointer;
 using Json.Schema;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -54,6 +53,18 @@ internal class CkSchemaValidator : ICkSchemaValidator
     public bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
     {
         return ValidateModelYaml(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult);
+    }
+
+    /// <inheritdoc />
+    public bool ValidateMigrationMetaInYaml(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        return ValidateModelYaml(stream, CkSchema.GetMigrationMetaSchema(), locationReference, operationResult);
+    }
+
+    /// <inheritdoc />
+    public bool ValidateMigrationScriptInYaml(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        return ValidateModelYaml(stream, CkSchema.GetMigrationScriptSchema(), locationReference, operationResult);
     }
 
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)

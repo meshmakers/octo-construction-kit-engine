@@ -5,7 +5,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
 /// <summary>
 /// Executes blueprint migration scripts
 /// </summary>
-public interface IMigrationExecutor
+public interface IBlueprintMigrationExecutor
 {
     /// <summary>
     /// Executes a migration script
@@ -15,10 +15,10 @@ public interface IMigrationExecutor
     /// <param name="options">Migration options</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the migration execution</returns>
-    Task<MigrationExecutionResult> ExecuteAsync(
+    Task<BlueprintMigrationExecutionResult> ExecuteAsync(
         string tenantId,
         BlueprintMigrationDto migration,
-        MigrationExecutionOptions? options = null,
+        BlueprintMigrationExecutionOptions? options = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>
@@ -28,7 +28,7 @@ public interface IMigrationExecutor
     /// <param name="migration">The migration script to validate</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Validation result with any issues found</returns>
-    Task<MigrationValidationResult> ValidateAsync(
+    Task<BlueprintMigrationValidationResult> ValidateAsync(
         string tenantId,
         BlueprintMigrationDto migration,
         CancellationToken cancellationToken = default);
@@ -37,7 +37,7 @@ public interface IMigrationExecutor
 /// <summary>
 /// Options for migration execution
 /// </summary>
-public class MigrationExecutionOptions
+public class BlueprintMigrationExecutionOptions
 {
     /// <summary>
     /// If true, only simulate the migration without making changes
@@ -63,7 +63,7 @@ public class MigrationExecutionOptions
 /// <summary>
 /// Result of a migration execution
 /// </summary>
-public class MigrationExecutionResult
+public class BlueprintMigrationExecutionResult
 {
     /// <summary>
     /// Whether the migration completed successfully
@@ -108,7 +108,7 @@ public class MigrationExecutionResult
     /// <summary>
     /// Detailed results for each step
     /// </summary>
-    public List<MigrationStepResult> StepResults { get; set; } = [];
+    public List<BlueprintMigrationStepResult> StepResults { get; set; } = [];
 
     /// <summary>
     /// Errors that occurred during execution
@@ -129,7 +129,7 @@ public class MigrationExecutionResult
 /// <summary>
 /// Result of a single migration step
 /// </summary>
-public class MigrationStepResult
+public class BlueprintMigrationStepResult
 {
     /// <summary>
     /// The step ID from the migration script
@@ -165,7 +165,7 @@ public class MigrationStepResult
 /// <summary>
 /// Result of migration validation
 /// </summary>
-public class MigrationValidationResult
+public class BlueprintMigrationValidationResult
 {
     /// <summary>
     /// Whether the migration is valid and can be executed
@@ -175,18 +175,18 @@ public class MigrationValidationResult
     /// <summary>
     /// Validation errors that would prevent execution
     /// </summary>
-    public List<MigrationValidationIssue> Errors { get; set; } = [];
+    public List<BlueprintMigrationValidationIssue> Errors { get; set; } = [];
 
     /// <summary>
     /// Validation warnings that don't prevent execution
     /// </summary>
-    public List<MigrationValidationIssue> Warnings { get; set; } = [];
+    public List<BlueprintMigrationValidationIssue> Warnings { get; set; } = [];
 }
 
 /// <summary>
 /// A validation issue found in the migration script
 /// </summary>
-public class MigrationValidationIssue
+public class BlueprintMigrationValidationIssue
 {
     /// <summary>
     /// The step ID where the issue was found (null for global issues)

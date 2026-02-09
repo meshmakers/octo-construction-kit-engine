@@ -127,6 +127,8 @@ public bool Validate(string yaml, CkSchemaType schemaType, OperationResult opera
 - `construction-kit-elements.schema.json` - Type, Record, Attribute, Enum, Association schemas
 - `construction-kit-meta.schema.json` - Model metadata schema
 - `construction-kit-compiled.schema.json` - Compiled output schema
+- `ck-migration-meta.schema.json` - Migration metadata schema
+- `ck-migration.schema.json` - Migration script schema
 
 ### Phase 3: Element Resolution
 
@@ -224,10 +226,21 @@ types:
 records: [...]
 enums: [...]
 associationRoles: [...]
+migrations:              # Included when ConstructionKit/migrations/ exists
+  meta:
+    ckModelId: System-1.0.1
+    migrations:
+      - fromVersion: "1.0.0"
+        toVersion: "1.0.1"
+        scriptPath: "1.0.0-to-1.0.1.yaml"
+  scripts: [...]
 ```
 
 #### Cache Generation (Optional)
 Generates a binary cache file (`ck-{modelId}.cache.json`) containing serialized `CkModelGraph` for faster runtime loading.
+
+#### Migration Embedding (Optional)
+If a `ConstructionKit/migrations/` directory exists and contains a `migration-meta.yaml`, the compiler parses the metadata and all referenced migration scripts, then embeds them in the compiled model's `migrations` field as a `CkCompiledMigrationDataDto`. Migration files are validated against the `ck-migration-meta.schema.json` and `ck-migration.schema.json` schemas. Missing or invalid script files are treated as errors and will fail the build.
 
 ## Data Structures
 

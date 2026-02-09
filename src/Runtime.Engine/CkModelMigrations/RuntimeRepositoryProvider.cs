@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
-using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Microsoft.Extensions.Logging;
 
-namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 
 /// <summary>
 /// Default implementation of <see cref="IRuntimeRepositoryProvider"/> that manages

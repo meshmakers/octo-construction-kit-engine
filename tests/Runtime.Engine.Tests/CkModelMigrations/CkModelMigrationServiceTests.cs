@@ -215,6 +215,110 @@ public class CkModelMigrationServiceTests
         Assert.True(result.HasBreakingChanges);
     }
 
+    [Fact]
+    public async Task FindMigrationPathAsync_PartialPath_WhenExactPathUnavailable_ShouldReturnPartialPath()
+    {
+        // Arrange - migration from 1.0.0->2.0.0 exists, but target is 2.0.2
+        // This tests the partial path fallback: data migration goes to 2.0.0, schema handles 2.0.0->2.0.2
+        var fromModel = new CkModelId("TestModel", "1.0.0");
+        var toModel = new CkModelId("TestModel", "2.0.2");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-2.0.2",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.0",
+                    ToVersion = "2.0.0",
+                    ScriptPath = "1.0.0-to-2.0.0.yaml",
+                    Description = "Major version migration"
+                }
+            ]
+        };
+
+        var script = new CkMigrationScriptDto
+        {
+            SourceVersion = "1.0.0",
+            TargetVersion = "2.0.0"
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "1.0.0", "2.0.0", A<CancellationToken>._))
+            .Returns(script);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.True(result.IsPartialPath);
+        Assert.Single(result.Steps);
+        Assert.Equal("1.0.0", result.Steps[0].FromVersion);
+        Assert.Equal("2.0.0", result.Steps[0].ToVersion);
+        Assert.Equal("2.0.0", result.ToModel.Version.ToString());
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_PartialPath_BestCandidate_ShouldReturnClosestVersion()
+    {
+        // Arrange - multiple intermediate migrations exist, should pick the one closest to target
+        var fromModel = new CkModelId("TestModel", "1.0.0");
+        var toModel = new CkModelId("TestModel", "3.0.5");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-3.0.5",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.0",
+                    ToVersion = "2.0.0",
+                    ScriptPath = "1.0.0-to-2.0.0.yaml"
+                },
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.0",
+                    ToVersion = "3.0.0",
+                    ScriptPath = "1.0.0-to-3.0.0.yaml"
+                }
+            ]
+        };
+
+        var script3 = new CkMigrationScriptDto
+        {
+            SourceVersion = "1.0.0",
+            TargetVersion = "3.0.0"
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "1.0.0", "3.0.0", A<CancellationToken>._))
+            .Returns(script3);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert - should pick 3.0.0 (closest to target 3.0.5), not 2.0.0
+        Assert.NotNull(result);
+        Assert.True(result.IsPartialPath);
+        Assert.Single(result.Steps);
+        Assert.Equal("1.0.0", result.Steps[0].FromVersion);
+        Assert.Equal("3.0.0", result.Steps[0].ToVersion);
+        Assert.Equal("3.0.0", result.ToModel.Version.ToString());
+    }
+
     #endregion
 
     #region MigrateAsync Tests
@@ -556,6 +660,57 @@ public class CkModelMigrationServiceTests
         // Assert
         Assert.True(result.IsValid);
         Assert.Contains(result.Warnings, w => w.Message.Contains("breaking changes"));
+    }
+
+    [Fact]
+    public async Task MigrateAsync_SuccessfulMigration_ShouldRecordHistory()
+    {
+        // Arrange - set up a successful non-dry-run migration with empty steps
+        var fromModel = new CkModelId("TestModel", "1.0.0");
+        var toModel = new CkModelId("TestModel", "2.0.0");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-2.0.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.0",
+                    ToVersion = "2.0.0",
+                    ScriptPath = "1.0.0-to-2.0.0.yaml"
+                }
+            ]
+        };
+
+        var script = new CkMigrationScriptDto
+        {
+            SourceVersion = "1.0.0",
+            TargetVersion = "2.0.0",
+            Steps = [] // Empty steps = success with no operations
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "1.0.0", "2.0.0", A<CancellationToken>._))
+            .Returns(script);
+
+        // Return null repository — RecordMigrationHistoryAsync handles this gracefully (logs warning, returns)
+        A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
+            .Returns((IRuntimeRepository?)null);
+
+        var options = new CkMigrationOptions { DryRun = false };
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.MigrateAsync("tenant1", fromModel, toModel, options, ct);
+
+        // Assert - migration succeeded and attempted to record history
+        Assert.True(result.Success);
+        A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
 
     #endregion

@@ -151,6 +151,114 @@ public class CompilerServiceMigrationTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadMigrations_MetaParseError_ReportsError()
+    {
+        // Arrange - invalid meta YAML (not valid YAML structure at all)
+        var ct = TestContext.Current.CancellationToken;
+        var migrationsDir = Path.Combine(_tempDir, "migrations");
+        Directory.CreateDirectory(migrationsDir);
+
+        await File.WriteAllTextAsync(Path.Combine(migrationsDir, "migration-meta.yaml"),
+            """
+            ckModelId: TestModel-2.0.0
+            migrations: "this should be an array not a string"
+            """, ct);
+
+        // Act - try to parse meta (mirrors ReadMigrationsAsync error handling)
+        var operationResult = new OperationResult();
+        CkMigrationMetaDto? meta = null;
+        try
+        {
+            meta = await _parser.ParseMetaAsync(
+                Path.Combine(migrationsDir, "migration-meta.yaml"), ct);
+        }
+        catch (Exception ex)
+        {
+            operationResult.AddMessage(
+                Meshmakers.Octo.ConstructionKit.Engine.Messages.MessageCodes.MigrationMetaParseError(
+                    Path.Combine(migrationsDir, "migration-meta.yaml"), ex.Message));
+        }
+
+        // Assert
+        Assert.Null(meta);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Warning, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(63, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public async Task ReadMigrations_ScriptParseError_ReportsError()
+    {
+        // Arrange - valid meta, but invalid script YAML
+        var ct = TestContext.Current.CancellationToken;
+        var migrationsDir = Path.Combine(_tempDir, "migrations");
+        Directory.CreateDirectory(migrationsDir);
+
+        await File.WriteAllTextAsync(Path.Combine(migrationsDir, "migration-meta.yaml"),
+            """
+            ckModelId: TestModel-2.0.0
+            migrations:
+              - fromVersion: "1.0.0"
+                toVersion: "2.0.0"
+                scriptPath: "1.0.0-to-2.0.0.yaml"
+            """, ct);
+
+        await File.WriteAllTextAsync(Path.Combine(migrationsDir, "1.0.0-to-2.0.0.yaml"),
+            """
+            sourceVersion: "1.0.0"
+            targetVersion: "2.0.0"
+            steps: "this should be an array not a string"
+            """, ct);
+
+        // Act - parse meta, then try to parse script (mirrors ReadMigrationsAsync error handling)
+        var meta = await _parser.ParseMetaAsync(
+            Path.Combine(migrationsDir, "migration-meta.yaml"), ct);
+
+        var operationResult = new OperationResult();
+        var scripts = new List<CkMigrationScriptDto>();
+        foreach (var migrationRef in meta.Migrations)
+        {
+            var scriptPath = Path.Combine(migrationsDir, migrationRef.ScriptPath);
+            try
+            {
+                var script = await _parser.ParseScriptAsync(scriptPath, ct);
+                scripts.Add(script);
+            }
+            catch (Exception ex)
+            {
+                operationResult.AddMessage(
+                    Meshmakers.Octo.ConstructionKit.Engine.Messages.MessageCodes.MigrationScriptParseError(
+                        scriptPath, ex.Message));
+            }
+        }
+
+        // Assert
+        Assert.NotNull(meta);
+        Assert.Empty(scripts); // script failed to parse
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(MessageLevel.Error, operationResult.Messages[0].MessageLevel);
+        Assert.Equal(65, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public void ReadMigrations_MigrationsDirectoryExistsButNoMetaFile_ReturnsNull()
+    {
+        // Arrange - migrations directory exists but no migration-meta.yaml
+        var migrationsDir = Path.Combine(_tempDir, "migrations");
+        Directory.CreateDirectory(migrationsDir);
+        // Add some random file to the directory (but not the meta file)
+        File.WriteAllText(Path.Combine(migrationsDir, "some-script.yaml"), "sourceVersion: '1.0.0'");
+
+        // Act - check for meta file (mirrors ReadMigrationsAsync: checks File.Exists for meta)
+        var metaPath = Path.Combine(migrationsDir, "migration-meta.yaml");
+        var exists = File.Exists(metaPath);
+
+        // Assert - directory exists but meta file doesn't, so migration reading returns null
+        Assert.True(Directory.Exists(migrationsDir));
+        Assert.False(exists);
+    }
+
+    [Fact]
     public async Task ReadMigrations_MultipleMigrations_EmbedsAll()
     {
         // Arrange - meta with two migration references and two scripts

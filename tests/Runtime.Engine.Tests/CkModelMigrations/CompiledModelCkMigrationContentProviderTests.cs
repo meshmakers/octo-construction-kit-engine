@@ -202,6 +202,34 @@ public class CompiledModelCkMigrationContentProviderTests
         Assert.Equal("2.0.0", scriptsB[0].SourceVersion);
     }
 
+    [Fact]
+    public async Task GetMigrationsAsync_UnsortedScripts_ReturnsSortedBySourceVersion()
+    {
+        // Arrange - store scripts in reverse order
+        var ckModelId = new CkModelId("TestModel", "1.0.0");
+        var migrationData = new CkCompiledMigrationDataDto
+        {
+            Meta = new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" },
+            Scripts =
+            [
+                new CkMigrationScriptDto { SourceVersion = "3.0.0", TargetVersion = "4.0.0" },
+                new CkMigrationScriptDto { SourceVersion = "1.0.0", TargetVersion = "2.0.0" },
+                new CkMigrationScriptDto { SourceVersion = "2.0.0", TargetVersion = "3.0.0" }
+            ]
+        };
+        _sut.SetMigrationData(ckModelId, migrationData);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.GetMigrationsAsync(ckModelId, ct);
+
+        // Assert - should be sorted by SourceVersion
+        Assert.Equal(3, result.Count);
+        Assert.Equal("1.0.0", result[0].SourceVersion);
+        Assert.Equal("2.0.0", result[1].SourceVersion);
+        Assert.Equal("3.0.0", result[2].SourceVersion);
+    }
+
     private static CkCompiledMigrationDataDto CreateMigrationData(string sourceVersion, string targetVersion)
     {
         return new CkCompiledMigrationDataDto

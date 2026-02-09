@@ -1,11 +1,9 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
-using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
-using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Meshmakers.Octo.ConstructionKit.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
@@ -15,7 +13,6 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Services;
-using Octokit;
 
 // ReSharper disable once CheckNamespace
 namespace Microsoft.Extensions.DependencyInjection;
@@ -66,6 +63,7 @@ public static class ServiceCollectionExtensions
             new Lazy<IRepositoryManagementService>(sp.GetRequiredService<IRepositoryManagementService>));
 
         // Adding services
+        services.AddTransient<ICkMigrationParser, CkMigrationParser>();
         services.AddTransient<ICompilerService, CompilerService>();
         services.AddSingleton<ICkCacheService, CkCacheService>();
         services.AddTransient<ICkClassMappingService, CkClassMappingService>();

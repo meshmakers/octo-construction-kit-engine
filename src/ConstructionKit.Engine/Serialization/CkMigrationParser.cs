@@ -2,7 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferOb
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
+namespace Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 
 /// <summary>
 /// Parses CK model migration scripts from YAML files
@@ -59,7 +59,7 @@ public interface ICkMigrationParser
 /// <summary>
 /// Parses CK model migration scripts from YAML files
 /// </summary>
-internal class CkMigrationParser : ICkMigrationParser
+public class CkMigrationParser : ICkMigrationParser
 {
     private readonly IDeserializer _deserializer;
 

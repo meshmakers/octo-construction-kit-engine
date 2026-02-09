@@ -211,6 +211,15 @@ internal static class MessageCodes
     internal static OperationMessage VariableUnknown(string? location, object variableName) =>
         GetMessage("VariableUnknown", location, variableName);
 
+    internal static OperationMessage MigrationMetaParseError(string? location, object errorMessage) =>
+        GetMessage("MigrationMetaParseError", location, errorMessage);
+
+    internal static OperationMessage MigrationScriptNotFound(string? location) =>
+        GetMessage("MigrationScriptNotFound", location);
+
+    internal static OperationMessage MigrationScriptParseError(string? location, object errorMessage) =>
+        GetMessage("MigrationScriptParseError", location, errorMessage);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -584,6 +593,24 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.FatalError,
                  62, "Variable '{variableName}' is undefined.",
                  new [] {"variableName"})
+        },
+        {
+            "MigrationMetaParseError",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 63, "Failed to parse migration meta file: {errorMessage}",
+                 new [] {"errorMessage"})
+        },
+        {
+            "MigrationScriptNotFound",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 64, "Migration script file not found.",
+                 new string[] {})
+        },
+        {
+            "MigrationScriptParseError",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 65, "Failed to parse migration script file: {errorMessage}",
+                 new [] {"errorMessage"})
         },
     };
 }

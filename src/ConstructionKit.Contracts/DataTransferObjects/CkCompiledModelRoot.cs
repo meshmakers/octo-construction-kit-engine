@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization.Schema;
 using YamlDotNet.Serialization;
@@ -31,4 +32,12 @@ public class CkCompiledModelRoot : CkModelRootBase
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public List<CkModelId>? Dependencies { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the inline migration data for this compiled model.
+    ///     When present, allows any service to run CK model migrations without
+    ///     needing the CK model NuGet package as a reference.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public CkCompiledMigrationDataDto? Migrations { get; set; }
 }

@@ -371,6 +371,24 @@
       "number": 62,
       "level": "FATALERROR",
       "text": "Variable '{variableName}' is undefined."
+    },
+    {
+      "key": "MigrationMetaParseError",
+      "number": 63,
+      "level": "WARNING",
+      "text": "Failed to parse migration meta file: {errorMessage}"
+    },
+    {
+      "key": "MigrationScriptNotFound",
+      "number": 64,
+      "level": "ERROR",
+      "text": "Migration script file not found."
+    },
+    {
+      "key": "MigrationScriptParseError",
+      "number": 65,
+      "level": "ERROR",
+      "text": "Failed to parse migration script file: {errorMessage}"
     }
   ]
 }

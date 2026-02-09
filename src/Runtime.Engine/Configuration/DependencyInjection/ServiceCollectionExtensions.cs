@@ -57,9 +57,9 @@ public static class ServiceCollectionExtensions
 
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();
-        services.AddTransient<ICkMigrationParser, CkMigrationParser>();
 
         // Migration content providers (aggregate by default, allows adding multiple sources)
+        services.AddSingleton<CompiledModelCkMigrationContentProvider>();
         services.AddSingleton<FileSystemCkMigrationContentProvider>();
         services.AddSingleton<EmbeddedCkMigrationContentProvider>();
         services.AddSingleton<ICkMigrationContentProvider>(sp =>
@@ -67,9 +67,11 @@ public static class ServiceCollectionExtensions
             var aggregate = new AggregateCkMigrationContentProvider(
                 sp.GetRequiredService<ILogger<AggregateCkMigrationContentProvider>>());
 
-            // Add embedded resources first (higher priority)
+            // Add compiled model migrations first (highest priority, populated during import)
+            aggregate.AddProvider(sp.GetRequiredService<CompiledModelCkMigrationContentProvider>());
+            // Then embedded resources (NuGet package references)
             aggregate.AddProvider(sp.GetRequiredService<EmbeddedCkMigrationContentProvider>());
-            // Then file system as fallback
+            // Then file system as fallback (local dev)
             aggregate.AddProvider(sp.GetRequiredService<FileSystemCkMigrationContentProvider>());
 
             return aggregate;

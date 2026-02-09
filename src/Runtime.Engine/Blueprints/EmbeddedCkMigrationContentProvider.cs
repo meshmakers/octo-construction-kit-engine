@@ -2,6 +2,7 @@ using System.Reflection;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Microsoft.Extensions.Logging;
 

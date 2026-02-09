@@ -48,6 +48,8 @@ internal static class CompilerStatics
     public const string Sample1Attribute2 = "sampleAttribute2.yaml";
     public const string Sample1Attribute3 = "sampleAttribute3.yaml";
     public const string Sample1Association = "sampleAssocation1.yaml";
+    public const string MigrationsDirectoryName = "migrations";
+    public const string MigrationMetaFile = "migration-meta.yaml";
 
     public static IEnumerable<CkIdVersionRange<CkTypeId>> WhiteListedCkTypeIds { get; } =
         [new("System-1.0.0/Entity")];

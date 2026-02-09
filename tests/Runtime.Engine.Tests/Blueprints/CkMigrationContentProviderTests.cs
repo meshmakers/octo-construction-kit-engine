@@ -3,6 +3,7 @@ using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
+using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
 using Microsoft.Extensions.Logging;
@@ -552,5 +553,130 @@ public class AggregateCkMigrationContentProviderTests
 
         var result = await sut.HasMigrationsAsync(ckModelId, ct);
         Assert.True(result);
+    }
+
+    [Fact]
+    public async Task CompiledProviderTakesPriority_WhenBothHaveData_ReturnsCompiledData()
+    {
+        // Arrange - simulate the DI registration order: Compiled first, then Embedded fallback
+        var logger = A.Fake<ILogger<AggregateCkMigrationContentProvider>>();
+        var compiledLogger = A.Fake<ILogger<CompiledModelCkMigrationContentProvider>>();
+        var compiledProvider = new CompiledModelCkMigrationContentProvider(compiledLogger);
+        var embeddedProvider = A.Fake<ICkMigrationContentProvider>();
+
+        var ckModelId = new CkModelId("TestModel", "1.0.0");
+        var compiledMeta = new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" };
+        var compiledScript = new CkMigrationScriptDto
+        {
+            SourceVersion = "1.0.0",
+            TargetVersion = "2.0.0",
+            Description = "From compiled model"
+        };
+        compiledProvider.SetMigrationData(ckModelId, new CkCompiledMigrationDataDto
+        {
+            Meta = compiledMeta,
+            Scripts = [compiledScript]
+        });
+
+        // Embedded also has data (should NOT be reached)
+        var embeddedMeta = new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" };
+        A.CallTo(() => embeddedProvider.HasMigrationsAsync(ckModelId, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => embeddedProvider.GetMigrationMetaAsync(ckModelId, A<CancellationToken>._))
+            .Returns(embeddedMeta);
+
+        var sut = new AggregateCkMigrationContentProvider(logger);
+        sut.AddProvider(compiledProvider); // first = highest priority
+        sut.AddProvider(embeddedProvider);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var meta = await sut.GetMigrationMetaAsync(ckModelId, ct);
+        var scripts = await sut.GetMigrationsAsync(ckModelId, ct);
+
+        // Assert - data comes from compiled provider, embedded is never queried
+        Assert.NotNull(meta);
+        Assert.Single(scripts);
+        Assert.Equal("From compiled model", scripts[0].Description);
+        A.CallTo(() => embeddedProvider.GetMigrationMetaAsync(A<CkModelId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => embeddedProvider.GetMigrationsAsync(A<CkModelId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task CompiledProviderEmpty_FallsBackToEmbedded()
+    {
+        // Arrange - compiled provider has no data, embedded does
+        var logger = A.Fake<ILogger<AggregateCkMigrationContentProvider>>();
+        var compiledLogger = A.Fake<ILogger<CompiledModelCkMigrationContentProvider>>();
+        var compiledProvider = new CompiledModelCkMigrationContentProvider(compiledLogger);
+        var embeddedProvider = A.Fake<ICkMigrationContentProvider>();
+
+        var ckModelId = new CkModelId("TestModel", "1.0.0");
+
+        // Embedded has data
+        A.CallTo(() => embeddedProvider.HasMigrationsAsync(ckModelId, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => embeddedProvider.GetMigrationMetaAsync(ckModelId, A<CancellationToken>._))
+            .Returns(new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" });
+        A.CallTo(() => embeddedProvider.GetMigrationsAsync(ckModelId, A<CancellationToken>._))
+            .Returns(new List<CkMigrationScriptDto>
+            {
+                new() { SourceVersion = "1.0.0", TargetVersion = "2.0.0", Description = "From embedded" }
+            });
+
+        var sut = new AggregateCkMigrationContentProvider(logger);
+        sut.AddProvider(compiledProvider); // first but empty
+        sut.AddProvider(embeddedProvider); // fallback with data
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var meta = await sut.GetMigrationMetaAsync(ckModelId, ct);
+        var scripts = await sut.GetMigrationsAsync(ckModelId, ct);
+
+        // Assert - falls back to embedded
+        Assert.NotNull(meta);
+        Assert.Single(scripts);
+        Assert.Equal("From embedded", scripts[0].Description);
+    }
+
+    [Fact]
+    public async Task CompiledProviderCleared_FallsBackToEmbedded()
+    {
+        // Arrange - compiled provider had data but was cleared
+        var logger = A.Fake<ILogger<AggregateCkMigrationContentProvider>>();
+        var compiledLogger = A.Fake<ILogger<CompiledModelCkMigrationContentProvider>>();
+        var compiledProvider = new CompiledModelCkMigrationContentProvider(compiledLogger);
+        var embeddedProvider = A.Fake<ICkMigrationContentProvider>();
+
+        var ckModelId = new CkModelId("TestModel", "1.0.0");
+
+        // First set data, then clear it (simulates import lifecycle)
+        compiledProvider.SetMigrationData(ckModelId, new CkCompiledMigrationDataDto
+        {
+            Meta = new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" },
+            Scripts = [new CkMigrationScriptDto { SourceVersion = "1.0.0", TargetVersion = "2.0.0" }]
+        });
+        compiledProvider.ClearMigrationData(ckModelId);
+
+        // Embedded has data
+        A.CallTo(() => embeddedProvider.HasMigrationsAsync(ckModelId, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => embeddedProvider.GetMigrationMetaAsync(ckModelId, A<CancellationToken>._))
+            .Returns(new CkMigrationMetaDto { CkModelId = "TestModel-1.0.0" });
+
+        var sut = new AggregateCkMigrationContentProvider(logger);
+        sut.AddProvider(compiledProvider);
+        sut.AddProvider(embeddedProvider);
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var hasMigrations = await sut.HasMigrationsAsync(ckModelId, ct);
+        var meta = await sut.GetMigrationMetaAsync(ckModelId, ct);
+
+        // Assert - compiled is empty after clear, falls back to embedded
+        Assert.True(hasMigrations);
+        Assert.NotNull(meta);
     }
 }

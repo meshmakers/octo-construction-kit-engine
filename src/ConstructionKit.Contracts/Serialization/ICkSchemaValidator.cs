@@ -67,4 +67,22 @@ public interface ICkSchemaValidator
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns></returns>
     bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult);
+
+    /// <summary>
+    ///     Validates a CK migration metadata file in YAML format.
+    /// </summary>
+    /// <param name="stream">Stream containing migration metadata in YAML format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">The result object that contains after call validation messages.</param>
+    /// <returns></returns>
+    bool ValidateMigrationMetaInYaml(Stream stream, string locationReference, OperationResult operationResult);
+
+    /// <summary>
+    ///     Validates a CK migration script file in YAML format.
+    /// </summary>
+    /// <param name="stream">Stream containing migration script in YAML format.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">The result object that contains after call validation messages.</param>
+    /// <returns></returns>
+    bool ValidateMigrationScriptInYaml(Stream stream, string locationReference, OperationResult operationResult);
 }

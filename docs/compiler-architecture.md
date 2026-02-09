@@ -228,9 +228,11 @@ enums: [...]
 associationRoles: [...]
 migrations:              # Included when ConstructionKit/migrations/ exists
   meta:
-    ckModelName: System
-    latestVersion: "1.0.1"
-    migrations: [...]
+    ckModelId: System-1.0.1
+    migrations:
+      - fromVersion: "1.0.0"
+        toVersion: "1.0.1"
+        scriptPath: "1.0.0-to-1.0.1.yaml"
   scripts: [...]
 ```
 
@@ -238,7 +240,7 @@ migrations:              # Included when ConstructionKit/migrations/ exists
 Generates a binary cache file (`ck-{modelId}.cache.json`) containing serialized `CkModelGraph` for faster runtime loading.
 
 #### Migration Embedding (Optional)
-If a `ConstructionKit/migrations/` directory exists and contains a `migration-meta.yaml`, the compiler parses the metadata and all referenced migration scripts, then embeds them in the compiled model's `migrations` field as a `CkCompiledMigrationDataDto`. Migration files are validated against the `ck-migration-meta.schema.json` and `ck-migration.schema.json` schemas. Missing script files produce warnings but do not fail the build.
+If a `ConstructionKit/migrations/` directory exists and contains a `migration-meta.yaml`, the compiler parses the metadata and all referenced migration scripts, then embeds them in the compiled model's `migrations` field as a `CkCompiledMigrationDataDto`. Migration files are validated against the `ck-migration-meta.schema.json` and `ck-migration.schema.json` schemas. Missing or invalid script files are treated as errors and will fail the build.
 
 ## Data Structures
 

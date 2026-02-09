@@ -3,53 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CK Migration Script",
   "description": "Schema for CK model migration scripts that define how to update runtime entities from one CK model version to another",
-  "type": "object",
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "format": "uri",
-      "description": "The URI of the schema for the migration script file"
-    },
-    "sourceVersion": {
-      "type": "string",
-      "description": "Source CK model version this migration applies from"
-    },
-    "targetVersion": {
-      "type": "string",
-      "description": "Target CK model version this migration updates to"
-    },
-    "description": {
-      "type": "string",
-      "description": "Description of what this migration does"
-    },
-    "preConditions": {
-      "type": "array",
-      "description": "Conditions that must be met before the migration can run",
-      "items": {
-        "$ref": "#/$defs/condition"
-      }
-    },
-    "steps": {
-      "type": "array",
-      "description": "Ordered list of migration steps to execute",
-      "items": {
-        "$ref": "#/$defs/migrationStep"
-      }
-    },
-    "postValidations": {
-      "type": "array",
-      "description": "Validations to run after migration completes",
-      "items": {
-        "$ref": "#/$defs/postValidation"
-      }
-    }
-  },
-  "additionalProperties": false,
-  "required": [
-    "sourceVersion",
-    "targetVersion",
-    "steps"
-  ],
+  "$ref": "#/definitions/CkMigrationScript",
   "definitions": {
     "CkMigrationScript": {
       "type": "object",
@@ -57,7 +11,8 @@
       "properties": {
         "$schema": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "description": "The URI of the schema for the migration script file"
         },
         "sourceVersion": {
           "type": "string",
@@ -73,20 +28,23 @@
         },
         "preConditions": {
           "type": "array",
+          "description": "Conditions that must be met before the migration can run",
           "items": {
-            "$ref": "#/$defs/condition"
+            "$ref": "#/definitions/condition"
           }
         },
         "steps": {
           "type": "array",
+          "description": "Ordered list of migration steps to execute",
           "items": {
-            "$ref": "#/$defs/migrationStep"
+            "$ref": "#/definitions/migrationStep"
           }
         },
         "postValidations": {
           "type": "array",
+          "description": "Validations to run after migration completes",
           "items": {
-            "$ref": "#/$defs/postValidation"
+            "$ref": "#/definitions/postValidation"
           }
         }
       },
@@ -96,9 +54,7 @@
         "targetVersion",
         "steps"
       ]
-    }
-  },
-  "$defs": {
+    },
     "migrationStep": {
       "type": "object",
       "description": "A single step in a CK migration script",
@@ -117,11 +73,11 @@
           "description": "The type of action to perform"
         },
         "target": {
-          "$ref": "#/$defs/migrationTarget",
+          "$ref": "#/definitions/migrationTarget",
           "description": "Target entities for this step"
         },
         "transform": {
-          "$ref": "#/$defs/transformConfig",
+          "$ref": "#/definitions/transformConfig",
           "description": "Transform configuration (for Transform action)"
         },
         "data": {
@@ -129,7 +85,7 @@
           "description": "Data to set (for Add/Update actions)"
         },
         "condition": {
-          "$ref": "#/$defs/condition",
+          "$ref": "#/definitions/condition",
           "description": "Optional condition for this step to execute"
         },
         "onConflict": {
@@ -164,7 +120,7 @@
           "description": "Well-known name of the entity to target"
         },
         "filter": {
-          "$ref": "#/$defs/filterExpression",
+          "$ref": "#/definitions/filterExpression",
           "description": "Filter expression to match entities"
         },
         "blueprintSourceOnly": {
@@ -193,12 +149,12 @@
         },
         "and": {
           "type": "array",
-          "items": { "$ref": "#/$defs/filterExpression" },
+          "items": { "$ref": "#/definitions/filterExpression" },
           "description": "AND combination of filters"
         },
         "or": {
           "type": "array",
-          "items": { "$ref": "#/$defs/filterExpression" },
+          "items": { "$ref": "#/definitions/filterExpression" },
           "description": "OR combination of filters"
         }
       },
@@ -247,7 +203,7 @@
           "description": "Type of condition"
         },
         "target": {
-          "$ref": "#/$defs/migrationTarget",
+          "$ref": "#/definitions/migrationTarget",
           "description": "Target for entity-based conditions"
         },
         "ckModelId": {
@@ -287,7 +243,7 @@
           "description": "Type of validation"
         },
         "target": {
-          "$ref": "#/$defs/migrationTarget",
+          "$ref": "#/definitions/migrationTarget",
           "description": "Target for validation"
         },
         "expectedCount": {

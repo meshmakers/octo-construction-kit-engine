@@ -3,31 +3,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "CK Migration Metadata",
   "description": "Schema for CK model migration metadata files that list available migrations from previous versions",
-  "type": "object",
-  "properties": {
-    "$schema": {
-      "type": "string",
-      "format": "uri",
-      "description": "The URI of the schema for the migration metadata file"
-    },
-    "ckModelId": {
-      "type": "string",
-      "pattern": "^[a-zA-Z0-9-.]+$",
-      "description": "The CK model ID this migration metadata belongs to (e.g., 'System-2.0.0')"
-    },
-    "migrations": {
-      "type": "array",
-      "description": "List of available migrations from previous versions",
-      "items": {
-        "$ref": "#/definitions/CkMigrationReference"
-      }
-    }
-  },
-  "additionalProperties": false,
-  "required": [
-    "ckModelId",
-    "migrations"
-  ],
+  "$ref": "#/definitions/CkMigrationMeta",
   "definitions": {
     "CkMigrationMeta": {
       "type": "object",
@@ -35,15 +11,17 @@
       "properties": {
         "$schema": {
           "type": "string",
-          "format": "uri"
+          "format": "uri",
+          "description": "The URI of the schema for the migration metadata file"
         },
         "ckModelId": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9-.]+$",
-          "description": "The CK model ID this migration metadata belongs to"
+          "description": "The CK model ID this migration metadata belongs to (e.g., 'System-2.0.0')"
         },
         "migrations": {
           "type": "array",
+          "description": "List of available migrations from previous versions",
           "items": {
             "$ref": "#/definitions/CkMigrationReference"
           }

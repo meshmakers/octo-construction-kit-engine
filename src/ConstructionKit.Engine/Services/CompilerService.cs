@@ -20,6 +20,7 @@ public class CompilerService : ICompilerService
     private readonly ICkCacheService _ckCacheService;
     private readonly ICatalogModelResolver _catalogModelResolver;
     private readonly ICkSerializer _ckSerializer;
+    private readonly ICkSchemaValidator _schemaValidator;
     private readonly ICkMigrationParser _migrationParser;
     private readonly ILogger<CompilerService> _logger;
 
@@ -30,15 +31,17 @@ public class CompilerService : ICompilerService
     /// <param name="ckSerializer"></param>
     /// <param name="ckCacheService"></param>
     /// <param name="catalogModelResolver"></param>
+    /// <param name="schemaValidator"></param>
     /// <param name="migrationParser"></param>
     public CompilerService(ILogger<CompilerService> logger, ICkSerializer ckSerializer,
         ICkCacheService ckCacheService, ICatalogModelResolver catalogModelResolver,
-        ICkMigrationParser migrationParser)
+        ICkSchemaValidator schemaValidator, ICkMigrationParser migrationParser)
     {
         _logger = logger;
         _ckSerializer = ckSerializer;
         _ckCacheService = ckCacheService;
         _catalogModelResolver = catalogModelResolver;
+        _schemaValidator = schemaValidator;
         _migrationParser = migrationParser;
     }
 
@@ -574,6 +577,16 @@ public class CompilerService : ICompilerService
             return null;
         }
 
+#if NETSTANDARD2_0
+        using var metaValidationStream = File.OpenRead(metaFilePath);
+#else
+        await using var metaValidationStream = File.OpenRead(metaFilePath);
+#endif
+        if (!_schemaValidator.ValidateMigrationMetaInYaml(metaValidationStream, metaFilePath, operationResult))
+        {
+            return null;
+        }
+
         CkMigrationMetaDto meta;
         try
         {
@@ -595,6 +608,16 @@ public class CompilerService : ICompilerService
                     "Migration script file '{ScriptPath}' referenced in meta but not found",
                     scriptPath);
                 operationResult.AddMessage(MessageCodes.MigrationScriptNotFound(scriptPath));
+                continue;
+            }
+
+#if NETSTANDARD2_0
+            using var scriptValidationStream = File.OpenRead(scriptPath);
+#else
+            await using var scriptValidationStream = File.OpenRead(scriptPath);
+#endif
+            if (!_schemaValidator.ValidateMigrationScriptInYaml(scriptValidationStream, scriptPath, operationResult))
+            {
                 continue;
             }
 

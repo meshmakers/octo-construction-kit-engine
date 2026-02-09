@@ -30,8 +30,7 @@ MyModel/
 
 ```yaml
 $schema: https://schemas.meshmakers.cloud/ck-migration-meta.schema.json
-ckModelName: MyModel
-latestVersion: "2.0.0"
+ckModelId: MyModel-2.0.0
 
 migrations:
   - fromVersion: "1.0.0"
@@ -302,16 +301,16 @@ embeddedProvider.RegisterMigrationSource(
     "MyCompany.MyModel");
 ```
 
-### Compiled Model (Automatic)
+### Compiled Model
 
-When the CK compiler finds a `migrations/` folder with a `migration-meta.yaml`, it embeds all migration metadata and scripts inline into the compiled `.yaml` model file. At runtime, when the compiled model is imported, the `CompiledModelCkMigrationContentProvider` is automatically populated — no manual registration needed.
+When the CK compiler finds a `migrations/` folder with a `migration-meta.yaml`, it embeds all migration metadata and scripts inline into the compiled `.yaml` model file. This makes compiled models self-contained: they carry their migrations with them, removing the need for a separate NuGet package reference just to provide migration scripts.
 
-This makes compiled models fully self-contained: they carry their migrations with them, removing the need for a separate NuGet package reference just to provide migration scripts.
+At runtime, the CK model import pipeline must call `SetMigrationData()` on the `CompiledModelCkMigrationContentProvider` to populate the provider with the embedded migration data:
 
 ```csharp
-// Automatically populated during CK model import — no manual setup required.
-// The provider is registered as a singleton and receives data via:
-compiledProvider.SetMigrationData(ckModelId, migrationData);
+// During CK model import, extract migration data from the compiled model
+// and register it with the provider:
+compiledProvider.SetMigrationData(ckModelId, compiledModel.Migrations);
 ```
 
 ### File System

@@ -302,6 +302,18 @@ embeddedProvider.RegisterMigrationSource(
     "MyCompany.MyModel");
 ```
 
+### Compiled Model (Automatic)
+
+When the CK compiler finds a `migrations/` folder with a `migration-meta.yaml`, it embeds all migration metadata and scripts inline into the compiled `.yaml` model file. At runtime, when the compiled model is imported, the `CompiledModelCkMigrationContentProvider` is automatically populated — no manual registration needed.
+
+This makes compiled models fully self-contained: they carry their migrations with them, removing the need for a separate NuGet package reference just to provide migration scripts.
+
+```csharp
+// Automatically populated during CK model import — no manual setup required.
+// The provider is registered as a singleton and receives data via:
+compiledProvider.SetMigrationData(ckModelId, migrationData);
+```
+
 ### File System
 
 For development or external migration scripts:
@@ -317,12 +329,13 @@ fsProvider.RegisterModelSourcePath(
 
 ### Aggregated Provider
 
-By default, an aggregated provider is used that first checks embedded resources, then the file system:
+By default, an aggregated provider chains three sources in priority order:
 
 ```csharp
 // Automatically configured:
-// 1. EmbeddedCkMigrationContentProvider (Priority)
-// 2. FileSystemCkMigrationContentProvider (Fallback)
+// 1. CompiledModelCkMigrationContentProvider (auto-populated during import)
+// 2. EmbeddedCkMigrationContentProvider (NuGet package references)
+// 3. FileSystemCkMigrationContentProvider (local dev fallback)
 ```
 
 ## Migration History
@@ -425,12 +438,13 @@ if (!result.Success)
 │Aggregate-       │  │Mongo-/InMemory-   │
 │ContentProvider  │  │RepositoryProvider │
 └─────────────────┘  └───────────────────┘
-    │         │
-    ▼         ▼
-┌────────┐ ┌────────┐
-│Embedded│ │File-   │
-│Resource│ │System  │
-└────────┘ └────────┘
+    │    │    │
+    ▼    ▼    ▼
+┌──────┐┌──────┐┌──────┐
+│Compi-││Embed-││File- │
+│led   ││ded   ││System│
+│Model ││Rsrc  ││      │
+└──────┘└──────┘└──────┘
 ```
 
 ## Namespace Organization

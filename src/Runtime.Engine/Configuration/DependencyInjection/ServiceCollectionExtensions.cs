@@ -53,7 +53,6 @@ public static class ServiceCollectionExtensions
 
         // Blueprint services
         services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
-        services.AddSingleton<ITenantBackupService, InMemoryTenantBackupService>();
         services.AddTransient<IBlueprintService, BlueprintService>();
         services.AddTransient<IBlueprintMigrationExecutor, BlueprintMigrationExecutor>();
         services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();

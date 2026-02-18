@@ -93,6 +93,34 @@ public class InvalidPathException : PersistenceException
             $"Cannot get attribute value '{pathTupleTerm.Value}' for runtime type '{rtTypeWithAttributes}'.");
     }
 
+    internal static Exception CkTypeNotFoundForEntity(string tenantId, RtTypeWithAttributes rtTypeWithAttributes,
+        PathTerm pathTerm)
+    {
+        return new InvalidPathException(
+            $"Construction Kit type definition for '{rtTypeWithAttributes}' not found for tenant '{tenantId}'. Cannot resolve attribute '{pathTerm.Value}'. Ensure the Construction Kit model is deployed for this tenant.");
+    }
+
+    internal static Exception AttributeNotFoundOnCkType(string tenantId, RtTypeWithAttributes rtTypeWithAttributes,
+        PathTerm pathTerm)
+    {
+        return new InvalidPathException(
+            $"Attribute '{pathTerm.Value}' is not defined on the Construction Kit type of '{rtTypeWithAttributes}' for tenant '{tenantId}'. Ensure the attribute exists in the Construction Kit model.");
+    }
+
+    internal static Exception CkRecordNotFoundForRecord(string tenantId, RtTypeWithAttributes rtTypeWithAttributes,
+        PathTerm pathTerm)
+    {
+        return new InvalidPathException(
+            $"Construction Kit record definition for '{rtTypeWithAttributes}' not found for tenant '{tenantId}'. Cannot resolve attribute '{pathTerm.Value}'. Ensure the Construction Kit model is deployed for this tenant.");
+    }
+
+    internal static Exception AttributeNotFoundOnCkRecord(string tenantId, RtTypeWithAttributes rtTypeWithAttributes,
+        PathTerm pathTerm)
+    {
+        return new InvalidPathException(
+            $"Attribute '{pathTerm.Value}' is not defined on the Construction Kit record of '{rtTypeWithAttributes}' for tenant '{tenantId}'. Ensure the attribute exists in the Construction Kit model.");
+    }
+
     internal static Exception AttributeValueIsNotArray(RtTypeWithAttributes rtTypeWithAttributes,
         PathTerm pathTupleTerm)
     {

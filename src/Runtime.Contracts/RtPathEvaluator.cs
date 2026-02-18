@@ -855,32 +855,52 @@ public static class RtPathEvaluator
 
                     switch (valueRtTypeWithAttribute)
                     {
-                        case RtEntity rtEntity
-                            when ckCacheService.TryGetRtCkType(tenantId, rtEntity.GetRtCkTypeId(), out var ckTypeGraph)
-                                 // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                 && ckTypeGraph != null &&
-                                 ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
-                                     out var ckTypeAttributeGraph):
+                        case RtEntity rtEntity:
+                        {
+                            if (!ckCacheService.TryGetRtCkType(tenantId, rtEntity.GetRtCkTypeId(),
+                                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                    out var ckTypeGraph) || ckTypeGraph == null)
+                            {
+                                throw InvalidPathException.CkTypeNotFoundForEntity(tenantId, rtEntity, token);
+                            }
+
+                            if (!ckTypeGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                    out var ckTypeAttributeGraph))
+                            {
+                                throw InvalidPathException.AttributeNotFoundOnCkType(tenantId, rtEntity, token);
+                            }
+
                             valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
                                 out var entityValue);
                             newPathLocators.Add(new PathLocator(rtEntity, ckTypeAttributeGraph, null,
-                                ConvertAttributeValue(ckCacheService, tenantId, ckTypeGraph, token.Value.ToPascalCase(),
+                                ConvertAttributeValue(ckCacheService, tenantId, ckTypeGraph,
+                                    token.Value.ToPascalCase(),
                                     entityValue, attributeValueResolveFlags)));
                             continue;
-                        case RtRecord rtRecord
-                            when ckCacheService.TryGetRtCkRecord(tenantId, rtRecord.CkRecordId, out var ckRecordGraph)
-                                 // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
-                                 && ckRecordGraph != null &&
-                                 ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
-                                     out var ckRecordAttributeGraph):
+                        }
+                        case RtRecord rtRecord:
+                        {
+                            if (!ckCacheService.TryGetRtCkRecord(tenantId, rtRecord.CkRecordId,
+                                    // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+                                    out var ckRecordGraph) || ckRecordGraph == null)
+                            {
+                                throw InvalidPathException.CkRecordNotFoundForRecord(tenantId, rtRecord, token);
+                            }
+
+                            if (!ckRecordGraph.AllAttributesByName.TryGetValue(token.Value.ToPascalCase(),
+                                    out var ckRecordAttributeGraph))
+                            {
+                                throw InvalidPathException.AttributeNotFoundOnCkRecord(tenantId, rtRecord, token);
+                            }
+
                             valueRtTypeWithAttribute.Attributes.TryGetValue(token.Value.ToPascalCase(),
                                 out var recordValue);
                             newPathLocators.Add(
                                 new PathLocator(rtRecord, ckRecordAttributeGraph, null,
                                     ConvertAttributeValue(ckCacheService, tenantId, ckRecordGraph,
                                         token.Value.ToPascalCase(), recordValue, attributeValueResolveFlags)));
-
                             continue;
+                        }
                         default:
                             throw InvalidPathException.CannotGetAttributeValue(locator.RtTypeWithAttributes, token);
                     }

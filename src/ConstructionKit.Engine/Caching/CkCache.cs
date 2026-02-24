@@ -302,6 +302,26 @@ internal class CkCache : IDisposable
         return missingModelIds;
     }
 
+    public ICollection<CkModelIdVersionRange> EnsureModelIdRanges(IEnumerable<CkModelIdVersionRange> modelIdRanges)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        var loadedModelIds = _modelGraph.Dependencies.Select(x => x.Key).Distinct().ToList();
+        List<CkModelIdVersionRange> unsatisfiedRanges = [];
+        foreach (var range in modelIdRanges)
+        {
+            if (!loadedModelIds.Any(range.IsSatisfiedBy))
+            {
+                unsatisfiedRanges.Add(range);
+            }
+        }
+
+        return unsatisfiedRanges;
+    }
+
     public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
         bool ignoreNavigationProperties)
     {

@@ -69,6 +69,15 @@
         <None Update="sampleData\files\rt-maintenanceArray.yaml">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </None>
+        <None Update="sampleData\files\entity-version-ranges.yaml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="sampleData\files\entity-version-ranges.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="sampleData\files\entity-exact-version-deps.yaml">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
 
     </ItemGroup>
 

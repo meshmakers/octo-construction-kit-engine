@@ -258,7 +258,7 @@ public class YamlSerializerTests
 
         var modelRoot = new RtModelRootTcDto
         {
-            Dependencies = { new CkModelId("System-1.0.0") },
+            Dependencies = { new CkModelIdVersionRange("System-1.0.0") },
             Entities =
             {
                 new RtEntityTcDto

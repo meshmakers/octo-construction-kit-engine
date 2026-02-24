@@ -10,7 +10,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Serialization;
 
 internal class RtDeserializeStream : IRtDeserializeStream
 {
-    private readonly List<CkModelId> _dependencies;
+    private readonly List<CkModelIdVersionRange> _dependencies;
     private readonly ConcurrentDictionary<OctoObjectId, RtEntityTcDto> _deserializedEntities = new();
     private readonly int _maxCount;
     private readonly JsonTextReader _reader;
@@ -32,7 +32,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
         Dependencies = _dependencies;
     }
 
-    public IReadOnlyCollection<CkModelId> Dependencies { get; }
+    public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; }
 
 
     public event EventHandler<RtDeserializeEventArgs>? BulkDeserialized;
@@ -153,7 +153,7 @@ internal class RtDeserializeStream : IRtDeserializeStream
                 var value = Convert.ToString(_reader.Value);
                 if (!string.IsNullOrWhiteSpace(value))
                 {
-                    _dependencies.Add(new CkModelId(value));
+                    _dependencies.Add(new CkModelIdVersionRange(value));
                 }
             }
         }

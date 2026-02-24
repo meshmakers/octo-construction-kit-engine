@@ -66,6 +66,17 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+    public ICollection<CkModelIdVersionRange> EnsureModelIdRanges(string tenantId, IEnumerable<CkModelIdVersionRange> modelIdRanges)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.EnsureModelIdRanges(modelIdRanges);
+    }
+
+    /// <inheritdoc />
     public void Unload(string tenantId)
     {
         if (!_ckCaches.TryRemove(tenantId, out var ckCache))

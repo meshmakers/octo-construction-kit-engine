@@ -8,9 +8,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 public interface IRtDeserializeStream : IDisposable
 {
     /// <summary>
-    ///     Returns dependencies of the model.
+    ///     Returns dependencies of the model. Supports version ranges.
     /// </summary>
-    public IReadOnlyCollection<CkModelId> Dependencies { get; }
+    public IReadOnlyCollection<CkModelIdVersionRange> Dependencies { get; }
 
     /// <summary>
     ///     Indicates that a bulk of entities has been deserialized.

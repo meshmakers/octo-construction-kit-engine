@@ -62,4 +62,9 @@ public class ExchangeException : PersistenceException
     {
         return new ExchangeException($"Models '{string.Join(", ", ckModelIds)}' are missing in tenant '{tenantId}'.");
     }
+
+    internal static Exception CkModelsMissing(string tenantId, ICollection<CkModelIdVersionRange> ckModelIdRanges)
+    {
+        return new ExchangeException($"No models satisfying '{string.Join(", ", ckModelIdRanges)}' found in tenant '{tenantId}'.");
+    }
 }

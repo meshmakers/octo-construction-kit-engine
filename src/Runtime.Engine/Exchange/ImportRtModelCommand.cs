@@ -146,12 +146,12 @@ internal class ImportRtModelCommand(
         }
     }
 
-    private void ValidateCkModels(string tenantId, ICollection<CkModelId> ckModelIds)
+    private void ValidateCkModels(string tenantId, ICollection<CkModelIdVersionRange> ckModelIdRanges)
     {
-        var missingCkModelIds = cacheService.EnsureModelIds(tenantId, ckModelIds);
-        if (missingCkModelIds.Any())
+        var unsatisfiedRanges = cacheService.EnsureModelIdRanges(tenantId, ckModelIdRanges);
+        if (unsatisfiedRanges.Any())
         {
-            throw ExchangeException.CkModelsMissing(tenantId, missingCkModelIds);
+            throw ExchangeException.CkModelsMissing(tenantId, unsatisfiedRanges);
         }
     }
 

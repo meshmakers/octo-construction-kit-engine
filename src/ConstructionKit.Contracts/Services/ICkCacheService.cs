@@ -38,6 +38,14 @@ public interface ICkCacheService
     ICollection<CkModelId> EnsureModelIds(string tenantId, IEnumerable<CkModelId> modelIds);
 
     /// <summary>
+    /// Ensures that the given model id version ranges are satisfied by models available in the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="modelIdRanges">The model id version ranges to ensure</param>
+    /// <returns>A list of version ranges that are not satisfied by any loaded model</returns>
+    ICollection<CkModelIdVersionRange> EnsureModelIdRanges(string tenantId, IEnumerable<CkModelIdVersionRange> modelIdRanges);
+
+    /// <summary>
     ///     Unload a tenant cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>

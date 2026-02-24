@@ -37,10 +37,10 @@ public class RtModelRootTcDto
     public virtual string SchemaUri { get; } = RtSchemaUri;
 
     /// <summary>
-    ///     Gets or sets the dependencies of the model.
+    ///     Gets or sets the dependencies of the model. Supports version ranges (e.g. "Basic-[2.0,3.0)").
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
-    public List<CkModelId> Dependencies { get; set; }
+    public List<CkModelIdVersionRange> Dependencies { get; set; }
 
     /// <summary>
     ///     Gets a list of entities in the runtime model.

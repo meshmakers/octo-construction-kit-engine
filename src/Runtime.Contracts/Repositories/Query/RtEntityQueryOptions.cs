@@ -62,6 +62,12 @@ public record RtEntityQueryOptions : FieldFilterCriteria
     public ICollection<GeospatialFilter>? GeospatialFilters { get; internal set; }
 
     /// <summary>
+    ///     Controls how navigation properties affect the result set.
+    ///     Default is <see cref="NavigationFilterMode.Filter"/> which filters out entities without associations.
+    /// </summary>
+    public NavigationFilterMode NavigationFilterMode { get; private set; } = NavigationFilterMode.Filter;
+
+    /// <summary>
     ///     Creates a new instance of <see cref="RtEntityQueryOptions" />.
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
@@ -167,6 +173,19 @@ public record RtEntityQueryOptions : FieldFilterCriteria
 
         GeospatialFilters.Add(new NearGeospatialFilter(attributeName,point, minDistance, maxDistance));
 
+        return this;
+    }
+
+    /// <summary>
+    ///     Sets the navigation filter mode.
+    ///     <see cref="NavigationFilterMode.Filter"/>: entities without associations are filtered out (pre-pagination).
+    ///     <see cref="NavigationFilterMode.Include"/>: entities without associations are kept with null values;
+    ///     navigation lookups run post-pagination for better performance on large result sets.
+    /// </summary>
+    /// <param name="mode">The navigation filter mode to use.</param>
+    public RtEntityQueryOptions UseNavigationFilterMode(NavigationFilterMode mode)
+    {
+        NavigationFilterMode = mode;
         return this;
     }
 }

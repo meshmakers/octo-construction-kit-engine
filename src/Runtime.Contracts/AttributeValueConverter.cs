@@ -72,12 +72,12 @@ public static class AttributeValueConverter
             case AttributeValueTypesDto.StringArray:
                 if (value is string[] stringArray)
                 {
-                    return stringArray.ToList();
+                    return stringArray.Select(s => s.Trim()).ToList();
                 }
-                
+
                 if (value is AttributeStringValueList stringList)
                 {
-                    return stringList.InnerList;
+                    return stringList.InnerList.Select(s => s.Trim()).ToList();
                 }
 
                 // This code is used for default value deserialization
@@ -87,21 +87,21 @@ public static class AttributeValueConverter
                     {
                         if (x is JsonElement jsonElementList)
                         {
-                            return jsonElementList.GetString();
+                            return jsonElementList.GetString()?.Trim();
                         }
 
-                        return Convert.ToString(x, CultureInfo.InvariantCulture);
+                        return Convert.ToString(x, CultureInfo.InvariantCulture)?.Trim();
                     }).ToList();
                 }
 
                 break;
             case AttributeValueTypesDto.String:
-                if (value is string)
+                if (value is string stringValue)
                 {
-                    return value;
+                    return stringValue.Trim();
                 }
 
-                return Convert.ToString(value, CultureInfo.InvariantCulture);
+                return Convert.ToString(value, CultureInfo.InvariantCulture)?.Trim();
             case AttributeValueTypesDto.Double:
                 if (value is double)
                 {

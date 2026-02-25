@@ -41,6 +41,9 @@ types:
         isOptional: true
       - id: ${this}/Query.CkTypeId
         name: QueryCkTypeId
+      - id: ${this}/Query.NavigationFilterMode
+        name: NavigationFilterMode
+        isOptional: true
   - typeId: SimpleRtQuery
     description: "Query type for retrieving rows/tuples from entities with support for column selection, sorting, and filtering."
     derivedFromCkTypeId: ${this}/PersistentQuery

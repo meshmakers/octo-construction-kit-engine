@@ -1,0 +1,11 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: NavigationFilterModes
+  description: Controls how navigation properties affect the result set.
+  values:
+  - key: 0
+    name: Filter
+    description: Entities without matching associations are filtered out (pre-pagination).
+  - key: 1
+    name: Include
+    description: Entities without matching associations are kept with null values (post-pagination).

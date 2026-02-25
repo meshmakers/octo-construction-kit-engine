@@ -54,6 +54,12 @@ attributes:
     description: "Defines a set of aggregation columns for the query, with its attribute path and aggregation type."
     valueType: RecordArray
     valueCkRecordId: ${this}/AggregationQueryColumn
+  - id: Query.NavigationFilterMode
+    description: "Controls how navigation properties affect the result set."
+    valueType: Enum
+    valueCkEnumId: ${this}/NavigationFilterModes
+    defaultValues:
+      - 0
   # This attribute is kept for backward compatibility
   # deprecated: true
   - id: Query.Types

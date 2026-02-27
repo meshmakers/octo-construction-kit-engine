@@ -125,7 +125,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.One)
                 {
                     var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, false,
-                        ignoredNavigations);
+                        new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>(ignoredNavigations));
                     foreach (var subColumn in subColumns)
                     {
                         var queryColumn = new CkTypeQueryColumn(

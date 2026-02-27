@@ -1,6 +1,11 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Tests.sampleData.systemFake;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.DependencyGraph;
 
@@ -75,5 +80,35 @@ public class CkTypeQueryColumnCollectorTests
             "MyRecord", "MyAttributeC", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"
         ], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
+    }
+
+    private static CkModelGraph BuildResolvedModelGraph(params CkCompiledModelRoot[] models)
+    {
+        CkModelGraph modelGraph = new();
+        foreach (var model in models)
+        {
+            modelGraph.AppendModel(model);
+        }
+
+        FixModelGraph(modelGraph);
+
+        var resolver = new InheritanceResolver(NullLogger<InheritanceResolver>.Instance);
+        var result = new OperationResult();
+        resolver.Resolve(modelGraph, new OriginFileResolver("TEST"), result);
+        return modelGraph;
+    }
+
+    [Fact]
+    public void MultiPath_BothPathsToSameTargetAreGenerated()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.multipath.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("MultiPath/Root");
+        var paths = result.Select(x => x.Path).ToList();
+
+        // Both paths through different intermediate types must reach Target's "name" attribute
+        Assert.Contains("linkA.multiPathMiddle1->linkC.multiPathTarget->name", paths);
+        Assert.Contains("linkB.multiPathMiddle2->linkC.multiPathTarget->name", paths);
     }
 }

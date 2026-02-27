@@ -68,6 +68,12 @@ public record RtEntityQueryOptions : FieldFilterCriteria
     public NavigationFilterMode NavigationFilterMode { get; private set; } = NavigationFilterMode.Filter;
 
     /// <summary>
+    ///     When set to <c>true</c>, the query result cache is bypassed for this query.
+    ///     This is useful for pipeline queries where underlying data may have changed between executions.
+    /// </summary>
+    public bool DisableCaching { get; private set; }
+
+    /// <summary>
     ///     Creates a new instance of <see cref="RtEntityQueryOptions" />.
     /// </summary>
     /// <param name="logicalOperator">The logical operator to use for combining field filters</param>
@@ -186,6 +192,15 @@ public record RtEntityQueryOptions : FieldFilterCriteria
     public RtEntityQueryOptions UseNavigationFilterMode(NavigationFilterMode mode)
     {
         NavigationFilterMode = mode;
+        return this;
+    }
+
+    /// <summary>
+    ///     Disables the query result cache for this query.
+    /// </summary>
+    public RtEntityQueryOptions WithCachingDisabled()
+    {
+        DisableCaching = true;
         return this;
     }
 }

@@ -164,10 +164,10 @@ public interface ICkModelGraph
     ///     Returns a list of all query column attribute paths for the given construction kit type
     /// </summary>
     /// <returns></returns>
-    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties);
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions? options = null);
 
     /// <summary>
     /// Returns a list of all query column attribute paths for the given runtime construction kit type
     /// </summary>
-    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties);
+    IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions? options = null);
 }

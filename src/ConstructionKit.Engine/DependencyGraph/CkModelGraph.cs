@@ -365,16 +365,16 @@ public class CkModelGraph : ICkModelGraph
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions? options = null)
     {
         var collector = new CkTypeQueryColumnCollector(this);
-        return collector.GetColumns(ckTypeId, ignoreNavigationProperties);
+        return collector.GetColumns(ckTypeId, options);
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions? options = null)
     {
         var collector = new CkTypeQueryColumnCollector(this);
-        return collector.GetColumnsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
+        return collector.GetColumnsByRtCkId(rtCkTypeId, options);
     }
 }

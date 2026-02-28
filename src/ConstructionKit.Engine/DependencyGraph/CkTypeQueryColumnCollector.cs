@@ -19,20 +19,20 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string SystemAttributeRtChangedDateTime = "RtChangedDateTime";
     private const string SystemAttributeCkTypeId = "CkTypeId";
 
-    public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
+    public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions? options = null)
     {
-        return GetColumns(ckTypeId, ignoreNavigationProperties,
-            []);
+        return GetColumns(ckTypeId, options ?? CkTypeQueryColumnOptions.Default,
+            [], 0);
     }
 
-    public List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties = false)
+    public List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions? options = null)
     {
-        return GetColumnsByRtCkId(rtCkTypeId, ignoreNavigationProperties,
-            []);
+        return GetColumnsByRtCkId(rtCkTypeId, options ?? CkTypeQueryColumnOptions.Default,
+            [], 0);
     }
 
-    private List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties,
-        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+    private List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions options,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations, int currentDepth)
     {
 
         if (!ckModelGraph.TypesByRtCk.TryGetValue(rtCkTypeId, out var ckTypeGraph))
@@ -40,11 +40,11 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             throw DependencyGraphException.RtCkTypeIdNotFound(rtCkTypeId);
         }
 
-        return GetColumns(ckTypeGraph, ignoreNavigationProperties, ignoredNavigations);
+        return GetColumns(ckTypeGraph, options, ignoredNavigations, currentDepth);
     }
 
-    private List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties,
-        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+    private List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions options,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations, int currentDepth)
     {
 
         if (!ckModelGraph.Types.TryGetValue(ckTypeId, out var ckTypeGraph))
@@ -52,18 +52,18 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             throw DependencyGraphException.CkTypeIdNotFound(ckTypeId);
         }
 
-        return GetColumns(ckTypeGraph, ignoreNavigationProperties, ignoredNavigations);
+        return GetColumns(ckTypeGraph, options, ignoredNavigations, currentDepth);
     }
 
-    private List<CkTypeQueryColumn> GetColumns(CkTypeGraph ckTypeGraph, bool ignoreNavigationProperties,
-        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+    private List<CkTypeQueryColumn> GetColumns(CkTypeGraph ckTypeGraph, CkTypeQueryColumnOptions options,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations, int currentDepth)
     {
         var columns = new List<CkTypeQueryColumn>();
 
         CollectTypeColumns(ckTypeGraph, columns);
-        if (!ignoreNavigationProperties)
+        if (!options.IgnoreNavigationProperties)
         {
-            CollectNavigationColumns(ckTypeGraph, columns, ignoredNavigations);
+            CollectNavigationColumns(ckTypeGraph, columns, ignoredNavigations, options, currentDepth);
         }
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(),
@@ -88,8 +88,14 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     }
 
     private void CollectNavigationColumns(CkTypeGraph typeGraph,
-        List<CkTypeQueryColumn> columns, HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations)
+        List<CkTypeQueryColumn> columns, HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations,
+        CkTypeQueryColumnOptions options, int currentDepth)
     {
+        if (options.MaxDepth.HasValue && currentDepth >= options.MaxDepth.Value)
+        {
+            return;
+        }
+
         foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.Out.All.GroupBy(x =>
                      x.NavigationPropertyName))
         {
@@ -124,8 +130,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 if (ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.ZeroOrOne ||
                     ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.One)
                 {
-                    var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, false,
-                        new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>(ignoredNavigations));
+                    var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, options with { IgnoreNavigationProperties = false },
+                        new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>(ignoredNavigations), currentDepth + 1);
                     foreach (var subColumn in subColumns)
                     {
                         var queryColumn = new CkTypeQueryColumn(
@@ -136,7 +142,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                                 new(ckTypeAssociationGraphGrouping.Key, PathType.Navigation),
                                 new(ckTypeAssociationDirectionTuple.CkTypeId.ToRtCkId().GetTypeName(), PathType.TargetCkTypeId),
                                 ..subColumn.AccessPathList
-                            ], subColumn.ValueType, subColumn.AssociationTuple);
+                            ], subColumn.ValueType, subColumn.AssociationTuple, subColumn.Description);
                         columns.Add(queryColumn);
                     }
                 }
@@ -155,6 +161,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
             var attributeNamePascalCase = attribute.AttributeName;
             var attributeNameCamelCase = attribute.AttributeName.ToCamelCase();
+            var description = attribute.Description;
 
             switch (attributeGraph.ValueType)
             {
@@ -175,7 +182,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     {
                         var l = c.AccessPathList.ToList();
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
-                        return new CkTypeQueryColumn(attributeNameCamelCase + Separator + c.Path, l, c.ValueType);
+                        return new CkTypeQueryColumn(attributeNameCamelCase + Separator + c.Path, l, c.ValueType,
+                            description: c.Description);
                     }));
                     break;
                 case AttributeValueTypesDto.RecordArray:
@@ -199,7 +207,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, FirstElement) + Separator + c.Path, l,
-                            true);
+                            true, c.Description);
                     }));
 
                     columns.AddRange(recordColumns.Select(c =>
@@ -209,7 +217,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
                         return new CkTypeQueryColumn(
                             attributeNameCamelCase + string.Format(Array, AllElements) + Separator + c.Path, l,
-                            true);
+                            true, c.Description);
                     }));
 
                     break;
@@ -219,11 +227,11 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     var l = new List<PathTerm>
                         { new(attributeNamePascalCase, PathType.Attribute), new(FirstElement, PathType.ArrayIndex) };
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, FirstElement), l,
-                        attributeGraph.ValueType));
+                        attributeGraph.ValueType, description: description));
 
                     l = [new(attributeNamePascalCase, PathType.Attribute), new(AllElements, PathType.ArrayIndex)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, AllElements), l,
-                        attributeGraph.ValueType));
+                        attributeGraph.ValueType, description: description));
                     break;
                 case AttributeValueTypesDto.Enum:
                     if (attributeGraph.ValueCkEnumId == null)
@@ -232,11 +240,13 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     }
 
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
-                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueCkEnumId));
+                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueCkEnumId,
+                        description));
                     break;
                 default:
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
-                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueType));
+                    columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueType,
+                        description: description));
                     break;
             }
         }

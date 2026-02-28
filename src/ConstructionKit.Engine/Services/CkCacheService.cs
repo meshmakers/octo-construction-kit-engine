@@ -368,24 +368,24 @@ public class CkCacheService : ICkCacheService
 
     /// <inheritdoc />
     public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(string tenantId, RtCkId<CkTypeId> rtCkTypeId,
-        bool ignoreNavigationProperties = false)
+        CkTypeQueryColumnOptions? options = null)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
 
-        return ckCache.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
+        return ckCache.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, options);
     }
 
     /// <inheritdoc />
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId, bool ignoreNavigationProperties = false)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(string tenantId, CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions? options = null)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
         {
             throw CkCacheException.CkCacheNotFound(tenantId);
         }
 
-        return ckCache.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
+        return ckCache.GetCkTypeQueryColumnPaths(ckTypeId, options);
     }
 }

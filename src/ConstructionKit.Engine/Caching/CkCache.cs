@@ -323,24 +323,24 @@ internal class CkCache : IDisposable
     }
 
     public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPaths(CkId<CkTypeId> ckTypeId,
-        bool ignoreNavigationProperties)
+        CkTypeQueryColumnOptions? options = null)
     {
         if (_modelGraph == null)
         {
             throw CkCacheException.CacheUnloaded(TenantId);
         }
 
-        return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId, ignoreNavigationProperties);
+        return _modelGraph.GetCkTypeQueryColumnPaths(ckTypeId, options);
     }
 
-    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, bool ignoreNavigationProperties)
+    public IReadOnlyCollection<CkTypeQueryColumn> GetCkTypeQueryColumnPathsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions? options = null)
     {
         if (_modelGraph == null)
         {
             throw CkCacheException.CacheUnloaded(TenantId);
         }
 
-        return _modelGraph.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, ignoreNavigationProperties);
+        return _modelGraph.GetCkTypeQueryColumnPathsByRtCkId(rtCkTypeId, options);
     }
 
     public CkTypeGraph GetRtCkType(RtCkId<CkTypeId> rtCkTypeId)

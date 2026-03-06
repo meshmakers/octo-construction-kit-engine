@@ -365,6 +365,145 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
 
     #endregion
 
+    #region Batch Delete Optimization Tests
+
+    [Fact]
+    public async Task ValidateAsync_DeleteMultipleEntities_BatchesAssociationLookup()
+    {
+        // Arrange — two entities being deleted, each with one association
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var entity1 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var entity2 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target1 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+        var target2 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+        var assoc1 = CreateAssociation(entity1, target1, SystemCkIds.RtCkParentChildRoleId);
+        var assoc2 = CreateAssociation(entity2, target2, SystemCkIds.RtCkParentChildRoleId);
+
+        // Mock the batch call — both entity IDs are passed together
+        A.CallTo(() =>
+                dataSource.GetRtAssociationsAsync(session,
+                    A<IEnumerable<RtEntityId>>._,
+                    A<RtAssociationExtendedQueryOptions>._))
+            .ReturnsLazily((IOctoSession _, IEnumerable<RtEntityId> ids, RtAssociationExtendedQueryOptions _) =>
+            {
+                var idList = ids.ToList();
+                var dict = new Dictionary<RtEntityId, ResultSet<RtAssociation>>();
+                foreach (var id in idList)
+                {
+                    if (id.Equals(entity1.ToRtEntityId()))
+                        dict[id] = new ResultSet<RtAssociation>([assoc1], 1, null, null);
+                    else if (id.Equals(entity2.ToRtEntityId()))
+                        dict[id] = new ResultSet<RtAssociation>([assoc2], 1, null, null);
+                    else
+                        dict[id] = new ResultSet<RtAssociation>([], 0, null, null);
+                }
+                return Task.FromResult<IMultipleOriginResultSet<RtAssociation>>(
+                    new AssociationMultipleOriginResultSet(dict));
+            });
+
+        // Act — delete both entities at once
+        var result = await engine.ValidateAsync(session, dataSource,
+            [
+                EntityUpdateInfo<RtEntity>.CreateDelete(entity1.ToRtEntityId()),
+                EntityUpdateInfo<RtEntity>.CreateDelete(entity2.ToRtEntityId())
+            ],
+            originFileResolver, operationResult);
+
+        // Assert — both associations should be scheduled for deletion
+        Assert.Equal(2, result.RtAssociationsToDelete.Count);
+        Assert.Contains(result.RtAssociationsToDelete, a => a.AssociationId == assoc1.AssociationId);
+        Assert.Contains(result.RtAssociationsToDelete, a => a.AssociationId == assoc2.AssociationId);
+
+        // Verify only ONE batch call was made, not two individual calls
+        A.CallTo(() =>
+                dataSource.GetRtAssociationsAsync(session,
+                    A<IEnumerable<RtEntityId>>._,
+                    A<RtAssociationExtendedQueryOptions>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DeleteMultipleAssociations_BatchesLookup()
+    {
+        // Arrange — two associations being deleted in batch
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin1 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target1 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+        var origin2 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target2 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+
+        SetupEntityRetrieval(dataSource, [origin1, target1, origin2, target2]);
+
+        var assoc1 = CreateAssociation(origin1, target1, SystemCkIds.RtCkParentChildRoleId);
+        var assoc2 = CreateAssociation(origin2, target2, SystemCkIds.RtCkParentChildRoleId);
+
+        // Mock the batch RtOriginTargetPair call
+        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._,
+                A<IEnumerable<RtOriginTargetPair>>._,
+                A<RtAssociationBaseQueryOptions>._))
+            .Returns(Task.FromResult<IReadOnlyList<RtAssociation>>([assoc1, assoc2]));
+
+        // Act
+        var result = await engine.ValidateAsync(session, dataSource,
+            [
+                EntityUpdateInfo<RtEntity>.CreateUpdate(origin1.ToRtEntityId(), origin1),
+                EntityUpdateInfo<RtEntity>.CreateUpdate(origin2.ToRtEntityId(), origin2)
+            ],
+            [
+                AssociationUpdateInfo.CreateDelete(origin1.ToRtEntityId(), target1.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId),
+                AssociationUpdateInfo.CreateDelete(origin2.ToRtEntityId(), target2.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId)
+            ],
+            originFileResolver, operationResult);
+
+        // Assert — both associations should be found and scheduled for deletion
+        Assert.Equal(2, result.RtAssociationsToDelete.Count);
+        Assert.False(operationResult.HasFatalErrors);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_DeleteMultipleAssociations_PartiallyMissing_ReportsErrors()
+    {
+        // Arrange — two delete requests, only one association exists
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin1 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target1 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+        var origin2 = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target2 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+
+        SetupEntityRetrieval(dataSource, [origin1, target1, origin2, target2]);
+
+        var assoc1 = CreateAssociation(origin1, target1, SystemCkIds.RtCkParentChildRoleId);
+
+        // Only assoc1 exists, assoc2 does not
+        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._,
+                A<IEnumerable<RtOriginTargetPair>>._,
+                A<RtAssociationBaseQueryOptions>._))
+            .Returns(Task.FromResult<IReadOnlyList<RtAssociation>>([assoc1]));
+
+        // Act
+        var result = await engine.ValidateAsync(session, dataSource,
+            [
+                EntityUpdateInfo<RtEntity>.CreateUpdate(origin1.ToRtEntityId(), origin1),
+                EntityUpdateInfo<RtEntity>.CreateUpdate(origin2.ToRtEntityId(), origin2)
+            ],
+            [
+                AssociationUpdateInfo.CreateDelete(origin1.ToRtEntityId(), target1.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId),
+                AssociationUpdateInfo.CreateDelete(origin2.ToRtEntityId(), target2.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId)
+            ],
+            originFileResolver, operationResult);
+
+        // Assert — one found, one error
+        Assert.Single(result.RtAssociationsToDelete);
+        Assert.Single(operationResult.Messages);
+        Assert.Equal(15, operationResult.Messages[0].MessageNumber); // AssociationDoesNotExist
+    }
+
+    #endregion
+
     #region Helper Methods
 
     private (GraphRuleEngine engine, IOctoSession session, IRepositoryDataSource dataSource,
@@ -453,6 +592,23 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         A.CallTo(() => dataSource.GetRtAssociationOrDefaultAsync(A<IOctoSession>._,
                 origin.ToRtEntityId(), target.ToRtEntityId(), roleId))
             .Returns(association);
+        A.CallTo(() => dataSource.GetRtAssociationsAsync(A<IOctoSession>._,
+                A<IEnumerable<RtOriginTargetPair>>._,
+                A<RtAssociationBaseQueryOptions>._))
+            .ReturnsLazily((IOctoSession _, IEnumerable<RtOriginTargetPair> pairs, RtAssociationBaseQueryOptions _) =>
+            {
+                var result = new List<RtAssociation>();
+                foreach (var pair in pairs)
+                {
+                    if (pair.Origin.Equals(origin.ToRtEntityId()) &&
+                        pair.Target.Equals(target.ToRtEntityId()) &&
+                        pair.AssociationRoleId.Equals(roleId))
+                    {
+                        result.Add(association);
+                    }
+                }
+                return Task.FromResult<IReadOnlyList<RtAssociation>>(result);
+            });
     }
 
     private static void SetupExistingAssociationInGetRtAssociationsAsync(IRepositoryDataSource dataSource,

@@ -322,4 +322,115 @@ public class RepositoryDataSourceAssociationTests(CacheServiceFixture fixture) :
     }
 
     #endregion
+
+    #region Batch Delete — GraphRuleEngine Optimization
+
+    [Fact]
+    public async Task ApplyChanges_DeleteMultipleIndependentEntitiesWithAssociations_AllArchived()
+    {
+        // Arrange — two independent pairs, delete both origins in a single batch
+        // This exercises the batched GetRtAssociationsAsync call in GraphRuleEngine.ValidateCkModel
+        var repository = await CreateRepositoryAsync();
+        var (origin1, target1) = await CreateAndLinkOceans(repository, "BatchDel_O1", "BatchDel_T1");
+        var (origin2, target2) = await CreateAndLinkOceans(repository, "BatchDel_O2", "BatchDel_T2");
+
+        // Act — delete both origins at once
+        List<EntityUpdateInfo<RtEntity>> deleteInfos =
+        [
+            EntityUpdateInfo<RtEntity>.CreateDelete(origin1.ToRtEntityId()),
+            EntityUpdateInfo<RtEntity>.CreateDelete(origin2.ToRtEntityId())
+        ];
+
+        OperationResult deleteResult = new();
+        var deleteOptions = new DeleteOptions { Strategy = DeleteStrategies.Archive };
+        await repository.ApplyChangesAsync(new LocalSession(), deleteInfos, [], deleteOptions, deleteResult);
+
+        // Assert — both origins archived
+        Assert.False(deleteResult.HasErrors);
+
+        var retrieved1 = await repository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), origin1.RtId);
+        var retrieved2 = await repository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), origin2.RtId);
+        Assert.NotNull(retrieved1);
+        Assert.NotNull(retrieved2);
+        Assert.Equal(RtState.Archived, retrieved1.RtState);
+        Assert.Equal(RtState.Archived, retrieved2.RtState);
+
+        // Targets should still exist and not be archived
+        var retrievedT1 = await repository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), target1.RtId);
+        var retrievedT2 = await repository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), target2.RtId);
+        Assert.NotNull(retrievedT1);
+        Assert.NotNull(retrievedT2);
+        Assert.NotEqual(RtState.Archived, retrievedT1.RtState);
+        Assert.NotEqual(RtState.Archived, retrievedT2.RtState);
+    }
+
+    [Fact]
+    public async Task ApplyChanges_DeleteAssociationExplicitly_AssociationRemoved()
+    {
+        // Arrange — tests the batched ValidateAssociationsToDelete path
+        var repository = await CreateRepositoryAsync();
+        var (origin, target) = await CreateAndLinkOceans(repository, "Origin_ExplDel", "Target_ExplDel");
+
+        // Act — explicitly delete the association
+        OperationResult deleteResult = new();
+        await repository.ApplyChangesAsync(new LocalSession(), [],
+        [
+            new AssociationUpdateInfo(
+                origin.ToRtEntityId(),
+                target.ToRtEntityId(),
+                SystemCkIds.RtCkRelatedRoleId,
+                AssociationModOptionsDto.Delete)
+        ], deleteResult);
+
+        // Assert — association should be gone
+        Assert.False(deleteResult.HasErrors);
+
+        var assocResult = await repository.GetRtAssociationsAsync(
+            new LocalSession(),
+            origin.ToRtEntityId(),
+            RtAssociationExtendedQueryOptions.Create(GraphDirections.Outbound));
+        Assert.Empty(assocResult.Items);
+    }
+
+    [Fact]
+    public async Task ApplyChanges_DeleteMultipleAssociationsExplicitly_AllRemoved()
+    {
+        // Arrange — two independent associations, both explicitly deleted in batch
+        var repository = await CreateRepositoryAsync();
+        var (origin1, target1) = await CreateAndLinkOceans(repository, "Origin_BatchDel1", "Target_BatchDel1");
+        var (origin2, target2) = await CreateAndLinkOceans(repository, "Origin_BatchDel2", "Target_BatchDel2");
+
+        // Act — delete both associations in a single ApplyChanges call
+        OperationResult deleteResult = new();
+        await repository.ApplyChangesAsync(new LocalSession(), [],
+        [
+            new AssociationUpdateInfo(
+                origin1.ToRtEntityId(),
+                target1.ToRtEntityId(),
+                SystemCkIds.RtCkRelatedRoleId,
+                AssociationModOptionsDto.Delete),
+            new AssociationUpdateInfo(
+                origin2.ToRtEntityId(),
+                target2.ToRtEntityId(),
+                SystemCkIds.RtCkRelatedRoleId,
+                AssociationModOptionsDto.Delete)
+        ], deleteResult);
+
+        // Assert — both associations should be removed
+        Assert.False(deleteResult.HasErrors);
+
+        var assocResult1 = await repository.GetRtAssociationsAsync(
+            new LocalSession(),
+            origin1.ToRtEntityId(),
+            RtAssociationExtendedQueryOptions.Create(GraphDirections.Outbound));
+        Assert.Empty(assocResult1.Items);
+
+        var assocResult2 = await repository.GetRtAssociationsAsync(
+            new LocalSession(),
+            origin2.ToRtEntityId(),
+            RtAssociationExtendedQueryOptions.Create(GraphDirections.Outbound));
+        Assert.Empty(assocResult2.Items);
+    }
+
+    #endregion
 }

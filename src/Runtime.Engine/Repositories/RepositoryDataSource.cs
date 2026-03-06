@@ -61,27 +61,35 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         var relatedRtCkTypeId = options.RelatedRtCkTypeId;
         var relatedRtId = options.RelatedRtId;
 
+        // Group entity IDs by CkTypeId to generate efficient $in queries instead of $anyElementTrue/$map.
+        // This allows MongoDB to use indexes on (targetCkTypeId, targetRtId) and (originCkTypeId, originRtId).
+        var entityGroups = rtEntityIds.GroupBy(e => e.CkTypeId).ToList();
+
         if (options.Direction == GraphDirections.Any ||
             options.Direction == GraphDirections.Inbound)
         {
-            foreach (var rtAssociation in queryable.Where(x =>
-                             (includeArchived || x.RtState != RtState.Archived) &&
-                             (roleId == null || x.AssociationRoleId == roleId) &&
-                             (relatedRtCkTypeId == null || x.OriginCkTypeId == relatedRtCkTypeId) &&
-                             (relatedRtId == null || x.OriginRtId == relatedRtId) &&
-                             rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.TargetRtId &&
-                                                           rtEntityId.CkTypeId == x.TargetCkTypeId
-                             )))
+            foreach (var group in entityGroups)
             {
-                // Add the association to the dictionary if it does not already exist
-                var rtEntityId = new RtEntityId(rtAssociation.TargetCkTypeId, rtAssociation.TargetRtId);
-                if (!associations.ContainsKey(rtEntityId))
+                var groupCkTypeId = group.Key;
+                var groupRtIds = group.Select(e => e.RtId).ToList();
+
+                foreach (var rtAssociation in queryable.Where(x =>
+                                 (includeArchived || x.RtState != RtState.Archived) &&
+                                 (roleId == null || x.AssociationRoleId == roleId) &&
+                                 (relatedRtCkTypeId == null || x.OriginCkTypeId == relatedRtCkTypeId) &&
+                                 (relatedRtId == null || x.OriginRtId == relatedRtId) &&
+                                 x.TargetCkTypeId == groupCkTypeId &&
+                                 groupRtIds.Contains(x.TargetRtId)))
                 {
-                    associations.Add(rtEntityId, [rtAssociation]);
-                }
-                else
-                {
-                    associations[rtEntityId].Add(rtAssociation);
+                    var rtEntityId = new RtEntityId(rtAssociation.TargetCkTypeId, rtAssociation.TargetRtId);
+                    if (!associations.ContainsKey(rtEntityId))
+                    {
+                        associations.Add(rtEntityId, [rtAssociation]);
+                    }
+                    else
+                    {
+                        associations[rtEntityId].Add(rtAssociation);
+                    }
                 }
             }
         }
@@ -89,24 +97,28 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
         if (options.Direction == GraphDirections.Any ||
             options.Direction == GraphDirections.Outbound)
         {
-            foreach (var rtAssociation in queryable.Where(x =>
-                         (includeArchived || x.RtState != RtState.Archived) &&
-                         (roleId == null || x.AssociationRoleId == roleId) &&
-                         (relatedRtCkTypeId == null || x.TargetCkTypeId == relatedRtCkTypeId) &&
-                         (relatedRtId == null || x.TargetRtId == relatedRtId) &&
-                         rtEntityIds.Any(rtEntityId => rtEntityId.RtId == x.OriginRtId &&
-                                                       rtEntityId.CkTypeId == x.OriginCkTypeId
-                         )))
+            foreach (var group in entityGroups)
             {
-                // Add the association to the dictionary if it does not already exist
-                var rtEntityId = new RtEntityId(rtAssociation.OriginCkTypeId, rtAssociation.OriginRtId);
-                if (!associations.ContainsKey(rtEntityId))
+                var groupCkTypeId = group.Key;
+                var groupRtIds = group.Select(e => e.RtId).ToList();
+
+                foreach (var rtAssociation in queryable.Where(x =>
+                             (includeArchived || x.RtState != RtState.Archived) &&
+                             (roleId == null || x.AssociationRoleId == roleId) &&
+                             (relatedRtCkTypeId == null || x.TargetCkTypeId == relatedRtCkTypeId) &&
+                             (relatedRtId == null || x.TargetRtId == relatedRtId) &&
+                             x.OriginCkTypeId == groupCkTypeId &&
+                             groupRtIds.Contains(x.OriginRtId)))
                 {
-                    associations.Add(rtEntityId, [rtAssociation]);
-                }
-                else
-                {
-                    associations[rtEntityId].Add(rtAssociation);
+                    var rtEntityId = new RtEntityId(rtAssociation.OriginCkTypeId, rtAssociation.OriginRtId);
+                    if (!associations.ContainsKey(rtEntityId))
+                    {
+                        associations.Add(rtEntityId, [rtAssociation]);
+                    }
+                    else
+                    {
+                        associations[rtEntityId].Add(rtAssociation);
+                    }
                 }
             }
         }

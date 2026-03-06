@@ -168,13 +168,15 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
-        foreach (var targetEntity in targetEntities.AsParallel())
+        // Note: .AsParallel() intentionally removed — these loops operate on in-memory data only,
+        // and .AsParallel() adds thread pool overhead without benefit for non-CPU-bound work.
+        foreach (var targetEntity in targetEntities)
         {
             var targetCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, targetEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Target == targetEntity.Key)
-                         .GroupBy(a => a.RoleId).AsParallel())
+                         .GroupBy(a => a.RoleId))
             {
                 var inboundTypeAssociationGraphs =
                     targetCkTypeGraph.Associations.In.All.Where(a =>
@@ -283,13 +285,13 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
-        foreach (var originEntity in originEntities.AsParallel())
+        foreach (var originEntity in originEntities)
         {
             var originCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, originEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Origin == originEntity.Key)
-                         .GroupBy(a => a.RoleId).AsParallel())
+                         .GroupBy(a => a.RoleId))
             {
                 var outboundTypeAssociationGraphs =
                     originCkTypeGraph.Associations.Out.All

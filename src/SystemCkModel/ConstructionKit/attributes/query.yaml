@@ -73,14 +73,8 @@ attributes:
     description: "Default end of the time window for the stream data query."
     valueType: DateTime
   - id: StreamDataQuery.Limit
-    description: "Maximum number of rows or downsampling points to return."
+    description: "Maximum number of rows to return."
     valueType: Int
-  - id: StreamDataQuery.QueryMode
-    description: "Execution mode: Default (raw values) or Downsampling."
-    valueType: Enum
-    valueCkEnumId: ${this}/StreamDataQueryModes
-    defaultValues:
-      - 0
   # This attribute is kept for backward compatibility
   # deprecated: true
   - id: Query.Types

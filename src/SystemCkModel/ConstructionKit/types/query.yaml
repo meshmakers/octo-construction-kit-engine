@@ -120,9 +120,6 @@ types:
       - id: ${this}/StreamDataQuery.Limit
         name: Limit
         isOptional: true
-      - id: ${this}/StreamDataQuery.QueryMode
-        name: QueryMode
-        isOptional: true
       - id: ${this}/Query.Sorting
         name: Sorting
         isOptional: true

@@ -60,6 +60,27 @@ attributes:
     valueCkEnumId: ${this}/NavigationFilterModes
     defaultValues:
       - 0
+  - id: StreamDataQuery.Columns
+    description: "Array of isDataStream attribute names to include as CrateDB data columns."
+    valueType: StringArray
+  - id: StreamDataQuery.RtIds
+    description: "Optional list of runtime entity IDs to scope the stream data query."
+    valueType: StringArray
+  - id: StreamDataQuery.From
+    description: "Default start of the time window for the stream data query."
+    valueType: DateTime
+  - id: StreamDataQuery.To
+    description: "Default end of the time window for the stream data query."
+    valueType: DateTime
+  - id: StreamDataQuery.Limit
+    description: "Maximum number of rows or downsampling points to return."
+    valueType: Int
+  - id: StreamDataQuery.QueryMode
+    description: "Execution mode: Default (raw values) or Downsampling."
+    valueType: Enum
+    valueCkEnumId: ${this}/StreamDataQueryModes
+    defaultValues:
+      - 0
   # This attribute is kept for backward compatibility
   # deprecated: true
   - id: Query.Types

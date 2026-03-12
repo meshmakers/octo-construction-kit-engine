@@ -1,0 +1,11 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: StreamDataQueryModes
+  description: "Defines the execution mode for a stream data query."
+  values:
+  - key: 0
+    name: Default
+    description: Returns raw values in the requested time range.
+  - key: 1
+    name: Downsampling
+    description: Downsamples the values to the requested number of points.

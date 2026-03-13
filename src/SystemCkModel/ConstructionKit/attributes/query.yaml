@@ -67,10 +67,10 @@ attributes:
     description: "Optional list of runtime entity IDs to scope the stream data query."
     valueType: StringArray
   - id: StreamDataQuery.From
-    description: "Default start of the time window for the stream data query."
+    description: "Start of the time window for the stream data query. Can be overridden at execution time."
     valueType: DateTime
   - id: StreamDataQuery.To
-    description: "Default end of the time window for the stream data query."
+    description: "End of the time window for the stream data query. Can be overridden at execution time."
     valueType: DateTime
   - id: StreamDataQuery.Limit
     description: "Maximum number of rows to return."

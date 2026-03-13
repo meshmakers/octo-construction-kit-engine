@@ -101,7 +101,7 @@ types:
         name: AttributeSearchFilter
         isOptional: true
   - typeId: StreamDataSimpleQuery
-    description: "Persistent query that retrieves time-series stream data from CrateDB for a given CK type with optional RtId scope, time filtering, and field filters."
+    description: "Persistent query that retrieves time-series stream data from CrateDB for a given CK type with optional RtIds scope, time filtering, and field filters."
     derivedFromCkTypeId: ${this}/PersistentQuery
     isFinal: false
     isAbstract: false

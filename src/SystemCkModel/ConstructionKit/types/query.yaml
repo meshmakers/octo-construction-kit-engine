@@ -126,3 +126,51 @@ types:
       - id: ${this}/Query.FieldFilter
         name: FieldFilter
         isOptional: true
+  - typeId: StreamDataAggregationQuery
+    description: "Persistent query that performs aggregation operations (Count, Min, Max, Avg, Sum) on time-series stream data from CrateDB without grouping."
+    derivedFromCkTypeId: ${this}/PersistentQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/AggregationQueryColumns
+        name: Columns
+      - id: ${this}/StreamDataQuery.RtIds
+        name: RtIds
+        isOptional: true
+      - id: ${this}/StreamDataQuery.From
+        name: From
+        isOptional: true
+      - id: ${this}/StreamDataQuery.To
+        name: To
+        isOptional: true
+      - id: ${this}/StreamDataQuery.Limit
+        name: Limit
+        isOptional: true
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true
+  - typeId: StreamDataGroupingAggregationQuery
+    description: "Persistent query that performs grouped aggregation operations with GROUP BY functionality on time-series stream data from CrateDB."
+    derivedFromCkTypeId: ${this}/PersistentQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/Query.GroupByColumns
+        name: GroupingColumns
+      - id: ${this}/AggregationQueryColumns
+        name: Columns
+      - id: ${this}/StreamDataQuery.RtIds
+        name: RtIds
+        isOptional: true
+      - id: ${this}/StreamDataQuery.From
+        name: From
+        isOptional: true
+      - id: ${this}/StreamDataQuery.To
+        name: To
+        isOptional: true
+      - id: ${this}/StreamDataQuery.Limit
+        name: Limit
+        isOptional: true
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true

@@ -100,3 +100,29 @@ types:
       - id: ${this}/Query.AttributeSearchFilter
         name: AttributeSearchFilter
         isOptional: true
+  - typeId: StreamDataSimpleQuery
+    description: "Persistent query that retrieves time-series stream data from CrateDB for a given CK type with optional RtIds scope, time filtering, and field filters."
+    derivedFromCkTypeId: ${this}/PersistentQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/StreamDataQuery.Columns
+        name: Columns
+      - id: ${this}/StreamDataQuery.RtIds
+        name: RtIds
+        isOptional: true
+      - id: ${this}/StreamDataQuery.From
+        name: From
+        isOptional: true
+      - id: ${this}/StreamDataQuery.To
+        name: To
+        isOptional: true
+      - id: ${this}/StreamDataQuery.Limit
+        name: Limit
+        isOptional: true
+      - id: ${this}/Query.Sorting
+        name: Sorting
+        isOptional: true
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true

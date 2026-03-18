@@ -109,8 +109,7 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             .ConfigureAwait(false);
 
         // Ensure that all mandatory associations with multiplicity of One exist when creating an entity
-        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert)
-                     .AsParallel())
+        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Insert))
         {
             var ckTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, entityUpdateInfo.CkTypeId);
 
@@ -132,17 +131,23 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
             }
         }
 
-        // Delete all corresponding associations if an entity is deleted  
-        foreach (var entityUpdateInfo in entityUpdateInfoList.Where(x => x.ModOption == EntityModOptions.Delete)
-                     .AsParallel())
+        // Delete all corresponding associations if an entity is deleted — batch query all delete entities at once
+        var deleteEntityIds = entityUpdateInfoList
+            .Where(x => x.ModOption == EntityModOptions.Delete)
+            .Select(x => new RtEntityId(x.CkTypeId,
+                x.RtId ?? throw PersistenceException.RtIdNotSet()))
+            .ToList();
+
+        if (deleteEntityIds.Count > 0)
         {
-            var rtEntityId = new RtEntityId(entityUpdateInfo.CkTypeId,
-                entityUpdateInfo.RtId ?? throw PersistenceException.RtIdNotSet());
             var result = await repositoryDataSource.GetRtAssociationsAsync(session,
-                [rtEntityId], RtAssociationExtendedQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
-            if (result.TryGetValue(rtEntityId, out var value))
+                deleteEntityIds, RtAssociationExtendedQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
+            foreach (var rtEntityId in deleteEntityIds)
             {
-                graphRuleEngineResult.RtAssociationsToDelete.AddRange(value.Items);
+                if (result.TryGetValue(rtEntityId, out var value))
+                {
+                    graphRuleEngineResult.RtAssociationsToDelete.AddRange(value.Items);
+                }
             }
         }
     }
@@ -163,13 +168,15 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
-        foreach (var targetEntity in targetEntities.AsParallel())
+        // Note: .AsParallel() intentionally removed — these loops operate on in-memory data only,
+        // and .AsParallel() adds thread pool overhead without benefit for non-CPU-bound work.
+        foreach (var targetEntity in targetEntities)
         {
             var targetCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, targetEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Target == targetEntity.Key)
-                         .GroupBy(a => a.RoleId).AsParallel())
+                         .GroupBy(a => a.RoleId))
             {
                 var inboundTypeAssociationGraphs =
                     targetCkTypeGraph.Associations.In.All.Where(a =>
@@ -278,13 +285,13 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                 new Tuple<RtEntityId, RtCkId<CkAssociationRoleId>>(a.Pair.RtEntityId, a.Pair.CkRoleId),
             v => v.CurrentMultiplicity);
 
-        foreach (var originEntity in originEntities.AsParallel())
+        foreach (var originEntity in originEntities)
         {
             var originCkTypeGraph = ckCache.GetRtCkType(repositoryDataSource.TenantId, originEntity.Key.CkTypeId);
 
             foreach (var associationUpdateInfosByRoleId in associationUpdateInfoList
                          .Where(a => a.Origin == originEntity.Key)
-                         .GroupBy(a => a.RoleId).AsParallel())
+                         .GroupBy(a => a.RoleId))
             {
                 var outboundTypeAssociationGraphs =
                     originCkTypeGraph.Associations.Out.All
@@ -383,25 +390,46 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
         IEnumerable<AssociationUpdateInfo> deleteAssociations, GraphRuleEngineResult graphRuleEngineResult,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
-        foreach (var d in deleteAssociations)
+        var deleteList = deleteAssociations.ToList();
+        if (deleteList.Count == 0)
         {
-            var origin = d.Origin;
-            var target = d.Target;
+            return;
+        }
 
-            var rtAssociation = await repositoryDataSource.GetRtAssociationOrDefaultAsync(session,
-                origin,
-                target,
-                d.RoleId).ConfigureAwait(false);
-            if (rtAssociation == null)
+        // Batch lookup: fetch all associations to delete in a single query
+        var pairs = deleteList
+            .Select(d => new RtOriginTargetPair(d.Origin, d.Target, d.RoleId))
+            .ToList();
+        var foundAssociations = await repositoryDataSource.GetRtAssociationsAsync(session, pairs,
+            RtAssociationBaseQueryOptions.Create(GraphDirections.Any)).ConfigureAwait(false);
+
+        // Build lookup for matching results back to requests
+        var foundLookup = new Dictionary<(RtEntityId Origin, RtEntityId Target, RtCkId<CkAssociationRoleId>? RoleId), RtAssociation>();
+        foreach (var a in foundAssociations)
+        {
+            var key = (new RtEntityId(a.OriginCkTypeId, a.OriginRtId),
+                new RtEntityId(a.TargetCkTypeId, a.TargetRtId),
+                a.AssociationRoleId);
+            if (!foundLookup.ContainsKey(key))
+            {
+                foundLookup[key] = a;
+            }
+        }
+
+        foreach (var d in deleteList)
+        {
+            var key = (d.Origin, d.Target, d.RoleId);
+            if (foundLookup.TryGetValue(key, out var rtAssociation))
+            {
+                graphRuleEngineResult.RtAssociationsToDelete.Add(rtAssociation);
+            }
+            else
             {
                 operationResult.AddMessage(MessageCodes.AssociationDoesNotExist(
                     originFileResolver.Resolve(repositoryDataSource.TenantId),
                     repositoryDataSource.TenantId, d.RoleId,
-                    origin.CkTypeId, origin.RtId, target.CkTypeId, target.RtId));
-                continue;
+                    d.Origin.CkTypeId, d.Origin.RtId, d.Target.CkTypeId, d.Target.RtId));
             }
-
-            graphRuleEngineResult.RtAssociationsToDelete.Add(rtAssociation);
         }
     }
 

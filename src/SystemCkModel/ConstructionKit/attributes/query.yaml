@@ -60,6 +60,21 @@ attributes:
     valueCkEnumId: ${this}/NavigationFilterModes
     defaultValues:
       - 0
+  - id: StreamDataQuery.Columns
+    description: "Array of isDataStream attribute names to include as CrateDB data columns."
+    valueType: StringArray
+  - id: StreamDataQuery.RtIds
+    description: "Optional list of runtime entity IDs to scope the stream data query."
+    valueType: StringArray
+  - id: StreamDataQuery.From
+    description: "Start of the time window for the stream data query. Can be overridden at execution time."
+    valueType: DateTime
+  - id: StreamDataQuery.To
+    description: "End of the time window for the stream data query. Can be overridden at execution time."
+    valueType: DateTime
+  - id: StreamDataQuery.Limit
+    description: "Maximum number of rows to return."
+    valueType: Int
   # This attribute is kept for backward compatibility
   # deprecated: true
   - id: Query.Types

@@ -44,13 +44,14 @@ public static class RtPathEvaluator
     }
 
     private const string PatternString =
-        @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->]+)(?=\.[^.\[\]\->]+->)  
-          | \.(?<targetCkTypeId>[^.\[\]\->]+)(?=->)                                          
-          | \[(?<arrayIndex>-?\d+|\*)\]                                                    
-          | (?:(?<=^)|(?<=\.|->))(?<property>[^.\[\]\->]+)(?!->)";
+        @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->:]+)(?=\.[^.\[\]\->:]+(?:->|::))
+          | \.(?<targetCkTypeId>[^.\[\]\->:]+)(?=->|::)
+          | ::(?<associationMeta>[^.\[\]\->:]+)
+          | \[(?<arrayIndex>-?\d+|\*)\]
+          | (?:(?<=^)|(?<=\.|->))(?<property>[^.\[\]\->:]+)(?!->|::)";
 
     private const string MatchPatternString =
-        @"^(?:[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)(?:(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)|(?:\.[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->]+(?:\[(?:-?\d+|\*)\])*)*$";
+        @"^(?:[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)(?:(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)::(?:[^.\[\]\->:]+))*$";
 
     // This regex is used to parse a path expression in the form of "property1.property2.property3[0]"
     // or "property1->property2.property3" or "property1[0].property2.property3"
@@ -83,7 +84,14 @@ public static class RtPathEvaluator
         {
             if (lastPathType != null)
             {
-                sb.Append(lastPathType != PathType.TargetCkTypeId ? "." : "->");
+                if (pathTerm.Type == PathType.AssociationMeta)
+                {
+                    sb.Append("::");
+                }
+                else
+                {
+                    sb.Append(lastPathType != PathType.TargetCkTypeId ? "." : "->");
+                }
             }
 
             switch (pathTerm.Type)
@@ -141,6 +149,11 @@ public static class RtPathEvaluator
             {
                 tokens.Add(new PathTerm(match.Groups["targetCkTypeId"].Value.ToCamelCase(),
                     PathType.TargetCkTypeId));
+            }
+            else if (match.Groups["associationMeta"].Success)
+            {
+                tokens.Add(new PathTerm(match.Groups["associationMeta"].Value,
+                    PathType.AssociationMeta));
             }
             // Otherwise, we check if the arrayIndex group was successful.
             else if (match.Groups["arrayIndex"].Success)
@@ -300,6 +313,98 @@ public static class RtPathEvaluator
     }
 
     /// <summary>
+    /// Tokenizes a list of paths and field filters into navigation pairs.
+    /// Association meta field filters (paths containing ::) are extracted from <paramref name="fieldFilters"/>,
+    /// their paths are tokenized into navigation pairs, and the filter operator/value is applied
+    /// as <see cref="AssociationCountFilter"/> on the resulting <see cref="NavigationPair"/>.
+    /// </summary>
+    /// <param name="ckCacheService">The cache service</param>
+    /// <param name="tenantId">Tenant id</param>
+    /// <param name="rtCkTypeId">Runtime construction kit type id the association belongs to</param>
+    /// <param name="paths">List of column paths to be evaluated</param>
+    /// <param name="fieldFilters">Mutable list of field filters. Association meta filters (::) are removed from
+    /// this list after processing and applied as AssociationCountFilter on the navigation pairs.</param>
+    /// <returns>A list of navigation pairs including those from association meta filters</returns>
+    public static List<NavigationPair> TokenizeAndGetNavigationPairsByRtCkId(ICkCacheService ckCacheService, string tenantId,
+        RtCkId<CkTypeId> rtCkTypeId,
+        IEnumerable<string> paths,
+        ICollection<FieldFilter> fieldFilters)
+    {
+        // Extract association meta filters (::) from field filters
+        var associationMetaFilters = fieldFilters.Where(ff => ff.AttributePath.Contains("::")).ToList();
+        foreach (var filter in associationMetaFilters)
+        {
+            fieldFilters.Remove(filter);
+        }
+
+        // Tokenize column paths and regular field filter paths together
+        var regularFieldFilterPaths = fieldFilters.Select(ff => ff.AttributePath);
+        var associationMetaPaths = associationMetaFilters.Select(ff => ff.AttributePath);
+        var allPaths = paths.Concat(regularFieldFilterPaths).Concat(associationMetaPaths);
+
+        var ckTypeGraph = ckCacheService.GetRtCkType(tenantId, rtCkTypeId);
+        var navigationPairs = TokenizeAndGetNavigationPairs(ckCacheService, tenantId, ckTypeGraph.CkTypeId, allPaths);
+
+        // Override default AssociationCountFilter with actual field filter values
+        foreach (var filter in associationMetaFilters)
+        {
+            var navPair = navigationPairs.FirstOrDefault(np => np.AssociationCountFilter != null &&
+                filter.AttributePath.StartsWith(
+                    np.PathTerms.First(p => p.Type == PathType.Navigation).Value.ToCamelCase() + "."));
+
+            Console.WriteLine($"[RtPathEvaluator Override] filter={filter.AttributePath}, navPairFound={navPair != null}, " +
+                              $"navPairs={navigationPairs.Count}, withCountFilter={navigationPairs.Count(np => np.AssociationCountFilter != null)}");
+            if (navPair != null)
+            {
+                Console.WriteLine($"[RtPathEvaluator Override] BEFORE: {navPair.AssociationCountFilter?.Operator} {navPair.AssociationCountFilter?.ComparisonValue}");
+            }
+            else
+            {
+                foreach (var np in navigationPairs)
+                {
+                    var hasNav = np.PathTerms.Any(p => p.Type == PathType.Navigation);
+                    var navVal = hasNav ? np.PathTerms.First(p => p.Type == PathType.Navigation).Value : "NONE";
+                    Console.WriteLine($"[RtPathEvaluator Override] navPair: nav={navVal}, countFilter={np.AssociationCountFilter != null}, dir={np.Direction}");
+                }
+            }
+
+            if (navPair == null) continue;
+
+            if (filter.AttributePath.EndsWith("exists"))
+            {
+                bool wantsExists;
+                try
+                {
+                    wantsExists = Convert.ToBoolean(filter.ComparisonValue);
+                }
+                catch
+                {
+                    wantsExists = bool.TryParse(filter.ComparisonValue?.ToString(), out var parsed) && parsed;
+                }
+
+                navPair.AssociationCountFilter = filter.Operator switch
+                {
+                    FieldFilterOperator.Equals => wantsExists
+                        ? new AssociationCountFilter(FieldFilterOperator.GreaterEqualThan, 1)
+                        : new AssociationCountFilter(FieldFilterOperator.Equals, 0),
+                    FieldFilterOperator.NotEquals => wantsExists
+                        ? new AssociationCountFilter(FieldFilterOperator.Equals, 0)
+                        : new AssociationCountFilter(FieldFilterOperator.GreaterEqualThan, 1),
+                    _ => navPair.AssociationCountFilter
+                };
+            }
+            else // totalCount
+            {
+                navPair.AssociationCountFilter = new AssociationCountFilter(
+                    (FieldFilterOperator)(int)filter.Operator,
+                    Convert.ToInt32(filter.ComparisonValue));
+            }
+        }
+
+        return navigationPairs;
+    }
+
+    /// <summary>
     /// Tokenizes a list of paths into a list of traversal navigation pairs
     /// </summary>
     /// <param name="ckCacheService">The cache service</param>
@@ -455,6 +560,19 @@ public static class RtPathEvaluator
             }
 
             navigationPair ??= currentNavigationPair;
+        }
+
+        // If the path contains an AssociationMeta token (e.g., ::totalCount or ::exists),
+        // mark the navigation pair so it will be used for enrichment (loading association counts).
+        // Do NOT set a count filter here — filters are only applied from explicit FieldFilters
+        // in the TokenizeAndGetNavigationPairsByRtCkId overload that accepts fieldFilters.
+        // Setting a default filter here would create separate pipeline stages for each column path.
+        var metaToken = tokens.LastOrDefault(t => t.Type == PathType.AssociationMeta);
+        if (metaToken != null && navigationPair != null && navigationPair.AssociationCountFilter == null)
+        {
+            // Mark as association meta navigation with a permissive default (count >= 0 = include all).
+            // This ensures the navigation pair triggers enrichment without filtering.
+            navigationPair.AssociationCountFilter = new AssociationCountFilter(FieldFilterOperator.GreaterEqualThan, 0);
         }
 
         return navigationPair;

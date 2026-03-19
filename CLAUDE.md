@@ -104,6 +104,47 @@ When modifying CK models:
 3. After changes, recompile the model using the compiler
 4. Generated code will be created based on the model definitions
 
+## N:M Association Query Columns
+
+N:M (many-to-many) associations are exposed as query columns with `totalCount` and `exists` meta-properties. These allow listing and filtering entities based on whether associations exist and how many there are.
+
+### Path Syntax
+```
+navigationPropertyName.targetTypeName::totalCount    → INTEGER_64 (count of associations)
+navigationPropertyName.targetTypeName::exists        → BOOLEAN (true if count > 0)
+```
+
+The `::` separator distinguishes association meta-properties from regular attribute navigation (`->`). This avoids collisions with actual attributes named `totalCount` or `exists` on the target type.
+
+### Key Components
+- **CkTypeQueryColumnCollector** (`ConstructionKit.Engine/DependencyGraph/`): Generates `totalCount` and `exists` columns for both outbound and inbound N:M associations. One column per navigation property grouping (not per derived type).
+- **AssociationCountFilter** (`Runtime.Contracts/Repositories/Query/`): Record type that carries count filter operator and comparison value on a `NavigationPair`.
+- **NavigationPair.AssociationCountFilter**: When set, the MongoDB layer generates a count-based aggregation pipeline instead of the standard existence check.
+
+### MongoDB Pipeline
+When `AssociationCountFilter` is set on a `NavigationPair`, `SingleOriginRtQuery.CreateAssociationCountNavigation` generates:
+1. `$lookup` on the associations collection (matching by role ID and target type)
+2. `$addFields` to compute `$size` of the lookup result
+3. `$match` to filter by the count comparison (e.g., `>= 1` for exists)
+4. `$project` to clean up temporary fields
+
+### Usage in GraphQL
+```graphql
+# Filter by existence
+fieldFilter: [{
+  attributePath: "documents.bankTransaction::exists"
+  operator: EQUALS
+  comparisonValue: true
+}]
+
+# Filter by count
+fieldFilter: [{
+  attributePath: "documents.bankTransaction::totalCount"
+  operator: GREATER_THAN
+  comparisonValue: 3
+}]
+```
+
 ## Repository Structure
 
 ```

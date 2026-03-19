@@ -24,4 +24,10 @@ public enum PathType
     /// Access to a target construction kit type id
     /// </summary>
     TargetCkTypeId = 3,
+
+    /// <summary>
+    /// Access to an association meta property (e.g., totalCount, exists).
+    /// Used with the :: separator in path syntax.
+    /// </summary>
+    AssociationMeta = 4,
 }

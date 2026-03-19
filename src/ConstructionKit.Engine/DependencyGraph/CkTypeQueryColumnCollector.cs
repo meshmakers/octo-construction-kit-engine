@@ -12,6 +12,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string AllElements = "*";
     private const string Separator = ".";
     private const string NavigationSeparator = "->";
+    private const string AssociationMetaSeparator = "::";
     private const string SystemAttributeRtId = "RtId";
     private const string SystemAttributeRtWellKnownName = "RtWellKnownName";
     private const string SystemAttributeRtVersion = "RtVersion";
@@ -125,6 +126,9 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 continue; // All Ck types are abstract for that association
             }
 
+            // For N:M associations, create totalCount and exists columns per navigation property grouping
+            CollectNtoMColumns(ckTypeAssociationGraphGrouping.Key, ckTypeAssociationDirectionTuples, columns);
+
             foreach (var ckTypeAssociationDirectionTuple in ckTypeAssociationDirectionTuples)
             {
                 if (ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.ZeroOrOne ||
@@ -148,6 +152,62 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 }
             }
         }
+
+        // Also collect N:M columns for inbound associations
+        foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.In.All.GroupBy(x =>
+                     x.NavigationPropertyName))
+        {
+            var ckTypeAssociationDirectionTuples = new List<CkTypeAssociationTuple>();
+            foreach (var typeAssociationGraph in ckTypeAssociationGraphGrouping)
+            {
+                if (!ckModelGraph.Types.TryGetValue(typeAssociationGraph.TargetCkTypeId, out var ckType))
+                {
+                    throw DependencyGraphException.CkTypeIdNotFound(typeAssociationGraph.TargetCkTypeId);
+                }
+
+                ckTypeAssociationDirectionTuples.AddRange(ckType.GetAllDerivedTypes(true)
+                    .Select(t =>
+                        new CkTypeAssociationTuple(t, typeAssociationGraph.CkRoleId,
+                            typeAssociationGraph.Multiplicity)));
+            }
+
+            if (!ckTypeAssociationDirectionTuples.Any())
+            {
+                continue;
+            }
+
+            CollectNtoMColumns(ckTypeAssociationGraphGrouping.Key, ckTypeAssociationDirectionTuples, columns);
+        }
+    }
+
+    private void CollectNtoMColumns(string navigationPropertyName,
+        List<CkTypeAssociationTuple> tuples, List<CkTypeQueryColumn> columns)
+    {
+        var firstNtoM = tuples.FirstOrDefault(t => t.Multiplicity == MultiplicitiesDto.N);
+        if (firstNtoM == null)
+        {
+            return;
+        }
+
+        var targetTypeName = firstNtoM.CkTypeId.ToRtCkId().GetTypeName();
+        var navNameCamel = navigationPropertyName.ToCamelCase();
+        var pathPrefix = navNameCamel + Separator + targetTypeName + AssociationMetaSeparator;
+
+        // totalCount column
+        columns.Add(new CkTypeQueryColumn(
+            pathPrefix + "totalCount",
+            [
+                new(navigationPropertyName, PathType.Navigation),
+                new(targetTypeName, PathType.TargetCkTypeId),
+            ], AttributeValueTypesDto.Int64, firstNtoM));
+
+        // exists column
+        columns.Add(new CkTypeQueryColumn(
+            pathPrefix + "exists",
+            [
+                new(navigationPropertyName, PathType.Navigation),
+                new(targetTypeName, PathType.TargetCkTypeId),
+            ], AttributeValueTypesDto.Boolean, firstNtoM));
     }
 
     private void CollectTypeColumns(CkTypeWithAttributesGraph current, List<CkTypeQueryColumn> columns)

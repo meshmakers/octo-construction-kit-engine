@@ -230,4 +230,123 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal(resultNull.Select(x => x.Path).OrderBy(x => x),
             resultDefault.Select(x => x.Path).OrderBy(x => x));
     }
+
+    [Fact]
+    public void NtoM_Outbound_GeneratesTotalCountAndExists()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document");
+        var paths = result.Select(x => x.Path).ToList();
+
+        // Outbound N:M association TransactionToDocument should generate totalCount and exists columns
+        Assert.Contains(paths, p => p.Contains("transactions") && p.EndsWith("::totalCount"));
+        Assert.Contains(paths, p => p.Contains("transactions") && p.EndsWith("::exists"));
+
+        // Verify value types
+        var totalCountCol = result.Single(x => x.Path.EndsWith("::totalCount") && x.Path.Contains("transactions"));
+        Assert.Equal(AttributeValueTypesDto.Int64, totalCountCol.ValueType);
+        Assert.NotNull(totalCountCol.AssociationTuple);
+        Assert.Equal(MultiplicitiesDto.N, totalCountCol.AssociationTuple.Multiplicity);
+
+        var existsCol = result.Single(x => x.Path.EndsWith("::exists") && x.Path.Contains("transactions"));
+        Assert.Equal(AttributeValueTypesDto.Boolean, existsCol.ValueType);
+        Assert.NotNull(existsCol.AssociationTuple);
+    }
+
+    [Fact]
+    public void NtoM_Inbound_GeneratesTotalCountAndExists()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        // Transaction has an inbound N:M from Document (Documents)
+        var result = collector.GetColumns("NToMTest/Transaction");
+        var paths = result.Select(x => x.Path).ToList();
+
+        Assert.Contains(paths, p => p.Contains("documents") && p.EndsWith("::totalCount"));
+        Assert.Contains(paths, p => p.Contains("documents") && p.EndsWith("::exists"));
+    }
+
+    [Fact]
+    public void NtoM_NoDuplicates_SingleColumnPerNavigationProperty()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document");
+
+        // Should have exactly one totalCount and one exists per N:M navigation property
+        var totalCountColumns = result.Where(x => x.Path.EndsWith("::totalCount")).ToList();
+        var existsColumns = result.Where(x => x.Path.EndsWith("::exists")).ToList();
+
+        // Document has 2 N:M navs: transactions (outbound) + relatesTo (from System/Entity)
+        // Each should appear exactly once
+        Assert.Equal(totalCountColumns.Select(x => x.Path).Distinct().Count(), totalCountColumns.Count);
+        Assert.Equal(existsColumns.Select(x => x.Path).Distinct().Count(), existsColumns.Count);
+    }
+
+    [Fact]
+    public void NtoM_OneToN_OnlyOutboundGeneratesColumns()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        // Category has outbound 1:N CategoryLink to Document (outbound multiplicity = N)
+        var result = collector.GetColumns("NToMTest/Category");
+        var paths = result.Select(x => x.Path).ToList();
+
+        // 1:N outbound should generate totalCount/exists for the N side
+        Assert.Contains(paths, p => p.Contains("items") && p.EndsWith("::totalCount"));
+        Assert.Contains(paths, p => p.Contains("items") && p.EndsWith("::exists"));
+    }
+
+    [Fact]
+    public void NtoM_IgnoreNavigationProperties_NoNtoMColumns()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document",
+            new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
+        var paths = result.Select(x => x.Path).ToList();
+
+        Assert.DoesNotContain(paths, p => p.Contains("::totalCount"));
+        Assert.DoesNotContain(paths, p => p.Contains("::exists"));
+    }
+
+    [Fact]
+    public void NtoM_PathFormat_UsesDoubleColonSeparator()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document");
+        var nToMColumns = result.Where(x =>
+            x.AssociationTuple is { Multiplicity: MultiplicitiesDto.N }).ToList();
+
+        // All N:M columns must use :: separator (not ->)
+        foreach (var col in nToMColumns)
+        {
+            Assert.Contains("::", col.Path);
+            Assert.DoesNotContain("->", col.Path);
+        }
+    }
+
+    [Fact]
+    public void NtoM_AccessPathList_ContainsNavigationAndTargetCkTypeId()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document");
+        var totalCountCol = result.Single(x => x.Path.EndsWith("::totalCount") && x.Path.Contains("transactions"));
+
+        var accessPath = totalCountCol.AccessPathList.ToList();
+        Assert.Equal(2, accessPath.Count);
+        Assert.Equal(PathType.Navigation, accessPath[0].Type);
+        Assert.Equal("Transactions", accessPath[0].Value);
+        Assert.Equal(PathType.TargetCkTypeId, accessPath[1].Type);
+    }
 }

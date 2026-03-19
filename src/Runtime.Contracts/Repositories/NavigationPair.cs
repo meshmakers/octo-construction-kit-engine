@@ -42,6 +42,12 @@ public record NavigationPair : FieldFilterCriteria
     public IEnumerable<IEnumerable<PathTerm>> SubPathTerms { get; private set; }
 
     /// <summary>
+    /// Gets the association count filter for N:M association meta queries (totalCount/exists).
+    /// When set, the navigation pair is used for counting associations rather than resolving target entities.
+    /// </summary>
+    public AssociationCountFilter? AssociationCountFilter { get; set; }
+
+    /// <summary>
     ///     Creates a new <see cref="NavigationPair" /> from the given <paramref name="ckRoleId" />, <paramref name="direction" />, and <paramref name="targetCkTypeId" />.
     /// </summary>
     /// <param name="pathTerms">Path terms to the navigation pair</param>

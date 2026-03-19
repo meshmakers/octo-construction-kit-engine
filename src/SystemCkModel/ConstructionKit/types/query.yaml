@@ -174,3 +174,23 @@ types:
       - id: ${this}/Query.FieldFilter
         name: FieldFilter
         isOptional: true
+  - typeId: StreamDataDownsamplingQuery
+    description: "Persistent query that downsamples time-series stream data from CrateDB using DATE_BIN bucketing with per-column aggregation (AVG, MIN, MAX). Requires From, To, and Limit (bucket count)."
+    derivedFromCkTypeId: ${this}/PersistentQuery
+    isFinal: false
+    isAbstract: false
+    attributes:
+      - id: ${this}/AggregationQueryColumns
+        name: Columns
+      - id: ${this}/StreamDataQuery.RtIds
+        name: RtIds
+        isOptional: true
+      - id: ${this}/StreamDataQuery.From
+        name: From
+      - id: ${this}/StreamDataQuery.To
+        name: To
+      - id: ${this}/StreamDataQuery.Limit
+        name: Limit
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true

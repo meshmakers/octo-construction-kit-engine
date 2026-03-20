@@ -69,22 +69,22 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtId.ToCamelCase(),
             [new(SystemAttributeRtId, PathType.Attribute)],
-            AttributeValueTypesDto.String));
+            AttributeValueTypesDto.String) { IsDataStream = true });
         columns.Add(new CkTypeQueryColumn(SystemAttributeCkTypeId.ToCamelCase(),
             [new(SystemAttributeCkTypeId, PathType.Attribute)],
-            AttributeValueTypesDto.String));
+            AttributeValueTypesDto.String) { IsDataStream = true });
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtWellKnownName.ToCamelCase(),
             [new(SystemAttributeRtWellKnownName, PathType.Attribute)],
-            AttributeValueTypesDto.String));
+            AttributeValueTypesDto.String) { IsDataStream = true });
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtVersion.ToCamelCase(),
             [new(SystemAttributeRtVersion, PathType.Attribute)],
             AttributeValueTypesDto.Int64));
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtCreationDateTime.ToCamelCase(),
             [new(SystemAttributeRtCreationDateTime, PathType.Attribute)],
-            AttributeValueTypesDto.DateTime));
+            AttributeValueTypesDto.DateTime) { IsDataStream = true });
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtChangedDateTime.ToCamelCase(),
             [new(SystemAttributeRtChangedDateTime, PathType.Attribute)],
-            AttributeValueTypesDto.DateTime));
+            AttributeValueTypesDto.DateTime) { IsDataStream = true });
         return columns;
     }
 
@@ -301,12 +301,12 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueCkEnumId,
-                        description));
+                        description) { IsDataStream = attribute.IsDataStream });
                     break;
                 default:
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueType,
-                        description: description));
+                        description: description) { IsDataStream = attribute.IsDataStream });
                     break;
             }
         }

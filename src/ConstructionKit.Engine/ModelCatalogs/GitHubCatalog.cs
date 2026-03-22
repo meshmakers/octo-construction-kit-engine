@@ -19,7 +19,7 @@ public class PublicGitHubCatalog(
 
 /// <summary>
 /// Private catalog on GitHub for construction kit models.
-/// Only enabled when a GitHub API token is configured.
+/// Checked before PublicGitHubCatalog so dev models take precedence.
 /// </summary>
 public class PrivateGitHubCatalog(
     ICkJsonSerializer ckJsonSerializer,
@@ -27,8 +27,7 @@ public class PrivateGitHubCatalog(
     IGitHubClientFactory gitHubClientFactory,
     IOptions<PrivateGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
     gitHubClientFactory, gitHubOptions.Value, 15, "PrivateGitHubCatalog",
-    "Private GitHub catalog for development and testing",
-    !string.IsNullOrWhiteSpace(gitHubOptions.Value.GitHubApiToken));
+    "Private GitHub catalog for development and testing");
 
 /// <summary>
 /// Construction kit model catalog for GitHub base class
@@ -51,9 +50,8 @@ public abstract class GitHubCatalog : CachedCatalog
     /// </summary>
     protected GitHubCatalog(ICkJsonSerializer ckJsonSerializer, IHttpClientFactory httpClientFactory,
         IGitHubClientFactory gitHubClientFactory,
-        GitHubCatalogOptions gitHubOptions, int order, string catalogName, string description,
-        bool isEnabled = true) : base(order,
-        catalogName, description, isEnabled, isEnabled, gitHubOptions)
+        GitHubCatalogOptions gitHubOptions, int order, string catalogName, string description) : base(order,
+        catalogName, description, true, true, gitHubOptions)
     {
         _ckJsonSerializer = ckJsonSerializer;
         _httpClientFactory = httpClientFactory;

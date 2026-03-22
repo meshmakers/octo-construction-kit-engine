@@ -410,11 +410,6 @@ public abstract class GitHubCatalog : CachedCatalog
 
         var cache = await ReadCacheAsync(false).ConfigureAwait(false);
         var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
-        if (catalog != null && cache.UpdatedAt != null && cache.UpdatedAt.Value == catalog.UpdatedAt)
-        {
-            // No changes in the catalog so we can skip the refresh
-            return;
-        }
 
         CacheTypes.CacheCatalog cacheCatalog = new()
         {

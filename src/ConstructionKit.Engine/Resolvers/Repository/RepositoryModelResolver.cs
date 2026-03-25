@@ -58,13 +58,16 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
             .ConfigureAwait(false);
 
         _referenceResolver.Resolve(modelGraph, originFileResolver, operationResult);
-        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult);
+
+        var failedModelIds = new HashSet<CkModelId>();
+        _inheritanceResolver.Resolve(modelGraph, originFileResolver, operationResult, failedModelIds);
 
         return new ModelResolveResult
         {
             CkModelGraph = modelGraph,
             SkippedModelIds = dependencyResolveResult.SkippedModelIds,
-            UnresolvedDependencyModelIds = dependencyResolveResult.UnresolvedDependencyModelIds
+            UnresolvedDependencyModelIds = dependencyResolveResult.UnresolvedDependencyModelIds,
+            FailedModelIds = failedModelIds
         };
     }
 
@@ -87,8 +90,10 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
         Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
         return new ModelResolveResult
         {
-            CkModelGraph = modelGraph, SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
-            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? []
+            CkModelGraph = modelGraph,
+            SkippedModelIds = dependencyResolveResult?.SkippedModelIds ?? [],
+            UnresolvedDependencyModelIds = dependencyResolveResult?.UnresolvedDependencyModelIds ?? [],
+            FailedModelIds = []
         };
     }
 

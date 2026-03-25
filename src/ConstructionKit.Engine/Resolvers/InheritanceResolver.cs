@@ -25,38 +25,443 @@ internal class InheritanceResolver : IInheritanceResolver
 
     /// <inheritdoc />
     public CkModelGraph Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
-        OperationResult operationResult)
+        OperationResult operationResult, ISet<CkModelId>? failedModelIds = null)
     {
         _logger.LogDebug("Starting resolving inheritance");
 
         HashSet<CkId<CkRecordId>> handledRecordHashSet = [];
         HashSet<CkId<CkTypeId>> handledTypesHashSet = [];
+        HashSet<CkId<CkTypeId>> failedTypeIds = [];
 
         foreach (var ckTypeKeyValue in modelGraph.Types)
         {
             _logger.LogDebug("Resolving inheritance for type {CkTypeId}", ckTypeKeyValue.Key);
-            GetAndUpdateTypeGraph(handledTypesHashSet, modelGraph, ckTypeKeyValue.Key, originFileResolver,
-                operationResult);
-            GetDirectedAggregationsAndAttributes(handledTypesHashSet, modelGraph, ckTypeKeyValue.Value,
-                originFileResolver,
-                operationResult);
+
+            if (failedModelIds != null)
+            {
+                var typeGraph = GetAndUpdateTypeGraphSafe(handledTypesHashSet, failedTypeIds, modelGraph,
+                    ckTypeKeyValue.Key, originFileResolver, operationResult, failedModelIds);
+                if (typeGraph == null)
+                {
+                    continue;
+                }
+
+                GetDirectedAggregationsAndAttributesSafe(handledTypesHashSet, failedTypeIds, modelGraph,
+                    ckTypeKeyValue.Value, originFileResolver, operationResult, failedModelIds);
+            }
+            else
+            {
+                GetAndUpdateTypeGraph(handledTypesHashSet, modelGraph, ckTypeKeyValue.Key, originFileResolver,
+                    operationResult);
+                GetDirectedAggregationsAndAttributes(handledTypesHashSet, modelGraph, ckTypeKeyValue.Value,
+                    originFileResolver, operationResult);
+            }
         }
 
         foreach (var ckRecordKeyValue in modelGraph.Records)
         {
             _logger.LogDebug("Resolving inheritance for record {CkRecordId}", ckRecordKeyValue.Key);
-            var recordGraph = GetAndUpdateRecordGraph(handledRecordHashSet, modelGraph, ckRecordKeyValue.Key,
-                originFileResolver,
-                operationResult);
-            GetDirectedRecordAttributes(modelGraph, recordGraph, originFileResolver, operationResult);
+
+            if (failedModelIds != null)
+            {
+                var recordGraph = GetAndUpdateRecordGraphSafe(handledRecordHashSet, modelGraph, ckRecordKeyValue.Key,
+                    originFileResolver, operationResult, failedModelIds);
+                if (recordGraph != null)
+                {
+                    GetDirectedRecordAttributes(modelGraph, recordGraph, originFileResolver, operationResult);
+                }
+            }
+            else
+            {
+                var recordGraph = GetAndUpdateRecordGraph(handledRecordHashSet, modelGraph, ckRecordKeyValue.Key,
+                    originFileResolver, operationResult);
+                GetDirectedRecordAttributes(modelGraph, recordGraph, originFileResolver, operationResult);
+            }
         }
 
         _logger.LogDebug("Resolving dependencies based on inheritance");
-        BuildInheritedConfiguration(modelGraph, originFileResolver, operationResult);
+        BuildInheritedConfiguration(modelGraph, failedTypeIds, originFileResolver, operationResult);
 
         _logger.LogDebug("Resolving inheritance completed");
 
         return modelGraph;
+    }
+
+    /// <summary>
+    /// Safe version of GetAndUpdateTypeGraph that does not throw on missing types.
+    /// Instead, it records the failed model ID and returns null.
+    /// </summary>
+    private CkTypeGraph? GetAndUpdateTypeGraphSafe(HashSet<CkId<CkTypeId>> handledTypesHashSet,
+        HashSet<CkId<CkTypeId>> failedTypeIds,
+        CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, ISet<CkModelId> failedModelIds)
+    {
+        if (failedTypeIds.Contains(ckTypeId))
+        {
+            return null;
+        }
+
+        if (!modelGraph.Types.TryGetValue(ckTypeId, out var typeGraph))
+        {
+            operationResult.AddMessage(MessageCodes.CkTypeIdUnknown(originFileResolver.Resolve(ckTypeId), ckTypeId));
+            failedModelIds.Add(ckTypeId.ModelId);
+            failedTypeIds.Add(ckTypeId);
+            return null;
+        }
+
+        if (!handledTypesHashSet.Contains(ckTypeId))
+        {
+            var baseTypes = GetBaseTypesSafe(modelGraph, ckTypeId, originFileResolver, operationResult, failedModelIds,
+                failedTypeIds);
+            if (baseTypes == null)
+            {
+                return null;
+            }
+
+            typeGraph.AddBaseTypes(baseTypes);
+
+            if (baseTypes.Any() && baseTypes.All(t =>
+                    CompilerStatics.WhiteListedCkTypeIds.Any(v => v.IsSatisfiedBy(t.BaseCkTypeId))))
+            {
+                typeGraph.SetIsCollectionRoot(true);
+                typeGraph.SetDefiningCollectionCkTypeId(typeGraph.CkTypeId);
+            }
+
+            foreach (var ckTypeAttribute in typeGraph.DefinedAttributes)
+            {
+                if (!modelGraph.Attributes.TryGetValue(ckTypeAttribute.CkAttributeId, out var attributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtType(
+                        originFileResolver.Resolve(ckTypeId),
+                        ckTypeAttribute.CkAttributeId, ckTypeId));
+                    continue;
+                }
+
+                typeGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    attributeGraph));
+            }
+
+            handledTypesHashSet.Add(ckTypeId);
+        }
+
+        return typeGraph;
+    }
+
+    /// <summary>
+    /// Safe version of GetBaseTypes that does not throw on broken inheritance chains.
+    /// Returns null if the type's model should be marked as failed.
+    /// </summary>
+    private static IList<CkGraphTypeInheritance>? GetBaseTypesSafe(CkModelGraph modelGraph,
+        CkId<CkTypeId> ckTypeId, IOriginFileResolver originFileResolver, OperationResult operationResult,
+        ISet<CkModelId> failedModelIds, HashSet<CkId<CkTypeId>> failedTypeIds)
+    {
+        var ckTypeIds = new List<CkGraphTypeInheritance>();
+
+        var i = 0;
+        CkId<CkTypeId>? currentCkTypeId = ckTypeId;
+        CkId<CkTypeId> lastCkTypeId = ckTypeId;
+        while (currentCkTypeId != null &&
+               modelGraph.Types.TryGetValue(currentCkTypeId, out var currentCkType))
+        {
+            var baseCkTypeId = currentCkType.DerivedFromCkTypeId;
+
+            if (i != 0)
+            {
+                if (currentCkType.IsFinal)
+                {
+                    operationResult.AddMessage(MessageCodes.DerivedFromCkTypeIdThatIsFinal(
+                        originFileResolver.Resolve(ckTypeId),
+                        currentCkTypeId, lastCkTypeId));
+                    failedModelIds.Add(ckTypeId.ModelId);
+                    failedTypeIds.Add(ckTypeId);
+                    return null;
+                }
+            }
+
+            if (baseCkTypeId != null)
+            {
+                ckTypeIds.Add(new CkGraphTypeInheritance(currentCkTypeId, baseCkTypeId, i++));
+            }
+
+            lastCkTypeId = currentCkTypeId;
+            currentCkTypeId = baseCkTypeId;
+        }
+
+        if (currentCkTypeId != null)
+        {
+            operationResult.AddMessage(
+                MessageCodes.UnknownCkTypeIdForInheritance(originFileResolver.Resolve(ckTypeId), currentCkTypeId));
+            failedModelIds.Add(ckTypeId.ModelId);
+            failedTypeIds.Add(ckTypeId);
+            return null;
+        }
+
+        if (!ckTypeIds.Any())
+        {
+            if (!CompilerStatics.WhiteListedCkTypeIds.Any(x => x.ModelId.Name == ckTypeId.ModelId.Name
+                                                               && x.Key.Name == ckTypeId.ElementId.Name))
+            {
+                operationResult.AddMessage(
+                    MessageCodes.InheritanceMissing(originFileResolver.Resolve(ckTypeId), ckTypeId.ElementId.Name));
+                failedModelIds.Add(ckTypeId.ModelId);
+                failedTypeIds.Add(ckTypeId);
+                return null;
+            }
+        }
+
+        return ckTypeIds;
+    }
+
+    /// <summary>
+    /// Safe version of GetAndUpdateRecordGraph that does not throw on missing records.
+    /// </summary>
+    private CkRecordGraph? GetAndUpdateRecordGraphSafe(HashSet<CkId<CkRecordId>> handledRecordHashSet,
+        CkModelGraph modelGraph, CkId<CkRecordId> ckRecordId,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, ISet<CkModelId> failedModelIds)
+    {
+        if (!modelGraph.Records.TryGetValue(ckRecordId, out var recordGraph))
+        {
+            operationResult.AddMessage(MessageCodes.CkRecordIdUnknown(originFileResolver.Resolve(ckRecordId),
+                ckRecordId));
+            failedModelIds.Add(ckRecordId.ModelId);
+            return null;
+        }
+
+        if (!handledRecordHashSet.Contains(ckRecordId))
+        {
+            var baseTypes = GetBaseRecordsSafe(modelGraph, ckRecordId, originFileResolver, operationResult,
+                failedModelIds);
+            if (baseTypes == null)
+            {
+                return null;
+            }
+
+            recordGraph.AddBaseRecords(baseTypes);
+
+            foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
+            {
+                if (!modelGraph.Attributes.TryGetValue(ckTypeAttribute.CkAttributeId, out var attributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtRecord(
+                        originFileResolver.Resolve(ckRecordId),
+                        ckTypeAttribute.CkAttributeId, ckRecordId));
+                    continue;
+                }
+
+                recordGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
+                    attributeGraph));
+            }
+
+            handledRecordHashSet.Add(ckRecordId);
+        }
+
+        return recordGraph;
+    }
+
+    /// <summary>
+    /// Safe version of GetBaseRecords that does not throw on broken record inheritance chains.
+    /// </summary>
+    private static IList<CkGraphRecordInheritance>? GetBaseRecordsSafe(CkModelGraph modelGraph,
+        CkId<CkRecordId> ckRecordId, IOriginFileResolver originFileResolver, OperationResult operationResult,
+        ISet<CkModelId> failedModelIds)
+    {
+        var ckRecordIds = new List<CkGraphRecordInheritance>();
+
+        var i = 0;
+        CkId<CkRecordId>? currentCkRecordId = ckRecordId;
+        CkId<CkRecordId> lastCkRecordId = ckRecordId;
+        while (currentCkRecordId != null &&
+               modelGraph.Records.TryGetValue(currentCkRecordId, out var currentCkType))
+        {
+            var baseCkRecordId = currentCkType.DerivedFromCkRecordId;
+
+            if (i != 0)
+            {
+                if (currentCkType.IsFinal)
+                {
+                    operationResult.AddMessage(
+                        MessageCodes.DerivedFromCkRecordIdThatIsFinal(originFileResolver.Resolve(ckRecordId),
+                            currentCkRecordId, lastCkRecordId));
+                    failedModelIds.Add(ckRecordId.ModelId);
+                    return null;
+                }
+            }
+
+            if (baseCkRecordId != null)
+            {
+                ckRecordIds.Add(new CkGraphRecordInheritance(currentCkRecordId, baseCkRecordId, i++));
+            }
+
+            lastCkRecordId = currentCkRecordId;
+            currentCkRecordId = baseCkRecordId;
+        }
+
+        if (currentCkRecordId != null)
+        {
+            operationResult.AddMessage(
+                MessageCodes.UnknownCkRecordIdForInheritance(originFileResolver.Resolve(ckRecordId),
+                    currentCkRecordId));
+            failedModelIds.Add(ckRecordId.ModelId);
+            return null;
+        }
+
+        return ckRecordIds;
+    }
+
+    /// <summary>
+    /// Safe version of GetDirectedAggregationsAndAttributes that skips types with failed resolution.
+    /// </summary>
+    private void GetDirectedAggregationsAndAttributesSafe(HashSet<CkId<CkTypeId>> handledTypesHashSet,
+        HashSet<CkId<CkTypeId>> failedTypeIds,
+        CkModelGraph ckModelGraph, CkTypeGraph originTypeGraph,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, ISet<CkModelId> failedModelIds)
+    {
+        _logger.LogDebug("Resolving directed aggregations and attributes for type {CkTypeId}",
+            originTypeGraph.CkTypeId);
+        for (var i = originTypeGraph.BaseTypes.Count - 1; i >= 0; i--)
+        {
+            var ckGraphTypeInheritance = originTypeGraph.BaseTypes.ElementAt(i);
+            if (!ckModelGraph.Types.TryGetValue(ckGraphTypeInheritance.BaseCkTypeId, out var baseCkType))
+            {
+                continue;
+            }
+
+            foreach (var typeAttribute in baseCkType.DefinedAttributes)
+            {
+                if (!baseCkType.AllAttributes.TryGetValue(typeAttribute.CkAttributeId, out var ckTypeAttributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkAttributeIdNotFoundAtType(
+                        originFileResolver.Resolve(baseCkType.CkTypeId),
+                        typeAttribute.CkAttributeId, baseCkType.CkTypeId));
+                    continue;
+                }
+
+                if (!originTypeGraph.TryAddAttribute(ckTypeAttributeGraph))
+                {
+                    operationResult.AddMessage(
+                        MessageCodes.CkTypeIdAttributeIdNotUniqueByInheritance(
+                            originFileResolver.Resolve(originTypeGraph.CkTypeId),
+                            baseCkType.CkTypeId, typeAttribute.CkAttributeId,
+                            originTypeGraph.CkTypeId));
+                }
+
+                originTypeGraph.IsStreamType |= ckTypeAttributeGraph.IsDataStream;
+            }
+        }
+
+        foreach (var typeAssociation in originTypeGraph.Associations.DefinedAssociations)
+        {
+            if (!ckModelGraph.AssociationRoles.TryGetValue(typeAssociation.CkRoleId, out var ckAssociationRole))
+            {
+                operationResult.AddMessage(MessageCodes.CkTypeIdAssociationRoleIdUnknown(
+                    originFileResolver.Resolve(originTypeGraph.CkTypeId),
+                    originTypeGraph.CkTypeId, typeAssociation.CkRoleId));
+                continue;
+            }
+
+            var targetCkTypeGraph =
+                GetAndUpdateTargetCkTypeGraphSafe(handledTypesHashSet, failedTypeIds, ckModelGraph, originTypeGraph,
+                    typeAssociation, originFileResolver, operationResult, failedModelIds);
+            if (targetCkTypeGraph == null)
+            {
+                continue;
+            }
+
+            if (originTypeGraph.Associations.Out.Owned.Any(x =>
+                    x.CkRoleId == typeAssociation.CkRoleId && x.TargetCkTypeId == typeAssociation.TargetCkTypeId))
+            {
+                operationResult.AddMessage(MessageCodes.CkTypeIdAssociationNotUnique(
+                    originFileResolver.Resolve(originTypeGraph.CkTypeId),
+                    originTypeGraph.CkTypeId, typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId));
+                continue;
+            }
+
+            var duplicateTypeAssociations = originTypeGraph.BaseTypes.SelectMany(inh =>
+            {
+                if (!ckModelGraph.Types.TryGetValue(inh.BaseCkTypeId, out var baseCkTypeGraph))
+                {
+                    return [];
+                }
+
+                return baseCkTypeGraph.Associations.Out.Owned.Where(x =>
+                        x.CkRoleId == typeAssociation.CkRoleId && originTypeGraph.BaseTypes.Any(y =>
+                            y.BaseCkTypeId == x.TargetCkTypeId))
+                    .Select(s => new { BaseCkTypeGraph = baseCkTypeGraph, s.TargetCkTypeId });
+            }).ToList();
+
+            if (duplicateTypeAssociations.Any())
+            {
+                foreach (var duplicateTypeAssociation in duplicateTypeAssociations)
+                {
+                    operationResult.AddMessage(MessageCodes.CkTypeIdMultipleOutgoingAssociationRepresentingSameRole(
+                        originFileResolver.Resolve(originTypeGraph.CkTypeId),
+                        originTypeGraph.CkTypeId,
+                        typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId,
+                        duplicateTypeAssociation.BaseCkTypeGraph.CkTypeId, duplicateTypeAssociation.TargetCkTypeId));
+                }
+
+                continue;
+            }
+
+            if (typeAssociation.TargetCkAttributeIds != null)
+            {
+                var invalidCkAttributeIds = typeAssociation.TargetCkAttributeIds.Where(a =>
+                    targetCkTypeGraph.AllAttributes.All(b => b.Key != a)).ToList();
+
+                invalidCkAttributeIds.ForEach(a =>
+                {
+                    operationResult.AddMessage(MessageCodes.CkTypeIdUnknownTargetAttributeIdForAssociation(
+                        originFileResolver.Resolve(originTypeGraph.CkTypeId), originTypeGraph.CkTypeId,
+                        typeAssociation.CkRoleId, a, typeAssociation.TargetCkTypeId));
+                });
+
+                if (invalidCkAttributeIds.Any())
+                {
+                    continue;
+                }
+            }
+
+            var inboundAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.InboundName,
+                ckAssociationRole.InboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
+            var outboundAssociationGraph = new CkTypeAssociationGraph(ckAssociationRole.OutboundName,
+                ckAssociationRole.OutboundMultiplicity, originTypeGraph.CkTypeId, typeAssociation);
+            targetCkTypeGraph.Associations.In.Owned.Add(inboundAssociationGraph);
+            originTypeGraph.Associations.Out.Owned.Add(outboundAssociationGraph);
+        }
+
+        var duplicateAttributeNames = originTypeGraph.AllAttributes.Values.GroupBy(a => a.AttributeName)
+            .Where(a => a.Count() > 1).ToList();
+        if (duplicateAttributeNames.Count > 0)
+        {
+            operationResult.AddMessage(
+                MessageCodes.CkTypeIdAttributeNameNotUniqueByInheritance(
+                    originFileResolver.Resolve(originTypeGraph.CkTypeId),
+                    originTypeGraph.CkTypeId,
+                    string.Join(", ", duplicateAttributeNames.Select(a => a.Key))));
+        }
+    }
+
+    /// <summary>
+    /// Safe version of GetAndUpdateTargetCkTypeGraph that returns null instead of throwing.
+    /// </summary>
+    private CkTypeGraph? GetAndUpdateTargetCkTypeGraphSafe(HashSet<CkId<CkTypeId>> handledTypesHashSet,
+        HashSet<CkId<CkTypeId>> failedTypeIds,
+        CkModelGraph ckModelGraph, CkTypeGraph typeGraph,
+        CkTypeAssociationDto typeAssociation, IOriginFileResolver originFileResolver,
+        OperationResult operationResult, ISet<CkModelId> failedModelIds)
+    {
+        if (!ckModelGraph.Types.ContainsKey(typeAssociation.TargetCkTypeId))
+        {
+            operationResult.AddMessage(MessageCodes.CkTypeIdUnknownTargetCkTypeIdForAssociation(
+                originFileResolver.Resolve(typeGraph.CkTypeId),
+                typeGraph.CkTypeId, typeAssociation.CkRoleId, typeAssociation.TargetCkTypeId));
+            failedModelIds.Add(typeGraph.CkTypeId.ModelId);
+            failedTypeIds.Add(typeGraph.CkTypeId);
+            return null;
+        }
+
+        return GetAndUpdateTypeGraphSafe(handledTypesHashSet, failedTypeIds, ckModelGraph,
+            typeAssociation.TargetCkTypeId, originFileResolver, operationResult, failedModelIds);
     }
 
     private CkTypeGraph GetAndUpdateTypeGraph(HashSet<CkId<CkTypeId>> handledTypesHashSet, CkModelGraph modelGraph,
@@ -203,9 +608,9 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             // Check if there is the same association role defined in a base type with a target to the same target type inheritance chain
-            var duplicateTypeAssociations = originTypeGraph.BaseTypes.SelectMany(i =>
+            var duplicateTypeAssociations = originTypeGraph.BaseTypes.SelectMany(inh =>
             {
-                var baseCkTypeGraph = GetAndUpdateTypeGraph(handledTypesHashSet, ckModelGraph, i.BaseCkTypeId,
+                var baseCkTypeGraph = GetAndUpdateTypeGraph(handledTypesHashSet, ckModelGraph, inh.BaseCkTypeId,
                     originFileResolver,
                     operationResult);
 
@@ -325,17 +730,32 @@ internal class InheritanceResolver : IInheritanceResolver
         return targetCkTypeGraph;
     }
 
-    private void BuildInheritedConfiguration(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
-        OperationResult operationResult)
+    private void BuildInheritedConfiguration(CkModelGraph modelGraph, HashSet<CkId<CkTypeId>> failedTypeIds,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         var handledInheritanceHashSet = new HashSet<Tuple<CkId<CkTypeId>, CkId<CkTypeId>>>();
         foreach (var graphType in modelGraph.Types)
         {
+            // Skip types that failed inheritance resolution
+            if (failedTypeIds.Contains(graphType.Key))
+            {
+                continue;
+            }
+
             List<CkTypeGraph> baseList = [];
             foreach (var ckGraphTypeInheritance in graphType.Value.BaseTypes.Reverse())
             {
-                var baseGraphType = modelGraph.Types[ckGraphTypeInheritance.BaseCkTypeId];
-                var inheritedGraphType = modelGraph.Types[ckGraphTypeInheritance.InheritorCkTypeId];
+                if (!modelGraph.Types.TryGetValue(ckGraphTypeInheritance.BaseCkTypeId, out var baseGraphType))
+                {
+                    continue;
+                }
+
+                if (!modelGraph.Types.TryGetValue(ckGraphTypeInheritance.InheritorCkTypeId,
+                        out var inheritedGraphType))
+                {
+                    continue;
+                }
+
                 baseList.Add(baseGraphType);
 
                 // Set the defining collection type id and merge index fields.

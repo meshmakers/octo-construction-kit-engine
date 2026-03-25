@@ -22,4 +22,10 @@ public class ModelResolveResult
     /// Gets a list of model ids that were not possible to resolve.
     /// </summary>
     public required IReadOnlyCollection<CkModelIdVersionRange> UnresolvedDependencyModelIds { get; init; }
+
+    /// <summary>
+    /// Gets a list of model ids that failed during inheritance resolution (e.g., broken base type references
+    /// after a dependency model was upgraded to a new major version).
+    /// </summary>
+    public required IReadOnlyCollection<CkModelId> FailedModelIds { get; init; }
 }

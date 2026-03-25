@@ -15,6 +15,10 @@ internal interface IInheritanceResolver
     /// <param name="modelGraph">Model graph to resolve</param>
     /// <param name="originFileResolver">Origin file resolver</param>
     /// <param name="operationResult">Operation result</param>
+    /// <param name="failedModelIds">Optional set to collect model IDs that failed inheritance resolution.
+    /// When provided, resolution errors are recorded instead of throwing exceptions,
+    /// enabling soft resolve scenarios where dependent models may have broken references.</param>
     /// <returns></returns>
-    CkModelGraph Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver, OperationResult operationResult);
+    CkModelGraph Resolve(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
+        OperationResult operationResult, ISet<CkModelId>? failedModelIds = null);
 }

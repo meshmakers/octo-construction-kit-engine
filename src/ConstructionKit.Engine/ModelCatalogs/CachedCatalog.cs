@@ -177,6 +177,7 @@ public abstract class CachedCatalog(
 
     /// <summary>
     /// Reads the cache catalog from the configured cache file if it exists.
+    /// Uses retry logic to handle concurrent access from parallel build processes.
     /// </summary>
     /// <param name="createCacheIfNotExits">Create cache file if cache not exists.</param>
     /// <returns>A task that represents the asynchronous read operation. The task result contains the cache catalog, or null if the cache file does not exist.</returns>
@@ -184,50 +185,67 @@ public abstract class CachedCatalog(
     protected async Task<CacheTypes.CacheCatalog> ReadCacheAsync(bool createCacheIfNotExits)
     {
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-        if (!File.Exists(cachePath))
-        {
-            if (createCacheIfNotExits)
-            {
-                // If the cache file does not exist, refresh the catalog to create it
-                await RefreshCatalogAsync().ConfigureAwait(false);
-            }
 
-            if (!File.Exists(cachePath))
+        if (!File.Exists(cachePath) && createCacheIfNotExits)
+        {
+            // If the cache file does not exist, refresh the catalog to create it
+            await RefreshCatalogAsync().ConfigureAwait(false);
+        }
+
+        const int maxRetries = 3;
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
             {
-                return new CacheTypes.CacheCatalog();
+                if (!File.Exists(cachePath))
+                {
+                    return new CacheTypes.CacheCatalog();
+                }
+
+#if NETSTANDARD2_0
+                using var streamReader = new FileStream(
+                    cachePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite, // Allow other processes to read/write while we read
+                    bufferSize: 4096,
+                    useAsync: true
+                );
+#else
+                await using var streamReader = new FileStream(
+                    cachePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite, // Allow other processes to read/write while we read
+                    bufferSize: 4096,
+                    useAsync: true
+                );
+#endif
+
+                var r = await System.Text.Json.JsonSerializer
+                    .DeserializeAsync<CacheTypes.CacheCatalog>(streamReader,
+                        new System.Text.Json.JsonSerializerOptions
+                        {
+                            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                            Converters = { new CkVersionConverter() }
+                        }).ConfigureAwait(false);
+                streamReader.Close();
+
+                return r ?? new CacheTypes.CacheCatalog();
+            }
+            catch (Exception ex) when (
+                attempt < maxRetries &&
+                (ex is FileNotFoundException || ex is IOException || ex is System.Text.Json.JsonException))
+            {
+                // Another process may be rewriting the cache file concurrently.
+                // FileNotFoundException: file was deleted between exists-check and open
+                // IOException: file is locked by another process
+                // JsonException: file contains partial/corrupt content during a concurrent write
+                await Task.Delay(200).ConfigureAwait(false);
             }
         }
 
-#if NETSTANDARD2_0
-        using var streamReader = new FileStream(
-            cachePath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite, // Allow other processes to read/write while we read
-            bufferSize: 4096,
-            useAsync: true
-        );
-#else
-        await using var streamReader = new FileStream(
-            cachePath,
-            FileMode.Open,
-            FileAccess.Read,
-            FileShare.ReadWrite,  // Allow other processes to read/write while we read
-            bufferSize: 4096,
-            useAsync: true
-        );
-#endif
-
-        var r = await System.Text.Json.JsonSerializer
-            .DeserializeAsync<CacheTypes.CacheCatalog>(streamReader,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                    Converters = { new CkVersionConverter() }
-                }).ConfigureAwait(false);
-        streamReader.Close();
-
-        return r ?? new CacheTypes.CacheCatalog();
+        return new CacheTypes.CacheCatalog();
     }
 
     /// <summary>
@@ -278,17 +296,15 @@ public abstract class CachedCatalog(
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
 
 
-        // We retry the move 5 times in case of file locks by other processes
+        // Use File.Copy with overwrite instead of Delete+Move to avoid a window
+        // where the cache file does not exist during concurrent parallel builds.
         const int maxRetries = 5;
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
             {
-                if (File.Exists(cachePath))
-                {
-                    File.Delete(cachePath);
-                }
-                File.Move(tempFileName, cachePath);
+                File.Copy(tempFileName, cachePath, overwrite: true);
+                File.Delete(tempFileName);
                 break; // Success
             }
             catch (IOException) when (attempt < maxRetries)

@@ -26,6 +26,7 @@ internal class ConfigCommand : Command<OctoToolOptions>
     private readonly IArgument _privateGitHubRepositoryBranch;
     private readonly IArgument _privateGitHubApiToken;
     private readonly IArgument _privateGitHubPagesUri;
+    private readonly IArgument _privateGitHubEnabled;
 
     public ConfigCommand(ILogger<ConfigCommand> logger, IOptions<OctoToolOptions> options,
         IOptions<LocalFileSystemCatalogOptions> localCatalogOptions,
@@ -65,6 +66,8 @@ internal class ConfigCommand : Command<OctoToolOptions>
             ["GitHub API token of the private GitHub catalog"], false, 1);
         _privateGitHubPagesUri = CommandArgumentValue.AddArgument("gp", "privateGitHubPagesUri",
             ["GitHub Pages URI to read models of the private GitHub catalog"], false, 1);
+        _privateGitHubEnabled = CommandArgumentValue.AddArgument("ge", "privateGitHubEnabled",
+            ["Enable or disable the private GitHub catalog"], false, 1);
     }
 
     public override Task Execute()
@@ -124,6 +127,13 @@ internal class ConfigCommand : Command<OctoToolOptions>
             Logger.LogInformation("Configuring private GitHub catalog API token");
             _privateGithubOptions.Value.GitHubApiToken =
                 CommandArgumentValue.GetArgumentScalarValue<string>(_privateGitHubApiToken);
+        }
+
+        if (CommandArgumentValue.IsArgumentUsed(_privateGitHubEnabled))
+        {
+            Logger.LogInformation("Configuring private GitHub catalog enabled state");
+            _privateGithubOptions.Value.IsEnabled =
+                CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_privateGitHubEnabled);
         }
     }
 

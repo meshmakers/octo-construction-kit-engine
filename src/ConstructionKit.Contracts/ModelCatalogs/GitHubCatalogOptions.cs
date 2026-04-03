@@ -33,6 +33,7 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
         GitHubRepositoryName = "construction-kit-libraries-build";
         GitHubRepositoryBranch = "main";
         GitHubPagesUri = "https://meshmakers.github.io/construction-kit-libraries-build/";
+        IsEnabled = false;
     }
 }
 
@@ -71,4 +72,9 @@ public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOption
     /// Represents the product name to be used in the User-Agent header when making requests to GitHub API.
     /// </summary>
     public string ProductName { get; set; } = "Meshmakers.Octo.ConstructionKit.Engine";
+
+    /// <summary>
+    /// When true, this GitHub catalog is enabled for reading and writing models.
+    /// </summary>
+    public bool IsEnabled { get; set; } = true;
 }

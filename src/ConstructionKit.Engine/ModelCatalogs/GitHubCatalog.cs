@@ -51,7 +51,7 @@ public abstract class GitHubCatalog : CachedCatalog
     protected GitHubCatalog(ICkJsonSerializer ckJsonSerializer, IHttpClientFactory httpClientFactory,
         IGitHubClientFactory gitHubClientFactory,
         GitHubCatalogOptions gitHubOptions, int order, string catalogName, string description) : base(order,
-        catalogName, description, true, true, gitHubOptions)
+        catalogName, description, gitHubOptions.IsEnabled, gitHubOptions.IsEnabled, gitHubOptions)
     {
         _ckJsonSerializer = ckJsonSerializer;
         _httpClientFactory = httpClientFactory;

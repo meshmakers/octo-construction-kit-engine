@@ -24,5 +24,5 @@ public class LocalFileSystemCatalogOptions : CatalogOptions
     /// <summary>
     /// When true, the local catalog in the file system is enabled.
     /// </summary>
-    public bool IsEnabled { get; set; }
+    public bool IsEnabled { get; set; } = true;
 }

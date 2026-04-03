@@ -33,7 +33,6 @@ public class PrivateGitHubCatalogOptions : GitHubCatalogOptions
         GitHubRepositoryName = "construction-kit-libraries-build";
         GitHubRepositoryBranch = "main";
         GitHubPagesUri = "https://meshmakers.github.io/construction-kit-libraries-build/";
-        IsEnabled = false;
     }
 }
 

@@ -190,7 +190,7 @@ public abstract class GitHubCatalog : CachedCatalog
             // Refresh the in-memory catalog
             await RefreshCatalogAsync(true).ConfigureAwait(false);
         }
-        catch (ApiValidationException e)
+        catch (ApiException e)
         {
             throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
         }

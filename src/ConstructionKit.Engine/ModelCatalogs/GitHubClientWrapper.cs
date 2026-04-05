@@ -46,7 +46,7 @@ internal class GitHubClientWrapper(IGitHubOptions gitHubOptions) : IGitHubClient
                     new UpdateFileRequest(commitMessage, content, currentSha)).ConfigureAwait(false);
                 return;
             }
-            catch (ApiValidationException) when (attempt < MaxRetries)
+            catch (ApiException ex) when (attempt < MaxRetries && IsShaConflict(ex))
             {
                 await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
                 var refreshed = await GetFileAsync(filePath).ConfigureAwait(false);
@@ -70,7 +70,7 @@ internal class GitHubClientWrapper(IGitHubOptions gitHubOptions) : IGitHubClient
                     new CreateFileRequest(commitMessage, content)).ConfigureAwait(false);
                 return;
             }
-            catch (ApiValidationException) when (attempt < MaxRetries)
+            catch (ApiException ex) when (attempt < MaxRetries && IsShaConflict(ex))
             {
                 // File may have been created by a parallel build — try updating instead
                 await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
@@ -83,5 +83,11 @@ internal class GitHubClientWrapper(IGitHubOptions gitHubOptions) : IGitHubClient
                 }
             }
         }
+    }
+
+    private static bool IsShaConflict(ApiException ex)
+    {
+        return ex.Message.Contains("but expected", StringComparison.OrdinalIgnoreCase)
+               || ex.StatusCode == System.Net.HttpStatusCode.Conflict;
     }
 }

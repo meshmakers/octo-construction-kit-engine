@@ -1,33 +1,5 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 types:
-  # This is the old Query type kept for backward compatibility
-  # deprecated: true
-  - typeId: Query
-    description: "Legacy query type for backward compatibility. Use SimpleRtQuery, AggregationRtQuery, or GroupingAggregationRtQuery instead."
-    derivedFromCkTypeId: ${this}/Entity
-    isFinal: false
-    isAbstract: false
-    attributes:
-      - id: ${this}/Query.CkTypeId
-        name: QueryCkTypeId
-      - id: ${this}/Query.Types
-        name: QueryType
-      - id: ${this}/Query.Columns
-        name: Columns
-      - id: ${this}/Query.Sorting
-        name: Sorting
-        isOptional: true
-      - id: ${this}/Query.FieldFilter
-        name: FieldFilter
-        isOptional: true
-      - id: ${this}/Query.TextSearchFilter
-        name: TextSearchFilter
-        isOptional: true
-      - id: ${this}/Query.AttributeSearchFilter
-        name: AttributeSearchFilter
-        isOptional: true
-      - id: ${this}/Name
-        name: Name
   - typeId: PersistentQuery
     description: "Abstract base type for all query types. Defines common query properties like name, description, and target type."
     derivedFromCkTypeId: ${this}/Entity

@@ -552,6 +552,57 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <returns></returns>
     protected abstract Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService);
 
+    /// <inheritdoc />
+    public virtual Task<(IReadOnlyList<RtEntity> Entities, bool IsSharedCollection)> GetRtEntitiesByTypeForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId)
+    {
+        throw new NotSupportedException(
+            "GetRtEntitiesByTypeForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can access entity collections without CK cache validation.");
+    }
+
+    /// <inheritdoc />
+    public virtual Task DeleteOneRtEntityForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, OctoObjectId rtId)
+    {
+        throw new NotSupportedException(
+            "DeleteOneRtEntityForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can access entity collections without CK cache validation.");
+    }
+
+    /// <inheritdoc />
+    public virtual Task InsertOneRtEntityForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, RtEntity rtEntity)
+    {
+        throw new NotSupportedException(
+            "InsertOneRtEntityForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can access entity collections without CK cache validation.");
+    }
+
+    /// <inheritdoc />
+    public virtual Task UpdateCkTypeIdForMigrationAsync(
+        IOctoSession session, OctoObjectId rtId, RtCkId<CkTypeId> newCkTypeId)
+    {
+        throw new NotSupportedException(
+            "UpdateCkTypeIdForMigrationAsync is not supported by this repository implementation.");
+    }
+
+    /// <inheritdoc />
+    public virtual Task<int> UpdateAssociationCkTypeIdsForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> oldCkTypeId, RtCkId<CkTypeId> newCkTypeId)
+    {
+        throw new NotSupportedException(
+            "UpdateAssociationCkTypeIdsForMigrationAsync is not supported by this repository implementation.");
+    }
+
+    /// <inheritdoc />
+    public virtual Task<bool> DropCollectionIfEmptyForMigrationAsync(RtCkId<CkTypeId> rtCkTypeId)
+    {
+        throw new NotSupportedException(
+            "DropCollectionIfEmptyForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can drop collections without CK cache validation.");
+    }
+
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)
         where TEntity : RtEntity, new()
     {

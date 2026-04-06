@@ -622,4 +622,79 @@ public interface IRuntimeRepository
     /// <returns></returns>
     /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
     Task<CkTypeGraph> GetCkTypeGraphAsync(RtCkId<CkTypeId> ckTypeId);
+
+    #region Migration support
+
+    /// <summary>
+    /// Gets all entities of the specified type without requiring the type to exist in the CK cache.
+    /// This is used during CK model migrations when the source type may have been removed from the current schema
+    /// (e.g., a type was renamed but the data migration was not yet executed).
+    /// First checks the type's own collection, then searches all RtEntity collections for derived types
+    /// that share a parent collection.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id to query (may not exist in current CK cache)</param>
+    /// <returns>
+    /// A tuple of (Entities, IsSharedCollection):
+    /// - Entities: List of entities found
+    /// - IsSharedCollection: True if entities were found in a shared parent collection (derived type),
+    ///   false if found in the type's own collection (root type). When true, use in-place ckTypeId update
+    ///   instead of Delete+Insert.
+    /// </returns>
+    Task<(IReadOnlyList<RtEntity> Entities, bool IsSharedCollection)> GetRtEntitiesByTypeForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId);
+
+    /// <summary>
+    /// Deletes an entity from a type-specific collection without requiring the type to exist in the CK cache.
+    /// This is used during CK model migrations when the source type may have been removed from the current schema.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id of the entity's collection (may not exist in current CK cache)</param>
+    /// <param name="rtId">The runtime object id of the entity to delete</param>
+    Task DeleteOneRtEntityForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, OctoObjectId rtId);
+
+    /// <summary>
+    /// Inserts an entity into a type-specific collection without requiring the type to exist in the CK cache.
+    /// This is used during CK model migrations when the target type may not yet be loaded in the CK cache.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id of the target collection (may not exist in current CK cache)</param>
+    /// <param name="rtEntity">The entity to insert</param>
+    Task InsertOneRtEntityForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, RtEntity rtEntity);
+
+    /// <summary>
+    /// Updates the ckTypeId field of an entity in-place without moving it between collections.
+    /// This is used during CK model migrations for derived types that share a parent collection.
+    /// When the source and target types share the same root collection, no Delete+Insert is needed.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtId">The runtime object id of the entity to update</param>
+    /// <param name="newCkTypeId">The new CK type id to set</param>
+    Task UpdateCkTypeIdForMigrationAsync(
+        IOctoSession session, OctoObjectId rtId, RtCkId<CkTypeId> newCkTypeId);
+
+    /// <summary>
+    /// Updates all associations that reference the old CK type id (in originCkTypeId or targetCkTypeId)
+    /// to use the new CK type id. This must be called after a ChangeCkType migration to keep
+    /// associations consistent with the renamed entities.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="oldCkTypeId">The old CK type id to find in associations</param>
+    /// <param name="newCkTypeId">The new CK type id to replace with</param>
+    /// <returns>The number of associations updated</returns>
+    Task<int> UpdateAssociationCkTypeIdsForMigrationAsync(
+        IOctoSession session, RtCkId<CkTypeId> oldCkTypeId, RtCkId<CkTypeId> newCkTypeId);
+
+    /// <summary>
+    /// Drops the collection for the specified type if it is empty.
+    /// This is used during CK model migrations after a ChangeCkType transform to clean up
+    /// the now-empty source collection.
+    /// </summary>
+    /// <param name="rtCkTypeId">The CK type id whose collection should be dropped</param>
+    /// <returns>True if the collection was dropped, false if it was not empty or does not exist</returns>
+    Task<bool> DropCollectionIfEmptyForMigrationAsync(RtCkId<CkTypeId> rtCkTypeId);
+
+    #endregion Migration support
 }

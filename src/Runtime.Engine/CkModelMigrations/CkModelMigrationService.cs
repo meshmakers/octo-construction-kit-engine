@@ -722,12 +722,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
         try
         {
             var sourceCkTypeId = ParseCkTypeId(step.Target.CkTypeId);
-            var queryOptions = BuildQueryOptions(step.Target);
-
-            var resultSet = await repository.GetRtEntitiesByTypeAsync(session, sourceCkTypeId, queryOptions)
-                .ConfigureAwait(false);
-
-            int updatedCount = 0;
 
             // Check if this is a ChangeCkType transform - requires special handling
             var isChangeCkType = step.Transform.Type == CkMigrationTransformType.ChangeCkType &&
@@ -741,28 +735,69 @@ internal class CkModelMigrationService : ICkModelMigrationService
                     sourceCkTypeId, targetCkTypeId);
             }
 
-            foreach (var entity in resultSet.Items)
+            // For ChangeCkType, the source type may no longer exist in the CK cache (it was removed
+            // from the schema). Use CkCache-free migration methods to access the raw collection.
+            // For other transforms, use the standard query path through CkCache.
+            IReadOnlyList<RtEntity> entities;
+            bool isSharedCollection = false;
+            if (isChangeCkType)
+            {
+                (entities, isSharedCollection) = await repository.GetRtEntitiesByTypeForMigrationAsync(session, sourceCkTypeId)
+                    .ConfigureAwait(false);
+
+                if (isSharedCollection && entities.Count > 0)
+                {
+                    _logger.LogDebug(
+                        "ChangeCkType migration: Source type {SourceType} is a derived type in a shared collection. " +
+                        "Using in-place ckTypeId update instead of Delete+Insert.",
+                        sourceCkTypeId);
+                }
+            }
+            else
+            {
+                var queryOptions = BuildQueryOptions(step.Target);
+                var resultSet = await repository.GetRtEntitiesByTypeAsync(session, sourceCkTypeId, queryOptions)
+                    .ConfigureAwait(false);
+                entities = resultSet.Items.ToList();
+            }
+
+            int updatedCount = 0;
+
+            foreach (var entity in entities)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 if (isChangeCkType && targetCkTypeId != null)
                 {
-                    // For ChangeCkType: Delete from old collection and insert into new collection
-                    // This is necessary because entities are stored in type-specific collections
+                    if (isSharedCollection)
+                    {
+                        // For derived types in a shared parent collection:
+                        // Just update the ckTypeId field in-place. No need to move between collections.
+                        await repository.UpdateCkTypeIdForMigrationAsync(session, entity.RtId, targetCkTypeId)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        // For root types with their own collection:
+                        // Delete from old collection and insert into new collection.
+                        // Use migration methods that bypass CkCache validation since the source type
+                        // may no longer exist in the current schema.
 
-                    // 1. Delete from source collection
-                    await repository.DeleteOneRtEntityByRtIdAsync(session, sourceCkTypeId, entity.RtId,
-                        DeleteOptions.Erase).ConfigureAwait(false);
+                        // 1. Delete from source collection (CkCache-free)
+                        await repository.DeleteOneRtEntityForMigrationAsync(session, sourceCkTypeId, entity.RtId)
+                            .ConfigureAwait(false);
 
-                    // 2. Change the entity's CkTypeId to the new type
-                    entity.CkTypeId = targetCkTypeId;
+                        // 2. Change the entity's CkTypeId to the new type
+                        entity.CkTypeId = targetCkTypeId;
 
-                    // 3. Apply any other transformations (but not the ckTypeId attribute since we set it on root level)
-                    ApplyTransformationExceptCkType(entity, step.Transform);
+                        // 3. Apply any other transformations (but not the ckTypeId attribute since we set it on root level)
+                        ApplyTransformationExceptCkType(entity, step.Transform);
 
-                    // 4. Insert into target collection
-                    await repository.InsertOneRtEntityAsync(session, targetCkTypeId, entity)
-                        .ConfigureAwait(false);
+                        // 4. Insert into target collection (CkCache-free, target type may also not be
+                        // loaded yet since cache was invalidated during import)
+                        await repository.InsertOneRtEntityForMigrationAsync(session, targetCkTypeId, entity)
+                            .ConfigureAwait(false);
+                    }
                 }
                 else
                 {
@@ -776,9 +811,49 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 updatedCount++;
             }
 
+            // After updating entities, also update associations that reference the old type.
+            // Always run this for ChangeCkType, even if no entities were found in this step,
+            // because associations may still reference the old type from a previous partial migration.
+            if (isChangeCkType && targetCkTypeId != null)
+            {
+                var assocCount = await repository.UpdateAssociationCkTypeIdsForMigrationAsync(
+                        session, sourceCkTypeId, targetCkTypeId)
+                    .ConfigureAwait(false);
+                if (assocCount > 0)
+                {
+                    _logger.LogInformation(
+                        "Updated {Count} association references from {OldType} to {NewType}",
+                        assocCount, sourceCkTypeId, targetCkTypeId);
+                }
+            }
+
             await session.CommitTransactionAsync().ConfigureAwait(false);
 
             _logger.LogDebug("Transform step completed: {Count} entities updated", updatedCount);
+
+            // After a successful ChangeCkType migration, drop the now-empty source collection
+            if (isChangeCkType)
+            {
+                try
+                {
+                    var dropped = await repository.DropCollectionIfEmptyForMigrationAsync(sourceCkTypeId)
+                        .ConfigureAwait(false);
+                    if (dropped)
+                    {
+                        _logger.LogInformation(
+                            "Dropped empty source collection for type {CkTypeId} after ChangeCkType migration",
+                            sourceCkTypeId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Non-fatal: collection cleanup is best-effort
+                    _logger.LogWarning(ex,
+                        "Failed to drop source collection for type {CkTypeId} after ChangeCkType migration",
+                        sourceCkTypeId);
+                }
+            }
+
             return (true, 0, updatedCount, 0, null);
         }
         catch (Exception ex)

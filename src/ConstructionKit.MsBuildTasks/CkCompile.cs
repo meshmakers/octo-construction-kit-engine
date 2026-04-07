@@ -202,6 +202,20 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     originFileResolver, true);
                                 Log.LogMessage(MessageImportance.High,
                                     $"Construction kit model published to '{PublishCatalogName}'");
+
+                                // Always publish to LocalFileSystemCatalog as well so that
+                                // dependent projects in the same solution build can resolve
+                                // the freshly compiled model (LocalFileSystem has higher
+                                // priority than GitHub catalogs).
+                                if (IsLocalCatalogEnabled &&
+                                    !string.Equals(PublishCatalogName, LocalFileSystemCatalog.Name,
+                                        StringComparison.OrdinalIgnoreCase))
+                                {
+                                    await catalogService.PublishAsync(LocalFileSystemCatalog.Name,
+                                        ckCompiledModelRoot, originFileResolver, true);
+                                    Log.LogMessage(MessageImportance.High,
+                                        $"Construction kit model also published to '{LocalFileSystemCatalog.Name}'");
+                                }
                             }
 
                             if (GenerateCkDocumentation)

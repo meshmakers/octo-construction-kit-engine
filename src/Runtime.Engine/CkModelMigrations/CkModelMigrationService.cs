@@ -255,28 +255,40 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 };
             }
 
-            // Fallback: Auto-bridge gap when the installed version is older than the earliest migration entry point.
-            // This handles cases where migrations exist (e.g., 3.0.1 -> 3.0.2 -> ... -> 3.1.1)
-            // but the tenant is at an older version (e.g., 2.2.0) with no explicit migration from that version.
-            // We create a no-op step to bridge the gap to the earliest reachable entry point.
-            var bridgedPath = await FindBridgedMigrationPathAsync(
+            // Fallback: Auto-bridge version gaps at both ends of the migration chain.
+            // Start gap: tenant at older version (e.g., 2.2.0) than earliest migration entry (e.g., 3.0.1)
+            // End gap: migration chain ends before target (e.g., chain ends at 3.1.1, target is 3.1.2)
+            var (bridgedSteps, isBridgedPartial, bridgedReachedVersion) = await FindBridgedMigrationPathAsync(
                 toModel, meta.Migrations, fromModel.Version, toModel.Version, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (bridgedPath is { Count: > 0 })
+            if (bridgedSteps is { Count: > 0 })
             {
-                _logger.LogInformation(
-                    "Auto-bridging version gap from {FromVersion} to {EntryVersion} (no-op) for CK model {CkModelName}, " +
-                    "then executing {StepCount} migration steps to {ToVersion}",
-                    fromModel.Version, bridgedPath[0].ToVersion, fromModel.Name,
-                    bridgedPath.Count - 1, toModel.Version);
+                if (isBridgedPartial)
+                {
+                    _logger.LogInformation(
+                        "Auto-bridging version gap for CK model {CkModelName}: {FromVersion} -> {EntryVersion} (no-op), " +
+                        "then {StepCount} migration steps to {ReachedVersion} (target was {ToVersion}). " +
+                        "Schema-only changes to {ToVersion} will be applied without data migration.",
+                        fromModel.Name, fromModel.Version, bridgedSteps[0].ToVersion,
+                        bridgedSteps.Count - 1, bridgedReachedVersion, toModel.Version, toModel.Version);
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "Auto-bridging version gap from {FromVersion} to {EntryVersion} (no-op) for CK model {CkModelName}, " +
+                        "then executing {StepCount} migration steps to {ToVersion}",
+                        fromModel.Version, bridgedSteps[0].ToVersion, fromModel.Name,
+                        bridgedSteps.Count - 1, toModel.Version);
+                }
 
                 return new CkMigrationPath
                 {
                     FromModel = fromModel,
                     ToModel = toModel,
-                    HasBreakingChanges = bridgedPath.Any(s => s.Breaking),
-                    Steps = bridgedPath
+                    HasBreakingChanges = bridgedSteps.Any(s => s.Breaking),
+                    IsPartialPath = isBridgedPartial,
+                    Steps = bridgedSteps
                 };
             }
 
@@ -366,72 +378,160 @@ internal class CkModelMigrationService : ICkModelMigrationService
     }
 
     /// <summary>
-    /// Finds a migration path by auto-bridging a version gap. When the installed version is older
-    /// than the earliest entry point in the migration chain, this creates a no-op step to bridge
-    /// the gap, then appends the actual migration steps.
+    /// Finds a migration path by auto-bridging version gaps at both ends of the migration chain.
+    /// When the installed version is older than the earliest migration entry point, a no-op step
+    /// bridges the gap at the start. When the migration chain doesn't reach the exact target version
+    /// (e.g., chain ends at 3.1.1 but target is 3.1.2), the partial path is accepted and marked
+    /// accordingly. This eliminates the need for developers to create empty migration entries for
+    /// every version bump.
     /// </summary>
-    private async Task<List<CkMigrationStep>?> FindBridgedMigrationPathAsync(
+    private async Task<(List<CkMigrationStep>? Steps, bool IsPartial, CkVersion? ReachedVersion)> FindBridgedMigrationPathAsync(
         CkModelId ckModelId,
         IReadOnlyCollection<CkMigrationReferenceDto> migrations,
         CkVersion fromVersion,
         CkVersion targetVersion,
         CancellationToken cancellationToken)
     {
-        // Collect all fromVersions that are entry points into chains reaching the target
-        var entryPoints = new List<(string VersionString, CkVersion Version)>();
         var migrationList = migrations.ToList();
 
+        // Collect all unique fromVersions that are greater than the installed version
+        var candidateEntryPoints = new HashSet<string>();
         foreach (var migration in migrations)
         {
             var parsedFrom = TryParseCkVersion(migration.FromVersion);
-            if (parsedFrom == null || parsedFrom.Value.CompareTo(fromVersion) <= 0)
+            if (parsedFrom != null && parsedFrom.Value.CompareTo(fromVersion) > 0)
+            {
+                candidateEntryPoints.Add(migration.FromVersion);
+            }
+        }
+
+        if (candidateEntryPoints.Count == 0)
+        {
+            return (null, false, null);
+        }
+
+        // For each candidate entry point, find the longest reachable chain towards the target
+        var bestResult = default((string EntryVersion, CkVersion EntryParsed, List<CkMigrationStep> Path, CkVersion ReachedVersion, bool IsExact)?);
+
+        foreach (var entryVersionString in candidateEntryPoints)
+        {
+            var entryParsed = TryParseCkVersion(entryVersionString)!.Value;
+
+            // First try exact match to target
+            var exactPath = await FindMultiHopPathAsync(
+                ckModelId, migrationList, entryVersionString, targetVersion.ToString(), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (exactPath is { Count: > 0 })
+            {
+                // Prefer exact matches; among exact matches, prefer the earliest entry point
+                if (bestResult == null || !bestResult.Value.IsExact ||
+                    entryParsed.CompareTo(bestResult.Value.EntryParsed) < 0)
+                {
+                    bestResult = (entryVersionString, entryParsed, exactPath, targetVersion, true);
+                }
+                continue;
+            }
+
+            // If we already found an exact match, skip partial candidates
+            if (bestResult is { IsExact: true })
             {
                 continue;
             }
 
-            // Check if this entry point can reach the target via multi-hop
-            var pathFromEntry = await FindMultiHopPathAsync(
-                ckModelId, migrationList, migration.FromVersion, targetVersion.ToString(), cancellationToken)
+            // Find the highest reachable version from this entry point
+            var highestReachable = FindHighestReachableVersion(migrationList, entryVersionString, targetVersion);
+            if (highestReachable == null)
+            {
+                continue;
+            }
+
+            var partialPath = await FindMultiHopPathAsync(
+                ckModelId, migrationList, entryVersionString, highestReachable.Value.VersionString, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (pathFromEntry is { Count: > 0 })
+            if (partialPath is not { Count: > 0 })
             {
-                entryPoints.Add((migration.FromVersion, parsedFrom.Value));
+                continue;
+            }
+
+            // Prefer: highest reached version, then earliest entry point
+            if (bestResult == null ||
+                highestReachable.Value.Version.CompareTo(bestResult.Value.ReachedVersion) > 0 ||
+                (highestReachable.Value.Version.CompareTo(bestResult.Value.ReachedVersion) == 0 &&
+                 entryParsed.CompareTo(bestResult.Value.EntryParsed) < 0))
+            {
+                bestResult = (entryVersionString, entryParsed, partialPath, highestReachable.Value.Version, false);
             }
         }
 
-        if (entryPoints.Count == 0)
+        if (bestResult == null)
         {
-            return null;
+            return (null, false, null);
         }
 
-        // Pick the earliest entry point to maximize the migration chain
-        var earliest = entryPoints.OrderBy(e => e.Version).First();
+        var result = bestResult.Value;
 
         // Build the bridged path: no-op step + actual migration steps
-        var actualPath = await FindMultiHopPathAsync(
-            ckModelId, migrationList, earliest.VersionString, targetVersion.ToString(), cancellationToken)
-            .ConfigureAwait(false);
-
-        if (actualPath is not { Count: > 0 })
-        {
-            return null;
-        }
-
         var bridgedPath = new List<CkMigrationStep>
         {
             new()
             {
                 FromVersion = fromVersion.ToString(),
-                ToVersion = earliest.VersionString,
+                ToVersion = result.EntryVersion,
                 Script = null, // No-op: schema-only version bump
-                Description = $"Auto-bridge from {fromVersion} to {earliest.VersionString} (no data migration needed)",
+                Description = $"Auto-bridge from {fromVersion} to {result.EntryVersion} (no data migration needed)",
                 Breaking = false
             }
         };
-        bridgedPath.AddRange(actualPath);
+        bridgedPath.AddRange(result.Path);
 
-        return bridgedPath;
+        return (bridgedPath, !result.IsExact, result.ReachedVersion);
+    }
+
+    /// <summary>
+    /// Finds the highest version reachable from a given entry point via the migration chain,
+    /// constrained to versions less than or equal to the target.
+    /// </summary>
+    private static (string VersionString, CkVersion Version)? FindHighestReachableVersion(
+        List<CkMigrationReferenceDto> migrations,
+        string entryVersion,
+        CkVersion targetVersion)
+    {
+        // BFS to find all reachable versions from the entry point
+        var reachable = new Dictionary<string, CkVersion>();
+        var queue = new Queue<string>();
+        var visited = new HashSet<string> { entryVersion };
+
+        queue.Enqueue(entryVersion);
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var migration in migrations.Where(m => m.FromVersion == current))
+            {
+                if (!visited.Add(migration.ToVersion))
+                {
+                    continue;
+                }
+
+                var parsed = TryParseCkVersion(migration.ToVersion);
+                if (parsed != null && parsed.Value.CompareTo(targetVersion) <= 0)
+                {
+                    reachable[migration.ToVersion] = parsed.Value;
+                    queue.Enqueue(migration.ToVersion);
+                }
+            }
+        }
+
+        if (reachable.Count == 0)
+        {
+            return null;
+        }
+
+        // Return the highest reachable version
+        var highest = reachable.OrderByDescending(kvp => kvp.Value).First();
+        return (highest.Key, highest.Value);
     }
 
     private static CkVersion? TryParseCkVersion(string version)

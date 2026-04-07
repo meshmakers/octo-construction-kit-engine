@@ -319,9 +319,335 @@ public class CkModelMigrationServiceTests
         Assert.Equal("3.0.0", result.ToModel.Version.ToString());
     }
 
+    [Fact]
+    public async Task FindMigrationPathAsync_AutoBridge_StartGap_ShouldBridgeToEarliestEntryPoint()
+    {
+        // Arrange - tenant at 2.2.0, migrations start at 3.0.1
+        var fromModel = new CkModelId("TestModel", "2.2.0");
+        var toModel = new CkModelId("TestModel", "3.1.0");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-3.1.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.1",
+                    ToVersion = "3.0.2",
+                    ScriptPath = "3.0.1-to-3.0.2.yaml",
+                    Breaking = true
+                },
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.2",
+                    ToVersion = "3.1.0",
+                    ScriptPath = "3.0.2-to-3.1.0.yaml"
+                }
+            ]
+        };
+
+        var script1 = new CkMigrationScriptDto { SourceVersion = "3.0.1", TargetVersion = "3.0.2" };
+        var script2 = new CkMigrationScriptDto { SourceVersion = "3.0.2", TargetVersion = "3.1.0" };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.1", "3.0.2", A<CancellationToken>._))
+            .Returns(script1);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.2", "3.1.0", A<CancellationToken>._))
+            .Returns(script2);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert - should bridge 2.2.0 → 3.0.1 (no-op) then execute 3.0.1 → 3.0.2 → 3.1.0
+        Assert.NotNull(result);
+        Assert.Equal(3, result.Steps.Count);
+
+        // First step is the no-op bridge
+        Assert.Equal("2.2.0", result.Steps[0].FromVersion);
+        Assert.Equal("3.0.1", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+
+        // Remaining steps are actual migrations
+        Assert.Equal("3.0.1", result.Steps[1].FromVersion);
+        Assert.Equal("3.0.2", result.Steps[1].ToVersion);
+        Assert.NotNull(result.Steps[1].Script);
+
+        Assert.Equal("3.0.2", result.Steps[2].FromVersion);
+        Assert.Equal("3.1.0", result.Steps[2].ToVersion);
+        Assert.NotNull(result.Steps[2].Script);
+
+        Assert.True(result.HasBreakingChanges);
+        Assert.False(result.IsPartialPath);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_AutoBridge_BothGaps_ShouldBridgeStartAndAcceptPartialEnd()
+    {
+        // Arrange - tenant at 2.2.0, migrations 3.0.1→3.1.1, target 3.1.2
+        var fromModel = new CkModelId("TestModel", "2.2.0");
+        var toModel = new CkModelId("TestModel", "3.1.2");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-3.1.2",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.1",
+                    ToVersion = "3.1.0",
+                    ScriptPath = "3.0.1-to-3.1.0.yaml"
+                },
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.1.0",
+                    ToVersion = "3.1.1",
+                    ScriptPath = "3.1.0-to-3.1.1.yaml"
+                }
+            ]
+        };
+
+        var script1 = new CkMigrationScriptDto { SourceVersion = "3.0.1", TargetVersion = "3.1.0" };
+        var script2 = new CkMigrationScriptDto { SourceVersion = "3.1.0", TargetVersion = "3.1.1" };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.1", "3.1.0", A<CancellationToken>._))
+            .Returns(script1);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.1.0", "3.1.1", A<CancellationToken>._))
+            .Returns(script2);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert - bridge at start (2.2.0→3.0.1), execute chain (3.0.1→3.1.0→3.1.1), partial at end (3.1.1 < 3.1.2)
+        Assert.NotNull(result);
+        Assert.True(result.IsPartialPath);
+        Assert.Equal(3, result.Steps.Count);
+
+        // No-op bridge
+        Assert.Equal("2.2.0", result.Steps[0].FromVersion);
+        Assert.Equal("3.0.1", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+
+        // Actual migrations
+        Assert.Equal("3.0.1", result.Steps[1].FromVersion);
+        Assert.Equal("3.1.0", result.Steps[1].ToVersion);
+        Assert.Equal("3.1.0", result.Steps[2].FromVersion);
+        Assert.Equal("3.1.1", result.Steps[2].ToVersion);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_AutoBridge_PicksEarliestEntryPoint()
+    {
+        // Arrange - two possible entry points (3.0.1 and 3.0.5), should pick earliest (3.0.1)
+        var fromModel = new CkModelId("TestModel", "2.0.0");
+        var toModel = new CkModelId("TestModel", "4.0.0");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-4.0.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.1",
+                    ToVersion = "4.0.0",
+                    ScriptPath = "3.0.1-to-4.0.0.yaml"
+                },
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.5",
+                    ToVersion = "4.0.0",
+                    ScriptPath = "3.0.5-to-4.0.0.yaml"
+                }
+            ]
+        };
+
+        var script1 = new CkMigrationScriptDto { SourceVersion = "3.0.1", TargetVersion = "4.0.0" };
+        var script2 = new CkMigrationScriptDto { SourceVersion = "3.0.5", TargetVersion = "4.0.0" };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.1", "4.0.0", A<CancellationToken>._))
+            .Returns(script1);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.5", "4.0.0", A<CancellationToken>._))
+            .Returns(script2);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert - should bridge to 3.0.1 (earliest), not 3.0.5
+        Assert.NotNull(result);
+        Assert.Equal(2, result.Steps.Count);
+        Assert.Equal("2.0.0", result.Steps[0].FromVersion);
+        Assert.Equal("3.0.1", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_AutoBridge_NoEntryPointReachesTarget_ShouldReturnNull()
+    {
+        // Arrange - migrations exist but none can reach the target (disconnected chains)
+        var fromModel = new CkModelId("TestModel", "1.0.0");
+        var toModel = new CkModelId("TestModel", "5.0.0");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-5.0.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.0",
+                    ToVersion = "3.1.0",
+                    ScriptPath = "3.0.0-to-3.1.0.yaml"
+                }
+                // No migration from 3.1.0 to 5.0.0 — chain ends at 3.1.0
+            ]
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        // GetMigrationAsync for 3.0.0→3.1.0 returns a script
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.0", "3.1.0", A<CancellationToken>._))
+            .Returns(new CkMigrationScriptDto { SourceVersion = "3.0.0", TargetVersion = "3.1.0" });
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert - should use auto-bridge with partial end (bridge 1.0.0→3.0.0, execute 3.0.0→3.1.0, partial to 5.0.0)
+        Assert.NotNull(result);
+        Assert.True(result.IsPartialPath);
+        Assert.Equal(2, result.Steps.Count);
+        Assert.Equal("1.0.0", result.Steps[0].FromVersion);
+        Assert.Equal("3.0.0", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+        Assert.Equal("3.0.0", result.Steps[1].FromVersion);
+        Assert.Equal("3.1.0", result.Steps[1].ToVersion);
+    }
+
     #endregion
 
     #region MigrateAsync Tests
+
+    [Fact]
+    public async Task MigrateAsync_NoOpBridgeStep_ShouldSucceed()
+    {
+        // Arrange - simulate a migration path with a no-op bridge step (Script = null)
+        var fromModel = new CkModelId("TestModel", "2.2.0");
+        var toModel = new CkModelId("TestModel", "3.0.2");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-3.0.2",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.1",
+                    ToVersion = "3.0.2",
+                    ScriptPath = "3.0.1-to-3.0.2.yaml"
+                }
+            ]
+        };
+
+        var script = new CkMigrationScriptDto
+        {
+            SourceVersion = "3.0.1",
+            TargetVersion = "3.0.2",
+            Steps = [] // Empty steps = success
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.1", "3.0.2", A<CancellationToken>._))
+            .Returns(script);
+        A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
+            .Returns((IRuntimeRepository?)null);
+
+        var options = new CkMigrationOptions { DryRun = false };
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.MigrateAsync("tenant1", fromModel, toModel, options, ct);
+
+        // Assert - migration should succeed (no-op bridge step + empty script step both pass)
+        Assert.True(result.Success);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_NoOpBridgeStep_ShouldBeValid()
+    {
+        // Arrange - path with a no-op bridge step (Script = null) should validate successfully
+        var fromModel = new CkModelId("TestModel", "2.2.0");
+        var toModel = new CkModelId("TestModel", "3.0.2");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "TestModel-3.0.2",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "3.0.1",
+                    ToVersion = "3.0.2",
+                    ScriptPath = "3.0.1-to-3.0.2.yaml"
+                }
+            ]
+        };
+
+        var script = new CkMigrationScriptDto
+        {
+            SourceVersion = "3.0.1",
+            TargetVersion = "3.0.2",
+            Steps =
+            [
+                new CkMigrationStepDto
+                {
+                    StepId = "test",
+                    Action = CkMigrationActionType.Transform,
+                    Target = new CkMigrationTargetDto { CkTypeId = "TestModel/Entity" },
+                    Transform = new CkMigrationTransformDto { Type = CkMigrationTransformType.ChangeCkType, NewCkTypeId = "TestModel/NewEntity" }
+                }
+            ]
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "3.0.1", "3.0.2", A<CancellationToken>._))
+            .Returns(script);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.ValidateAsync("tenant1", fromModel, toModel, ct);
+
+        // Assert - validation should pass (no-op bridge step is valid, actual step has proper config)
+        Assert.True(result.IsValid);
+    }
 
     [Fact]
     public async Task MigrateAsync_DifferentModelNames_ShouldReturnFailed()

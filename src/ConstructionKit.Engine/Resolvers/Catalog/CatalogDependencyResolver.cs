@@ -34,7 +34,10 @@ internal class CatalogDependencyResolver(
             throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds);
         }
 
-        return resolveResult.RootDependencyModelIds;
+        // Return all resolved dependencies including transitive ones so that the
+        // compiled model contains the full dependency closure.  This allows
+        // compatibility checks without re-resolving transitive dependencies.
+        return resolveResult.ResolvedDependentModelIds;
     }
 
     public Task<IReadOnlyCollection<CkModelId>> HardResolveDependenciesAsync(ICollection<CkModelId> dependencies, CkModelGraph ckModelGraph,

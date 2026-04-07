@@ -255,6 +255,31 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 };
             }
 
+            // Fallback: Auto-bridge gap when the installed version is older than the earliest migration entry point.
+            // This handles cases where migrations exist (e.g., 3.0.1 -> 3.0.2 -> ... -> 3.1.1)
+            // but the tenant is at an older version (e.g., 2.2.0) with no explicit migration from that version.
+            // We create a no-op step to bridge the gap to the earliest reachable entry point.
+            var bridgedPath = await FindBridgedMigrationPathAsync(
+                toModel, meta.Migrations, fromModel.Version, toModel.Version, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (bridgedPath is { Count: > 0 })
+            {
+                _logger.LogInformation(
+                    "Auto-bridging version gap from {FromVersion} to {EntryVersion} (no-op) for CK model {CkModelName}, " +
+                    "then executing {StepCount} migration steps to {ToVersion}",
+                    fromModel.Version, bridgedPath[0].ToVersion, fromModel.Name,
+                    bridgedPath.Count - 1, toModel.Version);
+
+                return new CkMigrationPath
+                {
+                    FromModel = fromModel,
+                    ToModel = toModel,
+                    HasBreakingChanges = bridgedPath.Any(s => s.Breaking),
+                    Steps = bridgedPath
+                };
+            }
+
             // Fallback: Find a "partial" migration path
             // This handles cases where data migrations are defined for major version jumps (e.g., 1.0.3 -> 2.0.0)
             // but the actual target version is higher (e.g., 2.0.2) due to schema-only changes that don't need data migration.
@@ -338,6 +363,75 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 }
             ]
         };
+    }
+
+    /// <summary>
+    /// Finds a migration path by auto-bridging a version gap. When the installed version is older
+    /// than the earliest entry point in the migration chain, this creates a no-op step to bridge
+    /// the gap, then appends the actual migration steps.
+    /// </summary>
+    private async Task<List<CkMigrationStep>?> FindBridgedMigrationPathAsync(
+        CkModelId ckModelId,
+        IReadOnlyCollection<CkMigrationReferenceDto> migrations,
+        CkVersion fromVersion,
+        CkVersion targetVersion,
+        CancellationToken cancellationToken)
+    {
+        // Collect all fromVersions that are entry points into chains reaching the target
+        var entryPoints = new List<(string VersionString, CkVersion Version)>();
+        var migrationList = migrations.ToList();
+
+        foreach (var migration in migrations)
+        {
+            var parsedFrom = TryParseCkVersion(migration.FromVersion);
+            if (parsedFrom == null || parsedFrom.Value.CompareTo(fromVersion) <= 0)
+            {
+                continue;
+            }
+
+            // Check if this entry point can reach the target via multi-hop
+            var pathFromEntry = await FindMultiHopPathAsync(
+                ckModelId, migrationList, migration.FromVersion, targetVersion.ToString(), cancellationToken)
+                .ConfigureAwait(false);
+
+            if (pathFromEntry is { Count: > 0 })
+            {
+                entryPoints.Add((migration.FromVersion, parsedFrom.Value));
+            }
+        }
+
+        if (entryPoints.Count == 0)
+        {
+            return null;
+        }
+
+        // Pick the earliest entry point to maximize the migration chain
+        var earliest = entryPoints.OrderBy(e => e.Version).First();
+
+        // Build the bridged path: no-op step + actual migration steps
+        var actualPath = await FindMultiHopPathAsync(
+            ckModelId, migrationList, earliest.VersionString, targetVersion.ToString(), cancellationToken)
+            .ConfigureAwait(false);
+
+        if (actualPath is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var bridgedPath = new List<CkMigrationStep>
+        {
+            new()
+            {
+                FromVersion = fromVersion.ToString(),
+                ToVersion = earliest.VersionString,
+                Script = null, // No-op: schema-only version bump
+                Description = $"Auto-bridge from {fromVersion} to {earliest.VersionString} (no data migration needed)",
+                Breaking = false
+            }
+        };
+        bridgedPath.AddRange(actualPath);
+
+        return bridgedPath;
     }
 
     private static CkVersion? TryParseCkVersion(string version)
@@ -516,11 +610,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
             if (script == null)
             {
-                result.IsValid = false;
-                result.Errors.Add(new CkMigrationValidationIssue
-                {
-                    Message = $"No migration script available for step {step.FromVersion} -> {step.ToVersion}"
-                });
+                // No-op migration step (auto-bridged version gap) - valid, no script needed
                 continue;
             }
 
@@ -583,8 +673,11 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
             if (script == null)
             {
-                result.Success = false;
-                result.Errors.Add($"No migration script available for step {step.FromVersion} -> {step.ToVersion}");
+                // No-op migration step (auto-bridged version gap, no data migration needed)
+                _logger.LogInformation(
+                    "No-op migration step {FromVersion} -> {ToVersion}: no data migration needed",
+                    step.FromVersion, step.ToVersion);
+                result.Success = true;
                 return result;
             }
 

@@ -91,9 +91,10 @@ public class CkMigrationOptions
     public bool ContinueOnError { get; set; } = false;
 
     /// <summary>
-    /// If true, create a backup before executing the migration
+    /// If true, create a backup before executing the migration.
+    /// Requires mongodump to be available in the container.
     /// </summary>
-    public bool CreateBackup { get; set; } = true;
+    public bool CreateBackup { get; set; } = false;
 
     /// <summary>
     /// If true, also migrate entities not created by blueprints (user-created entities)

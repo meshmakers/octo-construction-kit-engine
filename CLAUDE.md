@@ -187,6 +187,10 @@ Migration scripts location: `ConstructionKit/migrations/`
 
 MSBuild property to control embedding: `OctoEmbedCkMigrations` (default: true)
 
+Path resolution order: Direct → Multi-Hop → Auto-Bridge → Partial → No Path
+
+**Auto-bridging**: The engine automatically bridges version gaps at both ends of the migration chain. When the tenant's installed version is older than the earliest migration entry point, a no-op bridge step is created. When the chain doesn't reach the exact target version, the partial path is executed and the rest is treated as schema-only. Developers only need to create migration scripts for versions that actually transform data.
+
 ## Key Interfaces
 
 | Interface | Namespace | Description |

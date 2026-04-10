@@ -909,18 +909,20 @@ internal class CkModelMigrationService : ICkModelMigrationService
         _logger.LogInformation("Transform step {StepId}: Target={CkTypeId}, Transform={TransformType}",
             step.StepId, step.Target.CkTypeId, step.Transform.Type);
 
+        var sourceCkTypeId = ParseCkTypeId(step.Target.CkTypeId);
+
+        // Check if this is a ChangeCkType transform - requires special handling
+        var isChangeCkType = step.Transform.Type == CkMigrationTransformType.ChangeCkType &&
+                             !string.IsNullOrEmpty(step.Transform.NewCkTypeId);
+
+        RtCkId<CkTypeId>? targetCkTypeId = null;
+        int updatedCount = 0;
+
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
         session.StartTransaction();
 
         try
         {
-            var sourceCkTypeId = ParseCkTypeId(step.Target.CkTypeId);
-
-            // Check if this is a ChangeCkType transform - requires special handling
-            var isChangeCkType = step.Transform.Type == CkMigrationTransformType.ChangeCkType &&
-                                 !string.IsNullOrEmpty(step.Transform.NewCkTypeId);
-
-            RtCkId<CkTypeId>? targetCkTypeId = null;
             if (isChangeCkType)
             {
                 targetCkTypeId = ParseCkTypeId(step.Transform.NewCkTypeId);
@@ -953,8 +955,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
                     .ConfigureAwait(false);
                 entities = resultSet.Items.ToList();
             }
-
-            int updatedCount = 0;
 
             foreach (var entity in entities)
             {
@@ -1004,13 +1004,29 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 updatedCount++;
             }
 
-            // After updating entities, also update associations that reference the old type.
-            // Always run this for ChangeCkType, even if no entities were found in this step,
-            // because associations may still reference the old type from a previous partial migration.
-            if (isChangeCkType && targetCkTypeId != null)
+            await session.CommitTransactionAsync().ConfigureAwait(false);
+
+            _logger.LogDebug("Transform step completed: {Count} entities updated", updatedCount);
+        }
+        catch (Exception ex)
+        {
+            await session.AbortTransactionAsync().ConfigureAwait(false);
+            _logger.LogError(ex, "Error executing transform step {StepId}", step.StepId);
+            return (false, 0, 0, 0, ex.Message);
+        }
+
+        // After the entity transaction is committed, update association references outside
+        // the transaction. These are idempotent updateMany operations that can safely run
+        // without transactional guarantees. Running them outside the transaction avoids
+        // exceeding MongoDB's oplog entry size limit when updating large numbers of
+        // association documents (e.g., 90K+).
+        if (isChangeCkType && targetCkTypeId != null)
+        {
+            try
             {
+                var assocSession = await repository.GetSessionAsync().ConfigureAwait(false);
                 var assocCount = await repository.UpdateAssociationCkTypeIdsForMigrationAsync(
-                        session, sourceCkTypeId, targetCkTypeId)
+                        assocSession, sourceCkTypeId, targetCkTypeId)
                     .ConfigureAwait(false);
                 if (assocCount > 0)
                 {
@@ -1019,42 +1035,41 @@ internal class CkModelMigrationService : ICkModelMigrationService
                         assocCount, sourceCkTypeId, targetCkTypeId);
                 }
             }
-
-            await session.CommitTransactionAsync().ConfigureAwait(false);
-
-            _logger.LogDebug("Transform step completed: {Count} entities updated", updatedCount);
-
-            // After a successful ChangeCkType migration, drop the now-empty source collection
-            if (isChangeCkType)
+            catch (Exception ex)
             {
-                try
+                _logger.LogError(ex,
+                    "Failed to update association references from {OldType} to {NewType}. " +
+                    "Association references may be stale and will be corrected on next migration retry.",
+                    sourceCkTypeId, targetCkTypeId);
+                return (false, 0, updatedCount, 0,
+                    $"Entity migration succeeded but association update failed: {ex.Message}");
+            }
+        }
+
+        // After a successful ChangeCkType migration, drop the now-empty source collection
+        if (isChangeCkType)
+        {
+            try
+            {
+                var dropped = await repository.DropCollectionIfEmptyForMigrationAsync(sourceCkTypeId)
+                    .ConfigureAwait(false);
+                if (dropped)
                 {
-                    var dropped = await repository.DropCollectionIfEmptyForMigrationAsync(sourceCkTypeId)
-                        .ConfigureAwait(false);
-                    if (dropped)
-                    {
-                        _logger.LogInformation(
-                            "Dropped empty source collection for type {CkTypeId} after ChangeCkType migration",
-                            sourceCkTypeId);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Non-fatal: collection cleanup is best-effort
-                    _logger.LogWarning(ex,
-                        "Failed to drop source collection for type {CkTypeId} after ChangeCkType migration",
+                    _logger.LogInformation(
+                        "Dropped empty source collection for type {CkTypeId} after ChangeCkType migration",
                         sourceCkTypeId);
                 }
             }
+            catch (Exception ex)
+            {
+                // Non-fatal: collection cleanup is best-effort
+                _logger.LogWarning(ex,
+                    "Failed to drop source collection for type {CkTypeId} after ChangeCkType migration",
+                    sourceCkTypeId);
+            }
+        }
 
-            return (true, 0, updatedCount, 0, null);
-        }
-        catch (Exception ex)
-        {
-            await session.AbortTransactionAsync().ConfigureAwait(false);
-            _logger.LogError(ex, "Error executing transform step {StepId}", step.StepId);
-            return (false, 0, 0, 0, ex.Message);
-        }
+        return (true, 0, updatedCount, 0, null);
     }
 
     private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)> ExecuteUpdateAsync(

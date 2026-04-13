@@ -334,9 +334,24 @@ public class CkMigrationHistoryEntry
     public bool Success { get; set; }
 
     /// <summary>
-    /// Number of entities affected
+    /// Number of entities affected (sum of added, updated, deleted)
     /// </summary>
     public int EntitiesAffected { get; set; }
+
+    /// <summary>
+    /// Number of entities added during migration
+    /// </summary>
+    public int EntitiesAdded { get; set; }
+
+    /// <summary>
+    /// Number of entities updated during migration
+    /// </summary>
+    public int EntitiesUpdated { get; set; }
+
+    /// <summary>
+    /// Number of entities deleted during migration
+    /// </summary>
+    public int EntitiesDeleted { get; set; }
 
     /// <summary>
     /// Duration of the migration in milliseconds
@@ -347,6 +362,16 @@ public class CkMigrationHistoryEntry
     /// Errors if migration failed
     /// </summary>
     public List<string>? Errors { get; set; }
+
+    /// <summary>
+    /// Warning messages generated during migration
+    /// </summary>
+    public List<string>? Warnings { get; set; }
+
+    /// <summary>
+    /// Identifier of the backup created before migration
+    /// </summary>
+    public string? BackupId { get; set; }
 }
 
 /// <summary>

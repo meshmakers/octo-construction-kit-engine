@@ -40,6 +40,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
     private const string AttributeEntitiesUpdated = "EntitiesUpdated";
     private const string AttributeEntitiesDeleted = "EntitiesDeleted";
     private const string AttributeErrors = "Errors";
+    private const string AttributeWarnings = "Warnings";
     private const string AttributeBackupId = "BackupId";
 
     /// <summary>
@@ -622,6 +623,10 @@ internal class CkModelMigrationService : ICkModelMigrationService
             foreach (var entity in resultSet.Items)
             {
                 var errorMsgs = entity.GetAttributeStringValuesOrDefault(AttributeErrors);
+                var warningMsgs = entity.GetAttributeStringValuesOrDefault(AttributeWarnings);
+                var added = entity.GetAttributeValueOrDefault<int>(AttributeEntitiesAdded) ?? 0;
+                var updated = entity.GetAttributeValueOrDefault<int>(AttributeEntitiesUpdated) ?? 0;
+                var deleted = entity.GetAttributeValueOrDefault<int>(AttributeEntitiesDeleted) ?? 0;
                 historyEntries.Add(new CkMigrationHistoryEntry
                 {
                     CkModelName = entity.GetAttributeStringValueOrDefault(AttributeCkModelName) ?? ckModelName,
@@ -630,10 +635,13 @@ internal class CkModelMigrationService : ICkModelMigrationService
                     ExecutedAt = entity.GetAttributeValueOrDefault<DateTime>(AttributeExecutedAt) ?? DateTime.MinValue,
                     Success = entity.GetAttributeValueOrDefault<bool>(AttributeSuccess) ?? false,
                     DurationMs = entity.GetAttributeValueOrDefault<long>(AttributeDurationMs) ?? 0,
-                    EntitiesAffected = (entity.GetAttributeValueOrDefault<int>(AttributeEntitiesAdded) ?? 0) +
-                                       (entity.GetAttributeValueOrDefault<int>(AttributeEntitiesUpdated) ?? 0) +
-                                       (entity.GetAttributeValueOrDefault<int>(AttributeEntitiesDeleted) ?? 0),
-                    Errors = errorMsgs?.ToList()
+                    EntitiesAffected = added + updated + deleted,
+                    EntitiesAdded = added,
+                    EntitiesUpdated = updated,
+                    EntitiesDeleted = deleted,
+                    Errors = errorMsgs?.ToList(),
+                    Warnings = warningMsgs?.ToList(),
+                    BackupId = entity.GetAttributeStringValueOrDefault(AttributeBackupId)
                 });
             }
 

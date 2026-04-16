@@ -708,4 +708,14 @@ public abstract class RtTypeWithAttributes
     {
         _attributes[attributeName] = AttributeValueConverter.ConvertAttributeValue(attributeValueTypes, attributeValue);
     }
+
+    /// <summary>
+    ///     Sets an attribute value without any type conversion. Intended for hydration paths
+    ///     where the raw value from the data source is assigned directly (e.g. CrateDB row dicts
+    ///     being poured into an <see cref="StreamData.SdEntity"/>).
+    /// </summary>
+    public void SetAttributeRawValue(string attributeName, object? attributeValue)
+    {
+        _attributes[attributeName] = attributeValue;
+    }
 }

@@ -72,58 +72,49 @@ types:
       - id: ${this}/Query.AttributeSearchFilter
         name: AttributeSearchFilter
         isOptional: true
-  - typeId: StreamDataSimpleQuery
-    description: "Persistent query that retrieves time-series stream data from CrateDB for a given CK type with optional RtIds scope, time filtering, and field filters."
+  - typeId: StreamDataQuery
+    description: "Abstract base for stream-data query types. Carries the common time-range, limit, rtId scope, and field-filter attributes shared by all concrete SdQuery subtypes."
     derivedFromCkTypeId: ${this}/PersistentQuery
+    isFinal: false
+    isAbstract: true
+    attributes:
+      - id: ${this}/StreamDataQuery.RtIds
+        name: RtIds
+        isOptional: true
+      - id: ${this}/StreamDataQuery.From
+        name: From
+        isOptional: true
+      - id: ${this}/StreamDataQuery.To
+        name: To
+        isOptional: true
+      - id: ${this}/StreamDataQuery.Limit
+        name: Limit
+        isOptional: true
+      - id: ${this}/Query.FieldFilter
+        name: FieldFilter
+        isOptional: true
+  - typeId: SimpleSdQuery
+    description: "Persistent stream-data query that retrieves time-series rows for a given CK type with optional column projection, sorting, and field filters."
+    derivedFromCkTypeId: ${this}/StreamDataQuery
     isFinal: false
     isAbstract: false
     attributes:
       - id: ${this}/StreamDataQuery.Columns
         name: Columns
-      - id: ${this}/StreamDataQuery.RtIds
-        name: RtIds
-        isOptional: true
-      - id: ${this}/StreamDataQuery.From
-        name: From
-        isOptional: true
-      - id: ${this}/StreamDataQuery.To
-        name: To
-        isOptional: true
-      - id: ${this}/StreamDataQuery.Limit
-        name: Limit
-        isOptional: true
       - id: ${this}/Query.Sorting
         name: Sorting
         isOptional: true
-      - id: ${this}/Query.FieldFilter
-        name: FieldFilter
-        isOptional: true
-  - typeId: StreamDataAggregationQuery
-    description: "Persistent query that performs aggregation operations (Count, Min, Max, Avg, Sum) on time-series stream data from CrateDB without grouping."
-    derivedFromCkTypeId: ${this}/PersistentQuery
+  - typeId: AggregationSdQuery
+    description: "Persistent stream-data query that performs aggregation operations (Count, Min, Max, Avg, Sum) on time-series data without grouping."
+    derivedFromCkTypeId: ${this}/StreamDataQuery
     isFinal: false
     isAbstract: false
     attributes:
       - id: ${this}/AggregationQueryColumns
         name: Columns
-      - id: ${this}/StreamDataQuery.RtIds
-        name: RtIds
-        isOptional: true
-      - id: ${this}/StreamDataQuery.From
-        name: From
-        isOptional: true
-      - id: ${this}/StreamDataQuery.To
-        name: To
-        isOptional: true
-      - id: ${this}/StreamDataQuery.Limit
-        name: Limit
-        isOptional: true
-      - id: ${this}/Query.FieldFilter
-        name: FieldFilter
-        isOptional: true
-  - typeId: StreamDataGroupingAggregationQuery
-    description: "Persistent query that performs grouped aggregation operations with GROUP BY functionality on time-series stream data from CrateDB."
-    derivedFromCkTypeId: ${this}/PersistentQuery
+  - typeId: GroupingAggregationSdQuery
+    description: "Persistent stream-data query that performs grouped aggregation with GROUP BY functionality on time-series data."
+    derivedFromCkTypeId: ${this}/StreamDataQuery
     isFinal: false
     isAbstract: false
     attributes:
@@ -131,38 +122,11 @@ types:
         name: GroupingColumns
       - id: ${this}/AggregationQueryColumns
         name: Columns
-      - id: ${this}/StreamDataQuery.RtIds
-        name: RtIds
-        isOptional: true
-      - id: ${this}/StreamDataQuery.From
-        name: From
-        isOptional: true
-      - id: ${this}/StreamDataQuery.To
-        name: To
-        isOptional: true
-      - id: ${this}/StreamDataQuery.Limit
-        name: Limit
-        isOptional: true
-      - id: ${this}/Query.FieldFilter
-        name: FieldFilter
-        isOptional: true
-  - typeId: StreamDataDownsamplingQuery
-    description: "Persistent query that downsamples time-series stream data from CrateDB using DATE_BIN bucketing with per-column aggregation (AVG, MIN, MAX). Requires From, To, and Limit (bucket count)."
-    derivedFromCkTypeId: ${this}/PersistentQuery
+  - typeId: DownsamplingSdQuery
+    description: "Persistent stream-data query that downsamples time-series data using DATE_BIN bucketing with per-column aggregation (AVG, MIN, MAX). From, To, and Limit (bucket count) are required at the API level even though the schema marks them optional on the base."
+    derivedFromCkTypeId: ${this}/StreamDataQuery
     isFinal: false
     isAbstract: false
     attributes:
       - id: ${this}/AggregationQueryColumns
         name: Columns
-      - id: ${this}/StreamDataQuery.RtIds
-        name: RtIds
-        isOptional: true
-      - id: ${this}/StreamDataQuery.From
-        name: From
-      - id: ${this}/StreamDataQuery.To
-        name: To
-      - id: ${this}/StreamDataQuery.Limit
-        name: Limit
-      - id: ${this}/Query.FieldFilter
-        name: FieldFilter
-        isOptional: true

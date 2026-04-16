@@ -12,7 +12,7 @@ public class SortOrderItem
     /// </summary>
     /// <param name="attributePath">Path to an attribute to filter for</param>
     /// <param name="sortOrder">Type of sort order</param>
-    internal SortOrderItem(string attributePath, SortOrders sortOrder)
+    public SortOrderItem(string attributePath, SortOrders sortOrder)
     {
         ArgumentValidation.ValidateString(nameof(attributePath), attributePath);
 

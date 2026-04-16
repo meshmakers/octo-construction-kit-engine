@@ -86,6 +86,39 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
 
         sb.AppendLine("}");
 
+        // Emit Sd{CkType} : SdEntity only when at least one attribute is a data-stream attribute.
+        if (ckType.Attributes != null)
+        {
+            var dataStreamAttributes = ckType.Attributes
+                .Select(a => (Dto: a, Graph: cacheService.GetCkAttribute(cacheTenantId, a.CkAttributeId)))
+                .Where(x => x.Graph.IsDataStream)
+                .ToList();
+
+            if (dataStreamAttributes.Count > 0)
+            {
+                var typeName = ckType.TypeId.MakeClassName();
+                sb.AppendLine();
+                sb.AppendLine("/// <summary>");
+                sb.AppendLine($"/// Stream-data projection generated from construction kit type {ckType.TypeId.FullName}");
+                sb.AppendLine("/// </summary>");
+                sb.AppendLine($"public partial class Sd{typeName} : Meshmakers.Octo.Runtime.Contracts.StreamData.SdEntity");
+                sb.AppendLine("{");
+                foreach (var (dto, graph) in dataStreamAttributes)
+                {
+                    if (!string.IsNullOrWhiteSpace(graph.Description))
+                    {
+                        sb.AppendLine("  /// <summary>");
+                        sb.AppendLine($"  /// {graph.Description}");
+                        sb.AppendLine("  /// </summary>");
+                    }
+
+                    AttributeCodeGenerator.GenerateNullableProperty(dto, sb, graph);
+                }
+
+                sb.AppendLine("}");
+            }
+        }
+
         return sb.ToString();
     }
 

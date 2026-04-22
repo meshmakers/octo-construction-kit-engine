@@ -722,8 +722,32 @@ public static class RtPathEvaluator
 
                     if (pathTupleLocator.Index == null)
                     {
-                        throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes,
-                            pathTuple.Term);
+                        // No index specified: replace the entire array value.
+                        // Convert to a typed list matching the attribute type to avoid
+                        // serialization issues (e.g. JArray not supported by MongoDB BSON).
+                        if (setValue is IEnumerable setArray)
+                        {
+                            object typedList = pathTupleLocator.CkTypeAttributeGraph.ValueType switch
+                            {
+                                AttributeValueTypesDto.StringArray => setArray.Cast<object?>()
+                                    .Select(v => v?.ToString()).ToList(),
+                                AttributeValueTypesDto.IntArray => setArray.Cast<object?>()
+                                    .Select(v => v != null ? Convert.ToInt32(v) : 0).ToList(),
+                                _ => setArray.Cast<object?>().ToList()
+                            };
+
+                            pathTupleLocator.RtTypeWithAttributes.SetAttributeValue(
+                                pathTupleLocator.CkTypeAttributeGraph.AttributeName,
+                                pathTupleLocator.CkTypeAttributeGraph.ValueType,
+                                typedList);
+                        }
+                        else
+                        {
+                            throw InvalidPathException.PathNotSettable(pathTupleLocator.RtTypeWithAttributes,
+                                pathTuple.Term);
+                        }
+
+                        break;
                     }
 
                     if (!pathTupleLocator.RtTypeWithAttributes.Attributes.TryGetValue(pathTupleLocator

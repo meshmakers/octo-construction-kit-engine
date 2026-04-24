@@ -31,6 +31,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IsFinal = ckTypeDto.IsFinal;
         IsStreamType = ckTypeDto.IsStreamType;
         IsCollectionRoot = ckTypeDto.IsCollectionRoot;
+        EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         Description = ckTypeDto.Description;
         _baseTypes = [];
@@ -59,6 +60,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="indexes"></param>
     /// <param name="associations"></param>
     /// <param name="description"></param>
+    /// <param name="enableChangeStreamPreAndPostImages"></param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot, bool isStreamType,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -67,7 +69,8 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyCollection<CkGraphTypeInheritance> derivedTypes,
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
-        IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description)
+        IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description,
+        bool enableChangeStreamPreAndPostImages)
         : base(definedAttributes, allAttributes)
     {
         CkTypeId = ckTypeId;
@@ -75,6 +78,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IsFinal = isFinal;
         IsStreamType = isStreamType;
         IsCollectionRoot = isCollectionRoot;
+        EnableChangeStreamPreAndPostImages = enableChangeStreamPreAndPostImages;
         DerivedFromCkTypeId = derivedFromCkTypeId;
         DefiningCollectionRootCkTypeId = definingCollectionRootCkTypeId;
         Description = description;
@@ -145,7 +149,14 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// This information is gathered from the types.
     /// </summary>
     public bool IsStreamType { get; set; }
-    
+
+    /// <summary>
+    ///     Gets a value indicating whether the change stream should include pre- and post-images
+    ///     for this type's collection. Required on the collection-root CK type for
+    ///     <c>fullDocumentBeforeChange</c> filters to evaluate.
+    /// </summary>
+    public bool EnableChangeStreamPreAndPostImages { get; }
+
     /// <summary>
     ///     An optional description of the type
     /// </summary>

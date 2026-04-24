@@ -22,7 +22,7 @@ internal class ImportRtModelCommand(
     IRtJsonSerializer rtJsonSerializer)
     : IImportRtModelCommand
 {
-    private readonly HashSet<OctoObjectId> _entityImportIds = [];
+    private readonly ConcurrentDictionary<OctoObjectId, byte> _entityImportIds = new();
     private readonly ConcurrentQueue<RtAssociation> _importAssociationQueue = new();
 
     private readonly ConcurrentQueue<RtEntity> _importEntityQueue = new();
@@ -180,14 +180,11 @@ internal class ImportRtModelCommand(
             rtEntity.RtWellKnownName = modelRtEntity.RtWellKnownName;
             rtEntity.RtState = modelRtEntity.RtState;
 
-            if (_entityImportIds.Contains(rtEntity.RtId))
+            // Atomic check-and-insert across Parallel.ForEachAsync workers; HashSet is not
+            // thread-safe and a separate Contains + Add racily hits its internal resize.
+            if (!_entityImportIds.TryAdd(rtEntity.RtId, 0))
             {
                 logger.LogError("'{RtEntityRtId}' already imported", rtEntity.RtId);
-            }
-
-            lock (_entityImportIds)
-            {
-                _entityImportIds.Add(rtEntity.RtId);
             }
 
 #if !NETSTANDARD2_0

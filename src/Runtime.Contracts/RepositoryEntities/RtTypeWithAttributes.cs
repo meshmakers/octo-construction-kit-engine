@@ -712,7 +712,7 @@ public abstract class RtTypeWithAttributes
     /// <summary>
     ///     Sets an attribute value without any type conversion. Intended for hydration paths
     ///     where the raw value from the data source is assigned directly (e.g. CrateDB row dicts
-    ///     being poured into an <see cref="StreamData.SdEntity"/>).
+    ///     being poured into an <see cref="StreamData.StreamDataEntity"/>).
     /// </summary>
     public void SetAttributeRawValue(string attributeName, object? attributeValue)
     {

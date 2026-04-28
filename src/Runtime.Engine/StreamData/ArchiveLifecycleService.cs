@@ -20,13 +20,19 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// failure on the entity-store update converges cleanly without leaving partial state visible to
 /// callers (the status-first check keeps inserts and queries gated regardless).
 /// </remarks>
-internal sealed class ArchiveLifecycleService : IArchiveLifecycleService
+/// <summary>
+/// Default implementation of <see cref="IArchiveLifecycleService"/>. Public so per-tenant hosts
+/// (e.g. the MongoDB tenant context) can construct it directly with tenant-scoped dependencies
+/// without going through DI registration.
+/// </summary>
+public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 {
     private readonly ICkArchiveRuntimeStore _store;
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<ArchiveLifecycleService> _logger;
 
+    /// <summary>Constructs the lifecycle service. All four dependencies must be tenant-scoped.</summary>
     public ArchiveLifecycleService(
         ICkArchiveRuntimeStore store,
         IStreamDataRepository repository,
@@ -39,6 +45,7 @@ internal sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task ActivateAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);
@@ -59,6 +66,7 @@ internal sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
+    /// <inheritdoc />
     public async Task DisableAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);
@@ -72,8 +80,10 @@ internal sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await TransitionAsync(snapshot, CkArchiveStatus.Disabled);
     }
 
+    /// <inheritdoc />
     public Task EnableAsync(OctoObjectId archiveRtId) => ActivateAsync(archiveRtId);
 
+    /// <inheritdoc />
     public async Task RetryActivationAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);
@@ -87,6 +97,7 @@ internal sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
+    /// <inheritdoc />
     public async Task DeleteAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -31,4 +32,11 @@ public interface ICkArchiveRuntimeStore
     /// dropped separately by the lifecycle service via <see cref="IStreamDataRepository"/>.
     /// </summary>
     Task ArchiveEntityAsync(OctoObjectId archiveRtId);
+
+    /// <summary>
+    /// Enumerates every non-soft-deleted CkArchive entity in the tenant. Used by the startup
+    /// reconciliation job (concept §11) to compare Mongo state against CrateDB reality. Order is
+    /// implementation-defined; callers must not rely on it.
+    /// </summary>
+    IAsyncEnumerable<CkArchiveSnapshot> EnumerateAsync();
 }

@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <Description>OctoMesh StreamData construction kit model defining CkArchive and related types for archive-based time-series storage.</Description>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <PackageId>Meshmakers.Octo.ConstructionKit.Models.StreamData</PackageId>
+        <AssemblyName>Meshmakers.Octo.ConstructionKit.Models.StreamData</AssemblyName>
+        <RootNamespace>Meshmakers.Octo.ConstructionKit.Models.StreamData</RootNamespace>
+        <Configurations>Debug;Release;DebugL</Configurations>
+        <Platforms>AnyCPU</Platforms>
+        <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0'">true</OctoPublishCkModel>
+        <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net10.0'">true</OctoGenerateCkDocumentation>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <None Include="..\..\assets\meshmakers64.png">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>meshmakers64.png</Link>
+        </None>
+        <None Include="..\..\LICENSE">
+            <Pack>True</Pack>
+            <PackagePath/>
+            <Link>LICENSE</Link>
+        </None>
+    </ItemGroup>
+
+    <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->
+    <Import Project="../ConstructionKit.SourceGeneration/build/Meshmakers.Octo.ConstructionKit.SourceGeneration.props"/>
+
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.SourceGeneration\ConstructionKit.SourceGeneration.csproj" PrivateAssets="all"
+                          ReferenceOutputAssembly="false"
+                          ExcludeAssets="runtime"
+                          OutputItemType="Analyzer">
+        </ProjectReference>
+        <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
+        <ProjectReference Include="..\SystemCkModel\SystemCkModel.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <ConstructionKitFolder Visible="false" Include="$(MSBuildProjectDirectory)\ConstructionKit"/>
+    </ItemGroup>
+
+</Project>

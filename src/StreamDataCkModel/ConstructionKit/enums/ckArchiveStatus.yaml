@@ -1,0 +1,19 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkArchiveStatus
+    useFlags: false
+    isExtensible: false
+    description: "Lifecycle status of a CkArchive instance."
+    values:
+      - key: 0
+        name: Created
+        description: "Archive definition exists, but no Crate table has been provisioned. Inserts and queries are rejected."
+      - key: 1
+        name: Activated
+        description: "Crate table exists, schema is frozen, inserts and queries are accepted."
+      - key: 2
+        name: Disabled
+        description: "Crate table exists, but inserts and queries are rejected. Data is preserved."
+      - key: 3
+        name: Failed
+        description: "Activation failed; manual retry required. Inserts and queries are rejected."

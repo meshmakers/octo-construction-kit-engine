@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -109,10 +110,18 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     {
         var snapshot = await LoadAsync(archiveRtId);
 
+        using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.delete");
+        activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());
+        activity?.SetTag("streamdata.archive.from_status", snapshot.Status.ToString());
+
         // Crate first (idempotent), entity store last; matches §11.
         await _repository.DeleteArchiveAsync(archiveRtId);
         await _store.ArchiveEntityAsync(archiveRtId);
         await _audit.RecordDeletionAsync(_tenantId, archiveRtId, snapshot.Status);
+
+        StreamDataDiagnostics.Deletions.Add(1,
+            new("archive", archiveRtId.ToString()),
+            new("from_status", snapshot.Status.ToString()));
     }
 
     private async Task<CkArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
@@ -127,12 +136,28 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 
     private async Task EnsureCrateProvisionedAsync(CkArchiveSnapshot snapshot)
     {
+        using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.activate");
+        activity?.SetTag("streamdata.archive.rtid", snapshot.RtId.ToString());
+        activity?.SetTag("streamdata.archive.from_status", snapshot.Status.ToString());
+
+        var stopwatch = Stopwatch.StartNew();
         try
         {
             await _repository.EnsureArchiveCreatedAsync(snapshot);
+
+            stopwatch.Stop();
+            StreamDataDiagnostics.ActivationDurationMs.Record(stopwatch.Elapsed.TotalMilliseconds,
+                new("archive", snapshot.RtId.ToString()),
+                new("outcome", "success"));
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            StreamDataDiagnostics.ActivationDurationMs.Record(stopwatch.Elapsed.TotalMilliseconds,
+                new("archive", snapshot.RtId.ToString()),
+                new("outcome", "failed"));
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+
             _logger.LogError(ex,
                 "Failed to provision Crate table for archive {ArchiveRtId} (was {FromStatus})",
                 snapshot.RtId, snapshot.Status);
@@ -143,6 +168,11 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             {
                 await _store.SetStatusAsync(snapshot.RtId, CkArchiveStatus.Failed);
                 await _audit.RecordTransitionAsync(_tenantId, snapshot.RtId, snapshot.Status, CkArchiveStatus.Failed, ex.Message);
+
+                StreamDataDiagnostics.StatusTransitions.Add(1,
+                    new("archive", snapshot.RtId.ToString()),
+                    new("from", snapshot.Status.ToString()),
+                    new("to", CkArchiveStatus.Failed.ToString()));
             }
             catch (Exception bookkeepingEx)
             {
@@ -159,5 +189,14 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     {
         await _store.SetStatusAsync(from.RtId, toStatus);
         await _audit.RecordTransitionAsync(_tenantId, from.RtId, from.Status, toStatus, reason: null);
+
+        StreamDataDiagnostics.StatusTransitions.Add(1,
+            new("archive", from.RtId.ToString()),
+            new("from", from.Status.ToString()),
+            new("to", toStatus.ToString()));
+
+        _logger.LogInformation(
+            "CkArchive {ArchiveRtId} transitioned {FromStatus} → {ToStatus}",
+            from.RtId, from.Status, toStatus);
     }
 }

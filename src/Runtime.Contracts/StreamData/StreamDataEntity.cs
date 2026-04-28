@@ -12,19 +12,19 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 ///     <see cref="RtWellKnownName"/>, <see cref="RtCreationDateTime"/>, <see cref="RtChangedDateTime"/>).
 /// </summary>
 [DebuggerDisplay("{CkTypeId}@{RtId}@{Timestamp}")]
-public class SdEntity : RtTypeWithAttributes
+public class StreamDataEntity : RtTypeWithAttributes
 {
     /// <summary>
-    ///     Creates a new instance of <see cref="SdEntity"/>.
+    ///     Creates a new instance of <see cref="StreamDataEntity"/>.
     /// </summary>
-    public SdEntity()
+    public StreamDataEntity()
     {
     }
 
     /// <summary>
-    ///     Creates a new instance of <see cref="SdEntity"/> with the attribute bag pre-populated.
+    ///     Creates a new instance of <see cref="StreamDataEntity"/> with the attribute bag pre-populated.
     /// </summary>
-    public SdEntity(IReadOnlyDictionary<string, object?> attributes)
+    public StreamDataEntity(IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
     }

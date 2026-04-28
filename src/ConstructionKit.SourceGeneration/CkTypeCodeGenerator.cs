@@ -86,7 +86,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
 
         sb.AppendLine("}");
 
-        // Emit Sd{CkType} : SdEntity only when at least one attribute is a data-stream attribute.
+        // Emit Sd{CkType} : StreamDataEntity only when at least one attribute is a data-stream attribute.
         if (ckType.Attributes != null)
         {
             var dataStreamAttributes = ckType.Attributes
@@ -101,7 +101,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
                 sb.AppendLine("/// <summary>");
                 sb.AppendLine($"/// Stream-data projection generated from construction kit type {ckType.TypeId.FullName}");
                 sb.AppendLine("/// </summary>");
-                sb.AppendLine($"public partial class Sd{typeName} : Meshmakers.Octo.Runtime.Contracts.StreamData.SdEntity");
+                sb.AppendLine($"public partial class Sd{typeName} : Meshmakers.Octo.Runtime.Contracts.StreamData.StreamDataEntity");
                 sb.AppendLine("{");
                 foreach (var (dto, graph) in dataStreamAttributes)
                 {

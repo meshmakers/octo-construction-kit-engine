@@ -10,6 +10,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.StreamData;
 
 public class ArchiveLifecycleServiceTests
 {
+    private const string TenantId = "tenant-x";
     private static readonly OctoObjectId Rt = OctoObjectId.GenerateNewId();
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("TempSensor"));
 
@@ -18,7 +19,7 @@ public class ArchiveLifecycleServiceTests
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
     private ArchiveLifecycleService NewSut() =>
-        new(_store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance);
+        new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance);
 
     private void Stub(CkArchiveStatus status) =>
         A.CallTo(() => _store.GetAsync(Rt))
@@ -33,7 +34,7 @@ public class ArchiveLifecycleServiceTests
         // Crate first, store last (concept §11 ordering check via call-order on fakes).
         A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappenedOnceExactly();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => _audit.RecordTransitionAsync(Rt, CkArchiveStatus.Created, CkArchiveStatus.Activated, null))
+        A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Created, CkArchiveStatus.Activated, null))
             .MustHaveHappenedOnceExactly();
     }
 
@@ -77,7 +78,7 @@ public class ArchiveLifecycleServiceTests
         await Assert.ThrowsAsync<ArchiveActivationFailedException>(() => NewSut().ActivateAsync(Rt));
 
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Failed)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => _audit.RecordTransitionAsync(Rt, CkArchiveStatus.Created, CkArchiveStatus.Failed, "crate boom"))
+        A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Created, CkArchiveStatus.Failed, "crate boom"))
             .MustHaveHappenedOnceExactly();
         // Status was never set to Activated.
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustNotHaveHappened();
@@ -155,7 +156,7 @@ public class ArchiveLifecycleServiceTests
 
         A.CallTo(() => _repo.DeleteArchiveAsync(Rt)).MustHaveHappenedOnceExactly();
         A.CallTo(() => _store.ArchiveEntityAsync(Rt)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => _audit.RecordDeletionAsync(Rt, from)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _audit.RecordDeletionAsync(TenantId, Rt, from)).MustHaveHappenedOnceExactly();
     }
 
     [Fact]

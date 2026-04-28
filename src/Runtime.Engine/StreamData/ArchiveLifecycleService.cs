@@ -27,18 +27,25 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// </summary>
 public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 {
+    private readonly string _tenantId;
     private readonly ICkArchiveRuntimeStore _store;
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<ArchiveLifecycleService> _logger;
 
-    /// <summary>Constructs the lifecycle service. All four dependencies must be tenant-scoped.</summary>
+    /// <summary>
+    /// Constructs the lifecycle service. The store and stream-data repository must be
+    /// tenant-scoped; the audit trail can be either tenant-scoped or shared (the tenant id is
+    /// passed explicitly into every audit call).
+    /// </summary>
     public ArchiveLifecycleService(
+        string tenantId,
         ICkArchiveRuntimeStore store,
         IStreamDataRepository repository,
         IArchiveAuditTrail audit,
         ILogger<ArchiveLifecycleService> logger)
     {
+        _tenantId = tenantId;
         _store = store;
         _repository = repository;
         _audit = audit;
@@ -105,7 +112,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // Crate first (idempotent), entity store last; matches §11.
         await _repository.DeleteArchiveAsync(archiveRtId);
         await _store.ArchiveEntityAsync(archiveRtId);
-        await _audit.RecordDeletionAsync(archiveRtId, snapshot.Status);
+        await _audit.RecordDeletionAsync(_tenantId, archiveRtId, snapshot.Status);
     }
 
     private async Task<CkArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
@@ -135,7 +142,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             try
             {
                 await _store.SetStatusAsync(snapshot.RtId, CkArchiveStatus.Failed);
-                await _audit.RecordTransitionAsync(snapshot.RtId, snapshot.Status, CkArchiveStatus.Failed, ex.Message);
+                await _audit.RecordTransitionAsync(_tenantId, snapshot.RtId, snapshot.Status, CkArchiveStatus.Failed, ex.Message);
             }
             catch (Exception bookkeepingEx)
             {
@@ -151,6 +158,6 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private async Task TransitionAsync(CkArchiveSnapshot from, CkArchiveStatus toStatus)
     {
         await _store.SetStatusAsync(from.RtId, toStatus);
-        await _audit.RecordTransitionAsync(from.RtId, from.Status, toStatus, reason: null);
+        await _audit.RecordTransitionAsync(_tenantId, from.RtId, from.Status, toStatus, reason: null);
     }
 }

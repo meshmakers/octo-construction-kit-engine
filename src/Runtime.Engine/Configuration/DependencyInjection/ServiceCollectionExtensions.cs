@@ -84,9 +84,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkModelMigrationService, CkModelMigrationService>();
         services.AddTransient<ICkModelUpgradeService, CkModelUpgradeService>();
 
-        // StreamData archive lifecycle. Concept §3, §11. The two store dependencies
-        // (ICkArchiveRuntimeStore, IArchiveAuditTrail) and IStreamDataRepository must be supplied
-        // by the host project (mongodb / event bus) — this registration only wires the orchestrator.
+        // StreamData archive lifecycle. Concept §3, §11. ICkArchiveRuntimeStore and
+        // IStreamDataRepository must still be supplied by the host project (Mongo / CrateDB);
+        // the audit-trail default writes structured log entries, which a host can replace by
+        // registering a different IArchiveAuditTrail implementation later.
+        services.AddTransient<IArchiveAuditTrail, LoggingArchiveAuditTrail>();
         services.AddTransient<IArchiveLifecycleService, ArchiveLifecycleService>();
 
         return new RuntimeEngineBuilder(services);

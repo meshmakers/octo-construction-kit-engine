@@ -13,9 +13,12 @@ public interface IArchiveAuditTrail
     /// <summary>
     /// Records a status transition. <paramref name="reason"/> carries the underlying error code
     /// or free-text reason for transitions to <see cref="CkArchiveStatus.Failed"/>; <c>null</c>
-    /// for routine transitions.
+    /// for routine transitions. <paramref name="tenantId"/> identifies the tenant whose archive
+    /// transitioned; consumers (notification bus, audit log) need it for routing and
+    /// correlation.
     /// </summary>
     Task RecordTransitionAsync(
+        string tenantId,
         OctoObjectId archiveRtId,
         CkArchiveStatus from,
         CkArchiveStatus to,
@@ -24,5 +27,5 @@ public interface IArchiveAuditTrail
     /// <summary>
     /// Records a deletion (any state → soft-deleted entity + dropped Crate table).
     /// </summary>
-    Task RecordDeletionAsync(OctoObjectId archiveRtId, CkArchiveStatus statusAtDeletion);
+    Task RecordDeletionAsync(string tenantId, OctoObjectId archiveRtId, CkArchiveStatus statusAtDeletion);
 }

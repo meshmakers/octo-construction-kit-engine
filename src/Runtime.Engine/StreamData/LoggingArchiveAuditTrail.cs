@@ -22,6 +22,7 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
 
     /// <inheritdoc />
     public Task RecordTransitionAsync(
+        string tenantId,
         OctoObjectId archiveRtId,
         CkArchiveStatus from,
         CkArchiveStatus to,
@@ -30,24 +31,24 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
         if (reason is null)
         {
             _logger.LogInformation(
-                "Archive {ArchiveRtId} transitioned {FromStatus} → {ToStatus}",
-                archiveRtId, from, to);
+                "Archive {ArchiveRtId} (tenant {TenantId}) transitioned {FromStatus} → {ToStatus}",
+                archiveRtId, tenantId, from, to);
         }
         else
         {
             _logger.LogWarning(
-                "Archive {ArchiveRtId} transitioned {FromStatus} → {ToStatus}: {Reason}",
-                archiveRtId, from, to, reason);
+                "Archive {ArchiveRtId} (tenant {TenantId}) transitioned {FromStatus} → {ToStatus}: {Reason}",
+                archiveRtId, tenantId, from, to, reason);
         }
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
-    public Task RecordDeletionAsync(OctoObjectId archiveRtId, CkArchiveStatus statusAtDeletion)
+    public Task RecordDeletionAsync(string tenantId, OctoObjectId archiveRtId, CkArchiveStatus statusAtDeletion)
     {
         _logger.LogInformation(
-            "Archive {ArchiveRtId} deleted (was {StatusAtDeletion})",
-            archiveRtId, statusAtDeletion);
+            "Archive {ArchiveRtId} (tenant {TenantId}) deleted (was {StatusAtDeletion})",
+            archiveRtId, tenantId, statusAtDeletion);
         return Task.CompletedTask;
     }
 }

@@ -1,0 +1,11 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+  - recordId: CkArchiveColumn
+    description: "Single column definition inside a CkArchive: the attribute path to capture and whether it is required and indexed."
+    attributes:
+      - id: ${this}/CkArchiveColumn.Path
+        name: Path
+      - id: ${this}/CkArchiveColumn.Required
+        name: Required
+      - id: ${this}/CkArchiveColumn.Indexed
+        name: Indexed

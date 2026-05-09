@@ -104,4 +104,16 @@ public class ModelValidationException : CkModelException
         return new ModelValidationException(
             $"Dependencies '{modelIds}' are unknown construction kit model libraries. This may happen because dependencies to other construction kit models are missing.");
     }
+
+    internal static Exception MultipleVersionsOfCkModel(string modelName, IEnumerable<CkModelId> conflictingModelIds, IEnumerable<CkModelId> originModelIds)
+    {
+        var versions = string.Join(", ", conflictingModelIds.Select(m => m.FullName));
+        var origins = string.Join(", ", originModelIds.Select(m => m.FullName));
+        return new ModelValidationException(
+            $"Multiple versions of construction kit model '{modelName}' were resolved as transitive dependencies: {versions}. " +
+            $"Conflicting versions are referenced by: {origins}. " +
+            "This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. " +
+            "Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, " +
+            "or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled).");
+    }
 }

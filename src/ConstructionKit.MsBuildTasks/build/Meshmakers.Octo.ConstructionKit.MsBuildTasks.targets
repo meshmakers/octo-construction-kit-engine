@@ -44,6 +44,8 @@
                    PublishCkModel="$(OctoPublishCkModel)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
+                   IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"
+                   IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
                    PrivateGitHubApiKey="$(OctoPrivateGitHubApiKey)"
                    PublicGitHubApiKey="$(OctoPublicGitHubApiKey)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
@@ -78,6 +80,8 @@
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
+                   IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"
+                   IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
                    OutputPath="$(OctoCkCompileOutputImportFolder)"
                    CacheFilePath="$(OctoCkCompileCacheImportFolder)">
             <Output TaskParameter="CompiledModelFiles" ItemName="CompiledModelFiles" />

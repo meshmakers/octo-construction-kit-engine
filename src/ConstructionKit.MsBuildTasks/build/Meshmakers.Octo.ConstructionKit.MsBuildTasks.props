@@ -20,6 +20,8 @@
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>
         <OctoPublishCatalog Condition="'$(OctoPublishCatalog)' == ''">LocalFileSystemCatalog</OctoPublishCatalog>
         <OctoLocalCatalogIsEnabled Condition="'$(OctoLocalCatalogIsEnabled)' == ''">true</OctoLocalCatalogIsEnabled>
+        <OctoPublicGitHubCatalogIsEnabled Condition="'$(OctoPublicGitHubCatalogIsEnabled)' == ''">true</OctoPublicGitHubCatalogIsEnabled>
+        <OctoPrivateGitHubCatalogIsEnabled Condition="'$(OctoPrivateGitHubCatalogIsEnabled)' == ''">true</OctoPrivateGitHubCatalogIsEnabled>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
     </PropertyGroup>

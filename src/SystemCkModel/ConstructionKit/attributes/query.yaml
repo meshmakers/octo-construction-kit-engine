@@ -63,6 +63,9 @@ attributes:
   - id: StreamDataQuery.Columns
     description: "Array of isDataStream attribute names to include as CrateDB data columns."
     valueType: StringArray
+  - id: StreamDataQuery.ArchiveRtId
+    description: "Runtime id of the CkArchive (concept §3) this query targets at execution time. Stored as OctoObjectId string."
+    valueType: String
   - id: StreamDataQuery.RtIds
     description: "Optional list of runtime entity IDs to scope the stream data query."
     valueType: StringArray

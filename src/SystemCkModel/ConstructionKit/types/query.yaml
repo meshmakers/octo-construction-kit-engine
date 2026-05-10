@@ -73,11 +73,14 @@ types:
         name: AttributeSearchFilter
         isOptional: true
   - typeId: StreamDataQuery
-    description: "Abstract base for stream-data query types. Carries the common time-range, limit, rtId scope, and field-filter attributes shared by all concrete SdQuery subtypes."
+    description: "Abstract base for stream-data query types. Carries the common time-range, limit, rtId scope, archive reference, and field-filter attributes shared by all concrete SdQuery subtypes."
     derivedFromCkTypeId: ${this}/PersistentQuery
     isFinal: false
     isAbstract: true
     attributes:
+      - id: ${this}/StreamDataQuery.ArchiveRtId
+        name: ArchiveRtId
+        isOptional: true
       - id: ${this}/StreamDataQuery.RtIds
         name: RtIds
         isOptional: true

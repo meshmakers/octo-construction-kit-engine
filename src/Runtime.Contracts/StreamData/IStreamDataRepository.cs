@@ -30,12 +30,14 @@ public interface IStreamDataRepository
     // --- Per-archive control plane ------------------------------------------------------------
 
     /// <summary>
-    /// Creates the storage table for the archive identified by <paramref name="archiveRtId"/>
-    /// according to its current <c>CkArchive</c> definition. Idempotent (uses
-    /// <c>CREATE TABLE IF NOT EXISTS</c>) so retries after a transient Mongo update failure
-    /// converge cleanly.
+    /// Creates the storage table for the archive described by <paramref name="snapshot"/> according
+    /// to its current <c>CkArchive</c> definition. The snapshot carries the target CK type and
+    /// user-picked columns the data store needs to generate DDL — passing it directly avoids a
+    /// round-trip through <see cref="ICkArchiveRuntimeStore"/> from inside the repository.
+    /// Idempotent (uses <c>CREATE TABLE IF NOT EXISTS</c>) so retries after a transient Mongo
+    /// update failure converge cleanly.
     /// </summary>
-    Task EnsureArchiveCreatedAsync(OctoObjectId archiveRtId);
+    Task EnsureArchiveCreatedAsync(CkArchiveSnapshot snapshot);
 
     /// <summary>
     /// Drops the storage table for the archive identified by <paramref name="archiveRtId"/>.

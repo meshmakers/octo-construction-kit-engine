@@ -129,7 +129,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     {
         try
         {
-            await _repository.EnsureArchiveCreatedAsync(snapshot.RtId);
+            await _repository.EnsureArchiveCreatedAsync(snapshot);
         }
         catch (Exception ex)
         {

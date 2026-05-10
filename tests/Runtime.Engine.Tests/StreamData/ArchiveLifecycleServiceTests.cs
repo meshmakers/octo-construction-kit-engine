@@ -23,7 +23,7 @@ public class ArchiveLifecycleServiceTests
 
     private void Stub(CkArchiveStatus status) =>
         A.CallTo(() => _store.GetAsync(Rt))
-            .Returns(new CkArchiveSnapshot(Rt, TargetType, status, null));
+            .Returns(new CkArchiveSnapshot(Rt, TargetType, status, null, Array.Empty<CkArchiveColumnSpec>()));
 
     [Fact]
     public async Task Activate_FromCreated_ProvisionsCrateThenSetsActivated()
@@ -32,7 +32,7 @@ public class ArchiveLifecycleServiceTests
         await NewSut().ActivateAsync(Rt);
 
         // Crate first, store last (concept §11 ordering check via call-order on fakes).
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt))).MustHaveHappenedOnceExactly();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
         A.CallTo(() => _audit.RecordTransitionAsync(TenantId, Rt, CkArchiveStatus.Created, CkArchiveStatus.Activated, null))
             .MustHaveHappenedOnceExactly();
@@ -44,7 +44,7 @@ public class ArchiveLifecycleServiceTests
         Stub(CkArchiveStatus.Disabled);
         await NewSut().ActivateAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt))).MustHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappened();
     }
 
@@ -54,7 +54,7 @@ public class ArchiveLifecycleServiceTests
         Stub(CkArchiveStatus.Failed);
         await NewSut().ActivateAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt))).MustHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappened();
     }
 
@@ -64,7 +64,7 @@ public class ArchiveLifecycleServiceTests
         Stub(CkArchiveStatus.Activated);
         await NewSut().ActivateAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>._)).MustNotHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
     }
 
@@ -72,7 +72,7 @@ public class ArchiveLifecycleServiceTests
     public async Task Activate_DdlFails_FlipsToFailedAndThrowsActivationFailedException()
     {
         Stub(CkArchiveStatus.Created);
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt))
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt)))
             .Throws(new InvalidOperationException("crate boom"));
 
         await Assert.ThrowsAsync<ArchiveActivationFailedException>(() => NewSut().ActivateAsync(Rt));
@@ -91,7 +91,7 @@ public class ArchiveLifecycleServiceTests
         await NewSut().DisableAsync(Rt);
 
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Disabled)).MustHaveHappenedOnceExactly();
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>._)).MustNotHaveHappened();
         A.CallTo(() => _repo.DeleteArchiveAsync(A<OctoObjectId>._)).MustNotHaveHappened();
     }
 
@@ -119,7 +119,7 @@ public class ArchiveLifecycleServiceTests
         Stub(CkArchiveStatus.Disabled);
         await NewSut().EnableAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt))).MustHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappened();
     }
 
@@ -129,7 +129,7 @@ public class ArchiveLifecycleServiceTests
         Stub(CkArchiveStatus.Failed);
         await NewSut().RetryActivationAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(Rt)).MustHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>.That.Matches(s => s.RtId == Rt))).MustHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappened();
     }
 

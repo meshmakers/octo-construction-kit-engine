@@ -225,6 +225,8 @@ The engine automatically bridges version gaps at **both ends** of the migration 
 
 **End gap**: When the migration chain doesn't reach the exact target version (e.g., chain ends at `3.1.1` but new model is `3.1.2`), the engine executes all available migrations and treats the remaining version bump as schema-only.
 
+**No-migrations bridge**: When a CK model defines no migration scripts at all but the target version is strictly greater than the installed version, the entire `fromVersion → toVersion` jump is treated as a single schema-only no-op step. This lets a CK model ship a purely additive version bump (e.g., adding a new type) without authoring an empty `migration-meta.yaml` + tombstone script.
+
 **Example**: A tenant at version `2.2.0` receiving model version `3.1.2` with migrations defined from `3.0.1` to `3.1.1`:
 
 ```
@@ -246,7 +248,8 @@ The engine resolves migration paths in this order:
 2. **Multi-hop path** — BFS through the migration chain to the exact target
 3. **Auto-bridged path** — bridge version gaps at start and/or end of chain
 4. **Partial path** — direct migration to the closest reachable version
-5. **No path** — version recorded as schema-only upgrade (warning logged)
+5. **No-migrations bridge** — model defines no migration scripts at all; if `toVersion > fromVersion`, returned as a single schema-only no-op step
+6. **No path** — only reached for same-version or downgrade cases without scripts; surfaced as "No migration path found"
 
 ## Pre-Conditions
 

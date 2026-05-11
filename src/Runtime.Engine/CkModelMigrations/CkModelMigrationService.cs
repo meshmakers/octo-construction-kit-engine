@@ -195,6 +195,38 @@ internal class CkModelMigrationService : ICkModelMigrationService
         if (!await _contentProvider.HasMigrationsAsync(toModel, cancellationToken).ConfigureAwait(false))
         {
             _logger.LogDebug("No migrations found for CK model {Model}", toModel);
+
+            // Pure schema-only upgrade: no migration scripts exist for this model at all, but the
+            // target version is strictly greater than the installed version. Treat as a single no-op
+            // bridge step. Same idea as the in-chain auto-bridge below but with no chain to extend.
+            // Lets developers ship additive-only CK model bumps (e.g., adding a new type) without
+            // having to author an empty migration-meta + tombstone script.
+            if (fromModel.Version.CompareTo(toModel.Version) < 0)
+            {
+                _logger.LogInformation(
+                    "No migration scripts defined for CK model {ModelName}; treating {FromVersion} -> {ToVersion} as schema-only upgrade (no data migration needed).",
+                    fromModel.Name, fromModel.Version, toModel.Version);
+
+                return new CkMigrationPath
+                {
+                    FromModel = fromModel,
+                    ToModel = toModel,
+                    HasBreakingChanges = false,
+                    Description = $"Schema-only upgrade from {fromModel.Version} to {toModel.Version} (no data migration needed)",
+                    Steps =
+                    [
+                        new CkMigrationStep
+                        {
+                            FromVersion = fromModel.Version.ToString(),
+                            ToVersion = toModel.Version.ToString(),
+                            Script = null,
+                            Description = $"Schema-only upgrade from {fromModel.Version} to {toModel.Version} (no data migration needed)",
+                            Breaking = false
+                        }
+                    ]
+                };
+            }
+
             return null;
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -13,6 +14,22 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// </summary>
 public interface IRollupArchiveLifecycleService
 {
+    /// <summary>
+    /// Creates a new CkRollupArchive entity in <see cref="CkArchiveStatus.Created"/> from a
+    /// rollup-specific input. The inherited CkArchive attributes <c>TargetCkTypeId</c> (from the
+    /// source archive) and <c>Columns</c> (from <see cref="RollupColumnGenerator.Generate"/>) are
+    /// resolved server-side so callers don't have to duplicate the column-derivation rule.
+    /// Concept §4. Throws <see cref="ArchiveNotFoundException"/> if
+    /// <paramref name="sourceArchiveRtId"/> doesn't resolve.
+    /// </summary>
+    /// <returns>The generated runtime id of the new rollup archive.</returns>
+    Task<OctoObjectId> CreateAsync(
+        string? rtWellKnownName,
+        OctoObjectId sourceArchiveRtId,
+        TimeSpan bucketSize,
+        TimeSpan watermarkLag,
+        IReadOnlyList<CkRollupAggregationSpec> aggregations);
+
     /// <summary>
     /// Sets <see cref="CkRollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.
     /// Monotonic: rejected when <paramref name="until"/> is earlier than the current value

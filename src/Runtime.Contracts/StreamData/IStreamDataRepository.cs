@@ -1,5 +1,7 @@
 #pragma warning disable CS1591 // Missing XML comments on stream data contracts
+using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -84,4 +86,28 @@ public interface IStreamDataRepository
     /// </summary>
     Task<StreamDataQueryResult> ExecuteDownsamplingQueryAsync(
         OctoObjectId archiveRtId, StreamDataDownsamplingQueryOptions options);
+
+    // --- Rollup data plane --------------------------------------------------------------------
+
+    /// <summary>
+    /// Aggregates one bucket from <paramref name="sourceArchive"/> into <paramref name="rollup"/>:
+    /// reads source rows with <c>timestamp ∈ [bucketStart, bucketEnd)</c>, groups by <c>rtId</c>,
+    /// applies the <see cref="CkRollupAggregationSpec"/> aggregations, and upserts one row per
+    /// entity into the rollup archive's table with <c>timestamp = bucketEnd</c>. Rollup-archives
+    /// concept §5.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent on the natural key <c>(timestamp, rtId)</c>: when the same bucket is
+    /// re-aggregated (e.g. after a watermark rewind, or a crash before
+    /// <see cref="ICkRollupArchiveRuntimeStore.AdvanceWatermarkAsync"/> committed), the
+    /// implementation must collapse duplicates via the data store's upsert primitive
+    /// (CrateDB: <c>ON CONFLICT (timestamp, rtId) DO UPDATE</c>) so the orchestrator can
+    /// always retry safely. Returns the number of upserted target rows.
+    /// </remarks>
+    Task<int> AggregateBucketAsync(
+        CkArchiveSnapshot sourceArchive,
+        CkRollupArchiveSnapshot rollup,
+        DateTime bucketStart,
+        DateTime bucketEnd,
+        CancellationToken cancellationToken);
 }

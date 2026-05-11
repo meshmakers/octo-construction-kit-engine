@@ -195,7 +195,7 @@ public class LocalFileSystemCatalogTests : IDisposable
         await PublishModel(new CkModelId("TestModel", "1.0.0"), null);
 
         var operationResult = new OperationResult();
-        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult))
+        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult, A<bool>._))
             .Returns(Task.FromResult(expectedModel));
 
         // Act
@@ -203,7 +203,7 @@ public class LocalFileSystemCatalogTests : IDisposable
 
         // Assert
         Assert.Equal(expectedModel, result);
-        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult))
+        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult, A<bool>._))
             .MustHaveHappenedOnceExactly();
     }
 
@@ -233,7 +233,7 @@ public class LocalFileSystemCatalogTests : IDisposable
         var operationResult = new OperationResult();
         operationResult.AddMessage(new OperationMessage(MessageLevel.Error, "Test", 1, "Deserialization failed"));
 
-        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult))
+        A.CallTo(() => _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, operationResult, A<bool>._))
             .Returns(Task.FromResult(new CkCompiledModelRoot { ModelId = modelId }));
 
         // Act & Assert
@@ -570,7 +570,7 @@ public class LocalFileSystemCatalogTests : IDisposable
         A.CallTo(() => _mockJsonSerializer.SerializeAsync(A<StreamWriter>._, compiledModel))
             .Returns(Task.CompletedTask);
         A.CallTo(() =>
-                _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._))
+                _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
             .Returns(Task.FromResult(compiledModel));
 
         // Act - Publish

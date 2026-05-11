@@ -22,6 +22,14 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
 
     public bool RequireFormatValidation { get; set; }
 
+    /// <summary>
+    /// When true, failures caused exclusively by the JSON Schema `additionalProperties` keyword
+    /// are tolerated: the converter deserializes the payload anyway and drops the unknown fields.
+    /// Used for forward-compatible reads from persisted catalogs after schema changes that remove
+    /// properties. Other schema violations still fail the read.
+    /// </summary>
+    public bool IgnoreAdditionalProperties { get; set; }
+
     public override T? Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
@@ -37,7 +45,7 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
             OutputFormat = OutputFormat,
             RequireFormatValidation = RequireFormatValidation
         });
-        if (evaluationResults.IsValid)
+        if (evaluationResults.IsValid || (IgnoreAdditionalProperties && OnlyAdditionalPropertiesFailures(evaluationResults)))
         {
             var options1 = _optionsFactory(options);
             return JsonSerializer.Deserialize<T>(ref reader, options1);
@@ -51,6 +59,28 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
             }
         };
         throw jsonException;
+    }
+
+    private static bool OnlyAdditionalPropertiesFailures(EvaluationResults evaluationResults)
+    {
+        if (evaluationResults.IsValid)
+        {
+            return true;
+        }
+
+        var details = evaluationResults.Details;
+        if (details == null)
+        {
+            return false;
+        }
+
+        var failingDetails = details.Where(d => d.Errors != null && d.Errors.Count > 0).ToList();
+        if (failingDetails.Count == 0)
+        {
+            return false;
+        }
+
+        return failingDetails.All(d => d.EvaluationPath.ToString().Contains("/additionalProperties"));
     }
 
     public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)

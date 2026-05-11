@@ -29,8 +29,14 @@ public interface ICkSchemaValidator
     /// <param name="stream">Stream containing construction kit model in JSON format.</param>
     /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
+    /// <param name="tolerantToUnknownProperties">
+    ///     When true, `additionalProperties: false` violations are skipped. Other schema violations still fail.
+    ///     Use only when reading from persisted catalogs after schema changes that removed properties; do not use
+    ///     on the publish/compile path.
+    /// </param>
     /// <returns></returns>
-    bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult);
+    bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false);
 
     /// <summary>
     ///     Validates the elements in the stream using YAML format.
@@ -65,8 +71,14 @@ public interface ICkSchemaValidator
     /// <param name="stream">Stream containing construction kit model in YAML format.</param>
     /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
+    /// <param name="tolerantToUnknownProperties">
+    ///     When true, `additionalProperties: false` violations are skipped. Other schema violations still fail.
+    ///     Use only when reading from persisted catalogs after schema changes that removed properties; do not use
+    ///     on the publish/compile path.
+    /// </param>
     /// <returns></returns>
-    bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult);
+    bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false);
 
     /// <summary>
     ///     Validates a CK migration metadata file in YAML format.

@@ -145,7 +145,8 @@ public class LocalFileSystemCatalog : CachedCatalog
         await using var streamReader = File.OpenRead(compiledModelFilePath);
 #endif
         var compiledModelRoot = await _ckJsonSerializer
-            .DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult)
+            .DeserializeCompiledModelRootAsync(streamReader, compiledModelFilePath, operationResult,
+                tolerantToUnknownProperties: true)
             .ConfigureAwait(false);
         if (operationResult.HasErrors)
         {

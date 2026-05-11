@@ -7,4 +7,6 @@ internal interface IOctoValidatingJsonConverter
     OutputFormat OutputFormat { get; set; }
 
     bool RequireFormatValidation { get; set; }
+
+    bool IgnoreAdditionalProperties { get; set; }
 }

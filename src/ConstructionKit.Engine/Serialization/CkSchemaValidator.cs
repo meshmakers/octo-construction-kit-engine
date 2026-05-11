@@ -26,9 +26,10 @@ internal class CkSchemaValidator : ICkSchemaValidator
     }
 
     /// <inheritdoc />
-    public bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult)
+    public bool ValidateCompiledModelInJson(Stream stream, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false)
     {
-        return ValidateModelJson(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult);
+        return ValidateModelJson(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult, tolerantToUnknownProperties);
     }
 
     /// <inheritdoc />
@@ -50,9 +51,10 @@ internal class CkSchemaValidator : ICkSchemaValidator
     }
 
     /// <inheritdoc />
-    public bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult)
+    public bool ValidateCompiledModelInYaml(Stream stream, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false)
     {
-        return ValidateModelYaml(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult);
+        return ValidateModelYaml(stream, CkSchema.GetCompiledModelSchema(), locationReference, operationResult, tolerantToUnknownProperties);
     }
 
     /// <inheritdoc />
@@ -67,16 +69,18 @@ internal class CkSchemaValidator : ICkSchemaValidator
         return ValidateModelYaml(stream, CkSchema.GetMigrationScriptSchema(), locationReference, operationResult);
     }
 
-    private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
+    private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false)
     {
         using var document = System.Text.Json.JsonDocument.Parse(stream);
         var jsonElement = document.RootElement;
 
         var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement, tolerantToUnknownProperties);
     }
 
-    private static bool ValidateModelYaml(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
+    private static bool ValidateModelYaml(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult,
+        bool tolerantToUnknownProperties = false)
     {
         using var memoryStream = new MemoryStream();
         stream.CopyTo(memoryStream);
@@ -99,36 +103,55 @@ internal class CkSchemaValidator : ICkSchemaValidator
         var jsonElement = document.RootElement;
 
         var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
-        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement);
+        return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement, tolerantToUnknownProperties);
     }
 
     private static bool ValidateEvaluationResults(string locationReference, OperationResult operationResult,
-        EvaluationResults evaluationResults, System.Text.Json.JsonElement? rootElement = null)
+        EvaluationResults evaluationResults, System.Text.Json.JsonElement? rootElement = null,
+        bool tolerantToUnknownProperties = false)
     {
-        if (!evaluationResults.IsValid)
+        if (evaluationResults.IsValid)
         {
-            // In JsonSchema.Net 8.0, HasErrors was removed. Check for errors using Errors property.
-            // Details may be null, and Errors is now Dictionary<string, string> (not nullable)
-            var details = evaluationResults.Details;
-            if (details != null)
+            return true;
+        }
+
+        var details = evaluationResults.Details;
+        if (details == null)
+        {
+            return false;
+        }
+
+        var failingDetails = details.Where(x => x.Errors != null && x.Errors.Count > 0).ToList();
+
+        if (tolerantToUnknownProperties)
+        {
+            // additionalProperties violations show up in the EvaluationPath of the failing detail
+            // (e.g. "/properties/types/items/$ref/.../additionalProperties"). Strip them out and
+            // re-check whether anything else still fails.
+            failingDetails = failingDetails
+                .Where(d => !d.EvaluationPath.ToString().Contains("/additionalProperties"))
+                .ToList();
+            if (failingDetails.Count == 0)
             {
-                foreach (var evaluationResult in details.Where(x => x.Errors != null && x.Errors.Count > 0))
-                {
-                    var path = evaluationResult.InstanceLocation.ToString();
-                    var errorMessages = evaluationResult.Errors != null
-                        ? string.Join(", ", evaluationResult.Errors.Values)
-                        : string.Empty;
-
-                    // Get detailed information about the failing object
-                    var objectDetails = GetObjectDetails(rootElement, evaluationResult.InstanceLocation);
-                    var enhancedErrorMessage = string.IsNullOrEmpty(objectDetails) ? errorMessages : $"{errorMessages}. Object details: {objectDetails}";
-
-                    operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, enhancedErrorMessage));
-                }
+                return true;
             }
         }
 
-        return evaluationResults.IsValid;
+        foreach (var evaluationResult in failingDetails)
+        {
+            var path = evaluationResult.InstanceLocation.ToString();
+            var errorMessages = evaluationResult.Errors != null
+                ? string.Join(", ", evaluationResult.Errors.Values)
+                : string.Empty;
+
+            // Get detailed information about the failing object
+            var objectDetails = GetObjectDetails(rootElement, evaluationResult.InstanceLocation);
+            var enhancedErrorMessage = string.IsNullOrEmpty(objectDetails) ? errorMessages : $"{errorMessages}. Object details: {objectDetails}";
+
+            operationResult.AddMessage(MessageCodes.SchemaValidationError(locationReference, path, enhancedErrorMessage));
+        }
+
+        return false;
     }
 
     private const int MaxDisplayedProperties = 10;

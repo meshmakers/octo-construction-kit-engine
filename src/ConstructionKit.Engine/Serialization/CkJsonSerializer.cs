@@ -16,6 +16,7 @@ internal class CkJsonSerializer : ICkJsonSerializer
 {
     private const string Validation = "validation";
     private readonly JsonSerializerOptions _options;
+    private readonly JsonSerializerOptions _tolerantOptions;
 
     // ReSharper disable once ConvertConstructorToMemberInitializers
     /// <summary>
@@ -31,6 +32,21 @@ internal class CkJsonSerializer : ICkJsonSerializer
             Converters =
             {
                 new OctoValidatingJsonConverterFactory { RequireFormatValidation = true, OutputFormat = OutputFormat.List }
+            }
+        };
+        _tolerantOptions = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = true,
+            Converters =
+            {
+                new OctoValidatingJsonConverterFactory
+                {
+                    RequireFormatValidation = true,
+                    OutputFormat = OutputFormat.List,
+                    IgnoreAdditionalProperties = true
+                }
             }
         };
     }
@@ -106,29 +122,45 @@ internal class CkJsonSerializer : ICkJsonSerializer
 
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
         OperationResult operationResult)
+        => DeserializeCompiledModelRootAsync(s, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
+        return await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult, tolerantToUnknownProperties).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
+        => DeserializeCompiledModelRoot(s, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        return DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
+        return DeserializeCompiledModelRoot(memStream, locationReference, operationResult, tolerantToUnknownProperties);
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
         OperationResult operationResult)
+        => DeserializeCompiledModelRootAsync(stream, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
+        var options = tolerantToUnknownProperties ? _tolerantOptions : _options;
         try
         {
-            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, _options).ConfigureAwait(false);
+            var ckModelRoot = await JsonSerializer.DeserializeAsync<CkCompiledModelRoot>(stream, options).ConfigureAwait(false);
             return ckModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)
@@ -138,11 +170,13 @@ internal class CkJsonSerializer : ICkJsonSerializer
         }
     }
 
-    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
+        var options = tolerantToUnknownProperties ? _tolerantOptions : _options;
         try
         {
-            var ckModelRoot = JsonSerializer.Deserialize<CkCompiledModelRoot>(stream, _options);
+            var ckModelRoot = JsonSerializer.Deserialize<CkCompiledModelRoot>(stream, options);
             return ckModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
         }
         catch (JsonException e)

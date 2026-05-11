@@ -27,6 +27,14 @@ public class OctoValidatingJsonConverterFactory : JsonConverterFactory
     /// </summary>
     public bool? RequireFormatValidation { get; set; }
 
+    /// <summary>
+    ///     When true, the produced converter tolerates payloads with unknown
+    ///     properties (`additionalProperties: false` violations) and silently drops
+    ///     them. Used for forward-compatible reads from persisted catalogs after
+    ///     schema changes. Other schema violations still fail validation.
+    /// </summary>
+    public bool IgnoreAdditionalProperties { get; set; }
+
     /// <summary>When overridden in a derived class, determines whether the converter instance can convert the specified object type.</summary>
     /// <param name="typeToConvert">The type of the object to check whether it can be converted by this converter instance.</param>
     /// <returns>
@@ -86,6 +94,7 @@ public class OctoValidatingJsonConverterFactory : JsonConverterFactory
         {
             validatingJsonConverter.OutputFormat = OutputFormat.GetValueOrDefault();
             validatingJsonConverter.RequireFormatValidation = RequireFormatValidation.GetValueOrDefault();
+            validatingJsonConverter.IgnoreAdditionalProperties = IgnoreAdditionalProperties;
             _cache[typeToConvert] = instance;
         }
 

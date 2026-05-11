@@ -88,6 +88,23 @@ public interface ICkSerializer
     Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult);
 
     /// <summary>
+    ///     Deserializes the compiled model from a string with optional tolerance for unknown properties.
+    /// </summary>
+    /// <param name="s">The text containing the construction kit to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">
+    ///     A operation result object that lists all validation issues. In case of exceptions this object contains the
+    ///     validation errors too.
+    /// </param>
+    /// <param name="tolerantToUnknownProperties">
+    ///     When true, properties that violate the schema's `additionalProperties: false` constraint are silently
+    ///     dropped instead of failing the read. Other schema violations still fail. Use for forward-compatible reads
+    ///     from persisted catalogs after schema evolution removed properties; never use on the publish/compile path.
+    /// </param>
+    /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
+    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference, OperationResult operationResult, bool tolerantToUnknownProperties);
+
+    /// <summary>
     ///     Deserializes the compiled model from a string.
     /// </summary>
     /// <param name="s">The text containing the construction kit to read</param>
@@ -100,6 +117,19 @@ public interface ICkSerializer
     CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult);
 
     /// <summary>
+    ///     Deserializes the compiled model from a string with optional tolerance for unknown properties.
+    /// </summary>
+    /// <param name="s">The text containing the construction kit to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">
+    ///     A operation result object that lists all validation issues. In case of exceptions this object contains the
+    ///     validation errors too.
+    /// </param>
+    /// <param name="tolerantToUnknownProperties">See <see cref="DeserializeCompiledModelRootAsync(string,string,OperationResult,bool)"/>.</param>
+    /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
+    CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult, bool tolerantToUnknownProperties);
+
+    /// <summary>
     ///     Deserializes the compiled model from the stream.
     /// </summary>
     /// <param name="stream">The stream to read</param>
@@ -110,4 +140,17 @@ public interface ICkSerializer
     /// </param>
     /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
     Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult);
+
+    /// <summary>
+    ///     Deserializes the compiled model from the stream with optional tolerance for unknown properties.
+    /// </summary>
+    /// <param name="stream">The stream to read</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource</param>
+    /// <param name="operationResult">
+    ///     A operation result object that lists all validation issues. In case of exceptions this object contains the
+    ///     validation errors too.
+    /// </param>
+    /// <param name="tolerantToUnknownProperties">See <see cref="DeserializeCompiledModelRootAsync(string,string,OperationResult,bool)"/>.</param>
+    /// <returns>The deserialized object. Please check the for validation issues in operationResult.</returns>
+    Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference, OperationResult operationResult, bool tolerantToUnknownProperties);
 }

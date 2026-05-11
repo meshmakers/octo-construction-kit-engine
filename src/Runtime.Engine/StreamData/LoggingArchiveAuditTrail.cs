@@ -51,4 +51,41 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
             archiveRtId, tenantId, statusAtDeletion);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task RecordRollupRunAsync(
+        string tenantId,
+        OctoObjectId rollupRtId,
+        DateTime bucketStart,
+        DateTime bucketEnd,
+        int rowsWritten,
+        TimeSpan elapsed)
+    {
+        _logger.LogInformation(
+            "Rollup {RollupRtId} (tenant {TenantId}) committed bucket [{BucketStart:O}, {BucketEnd:O}): {RowsWritten} rows in {ElapsedMs}ms",
+            rollupRtId, tenantId, bucketStart, bucketEnd, rowsWritten, elapsed.TotalMilliseconds);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RecordFreezeAsync(
+        string tenantId,
+        OctoObjectId rollupRtId,
+        DateTime frozenUntil,
+        string? reason)
+    {
+        if (reason is null)
+        {
+            _logger.LogInformation(
+                "Rollup {RollupRtId} (tenant {TenantId}) frozen until {FrozenUntil:O}",
+                rollupRtId, tenantId, frozenUntil);
+        }
+        else
+        {
+            _logger.LogWarning(
+                "Rollup {RollupRtId} (tenant {TenantId}) frozen until {FrozenUntil:O}: {Reason}",
+                rollupRtId, tenantId, frozenUntil, reason);
+        }
+        return Task.CompletedTask;
+    }
 }

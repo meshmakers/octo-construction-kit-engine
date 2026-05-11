@@ -221,6 +221,8 @@ public class ArchiveLifecycleServiceTests
         new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance,
             rollupStore, () => FixedNow);
 
+    private static readonly OctoObjectId SourceRt = OctoObjectId.GenerateNewId();
+
     private static CkRollupArchiveSnapshot RollupSnapshot(
         DateTime? watermark,
         TimeSpan? bucketSize = null,
@@ -228,12 +230,20 @@ public class ArchiveLifecycleServiceTests
     {
         return new CkRollupArchiveSnapshot(
             Rt, TargetType, status, null,
-            OctoObjectId.GenerateNewId(),
+            SourceRt,
             bucketSize ?? TimeSpan.FromMinutes(1),
             TimeSpan.FromMinutes(5),
             watermark,
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
             FrozenUntil: null);
+    }
+
+    private void StubSourceActivatedWithVoltage()
+    {
+        A.CallTo(() => _store.GetAsync(SourceRt))
+            .Returns(new CkArchiveSnapshot(
+                SourceRt, TargetType, CkArchiveStatus.Activated, null,
+                new[] { new CkArchiveColumnSpec("voltage", Indexed: true, Required: false) }));
     }
 
     [Fact]
@@ -243,6 +253,7 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => rollupStore.GetAsync(Rt))
             .Returns(RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromMinutes(1)));
         Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage();
 
         await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
 
@@ -261,6 +272,7 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => rollupStore.GetAsync(Rt))
             .Returns(RollupSnapshot(watermark: existing));
         Stub(CkArchiveStatus.Disabled);
+        StubSourceActivatedWithVoltage();
 
         await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
 
@@ -292,5 +304,59 @@ public class ArchiveLifecycleServiceTests
 
         // No exception, archive transitions through normally.
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
+    }
+
+    // ---- Activation-time rollup validation (rollup-archives concept §10) ----
+
+    [Fact]
+    public async Task Activate_Rollup_SourceMissing_ThrowsAndDoesNotProvision()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null));
+        Stub(CkArchiveStatus.Created);
+        A.CallTo(() => _store.GetAsync(SourceRt))
+            .Returns(Task.FromResult<CkArchiveSnapshot?>(null));
+
+        await Assert.ThrowsAsync<RollupSourceMissingException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<CkArchiveSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Activate_Rollup_SourceNotActivated_Throws()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null));
+        Stub(CkArchiveStatus.Created);
+        A.CallTo(() => _store.GetAsync(SourceRt))
+            .Returns(new CkArchiveSnapshot(
+                SourceRt, TargetType, CkArchiveStatus.Disabled, null,
+                new[] { new CkArchiveColumnSpec("voltage", true, false) }));
+
+        var ex = await Assert.ThrowsAsync<RollupSourceNotActivatedException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+        Assert.Equal(CkArchiveStatus.Disabled, ex.SourceStatus);
+    }
+
+    [Fact]
+    public async Task Activate_Rollup_SourcePathMissing_Throws()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null));
+        Stub(CkArchiveStatus.Created);
+        // Source archive is activated but doesn't capture "voltage" — only "current".
+        A.CallTo(() => _store.GetAsync(SourceRt))
+            .Returns(new CkArchiveSnapshot(
+                SourceRt, TargetType, CkArchiveStatus.Activated, null,
+                new[] { new CkArchiveColumnSpec("current", true, false) }));
+
+        var ex = await Assert.ThrowsAsync<RollupSourcePathInvalidException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+        Assert.Equal("voltage", ex.SourcePath);
     }
 }

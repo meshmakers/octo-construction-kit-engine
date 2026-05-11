@@ -80,6 +80,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
                 throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status, "activate");
         }
 
+        await ValidateRollupForActivationAsync(archiveRtId);
         await EnsureCrateProvisionedAsync(snapshot);
         await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
@@ -112,6 +113,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status, "retry activation of");
         }
 
+        await ValidateRollupForActivationAsync(archiveRtId);
         await EnsureCrateProvisionedAsync(snapshot);
         await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
@@ -157,6 +159,23 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             throw new ArchiveNotFoundException(archiveRtId);
         }
         return snapshot;
+    }
+
+    /// <summary>
+    /// Runs the rollup-archives concept §10 activation-time validation when the archive is a
+    /// rollup. No-op when no rollup store is wired or when the archive is not a rollup. Throws
+    /// the matching <see cref="StreamDataException"/> subclass on the first violation; the
+    /// caller surfaces the exception via the GraphQL error mapper.
+    /// </summary>
+    private async Task ValidateRollupForActivationAsync(OctoObjectId archiveRtId)
+    {
+        if (_rollupStore is null) return;
+
+        var rollup = await _rollupStore.GetAsync(archiveRtId);
+        if (rollup is null) return; // not a rollup, or soft-deleted
+
+        var source = await _store.GetAsync(rollup.SourceArchiveRtId);
+        RollupValidator.ValidateForActivation(rollup, source);
     }
 
     /// <summary>

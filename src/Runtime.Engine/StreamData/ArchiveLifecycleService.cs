@@ -34,13 +34,16 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly IArchiveAuditTrail _audit;
     private readonly ICkRollupArchiveRuntimeStore? _rollupStore;
     private readonly ILogger<ArchiveLifecycleService> _logger;
+    private readonly Func<DateTime> _clock;
 
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
     /// tenant-scoped; the audit trail can be either tenant-scoped or shared (the tenant id is
     /// passed explicitly into every audit call). <paramref name="rollupStore"/> is optional;
     /// when supplied, <see cref="DeleteAsync"/> rejects deletion of source archives that still
-    /// have active rollups attached (rollup-archives concept §6, §10).
+    /// have active rollups attached (rollup-archives concept §6, §10) and rollup archives get
+    /// their <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> initialised on the
+    /// first activation (rollup-archives concept §4).
     /// </summary>
     public ArchiveLifecycleService(
         string tenantId,
@@ -48,7 +51,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         IStreamDataRepository repository,
         IArchiveAuditTrail audit,
         ILogger<ArchiveLifecycleService> logger,
-        ICkRollupArchiveRuntimeStore? rollupStore = null)
+        ICkRollupArchiveRuntimeStore? rollupStore = null,
+        Func<DateTime>? clock = null)
     {
         _tenantId = tenantId;
         _store = store;
@@ -56,6 +60,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _audit = audit;
         _rollupStore = rollupStore;
         _logger = logger;
+        _clock = clock ?? (() => DateTime.UtcNow);
     }
 
     /// <inheritdoc />
@@ -76,6 +81,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         await EnsureCrateProvisionedAsync(snapshot);
+        await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
@@ -107,6 +113,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         await EnsureCrateProvisionedAsync(snapshot);
+        await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
@@ -150,6 +157,45 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             throw new ArchiveNotFoundException(archiveRtId);
         }
         return snapshot;
+    }
+
+    /// <summary>
+    /// Seeds <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> when a rollup archive
+    /// transitions to Activated for the first time. No-op when the archive is not a rollup, when
+    /// no rollup store is wired, or when the watermark has already been set (re-activation after
+    /// Disabled/Failed must preserve progress). Concept §4.
+    /// </summary>
+    /// <remarks>
+    /// MVP policy: initial watermark = <c>truncate(now - BucketSize)</c> down to the bucket
+    /// boundary. Historical source rows that predate activation are deliberately not back-filled
+    /// — call <c>rewindRollupWatermark</c> to opt in. The "scan the source for the smallest
+    /// timestamp" variant from the concept doc waits on a dedicated repository method.
+    /// </remarks>
+    private async Task EnsureRollupWatermarkInitialisedAsync(OctoObjectId archiveRtId)
+    {
+        if (_rollupStore is null) return;
+
+        var rollup = await _rollupStore.GetAsync(archiveRtId);
+        if (rollup is null) return; // not a rollup; or soft-deleted
+        if (rollup.LastAggregatedBucketEnd is not null) return; // re-activate after disable/failed
+
+        if (rollup.BucketSize <= TimeSpan.Zero)
+        {
+            _logger.LogWarning(
+                "Rollup {RollupRtId}: BucketSize is non-positive ({BucketSize}); skipping initial watermark seed.",
+                archiveRtId, rollup.BucketSize);
+            return;
+        }
+
+        var now = _clock();
+        var ticks = rollup.BucketSize.Ticks;
+        var initialBucketEnd = new DateTime(((now - rollup.BucketSize).Ticks / ticks) * ticks, now.Kind);
+
+        await _rollupStore.AdvanceWatermarkAsync(archiveRtId, initialBucketEnd);
+
+        _logger.LogInformation(
+            "Rollup {RollupRtId}: initial watermark seeded to {Watermark:O} (bucketSize={BucketSize})",
+            archiveRtId, initialBucketEnd, rollup.BucketSize);
     }
 
     private async Task EnsureCrateProvisionedAsync(CkArchiveSnapshot snapshot)

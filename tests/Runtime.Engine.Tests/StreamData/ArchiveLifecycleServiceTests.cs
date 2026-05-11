@@ -212,4 +212,85 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => _store.ArchiveEntityAsync(A<OctoObjectId>._)).MustNotHaveHappened();
         A.CallTo(() => _audit.RecordDeletionAsync(A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
     }
+
+    // ---- Initial-watermark seeding on activation (rollup-archives concept §4) ----
+
+    private static readonly DateTime FixedNow = new(2026, 5, 11, 14, 0, 42, DateTimeKind.Utc);
+
+    private ArchiveLifecycleService NewSutWithRollupAndClock(ICkRollupArchiveRuntimeStore rollupStore) =>
+        new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance,
+            rollupStore, () => FixedNow);
+
+    private static CkRollupArchiveSnapshot RollupSnapshot(
+        DateTime? watermark,
+        TimeSpan? bucketSize = null,
+        CkArchiveStatus status = CkArchiveStatus.Created)
+    {
+        return new CkRollupArchiveSnapshot(
+            Rt, TargetType, status, null,
+            OctoObjectId.GenerateNewId(),
+            bucketSize ?? TimeSpan.FromMinutes(1),
+            TimeSpan.FromMinutes(5),
+            watermark,
+            new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
+            FrozenUntil: null);
+    }
+
+    [Fact]
+    public async Task Activate_RollupWithNullWatermark_SeedsToPreviousBucketBoundary()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromMinutes(1)));
+        Stub(CkArchiveStatus.Created);
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        // now = 14:00:42; bucketSize = 1m; (now - bucketSize) = 13:59:42; truncate-down to
+        // bucket boundary = 13:59:00.
+        var expected = new DateTime(2026, 5, 11, 13, 59, 0, DateTimeKind.Utc);
+        A.CallTo(() => rollupStore.AdvanceWatermarkAsync(Rt, expected, A<bool>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Activate_RollupWithExistingWatermark_PreservesIt()
+    {
+        var existing = new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc);
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: existing));
+        Stub(CkArchiveStatus.Disabled);
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => rollupStore.AdvanceWatermarkAsync(A<OctoObjectId>._, A<DateTime>._, A<bool>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Activate_NonRollup_DoesNotTouchRollupStore()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(Task.FromResult<CkRollupArchiveSnapshot?>(null));
+        Stub(CkArchiveStatus.Created);
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => rollupStore.AdvanceWatermarkAsync(A<OctoObjectId>._, A<DateTime>._, A<bool>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Activate_NoRollupStore_SkipsSeeding()
+    {
+        // Default-constructed service: no rollup store; nothing rollup-related happens.
+        Stub(CkArchiveStatus.Created);
+
+        await NewSut().ActivateAsync(Rt);
+
+        // No exception, archive transitions through normally.
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
+    }
 }

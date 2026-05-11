@@ -103,7 +103,6 @@ internal class ReferenceResolver : IReferenceResolver
                 }
 
                 var ckAttribute = modelGraph.Attributes[ckTypeAttribute.CkAttributeId];
-                ckTypeGraph.IsStreamType |= ckAttribute.IsDataStream;
 
                 ckTypeGraph.TryAddAttribute(new CkTypeAttributeGraph(ckTypeAttribute.CkAttributeId, ckTypeAttribute,
                     ckAttribute));

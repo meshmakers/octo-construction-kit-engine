@@ -350,43 +350,4 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal(PathType.TargetCkTypeId, accessPath[1].Type);
     }
 
-    [Fact]
-    public void IsDataStream_SystemFields_CorrectValues()
-    {
-        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.sample1.Builder.Build());
-        var collector = new CkTypeQueryColumnCollector(modelGraph);
-
-        var result = collector.GetColumns("sample1/Demo1", new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
-
-        Assert.True(result.Single(x => x.Path == "rtId").IsDataStream);
-        Assert.True(result.Single(x => x.Path == "ckTypeId").IsDataStream);
-        Assert.True(result.Single(x => x.Path == "rtWellKnownName").IsDataStream);
-        Assert.False(result.Single(x => x.Path == "rtVersion").IsDataStream);
-        Assert.True(result.Single(x => x.Path == "rtCreationDateTime").IsDataStream);
-        Assert.True(result.Single(x => x.Path == "rtChangedDateTime").IsDataStream);
-    }
-
-    [Fact]
-    public void IsDataStream_CkAttributeWithDataStream_IsTrue()
-    {
-        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.withDataStream.Builder.Build());
-        var collector = new CkTypeQueryColumnCollector(modelGraph);
-
-        var result = collector.GetColumns("StreamTest/Sensor", new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
-
-        Assert.True(result.Single(x => x.Path == "temperature").IsDataStream);
-        Assert.True(result.Single(x => x.Path == "pressure").IsDataStream);
-    }
-
-    [Fact]
-    public void IsDataStream_CkAttributeWithoutDataStream_IsFalse()
-    {
-        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.withDataStream.Builder.Build());
-        var collector = new CkTypeQueryColumnCollector(modelGraph);
-
-        var result = collector.GetColumns("StreamTest/Sensor", new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
-
-        Assert.False(result.Single(x => x.Path == "deviceName").IsDataStream);
-        Assert.False(result.Single(x => x.Path == "location").IsDataStream);
-    }
 }

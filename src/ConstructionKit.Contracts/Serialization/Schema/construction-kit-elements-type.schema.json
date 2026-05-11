@@ -141,9 +141,6 @@
         "isAbstract": {
           "type": "boolean"
         },
-        "isStreamType": {
-          "type": "boolean"
-        },
         "description": {
           "type": "string"
         },

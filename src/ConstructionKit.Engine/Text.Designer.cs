@@ -63,12 +63,6 @@ namespace Meshmakers.Octo.ConstructionKit.Engine {
             }
         }
         
-        internal static string IsDataStream {
-            get {
-                return ResourceManager.GetString("IsDataStream", resourceCulture);
-            }
-        }
-        
         internal static string Description {
             get {
                 return ResourceManager.GetString("Description", resourceCulture);

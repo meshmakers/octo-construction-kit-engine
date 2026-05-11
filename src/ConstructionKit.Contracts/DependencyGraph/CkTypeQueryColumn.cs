@@ -87,10 +87,4 @@ public class CkTypeQueryColumn
     /// An optional description of the column.
     /// </summary>
     public string? Description { get; }
-
-    /// <summary>
-    /// Indicates whether this column is available in stream data (CrateDB) queries.
-    /// True for system fields (RtId, CkTypeId, etc.) and CK attributes marked as data streams.
-    /// </summary>
-    public bool IsDataStream { get; init; }
 }

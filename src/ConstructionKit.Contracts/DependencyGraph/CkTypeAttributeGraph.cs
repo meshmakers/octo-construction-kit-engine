@@ -29,7 +29,6 @@ public class CkTypeAttributeGraph
         ValueCkEnumId = ckAttributeGraph.ValueCkEnumId;
         DefaultValues = ckAttributeGraph.DefaultValues;
         IsOptional = ckTypeAttributeDto.IsOptional;
-        IsDataStream = ckAttributeGraph.IsDataStream;
         Description = ckAttributeGraph.Description;
         MetaData = ckAttributeGraph.MetaData;
     }
@@ -45,14 +44,13 @@ public class CkTypeAttributeGraph
     /// <param name="valueCkEnumId"></param>
     /// <param name="autoIncrementReference"></param>
     /// <param name="metaData"></param>
-    /// <param name="isDataStream"></param>
     /// <param name="defaultValues"></param>
     /// <param name="isOptional"></param>
     /// <param name="description"></param>
     [JsonConstructor]
     public CkTypeAttributeGraph(CkId<CkAttributeId> ckAttributeId, string attributeName, IReadOnlyCollection<object>? autoCompleteValues,
         AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId, CkId<CkEnumId>? valueCkEnumId,
-        string? autoIncrementReference, ICollection<CkAttributeMetaDataDto>? metaData, bool isDataStream,
+        string? autoIncrementReference, ICollection<CkAttributeMetaDataDto>? metaData,
         ICollection<object>? defaultValues, bool isOptional, string? description)
     {
         CkAttributeId = ckAttributeId;
@@ -64,7 +62,6 @@ public class CkTypeAttributeGraph
         ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
         MetaData = metaData;
-        IsDataStream = isDataStream;
         IsOptional = isOptional;
         Description = description;
     }
@@ -118,11 +115,6 @@ public class CkTypeAttributeGraph
     ///     Optional meta data of the attribute
     /// </summary>
     public ICollection<CkAttributeMetaDataDto>? MetaData { get; }
-
-    /// <summary>
-    ///     If true, the attribute is a data stream
-    /// </summary>
-    public bool IsDataStream { get; }
 
     /// <summary>
     ///     An optional description of the attribute

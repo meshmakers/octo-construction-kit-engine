@@ -32,24 +32,29 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly ICkArchiveRuntimeStore _store;
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
+    private readonly ICkRollupArchiveRuntimeStore? _rollupStore;
     private readonly ILogger<ArchiveLifecycleService> _logger;
 
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
     /// tenant-scoped; the audit trail can be either tenant-scoped or shared (the tenant id is
-    /// passed explicitly into every audit call).
+    /// passed explicitly into every audit call). <paramref name="rollupStore"/> is optional;
+    /// when supplied, <see cref="DeleteAsync"/> rejects deletion of source archives that still
+    /// have active rollups attached (rollup-archives concept §6, §10).
     /// </summary>
     public ArchiveLifecycleService(
         string tenantId,
         ICkArchiveRuntimeStore store,
         IStreamDataRepository repository,
         IArchiveAuditTrail audit,
-        ILogger<ArchiveLifecycleService> logger)
+        ILogger<ArchiveLifecycleService> logger,
+        ICkRollupArchiveRuntimeStore? rollupStore = null)
     {
         _tenantId = tenantId;
         _store = store;
         _repository = repository;
         _audit = audit;
+        _rollupStore = rollupStore;
         _logger = logger;
     }
 
@@ -109,6 +114,19 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     public async Task DeleteAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);
+
+        // Rollup-archives concept §6 / §10: reject source-archive delete while non-soft-deleted
+        // rollups still reference it. The guard is skipped silently when no rollup store is
+        // registered (deployments without rollups configured), so it costs nothing for the
+        // rollup-free path.
+        if (_rollupStore is not null)
+        {
+            var dependentRollups = await _rollupStore.CountActiveRollupsForSourceAsync(archiveRtId);
+            if (dependentRollups > 0)
+            {
+                throw new RollupSourceInUseException(archiveRtId, dependentRollups);
+            }
+        }
 
         using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.delete");
         activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());

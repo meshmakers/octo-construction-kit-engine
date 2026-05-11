@@ -121,15 +121,27 @@ internal class CkSchemaValidator : ICkSchemaValidator
             return false;
         }
 
-        var failingDetails = details.Where(x => x.Errors != null && x.Errors.Count > 0).ToList();
+        var invalidDetails = details.Where(d => !d.IsValid).ToList();
+        var failedAnyOfPaths = new HashSet<string>(
+            invalidDetails
+                .Select(d => d.EvaluationPath.ToString())
+                .Where(p => p.EndsWith("/anyOf") || p.EndsWith("/oneOf")));
+
+        var failingDetails = invalidDetails
+            .Where(d => d.Errors != null && d.Errors.Count > 0)
+            // Drop anyOf/oneOf branch failures that belong to an overall-successful parent: with
+            // OutputFormat.List, non-matching alternatives appear even when at least one branch
+            // matched. A branch failure is real only if its parent anyOf/oneOf is itself invalid.
+            .Where(d => !IsBranchFailureOfSuccessfulAnyOf(d.EvaluationPath.ToString(), failedAnyOfPaths))
+            .ToList();
 
         if (tolerantToUnknownProperties)
         {
-            // additionalProperties violations show up in the EvaluationPath of the failing detail
-            // (e.g. "/properties/types/items/$ref/.../additionalProperties"). Strip them out and
-            // re-check whether anything else still fails.
+            // additionalProperties violations show up at the leaf level (path ending with
+            // "/additionalProperties"). Strip them out and re-check whether anything else still
+            // fails.
             failingDetails = failingDetails
-                .Where(d => !d.EvaluationPath.ToString().Contains("/additionalProperties"))
+                .Where(d => !d.EvaluationPath.ToString().EndsWith("/additionalProperties"))
                 .ToList();
             if (failingDetails.Count == 0)
             {
@@ -152,6 +164,18 @@ internal class CkSchemaValidator : ICkSchemaValidator
         }
 
         return false;
+    }
+
+    private static bool IsBranchFailureOfSuccessfulAnyOf(string evaluationPath, HashSet<string> failedAnyOfPaths)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(
+            evaluationPath, @"^(?<parent>.*/(anyOf|oneOf))/\d+(/.*)?$");
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        return !failedAnyOfPaths.Contains(match.Groups["parent"].Value);
     }
 
     private const int MaxDisplayedProperties = 10;

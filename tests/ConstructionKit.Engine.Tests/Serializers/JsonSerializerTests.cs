@@ -196,6 +196,45 @@ public class JsonSerializerTests
     }
 
     [Fact]
+    public async Task DeserializeCompiledModelRootAsync_TolerantMode_IgnoresAnyOfBranchNoise()
+    {
+        // CkAttribute.defaultValues uses anyOf [string|boolean|number]. A real catalog file
+        // observed in the wild stores enum defaults as quoted strings (e.g. defaultValues: ["1"]).
+        // The schema engine reports the failing boolean/number branches as noise even though the
+        // string branch matched. Combined with removed-property noise (isStreamType), the tolerant
+        // path must still succeed.
+        const string payload = """
+            {
+              "$schema": "https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json",
+              "modelId": "Test-1.0.0",
+              "dependencies": [],
+              "types": [
+                { "typeId": "Sample-1", "isStreamType": false }
+              ],
+              "attributes": [
+                {
+                  "id": "State-1",
+                  "valueType": "Enum",
+                  "valueCkEnumId": "Test-1.0.0/State-1",
+                  "defaultValues": ["1"]
+                }
+              ]
+            }
+            """;
+
+        var ckJsonSerializer = new CkJsonSerializer();
+        var operationResult = new OperationResult();
+
+        var model = await ckJsonSerializer.DeserializeCompiledModelRootAsync(
+            payload, "test", operationResult, tolerantToUnknownProperties: true);
+
+        Assert.False(operationResult.HasErrors);
+        Assert.Equal("Test-1.0.0", model.ModelId.ToString());
+        Assert.NotNull(model.Attributes);
+        Assert.Single(model.Attributes);
+    }
+
+    [Fact]
     public async Task DeserializeCompiledModelRootAsync_TolerantMode_StillFailsOnGenuineErrors()
     {
         var ckJsonSerializer = new CkJsonSerializer();

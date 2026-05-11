@@ -126,9 +126,6 @@
               "key"
             ]
           }
-        },
-        "isDataStream": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false,

@@ -344,8 +344,6 @@ internal class InheritanceResolver : IInheritanceResolver
                             baseCkType.CkTypeId, typeAttribute.CkAttributeId,
                             originTypeGraph.CkTypeId));
                 }
-
-                originTypeGraph.IsStreamType |= ckTypeAttributeGraph.IsDataStream;
             }
         }
 
@@ -575,8 +573,6 @@ internal class InheritanceResolver : IInheritanceResolver
                             baseCkType.CkTypeId, typeAttribute.CkAttributeId,
                             originTypeGraph.CkTypeId));
                 }
-
-                originTypeGraph.IsStreamType |= ckTypeAttributeGraph.IsDataStream;
             }
         }
 

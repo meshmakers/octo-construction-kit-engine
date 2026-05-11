@@ -67,13 +67,6 @@ internal class ContentGenerator(
                 await TextWrapper.AddDescription(outputFile, attribute.Description).ConfigureAwait(false);
             }
 
-            if (attribute.IsDataStream)
-            {
-                await outputFile.WriteLineAsync().ConfigureAwait(false);
-                await TextWrapper.AddDescription(outputFile, "This attribute allows data streams.")
-                    .ConfigureAwait(false);
-            }
-
             await outputFile.WriteLineAsync("##### Data Type").ConfigureAwait(false);
 
             switch (attribute.ValueType)

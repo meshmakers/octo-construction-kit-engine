@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -24,24 +25,77 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
 {
     private readonly string _tenantId;
     private readonly ICkRollupArchiveRuntimeStore _rollupStore;
+    private readonly ICkArchiveRuntimeStore _archiveStore;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<RollupArchiveLifecycleService> _logger;
 
     /// <summary>
-    /// Constructs the rollup lifecycle service. <paramref name="rollupStore"/> must be
-    /// tenant-scoped; the audit trail can be either tenant-scoped or shared (the tenant id is
-    /// passed explicitly into every audit call).
+    /// Constructs the rollup lifecycle service. <paramref name="rollupStore"/> and
+    /// <paramref name="archiveStore"/> must be tenant-scoped (the source archive lookup in
+    /// <see cref="CreateAsync"/> uses the same Mongo polymorphism that handles both raw archives
+    /// and chained rollups via the shared CkArchive base). The audit trail can be either
+    /// tenant-scoped or shared (the tenant id is passed explicitly into every audit call).
     /// </summary>
     public RollupArchiveLifecycleService(
         string tenantId,
         ICkRollupArchiveRuntimeStore rollupStore,
+        ICkArchiveRuntimeStore archiveStore,
         IArchiveAuditTrail audit,
         ILogger<RollupArchiveLifecycleService> logger)
     {
         _tenantId = tenantId;
         _rollupStore = rollupStore;
+        _archiveStore = archiveStore;
         _audit = audit;
         _logger = logger;
+    }
+
+    /// <inheritdoc />
+    public async Task<OctoObjectId> CreateAsync(
+        string? rtWellKnownName,
+        OctoObjectId sourceArchiveRtId,
+        TimeSpan bucketSize,
+        TimeSpan watermarkLag,
+        IReadOnlyList<CkRollupAggregationSpec> aggregations)
+    {
+        if (aggregations is null) throw new ArgumentNullException(nameof(aggregations));
+        if (aggregations.Count == 0)
+        {
+            throw new ArgumentException("At least one aggregation is required.", nameof(aggregations));
+        }
+        if (bucketSize <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bucketSize), "BucketSize must be positive.");
+        }
+        if (watermarkLag < TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(watermarkLag), "WatermarkLag must be non-negative.");
+        }
+
+        // Source archive lookup goes through the shared CkArchive store: thanks to Mongo
+        // polymorphism the result is the same regardless of whether the source is a raw archive
+        // or another rollup (chained rollups, concept §10). The snapshot carries the inherited
+        // TargetCkTypeId that the new rollup must mirror.
+        var source = await _archiveStore.GetAsync(sourceArchiveRtId)
+            ?? throw new ArchiveNotFoundException(sourceArchiveRtId);
+
+        // Pure-function derivation lives in Runtime.Contracts; ports (e.g. studio) mirror this rule.
+        var columns = RollupColumnGenerator.Generate(aggregations);
+
+        var rtId = await _rollupStore.InsertAsync(
+            rtWellKnownName,
+            source.TargetCkTypeId,
+            sourceArchiveRtId,
+            bucketSize,
+            watermarkLag,
+            aggregations,
+            columns);
+
+        _logger.LogInformation(
+            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns (tenant {TenantId})",
+            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, _tenantId);
+
+        return rtId;
     }
 
     /// <inheritdoc />

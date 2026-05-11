@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -16,10 +17,11 @@ public class RollupArchiveLifecycleServiceTests
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("CkRollupArchive"));
 
     private readonly ICkRollupArchiveRuntimeStore _store = A.Fake<ICkRollupArchiveRuntimeStore>();
+    private readonly ICkArchiveRuntimeStore _archiveStore = A.Fake<ICkArchiveRuntimeStore>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
     private RollupArchiveLifecycleService NewSut() =>
-        new(TenantId, _store, _audit, NullLogger<RollupArchiveLifecycleService>.Instance);
+        new(TenantId, _store, _archiveStore, _audit, NullLogger<RollupArchiveLifecycleService>.Instance);
 
     private static CkRollupArchiveSnapshot Snapshot(
         DateTime? frozenUntil = null,
@@ -36,6 +38,75 @@ public class RollupArchiveLifecycleServiceTests
             watermark,
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
             frozenUntil);
+
+    // ---- Create ----
+
+    [Fact]
+    public async Task Create_ResolvesTargetCkTypeFromSourceAndDerivesColumns()
+    {
+        // Source archive carries its TargetCkTypeId — the rollup inherits it. Columns are derived
+        // server-side from the aggregations; AVG produces two columns (sum + count).
+        var sourceSnapshot = new CkArchiveSnapshot(
+            SourceRt,
+            TargetType,
+            CkArchiveStatus.Activated,
+            "SourceArchive",
+            new[] { new CkArchiveColumnSpec("voltage", Indexed: true, Required: false) });
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(sourceSnapshot);
+
+        var insertedRtId = OctoObjectId.GenerateNewId();
+        A.CallTo(() => _store.InsertAsync(
+                A<string?>._, A<RtCkId<CkTypeId>>._, A<OctoObjectId>._, A<TimeSpan>._, A<TimeSpan>._,
+                A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._))
+            .Returns(insertedRtId);
+
+        var aggregations = new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) };
+
+        var rtId = await NewSut().CreateAsync(
+            "MyRollup", SourceRt, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(1), aggregations);
+
+        Assert.Equal(insertedRtId, rtId);
+        A.CallTo(() => _store.InsertAsync(
+                "MyRollup", TargetType, SourceRt,
+                TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(1),
+                aggregations,
+                A<IReadOnlyList<CkArchiveColumnSpec>>.That.Matches(cols =>
+                    cols.Count == 2 &&
+                    cols[0].Path == "voltage_avg_sum" &&
+                    cols[1].Path == "voltage_avg_count")))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Create_UnknownSourceArchive_ThrowsArchiveNotFound()
+    {
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(Task.FromResult<CkArchiveSnapshot?>(null));
+
+        await Assert.ThrowsAsync<ArchiveNotFoundException>(() => NewSut().CreateAsync(
+            null, SourceRt, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(1),
+            new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }));
+
+        A.CallTo(() => _store.InsertAsync(
+                A<string?>._, A<RtCkId<CkTypeId>>._, A<OctoObjectId>._, A<TimeSpan>._, A<TimeSpan>._,
+                A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Create_EmptyAggregations_ThrowsArgumentException()
+    {
+        await Assert.ThrowsAsync<ArgumentException>(() => NewSut().CreateAsync(
+            null, SourceRt, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(1),
+            Array.Empty<CkRollupAggregationSpec>()));
+    }
+
+    [Fact]
+    public async Task Create_NonPositiveBucketSize_ThrowsArgumentOutOfRange()
+    {
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => NewSut().CreateAsync(
+            null, SourceRt, TimeSpan.Zero, TimeSpan.FromMinutes(1),
+            new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }));
+    }
 
     // ---- Freeze ----
 

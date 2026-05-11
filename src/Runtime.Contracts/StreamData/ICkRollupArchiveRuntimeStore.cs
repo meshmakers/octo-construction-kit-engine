@@ -29,6 +29,35 @@ public interface ICkRollupArchiveRuntimeStore
     Task<CkRollupArchiveSnapshot?> GetAsync(OctoObjectId rollupRtId);
 
     /// <summary>
+    /// Inserts a new CkRollupArchive entity in <see cref="CkArchiveStatus.Created"/>. The shared
+    /// archive lifecycle service handles status transitions afterwards (Activate, Disable, etc.);
+    /// this method exists separately so the lifecycle service can derive the inherited CkArchive
+    /// attributes (<paramref name="targetCkTypeId"/>, <paramref name="columns"/>) from the source
+    /// archive and the aggregations, keeping the generic CkEntity GraphQL mutation pipeline free
+    /// of rollup-specific knowledge. Concept §4, §9.
+    /// </summary>
+    /// <param name="rtWellKnownName">Optional human-readable name. Null falls back to the rtId.</param>
+    /// <param name="targetCkTypeId">CK type the rollup rows live on — inherited from the source archive.</param>
+    /// <param name="sourceArchiveRtId">RtId of the source CkArchive (or CkRollupArchive for chained rollups).</param>
+    /// <param name="bucketSize">Bucket width.</param>
+    /// <param name="watermarkLag">How long the orchestrator waits after bucket-end before aggregating.</param>
+    /// <param name="aggregations">User-defined aggregation specs.</param>
+    /// <param name="columns">
+    /// Derived storage columns (from <see cref="RollupColumnGenerator.Generate"/>). Stored on the
+    /// inherited Columns slot for mandatory-attribute validation; the read path re-derives from
+    /// <paramref name="aggregations"/> to stay authoritative.
+    /// </param>
+    /// <returns>The generated runtime id of the new rollup archive.</returns>
+    Task<OctoObjectId> InsertAsync(
+        string? rtWellKnownName,
+        RtCkId<CkTypeId> targetCkTypeId,
+        OctoObjectId sourceArchiveRtId,
+        TimeSpan bucketSize,
+        TimeSpan watermarkLag,
+        IReadOnlyList<CkRollupAggregationSpec> aggregations,
+        IReadOnlyList<CkArchiveColumnSpec> columns);
+
+    /// <summary>
     /// Soft-deletes the rollup entity by setting <c>rtState = Archived</c>. The Crate table is
     /// dropped separately by the lifecycle service via <see cref="IStreamDataRepository"/>.
     /// </summary>

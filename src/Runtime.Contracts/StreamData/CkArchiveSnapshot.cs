@@ -16,7 +16,18 @@ public sealed record CkArchiveSnapshot(
     RtCkId<CkTypeId> TargetCkTypeId,
     CkArchiveStatus Status,
     string? RtWellKnownName,
-    IReadOnlyList<CkArchiveColumnSpec> Columns);
+    IReadOnlyList<CkArchiveColumnSpec> Columns)
+{
+    /// <summary>
+    /// When this snapshot represents a <c>CkRollupArchive</c>, the aggregation specs from which
+    /// <see cref="Columns"/> were derived (via <see cref="RollupColumnGenerator"/>). Null for raw
+    /// archives. The DDL path uses this to skip CK-type attribute resolution for rollups — the
+    /// derived column names (e.g. <c>temperature_avg_sum</c>) are storage identifiers, not paths
+    /// into the CK type, so the column SQL type is determined by the aggregation function instead.
+    /// Concept §4.
+    /// </summary>
+    public IReadOnlyList<CkRollupAggregationSpec>? RollupAggregations { get; init; }
+}
 
 /// <summary>
 /// Minimal projection of a <c>CkArchive.columns[]</c> entry — just enough for the data-store

@@ -57,11 +57,59 @@ public class CkModelMigrationServiceTests
     }
 
     [Fact]
-    public async Task FindMigrationPathAsync_NoMigrationsExist_ShouldReturnNull()
+    public async Task FindMigrationPathAsync_NoMigrationsExist_TargetIsHigher_ShouldReturnSchemaOnlyNoOpPath()
     {
         // Arrange
+        // A CK model that ships no migration scripts at all but ships a higher target version
+        // should still be allowed to auto-upgrade — purely additive schema bumps don't need a
+        // data migration script. See engine fix for the auto-bridge "no migrations at all" case.
         var fromModel = new CkModelId("TestModel", "1.0.0");
         var toModel = new CkModelId("TestModel", "2.0.0");
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(false);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Steps);
+        Assert.Equal("1.0.0", result.Steps[0].FromVersion);
+        Assert.Equal("2.0.0", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+        Assert.False(result.Steps[0].Breaking);
+        Assert.False(result.HasBreakingChanges);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_NoMigrationsExist_SameVersion_ShouldReturnNull()
+    {
+        // Arrange: no scripts AND target == source. Nothing to do; FindMigrationPathAsync should
+        // not invent a no-op for a non-upgrade.
+        var fromModel = new CkModelId("TestModel", "1.0.0");
+        var toModel = new CkModelId("TestModel", "1.0.0");
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(false);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_NoMigrationsExist_Downgrade_ShouldReturnNull()
+    {
+        // Arrange: no scripts AND target < source. Don't synthesize a downgrade path.
+        var fromModel = new CkModelId("TestModel", "2.0.0");
+        var toModel = new CkModelId("TestModel", "1.0.0");
 
         A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
             .Returns(false);
@@ -666,11 +714,13 @@ public class CkModelMigrationServiceTests
     }
 
     [Fact]
-    public async Task MigrateAsync_NoMigrationPath_ShouldReturnFailed()
+    public async Task MigrateAsync_NoMigrationPath_Downgrade_ShouldReturnFailed()
     {
-        // Arrange
-        var fromModel = new CkModelId("TestModel", "1.0.0");
-        var toModel = new CkModelId("TestModel", "2.0.0");
+        // Arrange: source version is higher than target, no migrations defined.
+        // Schema-only no-op auto-bridge only applies on upgrades (toVersion > fromVersion);
+        // downgrades must still fail because we can't synthesize a backwards path.
+        var fromModel = new CkModelId("TestModel", "2.0.0");
+        var toModel = new CkModelId("TestModel", "1.0.0");
 
         A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
             .Returns(false);
@@ -816,11 +866,11 @@ public class CkModelMigrationServiceTests
     }
 
     [Fact]
-    public async Task ValidateAsync_NoMigrationPath_ShouldReturnInvalid()
+    public async Task ValidateAsync_NoMigrationPath_Downgrade_ShouldReturnInvalid()
     {
-        // Arrange
-        var fromModel = new CkModelId("TestModel", "1.0.0");
-        var toModel = new CkModelId("TestModel", "2.0.0");
+        // Arrange: downgrade without scripts must fail validation (no auto-bridge for downgrades).
+        var fromModel = new CkModelId("TestModel", "2.0.0");
+        var toModel = new CkModelId("TestModel", "1.0.0");
 
         A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
             .Returns(false);

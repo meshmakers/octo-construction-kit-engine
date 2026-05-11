@@ -13,6 +13,9 @@ attributes:
     valueCkEnumId: ${this}/CkArchiveStatus
     defaultValues:
       - 0
+  - id: CkArchive.RawRetentionMs
+    description: "Retention window for raw data points in milliseconds. When set, the partition pruner may drop source partitions older than (now - RawRetentionMs), but never ahead of the slowest attached rollup's watermark. Null means keep forever."
+    valueType: Int
   - id: CkArchiveColumn.Path
     description: "Attribute path captured by this column. Supports nested record traversal (e.g. 'sensor.reading.value') and array projection (e.g. 'readings[*].value')."
     valueType: String

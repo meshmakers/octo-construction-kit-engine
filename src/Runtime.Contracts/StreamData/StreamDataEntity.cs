@@ -6,25 +6,24 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
 /// <summary>
 ///     Base class for stream-data entity projections. Mirrors <see cref="RtEntity"/> for the
-///     time-series domain: subclasses are emitted per CK type that has
-///     <c>isDataStream</c> attributes, exposing typed properties for those attributes plus the
-///     built-in stream fields (<see cref="Timestamp"/>, <see cref="RtId"/>, <see cref="CkTypeId"/>,
+///     time-series domain — typed properties for the captured attributes plus the built-in stream
+///     fields (<see cref="Timestamp"/>, <see cref="RtId"/>, <see cref="CkTypeId"/>,
 ///     <see cref="RtWellKnownName"/>, <see cref="RtCreationDateTime"/>, <see cref="RtChangedDateTime"/>).
 /// </summary>
 [DebuggerDisplay("{CkTypeId}@{RtId}@{Timestamp}")]
-public class SdEntity : RtTypeWithAttributes
+public class StreamDataEntity : RtTypeWithAttributes
 {
     /// <summary>
-    ///     Creates a new instance of <see cref="SdEntity"/>.
+    ///     Creates a new instance of <see cref="StreamDataEntity"/>.
     /// </summary>
-    public SdEntity()
+    public StreamDataEntity()
     {
     }
 
     /// <summary>
-    ///     Creates a new instance of <see cref="SdEntity"/> with the attribute bag pre-populated.
+    ///     Creates a new instance of <see cref="StreamDataEntity"/> with the attribute bag pre-populated.
     /// </summary>
-    public SdEntity(IReadOnlyDictionary<string, object?> attributes)
+    public StreamDataEntity(IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {
     }

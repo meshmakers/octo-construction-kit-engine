@@ -16,20 +16,17 @@ public class Builder
                 new()
                 {
                     AttributeId = "Temperature",
-                    ValueType = AttributeValueTypesDto.Double,
-                    IsDataStream = true
+                    ValueType = AttributeValueTypesDto.Double
                 },
                 new()
                 {
                     AttributeId = "Pressure",
-                    ValueType = AttributeValueTypesDto.Double,
-                    IsDataStream = true
+                    ValueType = AttributeValueTypesDto.Double
                 },
                 new()
                 {
                     AttributeId = "DeviceName",
-                    ValueType = AttributeValueTypesDto.String,
-                    IsDataStream = false
+                    ValueType = AttributeValueTypesDto.String
                 },
                 new()
                 {

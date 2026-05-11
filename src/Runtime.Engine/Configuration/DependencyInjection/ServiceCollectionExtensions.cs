@@ -4,6 +4,7 @@ using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
@@ -12,6 +13,7 @@ using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
+using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Meshmakers.Octo.Runtime.Engine.TransportContainer;
 using Microsoft.Extensions.Logging;
 
@@ -81,6 +83,14 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<ICkModelMigrationService, CkModelMigrationService>();
         services.AddTransient<ICkModelUpgradeService, CkModelUpgradeService>();
+
+        // StreamData archive lifecycle. Concept §3, §11. The lifecycle service itself is
+        // constructed per-tenant by the host (e.g. Mongo TenantContext) because it requires a
+        // tenant id; this registration only wires the audit-trail default. The default writes
+        // structured log entries; a host can replace it by registering a different
+        // IArchiveAuditTrail implementation (e.g. EventBusArchiveAuditTrail in
+        // octo-common-services).
+        services.AddTransient<IArchiveAuditTrail, LoggingArchiveAuditTrail>();
 
         return new RuntimeEngineBuilder(services);
     }

@@ -1,0 +1,14 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: CkArchive
+    description: "Defines an archive of time-series data points for a specific Construction Kit type. The archive's columns specify which attribute paths are captured. Once activated, the schema is frozen and the corresponding CrateDB table is created."
+    derivedFromCkTypeId: ${System}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/CkArchive.TargetCkTypeId
+        name: TargetCkTypeId
+      - id: ${this}/CkArchive.Columns
+        name: Columns
+      - id: ${this}/CkArchive.Status
+        name: Status

@@ -160,6 +160,30 @@ internal class CatalogDependencyResolver(
             }
         }
 
+        var versionConflicts = ckResolvedModels
+            .Where(m => !skippedDependencies.Contains(m.ModelId))
+            .GroupBy(m => m.ModelId.Name)
+            .Where(g => g.Select(m => m.ModelId).Distinct().Count() > 1)
+            .ToList();
+        if (versionConflicts.Count > 0)
+        {
+            var conflict = versionConflicts[0];
+            var conflictingIds = conflict.Select(m => m.ModelId).Distinct().ToList();
+            var origins = dependencies
+                .Where(d => conflictingIds.Any(id => d.Item2.IsSatisfiedBy(id)))
+                .SelectMany(d => d.Item1)
+                .Distinct()
+                .ToList();
+            var versionsText = string.Join(", ", conflictingIds.Select(m => m.FullName));
+            var originsText = origins.Count > 0
+                ? string.Join(", ", origins.Select(m => m.FullName))
+                : "<root>";
+            operationResult.AddMessage(MessageCodes.MultipleVersionsOfCkModelResolved(
+                originFileResolver.Resolve(conflictingIds[0].ToVersionRange()),
+                conflict.Key, versionsText, originsText));
+            throw ModelValidationException.MultipleVersionsOfCkModel(conflict.Key, conflictingIds, origins);
+        }
+
         foreach (var ckCompiledModelRoot in ckResolvedModels)
         {
             if (skippedDependencies.Contains(ckCompiledModelRoot.ModelId))

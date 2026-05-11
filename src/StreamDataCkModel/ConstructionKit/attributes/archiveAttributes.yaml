@@ -1,0 +1,26 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: CkArchive.TargetCkTypeId
+    description: "Construction Kit type ID that this archive captures time-series data for."
+    valueType: String
+  - id: CkArchive.Columns
+    description: "Set of columns (attribute paths) the archive captures. At least one column is required."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkArchiveColumn
+  - id: CkArchive.Status
+    description: "Lifecycle status of the archive. Defaults to Created."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkArchiveStatus
+    defaultValues:
+      - 0
+  - id: CkArchiveColumn.Path
+    description: "Attribute path captured by this column. Supports nested record traversal (e.g. 'sensor.reading.value') and array projection (e.g. 'readings[*].value')."
+    valueType: String
+  - id: CkArchiveColumn.Required
+    description: "When true, every insert must supply a non-null value for this path; missing values cause an exception. When false, missing values are stored as NULL and preserved across upserts via COALESCE."
+    valueType: Boolean
+  - id: CkArchiveColumn.Indexed
+    description: "When true (default), the generated CrateDB column is indexed by the standard rules; when false, the column is created with INDEX OFF. Disable only for columns that are read but never filtered."
+    valueType: Boolean
+    defaultValues:
+      - true

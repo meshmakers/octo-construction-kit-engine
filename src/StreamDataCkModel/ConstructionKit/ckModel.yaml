@@ -1,0 +1,5 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-meta.schema.json"
+modelId: System.StreamData-1.0.0
+description: "StreamData model. Defines CkArchive (per-CkType time-series archive definitions) and supporting enum/record types. Loaded only when StreamData is enabled at the instance level."
+dependencies:
+  - System-[2.0,3.0)

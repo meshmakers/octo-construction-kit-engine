@@ -26,7 +26,6 @@ public class CkAttributeGraph
         DefaultValues = attributeDto.DefaultValues;
         Description = attributeDto.Description;
         MetaData = attributeDto.MetaData;
-        IsDataStream = attributeDto.IsDataStream ?? false;
     }
 
     /// <summary>
@@ -40,11 +39,10 @@ public class CkAttributeGraph
     /// <param name="defaultValues"></param>
     /// <param name="description">An optional description to the attribute</param>
     /// <param name="metaData">Optional meta data of the attribute</param>
-    /// <param name="isDataStream">Optional flag that tells if an attribute is a data stream </param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
         CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description,
-        ICollection<CkAttributeMetaDataDto>? metaData, bool isDataStream)
+        ICollection<CkAttributeMetaDataDto>? metaData)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;
@@ -53,7 +51,6 @@ public class CkAttributeGraph
         DefaultValues = defaultValues;
         Description = description;
         MetaData = metaData;
-        IsDataStream = isDataStream;
     }
 
     /// <summary>
@@ -90,9 +87,4 @@ public class CkAttributeGraph
     ///     Optional meta data of the attribute
     /// </summary>
     public ICollection<CkAttributeMetaDataDto>? MetaData { get; }
-
-    /// <summary>
-    ///     Optional flag that tells if an attribute is a data stream
-    /// </summary>
-    public bool IsDataStream { get; }
 }

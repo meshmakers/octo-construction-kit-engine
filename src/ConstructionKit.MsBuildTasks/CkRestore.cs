@@ -40,6 +40,16 @@ public class CkRestore : Microsoft.Build.Utilities.Task
     public bool IsLocalCatalogEnabled { get; set; } = true;
 
     /// <summary>
+    /// When true, the public GitHub catalog is consulted during dependency resolution.
+    /// </summary>
+    public bool IsPublicGitHubCatalogEnabled { get; set; } = true;
+
+    /// <summary>
+    /// When true, the private GitHub catalog is consulted during dependency resolution.
+    /// </summary>
+    public bool IsPrivateGitHubCatalogEnabled { get; set; } = true;
+
+    /// <summary>
     /// A list of compiled models that has been generated
     /// </summary>
     [Output]
@@ -64,6 +74,16 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         services.Configure<LocalFileSystemCatalogOptions>(options =>
         {
             options.IsEnabled = IsLocalCatalogEnabled;
+        });
+
+        services.Configure<PublicGitHubCatalogOptions>(options =>
+        {
+            options.IsEnabled = IsPublicGitHubCatalogEnabled;
+        });
+
+        services.Configure<PrivateGitHubCatalogOptions>(options =>
+        {
+            options.IsEnabled = IsPrivateGitHubCatalogEnabled;
         });
 
         var serviceProvider = services.BuildServiceProvider();

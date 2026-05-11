@@ -27,9 +27,6 @@
     <data name="DefaultValues" xml:space="preserve">
         <value>Default Values</value>
     </data>
-    <data name="IsDataStream" xml:space="preserve">
-        <value>Is Data Stream?</value>
-    </data>
     <data name="Description" xml:space="preserve">
         <value>Description</value>
     </data>

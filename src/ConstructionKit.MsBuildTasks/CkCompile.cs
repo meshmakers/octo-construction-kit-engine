@@ -46,6 +46,16 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public bool IsLocalCatalogEnabled { get; set; } = true;
 
     /// <summary>
+    /// When true, the public GitHub catalog is consulted during dependency resolution. Set to false to ignore stale cache entries from public GitHub when working purely with locally built models.
+    /// </summary>
+    public bool IsPublicGitHubCatalogEnabled { get; set; } = true;
+
+    /// <summary>
+    /// When true, the private GitHub catalog is consulted during dependency resolution. Set to false to ignore stale cache entries from private GitHub when working purely with locally built models.
+    /// </summary>
+    public bool IsPrivateGitHubCatalogEnabled { get; set; } = true;
+
+    /// <summary>
     /// When true, the compiled construction kit model is published to the local catalog
     /// </summary>
     [Required]
@@ -113,21 +123,23 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             options.IsEnabled = IsLocalCatalogEnabled;
         });
 
-        if (!string.IsNullOrWhiteSpace(PublicGitHubApiKey))
+        services.Configure<PublicGitHubCatalogOptions>(options =>
         {
-            services.Configure<PublicGitHubCatalogOptions>(options =>
+            options.IsEnabled = IsPublicGitHubCatalogEnabled;
+            if (!string.IsNullOrWhiteSpace(PublicGitHubApiKey))
             {
                 options.GitHubApiToken = PublicGitHubApiKey;
-            });
-        }
+            }
+        });
 
-        if (!string.IsNullOrWhiteSpace(PrivateGitHubApiKey))
+        services.Configure<PrivateGitHubCatalogOptions>(options =>
         {
-            services.Configure<PrivateGitHubCatalogOptions>(options =>
+            options.IsEnabled = IsPrivateGitHubCatalogEnabled;
+            if (!string.IsNullOrWhiteSpace(PrivateGitHubApiKey))
             {
                 options.GitHubApiToken = PrivateGitHubApiKey;
-            });
-        }
+            }
+        });
 
         var serviceProvider = services.BuildServiceProvider();
 

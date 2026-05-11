@@ -74,13 +74,45 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
             return false;
         }
 
-        var failingDetails = details.Where(d => d.Errors != null && d.Errors.Count > 0).ToList();
-        if (failingDetails.Count == 0)
+        var invalidDetails = details.Where(d => !d.IsValid).ToList();
+
+        // With OutputFormat.List, anyOf/oneOf alternative branches that didn't match still
+        // appear as failing details even when at least one other branch passed (so the parent
+        // anyOf/oneOf as a whole is valid). Identify branch failures that belong to an
+        // overall-successful anyOf and treat them as noise. A branch failure is "real" iff
+        // the immediate parent `/.../anyOf` (or `/.../oneOf`) node is also invalid.
+        var failedAnyOfPaths = new HashSet<string>(
+            invalidDetails
+                .Select(d => d.EvaluationPath.ToString())
+                .Where(p => p.EndsWith("/anyOf") || p.EndsWith("/oneOf")));
+
+        var errorCarrying = invalidDetails
+            .Where(d => d.Errors != null && d.Errors.Count > 0)
+            .ToList();
+        if (errorCarrying.Count == 0)
         {
             return false;
         }
 
-        return failingDetails.All(d => d.EvaluationPath.ToString().Contains("/additionalProperties"));
+        var realErrors = errorCarrying
+            .Where(d => !IsBranchFailureOfSuccessfulAnyOf(d.EvaluationPath.ToString(), failedAnyOfPaths))
+            .ToList();
+
+        return realErrors.All(d => d.EvaluationPath.ToString().EndsWith("/additionalProperties"));
+    }
+
+    private static bool IsBranchFailureOfSuccessfulAnyOf(string evaluationPath, HashSet<string> failedAnyOfPaths)
+    {
+        // Match against the closest enclosing anyOf/oneOf branch index, e.g.
+        // "/properties/x/anyOf/1/type" → parent = "/properties/x/anyOf".
+        var match = System.Text.RegularExpressions.Regex.Match(
+            evaluationPath, @"^(?<parent>.*/(anyOf|oneOf))/\d+(/.*)?$");
+        if (!match.Success)
+        {
+            return false;
+        }
+
+        return !failedAnyOfPaths.Contains(match.Groups["parent"].Value);
     }
 
     public override void Write(Utf8JsonWriter writer, T value, JsonSerializerOptions options)

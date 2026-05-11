@@ -165,4 +165,51 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => _store.GetAsync(Rt)).Returns(Task.FromResult<CkArchiveSnapshot?>(null));
         await Assert.ThrowsAsync<ArchiveNotFoundException>(() => NewSut().ActivateAsync(Rt));
     }
+
+    // ---- Source-delete guard (rollup-archives concept §6 / §10) ----
+
+    private ArchiveLifecycleService NewSutWithRollupStore(ICkRollupArchiveRuntimeStore rollupStore) =>
+        new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance, rollupStore);
+
+    [Fact]
+    public async Task Delete_NoRollupStore_DeletesWithoutGuard()
+    {
+        // The default-constructed service has no rollup store; deletes proceed regardless.
+        Stub(CkArchiveStatus.Activated);
+
+        await NewSut().DeleteAsync(Rt);
+
+        A.CallTo(() => _repo.DeleteArchiveAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _store.ArchiveEntityAsync(Rt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Delete_WithRollupStore_NoDependentRollups_Proceeds()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.CountActiveRollupsForSourceAsync(Rt)).Returns(0);
+        Stub(CkArchiveStatus.Activated);
+
+        await NewSutWithRollupStore(rollupStore).DeleteAsync(Rt);
+
+        A.CallTo(() => _repo.DeleteArchiveAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _store.ArchiveEntityAsync(Rt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Delete_WithRollupStore_DependentRollupsExist_ThrowsAndPreservesArchive()
+    {
+        var rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.CountActiveRollupsForSourceAsync(Rt)).Returns(2);
+        Stub(CkArchiveStatus.Activated);
+
+        var ex = await Assert.ThrowsAsync<RollupSourceInUseException>(
+            () => NewSutWithRollupStore(rollupStore).DeleteAsync(Rt));
+        Assert.Equal(2, ex.DependentRollupCount);
+
+        // Neither the Crate table nor the entity must be touched when the guard fires.
+        A.CallTo(() => _repo.DeleteArchiveAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => _store.ArchiveEntityAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordDeletionAsync(A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
 }

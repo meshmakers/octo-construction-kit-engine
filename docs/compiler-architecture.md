@@ -371,6 +371,12 @@ Defined in `Directory.Build.props`:
 | `OctoGenerateCkModelServiceClass` | true | Generate service registration classes |
 | `OctoEmbedCkMigrations` | true | Embed migration scripts as resources |
 
+### Incremental Build and Clean
+
+The `CkCompile` and `CkRestore` targets (in `ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets`) use MSBuild `Inputs`/`Outputs` for incremental builds. The compiler assembly (`$(OctoCkCompileTasksAssembly)`) is part of the input set, so when the engine package is updated, the timestamp change forces a full recompile of every consuming CK project. Without this, schema changes in the engine would leave stale compiled YAMLs in `bin/.../octo-ck-libraries/` that the source generator then rejects against the new schema.
+
+The `CkClean` target hooks into `BeforeTargets="Clean"` and removes the generated `octo-ck-libraries/{out,imports}` and `octo-ck-cache/{out,imports}` folders so `dotnet clean` actually clears compiled CK output.
+
 ## File Structure
 
 ```

@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -28,4 +29,27 @@ public interface IArchiveAuditTrail
     /// Records a deletion (any state → soft-deleted entity + dropped Crate table).
     /// </summary>
     Task RecordDeletionAsync(string tenantId, OctoObjectId archiveRtId, CkArchiveStatus statusAtDeletion);
+
+    /// <summary>
+    /// Records one committed rollup bucket. Emitted by <see cref="IRollupOrchestrator"/> after a
+    /// bucket's rows were upserted and the watermark advanced. Concept (rollup-archives) §11.
+    /// </summary>
+    Task RecordRollupRunAsync(
+        string tenantId,
+        OctoObjectId rollupRtId,
+        DateTime bucketStart,
+        DateTime bucketEnd,
+        int rowsWritten,
+        TimeSpan elapsed);
+
+    /// <summary>
+    /// Records a freeze (manual or implicit when source data was truncated). <paramref name="reason"/>
+    /// carries a free-text reason or the triggering event id; <c>null</c> for explicit operator
+    /// freezes via the GraphQL mutation. Concept (rollup-archives) §11.
+    /// </summary>
+    Task RecordFreezeAsync(
+        string tenantId,
+        OctoObjectId rollupRtId,
+        DateTime frozenUntil,
+        string? reason);
 }

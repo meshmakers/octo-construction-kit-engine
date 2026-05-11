@@ -1,0 +1,117 @@
+#pragma warning disable CS1591 // Missing XML docs on rollup exception members
+using System;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+
+namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
+
+/// <summary>
+/// The rollup archive references a source archive that does not exist (or has been soft-deleted).
+/// Concept §10.
+/// </summary>
+public sealed class RollupSourceMissingException : StreamDataException
+{
+    public OctoObjectId SourceArchiveRtId { get; }
+
+    public RollupSourceMissingException(OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId)
+        : base($"Rollup archive '{rollupArchiveRtId}' references source archive '{sourceArchiveRtId}', which does not exist.", rollupArchiveRtId)
+    {
+        SourceArchiveRtId = sourceArchiveRtId;
+    }
+}
+
+/// <summary>
+/// Activation was attempted on a rollup archive whose source archive is not in
+/// <see cref="CkArchiveStatus.Activated"/>. Concept §10.
+/// </summary>
+public sealed class RollupSourceNotActivatedException : StreamDataException
+{
+    public OctoObjectId SourceArchiveRtId { get; }
+    public CkArchiveStatus SourceStatus { get; }
+
+    public RollupSourceNotActivatedException(
+        OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, CkArchiveStatus sourceStatus)
+        : base($"Cannot activate rollup '{rollupArchiveRtId}': source archive '{sourceArchiveRtId}' is in status {sourceStatus}; required: Activated.", rollupArchiveRtId)
+    {
+        SourceArchiveRtId = sourceArchiveRtId;
+        SourceStatus = sourceStatus;
+    }
+}
+
+/// <summary>
+/// One of the rollup's <c>Aggregations[].SourcePath</c> entries does not resolve against the source
+/// archive's captured column list, or the source column's primitive type is incompatible with the
+/// requested aggregation function (e.g. AVG/MIN/MAX/SUM on a non-numeric column). Concept §10.
+/// </summary>
+public sealed class RollupSourcePathInvalidException : StreamDataException
+{
+    public string SourcePath { get; }
+
+    public RollupSourcePathInvalidException(OctoObjectId rollupArchiveRtId, string sourcePath, string reason)
+        : base($"Rollup '{rollupArchiveRtId}' source path '{sourcePath}' is invalid: {reason}", rollupArchiveRtId)
+    {
+        SourcePath = sourcePath;
+    }
+}
+
+/// <summary>
+/// The rollup's <c>Aggregations</c> list is empty. At least one aggregation is required.
+/// Concept §10.
+/// </summary>
+public sealed class RollupAggregationsRequiredException : StreamDataException
+{
+    public RollupAggregationsRequiredException(OctoObjectId rollupArchiveRtId)
+        : base($"Rollup archive '{rollupArchiveRtId}' must define at least one aggregation.", rollupArchiveRtId) { }
+}
+
+/// <summary>
+/// Two entries in <c>Aggregations</c> share the same <c>(SourcePath, Function)</c> pair. Concept §10.
+/// </summary>
+public sealed class DuplicateRollupAggregationException : StreamDataException
+{
+    public string SourcePath { get; }
+    public CkRollupFunction Function { get; }
+
+    public DuplicateRollupAggregationException(
+        OctoObjectId rollupArchiveRtId, string sourcePath, CkRollupFunction function)
+        : base($"Rollup archive '{rollupArchiveRtId}' has duplicate aggregation '{function}' on '{sourcePath}'.", rollupArchiveRtId)
+    {
+        SourcePath = sourcePath;
+        Function = function;
+    }
+}
+
+/// <summary>
+/// A schema-relevant change (SourceArchiveRtId, BucketSize, Aggregations) was attempted on a
+/// rollup that has already left <see cref="CkArchiveStatus.Created"/>. Mutate WatermarkLag /
+/// FrozenUntil instead; recreate the rollup for schema changes. Concept §7, §10.
+/// </summary>
+public sealed class RollupSchemaImmutableException : StreamDataException
+{
+    public RollupSchemaImmutableException(OctoObjectId rollupArchiveRtId, CkArchiveStatus currentStatus)
+        : base($"Rollup archive '{rollupArchiveRtId}' is in status {currentStatus}; SourceArchiveRtId, BucketSize, and Aggregations are frozen.", rollupArchiveRtId) { }
+}
+
+/// <summary>
+/// The rollup chain forms a cycle (rollup references itself, directly or transitively). Concept §10.
+/// </summary>
+public sealed class RollupCycleException : StreamDataException
+{
+    public RollupCycleException(OctoObjectId rollupArchiveRtId)
+        : base($"Rollup archive '{rollupArchiveRtId}' would form a cycle in the source chain.", rollupArchiveRtId) { }
+}
+
+/// <summary>
+/// A source archive deletion was attempted while at least one non-soft-deleted rollup references
+/// it. The operator must delete or freeze the rollups first; this prevents accidental destruction
+/// of aggregated history. Concept §6, §10.
+/// </summary>
+public sealed class RollupSourceInUseException : StreamDataException
+{
+    public int DependentRollupCount { get; }
+
+    public RollupSourceInUseException(OctoObjectId sourceArchiveRtId, int dependentRollupCount)
+        : base($"Source archive '{sourceArchiveRtId}' has {dependentRollupCount} active rollup(s) attached. Delete or freeze them first.", sourceArchiveRtId)
+    {
+        DependentRollupCount = dependentRollupCount;
+    }
+}

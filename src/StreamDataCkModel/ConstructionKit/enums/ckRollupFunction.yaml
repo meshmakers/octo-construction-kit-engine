@@ -1,0 +1,22 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkRollupFunction
+    useFlags: false
+    isExtensible: false
+    description: "Aggregation function used by a CkRollupAggregation. AVG is stored as two columns (sum + count) so chained rollups stay numerically correct."
+    values:
+      - key: 0
+        name: Avg
+        description: "Arithmetic mean. Stored as sum and count columns; the average is computed on read."
+      - key: 1
+        name: Min
+        description: "Minimum value in the bucket."
+      - key: 2
+        name: Max
+        description: "Maximum value in the bucket."
+      - key: 3
+        name: Sum
+        description: "Sum of values in the bucket."
+      - key: 4
+        name: Count
+        description: "Number of non-null values in the bucket."

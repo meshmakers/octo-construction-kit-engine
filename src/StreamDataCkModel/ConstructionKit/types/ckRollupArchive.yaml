@@ -1,0 +1,22 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: CkRollupArchive
+    description: "Derived archive that stores time-bucketed aggregations of another CkArchive. Columns are generated from Aggregations[] at activation time and are immutable afterwards. Inserts happen exclusively through the rollup orchestrator. The inherited Columns attribute is populated automatically; direct edits are rejected by validation."
+    derivedFromCkTypeId: ${this}/CkArchive
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/CkRollupArchive.SourceArchiveRtId
+        name: SourceArchiveRtId
+      - id: ${this}/CkRollupArchive.BucketSizeMs
+        name: BucketSizeMs
+      - id: ${this}/CkRollupArchive.WatermarkLagMs
+        name: WatermarkLagMs
+      - id: ${this}/CkRollupArchive.LastAggregatedBucketEnd
+        name: LastAggregatedBucketEnd
+        isOptional: true
+      - id: ${this}/CkRollupArchive.Aggregations
+        name: Aggregations
+      - id: ${this}/CkRollupArchive.FrozenUntil
+        name: FrozenUntil
+        isOptional: true

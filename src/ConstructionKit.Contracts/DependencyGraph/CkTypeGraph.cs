@@ -29,7 +29,6 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         CkTypeId = ckTypeId;
         IsAbstract = ckTypeDto.IsAbstract;
         IsFinal = ckTypeDto.IsFinal;
-        IsStreamType = ckTypeDto.IsStreamType;
         IsCollectionRoot = ckTypeDto.IsCollectionRoot;
         EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
@@ -50,7 +49,6 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="isAbstract"></param>
     /// <param name="isFinal"></param>
     /// <param name="isCollectionRoot"></param>
-    /// <param name="isStreamType"></param>
     /// <param name="baseTypes"></param>
     /// <param name="derivedFromCkTypeId"></param>
     /// <param name="definingCollectionRootCkTypeId"></param>
@@ -62,7 +60,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="description"></param>
     /// <param name="enableChangeStreamPreAndPostImages"></param>
     [JsonConstructor]
-    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot, bool isStreamType,
+    public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
         CkId<CkTypeId>? derivedFromCkTypeId,
         CkId<CkTypeId>? definingCollectionRootCkTypeId,
@@ -76,7 +74,6 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
-        IsStreamType = isStreamType;
         IsCollectionRoot = isCollectionRoot;
         EnableChangeStreamPreAndPostImages = enableChangeStreamPreAndPostImages;
         DerivedFromCkTypeId = derivedFromCkTypeId;
@@ -143,12 +140,6 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     ///     Returns a list of indexes including inherited ones.
     /// </summary>
     public IReadOnlyCollection<CkTypeIndexDto> Indexes { get; set; }
-
-    /// <summary>
-    /// Get or sets a value indicating whether this type is a stream type.
-    /// This information is gathered from the types.
-    /// </summary>
-    public bool IsStreamType { get; set; }
 
     /// <summary>
     ///     Gets a value indicating whether the change stream should include pre- and post-images

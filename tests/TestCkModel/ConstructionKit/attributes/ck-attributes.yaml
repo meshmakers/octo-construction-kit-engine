@@ -452,7 +452,6 @@ attributes:
   - id: BatteryChargeLevel
     valueType: Int
     description: The battery charge level.
-    isDataStream: true
     metaData:
       - key: unit
         value: "%"
@@ -460,7 +459,6 @@ attributes:
   - id: TotalBatteryCapacity
     valueType: Int
     description: The total battery capacity.
-    isDataStream: false
     metaData:
       - key: unit
         value: Ah

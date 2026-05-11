@@ -389,6 +389,12 @@
       "number": 65,
       "level": "ERROR",
       "text": "Failed to parse migration script file: {errorMessage}"
+    },
+    {
+      "key": "MultipleVersionsOfCkModelResolved",
+      "number": 66,
+      "level": "FATALERROR",
+      "text": "Multiple versions of construction kit model '{modelName}' were resolved as transitive dependencies: {versions}. Conflicting versions are referenced by: {origins}. This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled)."
     }
   ]
 }

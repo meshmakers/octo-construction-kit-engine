@@ -220,6 +220,9 @@ internal static class MessageCodes
     internal static OperationMessage MigrationScriptParseError(string? location, object errorMessage) =>
         GetMessage("MigrationScriptParseError", location, errorMessage);
 
+    internal static OperationMessage MultipleVersionsOfCkModelResolved(string? location, object modelName, object versions, object origins) =>
+        GetMessage("MultipleVersionsOfCkModelResolved", location, modelName, versions, origins);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -611,6 +614,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  65, "Failed to parse migration script file: {errorMessage}",
                  new [] {"errorMessage"})
+        },
+        {
+            "MultipleVersionsOfCkModelResolved",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 66, "Multiple versions of construction kit model '{modelName}' were resolved as transitive dependencies: {versions}. Conflicting versions are referenced by: {origins}. This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled).",
+                 new [] {"modelName", "versions", "origins"})
         },
     };
 }

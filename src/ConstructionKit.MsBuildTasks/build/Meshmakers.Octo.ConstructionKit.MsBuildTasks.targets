@@ -14,6 +14,8 @@
     <Target Name="GatherCompileFiles">
         <ItemGroup>
             <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" />
+            <!-- Include the compiler assembly itself as an input so engine/schema updates invalidate stale outputs. -->
+            <ConstructionKitFolderInputCompileFiles Include="$(OctoCkCompileTasksAssembly)" />
             <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
@@ -21,6 +23,8 @@
     <Target Name="GatherImportFiles">
         <ItemGroup>
             <ConstructionKitFolderInputImportFiles Include="@(ConstructionKitConfigFile)" />
+            <!-- Include the compiler assembly itself as an input so engine/schema updates invalidate stale outputs. -->
+            <ConstructionKitFolderInputImportFiles Include="$(OctoCkCompileTasksAssembly)" />
             <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
@@ -113,6 +117,24 @@
         3. Items are added before Source Generators are initialized
         4. Incremental builds work correctly
     -->
+
+    <!--
+        Remove generated CK compile/restore output and cache folders on Clean.
+        Without this the compiled YAMLs (octo-ck-libraries/.../out/*.yaml) and the
+        intermediate cache (octo-ck-cache) survive `dotnet clean`. After an engine
+        or schema update those stale outputs trigger schema validation errors in
+        the source generator on the next build.
+    -->
+    <Target Name="CkClean" BeforeTargets="Clean">
+        <ItemGroup>
+            <_OctoCkCompileGeneratedFiles Include="$(OctoCkCompileOutputCompilerFolder)/**/*" />
+            <_OctoCkCompileGeneratedFiles Include="$(OctoCkCompileOutputImportFolder)/**/*" />
+            <_OctoCkCompileGeneratedFiles Include="$(OctoCkCompileCacheCompileFolder)/**/*" />
+            <_OctoCkCompileGeneratedFiles Include="$(OctoCkCompileCacheImportFolder)/**/*" />
+        </ItemGroup>
+        <Delete Files="@(_OctoCkCompileGeneratedFiles)" />
+        <RemoveDir Directories="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputImportFolder);$(OctoCkCompileCacheCompileFolder);$(OctoCkCompileCacheImportFolder)" />
+    </Target>
 
     <!--
         CK Model Migration Files Embedding

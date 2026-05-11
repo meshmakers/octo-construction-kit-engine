@@ -92,7 +92,8 @@ public abstract class GitHubCatalog : CachedCatalog
                     await using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
 #endif
                     var ckCompiledModelRoot = await _ckJsonSerializer
-                        .DeserializeCompiledModelRootAsync(stream, "", operationResult).ConfigureAwait(false);
+                        .DeserializeCompiledModelRootAsync(stream, "", operationResult,
+                            tolerantToUnknownProperties: true).ConfigureAwait(false);
                     if (operationResult.HasErrors)
                     {
                         throw ModelCatalogException.ErrorDuringModelLoad(modelId, CatalogName,
@@ -130,7 +131,8 @@ public abstract class GitHubCatalog : CachedCatalog
         }
 
         var ckCompiledModelRoot2 = await _ckJsonSerializer
-            .DeserializeCompiledModelRootAsync(r.Value.Item1, "", operationResult).ConfigureAwait(false);
+            .DeserializeCompiledModelRootAsync(r.Value.Item1, "", operationResult,
+                tolerantToUnknownProperties: true).ConfigureAwait(false);
         if (operationResult.HasErrors)
         {
             throw ModelCatalogException.ErrorDuringModelLoad(modelId, CatalogName,

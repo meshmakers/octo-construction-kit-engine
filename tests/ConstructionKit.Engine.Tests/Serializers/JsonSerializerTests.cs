@@ -139,4 +139,82 @@ public class JsonSerializerTests
         Assert.NotNull(json);
         Assert.Contains("$schema", json);
     }
+
+    private const string CompiledModelWithUnknownProperties = """
+        {
+          "$schema": "https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json",
+          "modelId": "Test-1.0.0",
+          "dependencies": [],
+          "types": [
+            {
+              "typeId": "Sample-1",
+              "isStreamType": false,
+              "obsoleteFlag": true
+            }
+          ],
+          "attributes": [
+            {
+              "id": "Sample-1",
+              "valueType": "String",
+              "isDataStream": true
+            }
+          ]
+        }
+        """;
+
+    [Fact]
+    public async Task DeserializeCompiledModelRootAsync_StrictMode_FailsOnUnknownProperties()
+    {
+        var ckJsonSerializer = new CkJsonSerializer();
+        var operationResult = new OperationResult();
+
+        await Assert.ThrowsAsync<ModelParseException>(async () =>
+            await ckJsonSerializer.DeserializeCompiledModelRootAsync(
+                CompiledModelWithUnknownProperties, "test", operationResult));
+
+        Assert.True(operationResult.HasErrors);
+    }
+
+    [Fact]
+    public async Task DeserializeCompiledModelRootAsync_TolerantMode_DropsUnknownPropertiesSilently()
+    {
+        var ckJsonSerializer = new CkJsonSerializer();
+        var operationResult = new OperationResult();
+
+        var model = await ckJsonSerializer.DeserializeCompiledModelRootAsync(
+            CompiledModelWithUnknownProperties, "test", operationResult,
+            tolerantToUnknownProperties: true);
+
+        Assert.False(operationResult.HasErrors);
+        Assert.Equal("Test-1.0.0", model.ModelId.ToString());
+        Assert.NotNull(model.Types);
+        Assert.Single(model.Types);
+        Assert.Equal("Sample", model.Types[0].TypeId.Name);
+        Assert.NotNull(model.Attributes);
+        Assert.Single(model.Attributes);
+        Assert.Equal("Sample", model.Attributes[0].AttributeId.Name);
+    }
+
+    [Fact]
+    public async Task DeserializeCompiledModelRootAsync_TolerantMode_StillFailsOnGenuineErrors()
+    {
+        var ckJsonSerializer = new CkJsonSerializer();
+        var operationResult = new OperationResult();
+
+        // missing required 'modelId' is a genuine schema violation that must not be tolerated
+        const string invalid = """
+            {
+              "$schema": "https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json",
+              "types": [
+                { "typeId": "Sample-1", "isStreamType": true }
+              ]
+            }
+            """;
+
+        await Assert.ThrowsAsync<ModelParseException>(async () =>
+            await ckJsonSerializer.DeserializeCompiledModelRootAsync(
+                invalid, "test", operationResult, tolerantToUnknownProperties: true));
+
+        Assert.True(operationResult.HasErrors);
+    }
 }

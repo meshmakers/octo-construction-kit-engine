@@ -150,34 +150,50 @@ internal class CkYamlSerializer : ICkYamlSerializer
     }
 
     /// <inheritdoc />
-    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
         OperationResult operationResult)
+        => DeserializeCompiledModelRootAsync(s, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(string s, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        var ckCompiledModelRoot = await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult).ConfigureAwait(false);
+        var ckCompiledModelRoot = await DeserializeCompiledModelRootAsync(memStream, locationReference, operationResult, tolerantToUnknownProperties).ConfigureAwait(false);
         return ckCompiledModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference, OperationResult operationResult)
+        => DeserializeCompiledModelRoot(s, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public CkCompiledModelRoot DeserializeCompiledModelRoot(string s, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
         var byteArray = Encoding.UTF8.GetBytes(s);
         using var memStream = new MemoryStream(byteArray);
-        var ckCompiledModelRoot =  DeserializeCompiledModelRoot(memStream, locationReference, operationResult);
+        var ckCompiledModelRoot =  DeserializeCompiledModelRoot(memStream, locationReference, operationResult, tolerantToUnknownProperties);
         return ckCompiledModelRoot ?? throw ModelParseException.DeserializedModelWasNull(locationReference, operationResult);
     }
 
     /// <inheritdoc />
     public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
         OperationResult operationResult)
+        => DeserializeCompiledModelRootAsync(stream, locationReference, operationResult, tolerantToUnknownProperties: false);
+
+    /// <inheritdoc />
+    public Task<CkCompiledModelRoot> DeserializeCompiledModelRootAsync(Stream stream, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties)
     {
-        return Task.FromResult(DeserializeCompiledModelRoot(stream, locationReference, operationResult));
+        return Task.FromResult(DeserializeCompiledModelRoot(stream, locationReference, operationResult, tolerantToUnknownProperties));
     }
 
-    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference, OperationResult operationResult)
+    private CkCompiledModelRoot DeserializeCompiledModelRoot(Stream stream, string locationReference,
+        OperationResult operationResult, bool tolerantToUnknownProperties = false)
     {
-        _ckSchemaValidator.ValidateCompiledModelInYaml(stream, locationReference, operationResult);
+        _ckSchemaValidator.ValidateCompiledModelInYaml(stream, locationReference, operationResult, tolerantToUnknownProperties);
         if (operationResult.HasErrors)
         {
             throw ModelParseException.SchemaValidationFailed(locationReference, operationResult);

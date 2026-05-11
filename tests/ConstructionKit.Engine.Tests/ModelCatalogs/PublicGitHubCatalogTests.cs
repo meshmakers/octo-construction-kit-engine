@@ -381,7 +381,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
 
         A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
             .Returns((jsonContent, "sha123"));
-        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._))
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._, A<bool>._))
             .Returns(expectedModel);
 
         var result = await Catalog.GetAsync(modelId, operationResult);
@@ -546,8 +546,8 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
 
         A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
             .Returns((jsonContent, "sha123"));
-        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._))
-            .Invokes((string s, string p, OperationResult r) =>
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._, A<bool>._))
+            .Invokes((string s, string p, OperationResult r, bool _) =>
             {
                 r.AddMessage(new OperationMessage(MessageLevel.Error, "TestLocation", 1001, "Test error occurred"));
             })

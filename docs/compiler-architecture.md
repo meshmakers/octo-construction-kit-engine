@@ -130,6 +130,19 @@ public bool Validate(string yaml, CkSchemaType schemaType, OperationResult opera
 - `ck-migration-meta.schema.json` - Migration metadata schema
 - `ck-migration.schema.json` - Migration script schema
 
+#### Forward-Compatible Reads from Catalogs
+
+The compiled-model schemas declare `additionalProperties: false` on every element, which is strict by design: it catches genuine mistakes at compile and publish time. However, persisted catalogs (`LocalFileSystemCatalog`, `GitHubCatalog`) hold compiled models written by *older* engine versions. If the schema later removes a property (e.g. `isStreamType`, `isDataStream`), the strict validator would refuse to load any of those persisted models — blocking the service even from running `fixall` or migrations.
+
+To handle this, the validator and serializer accept a `tolerantToUnknownProperties` flag:
+
+- `ICkSchemaValidator.ValidateCompiledModelIn{Json,Yaml}(... , bool tolerantToUnknownProperties = false)`
+- `ICkSerializer.DeserializeCompiledModelRoot{,Async}(... , bool tolerantToUnknownProperties)`
+
+When true, evaluation results whose `EvaluationPath` contains `/additionalProperties` are filtered out before reporting errors. All other schema violations (missing required fields, type mismatches, pattern violations) still fail. The DTO deserializer silently drops the unknown fields.
+
+`LocalFileSystemCatalog.GetAsync` and `GitHubCatalog`'s reads pass `true`. **Publish, compile, and source-input paths always pass `false`** so authoring mistakes are still caught.
+
 ### Phase 3: Element Resolution
 
 **File**: `src/ConstructionKit.Engine/Resolvers/ElementResolver.cs`

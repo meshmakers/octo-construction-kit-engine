@@ -119,18 +119,21 @@ When a `CkRollupArchive` is activated:
    - All `Aggregations[].SourcePath` entries resolve against the source archive's `Columns` list (not the CK type — the path must already be captured by the source).
    - `MIN`, `MAX`, `SUM`, `AVG` require a numeric source column; `COUNT` accepts any non-null column. Validated via the resolved `ArchiveColumnSpec.PrimitiveType`.
    - `BucketSize` is a positive interval.
-2. **Column generation**:
+2. **Column generation** (`RollupColumnGenerator.Generate` in `Runtime.Contracts.StreamData`):
    - For each `Aggregations[]` entry, derive target columns:
      - `MIN`/`MAX`/`SUM`/`COUNT` → one column.
      - `AVG` → two columns (`{name}_sum`, `{name}_count`). The `AVG` is computed on read as `sum / NULLIF(count, 0)`.
-   - Persist the generated list to the inherited `CkArchive.Columns` so all existing query / DDL code paths continue to work as for raw archives.
-   - `TargetCkTypeId` is set to `CkRollupArchive` itself (the rollup is not "about" the source CK type — its rows are aggregates, not entities). Storage uses the synthetic columns directly.
+   - The derived columns are written to the inherited `CkArchive.Columns` slot at **create** time (by `RollupArchiveLifecycleService.CreateAsync`), so the generic CkEntity mandatory-attribute validation passes and the read-side mapping (`MongoCkArchiveRuntimeStore.MapToSnapshot`) re-derives them from `Aggregations[]` on every load.
+   - `TargetCkTypeId` is **inherited from the source archive** — a rollup of an archive about `Industry.Energy/Meter` rows is itself about `Industry.Energy/Meter` rows (just grouped by bucket). This lets the existing `RtCkTypeId`-keyed query / DDL plumbing work transparently. The rollup rows are still identifiable as rollups via the `ckTypeId` SQL column (= the rollup's own `RtCkRollupArchive` CK type), written by the orchestrator's INSERT.
 3. **DDL** (concept §11):
    - Crate first, Mongo last. `CREATE TABLE IF NOT EXISTS` with the generated columns plus the standard `(timestamp, rtId, ckTypeId, rtWellKnownName)` columns.
+   - For rollup snapshots (`CkArchiveSnapshot.RollupAggregations is not null`), `EnsureArchiveCreatedAsync` routes through `RollupColumnTypeResolver` instead of `ArchivePathTypeResolver`: the derived storage names are not paths into the CK type, so the column SQL type is determined by the aggregation function (COUNT and AVG's count half → `BIGINT`; SUM/MIN/MAX and AVG's sum half → `DOUBLE PRECISION`).
    - `timestamp` on a rollup row is the bucket **end** (exclusive), giving `[bucketEnd - BucketSize, bucketEnd)` semantics. This matches how `ExecuteDownsamplingQueryAsync` already emits its `date_trunc` boundary and keeps "give me the last hour" filters intuitive.
-   - The orchestrator's batched upserts use the natural key `(timestamp, rtId)`.
-4. **Initial watermark**:
-   - `LastAggregatedBucketEnd` is set to the smallest `timestamp` in the source table truncated down to the bucket boundary, **minus** one bucket — so the first run aggregates from the very beginning. If the source is empty, watermark is set to the first activation timestamp truncated; the orchestrator no-ops until data arrives.
+   - The orchestrator's batched upserts use the natural key `(timestamp, rtId, ckTypeId)`.
+4. **Initial watermark** (`ArchiveLifecycleService.EnsureRollupWatermarkInitialisedAsync`):
+   - MVP policy: `LastAggregatedBucketEnd = truncate(now - BucketSize)` down to the bucket boundary. Historical source rows that predate activation are deliberately not back-filled — use `rewindRollupWatermark` to opt in.
+   - Re-activation after Disabled/Failed preserves the existing watermark; it is only seeded when null.
+   - The "scan the source for the smallest timestamp" variant remains documented as a future option but requires a dedicated repository method that doesn't exist yet.
 
 Deactivation (`Activated → Disabled`) and reactivation behave identically to `CkArchive` for the table and status; the orchestrator skips disabled rollups. Reactivation re-validates source paths but does not re-emit DDL.
 
@@ -223,11 +226,14 @@ Inherited from `CkArchive` plus rollup-specific failure modes that produce `Fail
 
 | Field | Returns | Notes |
 |---|---|---|
+| `createRollupArchive(input: CreateRollupArchiveInput!)` | `OctoObjectId` | Server-side rollup creation. Input carries only the rollup-specific fields (`sourceArchiveRtId`, `bucketSizeMs`, `watermarkLagMs`, `aggregations[]` + optional name); `TargetCkTypeId` is inherited from the source archive and `Columns` is derived from the aggregations via `RollupColumnGenerator`. Requires `StreamDataAdmin`. |
 | `freezeRollupArchive(archiveRtId, until)` | `ArchiveTransitionResult` | Sets `FrozenUntil`. Idempotent if `until` ≥ current. |
-| `unfreezeRollupArchive(archiveRtId)` | `ArchiveTransitionResult` | Clears `FrozenUntil`. Rejected if any source data within the previously frozen range has been truncated (would create gaps); admin must explicitly accept gaps via a force flag. |
-| `rewindRollupWatermark(archiveRtId, toTimestamp)` | `ArchiveTransitionResult` | See §5. Requires `StreamDataAdmin`. |
+| `unfreezeRollupArchive(archiveRtId, acceptGaps)` | `ArchiveTransitionResult` | Clears `FrozenUntil`. The gap-detection guard is deferred to a follow-up; for the MVP `FrozenUntil` is cleared unconditionally and the `acceptGaps` flag is logged for traceability. |
+| `rewindRollupWatermark(archiveRtId, toBucketEnd)` | `ArchiveTransitionResult` | See §5. The target timestamp is truncated down to the bucket boundary. Requires `StreamDataAdmin`. |
 
 `activateArchive` / `disableArchive` / `enableArchive` / `retryArchiveActivation` / `deleteArchive` work transparently on `CkRollupArchive` (the mutations are typed on `CkArchive`, dispatch is polymorphic).
+
+The generic `systemStreamDataCkRollupArchives.create` mutation (auto-generated from the CK model) is technically still callable, but should not be used: it requires the caller to pre-fill `TargetCkTypeId` and `Columns`, and bypasses the source-archive cross-check that the dedicated `createRollupArchive` enforces.
 
 ### Queries
 

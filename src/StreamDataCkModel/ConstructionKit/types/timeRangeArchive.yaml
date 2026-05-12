@@ -1,0 +1,11 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: TimeRangeArchive
+    description: "Concrete Archive subtype for externally pre-aggregated time-range data. Each row carries an explicit [from, to) window (a System/TimeRange record on the time axis at the storage layer) instead of a single timestamp. External systems (EDA reports, smart meters, weather APIs) push data directly via SaveTimeRangeStreamDataInArchive@1 / IStreamDataRepository.InsertTimeRangeAsync — there is no source archive and no system orchestrator on this path. Concept doc: docs/concept-time-range-archives.md."
+    derivedFromCkTypeId: ${this}/Archive
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/TimeRangeArchive.Period
+        name: Period
+        isOptional: true

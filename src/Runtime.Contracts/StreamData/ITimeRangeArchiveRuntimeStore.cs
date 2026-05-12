@@ -29,6 +29,25 @@ public interface ITimeRangeArchiveRuntimeStore
     Task<ArchiveSnapshot?> GetAsync(OctoObjectId archiveRtId);
 
     /// <summary>
+    /// Creates a new <c>TimeRangeArchive</c> entity in <see cref="CkArchiveStatus.Created"/>. The
+    /// archive is not yet provisioned on CrateDB; the standard
+    /// <see cref="IArchiveLifecycleService.ActivateAsync"/> path drives the DDL emission. Returns
+    /// the generated runtime id. Time-range concept §3, §10.
+    /// </summary>
+    /// <param name="rtWellKnownName">Optional human-readable name; null falls back to the rtId.</param>
+    /// <param name="targetCkTypeId">CK type whose rows this archive captures windowed values for.</param>
+    /// <param name="columns">User-picked attribute paths that become CrateDB storage columns.</param>
+    /// <param name="period">
+    /// Advisory period for the archive's windows (e.g. 15 min, 1 h). Optional and descriptive only —
+    /// the engine does not enforce that incoming windows match the declared period.
+    /// </param>
+    Task<OctoObjectId> InsertAsync(
+        string? rtWellKnownName,
+        RtCkId<CkTypeId> targetCkTypeId,
+        System.Collections.Generic.IReadOnlyList<CkArchiveColumnSpec> columns,
+        System.TimeSpan? period);
+
+    /// <summary>
     /// Soft-deletes the time-range archive entity by setting <c>rtState = Archived</c>. The Crate
     /// table is dropped separately by the lifecycle service via
     /// <see cref="IStreamDataRepository.DeleteArchiveAsync"/>.

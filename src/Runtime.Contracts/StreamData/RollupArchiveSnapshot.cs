@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
 /// <summary>
 /// Read-only snapshot of the parts of a <c>CkRollupArchive</c> entity the orchestrator and the
-/// lifecycle service need. Extends the data carried by <see cref="CkArchiveSnapshot"/> with rollup-
+/// lifecycle service need. Extends the data carried by <see cref="ArchiveSnapshot"/> with rollup-
 /// specific fields. Backend-specific stores translate from their concrete representation to this
 /// record.
 /// </summary>
@@ -16,7 +16,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// <c>rewindRollupWatermark</c> mutation. <see cref="FrozenUntil"/> is null when the rollup is not
 /// frozen; once set it is monotonic.
 /// </remarks>
-public sealed record CkRollupArchiveSnapshot(
+public sealed record RollupArchiveSnapshot(
     OctoObjectId RtId,
     RtCkId<CkTypeId> TargetCkTypeId,
     CkArchiveStatus Status,

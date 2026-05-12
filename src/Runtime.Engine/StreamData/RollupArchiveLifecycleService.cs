@@ -9,13 +9,13 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 
 /// <summary>
 /// Default <see cref="IRollupArchiveLifecycleService"/> implementation. Thin orchestration over
-/// <see cref="ICkRollupArchiveRuntimeStore"/> + <see cref="IArchiveAuditTrail"/>; no DB-specific
+/// <see cref="IRollupArchiveRuntimeStore"/> + <see cref="IArchiveAuditTrail"/>; no DB-specific
 /// code. The shared archive lifecycle (activate / disable / enable / retry / delete) stays on
 /// <see cref="IArchiveLifecycleService"/> since rollups inherit those semantics unchanged
 /// (rollup-archives concept §2).
 /// </summary>
 /// <remarks>
-/// Monotonicity of <see cref="CkRollupArchiveSnapshot.FrozenUntil"/> (only forward) is enforced
+/// Monotonicity of <see cref="RollupArchiveSnapshot.FrozenUntil"/> (only forward) is enforced
 /// here, before the store call, so the audit event reflects the *applied* operation and the store
 /// implementation can stay a thin writer. <see cref="UnfreezeAsync"/>'s gap detection is deferred
 /// to a follow-up: for the MVP we set <c>FrozenUntil = null</c> unconditionally and let the
@@ -24,8 +24,8 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleService
 {
     private readonly string _tenantId;
-    private readonly ICkRollupArchiveRuntimeStore _rollupStore;
-    private readonly ICkArchiveRuntimeStore _archiveStore;
+    private readonly IRollupArchiveRuntimeStore _rollupStore;
+    private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<RollupArchiveLifecycleService> _logger;
 
@@ -38,8 +38,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
     /// </summary>
     public RollupArchiveLifecycleService(
         string tenantId,
-        ICkRollupArchiveRuntimeStore rollupStore,
-        ICkArchiveRuntimeStore archiveStore,
+        IRollupArchiveRuntimeStore rollupStore,
+        IArchiveRuntimeStore archiveStore,
         IArchiveAuditTrail audit,
         ILogger<RollupArchiveLifecycleService> logger)
     {
@@ -163,7 +163,7 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             rollupRtId, toBucketEnd, snapshot.LastAggregatedBucketEnd);
     }
 
-    private async Task<CkRollupArchiveSnapshot> LoadAsync(OctoObjectId rollupRtId)
+    private async Task<RollupArchiveSnapshot> LoadAsync(OctoObjectId rollupRtId)
     {
         var snapshot = await _rollupStore.GetAsync(rollupRtId);
         if (snapshot is null)

@@ -1,21 +1,22 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
-  - id: CkArchive.TargetCkTypeId
+  - id: Archive.TargetCkTypeId
     description: "Construction Kit type ID that this archive captures time-series data for."
     valueType: String
-  - id: CkArchive.Columns
+  - id: Archive.Columns
     description: "Set of columns (attribute paths) the archive captures. At least one column is required."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkArchiveColumn
-  - id: CkArchive.Status
+  - id: Archive.Status
     description: "Lifecycle status of the archive. Defaults to Created."
     valueType: Enum
     valueCkEnumId: ${this}/CkArchiveStatus
     defaultValues:
       - 0
-  - id: CkArchive.RawRetentionMs
+  - id: Archive.RawRetentionMs
     description: "Retention window for raw data points in milliseconds. When set, the partition pruner may drop source partitions older than (now - RawRetentionMs), but never ahead of the slowest attached rollup's watermark. Null means keep forever."
     valueType: Int
+  # ---------- CkArchiveColumn (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) ----
   - id: CkArchiveColumn.Path
     description: "Attribute path captured by this column. Supports nested record traversal (e.g. 'sensor.reading.value') and array projection (e.g. 'readings[*].value')."
     valueType: String

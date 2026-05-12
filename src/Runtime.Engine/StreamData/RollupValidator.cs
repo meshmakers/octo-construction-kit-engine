@@ -22,7 +22,7 @@ public static class RollupValidator
     /// archive — non-empty aggregations, no duplicate <c>(SourcePath, Function)</c> pairs, no
     /// direct self-cycle.
     /// </summary>
-    public static void ValidateForSave(CkRollupArchiveSnapshot rollup)
+    public static void ValidateForSave(RollupArchiveSnapshot rollup)
     {
         if (rollup.Aggregations is null || rollup.Aggregations.Count == 0)
         {
@@ -55,10 +55,10 @@ public static class RollupValidator
     /// <param name="rollup">The rollup snapshot being activated.</param>
     /// <param name="source">
     /// The source archive's current snapshot, loaded via
-    /// <see cref="ICkArchiveRuntimeStore.GetAsync"/>. <c>null</c> when the source archive does not
+    /// <see cref="IArchiveRuntimeStore.GetAsync"/>. <c>null</c> when the source archive does not
     /// exist (or has been soft-deleted), surfaced via <see cref="RollupSourceMissingException"/>.
     /// </param>
-    public static void ValidateForActivation(CkRollupArchiveSnapshot rollup, CkArchiveSnapshot? source)
+    public static void ValidateForActivation(RollupArchiveSnapshot rollup, ArchiveSnapshot? source)
     {
         ValidateForSave(rollup);
 

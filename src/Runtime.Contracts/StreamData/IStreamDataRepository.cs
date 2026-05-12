@@ -35,11 +35,11 @@ public interface IStreamDataRepository
     /// Creates the storage table for the archive described by <paramref name="snapshot"/> according
     /// to its current <c>CkArchive</c> definition. The snapshot carries the target CK type and
     /// user-picked columns the data store needs to generate DDL — passing it directly avoids a
-    /// round-trip through <see cref="ICkArchiveRuntimeStore"/> from inside the repository.
+    /// round-trip through <see cref="IArchiveRuntimeStore"/> from inside the repository.
     /// Idempotent (uses <c>CREATE TABLE IF NOT EXISTS</c>) so retries after a transient Mongo
     /// update failure converge cleanly.
     /// </summary>
-    Task EnsureArchiveCreatedAsync(CkArchiveSnapshot snapshot);
+    Task EnsureArchiveCreatedAsync(ArchiveSnapshot snapshot);
 
     /// <summary>
     /// Drops the storage table for the archive identified by <paramref name="archiveRtId"/>.
@@ -99,14 +99,14 @@ public interface IStreamDataRepository
     /// <remarks>
     /// Idempotent on the natural key <c>(timestamp, rtId)</c>: when the same bucket is
     /// re-aggregated (e.g. after a watermark rewind, or a crash before
-    /// <see cref="ICkRollupArchiveRuntimeStore.AdvanceWatermarkAsync"/> committed), the
+    /// <see cref="IRollupArchiveRuntimeStore.AdvanceWatermarkAsync"/> committed), the
     /// implementation must collapse duplicates via the data store's upsert primitive
     /// (CrateDB: <c>ON CONFLICT (timestamp, rtId) DO UPDATE</c>) so the orchestrator can
     /// always retry safely. Returns the number of upserted target rows.
     /// </remarks>
     Task<int> AggregateBucketAsync(
-        CkArchiveSnapshot sourceArchive,
-        CkRollupArchiveSnapshot rollup,
+        ArchiveSnapshot sourceArchive,
+        RollupArchiveSnapshot rollup,
         DateTime bucketStart,
         DateTime bucketEnd,
         CancellationToken cancellationToken);

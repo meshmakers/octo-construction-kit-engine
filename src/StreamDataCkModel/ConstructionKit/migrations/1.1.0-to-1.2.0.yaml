@@ -1,0 +1,76 @@
+$schema: https://schemas.meshmakers.cloud/ck-migration.schema.json
+sourceVersion: "1.1.0"
+targetVersion: "1.2.0"
+description: |
+  Migration from System.StreamData 1.1.0 to 1.2.0.
+
+  Type renames (Phase 2 of the time-range concept — see
+  octo-construction-kit-engine/docs/concept-time-range-archives.md):
+  - CkArchive (was a concrete raw archive default) is split:
+    - Archive becomes the abstract base.
+    - RawArchive (new concrete subtype) inherits the today's raw-archive
+      semantics. Existing entities are rewritten to RawArchive.
+  - CkRollupArchive is renamed RollupArchive. No semantic change; the
+    type just drops the misleading Ck prefix (Ck was for the CK type
+    system itself, not for runtime entity types).
+
+  Records (CkArchiveColumn, CkRollupAggregation) and enums
+  (CkArchiveStatus, CkRollupFunction) keep their Ck-prefixed names in
+  this migration. Renaming them requires a `ChangeCkRecordId` /
+  `ChangeCkEnumId` migration action which the engine doesn't yet
+  support; that cleanup lands in Phase 2.5 once the framework is
+  extended.
+
+  The per-archive CrateDB tables are unaffected: the physical table
+  name is derived from the entity rtid only, not from the CK type
+  discriminator.
+
+  Breaking changes:
+  - Callers of the auto-generated `runtime.systemStreamDataCkArchives
+    .create` GraphQL mutation must switch to
+    `runtime.systemStreamDataRawArchives.create`. The CkRollupArchive
+    create mutation is replaced by `systemStreamDataRollupArchives`.
+  - C# code that instantiates `new RtCkArchive { ... }` or
+    `new RtCkRollupArchive { ... }` must switch to `new RtRawArchive`
+    / `new RtRollupArchive`. The abstract `Archive` base cannot be
+    instantiated.
+
+steps:
+  - stepId: rename-ckarchive-to-rawarchive
+    description: "Promote existing CkArchive entities to the new concrete RawArchive subtype."
+    action: Transform
+    target:
+      ckTypeId: System.StreamData/CkArchive
+      blueprintSourceOnly: false
+    transform:
+      type: ChangeCkType
+      newCkTypeId: System.StreamData/RawArchive
+    onConflict: Skip
+    continueOnError: false
+
+  - stepId: rename-ckrollupArchive-to-rollupArchive
+    description: "Strip the Ck prefix from existing CkRollupArchive entities — no semantic change, just a rename."
+    action: Transform
+    target:
+      ckTypeId: System.StreamData/CkRollupArchive
+      blueprintSourceOnly: false
+    transform:
+      type: ChangeCkType
+      newCkTypeId: System.StreamData/RollupArchive
+    onConflict: Skip
+    continueOnError: false
+
+postValidations:
+  - validationId: no-legacy-ckarchive-entities
+    description: "Verify no entities remain with the old abstract-base ckTypeId."
+    type: NoEntitiesOfType
+    target:
+      ckTypeId: System.StreamData/CkArchive
+    severity: Warning
+
+  - validationId: no-legacy-ckrollupArchive-entities
+    description: "Verify no entities remain with the old CkRollupArchive ckTypeId."
+    type: NoEntitiesOfType
+    target:
+      ckTypeId: System.StreamData/CkRollupArchive
+    severity: Warning

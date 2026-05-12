@@ -1,0 +1,7 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: RawArchive
+    description: "Concrete Archive subtype for instant time-series measurements — one row per data point with a single timestamp. External callers (MeshAdapter pipelines, REST clients) push StreamDataPoints via SaveStreamDataInArchive@1 / IStreamDataRepository.InsertAsync. No source archive, no orchestrator. The 1.1.0 de-facto raw-archive shape, lifted out of what's now the abstract Archive base."
+    derivedFromCkTypeId: ${this}/Archive
+    isFinal: true
+    isAbstract: false

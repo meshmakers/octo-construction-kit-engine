@@ -11,7 +11,7 @@ public class RollupValidatorTests
     private static readonly OctoObjectId SourceRt = OctoObjectId.GenerateNewId();
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("CkRollupArchive"));
 
-    private static CkRollupArchiveSnapshot Rollup(
+    private static RollupArchiveSnapshot Rollup(
         OctoObjectId? sourceRt = null,
         CkRollupAggregationSpec[]? aggregations = null) =>
         new(
@@ -22,7 +22,7 @@ public class RollupValidatorTests
             aggregations ?? new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
             null);
 
-    private static CkArchiveSnapshot Source(
+    private static ArchiveSnapshot Source(
         CkArchiveStatus status = CkArchiveStatus.Activated,
         params string[] paths) =>
         new(

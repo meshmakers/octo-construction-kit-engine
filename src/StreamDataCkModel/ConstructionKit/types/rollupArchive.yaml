@@ -1,0 +1,22 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: RollupArchive
+    description: "Concrete Archive subtype for derived bucketed aggregations of another archive (raw or rollup-of-rollup). Columns are generated from Aggregations[] at activation time and immutable afterwards. Inserts happen exclusively through the system-internal rollup orchestrator. The inherited Columns attribute is populated automatically; direct edits are rejected by validation."
+    derivedFromCkTypeId: ${this}/Archive
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/RollupArchive.SourceArchiveRtId
+        name: SourceArchiveRtId
+      - id: ${this}/RollupArchive.BucketSizeMs
+        name: BucketSizeMs
+      - id: ${this}/RollupArchive.WatermarkLagMs
+        name: WatermarkLagMs
+      - id: ${this}/RollupArchive.LastAggregatedBucketEnd
+        name: LastAggregatedBucketEnd
+        isOptional: true
+      - id: ${this}/RollupArchive.Aggregations
+        name: Aggregations
+      - id: ${this}/RollupArchive.FrozenUntil
+        name: FrozenUntil
+        isOptional: true

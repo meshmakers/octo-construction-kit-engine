@@ -16,14 +16,14 @@ public class RollupArchiveLifecycleServiceTests
     private static readonly OctoObjectId SourceRt = OctoObjectId.GenerateNewId();
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("CkRollupArchive"));
 
-    private readonly ICkRollupArchiveRuntimeStore _store = A.Fake<ICkRollupArchiveRuntimeStore>();
-    private readonly ICkArchiveRuntimeStore _archiveStore = A.Fake<ICkArchiveRuntimeStore>();
+    private readonly IRollupArchiveRuntimeStore _store = A.Fake<IRollupArchiveRuntimeStore>();
+    private readonly IArchiveRuntimeStore _archiveStore = A.Fake<IArchiveRuntimeStore>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
     private RollupArchiveLifecycleService NewSut() =>
         new(TenantId, _store, _archiveStore, _audit, NullLogger<RollupArchiveLifecycleService>.Instance);
 
-    private static CkRollupArchiveSnapshot Snapshot(
+    private static RollupArchiveSnapshot Snapshot(
         DateTime? frozenUntil = null,
         DateTime? watermark = null,
         TimeSpan? bucketSize = null) =>
@@ -46,7 +46,7 @@ public class RollupArchiveLifecycleServiceTests
     {
         // Source archive carries its TargetCkTypeId — the rollup inherits it. Columns are derived
         // server-side from the aggregations; AVG produces two columns (sum + count).
-        var sourceSnapshot = new CkArchiveSnapshot(
+        var sourceSnapshot = new ArchiveSnapshot(
             SourceRt,
             TargetType,
             CkArchiveStatus.Activated,
@@ -80,7 +80,7 @@ public class RollupArchiveLifecycleServiceTests
     [Fact]
     public async Task Create_UnknownSourceArchive_ThrowsArchiveNotFound()
     {
-        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(Task.FromResult<CkArchiveSnapshot?>(null));
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(Task.FromResult<ArchiveSnapshot?>(null));
 
         await Assert.ThrowsAsync<ArchiveNotFoundException>(() => NewSut().CreateAsync(
             null, SourceRt, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(1),
@@ -152,7 +152,7 @@ public class RollupArchiveLifecycleServiceTests
     [Fact]
     public async Task Freeze_UnknownRollup_ThrowsArchiveNotFoundException()
     {
-        A.CallTo(() => _store.GetAsync(Rt)).Returns(Task.FromResult<CkRollupArchiveSnapshot?>(null));
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Task.FromResult<RollupArchiveSnapshot?>(null));
 
         await Assert.ThrowsAsync<ArchiveNotFoundException>(
             () => NewSut().FreezeAsync(Rt, DateTime.UtcNow));

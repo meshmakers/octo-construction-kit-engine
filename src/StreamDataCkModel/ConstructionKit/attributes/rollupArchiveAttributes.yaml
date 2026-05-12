@@ -1,29 +1,29 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
-  # ---------- CkRollupArchive ---------------------------------------------------------------
-  - id: CkRollupArchive.SourceArchiveRtId
-    description: "Runtime id of the source CkArchive this rollup aggregates from. May reference another CkRollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated."
+  # ---------- RollupArchive -----------------------------------------------------------------
+  - id: RollupArchive.SourceArchiveRtId
+    description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated."
     valueType: String
-  - id: CkRollupArchive.BucketSizeMs
+  - id: RollupArchive.BucketSizeMs
     description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. Immutable after activation."
     valueType: Int
-  - id: CkRollupArchive.WatermarkLagMs
+  - id: RollupArchive.WatermarkLagMs
     description: "Lower bound on how far behind real-time the orchestrator stays before closing a bucket, in milliseconds. Absorbs late-arriving source inserts. Default 300000 (five minutes). Mutable."
     valueType: Int
     defaultValues:
       - 300000
-  - id: CkRollupArchive.LastAggregatedBucketEnd
+  - id: RollupArchive.LastAggregatedBucketEnd
     description: "Exclusive end timestamp of the most recently committed bucket. Null before the first run. Maintained exclusively by the rollup orchestrator; manual edits go through the rewindRollupWatermark mutation."
     valueType: DateTime
-  - id: CkRollupArchive.Aggregations
+  - id: RollupArchive.Aggregations
     description: "List of aggregation definitions. At least one entry is required at activation time. Immutable after activation; schema changes require creating a new rollup."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkRollupAggregation
-  - id: CkRollupArchive.FrozenUntil
+  - id: RollupArchive.FrozenUntil
     description: "When set, the rollup is read-only up to this timestamp: the orchestrator will not produce new buckets whose bucketEnd is ≤ FrozenUntil. Set automatically when the source archive is truncated for the covered range, so the already-aggregated history is preserved. Monotonic; can only move forward."
     valueType: DateTime
 
-  # ---------- CkRollupAggregation -----------------------------------------------------------
+  # ---------- CkRollupAggregation (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) -
   - id: CkRollupAggregation.SourcePath
     description: "Attribute path on the source archive (must exist in the source's Columns list at activation time). For chained rollups referencing a stored AVG, use the explicit _sum / _count column names."
     valueType: String

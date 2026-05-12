@@ -13,20 +13,20 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// taking a hard dependency on the StreamData CK model package.
 /// </summary>
 /// <remarks>
-/// Mirrors <see cref="ICkArchiveRuntimeStore"/> for the rollup-specific entity. Implementations
+/// Mirrors <see cref="IArchiveRuntimeStore"/> for the rollup-specific entity. Implementations
 /// must reject schema-relevant mutations once the rollup has left
 /// <see cref="CkArchiveStatus.Created"/> (concept §7) and must maintain
-/// <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> and
-/// <see cref="CkRollupArchiveSnapshot.FrozenUntil"/> as monotonic where the concept requires it
+/// <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> and
+/// <see cref="RollupArchiveSnapshot.FrozenUntil"/> as monotonic where the concept requires it
 /// (§6).
 /// </remarks>
-public interface ICkRollupArchiveRuntimeStore
+public interface IRollupArchiveRuntimeStore
 {
     /// <summary>
     /// Reads the current state of the rollup identified by <paramref name="rollupRtId"/>, or
     /// <c>null</c> if no such entity exists (or has been soft-deleted).
     /// </summary>
-    Task<CkRollupArchiveSnapshot?> GetAsync(OctoObjectId rollupRtId);
+    Task<RollupArchiveSnapshot?> GetAsync(OctoObjectId rollupRtId);
 
     /// <summary>
     /// Inserts a new CkRollupArchive entity in <see cref="CkArchiveStatus.Created"/>. The shared
@@ -64,7 +64,7 @@ public interface ICkRollupArchiveRuntimeStore
     Task ArchiveEntityAsync(OctoObjectId rollupRtId);
 
     /// <summary>
-    /// Advances <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> to
+    /// Advances <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> to
     /// <paramref name="bucketEnd"/>. Called by the orchestrator immediately after a bucket's rows
     /// have been upserted into the rollup table. Implementations should reject backwards moves
     /// unless <paramref name="allowRewind"/> is true (used by the <c>rewindRollupWatermark</c>
@@ -73,7 +73,7 @@ public interface ICkRollupArchiveRuntimeStore
     Task AdvanceWatermarkAsync(OctoObjectId rollupRtId, DateTime bucketEnd, bool allowRewind = false);
 
     /// <summary>
-    /// Sets <see cref="CkRollupArchiveSnapshot.FrozenUntil"/>. Implementations enforce monotonicity:
+    /// Sets <see cref="RollupArchiveSnapshot.FrozenUntil"/>. Implementations enforce monotonicity:
     /// the new value must be greater than or equal to the current one, except when the
     /// <c>unfreezeRollupArchive</c> mutation is called (which passes <c>null</c>). Concept §6.
     /// </summary>
@@ -84,7 +84,7 @@ public interface ICkRollupArchiveRuntimeStore
     /// orchestrator background worker on each tick to pick up rollups that are due for processing.
     /// Order is implementation-defined; callers must not rely on it.
     /// </summary>
-    IAsyncEnumerable<CkRollupArchiveSnapshot> EnumerateAsync();
+    IAsyncEnumerable<RollupArchiveSnapshot> EnumerateAsync();
 
     /// <summary>
     /// Returns the count of non-soft-deleted rollups that reference

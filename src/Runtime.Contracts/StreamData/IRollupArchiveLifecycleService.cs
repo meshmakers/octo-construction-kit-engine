@@ -31,7 +31,7 @@ public interface IRollupArchiveLifecycleService
         IReadOnlyList<CkRollupAggregationSpec> aggregations);
 
     /// <summary>
-    /// Sets <see cref="CkRollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.
+    /// Sets <see cref="RollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.
     /// Monotonic: rejected when <paramref name="until"/> is earlier than the current value
     /// (use <see cref="UnfreezeAsync"/> instead). When set, the orchestrator will not produce new
     /// buckets whose <c>bucketEnd</c> falls within the frozen range; already-aggregated rows in
@@ -40,7 +40,7 @@ public interface IRollupArchiveLifecycleService
     Task FreezeAsync(OctoObjectId rollupRtId, DateTime until);
 
     /// <summary>
-    /// Clears <see cref="CkRollupArchiveSnapshot.FrozenUntil"/>. Rejected when source data inside
+    /// Clears <see cref="RollupArchiveSnapshot.FrozenUntil"/>. Rejected when source data inside
     /// the previously frozen range has been truncated and <paramref name="acceptGaps"/> is false,
     /// because unfreezing would produce visible gaps once the orchestrator catches up. The
     /// override is intentional so an operator can knowingly accept the inconsistency. Concept §9.
@@ -48,7 +48,7 @@ public interface IRollupArchiveLifecycleService
     Task UnfreezeAsync(OctoObjectId rollupRtId, bool acceptGaps = false);
 
     /// <summary>
-    /// Resets <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> to
+    /// Resets <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> to
     /// <paramref name="toBucketEnd"/> (truncated to the bucket boundary). Subsequent orchestrator
     /// ticks re-aggregate the rewound range. Destructive: previously committed rows in that range
     /// are temporarily out of sync until the orchestrator catches up. Requires elevated

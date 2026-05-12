@@ -1,0 +1,17 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Archive
+    description: "Abstract base for a CrateDB-backed time-series archive. Concrete subtypes: RawArchive (instant measurements with a single timestamp), RollupArchive (system-orchestrated bucket aggregations of another archive), TimeRangeArchive (externally aggregated values with [from, to) windows — added in a later concept). Shared attributes: TargetCkTypeId, Columns, Status, optional RawRetentionMs. Subtypes add their own time-axis semantics."
+    derivedFromCkTypeId: ${System}/Entity
+    isFinal: false
+    isAbstract: true
+    attributes:
+      - id: ${this}/Archive.TargetCkTypeId
+        name: TargetCkTypeId
+      - id: ${this}/Archive.Columns
+        name: Columns
+      - id: ${this}/Archive.Status
+        name: Status
+      - id: ${this}/Archive.RawRetentionMs
+        name: RawRetentionMs
+        isOptional: true

@@ -29,8 +29,8 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     public const int DefaultMaxBucketsPerTick = 60;
 
     private readonly string _tenantId;
-    private readonly ICkArchiveRuntimeStore _archiveStore;
-    private readonly ICkRollupArchiveRuntimeStore _rollupStore;
+    private readonly IArchiveRuntimeStore _archiveStore;
+    private readonly IRollupArchiveRuntimeStore _rollupStore;
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<RollupOrchestrator> _logger;
@@ -40,8 +40,8 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     /// <summary>Constructs the orchestrator with tenant-scoped dependencies.</summary>
     public RollupOrchestrator(
         string tenantId,
-        ICkArchiveRuntimeStore archiveStore,
-        ICkRollupArchiveRuntimeStore rollupStore,
+        IArchiveRuntimeStore archiveStore,
+        IRollupArchiveRuntimeStore rollupStore,
         IStreamDataRepository repository,
         IArchiveAuditTrail audit,
         ILogger<RollupOrchestrator> logger,
@@ -133,7 +133,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     }
 
     private async Task<int> ProcessRollupSnapshotAsync(
-        CkRollupArchiveSnapshot rollup, CancellationToken cancellationToken)
+        RollupArchiveSnapshot rollup, CancellationToken cancellationToken)
     {
         if (rollup.BucketSize <= TimeSpan.Zero)
         {
@@ -220,7 +220,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         return committed;
     }
 
-    private async Task<CkRollupArchiveSnapshot> LoadRollupAsync(OctoObjectId rollupRtId)
+    private async Task<RollupArchiveSnapshot> LoadRollupAsync(OctoObjectId rollupRtId)
     {
         var snapshot = await _rollupStore.GetAsync(rollupRtId);
         if (snapshot is null)

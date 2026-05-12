@@ -1,0 +1,8 @@
+$schema: https://schemas.meshmakers.cloud/ck-migration-meta.schema.json
+ckModelId: System.StreamData-1.2.0
+migrations:
+  - fromVersion: "1.1.0"
+    toVersion: "1.2.0"
+    scriptPath: 1.1.0-to-1.2.0.yaml
+    description: "Rename CkArchive (concrete raw-archive default) to CkRawArchive. CkArchive becomes the abstract base for raw / rollup / time-range subtypes."
+    breaking: true

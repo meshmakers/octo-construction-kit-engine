@@ -1,0 +1,12 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+attributes:
+  - id: From
+    valueType: DateTime
+    description: "Inclusive start of a TimeRange (UTC)."
+  - id: To
+    valueType: DateTime
+    description: "Exclusive end of a TimeRange (UTC)."
+  - id: TimeRange
+    valueType: Record
+    valueCkRecordId: ${this}/TimeRange
+    description: "A time range with an inclusive start and exclusive end date (UTC)."

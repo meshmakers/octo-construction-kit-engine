@@ -536,11 +536,15 @@ Suggested rollout order — each phase ships a coherent slice.
    `POST /v1/streamdata/{rtId}/insertTimeRange`.
 6. **MeshAdapter node** — `SaveTimeRangeStreamDataInArchive@1`. EDA pipeline can now
    land data.
-7. **Unify `CkRollupArchive` storage to `(window_start, window_end)`** — §6 migration.
-   Drop-and-recreate path for existing rollups; new schema for new ones.
-8. **Chained rollup aggregation over time-range sources** — orchestrator's SQL builder
-   branches on source shape, `was_updated` propagation. §7 cascade examples become
-   testable.
+7. **Unify `CkRollupArchive` storage to `(window_start, window_end)`** ✅ — §6 migration.
+   Drop-and-recreate path for existing rollups (`EnsureWindowedTableShapeAsync` detects
+   the pre-Phase-7 single-`timestamp` shape and drops); new schema for new ones via
+   `ArchiveDdlGenerator.GenerateCreateWindowedTable`.
+8. **Chained rollup aggregation over time-range sources** ✅ — orchestrator's SQL builder
+   branches on source shape (`RollupAggregationSqlBuilder.Build` takes
+   `sourceUsesWindowedStorage`), windowed source ⇒ fully-contained
+   `window_start >= B_start AND window_end <= B_end` predicate and `MAX(was_updated)`
+   propagation. Raw source path unchanged. §7 cascade examples become testable.
 9. **Calendar alignment** — `BucketAlignment` attribute on `CkRollupArchive`, calendar-
    month / week / day boundary computation in the orchestrator. Enables daily /
    weekly / monthly EDA rollups.

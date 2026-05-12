@@ -123,4 +123,21 @@ public interface IStreamDataRepository
         DateTime bucketStart,
         DateTime bucketEnd,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns per-archive storage stats (row count, on-disk size, health) for each
+    /// <paramref name="archiveRtIds"/> entry. Bulk call so the studio's archives list can render
+    /// stats columns without an N+1 round-trip per row. Archives whose backing table doesn't
+    /// exist yet (not activated, or post-delete) appear in the result with
+    /// <see cref="ArchiveStorageStats.TableExists"/> false and zero counters — the caller is not
+    /// expected to filter the input list beforehand.
+    /// </summary>
+    /// <remarks>
+    /// Implementations may issue a single underlying query against their introspection surface
+    /// (e.g. CrateDB <c>sys.shards</c> + <c>sys.health</c>) and return one entry per requested
+    /// rtId. Order of returned entries is implementation-defined; callers must look up by rtId.
+    /// </remarks>
+    Task<IReadOnlyDictionary<OctoObjectId, ArchiveStorageStats>> GetArchiveStatsAsync(
+        IReadOnlyList<OctoObjectId> archiveRtIds,
+        CancellationToken cancellationToken = default);
 }

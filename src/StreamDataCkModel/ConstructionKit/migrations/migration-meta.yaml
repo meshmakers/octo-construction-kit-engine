@@ -1,5 +1,5 @@
 $schema: https://schemas.meshmakers.cloud/ck-migration-meta.schema.json
-ckModelId: System.StreamData-1.2.0
+ckModelId: System.StreamData-1.3.0
 migrations:
   - fromVersion: "1.1.0"
     toVersion: "1.2.0"

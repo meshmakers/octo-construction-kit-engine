@@ -1,0 +1,5 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: TimeRangeArchive.Period
+    description: "Advisory window length for the rows this archive holds (e.g. PT15M, PT1H, P1D). Optional and descriptive only — the engine does not enforce that incoming [from, to) windows match the declared period. Used by the studio to label the archive ('EDA 15-min') and by chained-rollup recommendations. Variable-period archives are allowed (leave null)."
+    valueType: TimeSpan

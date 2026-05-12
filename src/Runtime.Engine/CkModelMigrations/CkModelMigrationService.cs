@@ -342,6 +342,38 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
                 return partialPath;
             }
+
+            // Final fallback: post-chain schema-only bridge. The migration chain exists for older
+            // versions only — the tenant is past the latest chain entry and the target is past the
+            // tenant. Symmetrical to the no-migrations bridge above: a purely additive bump after
+            // the data-migration era ended doesn't need a tombstone migration script. Without this
+            // every CK model would have to grow a no-op entry on every patch-level bump.
+            if (fromModel.Version.CompareTo(toModel.Version) < 0)
+            {
+                _logger.LogInformation(
+                    "Post-chain schema-only bridge for CK model {ModelName}: {FromVersion} -> {ToVersion} " +
+                    "(migration chain ends below installed version; treating as additive upgrade with no data migration needed).",
+                    fromModel.Name, fromModel.Version, toModel.Version);
+
+                return new CkMigrationPath
+                {
+                    FromModel = fromModel,
+                    ToModel = toModel,
+                    HasBreakingChanges = false,
+                    Description = $"Schema-only upgrade from {fromModel.Version} to {toModel.Version} (no data migration needed)",
+                    Steps =
+                    [
+                        new CkMigrationStep
+                        {
+                            FromVersion = fromModel.Version.ToString(),
+                            ToVersion = toModel.Version.ToString(),
+                            Script = null,
+                            Description = $"Schema-only upgrade from {fromModel.Version} to {toModel.Version} (no data migration needed)",
+                            Breaking = false
+                        }
+                    ]
+                };
+            }
         }
         catch (Exception ex)
         {

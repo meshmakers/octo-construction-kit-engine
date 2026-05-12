@@ -1,0 +1,9 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+- recordId: TimeRange
+  description: "A time range with an inclusive start and exclusive end date (UTC). System-scope mirror of Basic/TimeRange so System.*-level CKs can reference it without depending on the Basic CK; see concept-time-range-archives.md."
+  attributes:
+    - id: ${this}/From
+      name: From
+    - id: ${this}/To
+      name: To

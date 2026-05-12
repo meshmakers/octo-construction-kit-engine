@@ -124,6 +124,91 @@ public class CkModelMigrationServiceTests
     }
 
     [Fact]
+    public async Task FindMigrationPathAsync_PostChainSchemaOnly_TargetAboveLatestChainEntry_ShouldReturnNoOpBridge()
+    {
+        // Arrange: tenant is past the latest chain entry. Target is one more patch-level above.
+        // Pinned regression for the System CK 2.0.10 -> 2.1.0 case: the existing 1.0.3 -> 2.0.0
+        // migration chain doesn't help, no candidate auto-bridge entry point exists (all chain
+        // FromVersions are below the tenant), and the partial-path resolver only matches FromVersion
+        // exactly. Without this fallback every additive patch bump would force an empty migration
+        // script — violating "Developers only need to create migration scripts for versions that
+        // actually transform data."
+        var fromModel = new CkModelId("System", "2.0.10");
+        var toModel = new CkModelId("System", "2.1.0");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "System-2.1.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.3",
+                    ToVersion = "2.0.0",
+                    ScriptPath = "1.0.3-to-2.0.0.yaml",
+                    Description = "Legacy Query → SimpleRtQuery."
+                }
+            ]
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Single(result.Steps);
+        Assert.Equal("2.0.10", result.Steps[0].FromVersion);
+        Assert.Equal("2.1.0", result.Steps[0].ToVersion);
+        Assert.Null(result.Steps[0].Script);
+        Assert.False(result.Steps[0].Breaking);
+        Assert.False(result.HasBreakingChanges);
+    }
+
+    [Fact]
+    public async Task FindMigrationPathAsync_PostChainSchemaOnly_DowngradeOrSameVersion_ShouldReturnNull()
+    {
+        // Arrange: tenant is past the latest chain entry, target is equal or below.
+        // The post-chain bridge must only synthesise upgrades, never downgrades.
+        var fromModel = new CkModelId("System", "2.1.0");
+        var toModel = new CkModelId("System", "2.0.10");
+
+        var meta = new CkMigrationMetaDto
+        {
+            CkModelId = "System-2.1.0",
+            Migrations =
+            [
+                new CkMigrationReferenceDto
+                {
+                    FromVersion = "1.0.3",
+                    ToVersion = "2.0.0",
+                    ScriptPath = "1.0.3-to-2.0.0.yaml",
+                    Description = "Legacy Query → SimpleRtQuery."
+                }
+            ]
+        };
+
+        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
+            .Returns(true);
+        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
+            .Returns(meta);
+
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
     public async Task FindMigrationPathAsync_DirectMigrationExists_ShouldReturnPath()
     {
         // Arrange

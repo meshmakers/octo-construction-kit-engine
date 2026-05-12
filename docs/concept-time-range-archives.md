@@ -552,8 +552,13 @@ Suggested rollout order — each phase ships a coherent slice.
    `RewindWatermarkAsync`. Supports `CalendarDay`, `Iso8601Week`, `CalendarMonth`,
    `CalendarYear` — enables daily / weekly / monthly / yearly EDA rollups without
    forcing a fixed `TimeSpan`.
-10. **Studio UI** — list time-range archives in the archives list, create form, insert
-    preview, rollup cascade visualisation.
+10. **Studio UI** ✅ (partial) — list filter switch (Raw / Time-Range) on
+    `archives-list.component`, dedicated `TimeRangeArchiveFormComponent` for create + rename
+    (custom `streamData.createTimeRangeArchive` mutation), routes under
+    `repository/archives/time-range/...`. **Out of scope for this pass**: insert preview
+    (defer to the query-builder surface, which already speaks time-range via the read
+    compatibility layer §6); rollup-cascade visualisation (deserves a dedicated page —
+    `RollupsPanelComponent` on the archive form already shows immediate descendants).
 11. **Cleanup pass** — deprecate `Basic/TimeRange`, migrate consumers to
     `System/TimeRange`. Separate concept; out of scope here.
 

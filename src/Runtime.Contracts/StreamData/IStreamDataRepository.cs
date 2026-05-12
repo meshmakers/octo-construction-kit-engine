@@ -64,6 +64,19 @@ public interface IStreamDataRepository
     Task InsertAsync(OctoObjectId archiveRtId, IEnumerable<StreamDataPoint> datapoints);
 
     /// <summary>
+    /// Inserts externally pre-aggregated time-range data points into a <c>TimeRangeArchive</c>.
+    /// Each point carries an explicit <c>[from, to)</c> window; the natural key
+    /// <c>(window_start, window_end, rtid, ckTypeId)</c> handles re-deliveries via
+    /// <c>ON CONFLICT DO UPDATE</c>, setting the row's <c>was_updated</c> flag to true on every
+    /// upsert. Concept §3 / §5. Throws <c>ArchiveNotActivatedException</c> if the archive is not
+    /// in Activated state, and <c>ArgumentException</c> if any point has <c>To &lt;= From</c>.
+    /// </summary>
+    Task InsertTimeRangeAsync(
+        OctoObjectId archiveRtId,
+        IEnumerable<TimeRangeStreamDataPoint> datapoints,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Executes a simple stream data query against the archive.
     /// </summary>
     Task<StreamDataQueryResult> ExecuteQueryAsync(

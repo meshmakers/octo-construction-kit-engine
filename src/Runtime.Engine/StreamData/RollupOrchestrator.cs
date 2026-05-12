@@ -118,12 +118,10 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     {
         var snapshot = await LoadRollupAsync(rollupRtId);
 
-        // Truncate down to the bucket boundary so the next tick starts cleanly.
-        var ticks = snapshot.BucketSize.Ticks;
-        if (ticks > 0)
-        {
-            toBucketEnd = new DateTime((toBucketEnd.Ticks / ticks) * ticks, toBucketEnd.Kind);
-        }
+        // Truncate down to the bucket boundary so the next tick starts cleanly. The alignment-
+        // aware helper handles FixedSize (legacy modulo arithmetic) and calendar variants
+        // (snap to start of period containing the target) uniformly.
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 
@@ -177,7 +175,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
             cancellationToken.ThrowIfCancellationRequested();
 
             var bucketStart = watermark;
-            var bucketEnd = bucketStart + rollup.BucketSize;
+            var bucketEnd = BucketBoundary.NextBucketEnd(bucketStart, rollup.BucketAlignment, rollup.BucketSize);
 
             // Wait until the bucket is fully past + lag so late-arriving inserts are captured.
             if (bucketEnd > now - rollup.WatermarkLag)

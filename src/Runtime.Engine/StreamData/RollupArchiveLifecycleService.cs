@@ -56,7 +56,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         OctoObjectId sourceArchiveRtId,
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
-        IReadOnlyList<CkRollupAggregationSpec> aggregations)
+        IReadOnlyList<CkRollupAggregationSpec> aggregations,
+        BucketAlignment bucketAlignment = BucketAlignment.FixedSize)
     {
         if (aggregations is null) throw new ArgumentNullException(nameof(aggregations));
         if (aggregations.Count == 0)
@@ -70,6 +71,11 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         if (watermarkLag < TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(watermarkLag), "WatermarkLag must be non-negative.");
+        }
+        if (!Enum.IsDefined(typeof(BucketAlignment), bucketAlignment))
+        {
+            throw new ArgumentOutOfRangeException(nameof(bucketAlignment), bucketAlignment,
+                "BucketAlignment value is not a known enum member.");
         }
 
         // Source archive lookup goes through the shared CkArchive store: thanks to Mongo
@@ -89,11 +95,12 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             bucketSize,
             watermarkLag,
             aggregations,
-            columns);
+            columns,
+            bucketAlignment);
 
         _logger.LogInformation(
-            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns (tenant {TenantId})",
-            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, _tenantId);
+            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment} (tenant {TenantId})",
+            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, bucketAlignment, _tenantId);
 
         return rtId;
     }

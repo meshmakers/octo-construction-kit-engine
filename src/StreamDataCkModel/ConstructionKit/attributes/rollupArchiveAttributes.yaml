@@ -22,6 +22,12 @@ attributes:
   - id: RollupArchive.FrozenUntil
     description: "When set, the rollup is read-only up to this timestamp: the orchestrator will not produce new buckets whose bucketEnd is ≤ FrozenUntil. Set automatically when the source archive is truncated for the covered range, so the already-aggregated history is preserved. Monotonic; can only move forward."
     valueType: DateTime
+  - id: RollupArchive.BucketAlignment
+    description: "Bucket-boundary alignment. FixedSize (default, key 0) preserves the legacy 'LastAggregatedBucketEnd + BucketSizeMs' arithmetic. Calendar/Iso8601 values align bucket boundaries to wall-clock UTC boundaries so monthly / weekly / yearly rollups become expressible without forcing BucketSizeMs into a single TimeSpan. Pre-1.4.0 entities resolve to FixedSize at read time. Immutable after activation."
+    valueType: Enum
+    valueCkEnumId: ${this}/BucketAlignment
+    defaultValues:
+      - 0
 
   # ---------- CkRollupAggregation (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) -
   - id: CkRollupAggregation.SourcePath

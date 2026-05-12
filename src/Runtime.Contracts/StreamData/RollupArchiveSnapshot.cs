@@ -26,7 +26,17 @@ public sealed record RollupArchiveSnapshot(
     TimeSpan WatermarkLag,
     DateTime? LastAggregatedBucketEnd,
     IReadOnlyList<CkRollupAggregationSpec> Aggregations,
-    DateTime? FrozenUntil);
+    DateTime? FrozenUntil)
+{
+    /// <summary>
+    /// Bucket-boundary alignment. <see cref="BucketAlignment.FixedSize"/> (the default for
+    /// entities created before System.StreamData 1.4.0) preserves the legacy
+    /// <c>LastAggregatedBucketEnd + BucketSize</c> arithmetic. Calendar / ISO-week variants
+    /// derive bucket boundaries from the wall clock so monthly / weekly / yearly rollups become
+    /// expressible. Concept-time-range §7.
+    /// </summary>
+    public BucketAlignment BucketAlignment { get; init; } = BucketAlignment.FixedSize;
+}
 
 /// <summary>
 /// Minimal projection of a <c>CkRollupAggregation</c> record — the source column on the source

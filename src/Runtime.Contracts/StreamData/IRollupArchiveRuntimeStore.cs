@@ -47,6 +47,10 @@ public interface IRollupArchiveRuntimeStore
     /// inherited Columns slot for mandatory-attribute validation; the read path re-derives from
     /// <paramref name="aggregations"/> to stay authoritative.
     /// </param>
+    /// <param name="bucketAlignment">
+    /// Bucket-boundary alignment. Defaults to <see cref="BucketAlignment.FixedSize"/> for callers
+    /// (and pre-1.4.0 entities) that don't need calendar-aware buckets. Concept-time-range §7.
+    /// </param>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
     Task<OctoObjectId> InsertAsync(
         string? rtWellKnownName,
@@ -55,7 +59,8 @@ public interface IRollupArchiveRuntimeStore
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
-        IReadOnlyList<CkArchiveColumnSpec> columns);
+        IReadOnlyList<CkArchiveColumnSpec> columns,
+        BucketAlignment bucketAlignment = BucketAlignment.FixedSize);
 
     /// <summary>
     /// Soft-deletes the rollup entity by setting <c>rtState = Archived</c>. The Crate table is

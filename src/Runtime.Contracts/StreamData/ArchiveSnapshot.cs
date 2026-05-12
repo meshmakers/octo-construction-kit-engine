@@ -49,6 +49,14 @@ public sealed record ArchiveSnapshot(
     /// the declared period. Null for raw and rollup archives.
     /// </summary>
     public System.TimeSpan? Period { get; init; }
+
+    /// <summary>
+    /// True when this snapshot's storage shape is the windowed
+    /// <c>(window_start, window_end, rtid, ckTypeId)</c> + <c>was_updated</c> layout — i.e. either
+    /// a rollup archive (Phase 7 unification) or a time-range archive. False ⇒ raw archive with
+    /// the single <c>timestamp</c> column. Concept-time-range §4 / §6.
+    /// </summary>
+    public bool UsesWindowedStorage => IsTimeRange || RollupAggregations is not null;
 }
 
 /// <summary>

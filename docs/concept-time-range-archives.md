@@ -545,9 +545,13 @@ Suggested rollout order — each phase ships a coherent slice.
    `sourceUsesWindowedStorage`), windowed source ⇒ fully-contained
    `window_start >= B_start AND window_end <= B_end` predicate and `MAX(was_updated)`
    propagation. Raw source path unchanged. §7 cascade examples become testable.
-9. **Calendar alignment** — `BucketAlignment` attribute on `CkRollupArchive`, calendar-
-   month / week / day boundary computation in the orchestrator. Enables daily /
-   weekly / monthly EDA rollups.
+9. **Calendar alignment** ✅ — `BucketAlignment` enum + attribute on `RollupArchive`
+   (System.StreamData 1.4.0, additive; pre-1.4.0 entities resolve to `FixedSize`).
+   Boundary math lives in `BucketBoundary` (NextBucketEnd / InitialWatermark /
+   AlignDown), wired into `RollupOrchestrator`, `ArchiveLifecycleService`, and
+   `RewindWatermarkAsync`. Supports `CalendarDay`, `Iso8601Week`, `CalendarMonth`,
+   `CalendarYear` — enables daily / weekly / monthly / yearly EDA rollups without
+   forcing a fixed `TimeSpan`.
 10. **Studio UI** — list time-range archives in the archives list, create form, insert
     preview, rollup cascade visualisation.
 11. **Cleanup pass** — deprecate `Basic/TimeRange`, migrate consumers to

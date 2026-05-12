@@ -20,3 +20,6 @@ types:
       - id: ${this}/RollupArchive.FrozenUntil
         name: FrozenUntil
         isOptional: true
+      - id: ${this}/RollupArchive.BucketAlignment
+        name: BucketAlignment
+        isOptional: true

@@ -207,14 +207,13 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         var now = _clock();
-        var ticks = rollup.BucketSize.Ticks;
-        var initialBucketEnd = new DateTime(((now - rollup.BucketSize).Ticks / ticks) * ticks, now.Kind);
+        var initialBucketEnd = BucketBoundary.InitialWatermark(now, rollup.BucketAlignment, rollup.BucketSize);
 
         await _rollupStore.AdvanceWatermarkAsync(archiveRtId, initialBucketEnd);
 
         _logger.LogInformation(
-            "Rollup {RollupRtId}: initial watermark seeded to {Watermark:O} (bucketSize={BucketSize})",
-            archiveRtId, initialBucketEnd, rollup.BucketSize);
+            "Rollup {RollupRtId}: initial watermark seeded to {Watermark:O} (bucketSize={BucketSize}, alignment={Alignment})",
+            archiveRtId, initialBucketEnd, rollup.BucketSize, rollup.BucketAlignment);
     }
 
     private async Task EnsureCrateProvisionedAsync(ArchiveSnapshot snapshot)

@@ -1,0 +1,22 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: BucketAlignment
+    useFlags: false
+    isExtensible: false
+    description: "Bucket-boundary alignment for a RollupArchive. FixedSize (default) uses the legacy LastAggregatedBucketEnd + BucketSizeMs arithmetic. The other values align to calendar boundaries — BucketSizeMs is interpreted as a lower bound (e.g. 28d for monthly) but the actual boundary comes from the calendar so monthly/weekly EDA rollups become expressible. Concept-time-range §7."
+    values:
+      - key: 0
+        name: FixedSize
+        description: "Default. Each bucket spans exactly BucketSizeMs; boundaries are LastAggregatedBucketEnd, LastAggregatedBucketEnd + BucketSizeMs, ..."
+      - key: 1
+        name: CalendarDay
+        description: "Bucket boundaries align to UTC calendar days (00:00:00 UTC). BucketSizeMs is informational only."
+      - key: 2
+        name: Iso8601Week
+        description: "Bucket boundaries align to ISO-8601 weeks (Monday 00:00:00 UTC to next Monday 00:00:00 UTC). BucketSizeMs is informational only."
+      - key: 3
+        name: CalendarMonth
+        description: "Bucket boundaries align to UTC calendar months (first day of month 00:00:00 UTC). BucketSizeMs is informational only; month lengths vary 28-31 days."
+      - key: 4
+        name: CalendarYear
+        description: "Bucket boundaries align to UTC calendar years (Jan 1 00:00:00 UTC). BucketSizeMs is informational only."

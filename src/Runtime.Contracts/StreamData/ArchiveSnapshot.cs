@@ -19,14 +19,36 @@ public sealed record ArchiveSnapshot(
     IReadOnlyList<CkArchiveColumnSpec> Columns)
 {
     /// <summary>
-    /// When this snapshot represents a <c>CkRollupArchive</c>, the aggregation specs from which
+    /// When this snapshot represents a <c>RollupArchive</c>, the aggregation specs from which
     /// <see cref="Columns"/> were derived (via <see cref="RollupColumnGenerator"/>). Null for raw
-    /// archives. The DDL path uses this to skip CK-type attribute resolution for rollups — the
-    /// derived column names (e.g. <c>temperature_avg_sum</c>) are storage identifiers, not paths
-    /// into the CK type, so the column SQL type is determined by the aggregation function instead.
-    /// Concept §4.
+    /// and time-range archives. The DDL path uses this to skip CK-type attribute resolution for
+    /// rollups — the derived column names (e.g. <c>temperature_avg_sum</c>) are storage
+    /// identifiers, not paths into the CK type, so the column SQL type is determined by the
+    /// aggregation function instead. Concept §4.
     /// </summary>
     public IReadOnlyList<CkRollupAggregationSpec>? RollupAggregations { get; init; }
+
+    /// <summary>
+    /// True when this snapshot represents a <c>TimeRangeArchive</c> — each row carries an
+    /// explicit <c>[window_start, window_end)</c> instead of a single <c>timestamp</c>. The DDL
+    /// path emits two timestamp columns + a <c>was_updated</c> flag column, and the natural key
+    /// becomes <c>(window_start, window_end, rtid, ckTypeId)</c>. Concept §4 + §6.
+    /// </summary>
+    /// <remarks>
+    /// Discriminator semantics: <see cref="RollupAggregations"/> non-null ⇒ rollup;
+    /// <see cref="IsTimeRange"/> true ⇒ time-range; both false ⇒ raw archive. Rollups and
+    /// time-range archives are mutually exclusive at the storage shape level (a rollup
+    /// snapshot has IsTimeRange = false today; the rollup-on-time-range unification ships
+    /// in Phase 7).
+    /// </remarks>
+    public bool IsTimeRange { get; init; }
+
+    /// <summary>
+    /// Advisory period for a <c>TimeRangeArchive</c>'s windows (e.g. 15 min, 1 h, 1 d).
+    /// Optional and descriptive only — the engine does not enforce that incoming windows match
+    /// the declared period. Null for raw and rollup archives.
+    /// </summary>
+    public System.TimeSpan? Period { get; init; }
 }
 
 /// <summary>

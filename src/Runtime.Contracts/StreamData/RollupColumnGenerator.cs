@@ -6,7 +6,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// <summary>
 /// Derives the <see cref="CkArchiveColumnSpec"/> set a rollup archive must materialise to back its
 /// <see cref="CkRollupAggregationSpec"/> entries. Pure function, DB-neutral. The output is the same
-/// list a raw archive would carry in <see cref="CkArchiveSnapshot.Columns"/>, so the existing
+/// list a raw archive would carry in <see cref="ArchiveSnapshot.Columns"/>, so the existing
 /// DDL / query / insert paths can consume a rollup snapshot without branching on rollup-ness.
 /// Rollup-archives concept §4.
 /// </summary>

@@ -19,8 +19,8 @@ public class RollupOrchestratorTests
     private static readonly RtCkId<CkTypeId> SourceType = new("Test", new CkTypeId("TempSensor"));
     private static readonly DateTime BaseTime = new(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
 
-    private readonly ICkArchiveRuntimeStore _archiveStore = A.Fake<ICkArchiveRuntimeStore>();
-    private readonly ICkRollupArchiveRuntimeStore _rollupStore = A.Fake<ICkRollupArchiveRuntimeStore>();
+    private readonly IArchiveRuntimeStore _archiveStore = A.Fake<IArchiveRuntimeStore>();
+    private readonly IRollupArchiveRuntimeStore _rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
     private readonly IStreamDataRepository _repo = A.Fake<IStreamDataRepository>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
@@ -28,7 +28,7 @@ public class RollupOrchestratorTests
         new(TenantId, _archiveStore, _rollupStore, _repo, _audit,
             NullLogger<RollupOrchestrator>.Instance, maxBucketsPerTick, () => now);
 
-    private static CkRollupArchiveSnapshot Rollup(
+    private static RollupArchiveSnapshot Rollup(
         DateTime? watermark,
         TimeSpan? bucketSize = null,
         TimeSpan? watermarkLag = null,
@@ -46,13 +46,13 @@ public class RollupOrchestratorTests
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
             frozenUntil);
 
-    private static CkArchiveSnapshot ActivatedSource() =>
+    private static ArchiveSnapshot ActivatedSource() =>
         new(SourceRt, SourceType, CkArchiveStatus.Activated, null, Array.Empty<CkArchiveColumnSpec>());
 
     private void StubActivatedSource() =>
         A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(ActivatedSource());
 
-    private void StubRollups(params CkRollupArchiveSnapshot[] rollups) =>
+    private void StubRollups(params RollupArchiveSnapshot[] rollups) =>
         A.CallTo(() => _rollupStore.EnumerateAsync()).Returns(ToAsync(rollups));
 
     private static async IAsyncEnumerable<T> ToAsync<T>(T[] items)
@@ -71,7 +71,7 @@ public class RollupOrchestratorTests
 
         Assert.Equal(0, n);
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
@@ -103,7 +103,7 @@ public class RollupOrchestratorTests
         StubRollups(Rollup(watermark, bucketSize));
         StubActivatedSource();
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .Returns(5);
 
@@ -111,8 +111,8 @@ public class RollupOrchestratorTests
 
         Assert.Equal(3, n);
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt),
-                A<CkRollupArchiveSnapshot>.That.Matches(r => r.RtId == RollupRt),
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt),
+                A<RollupArchiveSnapshot>.That.Matches(r => r.RtId == RollupRt),
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .MustHaveHappened(3, Times.Exactly);
         A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, BaseTime + bucketSize, false))
@@ -136,7 +136,7 @@ public class RollupOrchestratorTests
         StubRollups(Rollup(watermark, bucketSize));
         StubActivatedSource();
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .Returns(1);
 
@@ -158,7 +158,7 @@ public class RollupOrchestratorTests
         StubRollups(Rollup(watermark, bucketSize, frozenUntil: frozenUntil));
         StubActivatedSource();
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .Returns(1);
 
@@ -167,13 +167,13 @@ public class RollupOrchestratorTests
         // One real aggregation (bucket [t+2,t+3))
         Assert.Equal(1, n);
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 BaseTime + bucketSize * 2, BaseTime + bucketSize * 3,
                 A<CancellationToken>._))
             .MustHaveHappenedOnceExactly();
         // Frozen-range buckets must not aggregate.
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>.That.Matches(d => d <= frozenUntil),
                 A<CancellationToken>._))
             .MustNotHaveHappened();
@@ -191,7 +191,7 @@ public class RollupOrchestratorTests
 
         Assert.Equal(0, n);
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._, A<CkRollupArchiveSnapshot>._,
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
@@ -212,7 +212,7 @@ public class RollupOrchestratorTests
     {
         StubRollups(Rollup(BaseTime));
         A.CallTo(() => _archiveStore.GetAsync(SourceRt))
-            .Returns(Task.FromResult<CkArchiveSnapshot?>(null));
+            .Returns(Task.FromResult<ArchiveSnapshot?>(null));
 
         var n = await NewSut(BaseTime + TimeSpan.FromHours(1)).TickAsync(CancellationToken.None);
 
@@ -224,7 +224,7 @@ public class RollupOrchestratorTests
     {
         StubRollups(Rollup(BaseTime));
         A.CallTo(() => _archiveStore.GetAsync(SourceRt))
-            .Returns(new CkArchiveSnapshot(SourceRt, SourceType, CkArchiveStatus.Disabled, null, Array.Empty<CkArchiveColumnSpec>()));
+            .Returns(new ArchiveSnapshot(SourceRt, SourceType, CkArchiveStatus.Disabled, null, Array.Empty<CkArchiveColumnSpec>()));
 
         var n = await NewSut(BaseTime + TimeSpan.FromHours(1)).TickAsync(CancellationToken.None);
 
@@ -236,7 +236,7 @@ public class RollupOrchestratorTests
     {
         var otherRt = OctoObjectId.GenerateNewId();
         var first = Rollup(BaseTime);
-        var second = new CkRollupArchiveSnapshot(
+        var second = new RollupArchiveSnapshot(
             otherRt, TargetType, CkArchiveStatus.Activated, null, SourceRt,
             TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5),
             BaseTime, // watermark
@@ -246,13 +246,13 @@ public class RollupOrchestratorTests
         StubActivatedSource();
 
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._,
-                A<CkRollupArchiveSnapshot>.That.Matches(r => r.RtId == RollupRt),
+                A<ArchiveSnapshot>._,
+                A<RollupArchiveSnapshot>.That.Matches(r => r.RtId == RollupRt),
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .Throws<InvalidOperationException>();
         A.CallTo(() => _repo.AggregateBucketAsync(
-                A<CkArchiveSnapshot>._,
-                A<CkRollupArchiveSnapshot>.That.Matches(r => r.RtId == otherRt),
+                A<ArchiveSnapshot>._,
+                A<RollupArchiveSnapshot>.That.Matches(r => r.RtId == otherRt),
                 A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .Returns(1);
 
@@ -269,7 +269,7 @@ public class RollupOrchestratorTests
     public async Task ProcessRollup_UnknownRollup_ThrowsArchiveNotFoundException()
     {
         A.CallTo(() => _rollupStore.GetAsync(RollupRt))
-            .Returns(Task.FromResult<CkRollupArchiveSnapshot?>(null));
+            .Returns(Task.FromResult<RollupArchiveSnapshot?>(null));
 
         await Assert.ThrowsAsync<ArchiveNotFoundException>(
             () => NewSut(BaseTime).ProcessRollupAsync(RollupRt, CancellationToken.None));

@@ -1,5 +1,5 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-meta.schema.json"
-modelId: System.StreamData-1.1.0
-description: "StreamData model. Defines CkArchive (per-CkType time-series archive definitions), CkRollupArchive (derived bucketed-aggregation archives), and supporting enum/record types. Loaded only when StreamData is enabled at the instance level."
+modelId: System.StreamData-1.2.0
+description: "StreamData model. Defines the abstract CkArchive base, CkRawArchive (instant measurements), CkRollupArchive (derived bucketed-aggregation archives), and supporting enum/record types. The 1.1.0 → 1.2.0 bump renames the de-facto raw archive from CkArchive to CkRawArchive and marks CkArchive itself abstract; an embedded migration rewrites existing entities. Loaded only when StreamData is enabled at the instance level."
 dependencies:
-  - System-[2.0,3.0)
+  - System-[2.1,3.0)

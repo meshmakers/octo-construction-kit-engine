@@ -9,7 +9,7 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 
 /// <summary>
 /// Default <see cref="IArchiveLifecycleService"/> implementation. Pure orchestration of the
-/// CkArchive state machine on top of <see cref="ICkArchiveRuntimeStore"/>,
+/// CkArchive state machine on top of <see cref="IArchiveRuntimeStore"/>,
 /// <see cref="IStreamDataRepository"/>, and <see cref="IArchiveAuditTrail"/>; no DB-specific code
 /// lives here.
 /// </summary>
@@ -29,10 +29,10 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 {
     private readonly string _tenantId;
-    private readonly ICkArchiveRuntimeStore _store;
+    private readonly IArchiveRuntimeStore _store;
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
-    private readonly ICkRollupArchiveRuntimeStore? _rollupStore;
+    private readonly IRollupArchiveRuntimeStore? _rollupStore;
     private readonly ILogger<ArchiveLifecycleService> _logger;
     private readonly Func<DateTime> _clock;
 
@@ -42,16 +42,16 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     /// passed explicitly into every audit call). <paramref name="rollupStore"/> is optional;
     /// when supplied, <see cref="DeleteAsync"/> rejects deletion of source archives that still
     /// have active rollups attached (rollup-archives concept §6, §10) and rollup archives get
-    /// their <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> initialised on the
+    /// their <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> initialised on the
     /// first activation (rollup-archives concept §4).
     /// </summary>
     public ArchiveLifecycleService(
         string tenantId,
-        ICkArchiveRuntimeStore store,
+        IArchiveRuntimeStore store,
         IStreamDataRepository repository,
         IArchiveAuditTrail audit,
         ILogger<ArchiveLifecycleService> logger,
-        ICkRollupArchiveRuntimeStore? rollupStore = null,
+        IRollupArchiveRuntimeStore? rollupStore = null,
         Func<DateTime>? clock = null)
     {
         _tenantId = tenantId;
@@ -151,7 +151,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             new("from_status", snapshot.Status.ToString()));
     }
 
-    private async Task<CkArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
+    private async Task<ArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await _store.GetAsync(archiveRtId);
         if (snapshot is null)
@@ -179,7 +179,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     }
 
     /// <summary>
-    /// Seeds <see cref="CkRollupArchiveSnapshot.LastAggregatedBucketEnd"/> when a rollup archive
+    /// Seeds <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> when a rollup archive
     /// transitions to Activated for the first time. No-op when the archive is not a rollup, when
     /// no rollup store is wired, or when the watermark has already been set (re-activation after
     /// Disabled/Failed must preserve progress). Concept §4.
@@ -217,7 +217,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             archiveRtId, initialBucketEnd, rollup.BucketSize);
     }
 
-    private async Task EnsureCrateProvisionedAsync(CkArchiveSnapshot snapshot)
+    private async Task EnsureCrateProvisionedAsync(ArchiveSnapshot snapshot)
     {
         using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.activate");
         activity?.SetTag("streamdata.archive.rtid", snapshot.RtId.ToString());
@@ -268,7 +268,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
     }
 
-    private async Task TransitionAsync(CkArchiveSnapshot from, CkArchiveStatus toStatus)
+    private async Task TransitionAsync(ArchiveSnapshot from, CkArchiveStatus toStatus)
     {
         await _store.SetStatusAsync(from.RtId, toStatus);
         await _audit.RecordTransitionAsync(_tenantId, from.RtId, from.Status, toStatus, reason: null);

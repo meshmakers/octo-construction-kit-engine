@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// columns (path/indexed/required) the data-store provider needs to generate DDL — empty when the
 /// archive only has the standard time-series columns.
 /// </summary>
-public sealed record CkArchiveSnapshot(
+public sealed record ArchiveSnapshot(
     OctoObjectId RtId,
     RtCkId<CkTypeId> TargetCkTypeId,
     CkArchiveStatus Status,

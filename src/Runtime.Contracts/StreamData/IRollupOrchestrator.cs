@@ -7,7 +7,7 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
 /// <summary>
 /// Tenant-scoped orchestrator that drives <c>CkRollupArchive</c> aggregation. On each tick the
-/// orchestrator enumerates activated, non-frozen rollups via <see cref="ICkRollupArchiveRuntimeStore"/>
+/// orchestrator enumerates activated, non-frozen rollups via <see cref="IRollupArchiveRuntimeStore"/>
 /// and processes due buckets: for each bucket it issues an
 /// <c>INSERT INTO target (...) SELECT ... FROM source WHERE timestamp ∈ bucket GROUP BY rtId</c>
 /// against the stream-data store, then advances the watermark. DB-neutral: SQL emission lives in

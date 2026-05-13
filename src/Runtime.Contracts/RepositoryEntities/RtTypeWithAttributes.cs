@@ -112,7 +112,54 @@ public abstract class RtTypeWithAttributes
             return (TValue)Enum.ToObject(typeof(TValue), value);
         }
 
+        if (typeof(TValue) == typeof(TimeSpan) && TryCoerceTimeSpan(value, out var timeSpan))
+        {
+            return (TValue)(object)timeSpan;
+        }
+
         return (TValue)Convert.ChangeType(value, typeof(TValue));
+    }
+
+    /// <summary>
+    ///     Coerces a Mongo-deserialised attribute value to <see cref="TimeSpan"/>. Accepts the value
+    ///     as-is, a tick count (Int64/Int32), or a string in either .NET (<c>00:15:00</c>) or
+    ///     ISO-8601 (<c>PT15M</c>) format. <see cref="Convert.ChangeType(object, Type)"/> on its own
+    ///     does not handle any of these conversions and would throw <see cref="InvalidCastException"/>
+    ///     on the <c>Dictionary&lt;string, object?&gt;</c> values that the runtime engine stores —
+    ///     they round-trip through <c>OctoObjectSerializer</c> which dispatches on BSON type, not
+    ///     on the consumer's expected CLR type, so strings/long stay strings/long after read.
+    /// </summary>
+    private static bool TryCoerceTimeSpan(object value, out TimeSpan timeSpan)
+    {
+        switch (value)
+        {
+            case TimeSpan ts:
+                timeSpan = ts;
+                return true;
+            case long ticks:
+                timeSpan = TimeSpan.FromTicks(ticks);
+                return true;
+            case int ticks32:
+                timeSpan = TimeSpan.FromTicks(ticks32);
+                return true;
+            case string s when TimeSpan.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var parsed):
+                timeSpan = parsed;
+                return true;
+            case string s:
+                try
+                {
+                    timeSpan = System.Xml.XmlConvert.ToTimeSpan(s);
+                    return true;
+                }
+                catch (FormatException)
+                {
+                    timeSpan = default;
+                    return false;
+                }
+            default:
+                timeSpan = default;
+                return false;
+        }
     }
 
     /// <summary>
@@ -339,9 +386,9 @@ public abstract class RtTypeWithAttributes
             return (TValue)Enum.ToObject(typeof(TValue), value);
         }
 
-        if (typeof(TValue) == typeof(TimeSpan) && value is string s)
+        if (typeof(TValue) == typeof(TimeSpan) && TryCoerceTimeSpan(value, out var timeSpan))
         {
-            return (TValue)Convert.ChangeType(TimeSpan.Parse(s), typeof(TValue));
+            return (TValue)(object)timeSpan;
         }
 
         return (TValue)Convert.ChangeType(value, typeof(TValue));

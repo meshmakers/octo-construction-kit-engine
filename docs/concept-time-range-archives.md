@@ -292,6 +292,55 @@ that contains a corrected quarter-hour should itself be flagged.
 The chained-rollup aggregation SQL (§7) emits `MAX(was_updated) AS was_updated`
 alongside the user-column aggregates.
 
+#### Propagation is bound to (re-)aggregation, not to source-row mutation
+
+The `MAX(was_updated)` propagation runs **inside** the aggregation SQL, so it only fires
+when the orchestrator (re-)aggregates a bucket. The default orchestrator advances the
+watermark monotonically: once a bucket has been written, the orchestrator never revisits
+it on its own. Consequence: an external correction to a quarter-hour row that flips
+`was_updated = TRUE` on the source archive **does not automatically appear** on the
+already-aggregated hour, day, month buckets — those rows keep the value they had at the
+moment the bucket was first closed.
+
+Operators have two ways to surface the correction in the rollups:
+
+- **Live**: keep `WatermarkLag` long enough that corrections arrive before the bucket is
+  closed (so the first aggregation already sees `was_updated = TRUE` on the source).
+- **Retroactive**: call `rewindRollupWatermark` on each rollup level (bottom-up:
+  hourly first, then daily, then monthly) to re-aggregate the affected windows. Each
+  level then picks up `MAX(source.was_updated) = TRUE` from the level below.
+
+The bottom-up requirement matters because monthly aggregates from daily, which
+aggregates from hourly. A rewind on monthly alone re-reads the (still-stale) daily and
+does **not** see the QH correction; the chain must be re-run from the lowest affected
+level upward.
+
+This is intentional — the watermark is the contract between the orchestrator and the
+operator about which buckets are "closed" — but it means dashboards that surface
+`was_updated` get only "ever-corrected at write time", not "ever-corrected at any time".
+Audit-grade history beyond this flag requires the post-MVP revision-counter / sidecar
+discussed in §13.
+
+#### Back-fill of historical source data
+
+The same watermark-monotone tick that protects `was_updated` propagation also makes the
+orchestrator blind to **new source rows that land in already-passed buckets**. Once the
+watermark has advanced past `T`, `AggregateBucketAsync` is never called again for any
+bucket ending at or before `T`. Adding QH rows for a long-past window therefore leaves
+the corresponding rollup buckets empty — across all chained levels.
+
+Worse: the orchestrator advances the watermark even when the bucket is empty
+(<c>rowsWritten == 0</c> on line 199 of `RollupOrchestrator.TickAsync`). A rewind to a
+date far before any data exists therefore burns through the empty range at
+`maxBucketsPerTick` buckets per tick (default 60), reaching the present in minutes, even
+if useful source data lands seconds after the watermark passed. Operators who ingest in
+non-chronological order must rewind **after** the back-fill, not before.
+
+The rewind itself must always be **bottom-up**: hourly first (so its rows reflect the
+new QH data), then daily (so its rows reflect the rebuilt hourly), then monthly. A top-
+down rewind re-reads stale source rows and produces a rollup that disagrees with the
+level below.
+
 ## §6 CkRollupArchive Schema Migration (Option A)
 
 The existing `CkRollupArchive` shipped with a single `timestamp = bucketEnd` column. As

@@ -623,6 +623,7 @@ internal class BlueprintService : IBlueprintService
             tenantId, targetVersion, updateMode);
 
         var result = new BlueprintUpdateResult();
+        var correlationId = Guid.NewGuid();
 
         try
         {
@@ -643,6 +644,7 @@ internal class BlueprintService : IBlueprintService
                 {
                     result.Errors.Add($"Conflict: {conflict.Description}");
                 }
+                await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
                 return result;
             }
 
@@ -682,6 +684,7 @@ internal class BlueprintService : IBlueprintService
                     {
                         result.Success = false;
                         result.Errors.Add("Backup creation failed and ContinueOnError is false");
+                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
                         return result;
                     }
                 }
@@ -700,6 +703,7 @@ internal class BlueprintService : IBlueprintService
                 {
                     result.Errors.Add(error.MessageText);
                 }
+                await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
                 return result;
             }
 
@@ -723,6 +727,7 @@ internal class BlueprintService : IBlueprintService
                 {
                     result.Success = false;
                     result.Errors.AddRange(upgradeResult.Errors.Select(e => $"CK model migration: {e}"));
+                    await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
                     return result;
                 }
 
@@ -810,6 +815,24 @@ internal class BlueprintService : IBlueprintService
                 _logger.LogInformation(
                     "Update applied successfully: {Added} added, {Updated} updated, {Deleted} deleted",
                     result.EntitiesAdded, result.EntitiesUpdated, result.EntitiesDeleted);
+
+                await _notifications.NotifyUpdatedAsync(
+                    new BlueprintUpdatedNotification(
+                        tenantId,
+                        targetVersion,
+                        currentInfo?.BlueprintId,
+                        updateMode,
+                        result.EntitiesAdded,
+                        result.EntitiesUpdated,
+                        result.EntitiesDeleted,
+                        result.BackupId,
+                        correlationId,
+                        DateTime.UtcNow),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
@@ -817,9 +840,34 @@ internal class BlueprintService : IBlueprintService
             _logger.LogError(ex, "Error applying update to tenant {TenantId}", tenantId);
             result.Success = false;
             result.Errors.Add($"Failed to apply update: {ex.Message}");
+            await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
         }
 
         return result;
+    }
+
+    private async Task NotifyUpdateFailedAsync(
+        string tenantId,
+        BlueprintId targetVersion,
+        IReadOnlyList<string> errors,
+        Guid correlationId)
+    {
+        try
+        {
+            await _notifications.NotifyOperationFailedAsync(
+                new BlueprintOperationFailedNotification(
+                    tenantId,
+                    targetVersion,
+                    Operation: "Update",
+                    ErrorMessage: string.Join("; ", errors),
+                    correlationId,
+                    DateTime.UtcNow),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception notifyEx)
+        {
+            _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Update)");
+        }
     }
 
     private async Task ApplySeedDataAsync(
@@ -888,5 +936,80 @@ internal class BlueprintService : IBlueprintService
 
         return await _blueprintHistory.GetHistoryAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<BackupRestoreResult> RollbackAsync(
+        string tenantId,
+        string backupId,
+        CancellationToken cancellationToken = default)
+    {
+        var correlationId = Guid.NewGuid();
+
+        _logger.LogInformation("Rolling back tenant {TenantId} to backup {BackupId}", tenantId, backupId);
+
+        // Capture the active blueprint id BEFORE the restore so the notification carries it.
+        var currentInfo = await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+
+        BackupRestoreResult result;
+        try
+        {
+            result = await _backupService.RestoreBackupAsync(tenantId, backupId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Rollback failed for tenant {TenantId} backup {BackupId}", tenantId, backupId);
+            await NotifyRollbackFailedAsync(tenantId, currentInfo?.BlueprintId, ex.Message, correlationId)
+                .ConfigureAwait(false);
+            throw;
+        }
+
+        if (result.Success)
+        {
+            await _notifications.NotifyRolledBackAsync(
+                new BlueprintRolledBackNotification(
+                    tenantId,
+                    currentInfo?.BlueprintId,
+                    backupId,
+                    correlationId,
+                    DateTime.UtcNow),
+                cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            await NotifyRollbackFailedAsync(
+                tenantId,
+                currentInfo?.BlueprintId,
+                string.Join("; ", result.Errors),
+                correlationId).ConfigureAwait(false);
+        }
+
+        return result;
+    }
+
+    private async Task NotifyRollbackFailedAsync(
+        string tenantId,
+        BlueprintId? blueprintId,
+        string errorMessage,
+        Guid correlationId)
+    {
+        try
+        {
+            await _notifications.NotifyOperationFailedAsync(
+                new BlueprintOperationFailedNotification(
+                    tenantId,
+                    blueprintId,
+                    Operation: "Rollback",
+                    ErrorMessage: errorMessage,
+                    correlationId,
+                    DateTime.UtcNow),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception notifyEx)
+        {
+            _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Rollback)");
+        }
     }
 }

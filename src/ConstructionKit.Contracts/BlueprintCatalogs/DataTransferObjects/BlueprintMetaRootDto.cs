@@ -34,6 +34,15 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     public List<CkModelIdVersionRange>? CkModelDependencies { get; set; }
 
     /// <summary>
+    ///     Gets or sets the blueprint dependencies. When this blueprint is
+    ///     installed, the listed blueprints are resolved transitively, topo-sorted
+    ///     and installed first as separate installations (each marked as a
+    ///     dependency on the runtime installation record).
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<BlueprintIdVersionRange>? BlueprintDependencies { get; set; }
+
+    /// <summary>
     ///     Gets or sets the path to the seed data file (relative to blueprint root).
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]

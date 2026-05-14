@@ -1,21 +1,43 @@
+using System.Text.Json;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Meshmakers.Octo.Runtime.Contracts.Exchange;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 
 /// <summary>
-/// Executes blueprint migration scripts
+/// Executes blueprint migration scripts against a tenant repository.
 /// </summary>
 internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
 {
+    private static readonly RtCkId<CkAttributeId> RtBlueprintSourceAttrId =
+        new("System/RtBlueprintSource");
+    private static readonly RtCkId<CkAttributeId> RtBlueprintLockedAttrId =
+        new("System/RtBlueprintLocked");
+    private static readonly RtCkId<CkAttributeId> RtBlueprintAppliedAtAttrId =
+        new("System/RtBlueprintAppliedAt");
+
+    private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
+    private readonly IImportRtModelCommand _importRtModelCommand;
     private readonly ILogger<BlueprintMigrationExecutor> _logger;
 
     /// <summary>
     /// Creates a new instance of <see cref="BlueprintMigrationExecutor"/>
     /// </summary>
-    public BlueprintMigrationExecutor(ILogger<BlueprintMigrationExecutor> logger)
+    public BlueprintMigrationExecutor(
+        IRuntimeRepositoryProvider runtimeRepositoryProvider,
+        IImportRtModelCommand importRtModelCommand,
+        ILogger<BlueprintMigrationExecutor> logger)
     {
+        _runtimeRepositoryProvider = runtimeRepositoryProvider;
+        _importRtModelCommand = importRtModelCommand;
         _logger = logger;
     }
 
@@ -259,7 +281,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         return result;
     }
 
-    private Task<int> ExecuteAddAsync(
+    private async Task<int> ExecuteAddAsync(
         string tenantId,
         MigrationStepDto step,
         BlueprintMigrationExecutionOptions options,
@@ -267,24 +289,47 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     {
         _logger.LogDebug("Adding entity for step {StepId}", step.StepId);
 
-        // TODO: Implement actual entity creation using repository
-        // This is a placeholder implementation
-        // In a real implementation, this would:
-        // 1. Parse the step.Data as entity data
-        // 2. Set rtBlueprintSource to options.BlueprintSource
-        // 3. Set rtBlueprintLocked to true
-        // 4. Create the entity in the repository
+        if (step.Data == null)
+        {
+            throw new InvalidOperationException("Add action requires step.Data containing the entity payload");
+        }
+
+        var entityDto = step.Data.Value.Deserialize<RtEntityTcDto>(SerializerOptions)
+            ?? throw new InvalidOperationException("Could not deserialise step.Data into RtEntityTcDto");
+
+        // Inherit type id from the target if the data did not carry one.
+        if (entityDto.CkTypeId == null && !string.IsNullOrEmpty(step.Target.CkTypeId))
+        {
+            entityDto.CkTypeId = new RtCkId<CkTypeId>(step.Target.CkTypeId!);
+        }
+        if (entityDto.CkTypeId == null)
+        {
+            throw new InvalidOperationException(
+                $"Add step '{step.StepId}' must specify ckTypeId either in target or in data");
+        }
+
+        StampBlueprintProvenance(entityDto, options.BlueprintSource);
 
         if (options.DryRun)
         {
-            _logger.LogDebug("DryRun: Would add entity");
-            return Task.FromResult(0);
+            _logger.LogDebug("DryRun: would add entity of type {CkTypeId}", entityDto.CkTypeId);
+            return 0;
         }
 
-        return Task.FromResult(1);
+        var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+
+        var root = new RtModelRootTcDto
+        {
+            Entities = [entityDto]
+        };
+
+        await _importRtModelCommand.ImportModelAsync(
+            repository, root, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
+
+        return 1;
     }
 
-    private Task<int> ExecuteUpdateAsync(
+    private async Task<int> ExecuteUpdateAsync(
         string tenantId,
         MigrationStepDto step,
         BlueprintMigrationExecutionOptions options,
@@ -292,23 +337,51 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     {
         _logger.LogDebug("Updating entities for step {StepId}", step.StepId);
 
-        // TODO: Implement actual entity update using repository
-        // This is a placeholder implementation
-        // In a real implementation, this would:
-        // 1. Find entities matching step.Target
-        // 2. Apply step.Data as attribute updates
-        // 3. Update rtBlueprintAppliedAt
+        if (step.Data == null)
+        {
+            throw new InvalidOperationException("Update action requires step.Data containing attribute updates");
+        }
+
+        var attributeUpdates = ParseAttributeUpdates(step.Data.Value);
+
+        var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var resolved = await ResolveTargetEntitiesAsync(
+            repository, step.Target, options.BlueprintSource, cancellationToken).ConfigureAwait(false);
+
+        if (resolved.Count == 0)
+        {
+            _logger.LogDebug("Step {StepId}: no entities matched target", step.StepId);
+            return 0;
+        }
 
         if (options.DryRun)
         {
-            _logger.LogDebug("DryRun: Would update entities");
-            return Task.FromResult(0);
+            _logger.LogDebug("DryRun: would update {Count} entities for step {StepId}",
+                resolved.Count, step.StepId);
+            return 0;
         }
 
-        return Task.FromResult(1);
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var affected = 0;
+
+        foreach (var (ckTypeId, entity) in resolved)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            foreach (var kvp in attributeUpdates)
+            {
+                entity.SetAttributeRawValue(kvp.Key, kvp.Value);
+            }
+            entity.SetAttributeRawValue(RtBlueprintAppliedAtAttrId.ElementId.Name, DateTime.UtcNow);
+
+            await repository.ReplaceOneRtEntityByIdAsync(session, ckTypeId, entity.RtId, entity)
+                .ConfigureAwait(false);
+            affected++;
+        }
+
+        return affected;
     }
 
-    private Task<int> ExecuteDeleteAsync(
+    private async Task<int> ExecuteDeleteAsync(
         string tenantId,
         MigrationStepDto step,
         BlueprintMigrationExecutionOptions options,
@@ -316,20 +389,34 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     {
         _logger.LogDebug("Deleting entities for step {StepId}", step.StepId);
 
-        // TODO: Implement actual entity deletion using repository
-        // This is a placeholder implementation
-        // In a real implementation, this would:
-        // 1. Find entities matching step.Target
-        // 2. If BlueprintSourceOnly, only delete entities where rtBlueprintSource matches
-        // 3. Delete the entities
+        var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var resolved = await ResolveTargetEntitiesAsync(
+            repository, step.Target, options.BlueprintSource, cancellationToken).ConfigureAwait(false);
+
+        if (resolved.Count == 0)
+        {
+            return 0;
+        }
 
         if (options.DryRun)
         {
-            _logger.LogDebug("DryRun: Would delete entities");
-            return Task.FromResult(0);
+            _logger.LogDebug("DryRun: would delete {Count} entities for step {StepId}",
+                resolved.Count, step.StepId);
+            return 0;
         }
 
-        return Task.FromResult(1);
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var deleted = 0;
+
+        foreach (var (ckTypeId, entity) in resolved)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await repository.DeleteOneRtEntityByRtIdAsync(
+                session, ckTypeId, entity.RtId, DeleteOptions.Erase).ConfigureAwait(false);
+            deleted++;
+        }
+
+        return deleted;
     }
 
     private Task<int> ExecuteRenameAsync(
@@ -338,19 +425,24 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         BlueprintMigrationExecutionOptions options,
         CancellationToken cancellationToken)
     {
-        _logger.LogDebug("Renaming for step {StepId}", step.StepId);
-
-        // TODO: Implement actual rename using repository
-        if (options.DryRun)
+        _logger.LogDebug("Rename step {StepId}", step.StepId);
+        // Rename is an alias for Transform with Type=Rename — both paths reach
+        // ExecuteTransformAsync which carries SourceAttribute / TargetAttribute.
+        if (step.Transform == null)
         {
-            _logger.LogDebug("DryRun: Would rename");
-            return Task.FromResult(0);
+            throw new InvalidOperationException(
+                $"Rename step '{step.StepId}' requires a Transform configuration with SourceAttribute and TargetAttribute");
         }
-
-        return Task.FromResult(1);
+        if (step.Transform.Type != TransformType.Rename)
+        {
+            _logger.LogDebug(
+                "Step {StepId} action=Rename but transform type is {TransformType}; running anyway",
+                step.StepId, step.Transform.Type);
+        }
+        return ExecuteTransformAsync(tenantId, step, options, cancellationToken);
     }
 
-    private Task<int> ExecuteTransformAsync(
+    private async Task<int> ExecuteTransformAsync(
         string tenantId,
         MigrationStepDto step,
         BlueprintMigrationExecutionOptions options,
@@ -363,39 +455,197 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
             throw new InvalidOperationException("Transform action requires Transform configuration");
         }
 
-        // TODO: Implement actual transform using repository
-        // Based on step.Transform.Type:
-        // - Rename: Rename attribute
-        // - Copy: Copy attribute value to new attribute
-        // - Delete: Remove attribute
-        // - SetValue: Set static value
-        // - MapValue: Transform value using mapping table
+        var transform = step.Transform;
+        var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        var resolved = await ResolveTargetEntitiesAsync(
+            repository, step.Target, options.BlueprintSource, cancellationToken).ConfigureAwait(false);
+
+        if (resolved.Count == 0)
+        {
+            return 0;
+        }
 
         if (options.DryRun)
         {
-            _logger.LogDebug("DryRun: Would transform");
-            return Task.FromResult(0);
+            _logger.LogDebug(
+                "DryRun: would transform ({Type}) {Count} entities for step {StepId}",
+                transform.Type, resolved.Count, step.StepId);
+            return 0;
         }
 
-        return Task.FromResult(1);
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var affected = 0;
+
+        foreach (var (ckTypeId, entity) in resolved)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var mutated = ApplyTransform(entity, transform);
+            if (!mutated)
+            {
+                continue;
+            }
+            entity.SetAttributeRawValue(RtBlueprintAppliedAtAttrId.ElementId.Name, DateTime.UtcNow);
+            await repository.ReplaceOneRtEntityByIdAsync(session, ckTypeId, entity.RtId, entity)
+                .ConfigureAwait(false);
+            affected++;
+        }
+
+        return affected;
     }
 
-    private Task<bool> EvaluateConditionAsync(
+    private static bool ApplyTransform(RtEntity entity, TransformConfigDto transform)
+    {
+        switch (transform.Type)
+        {
+            case TransformType.Rename:
+            {
+                if (string.IsNullOrEmpty(transform.SourceAttribute)
+                    || string.IsNullOrEmpty(transform.TargetAttribute))
+                {
+                    throw new InvalidOperationException(
+                        "Rename transform requires SourceAttribute and TargetAttribute");
+                }
+                if (!entity.Attributes.TryGetValue(transform.SourceAttribute!, out var value))
+                {
+                    return false;
+                }
+                entity.SetAttributeRawValue(transform.TargetAttribute!, value);
+                entity.SetAttributeRawValue(transform.SourceAttribute!, null);
+                return true;
+            }
+            case TransformType.Copy:
+            {
+                if (string.IsNullOrEmpty(transform.SourceAttribute)
+                    || string.IsNullOrEmpty(transform.TargetAttribute))
+                {
+                    throw new InvalidOperationException(
+                        "Copy transform requires SourceAttribute and TargetAttribute");
+                }
+                if (!entity.Attributes.TryGetValue(transform.SourceAttribute!, out var value))
+                {
+                    return false;
+                }
+                entity.SetAttributeRawValue(transform.TargetAttribute!, value);
+                return true;
+            }
+            case TransformType.Delete:
+            {
+                if (string.IsNullOrEmpty(transform.SourceAttribute))
+                {
+                    throw new InvalidOperationException("Delete transform requires SourceAttribute");
+                }
+                if (!entity.Attributes.ContainsKey(transform.SourceAttribute!))
+                {
+                    return false;
+                }
+                entity.SetAttributeRawValue(transform.SourceAttribute!, null);
+                return true;
+            }
+            case TransformType.SetValue:
+            {
+                var attribute = transform.TargetAttribute ?? transform.SourceAttribute;
+                if (string.IsNullOrEmpty(attribute))
+                {
+                    throw new InvalidOperationException(
+                        "SetValue transform requires TargetAttribute (or SourceAttribute) to identify the destination");
+                }
+                entity.SetAttributeRawValue(attribute!, transform.Value);
+                return true;
+            }
+            case TransformType.MapValue:
+            {
+                if (string.IsNullOrEmpty(transform.SourceAttribute))
+                {
+                    throw new InvalidOperationException("MapValue transform requires SourceAttribute");
+                }
+                if (transform.ValueMapping == null || transform.ValueMapping.Count == 0)
+                {
+                    throw new InvalidOperationException("MapValue transform requires ValueMapping entries");
+                }
+                if (!entity.Attributes.TryGetValue(transform.SourceAttribute!, out var current))
+                {
+                    return false;
+                }
+
+                var key = current?.ToString();
+                if (key != null && transform.ValueMapping.TryGetValue(key, out var mapped))
+                {
+                    var dst = transform.TargetAttribute ?? transform.SourceAttribute!;
+                    entity.SetAttributeRawValue(dst, mapped);
+                    return true;
+                }
+                return false;
+            }
+            default:
+                throw new InvalidOperationException($"Unsupported transform type: {transform.Type}");
+        }
+    }
+
+    private async Task<bool> EvaluateConditionAsync(
         string tenantId,
         MigrationConditionDto condition,
         CancellationToken cancellationToken)
     {
         _logger.LogDebug("Evaluating condition: {ConditionType}", condition.Type);
 
-        // TODO: Implement actual condition evaluation using repository
-        // This is a placeholder that always returns true
-        // In a real implementation, this would:
-        // - EntityExists: Check if entity matching Target exists
-        // - EntityNotExists: Check if entity matching Target does not exist
-        // - AttributeEquals: Check if attribute has expected value
-        // - Custom: Evaluate custom expression
+        switch (condition.Type)
+        {
+            case MigrationConditionType.Custom:
+                _logger.LogWarning(
+                    "Custom condition is not yet supported by the migration executor; treating as 'true'");
+                return true;
 
-        return Task.FromResult(true);
+            case MigrationConditionType.EntityExists:
+            case MigrationConditionType.EntityNotExists:
+            {
+                if (condition.Target == null)
+                {
+                    throw new InvalidOperationException(
+                        $"Condition '{condition.Type}' requires a target");
+                }
+                var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                var matches = await ResolveTargetEntitiesAsync(
+                    repository, condition.Target, blueprintSource: null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return condition.Type == MigrationConditionType.EntityExists
+                    ? matches.Count > 0
+                    : matches.Count == 0;
+            }
+
+            case MigrationConditionType.AttributeEquals:
+            {
+                if (condition.Target == null
+                    || string.IsNullOrEmpty(condition.Attribute))
+                {
+                    throw new InvalidOperationException(
+                        "AttributeEquals condition requires Target and Attribute");
+                }
+
+                var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                var matches = await ResolveTargetEntitiesAsync(
+                    repository, condition.Target, blueprintSource: null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (matches.Count == 0)
+                {
+                    return false;
+                }
+
+                return matches.All(m =>
+                {
+                    var (_, entity) = m;
+                    if (!entity.Attributes.TryGetValue(condition.Attribute!, out var actual))
+                    {
+                        return condition.Value == null;
+                    }
+                    return Equals(actual?.ToString(), condition.Value?.ToString());
+                });
+            }
+
+            default:
+                throw new InvalidOperationException($"Unsupported condition type: {condition.Type}");
+        }
     }
 
     private async Task<(bool Success, string? Message)> RunValidationAsync(
@@ -405,17 +655,223 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     {
         _logger.LogDebug("Running validation: {ValidationId}", validation.ValidationId);
 
-        // TODO: Implement actual validation using repository
-        // This is a placeholder that always succeeds
-        // In a real implementation, this would:
-        // - EntityCount: Count entities and compare to ExpectedCount
-        // - EntityExists: Check entity exists
-        // - AttributeValue: Check attribute value
-        // - ReferenceIntegrity: Verify associations are valid
+        switch (validation.Type)
+        {
+            case MigrationValidationType.ReferenceIntegrity:
+                return (true,
+                    "ReferenceIntegrity validation is not yet implemented; skipped");
 
-        await Task.CompletedTask;
-        return (true, null);
+            case MigrationValidationType.EntityCount:
+            case MigrationValidationType.EntityExists:
+            {
+                if (validation.Target == null)
+                {
+                    return (false, $"Validation '{validation.ValidationId}' requires a target");
+                }
+
+                var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                var matches = await ResolveTargetEntitiesAsync(
+                    repository, validation.Target, blueprintSource: null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (validation.Type == MigrationValidationType.EntityExists)
+                {
+                    return matches.Count > 0
+                        ? (true, null)
+                        : (false, $"Validation '{validation.ValidationId}': no matching entities");
+                }
+
+                var expected = validation.ExpectedCount ?? 0;
+                return matches.Count == expected
+                    ? (true, null)
+                    : (false,
+                        $"Validation '{validation.ValidationId}': expected {expected} entities, found {matches.Count}");
+            }
+
+            case MigrationValidationType.AttributeValue:
+            {
+                if (validation.Target == null || string.IsNullOrEmpty(validation.Target.RtWellKnownName))
+                {
+                    return (false,
+                        $"Validation '{validation.ValidationId}' requires a target with rtWellKnownName");
+                }
+
+                var repository = await RequireRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                var matches = await ResolveTargetEntitiesAsync(
+                    repository, validation.Target, blueprintSource: null, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (matches.Count == 0)
+                {
+                    return (false, $"Validation '{validation.ValidationId}': no matching entities");
+                }
+
+                var attribute = validation.Target.RtWellKnownName!;
+                var entity = matches[0].Entity;
+                if (!entity.Attributes.TryGetValue(attribute, out var actual))
+                {
+                    return (false,
+                        $"Validation '{validation.ValidationId}': attribute '{attribute}' not present");
+                }
+
+                return Equals(actual?.ToString(), validation.ExpectedValue?.ToString())
+                    ? (true, null)
+                    : (false,
+                        $"Validation '{validation.ValidationId}': attribute '{attribute}' is '{actual}', expected '{validation.ExpectedValue}'");
+            }
+
+            default:
+                return (false, $"Unsupported validation type: {validation.Type}");
+        }
     }
+
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private void StampBlueprintProvenance(RtEntityTcDto entity, string? blueprintSource)
+    {
+        if (!string.IsNullOrEmpty(blueprintSource))
+        {
+            SetOrReplaceAttribute(entity, RtBlueprintSourceAttrId, blueprintSource!);
+        }
+        SetOrReplaceAttribute(entity, RtBlueprintAppliedAtAttrId, DateTime.UtcNow);
+        // Migration-created entities are blueprint-managed by default. The seed
+        // payload can override by passing rtBlueprintLocked = false explicitly.
+        if (entity.Attributes.All(a => !a.Id.Equals(RtBlueprintLockedAttrId)))
+        {
+            entity.Attributes.Add(new RtAttributeTcDto { Id = RtBlueprintLockedAttrId, Value = true });
+        }
+    }
+
+    private static void SetOrReplaceAttribute(
+        RtEntityTcDto entity, RtCkId<CkAttributeId> attributeId, object value)
+    {
+        var existing = entity.Attributes.FirstOrDefault(a => a.Id.Equals(attributeId));
+        if (existing != null)
+        {
+            existing.Value = value;
+        }
+        else
+        {
+            entity.Attributes.Add(new RtAttributeTcDto { Id = attributeId, Value = value });
+        }
+    }
+
+    private static Dictionary<string, object?> ParseAttributeUpdates(JsonElement data)
+    {
+        var updates = new Dictionary<string, object?>(StringComparer.Ordinal);
+        if (data.ValueKind != JsonValueKind.Object)
+        {
+            return updates;
+        }
+        foreach (var property in data.EnumerateObject())
+        {
+            updates[property.Name] = property.Value.ValueKind switch
+            {
+                JsonValueKind.String => property.Value.GetString(),
+                JsonValueKind.Number when property.Value.TryGetInt64(out var l) => (object)l,
+                JsonValueKind.Number => property.Value.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                _ => property.Value.GetRawText()
+            };
+        }
+        return updates;
+    }
+
+    private async Task<IRuntimeRepository> RequireRepositoryAsync(
+        string tenantId, CancellationToken cancellationToken)
+    {
+        var repository = await _runtimeRepositoryProvider
+            .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        return repository ?? throw new InvalidOperationException(
+            $"No runtime repository available for tenant '{tenantId}'");
+    }
+
+    /// <summary>
+    /// Resolves the entities that match an <see cref="EntityTargetDto"/>. Walks
+    /// only one CK type (the resolver does not span the entire schema) — the
+    /// caller must therefore put the right <c>CkTypeId</c> on the target.
+    /// </summary>
+    private async Task<List<TargetMatch>> ResolveTargetEntitiesAsync(
+        IRuntimeRepository repository,
+        EntityTargetDto target,
+        string? blueprintSource,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(target.CkTypeId))
+        {
+            throw new InvalidOperationException(
+                "Migration target must specify a ckTypeId — the executor does not scan all CK types");
+        }
+
+        var ckTypeId = new RtCkId<CkTypeId>(target.CkTypeId!);
+        var queryOptions = RtEntityQueryOptions.Create();
+
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var resultSet = await repository.GetRtEntitiesByTypeAsync(session, ckTypeId, queryOptions)
+            .ConfigureAwait(false);
+
+        IEnumerable<RtEntity> candidates = resultSet.Items;
+
+        if (!string.IsNullOrEmpty(target.RtId))
+        {
+            candidates = candidates.Where(e => e.RtId.ToString() == target.RtId);
+        }
+        if (!string.IsNullOrEmpty(target.RtWellKnownName))
+        {
+            candidates = candidates.Where(e => e.RtWellKnownName == target.RtWellKnownName);
+        }
+        if (target.Filter != null)
+        {
+            candidates = candidates.Where(e => EvaluateFilter(e, target.Filter));
+        }
+        if (target.BlueprintSourceOnly && !string.IsNullOrEmpty(blueprintSource))
+        {
+            candidates = candidates.Where(e =>
+                e.GetAttributeStringValueOrDefault(RtBlueprintSourceAttrId.ElementId.Name) == blueprintSource);
+        }
+
+        return candidates.Select(e => new TargetMatch(ckTypeId, e)).ToList();
+    }
+
+    private static bool EvaluateFilter(RtEntity entity, FilterExpressionDto filter)
+    {
+        if (filter.And != null && filter.And.Count > 0)
+        {
+            return filter.And.All(f => EvaluateFilter(entity, f));
+        }
+        if (filter.Or != null && filter.Or.Count > 0)
+        {
+            return filter.Or.Any(f => EvaluateFilter(entity, f));
+        }
+
+        if (string.IsNullOrEmpty(filter.Attribute) || filter.Operator == null)
+        {
+            return true;
+        }
+
+        var hasValue = entity.Attributes.TryGetValue(filter.Attribute!, out var raw);
+        var actual = raw?.ToString();
+        var expected = filter.Value?.ToString();
+
+        return filter.Operator switch
+        {
+            FilterOperator.Eq => string.Equals(actual, expected, StringComparison.Ordinal),
+            FilterOperator.Ne => !string.Equals(actual, expected, StringComparison.Ordinal),
+            FilterOperator.Contains => actual != null && expected != null && actual.Contains(expected),
+            FilterOperator.StartsWith => actual != null && expected != null && actual.StartsWith(expected),
+            FilterOperator.EndsWith => actual != null && expected != null && actual.EndsWith(expected),
+            FilterOperator.Exists => hasValue && raw != null,
+            FilterOperator.NotExists => !hasValue || raw == null,
+            _ => false
+        };
+    }
+
+    private readonly record struct TargetMatch(RtCkId<CkTypeId> CkTypeId, RtEntity Entity);
 
     private Task ValidateStepAsync(
         MigrationStepDto step,

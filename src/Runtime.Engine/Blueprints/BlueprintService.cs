@@ -972,12 +972,21 @@ internal class BlueprintService : IBlueprintService
             var preview = await PreviewUpdateAsync(tenantId, targetVersion, updateMode, cancellationToken)
                 .ConfigureAwait(false);
 
-            // 3. Check for blocking conflicts
-            if (!preview.CanProceed && !options.ContinueOnError)
+            // 3. Check for blocking conflicts. A conflict that the caller has
+            // pre-resolved (anything other than Skip in ConflictResolutions) is
+            // no longer blocking — Phase 2d wires those overrides through the
+            // apply path. Skip resolutions and unresolved conflicts still block
+            // unless ContinueOnError is set.
+            var resolutionMap = options.ConflictResolutions ?? new Dictionary<string, ConflictResolution>();
+            var unresolvedConflicts = preview.Conflicts
+                .Where(c => !resolutionMap.TryGetValue(c.EntityId, out var r) || r == ConflictResolution.Skip)
+                .ToList();
+
+            if (unresolvedConflicts.Count > 0 && !options.ContinueOnError)
             {
                 result.Success = false;
                 result.Errors.Add("Update blocked by conflicts. Use ContinueOnError to proceed anyway.");
-                foreach (var conflict in preview.Conflicts)
+                foreach (var conflict in unresolvedConflicts)
                 {
                     result.Errors.Add($"Conflict: {conflict.Description}");
                 }

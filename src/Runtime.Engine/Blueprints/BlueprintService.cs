@@ -1434,6 +1434,320 @@ internal class BlueprintService : IBlueprintService
         }
     }
 
+    /// <inheritdoc />
+    public async Task<BlueprintUninstallResult> UninstallAsync(
+        string tenantId,
+        string blueprintName,
+        bool cascade = false,
+        CancellationToken cancellationToken = default)
+    {
+        var result = new BlueprintUninstallResult();
+        var correlationId = Guid.NewGuid();
+
+        _logger.LogInformation(
+            "Uninstalling blueprint '{BlueprintName}' from tenant {TenantId} (cascade={Cascade})",
+            blueprintName, tenantId, cascade);
+
+        var installation = await _installations
+            .GetByBlueprintNameAsync(tenantId, blueprintName, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (installation == null)
+        {
+            result.Success = false;
+            result.Errors.Add($"Blueprint '{blueprintName}' is not installed on tenant '{tenantId}'.");
+            await NotifyUninstallFailedAsync(tenantId, null, result.Errors, correlationId).ConfigureAwait(false);
+            return result;
+        }
+
+        result.UninstalledBlueprintId = installation.BlueprintId;
+
+        // Refcount: any other installation that lists this blueprint as a dep blocks uninstall.
+        var allInstalled = await _installations.GetInstalledAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        var dependents = allInstalled
+            .Where(other => other.BlueprintId.Name != blueprintName
+                && other.ResolvedDependencies.Any(d => d.Name == blueprintName))
+            .Select(other => other.BlueprintId)
+            .ToList();
+
+        if (dependents.Count > 0 && !cascade)
+        {
+            result.Success = false;
+            result.BlockingDependents = dependents;
+            result.Errors.Add(
+                $"Cannot uninstall '{blueprintName}': still required by " +
+                string.Join(", ", dependents.Select(d => d.FullName)) +
+                ". Re-run with cascade to remove dependents as well.");
+            await NotifyUninstallFailedAsync(
+                tenantId, installation.BlueprintId, result.Errors, correlationId)
+                .ConfigureAwait(false);
+            return result;
+        }
+
+        // Cascade: uninstall the dependents first (recursive).
+        if (cascade)
+        {
+            foreach (var dependentId in dependents)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var depResult = await UninstallAsync(
+                        tenantId, dependentId.Name, cascade: true, cancellationToken)
+                    .ConfigureAwait(false);
+                if (!depResult.Success)
+                {
+                    result.Success = false;
+                    result.Errors.AddRange(depResult.Errors);
+                    await NotifyUninstallFailedAsync(
+                        tenantId, installation.BlueprintId, result.Errors, correlationId)
+                        .ConfigureAwait(false);
+                    return result;
+                }
+                result.EntitiesDeleted += depResult.EntitiesDeleted;
+                result.CascadedDependencies.Add(dependentId);
+                result.CascadedDependencies.AddRange(depResult.CascadedDependencies);
+            }
+        }
+
+        // Remove the entities owned by this blueprint.
+        try
+        {
+            var deleted = await DeleteBlueprintOwnedEntitiesAsync(
+                    tenantId, installation.BlueprintId, result, cancellationToken)
+                .ConfigureAwait(false);
+            result.EntitiesDeleted += deleted;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deleting entities for blueprint {BlueprintId} on tenant {TenantId}",
+                installation.BlueprintId, tenantId);
+            result.Success = false;
+            result.Errors.Add($"Failed to delete blueprint entities: {ex.Message}");
+            await NotifyUninstallFailedAsync(
+                tenantId, installation.BlueprintId, result.Errors, correlationId)
+                .ConfigureAwait(false);
+            return result;
+        }
+
+        await _installations.RemoveAsync(tenantId, blueprintName, cancellationToken).ConfigureAwait(false);
+
+        // Cascade transitive deps that are now orphaned and originally came in as dependencies.
+        if (cascade)
+        {
+            foreach (var depBpId in installation.ResolvedDependencies)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var depRow = await _installations
+                    .GetByBlueprintNameAsync(tenantId, depBpId.Name, cancellationToken)
+                    .ConfigureAwait(false);
+                if (depRow == null || !depRow.IsDependency)
+                {
+                    // Either already removed or originally an explicit install — leave it alone.
+                    continue;
+                }
+
+                // Is anyone else still referencing this dep?
+                var remaining = await _installations
+                    .GetInstalledAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                var stillReferenced = remaining.Any(other =>
+                    other.BlueprintId.Name != depBpId.Name
+                    && other.ResolvedDependencies.Any(d => d.Name == depBpId.Name));
+
+                if (stillReferenced)
+                {
+                    continue;
+                }
+
+                var cascadeResult = await UninstallAsync(
+                        tenantId, depBpId.Name, cascade: true, cancellationToken)
+                    .ConfigureAwait(false);
+                if (cascadeResult.Success)
+                {
+                    result.CascadedDependencies.Add(depBpId);
+                    result.CascadedDependencies.AddRange(cascadeResult.CascadedDependencies);
+                    result.EntitiesDeleted += cascadeResult.EntitiesDeleted;
+                }
+                else
+                {
+                    result.Warnings.AddRange(cascadeResult.Errors
+                        .Select(e => $"Cascade of '{depBpId.FullName}' failed: {e}"));
+                }
+            }
+        }
+
+        result.Success = result.Errors.Count == 0;
+
+        if (result.Success)
+        {
+            try
+            {
+                await _notifications.NotifyUninstalledAsync(
+                    new BlueprintUninstalledNotification(
+                        tenantId,
+                        installation.BlueprintId,
+                        result.CascadedDependencies,
+                        correlationId,
+                        DateTime.UtcNow),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception notifyEx)
+            {
+                _logger.LogWarning(notifyEx,
+                    "Failed to publish BlueprintUninstalled notification for {BlueprintId}",
+                    installation.BlueprintId);
+            }
+        }
+
+        return result;
+    }
+
+    private async Task NotifyUninstallFailedAsync(
+        string tenantId,
+        BlueprintId? blueprintId,
+        IReadOnlyList<string> errors,
+        Guid correlationId)
+    {
+        try
+        {
+            await _notifications.NotifyOperationFailedAsync(
+                new BlueprintOperationFailedNotification(
+                    tenantId,
+                    blueprintId,
+                    Operation: "Uninstall",
+                    ErrorMessage: string.Join("; ", errors),
+                    correlationId,
+                    DateTime.UtcNow),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception notifyEx)
+        {
+            _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Uninstall)");
+        }
+    }
+
+    /// <summary>
+    /// Erases all locked entities owned by the blueprint. Unlocked entities
+    /// are left in place — they may carry user modifications, so removing them
+    /// silently would be data loss; they are reported as warnings instead.
+    /// </summary>
+    /// <remarks>
+    /// We do not have a global "scan every collection" primitive, so we
+    /// re-read the blueprint's seed data and use that as the index of which
+    /// CK types this blueprint owns. The matching tenant rows are then
+    /// filtered to <c>rtBlueprintSource = blueprint.FullName</c> before
+    /// deletion to avoid clobbering rows that other blueprints adopted.
+    /// </remarks>
+    private async Task<int> DeleteBlueprintOwnedEntitiesAsync(
+        string tenantId,
+        BlueprintId blueprintId,
+        BlueprintUninstallResult result,
+        CancellationToken cancellationToken)
+    {
+        var opResult = new OperationResult();
+        var catalogBlueprint = await _blueprintCatalogManager
+            .GetAsync(blueprintId, opResult).ConfigureAwait(false);
+        if (opResult.HasErrors || string.IsNullOrEmpty(catalogBlueprint.SeedDataPath))
+        {
+            // No seed data → nothing to erase.
+            return 0;
+        }
+
+        var blueprintPath = await _blueprintCatalogManager
+            .GetBlueprintPathAsync(blueprintId).ConfigureAwait(false);
+        var seedDataPath = Path.Combine(blueprintPath, catalogBlueprint.SeedDataPath);
+
+        if (!File.Exists(seedDataPath))
+        {
+            return 0;
+        }
+
+        var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprintId, opResult)
+            .ConfigureAwait(false);
+        if (seedRoot == null)
+        {
+            result.Warnings.AddRange(opResult.Messages
+                .Where(m => m.MessageLevel == MessageLevel.Error)
+                .Select(m => m.MessageText));
+            return 0;
+        }
+
+        var repository = await _runtimeRepositoryProvider
+            .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        if (repository == null)
+        {
+            throw new InvalidOperationException(
+                $"No runtime repository available for tenant '{tenantId}'");
+        }
+
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var deletedCount = 0;
+
+        foreach (var typeGroup in seedRoot.Entities.GroupBy(e => e.CkTypeId))
+        {
+            var ckTypeId = typeGroup.Key;
+
+            IResultSet<RtEntity> tenantEntities;
+            try
+            {
+                tenantEntities = await repository.GetRtEntitiesByTypeAsync(
+                    session, ckTypeId, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                result.Warnings.Add(
+                    $"Could not query tenant entities for type {ckTypeId}: {ex.Message}");
+                continue;
+            }
+
+            var seedKeys = new HashSet<string>(
+                typeGroup
+                    .Select(e => e.RtWellKnownName ?? e.RtId.ToString())
+                    .Where(k => !string.IsNullOrEmpty(k))!,
+                StringComparer.Ordinal);
+
+            foreach (var entity in tenantEntities.Items)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var key = entity.RtWellKnownName ?? entity.RtId.ToString();
+                if (string.IsNullOrEmpty(key) || !seedKeys.Contains(key!))
+                {
+                    continue;
+                }
+
+                var source = entity.GetAttributeStringValueOrDefault("RtBlueprintSource");
+                if (source != blueprintId.FullName)
+                {
+                    // Adopted by another blueprint — leave it alone.
+                    continue;
+                }
+
+                var locked = entity.GetAttributeValueOrDefault<bool>("RtBlueprintLocked") ?? true;
+                if (!locked)
+                {
+                    result.Warnings.Add(
+                        $"Entity '{key}' (type {ckTypeId}) is unlocked; keeping as user data.");
+                    continue;
+                }
+
+                try
+                {
+                    await repository.DeleteOneRtEntityByRtIdAsync(
+                        session, ckTypeId, entity.RtId, DeleteOptions.Erase).ConfigureAwait(false);
+                    deletedCount++;
+                }
+                catch (Exception ex)
+                {
+                    result.Warnings.Add(
+                        $"Failed to delete entity '{key}' ({ckTypeId}): {ex.Message}");
+                }
+            }
+        }
+
+        return deletedCount;
+    }
+
     /// <summary>
     /// Imports the seed-data file (if any) of one blueprint in an install
     /// order. Returns the number of entities written. On error, errors are

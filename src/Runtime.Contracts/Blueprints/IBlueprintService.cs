@@ -126,4 +126,69 @@ public interface IBlueprintService
         string tenantId,
         string backupId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Removes a blueprint from a tenant. Locked entities owned by the
+    /// blueprint are erased; unlocked entities are left as user data
+    /// (they may have been adopted by the user after the original apply).
+    /// </summary>
+    /// <param name="tenantId">Target tenant identifier.</param>
+    /// <param name="blueprintName">Name of the blueprint to uninstall.</param>
+    /// <param name="cascade">
+    /// When <c>true</c>, transitive dependencies of the uninstalled blueprint
+    /// that were originally installed as dependencies (IsDependency = true)
+    /// and that no other installed blueprint still references are uninstalled
+    /// in the same pass. When <c>false</c>, dependencies are left in place.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>
+    /// <see cref="BlueprintUninstallResult"/> describing how many entities were
+    /// removed, which dependencies were cascaded, and any conflicts that
+    /// prevented the uninstall (e.g. other installed blueprints still
+    /// depend on the requested target).
+    /// </returns>
+    Task<BlueprintUninstallResult> UninstallAsync(
+        string tenantId,
+        string blueprintName,
+        bool cascade = false,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>
+/// Outcome of <see cref="IBlueprintService.UninstallAsync"/>.
+/// </summary>
+public class BlueprintUninstallResult
+{
+    /// <summary>Whether the uninstall completed without errors.</summary>
+    public bool Success { get; set; }
+
+    /// <summary>
+    /// Blueprint that was uninstalled (the explicit target, not the cascaded
+    /// dependencies). Null when the operation was rejected before any state
+    /// changed.
+    /// </summary>
+    public BlueprintId? UninstalledBlueprintId { get; set; }
+
+    /// <summary>Number of locked entities erased from the tenant.</summary>
+    public int EntitiesDeleted { get; set; }
+
+    /// <summary>
+    /// Blueprint ids that were cascade-uninstalled because they were marked
+    /// IsDependency = true and no longer referenced. Empty when the caller
+    /// did not request cascade or no orphan deps were found.
+    /// </summary>
+    public List<BlueprintId> CascadedDependencies { get; set; } = [];
+
+    /// <summary>
+    /// Other installed blueprints that still depend on the target. Populated
+    /// when uninstall is blocked because <see cref="Success"/> is false and
+    /// the caller did not pass <c>cascade=true</c>.
+    /// </summary>
+    public List<BlueprintId> BlockingDependents { get; set; } = [];
+
+    /// <summary>Errors emitted during the operation.</summary>
+    public List<string> Errors { get; set; } = [];
+
+    /// <summary>Warnings emitted during the operation.</summary>
+    public List<string> Warnings { get; set; } = [];
 }

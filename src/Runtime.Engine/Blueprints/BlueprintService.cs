@@ -33,6 +33,8 @@ internal class BlueprintService : IBlueprintService
     private readonly IImportRtModelCommand _importRtModelCommand;
     private readonly IRtYamlSerializer _rtYamlSerializer;
     private readonly IBlueprintNotifications _notifications;
+    private readonly IBlueprintDependencyResolver _dependencyResolver;
+    private readonly ITenantBlueprintInstallations _installations;
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
@@ -64,6 +66,8 @@ internal class BlueprintService : IBlueprintService
         IImportRtModelCommand importRtModelCommand,
         IRtYamlSerializer rtYamlSerializer,
         IBlueprintNotifications notifications,
+        IBlueprintDependencyResolver dependencyResolver,
+        ITenantBlueprintInstallations installations,
         ILogger<BlueprintService> logger)
     {
         _ckCacheService = ckCacheService;
@@ -77,6 +81,8 @@ internal class BlueprintService : IBlueprintService
         _importRtModelCommand = importRtModelCommand;
         _rtYamlSerializer = rtYamlSerializer;
         _notifications = notifications;
+        _dependencyResolver = dependencyResolver;
+        _installations = installations;
         _logger = logger;
     }
 
@@ -154,46 +160,53 @@ internal class BlueprintService : IBlueprintService
             _logger.LogInformation("Applying blueprint {BlueprintId} to tenant {TenantId}",
                 blueprintId, tenantId);
 
-            // 1. Fetch blueprint from catalog
-            var blueprint = await _blueprintCatalogManager.GetAsync(blueprintId, operationResult)
-                .ConfigureAwait(false);
+            // 1. Resolve the full dependency closure (topo-sorted; deps first, root last).
+            var resolution = await _dependencyResolver
+                .ResolveAsync(blueprintId, cancellationToken).ConfigureAwait(false);
 
-            if (operationResult.HasErrors)
+            if (!resolution.Success)
             {
+                foreach (var conflict in resolution.Conflicts)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error,
+                        null,
+                        50,
+                        $"{conflict.ConflictType}: {conflict.Description}"));
+                }
                 await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
                 return BlueprintApplicationResult.Failed(operationResult);
             }
 
-            // 2. Create tenant if not exists
+            foreach (var warning in resolution.Warnings)
+            {
+                operationResult.AddMessage(new OperationMessage(
+                    MessageLevel.Warning, null, 51, warning));
+            }
+
+            // 2. Tenant cache bootstrap.
             if (!_ckCacheService.IsTenantLoaded(tenantId))
             {
                 _ckCacheService.CreateTenant(tenantId);
                 _logger.LogDebug("Created tenant {TenantId}", tenantId);
             }
 
-            // 3. Load CK models into tenant cache and execute CK model migrations if needed
-            // Note: The actual CK model loading would be done via the dependency resolver
-            // For now, we record which models need to be loaded
-            foreach (var ckDependency in blueprint.CkModelDependencies ?? [])
-            {
-                _logger.LogDebug("Blueprint requires CK model: {CkModel}", ckDependency);
-                loadedCkModels.Add(ckDependency);
-                // The actual loading will be delegated to the CK catalog system
-                // This is a placeholder for the integration point
-            }
+            // 3. Aggregate all CK model dependencies across the install order and upgrade once.
+            var aggregatedCkDeps = resolution.InstallOrder
+                .SelectMany(bp => bp.CkModelDependencies ?? [])
+                .GroupBy(d => d.Name, StringComparer.Ordinal)
+                .Select(g => g.First())
+                .ToList();
+            loadedCkModels.AddRange(aggregatedCkDeps);
 
-            // 3b. Execute CK model migrations if upgrading from a previous version
-            if (loadedCkModels.Count > 0)
+            if (aggregatedCkDeps.Count > 0)
             {
-                var migrationOptions = new CkMigrationOptions
-                {
-                    CreateBackup = true,
-                    DryRun = false,
-                    ContinueOnError = false
-                };
-
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
-                    tenantId, loadedCkModels, migrationOptions, null, cancellationToken)
+                        tenantId,
+                        aggregatedCkDeps,
+                        new CkMigrationOptions { CreateBackup = true, DryRun = false, ContinueOnError = false },
+                        null,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 if (!upgradeResult.Success)
@@ -201,100 +214,94 @@ internal class BlueprintService : IBlueprintService
                     foreach (var error in upgradeResult.Errors)
                     {
                         operationResult.AddMessage(new OperationMessage(
-                            MessageLevel.Error,
-                            null,
-                            25,
-                            $"CK model migration failed: {error}"));
+                            MessageLevel.Error, null, 25, $"CK model migration failed: {error}"));
                     }
                     await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
                     return BlueprintApplicationResult.Failed(operationResult);
                 }
 
-                // Add warnings to result
                 foreach (var warning in upgradeResult.Warnings)
                 {
                     operationResult.AddMessage(new OperationMessage(
-                        MessageLevel.Warning,
-                        null,
-                        26,
-                        $"CK model migration: {warning}"));
+                        MessageLevel.Warning, null, 26, $"CK model migration: {warning}"));
                 }
-
-                _logger.LogInformation(
-                    "CK model upgrades completed: {Upgraded} upgraded, {Skipped} skipped, {TotalAffected} entities affected",
-                    upgradeResult.UpgradedModels.Count,
-                    upgradeResult.SkippedModels.Count,
-                    upgradeResult.TotalEntitiesAffected);
             }
 
-            // 4. Resolve and apply seed data
-            if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
+            // 4. Walk the topo-sorted install order. Each blueprint becomes its own
+            //    installation row; dependencies are tagged IsDependency = true so
+            //    uninstall can refcount.
+            var rootDependencyIds = new List<BlueprintId>();
+
+            foreach (var blueprint in resolution.InstallOrder)
             {
-                try
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var isRoot = blueprint.BlueprintId.Equals(blueprintId);
+
+                var existing = await _installations
+                    .GetByBlueprintNameAsync(tenantId, blueprint.BlueprintId.Name, cancellationToken)
+                    .ConfigureAwait(false);
+
+                // Idempotent skip: same version already on the tenant, no --force,
+                // and it's a transitive dep (not the explicitly-requested root).
+                if (existing != null
+                    && existing.BlueprintId.Equals(blueprint.BlueprintId)
+                    && !(isRoot && force))
                 {
-                    var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(blueprintId)
+                    if (!isRoot)
+                    {
+                        rootDependencyIds.Add(blueprint.BlueprintId);
+                        _logger.LogDebug(
+                            "Dependency {BlueprintId} already installed on tenant {TenantId}, skipping",
+                            blueprint.BlueprintId, tenantId);
+                        continue;
+                    }
+                    // Root with no force and already installed: still re-stamp to refresh
+                    // LastUpdatedAt / dependency list, but skip seed-data import.
+                }
+
+                // 4a. Seed-data import (skipped on idempotent root that's just being
+                //     re-recorded with refreshed metadata).
+                var willImportSeed = existing == null
+                    || !existing.BlueprintId.Equals(blueprint.BlueprintId)
+                    || (isRoot && force);
+
+                if (willImportSeed)
+                {
+                    var perBlueprintEntities = await ApplySeedDataForBlueprintAsync(
+                        tenantId, blueprint, operationResult, appliedSeedDataFiles, cancellationToken)
                         .ConfigureAwait(false);
 
-                    var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
-
-                    if (!File.Exists(seedDataPath))
+                    if (operationResult.HasErrors)
                     {
-                        _logger.LogWarning("Seed data file not found: {Path}", seedDataPath);
-                        operationResult.AddMessage(new OperationMessage(
-                            MessageLevel.Warning,
-                            seedDataPath,
-                            20,
-                            "Seed data file not found"));
+                        await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                        return BlueprintApplicationResult.Failed(operationResult);
                     }
-                    else
-                    {
-                        _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
 
-                        var repository = await _runtimeRepositoryProvider
-                            .GetRepositoryAsync(tenantId, cancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (repository == null)
-                        {
-                            operationResult.AddMessage(new OperationMessage(
-                                MessageLevel.Error,
-                                seedDataPath,
-                                22,
-                                $"No runtime repository available for tenant {tenantId}"));
-                        }
-                        else
-                        {
-                            var seedRoot = await LoadAndTagSeedAsync(
-                                seedDataPath, blueprintId, operationResult).ConfigureAwait(false);
-
-                            if (seedRoot != null)
-                            {
-                                await _importRtModelCommand.ImportModelAsync(
-                                    repository,
-                                    seedRoot,
-                                    ImportStrategy.Upsert,
-                                    cancellationToken).ConfigureAwait(false);
-
-                                appliedSeedDataFiles.Add(seedDataPath);
-                                entitiesCreated += seedRoot.Entities.Count;
-                            }
-                        }
-                    }
+                    entitiesCreated += perBlueprintEntities;
                 }
-                catch (Exception ex)
+
+                // 4b. Record the installation row.
+                var installation = new BlueprintInstallation
                 {
-                    _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
-                        blueprintId);
-                    operationResult.AddMessage(new OperationMessage(
-                        MessageLevel.Error,
-                        blueprint.SeedDataPath,
-                        21,
-                        $"Error applying seed data: {ex.Message}"));
+                    BlueprintId = blueprint.BlueprintId,
+                    InstalledAt = existing?.InstalledAt ?? DateTime.UtcNow,
+                    LastUpdatedAt = DateTime.UtcNow,
+                    IsDependency = !isRoot,
+                    ResolvedDependencies = isRoot
+                        ? rootDependencyIds.ToList()
+                        : []
+                };
+                await _installations.UpsertAsync(tenantId, installation, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (!isRoot)
+                {
+                    rootDependencyIds.Add(blueprint.BlueprintId);
                 }
             }
 
-            // 5. Record the application in history
+            // 5. Append a single history entry for the root operation.
             var blueprintInfo = new TenantBlueprintInfo
             {
                 BlueprintId = blueprintId,
@@ -309,8 +316,8 @@ internal class BlueprintService : IBlueprintService
                 .ConfigureAwait(false);
 
             _logger.LogInformation(
-                "Blueprint {BlueprintId} applied successfully to tenant {TenantId}: {SeedDataCount} seed data files applied",
-                blueprintId, tenantId, appliedSeedDataFiles.Count);
+                "Blueprint {BlueprintId} applied to tenant {TenantId}: {InstallCount} blueprints installed, {SeedDataCount} seed files imported",
+                blueprintId, tenantId, resolution.InstallOrder.Count, appliedSeedDataFiles.Count);
 
             await _notifications.NotifyAppliedAsync(
                 new BlueprintAppliedNotification(
@@ -1424,6 +1431,73 @@ internal class BlueprintService : IBlueprintService
         catch (Exception notifyEx)
         {
             _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Rollback)");
+        }
+    }
+
+    /// <summary>
+    /// Imports the seed-data file (if any) of one blueprint in an install
+    /// order. Returns the number of entities written. On error, errors are
+    /// pushed onto <paramref name="operationResult"/> and the caller treats
+    /// the whole apply as failed.
+    /// </summary>
+    private async Task<int> ApplySeedDataForBlueprintAsync(
+        string tenantId,
+        BlueprintMetaRootDto blueprint,
+        OperationResult operationResult,
+        List<string> appliedSeedDataFiles,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(blueprint.SeedDataPath))
+        {
+            return 0;
+        }
+
+        try
+        {
+            var blueprintPath = await _blueprintCatalogManager
+                .GetBlueprintPathAsync(blueprint.BlueprintId)
+                .ConfigureAwait(false);
+            var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
+
+            if (!File.Exists(seedDataPath))
+            {
+                _logger.LogWarning("Seed data file not found: {Path}", seedDataPath);
+                operationResult.AddMessage(new OperationMessage(
+                    MessageLevel.Warning, seedDataPath, 20, "Seed data file not found"));
+                return 0;
+            }
+
+            var repository = await _runtimeRepositoryProvider
+                .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            if (repository == null)
+            {
+                operationResult.AddMessage(new OperationMessage(
+                    MessageLevel.Error, seedDataPath, 22,
+                    $"No runtime repository available for tenant {tenantId}"));
+                return 0;
+            }
+
+            var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprint.BlueprintId, operationResult)
+                .ConfigureAwait(false);
+            if (seedRoot == null)
+            {
+                return 0;
+            }
+
+            await _importRtModelCommand.ImportModelAsync(
+                repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
+
+            appliedSeedDataFiles.Add(seedDataPath);
+            return seedRoot.Entities.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
+                blueprint.BlueprintId);
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Error, blueprint.SeedDataPath, 21,
+                $"Error applying seed data: {ex.Message}"));
+            return 0;
         }
     }
 

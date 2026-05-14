@@ -822,15 +822,17 @@ internal class BlueprintService : IBlueprintService
                     }
                     else
                     {
+                        var entityId = tenant.RtId.ToString() ?? string.Empty;
                         diff.Conflicts.Add(new BlueprintUpdateConflict
                         {
-                            EntityId = tenant.RtId.ToString() ?? string.Empty,
+                            EntityId = entityId,
                             EntityWellKnownName = tenant.RtWellKnownName,
                             EntityCkTypeId = ckTypeId.ToString(),
                             Description = $"Entity '{key}' is unlocked (rtBlueprintLocked=false); skipping in {updateMode} mode",
                             ConflictType = ConflictType.UserModified,
                             SuggestedResolution = ConflictResolution.Skip
                         });
+                        diff.ConflictSeedEntities[entityId] = seed;
                     }
                 }
                 else
@@ -863,15 +865,18 @@ internal class BlueprintService : IBlueprintService
                     }
                     else
                     {
+                        var entityId = tenantEntity.RtId.ToString() ?? string.Empty;
                         diff.Conflicts.Add(new BlueprintUpdateConflict
                         {
-                            EntityId = tenantEntity.RtId.ToString() ?? string.Empty,
+                            EntityId = entityId,
                             EntityWellKnownName = tenantEntity.RtWellKnownName,
                             EntityCkTypeId = ckTypeId.ToString(),
                             Description = $"Entity '{kvp.Key}' is no longer in seed data but is unlocked; user modifications would block delete",
                             ConflictType = ConflictType.DeleteModified,
                             SuggestedResolution = ConflictResolution.Skip
                         });
+                        diff.ConflictDeletionTargets[entityId] = new DeletionTarget(
+                            ckTypeId, tenantEntity.RtId, kvp.Key, tenantEntity.RtWellKnownName);
                     }
                 }
             }
@@ -902,6 +907,37 @@ internal class BlueprintService : IBlueprintService
         public List<RtEntityTcDto> EntitiesToAdd { get; } = [];
         public List<RtEntityTcDto> EntitiesToUpdate { get; } = [];
         public List<DeletionTarget> EntitiesToDelete { get; } = [];
+
+        /// <summary>
+        /// Seed entity for a UserModified conflict, keyed by the conflict's
+        /// <see cref="BlueprintUpdateConflict.EntityId"/>. Lets
+        /// <c>ApplyConflictOverrides</c> promote a KeepBlueprint resolution
+        /// by routing the original seed into <see cref="PromotedConflictUpserts"/>.
+        /// </summary>
+        public Dictionary<string, RtEntityTcDto> ConflictSeedEntities { get; } =
+            new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// Deletion target for a DeleteModified conflict, keyed by the
+        /// conflict's <see cref="BlueprintUpdateConflict.EntityId"/>. Used to
+        /// resurrect the deletion when a KeepBlueprint resolution is
+        /// applied (Full mode only).
+        /// </summary>
+        public Dictionary<string, DeletionTarget> ConflictDeletionTargets { get; } =
+            new(StringComparer.Ordinal);
+
+        /// <summary>
+        /// UserModified conflicts promoted via <see cref="ConflictResolution.KeepBlueprint"/>.
+        /// Honoured by the apply path regardless of <see cref="BlueprintUpdateMode"/> —
+        /// an explicit per-entity override beats the mode default.
+        /// </summary>
+        public List<RtEntityTcDto> PromotedConflictUpserts { get; } = [];
+
+        /// <summary>
+        /// DeleteModified conflicts promoted via <see cref="ConflictResolution.KeepBlueprint"/>.
+        /// Only honoured in <see cref="BlueprintUpdateMode.Full"/>.
+        /// </summary>
+        public List<DeletionTarget> PromotedConflictDeletions { get; } = [];
     }
 
     private sealed record DeletionTarget(
@@ -1212,20 +1248,24 @@ internal class BlueprintService : IBlueprintService
         var conflictOverrides = options.ConflictResolutions ?? new Dictionary<string, ConflictResolution>();
         ApplyConflictOverrides(diff, conflictOverrides, mode, result);
 
-        // Bucket counts after overrides — these reflect what the mode actually
-        // performs: Safe imports adds only; Merge/Full also write the locked
-        // updates; only Full deletes orphan locked entries.
+        // Bucket counts after overrides — mode-driven counts plus promoted
+        // conflicts, which always apply regardless of mode (an explicit per-
+        // entity override beats the mode default).
+        var modeUpserts = mode == BlueprintUpdateMode.Safe ? 0 : diff.EntitiesToUpdate.Count;
+        var modeDeletes = mode == BlueprintUpdateMode.Full ? diff.EntitiesToDelete.Count : 0;
         result.EntitiesAdded += diff.EntitiesToAdd.Count;
-        result.EntitiesUpdated += mode == BlueprintUpdateMode.Safe ? 0 : diff.EntitiesToUpdate.Count;
-        result.EntitiesDeleted += mode == BlueprintUpdateMode.Full ? diff.EntitiesToDelete.Count : 0;
+        result.EntitiesUpdated += modeUpserts + diff.PromotedConflictUpserts.Count;
+        result.EntitiesDeleted += modeDeletes + diff.PromotedConflictDeletions.Count;
         result.EntitiesSkipped += diff.Conflicts.Count(c => c.SuggestedResolution == ConflictResolution.Skip);
 
-        // Build the import set: Safe = Add only; Merge/Full = Add + Update
+        // Build the import set: Safe = Add only; Merge/Full = Add + Update.
+        // Promoted KeepBlueprint upserts apply on top regardless of mode.
         var entitiesToImport = new List<RtEntityTcDto>(diff.EntitiesToAdd);
         if (mode != BlueprintUpdateMode.Safe)
         {
             entitiesToImport.AddRange(diff.EntitiesToUpdate);
         }
+        entitiesToImport.AddRange(diff.PromotedConflictUpserts);
 
         if (entitiesToImport.Count > 0)
         {
@@ -1255,11 +1295,18 @@ internal class BlueprintService : IBlueprintService
             }
         }
 
-        // Deletions only run in Full mode (or when an unlocked DeleteModified
-        // conflict was overridden to KeepBlueprint).
-        if (diff.EntitiesToDelete.Count > 0)
+        // Deletions: Full-mode orphan deletes plus any DeleteModified
+        // conflicts the caller explicitly promoted via KeepBlueprint.
+        var deletions = new List<DeletionTarget>();
+        if (mode == BlueprintUpdateMode.Full)
         {
-            await DeleteOrphanEntitiesAsync(repository, diff.EntitiesToDelete, options, result, cancellationToken)
+            deletions.AddRange(diff.EntitiesToDelete);
+        }
+        deletions.AddRange(diff.PromotedConflictDeletions);
+
+        if (deletions.Count > 0)
+        {
+            await DeleteOrphanEntitiesAsync(repository, deletions, options, result, cancellationToken)
                 .ConfigureAwait(false);
         }
 
@@ -1297,17 +1344,38 @@ internal class BlueprintService : IBlueprintService
             switch (conflict.ConflictType)
             {
                 case ConflictType.UserModified:
-                    // We don't have the seed entity stashed on the conflict, so
-                    // surface a warning. The next preview/apply with KeepBlueprint
-                    // is the supported path for now.
-                    result.Warnings.Add(
-                        $"KeepBlueprint override on UserModified conflict for '{conflict.EntityId}' " +
-                        "is not yet supported in the same call — re-run with the entity re-locked.");
+                    if (diff.ConflictSeedEntities.TryGetValue(conflict.EntityId, out var seed))
+                    {
+                        // Re-lock so the next diff sees this as a normal locked update
+                        // instead of conflicting again, then push into the apply set.
+                        // The seed already carries the new blueprint source + applied-at
+                        // stamps from LoadAndTagSeedAsync.
+                        SetOrReplaceAttribute(seed, RtBlueprintLockedAttrId, true);
+                        diff.PromotedConflictUpserts.Add(seed);
+                    }
+                    else
+                    {
+                        result.Warnings.Add(
+                            $"KeepBlueprint override on UserModified conflict for '{conflict.EntityId}' " +
+                            "could not be applied: seed entity was not captured during diff");
+                    }
                     break;
                 case ConflictType.DeleteModified when mode == BlueprintUpdateMode.Full:
+                    if (diff.ConflictDeletionTargets.TryGetValue(conflict.EntityId, out var target))
+                    {
+                        diff.PromotedConflictDeletions.Add(target);
+                    }
+                    else
+                    {
+                        result.Warnings.Add(
+                            $"KeepBlueprint override on DeleteModified conflict for '{conflict.EntityId}' " +
+                            "could not be applied: deletion target was not captured during diff");
+                    }
+                    break;
+                case ConflictType.DeleteModified:
                     result.Warnings.Add(
                         $"KeepBlueprint override on DeleteModified conflict for '{conflict.EntityId}' " +
-                        "is not yet supported in the same call — re-run with the entity re-locked.");
+                        $"requires Full mode; current mode is {mode}");
                     break;
             }
         }

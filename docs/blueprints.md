@@ -1,25 +1,29 @@
 # Blueprints
 
-Blueprints initialize a tenant with pre-configured Construction Kit models and runtime data. They enable a quick start without a "cold start" problem.
+Blueprints are versioned, declarative bundles of Construction Kit models and runtime seed data that bootstrap a tenant — and continue to manage it. They are not a one-shot bootstrap mechanism: a blueprint can be updated, rolled back, uninstalled, depend on other blueprints, and ship migration scripts that transform tenant data when its own version moves forward.
 
 ## Properties
 
-| Property            | Description                                            |
-|---------------------|--------------------------------------------------------|
-| **One-time**        | Applied only during tenant creation                    |
-| **Modifiable**      | All generated models are editable after initialization |
-| **Non-destructive** | No dependency on the blueprint after setup             |
-| **Composable**      | Blueprints can reference and merge other blueprints    |
+| Property             | Description                                                                                  |
+|----------------------|----------------------------------------------------------------------------------------------|
+| **Versioned**        | SemVer (`MyBlueprint-1.2.3`). Version ranges express compatibility, like CK models.          |
+| **Dependency-aware** | A blueprint may depend on other blueprints, resolved transitively at install time.           |
+| **Owner-tracked**    | Every seed entity is tagged with `rtBlueprintSource` and `rtBlueprintLocked`.                |
+| **Updatable**        | Tenants are moved to newer versions via Safe / Merge / Full / Migration modes.               |
+| **Rollback-able**    | Destructive operations create a tenant backup; `Rollback` restores the snapshot.             |
+| **Multi-install**    | A tenant can host several blueprints concurrently. Refcounted, cascade-uninstall optional.   |
 
 ## Blueprint Structure
 
-A blueprint consists of a `blueprint.yaml` file and optional seed data:
+A blueprint is a directory containing a `blueprint.yaml`, optional seed data, and optional migration scripts:
 
 ```
 MyBlueprint-1.0.0/
-├── blueprint.yaml          # Blueprint metadata
-└── seed-data/
-    └── initial-entities.yaml   # Optional RT-Model seed data
+├── blueprint.yaml
+├── seed-data/
+│   └── entities.yaml
+└── migrations/
+    └── from-1.0.0.yaml
 ```
 
 ## Blueprint YAML Schema
@@ -29,28 +33,42 @@ $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
 blueprintId: InfrastructureStarter-1.0.0
 description: Infrastructure management starter blueprint
 
-# CK model dependencies (loaded when applying)
+# CK models loaded into the tenant when this blueprint is applied
 ckModelDependencies:
-  - System-[2.0,)
+  - System-[2.0,3.0)
   - Commerce-[1.0,2.0)
 
-# Path to seed data (relative to blueprint root)
-seedDataPath: seed-data/initial-entities.yaml
+# Other blueprints required before this one (resolved transitively, topo-sorted)
+blueprintDependencies:
+  - BaseEntities-[1.0,)
+  - SecurityModel-[2.0,)
+
+# Optional path to seed data (relative to blueprint root)
+seedDataPath: seed-data/entities.yaml
+
+# Optional migrations from older versions of this blueprint
+migrations:
+  - fromVersion: "0.9.0"
+    scriptPath: "migrations/from-0.9.0.yaml"
 ```
 
 ### Fields
 
-| Field                 | Type     | Description                                        |
-|-----------------------|----------|----------------------------------------------------|
-| `$schema`             | string   | Schema URI for validation                          |
-| `blueprintId`         | string   | Unique ID with version (e.g., `MyBlueprint-1.0.0`) |
-| `description`         | string   | Description of the blueprint                       |
-| `ckModelDependencies` | string[] | List of required CK models with version range      |
-| `seedDataPath`        | string   | Relative path to seed data (optional)              |
+| Field                   | Type     | Description                                                                |
+|-------------------------|----------|----------------------------------------------------------------------------|
+| `$schema`               | string   | Schema URI for validation                                                  |
+| `blueprintId`           | string   | Unique ID with version (`Name-Major.Minor.Patch`)                          |
+| `description`           | string   | Optional description                                                       |
+| `ckModelDependencies`   | string[] | CK models with version ranges (auto-imported on apply)                     |
+| `blueprintDependencies` | string[] | Other blueprints with version ranges (resolved transitively)               |
+| `seedDataPath`          | string   | Optional path to seed-data file (runtime-model format)                     |
+| `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
+
+> Composition (`composedBlueprints`) was removed in favour of dependency-only resolution. The field is no longer accepted; the schema rejects manifests that still carry it.
 
 ## Version Ranges
 
-Blueprints and CK model dependencies support semantic version ranges:
+Both `ckModelDependencies` and `blueprintDependencies` use the same range syntax as CK models:
 
 | Format          | Meaning                      |
 |-----------------|------------------------------|
@@ -60,539 +78,351 @@ Blueprints and CK model dependencies support semantic version ranges:
 | `(1.0.0,2.0.0]` | Version > 1.0.0 and <= 2.0.0 |
 | `[1.5.0]`       | Exactly version 1.5.0        |
 
-## Blueprint Application Flow
+## Application Flow
 
 ```
-ApplyBlueprintAsync(tenantId, blueprintId)
+ApplyBlueprintAsync(tenantId, blueprintId, force)
 │
-├── 1. Fetch blueprint from catalog
+├── 1. Resolve transitive blueprint dependency closure (topo-sorted)
 │
-├── 2. CreateTenant(tenantId) if not exists
+├── 2. Conflict-check (CK versions, entity ownership, rtId collisions)
+│       → BlueprintApplicationResult.Conflicts; abort on hard conflicts
 │
-├── 3. Load CK models
-│       ├── HardResolveDependenciesAsync()
-│       └── LoadCkModelGraph(tenantId, graph)
+├── 3. For each blueprint in topo order:
+│       ├── Idempotency: already installed in same version → no-op
+│       │                 already installed, --force → ReApply (upsert)
+│       │                 already installed, different version → Update path
+│       ├── Import CK model dependencies (auto-resolve via ICkModelUpgradeService)
+│       ├── Apply seed data via IImportRtModelCommand (Upsert)
+│       ├── Tag entities with rtBlueprintSource / rtBlueprintLocked / rtBlueprintAppliedAt
+│       ├── Persist BlueprintInstallation
+│       └── Publish BlueprintApplied event
 │
-└── 4. Apply seed data
-        ├── LoadSeedDataAsync(path)
-        └── ImportModelAsync(repository, rtModel, Upsert)
+└── 4. Append history entry, return result
 ```
 
-## API Usage
+## Entity Source Tracking
 
-### Configure Blueprint Catalog
+Every seed entity is stamped with three system attributes when applied:
 
-```csharp
-// In DI configuration
-services.AddBlueprintCatalogs(options =>
-{
-    options.AddLocalFileSystemCatalog("/path/to/blueprints");
-});
-```
+| Attribute              | Type     | Description                                                                       |
+|------------------------|----------|-----------------------------------------------------------------------------------|
+| `rtBlueprintSource`    | string   | Owning blueprint, full id (`Infrastructure-1.0.0`). Exactly one owner per entity. |
+| `rtBlueprintLocked`    | bool     | `true` = managed by blueprint, updates will overwrite; `false` = user-released.   |
+| `rtBlueprintAppliedAt` | DateTime | UTC timestamp of the most recent apply/update touching this entity.               |
 
-### Apply Blueprint to Tenant
-
-```csharp
-public class TenantSetupService
-{
-    private readonly IBlueprintService _blueprintService;
-
-    public async Task SetupTenantAsync(string tenantId, string blueprintName)
-    {
-        var blueprintId = new BlueprintIdVersionRange(blueprintName, "[1.0,)");
-        var result = await _blueprintService.ApplyBlueprintAsync(
-            tenantId,
-            blueprintId,
-            cancellationToken);
-
-        if (!result.Success)
-        {
-            // Error handling
-        }
-    }
-}
-```
+A blueprint that ships an entity but wants to leave it user-editable from day one can set `rtBlueprintLocked: false` in its seed data.
 
 ## Seed Data Format
 
-Seed data are RT-Model YAML files:
+Seed data is a runtime-model YAML file. The blueprint engine stamps the source attributes during import; you do not write them yourself.
 
 ```yaml
-$schema: https://schemas.meshmakers.cloud/rt-model-root.schema.json
+$schema: https://schemas.meshmakers.cloud/runtime-model.schema.json
 dependencies:
   - System-2.0.0
 entities:
-  - rtId: "507f1f77bcf86cd799439011"
-    ckTypeId: "System-2.0.0/Entity"
-    rtWellKnownName: "InitialEntity"
+  - rtId: 507f1f77bcf86cd799439011
+    ckTypeId: System/Entity
+    rtWellKnownName: InitialEntity
     attributes:
-      - name: Name
-        value: "My Initial Entity"
-      - name: Description
-        value: "Created by blueprint"
+      - id: System/Name
+        value: My Initial Entity
+      - id: System/Description
+        value: Created by blueprint
 ```
 
-Seed data is applied with **upsert strategy**:
-- Existing entities are updated
-- New entities are created
+Seed data is applied with **upsert** strategy: existing entities (matched by `rtId`) are updated; new ones are inserted.
 
-## Catalog Types
+## Update Modes
 
-| Catalog                            | Description                                        |
-|------------------------------------|----------------------------------------------------|
-| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system              |
-| `EmbeddedResourceBlueprintCatalog` | Loads blueprints from assembly resources           |
-| `PublicGitHubBlueprintCatalog`     | Loads blueprints from public GitHub Pages          |
-| `PrivateGitHubBlueprintCatalog`    | Loads blueprints from private GitHub repositories  |
+| Mode        | Behaviour                                                                                                    |
+|-------------|--------------------------------------------------------------------------------------------------------------|
+| `Safe`      | Add new entities only. Existing entities are left alone, even if locked.                                     |
+| `Merge`     | Add new + upsert locked entities. Unlocked entities raise `UserModified` conflicts (default: skip).          |
+| `Full`      | Like Merge, plus delete entities that exist in the tenant but no longer in the seed. Unlocked → conflict.    |
+| `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. |
 
-## GitHub Blueprint Hosting
-
-Blueprints can be hosted on GitHub Pages for easy distribution.
-
-### Repository Structure
-
-```
-blueprints/v1/
-├── catalog.json                           # Root catalog index
-├── i/
-│   └── InfrastructureStarter/
-│       ├── catalog.json                   # Blueprint library catalog
-│       └── 1/
-│           ├── catalog.json               # Version catalog
-│           └── InfrastructureStarter-1.0.0/
-│               ├── blueprint.yaml
-│               └── seed-data/
-└── e/
-    └── ECommerce/
-        └── ...
-```
-
-### Catalog Index Format
-
-**Root Catalog (`blueprints/v1/catalog.json`):**
-```json
-{
-  "version": "1.0",
-  "updatedAt": "2025-01-15T10:30:00Z",
-  "blueprints": [
-    {
-      "blueprintName": "InfrastructureStarter",
-      "catalogPath": "blueprints/v1/i/InfrastructureStarter/catalog.json"
-    }
-  ]
-}
-```
-
-**Blueprint Library Catalog:**
-```json
-{
-  "version": "1.0",
-  "blueprintId": "InfrastructureStarter",
-  "majorVersions": [
-    { "majorVersion": 1, "catalogPath": "blueprints/v1/i/InfrastructureStarter/1/catalog.json" }
-  ],
-  "updatedAt": "2025-01-15T10:30:00Z"
-}
-```
-
-**Version Catalog:**
-```json
-{
-  "version": "1.0",
-  "blueprintId": "InfrastructureStarter",
-  "majorVersion": 1,
-  "latestVersion": "1.0.0",
-  "description": "Infrastructure starter blueprint",
-  "versions": [
-    {
-      "version": "1.0.0",
-      "directoryPath": "blueprints/v1/i/InfrastructureStarter/1/InfrastructureStarter-1.0.0",
-      "publishedAt": "2025-01-15T10:30:00Z"
-    }
-  ],
-  "updatedAt": "2025-01-15T10:30:00Z"
-}
-```
-
-### Configuration
+## Updates
 
 ```csharp
-// Configure public GitHub catalog
-services.Configure<PublicGitHubBlueprintCatalogOptions>(options =>
+public async Task UpdateTenantAsync(string tenantId)
 {
-    options.GitHubPagesUri = "https://meshmakers.github.io/";
-});
+    var info = await _blueprintService.GetUpdateInfoAsync(tenantId);
+    if (info?.RecommendedVersion == null) return;
 
-// Configure private GitHub catalog (requires API token for write access)
-services.Configure<PrivateGitHubBlueprintCatalogOptions>(options =>
-{
-    options.GitHubPagesUri = "https://meshmakers.github.io/blueprint-libraries-build/";
-    options.GitHubApiToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
-});
-```
+    var preview = await _blueprintService.PreviewUpdateAsync(
+        tenantId, info.RecommendedVersion, BlueprintUpdateMode.Merge);
 
-## Architecture Components
+    Console.WriteLine($"+{preview.EntitiesToAdd} ~{preview.EntitiesToUpdate} -{preview.EntitiesToDelete}");
+    foreach (var c in preview.Conflicts) Console.WriteLine($"!  {c.Description}");
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     IBlueprintService                       │
-│  (Orchestrates blueprint application to tenants)            │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                 IBlueprintCatalogManager                    │
-│  (Manages multiple blueprint catalogs)                      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-     ┌────────────┬───────────┴───────────┬────────────┐
-     ▼            ▼                       ▼            ▼
-┌──────────┐ ┌──────────┐           ┌──────────┐ ┌──────────┐
-│LocalFile │ │Embedded  │           │PublicGH  │ │PrivateGH │
-│ System   │ │Resource  │           │Blueprint │ │Blueprint │
-└──────────┘ └──────────┘           └──────────┘ └──────────┘
-```
+    var result = await _blueprintService.ApplyUpdateAsync(
+        tenantId,
+        info.RecommendedVersion,
+        BlueprintUpdateMode.Merge,
+        new BlueprintUpdateOptions { CreateBackup = true });
 
-## Blueprint Updates
-
-Blueprints support updating tenants to newer versions while preserving user modifications.
-
-### Update Modes
-
-| Mode | Description |
-|------|-------------|
-| `Safe` | Only add new entities, never modify existing ones |
-| `Merge` | Add new entities + update blueprint-managed entities (`rtBlueprintLocked=true`) |
-| `Full` | Full sync: add, update, delete according to new blueprint (user modifications lost) |
-| `Migration` | Use explicit migration script for complex updates |
-
-### Entity Source Tracking
-
-When a blueprint is applied, entities are tagged with metadata:
-
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `rtBlueprintSource` | string | Blueprint ID that created the entity (e.g., `Infrastructure-1.0.0`) |
-| `rtBlueprintLocked` | boolean | If `true`, entity is managed by blueprint and will be updated |
-| `rtBlueprintAppliedAt` | DateTime | When the blueprint was applied |
-
-### Update API
-
-```csharp
-public class BlueprintUpdateService
-{
-    private readonly IBlueprintService _blueprintService;
-
-    public async Task UpdateTenantAsync(string tenantId)
-    {
-        // 1. Check for available updates
-        var updateInfo = await _blueprintService.GetUpdateInfoAsync(tenantId);
-
-        if (updateInfo?.RecommendedVersion == null)
-        {
-            Console.WriteLine("No updates available");
-            return;
-        }
-
-        // 2. Preview the update
-        var preview = await _blueprintService.PreviewUpdateAsync(
-            tenantId,
-            updateInfo.RecommendedVersion,
-            BlueprintUpdateMode.Merge);
-
-        Console.WriteLine($"Entities to add: {preview.EntitiesToAdd}");
-        Console.WriteLine($"Entities to update: {preview.EntitiesToUpdate}");
-        Console.WriteLine($"Conflicts: {preview.Conflicts.Count}");
-
-        // 3. Apply the update
-        var options = new BlueprintUpdateOptions
-        {
-            CreateBackup = true,
-            DryRun = false
-        };
-
-        var result = await _blueprintService.ApplyUpdateAsync(
-            tenantId,
-            updateInfo.RecommendedVersion,
-            BlueprintUpdateMode.Merge,
-            options);
-
-        if (result.Success)
-        {
-            Console.WriteLine($"Update successful! Backup: {result.BackupId}");
-        }
-    }
+    if (result.Success)
+        Console.WriteLine($"Backup: {result.BackupId}");
 }
 ```
 
-### Migration Scripts
+A pre-update backup is created by default (`CreateBackup = true`); disable it with `CreateBackup = false` if you have an external safety net.
 
-For complex updates, use explicit migration scripts:
+## Conflict Resolution
 
-```yaml
-# MyBlueprint-2.0.0/migrations/from-1.0.0.yaml
-$schema: https://schemas.meshmakers.cloud/blueprint-migration.schema.json
-migrationId: MyBlueprint-1.0.0-to-2.0.0
-fromVersion: "1.0.0"
-toVersion: "2.0.0"
-description: "Migration from v1 to v2"
+A conflict is raised when an unlocked entity (`rtBlueprintLocked = false`) is in the way of an update. Two conflict types exist:
 
-steps:
-  # Add new entity
-  - stepId: add-dashboard
-    action: Add
-    target:
-      ckTypeId: System/Entity
-      rtWellKnownName: NewDashboard
-    attributes:
-      Name: "Dashboard"
-      Description: "Added in v2"
+| Type             | Triggered when                                                                                                |
+|------------------|---------------------------------------------------------------------------------------------------------------|
+| `UserModified`   | The seed wants to update this entity, but the tenant entity has been unlocked.                                |
+| `DeleteModified` | Full mode wants to delete this entity (no longer in seed), but the tenant entity has been unlocked.           |
 
-  # Update existing entity
-  - stepId: update-config
-    action: Update
-    target:
-      rtWellKnownName: MainConfig
-    attributes:
-      Version: "2.0"
+Default per-entity resolution is `Skip`. The caller can override per-entity:
 
-  # Delete deprecated entity
-  - stepId: remove-legacy
-    action: Delete
-    target:
-      rtWellKnownName: LegacyConfig
-```
-
-Reference migrations in your blueprint:
-
-```yaml
-# MyBlueprint-2.0.0/blueprint.yaml
-$schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
-blueprintId: MyBlueprint-2.0.0
-
-migrations:
-  - fromVersion: "1.0.0"
-    scriptPath: "migrations/from-1.0.0.yaml"
-  - fromVersion: "1.5.0"
-    scriptPath: "migrations/from-1.5.0.yaml"
-```
-
-### Backup and Restore
-
-Updates automatically create backups (unless disabled):
-
-```csharp
-public class BackupService
-{
-    private readonly ITenantBackupService _backupService;
-
-    public async Task ManageBackupsAsync(string tenantId)
-    {
-        // List all backups
-        var backups = await _backupService.ListBackupsAsync(tenantId);
-
-        foreach (var backup in backups)
-        {
-            Console.WriteLine($"{backup.BackupId}: {backup.Reason} ({backup.CreatedAt})");
-        }
-
-        // Restore from backup
-        var result = await _backupService.RestoreBackupAsync(
-            tenantId,
-            backups.First().BackupId);
-
-        if (result.Success)
-        {
-            Console.WriteLine($"Restored {result.EntitiesRestored} entities");
-        }
-    }
-}
-```
-
-### Conflict Resolution
-
-When updating, conflicts can occur if users modified blueprint-managed entities:
-
-| Resolution | Description |
-|------------|-------------|
-| `KeepUser` | Keep user's modifications, skip blueprint update |
-| `KeepBlueprint` | Overwrite with blueprint values |
-| `Merge` | Attempt to merge both changes |
-| `Skip` | Skip entity entirely |
+| Resolution      | Behaviour                                                                                                              |
+|-----------------|------------------------------------------------------------------------------------------------------------------------|
+| `KeepUser`      | Keep the user's version, skip the blueprint change.                                                                    |
+| `KeepBlueprint` | Apply the blueprint's version. **UserModified**: seed is re-applied and the entity is re-locked. **DeleteModified** (Full only): entity is erased. |
+| `Merge`         | Currently treated as KeepUser (semantic 3-way merge is out of scope).                                                  |
+| `Skip`          | Skip this entity.                                                                                                      |
 
 ```csharp
 var options = new BlueprintUpdateOptions
 {
     ConflictResolutions = new Dictionary<string, ConflictResolution>
     {
-        ["entity-123"] = ConflictResolution.KeepUser,
-        ["entity-456"] = ConflictResolution.KeepBlueprint
+        ["507f1f77bcf86cd799439011"] = ConflictResolution.KeepBlueprint,
+        ["507f1f77bcf86cd799439012"] = ConflictResolution.KeepUser,
     }
 };
 ```
 
-### Blueprint History
+`KeepBlueprint` overrides take effect in the same call — the apply path treats explicitly-resolved conflicts as non-blocking and routes them through the same import / delete pipeline.
 
-Track all blueprint applications per tenant:
+## Migration Scripts
+
+For non-additive changes (rename, delete, transform), ship a migration script and reference it from `blueprint.yaml`:
+
+```yaml
+# MyBlueprint-2.0.0/migrations/from-1.0.0.yaml
+$schema: https://schemas.meshmakers.cloud/blueprint-migration.schema.json
+sourceVersion: "1.0.0"
+targetVersion: "2.0.0"
+description: "Migration from v1 to v2"
+
+preConditions:
+  - type: EntityExists
+    target:
+      ckTypeId: System/Entity
+      rtWellKnownName: MainConfig
+
+steps:
+  - stepId: rename-config-field
+    action: Transform
+    target:
+      ckTypeId: System/Entity
+      blueprintSourceOnly: true
+    transform:
+      type: Rename
+      sourceAttribute: LegacyVersion
+      targetAttribute: Version
+
+  - stepId: delete-deprecated
+    action: Delete
+    target:
+      ckTypeId: System/Entity
+      rtWellKnownName: LegacyConfig
+      blueprintSourceOnly: true
+
+postValidations:
+  - validationId: still-have-config
+    type: EntityCount
+    target:
+      ckTypeId: System/Entity
+    expectedCount: 5
+    severity: Error
+```
+
+Reference from the manifest:
+
+```yaml
+migrations:
+  - fromVersion: "1.0.0"
+    scriptPath: "migrations/from-1.0.0.yaml"
+```
+
+### Supported step actions
+
+| Action      | Purpose                                                                                          |
+|-------------|--------------------------------------------------------------------------------------------------|
+| `Add`       | Insert an entity (data carries the full `RtEntityTcDto` payload).                                |
+| `Update`    | Update attributes on matching entities (data is a `{ attributeName: value }` dict).              |
+| `Delete`    | Erase matching entities (`DeleteOptions.Erase` — permanent).                                     |
+| `Rename`    | Rename an attribute on matching entities (shorthand for `Transform` of type `Rename`).           |
+| `Transform` | Type-driven: `Rename`, `Copy`, `Delete`, `SetValue`, `MapValue`.                                 |
+
+Primitive attribute updates are coerced via the CK model's declared `AttributeValueTypesDto`. Record / RecordArray attributes are rejected from scalar migration payloads with a clear error.
+
+### Conditions & Validations
+
+| Construct                                                | Type                                                       | Notes                                                                  |
+|----------------------------------------------------------|------------------------------------------------------------|------------------------------------------------------------------------|
+| `preConditions[]`                                        | `EntityExists` / `EntityNotExists` / `AttributeEquals`     | Block the entire migration before any step runs.                       |
+| `step.condition`                                         | same as above                                              | Skip this specific step if the condition is not met.                   |
+| `postValidations[]`                                      | `EntityCount` / `EntityExists` / `ReferenceIntegrity`*     | Run after steps; surface as warnings or errors per `severity`.         |
+
+\* `ReferenceIntegrity` is currently a no-op placeholder.
+
+## Uninstall
 
 ```csharp
-var history = await _blueprintService.GetHistoryAsync(tenantId);
+var result = await _blueprintService.UninstallAsync(
+    tenantId,
+    blueprintName: "InfrastructureStarter",
+    cascade: false,
+    cancellationToken);
 
-foreach (var entry in history)
+if (!result.Success && result.BlockingDependents.Any())
 {
-    Console.WriteLine($"{entry.BlueprintId} applied at {entry.AppliedAt}");
-    Console.WriteLine($"  Mode: {entry.ApplicationMode}");
-    Console.WriteLine($"  Changes: +{entry.EntitiesCreated} ~{entry.EntitiesUpdated} -{entry.EntitiesDeleted}");
+    Console.WriteLine($"Blocked by: {string.Join(", ", result.BlockingDependents)}");
+    // re-run with cascade: true to uninstall dependents too
 }
 ```
 
-## CLI Tool: octo-bpm
+| Behaviour              | Default                                                                                       |
+|------------------------|-----------------------------------------------------------------------------------------------|
+| **Refcount check**     | If any other installed blueprint depends on this one, uninstall is blocked.                   |
+| **Owned entity erase** | All entities with `rtBlueprintSource == <this blueprint full id>` are erased permanently.     |
+| **Unlocked entities**  | Entities the user released (`rtBlueprintLocked = false`) are kept — they survive the uninstall. |
+| **Cascade**            | `cascade: true` uninstalls dependents first and orphan-cleans dependencies of the target.     |
 
-The `octo-bpm` (Blueprint Manager) is a dedicated CLI tool for managing blueprints. It provides a streamlined interface for all blueprint operations.
+## Multi-Blueprint Installation
 
-### Installation
+A tenant can host any number of blueprints concurrently. Two services track this state:
 
-```bash
-# Install as global tool
-dotnet tool install -g Meshmakers.Octo.BlueprintManager
+| Interface                          | Purpose                                                                                       |
+|------------------------------------|-----------------------------------------------------------------------------------------------|
+| `ITenantBlueprintInstallations`    | The current set of installed blueprints (one row per blueprint, with `IsDependency` flag).    |
+| `ITenantBlueprintHistory`          | Append-only operation log (install, update, rollback, uninstall) with timestamps and counts.  |
+
+```csharp
+var installations = await _installations.GetInstalledAsync(tenantId, ct);
+foreach (var i in installations)
+{
+    var role = i.IsDependency ? "(dep)" : "(root)";
+    Console.WriteLine($"{i.BlueprintId} {role}  installed {i.InstalledAt:u}");
+}
 ```
 
-### Configuration
+## Backup and Rollback
 
-Before using GitHub catalogs, configure your API token:
+Every update creates a pre-update backup by default. Rollback restores the entire tenant snapshot:
 
-```bash
-# Configure private GitHub API token
-octo-bpm -c config --privateGitHubApiToken "your-github-token"
+```csharp
+var backups = await _blueprintService.ListBackupsAsync(tenantId);
+var latest = backups.First();
 
-# Configure public GitHub API token (if needed for publishing)
-octo-bpm -c config --publicGitHubApiToken "your-github-token"
-
-# Configure local catalog path
-octo-bpm -c config --localCatalogPath "/path/to/blueprints"
+var result = await _blueprintService.RollbackAsync(tenantId, latest.BackupId, ct);
+Console.WriteLine($"Restored {result.EntitiesRestored} entities from {latest.CreatedAt:u}");
 ```
 
-### Blueprint Management Commands
+Rollback is a full tenant restore, not a semantic undo of migration steps. After rollback, the `BlueprintInstallations` rows match the snapshot — partial undo is not supported (see concept-v2 §2.5).
 
-| Command | Description |
-|---------|-------------|
-| `new` | Create a new blueprint project |
-| `validate` | Validate blueprint structure |
-| `pack` | Package blueprint for distribution |
-| `list` | List available blueprints in catalogs |
-| `version` | Display tool version |
+## Blueprint History
 
-### Catalog Commands
-
-| Command | Description |
-|---------|-------------|
-| `catalogs` | List available blueprint catalogs |
-| `get` | Get a blueprint from a catalog |
-| `publish` | Publish a blueprint to a catalog |
-| `config` | Configure tool settings (API tokens, paths) |
-
-### Blueprint Update Commands
-
-| Command | Description |
-|---------|-------------|
-| `status -t <tenant>` | Show current version and available updates |
-| `preview -t <tenant> -b <blueprint>` | Preview changes before applying |
-| `update -t <tenant> -b <blueprint> [-m <mode>]` | Apply update |
-| `history -t <tenant>` | Show application history |
-
-### Usage Examples
-
-```bash
-# List available catalogs
-octo-bpm -c catalogs
-
-# Create a new blueprint
-octo-bpm -c new -p ./blueprints -n MyBlueprint -v 1.0.0
-
-# Validate a blueprint
-octo-bpm -c validate -p ./blueprints/MyBlueprint-1.0.0
-
-# List blueprints in catalogs
-octo-bpm -c list
-
-# Search for blueprints
-octo-bpm -c list -s "Infrastructure"
-
-# Get a blueprint from catalog
-octo-bpm -c get -b MyBlueprint-1.0.0
-
-# Get and copy to output directory
-octo-bpm -c get -b MyBlueprint-1.0.0 -o ./output
-
-# Publish to local catalog (default)
-octo-bpm -c publish -p ./blueprints/MyBlueprint-1.0.0
-
-# Publish to private GitHub catalog
-octo-bpm -c publish -p ./blueprints/MyBlueprint-1.0.0 -c PrivateGitHubBlueprintCatalog
-
-# Publish with force (overwrite existing)
-octo-bpm -c publish -p ./blueprints/MyBlueprint-1.0.0 -c PrivateGitHubBlueprintCatalog -f
-
-# Check current blueprint status for tenant
-octo-bpm -c status -t my-tenant
-
-# Preview update to version 2.0.0
-octo-bpm -c preview -t my-tenant -b MyBlueprint-2.0.0
-
-# Apply update with merge mode (default)
-octo-bpm -c update -t my-tenant -b MyBlueprint-2.0.0
-
-# Apply update with safe mode (only add, never modify)
-octo-bpm -c update -t my-tenant -b MyBlueprint-2.0.0 -m Safe
-
-# Dry-run (preview without applying)
-octo-bpm -c update -t my-tenant -b MyBlueprint-2.0.0 --dry-run
-
-# Skip backup creation
-octo-bpm -c update -t my-tenant -b MyBlueprint-2.0.0 --no-backup
-
-# Force update despite conflicts
-octo-bpm -c update -t my-tenant -b MyBlueprint-2.0.0 --force
-
-# Show blueprint history
-octo-bpm -c history -t my-tenant -l 20
-
-# Pack blueprint for distribution
-octo-bpm -c pack -p ./blueprints/MyBlueprint-1.0.0 -o ./dist
+```csharp
+var history = await _blueprintService.GetHistoryAsync(tenantId);
+foreach (var e in history)
+{
+    Console.WriteLine($"{e.AppliedAt:u}  {e.BlueprintId}  {e.ApplicationMode}");
+    Console.WriteLine($"  +{e.EntitiesCreated} ~{e.EntitiesUpdated} -{e.EntitiesDeleted}");
+}
 ```
 
-### Publishing to GitHub
+`ApplicationMode` values: `Initial`, `ReApply`, `Update`, `Rollback`, `Uninstall`.
 
-Publishing blueprints to GitHub catalogs requires:
+## DI Configuration
 
-1. **GitHub API Token**: Configure via `config` command
-2. **Repository Access**: Write access to the target repository
+```csharp
+services.AddBlueprintCatalogs(options =>
+{
+    options.AddLocalFileSystemCatalog("/path/to/blueprints");
+});
 
-```bash
-# 1. Configure API token
-octo-bpm -c config --privateGitHubApiToken "ghp_your_token_here"
-
-# 2. Publish blueprint
-octo-bpm -c publish -p ./MyBlueprint-1.0.0 -c PrivateGitHubBlueprintCatalog
-
-# 3. Force overwrite existing version
-octo-bpm -c publish -p ./MyBlueprint-1.0.0 -c PrivateGitHubBlueprintCatalog -f
+services.AddRuntimeEngine();             // pulls in IBlueprintService et al.
+services.AddMongoBlueprintSupport();     // wires MongoDB-backed history + installations + backups
 ```
 
-The publish command will:
-- Upload all blueprint files to the GitHub repository
-- Update the version catalog (`catalog.json`)
-- Update the blueprint library catalog
-- Update the root catalog
+The blueprint service ships in `Runtime.Engine`. The MongoDB-backed history / installations / backup persistence ships in `Runtime.Engine.MongoDb` and is registered with `AddMongoBlueprintSupport()`. For in-memory-only setups (unit tests), `AddRuntimeEngine()` registers in-memory defaults.
+
+## Catalog Types
+
+| Catalog                            | Description                                                                       |
+|------------------------------------|-----------------------------------------------------------------------------------|
+| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system.                                            |
+| `EmbeddedResourceBlueprintCatalog` | Loads blueprints from assembly resources.                                         |
+| `PublicGitHubBlueprintCatalog`     | Reads blueprints from a public GitHub Pages site (default: `meshmakers.github.io`). |
+| `PrivateGitHubBlueprintCatalog`    | Reads blueprints from a private/internal GitHub repository (writes via Octokit).  |
+
+```csharp
+services.Configure<PublicGitHubBlueprintCatalogOptions>(o =>
+{
+    o.GitHubPagesUri = "https://meshmakers.github.io/";
+});
+
+services.Configure<PrivateGitHubBlueprintCatalogOptions>(o =>
+{
+    o.GitHubPagesUri = "https://meshmakers.github.io/blueprint-libraries-build/";
+    o.GitHubApiToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
+});
+```
+
+> The private GitHub catalog reads via HTTP against the Pages URI and writes via Octokit. If GitHub Pages is disabled on the source repository, reads will 404 and the catalog is effectively write-only until Pages is enabled.
+
+## GitHub Catalog Layout
+
+```
+blueprints/v1/
+├── catalog.json                                 # Root catalog index
+└── m/                                           # First letter of blueprint name (lowercase)
+    └── MyBlueprint/
+        ├── catalog.json                         # Library catalog (one entry per major version)
+        └── 1/
+            ├── catalog.json                     # Version catalog (list of versions)
+            └── MyBlueprint-1.0.0/
+                ├── blueprint.yaml
+                ├── seed-data/
+                └── migrations/
+```
+
+The three `catalog.json` levels are generated by the `Publish` flow on the engine side — application code talks to `IBlueprintCatalogManager`, not to the catalog files directly.
+
+## CLI (octo-cli)
+
+Runtime blueprint operations against a tenant service are handled by `octo-cli`. The relevant commands live under `Asset/Blueprints/`:
+
+| Command                       | Purpose                                                                |
+|-------------------------------|------------------------------------------------------------------------|
+| `ListBlueprints`              | List blueprints available across configured catalogs.                  |
+| `InstallBlueprint`            | Apply a blueprint to the active tenant. `-f` re-applies (upsert).      |
+| `GetBlueprintHistory`         | Show the application history for the active tenant.                    |
+| `ListBlueprintInstallations`  | List blueprints currently installed on the tenant.                     |
+| `PreviewBlueprintUpdate`      | Preview the diff for a target version + mode (Safe/Merge/Full).        |
+| `UpdateBlueprint`             | Apply an update. `-m <mode>`, `-dr` (dry-run), `-nb` (no backup).      |
+| `ListBlueprintBackups`        | List backups created before updates.                                   |
+| `RollbackBlueprint`           | Restore a tenant from a backup (`-bid <backupId>`).                    |
+| `UninstallBlueprint`          | Uninstall a blueprint. `-c` to cascade-uninstall dependents.           |
+
+See `octo-cli/CLAUDE.md` § "Blueprints" for the exact argument forms.
 
 ## Best Practices
 
-1. **Small, focused blueprints**: One blueprint per domain/feature
-2. **Use composition**: Extract common base entities into separate blueprints
-3. **Version ranges**: Use `[1.0,)` instead of exact versions for flexibility
-4. **Sparse seed data**: Only essential startup data, no test data
-5. **Documentation**: Always fill in the `description` field
-6. **Migration scripts**: Always provide migration scripts for breaking changes
-7. **Lock managed entities**: Set `rtBlueprintLocked=true` for entities that should be updated
-8. **Test updates**: Use `--dry-run` before applying updates in production
-9. **Backup strategy**: Keep backups for rollback capability
+1. **Small, focused blueprints.** One blueprint per domain/feature. Compose via `blueprintDependencies`, not by bundling unrelated entities.
+2. **Use version ranges for dependencies.** `[1.0,)` keeps things flexible; pinning exact versions is fine for `blueprintId` but rarely helpful in dependencies.
+3. **Sparse seed data.** Ship essential bootstrap data only — no test data, no per-customer specifics.
+4. **Lock managed entities.** Default `rtBlueprintLocked` is `true`; only override to `false` when you genuinely intend the user to take ownership immediately.
+5. **Migration scripts for breaking changes.** Schema renames, deletes, and value transformations need an explicit script. Additive changes work via Merge alone.
+6. **Test with `-dr`.** Use `UpdateBlueprint -dr` (dry-run) before applying to production tenants.
+7. **Keep backups.** Default backup creation is on; only disable it when you have an alternate snapshot mechanism.

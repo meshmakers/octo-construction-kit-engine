@@ -296,38 +296,54 @@ octo-cli blueprintUninstall -t T1 -b ECommerce-2.0.0 [--cascade]
 
 ## 7. Implementierungsreihenfolge
 
-### Phase 1: Seed-Import + Single-Blueprint produktiv
-- **Composition entfernen:** `BlueprintComposer`, `ComposedBlueprintDto`,
-  `composedBlueprints`-Feld, zugehörige Tests und Doku-Abschnitte raus.
-  `BlueprintService` so umbauen, dass er nur noch mit einem einzelnen
-  Blueprint plus dessen Dependencies arbeitet.
-- `BlueprintApplicationMode` erweitern um `ReApply` (für `--force`).
-- Lücke 1 schließen (Seed-Import an `IImportRtModelCommand` koppeln).
-- Audit-Events `BlueprintApplied`/`BlueprintOperationFailed` einführen.
-- octo-asset-repo-services um Blueprint-API erweitern (GraphQL-Schicht
-  + DI-Wiring `.AddMongoBlueprintSupport()`).
-- octo-cli: `blueprintInstall` (mit `--force`), `blueprintList`,
-  `blueprintHistory`.
+> Status-Legende: ✅ = umgesetzt und gemerged, ⏳ = offen, 🔄 = teilweise
 
-### Phase 2: Update + Rollback ohne Migration-Scripts
-- Diff/Preview-Logik (Safe + Merge gegen `rtBlueprintLocked`).
-- octo-cli: `blueprintPreview`, `blueprintUpdate`, `blueprintRollback`.
-- Events `BlueprintUpdated`, `BlueprintRolledBack`.
+### Phase 1: Seed-Import + Single-Blueprint produktiv ✅
+- ✅ Composition entfernt (`BlueprintComposer`, `ComposedBlueprintDto`,
+  `composedBlueprints`-Feld, Tests, Doku).
+- ✅ `BlueprintApplicationMode.ReApply` für `--force`.
+- ✅ Seed-Import an `IImportRtModelCommand` gekoppelt.
+- ✅ Audit-Events `BlueprintApplied` / `BlueprintOperationFailed`.
+- ✅ `octo-asset-repo-services` Blueprint-API (`BlueprintsController` mit
+  Tenant-API-Policies) + DI-Wiring `.AddMongoBlueprintSupport()`.
+- ✅ `octo-cli`: `InstallBlueprint` (`-f`), `ListBlueprints`, `GetBlueprintHistory`.
 
-### Phase 3: Multi-Blueprint + Dependencies + Konfliktdetektion
-- `ITenantBlueprintInstallations` einführen.
-- Dependency-Resolver mit Topo-Sort.
-- Konfliktdetektor (CK-Versionen, Entity-Owner, rtIds).
-- octo-cli: `blueprintUninstall` (mit `--cascade`).
+### Phase 2: Update + Rollback ohne Migration-Scripts ✅
+- ✅ Phase 2a/b/c: Diff/Preview-Logik (Safe / Merge / Full gegen
+  `rtBlueprintLocked`), Mode-spezifischer Apply, KeepBlueprint-Promotion in-call
+  (Phase 2d, PRs #172 / #173).
+- ✅ `octo-cli`: `PreviewBlueprintUpdate`, `UpdateBlueprint`,
+  `ListBlueprintBackups`, `RollbackBlueprint`.
+- ✅ Events `BlueprintUpdated`, `BlueprintRolledBack`.
 
-### Phase 4: Migration-Executor produktiv
-- `BlueprintMigrationExecutor` Stubs ersetzen (alle 5 Operations,
-  Conditions, Validations).
-- Update-Modus `Migration` aktivieren.
+### Phase 3: Multi-Blueprint + Dependencies + Konfliktdetektion ✅
+- ✅ Phase 3a: `ITenantBlueprintInstallations` + Mongo-Persistenz.
+- ✅ Phase 3b: Dependency-Resolver mit Topo-Sort.
+- ✅ Phase 3c: Multi-Install Apply-Pfad.
+- ✅ Phase 3d: Refcounted Uninstall + `--cascade`.
+- ✅ Phase 3e: REST/SDK/CLI für Uninstall (`UninstallBlueprint`,
+  `ListBlueprintInstallations`).
 
-### Phase 5: Kundenfähig
-- Permissions/Rollen (siehe Open Question G).
-- Public Catalogs aufräumen, Doku-Endspurt.
+### Phase 4: Migration-Executor produktiv ✅
+- ✅ Alle 5 Operations (Add / Update / Delete / Rename / Transform),
+  Conditions, Validations.
+- ✅ Type-aware Attribute-Writes über `ICkCacheService` +
+  `AttributeValueConverter` (PR #171); record-typed Skalar-Updates werden mit
+  klarer Fehlermeldung abgewiesen.
+
+### Phase 5: Kundenfähig 🔄
+- ✅ Permissions: Status quo via generischer
+  `TenantAssetApiReadOnlyPolicy` / `TenantAssetApiReadWritePolicy` (Open
+  Question G geschlossen — keine eigenen Blueprint-Permissions ohne
+  Kundenanforderung).
+- 🔄 Public Catalogs:
+  - ✅ `composedBlueprints`-Schema-Drift im
+    `blueprint-libraries-build`-Repo behoben.
+  - ⏳ GitHub Pages ist auf `blueprint-libraries-build` deaktiviert; Catalog ist
+    aktuell write-only. Entscheidung: Pages aktivieren *oder* Inhalt nach
+    `meshmakers.github.io/blueprints/` migrieren.
+- ✅ Doku-Endspurt: `blueprints.md` neu geschrieben; `blueprints-concept-v2.md`
+  mit Status-Markern.
 
 ## 8. Entschieden (2026-05-14)
 
@@ -338,7 +354,7 @@ octo-cli blueprintUninstall -t T1 -b ECommerce-2.0.0 [--cascade]
 | 3 | CK-Model-Auflösung | Auto-Install + Konfliktdetektion vor Install |
 | 4 | Audit-Trail | `IDistributionEventHubService` mit Record-Events |
 | 5 | Rollback | Voll, Backup-basiert |
-| 6 | Tool-Schnitt | `octo-bpm` = Authoring, `octo-cli` = Runtime-Ops |
+| 6 | Tool-Schnitt | `octo-cli` führt Runtime-Ops (Install/Update/Rollback/Uninstall). Authoring-CLI (`octo-bpm`) ist optional, derzeit nicht implementiert. |
 | 7 | Hosting | `octo-asset-repo-services` (GraphQL-API) |
 | 8 | Entity-Ownership | Ein Owner pro Entity |
 | 9 | Re-Apply | `--force` flag, neuer Mode `ReApply` |
@@ -353,10 +369,13 @@ automatisch auf den höchsten kompatiblen Schnitt? Mein Vorschlag:
 nur melden — Engine darf CK-Model-Versionen nie eigenmächtig wählen.
 Phase 3.
 
-**G. Berechtigungen (Phase 5)**
-Vorschlag: Permissions `blueprint:read`, `blueprint:install`,
-`blueprint:update`, `blueprint:uninstall`, `blueprint:rollback`.
-Granularität auf Tenant- vs. globaler Ebene noch zu klären.
+**G. Berechtigungen (Phase 5) — geschlossen**
+Entscheidung: Blueprint-Operationen folgen dem bestehenden Auth-Pattern
+des Asset-Repo-Service (`TenantAssetApiReadOnlyPolicy` für Reads,
+`TenantAssetApiReadWritePolicy` für Mutationen). Eigene Permissions wie
+`blueprint:install` / `blueprint:uninstall` werden erst eingeführt,
+wenn eine konkrete Kundenanforderung sie rechtfertigt — bis dahin
+YAGNI.
 
 **H. Migration-Scripts und Multi-Blueprint-Ownership**
 Migration-Script eines Blueprints A kann Entities tangieren, die

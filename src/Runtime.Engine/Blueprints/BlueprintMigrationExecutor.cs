@@ -1,6 +1,9 @@
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
@@ -26,6 +29,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
 
     private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
     private readonly IImportRtModelCommand _importRtModelCommand;
+    private readonly ICkCacheService _ckCacheService;
     private readonly ILogger<BlueprintMigrationExecutor> _logger;
 
     /// <summary>
@@ -34,10 +38,12 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     public BlueprintMigrationExecutor(
         IRuntimeRepositoryProvider runtimeRepositoryProvider,
         IImportRtModelCommand importRtModelCommand,
+        ICkCacheService ckCacheService,
         ILogger<BlueprintMigrationExecutor> logger)
     {
         _runtimeRepositoryProvider = runtimeRepositoryProvider;
         _importRtModelCommand = importRtModelCommand;
+        _ckCacheService = ckCacheService;
         _logger = logger;
     }
 
@@ -361,6 +367,8 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
             return 0;
         }
 
+        var ckTypeGraph = ResolveCkTypeGraph(tenantId, step.Target);
+
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
         var affected = 0;
 
@@ -369,7 +377,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var kvp in attributeUpdates)
             {
-                entity.SetAttributeRawValue(kvp.Key, kvp.Value);
+                ApplyAttributeUpdate(entity, ckTypeGraph, kvp.Key, kvp.Value);
             }
             entity.SetAttributeRawValue(RtBlueprintAppliedAtAttrId.ElementId.Name, DateTime.UtcNow);
 
@@ -473,13 +481,15 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
             return 0;
         }
 
+        var ckTypeGraph = ResolveCkTypeGraph(tenantId, step.Target);
+
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
         var affected = 0;
 
         foreach (var (ckTypeId, entity) in resolved)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var mutated = ApplyTransform(entity, transform);
+            var mutated = ApplyTransform(entity, ckTypeGraph, transform);
             if (!mutated)
             {
                 continue;
@@ -493,7 +503,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         return affected;
     }
 
-    private static bool ApplyTransform(RtEntity entity, TransformConfigDto transform)
+    private bool ApplyTransform(RtEntity entity, CkTypeGraph ckTypeGraph, TransformConfigDto transform)
     {
         switch (transform.Type)
         {
@@ -509,8 +519,8 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 {
                     return false;
                 }
-                entity.SetAttributeRawValue(transform.TargetAttribute!, value);
-                entity.SetAttributeRawValue(transform.SourceAttribute!, null);
+                ApplyAttributeUpdate(entity, ckTypeGraph, transform.TargetAttribute!, value);
+                ApplyAttributeUpdate(entity, ckTypeGraph, transform.SourceAttribute!, null);
                 return true;
             }
             case TransformType.Copy:
@@ -525,7 +535,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 {
                     return false;
                 }
-                entity.SetAttributeRawValue(transform.TargetAttribute!, value);
+                ApplyAttributeUpdate(entity, ckTypeGraph, transform.TargetAttribute!, value);
                 return true;
             }
             case TransformType.Delete:
@@ -538,7 +548,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 {
                     return false;
                 }
-                entity.SetAttributeRawValue(transform.SourceAttribute!, null);
+                ApplyAttributeUpdate(entity, ckTypeGraph, transform.SourceAttribute!, null);
                 return true;
             }
             case TransformType.SetValue:
@@ -549,7 +559,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                     throw new InvalidOperationException(
                         "SetValue transform requires TargetAttribute (or SourceAttribute) to identify the destination");
                 }
-                entity.SetAttributeRawValue(attribute!, transform.Value);
+                ApplyAttributeUpdate(entity, ckTypeGraph, attribute!, transform.Value);
                 return true;
             }
             case TransformType.MapValue:
@@ -571,7 +581,7 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
                 if (key != null && transform.ValueMapping.TryGetValue(key, out var mapped))
                 {
                     var dst = transform.TargetAttribute ?? transform.SourceAttribute!;
-                    entity.SetAttributeRawValue(dst, mapped);
+                    ApplyAttributeUpdate(entity, ckTypeGraph, dst, mapped);
                     return true;
                 }
                 return false;
@@ -872,6 +882,51 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
     }
 
     private readonly record struct TargetMatch(RtCkId<CkTypeId> CkTypeId, RtEntity Entity);
+
+    private CkTypeGraph ResolveCkTypeGraph(string tenantId, EntityTargetDto target)
+    {
+        var ckTypeId = new RtCkId<CkTypeId>(target.CkTypeId!);
+        if (!_ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var ckTypeGraph) || ckTypeGraph == null)
+        {
+            throw new InvalidOperationException(
+                $"CK type '{target.CkTypeId}' not found in cache for tenant '{tenantId}' — cannot type-check migration attribute updates");
+        }
+        return ckTypeGraph;
+    }
+
+    /// <summary>
+    /// Writes a single attribute on an entity using its CK-declared value type. Primitive
+    /// attributes go through <see cref="AttributeValueConverter"/> via
+    /// <see cref="RtTypeWithAttributes.SetAttributeValue"/> so JSON-extracted strings/numbers
+    /// land as the right CLR type; Record / RecordArray attributes are rejected because the
+    /// migration DTO carries scalars rather than the structured record payload these
+    /// attributes need (Phase 4 scope).
+    /// </summary>
+    private static void ApplyAttributeUpdate(
+        RtEntity entity, CkTypeGraph ckTypeGraph, string attributeName, object? value)
+    {
+        if (!ckTypeGraph.AllAttributesByName.TryGetValue(attributeName, out var attributeGraph))
+        {
+            throw new InvalidOperationException(
+                $"Attribute '{attributeName}' is not defined on type '{ckTypeGraph.CkTypeId}'");
+        }
+
+        if (attributeGraph.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+        {
+            if (value is RtRecord || value is IEnumerable<RtRecord>)
+            {
+                entity.SetAttributeValue(attributeName, attributeGraph.ValueType, value);
+                return;
+            }
+
+            throw new InvalidOperationException(
+                $"Attribute '{attributeName}' on type '{ckTypeGraph.CkTypeId}' is {attributeGraph.ValueType}-typed; " +
+                "blueprint migrations cannot yet update record-typed attributes from a scalar value. " +
+                "Provide a structured payload or target a primitive attribute.");
+        }
+
+        entity.SetAttributeValue(attributeName, attributeGraph.ValueType, value);
+    }
 
     private Task ValidateStepAsync(
         MigrationStepDto step,

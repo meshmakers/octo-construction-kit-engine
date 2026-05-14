@@ -8,15 +8,23 @@ namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
 public interface IBlueprintService
 {
     /// <summary>
-    /// Applies a blueprint to initialize a tenant with CK models and seed data
+    /// Applies a blueprint to initialize a tenant with CK models and seed data.
     /// </summary>
     /// <param name="tenantId">Target tenant identifier</param>
     /// <param name="blueprintId">Blueprint to apply</param>
+    /// <param name="force">
+    /// If <c>true</c>, re-apply seed data via upsert even if the same version is
+    /// already recorded for the tenant (recovery after storage corruption or
+    /// manual cleanup). The recorded application mode is then
+    /// <see cref="BlueprintApplicationMode.ReApply"/> instead of
+    /// <see cref="BlueprintApplicationMode.Initial"/>.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the blueprint application</returns>
     Task<BlueprintApplicationResult> ApplyBlueprintAsync(
         string tenantId,
         BlueprintId blueprintId,
+        bool force = false,
         CancellationToken cancellationToken = default);
 
     /// <summary>

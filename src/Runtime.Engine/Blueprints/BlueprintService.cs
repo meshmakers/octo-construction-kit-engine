@@ -8,6 +8,10 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
+using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
+using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -26,8 +30,21 @@ internal class BlueprintService : IBlueprintService
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
     private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
     private readonly IImportRtModelCommand _importRtModelCommand;
+    private readonly IRtYamlSerializer _rtYamlSerializer;
     private readonly IBlueprintNotifications _notifications;
     private readonly ILogger<BlueprintService> _logger;
+
+    // System CK attribute identifiers for blueprint tracking.
+    // RtCkId uses ModelId (no version) + ElementId, so these match against any version
+    // of the System model present in the tenant.
+    private static readonly RtCkId<CkAttributeId> RtBlueprintSourceAttrId =
+        new("System/Entity/RtBlueprintSource");
+
+    private static readonly RtCkId<CkAttributeId> RtBlueprintLockedAttrId =
+        new("System/Entity/RtBlueprintLocked");
+
+    private static readonly RtCkId<CkAttributeId> RtBlueprintAppliedAtAttrId =
+        new("System/Entity/RtBlueprintAppliedAt");
 
     /// <summary>
     /// Creates a new instance of <see cref="BlueprintService"/>
@@ -42,6 +59,7 @@ internal class BlueprintService : IBlueprintService
         ICkModelUpgradeService ckModelUpgradeService,
         IRuntimeRepositoryProvider runtimeRepositoryProvider,
         IImportRtModelCommand importRtModelCommand,
+        IRtYamlSerializer rtYamlSerializer,
         IBlueprintNotifications notifications,
         ILogger<BlueprintService> logger)
     {
@@ -54,8 +72,64 @@ internal class BlueprintService : IBlueprintService
         _ckModelUpgradeService = ckModelUpgradeService;
         _runtimeRepositoryProvider = runtimeRepositoryProvider;
         _importRtModelCommand = importRtModelCommand;
+        _rtYamlSerializer = rtYamlSerializer;
         _notifications = notifications;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Stamps blueprint provenance attributes on every entity in the seed root.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>rtBlueprintSource</c> and <c>rtBlueprintAppliedAt</c> are always set to the
+    /// blueprint id and the apply timestamp respectively — they describe the apply
+    /// operation, not the entity's data, so the seed cannot override them.
+    /// </para>
+    /// <para>
+    /// <c>rtBlueprintLocked</c> defaults to <c>true</c> (the entity is managed by the
+    /// blueprint), but a seed can explicitly set it to <c>false</c> to mark an entity
+    /// as user-modifiable. Those values are preserved here.
+    /// </para>
+    /// </remarks>
+    private static void StampBlueprintTags(
+        RtModelRootTcDto root,
+        BlueprintId blueprintId,
+        DateTime appliedAt)
+    {
+        foreach (var entity in root.Entities)
+        {
+            SetOrReplaceAttribute(entity, RtBlueprintSourceAttrId, blueprintId.FullName);
+            SetOrReplaceAttribute(entity, RtBlueprintAppliedAtAttrId, appliedAt);
+            SetAttributeIfMissing(entity, RtBlueprintLockedAttrId, true);
+        }
+    }
+
+    private static void SetOrReplaceAttribute(
+        RtEntityTcDto entity,
+        RtCkId<CkAttributeId> attributeId,
+        object value)
+    {
+        var existing = entity.Attributes.FirstOrDefault(a => a.Id.Equals(attributeId));
+        if (existing != null)
+        {
+            existing.Value = value;
+        }
+        else
+        {
+            entity.Attributes.Add(new RtAttributeTcDto { Id = attributeId, Value = value });
+        }
+    }
+
+    private static void SetAttributeIfMissing(
+        RtEntityTcDto entity,
+        RtCkId<CkAttributeId> attributeId,
+        object value)
+    {
+        if (entity.Attributes.All(a => !a.Id.Equals(attributeId)))
+        {
+            entity.Attributes.Add(new RtAttributeTcDto { Id = attributeId, Value = value });
+        }
     }
 
     /// <inheritdoc />
@@ -188,15 +262,20 @@ internal class BlueprintService : IBlueprintService
                         }
                         else
                         {
-                            await _importRtModelCommand.ImportAsync(
-                                repository,
-                                seedDataPath,
-                                ExchangeMimeTypes.MimeTypeYaml,
-                                ImportStrategy.Upsert,
-                                cancellationToken).ConfigureAwait(false);
+                            var seedRoot = await LoadAndTagSeedAsync(
+                                seedDataPath, blueprintId, operationResult).ConfigureAwait(false);
 
-                            appliedSeedDataFiles.Add(seedDataPath);
-                            entitiesCreated++;
+                            if (seedRoot != null)
+                            {
+                                await _importRtModelCommand.ImportModelAsync(
+                                    repository,
+                                    seedRoot,
+                                    ImportStrategy.Upsert,
+                                    cancellationToken).ConfigureAwait(false);
+
+                                appliedSeedDataFiles.Add(seedDataPath);
+                                entitiesCreated += seedRoot.Entities.Count;
+                            }
                         }
                     }
                 }
@@ -586,27 +665,222 @@ internal class BlueprintService : IBlueprintService
         }
         else
         {
-            // For non-migration modes, analyze seed data differences
-            // This is a simplified preview - actual implementation would compare entities
-            preview.EntitiesToAdd = string.IsNullOrEmpty(targetBlueprint.SeedDataPath) ? 0 : 1;
-            preview.EntitiesToUpdate = 0;
-            preview.EntitiesToDelete = updateMode == BlueprintUpdateMode.Full ? 1 : 0; // Placeholder
+            // Real diff: compare seed entities to tenant entities tagged with this
+            // blueprint's source. Modes affect interpretation, not the diff itself.
+            var diff = await ComputeUpdateDiffAsync(
+                tenantId, targetVersion, targetBlueprint, updateMode, cancellationToken)
+                .ConfigureAwait(false);
+
+            preview.EntitiesToAdd = diff.ToAdd;
+            preview.EntitiesToUpdate = diff.ToUpdate;
+            preview.EntitiesToDelete = diff.ToDelete;
+            preview.Warnings.AddRange(diff.Warnings);
+            foreach (var conflict in diff.Conflicts)
+            {
+                preview.Conflicts.Add(conflict);
+            }
 
             if (updateMode == BlueprintUpdateMode.Safe)
             {
-                preview.Warnings.Add("Safe mode: Only new entities will be added, existing entities will not be modified");
+                preview.Warnings.Add(
+                    "Safe mode: only new entities will be added; existing entities are skipped");
             }
             else if (updateMode == BlueprintUpdateMode.Merge)
             {
-                preview.Warnings.Add("Merge mode: Blueprint-locked entities (rtBlueprintLocked=true) will be updated");
+                preview.Warnings.Add(
+                    "Merge mode: locked entities (rtBlueprintLocked=true) will be updated; unlocked entities are skipped");
             }
             else if (updateMode == BlueprintUpdateMode.Full)
             {
-                preview.Warnings.Add("Full mode: All entities from blueprint will be synchronized - user modifications may be lost");
+                preview.Warnings.Add(
+                    "Full mode: locked entities updated; locked entities no longer in seed will be deleted");
             }
         }
 
         return preview;
+    }
+
+    /// <summary>
+    /// Compares a target blueprint's seed data to entities currently tagged with
+    /// this blueprint's source on the tenant. Used by both PreviewUpdateAsync and
+    /// (eventually) the mode-specific apply paths in Phase 2c.
+    /// </summary>
+    private async Task<BlueprintUpdateDiff> ComputeUpdateDiffAsync(
+        string tenantId,
+        BlueprintId targetVersion,
+        BlueprintMetaRootDto targetBlueprint,
+        BlueprintUpdateMode updateMode,
+        CancellationToken cancellationToken)
+    {
+        var diff = new BlueprintUpdateDiff();
+
+        if (string.IsNullOrEmpty(targetBlueprint.SeedDataPath))
+        {
+            diff.Warnings.Add("Target blueprint has no seed data; nothing to compare");
+            return diff;
+        }
+
+        var blueprintPath = await _blueprintCatalogManager
+            .GetBlueprintPathAsync(targetVersion).ConfigureAwait(false);
+        var seedPath = Path.Combine(blueprintPath, targetBlueprint.SeedDataPath);
+
+        if (!File.Exists(seedPath))
+        {
+            diff.Warnings.Add($"Seed data file not found: {seedPath}");
+            return diff;
+        }
+
+        var opResult = new OperationResult();
+        var seedRoot = await LoadAndTagSeedAsync(seedPath, targetVersion, opResult)
+            .ConfigureAwait(false);
+        if (seedRoot == null)
+        {
+            diff.Warnings.AddRange(opResult.Messages
+                .Where(m => m.MessageLevel == MessageLevel.Error)
+                .Select(m => m.MessageText));
+            return diff;
+        }
+
+        var repository = await _runtimeRepositoryProvider
+            .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        if (repository == null)
+        {
+            diff.Warnings.Add("Tenant repository not available; returning seed-only counts");
+            diff.ToAdd = seedRoot.Entities.Count;
+            return diff;
+        }
+
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+
+        foreach (var typeGroup in seedRoot.Entities.GroupBy(e => e.CkTypeId))
+        {
+            var ckTypeId = typeGroup.Key;
+            var seedEntitiesOfType = typeGroup.ToList();
+
+            IResultSet<RtEntity> tenantEntities;
+            try
+            {
+                tenantEntities = await repository.GetRtEntitiesByTypeAsync(
+                    session, ckTypeId, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                diff.Warnings.Add(
+                    $"Could not query tenant entities for type {ckTypeId}: {ex.Message}");
+                diff.ToAdd += seedEntitiesOfType.Count;
+                continue;
+            }
+
+            var tenantOfBlueprintByKey = new Dictionary<string, RtEntity>(StringComparer.Ordinal);
+            foreach (var t in tenantEntities.Items)
+            {
+                var source = t.GetAttributeStringValueOrDefault("RtBlueprintSource");
+                if (source == null || !IsSameBlueprintName(source, targetVersion))
+                {
+                    continue;
+                }
+
+                var key = t.RtWellKnownName ?? t.RtId.ToString();
+                if (!string.IsNullOrEmpty(key))
+                {
+                    tenantOfBlueprintByKey[key] = t;
+                }
+            }
+
+            var seedKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var seed in seedEntitiesOfType)
+            {
+                var key = seed.RtWellKnownName
+                    ?? (seed.RtId.Equals(OctoObjectId.Empty) ? null : seed.RtId.ToString());
+                if (string.IsNullOrEmpty(key))
+                {
+                    // Cannot match without an identity key — treat as new.
+                    diff.ToAdd++;
+                    continue;
+                }
+                seedKeys.Add(key!);
+
+                if (tenantOfBlueprintByKey.TryGetValue(key!, out var tenant))
+                {
+                    var locked = tenant.GetAttributeValueOrDefault<bool>("RtBlueprintLocked")
+                        ?? true;
+                    if (locked)
+                    {
+                        diff.ToUpdate++;
+                    }
+                    else
+                    {
+                        diff.Conflicts.Add(new BlueprintUpdateConflict
+                        {
+                            EntityId = tenant.RtId.ToString() ?? string.Empty,
+                            EntityWellKnownName = tenant.RtWellKnownName,
+                            EntityCkTypeId = ckTypeId.ToString(),
+                            Description = $"Entity '{key}' is unlocked (rtBlueprintLocked=false); skipping in {updateMode} mode",
+                            ConflictType = ConflictType.UserModified,
+                            SuggestedResolution = ConflictResolution.Skip
+                        });
+                    }
+                }
+                else
+                {
+                    diff.ToAdd++;
+                }
+            }
+
+            if (updateMode == BlueprintUpdateMode.Full)
+            {
+                foreach (var kvp in tenantOfBlueprintByKey)
+                {
+                    if (seedKeys.Contains(kvp.Key))
+                    {
+                        continue;
+                    }
+
+                    var tenantEntity = kvp.Value;
+                    var locked = tenantEntity.GetAttributeValueOrDefault<bool>("RtBlueprintLocked")
+                        ?? true;
+                    if (locked)
+                    {
+                        diff.ToDelete++;
+                    }
+                    else
+                    {
+                        diff.Conflicts.Add(new BlueprintUpdateConflict
+                        {
+                            EntityId = tenantEntity.RtId.ToString() ?? string.Empty,
+                            EntityWellKnownName = tenantEntity.RtWellKnownName,
+                            EntityCkTypeId = ckTypeId.ToString(),
+                            Description = $"Entity '{kvp.Key}' is no longer in seed data but is unlocked; user modifications would block delete",
+                            ConflictType = ConflictType.DeleteModified,
+                            SuggestedResolution = ConflictResolution.Skip
+                        });
+                    }
+                }
+            }
+        }
+
+        return diff;
+    }
+
+    private static bool IsSameBlueprintName(string source, BlueprintId target)
+    {
+        try
+        {
+            return new BlueprintId(source).Name == target.Name;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private sealed class BlueprintUpdateDiff
+    {
+        public int ToAdd { get; set; }
+        public int ToUpdate { get; set; }
+        public int ToDelete { get; set; }
+        public List<BlueprintUpdateConflict> Conflicts { get; } = [];
+        public List<string> Warnings { get; } = [];
     }
 
     /// <inheritdoc />
@@ -905,14 +1179,27 @@ internal class BlueprintService : IBlueprintService
                     }
                     else
                     {
-                        await _importRtModelCommand.ImportAsync(
-                            repository,
-                            seedDataPath,
-                            ExchangeMimeTypes.MimeTypeYaml,
-                            ImportStrategy.Upsert,
-                            cancellationToken).ConfigureAwait(false);
+                        var opResult = new OperationResult();
+                        var seedRoot = await LoadAndTagSeedAsync(
+                            seedDataPath, blueprintId, opResult).ConfigureAwait(false);
 
-                        result.EntitiesAdded++;
+                        if (seedRoot != null)
+                        {
+                            await _importRtModelCommand.ImportModelAsync(
+                                repository,
+                                seedRoot,
+                                ImportStrategy.Upsert,
+                                cancellationToken).ConfigureAwait(false);
+
+                            result.EntitiesAdded += seedRoot.Entities.Count;
+                        }
+
+                        result.Warnings.AddRange(opResult.Messages
+                            .Where(m => m.MessageLevel == MessageLevel.Warning)
+                            .Select(m => m.MessageText));
+                        result.Errors.AddRange(opResult.Messages
+                            .Where(m => m.MessageLevel == MessageLevel.Error)
+                            .Select(m => m.MessageText));
                     }
                 }
             }
@@ -1010,6 +1297,43 @@ internal class BlueprintService : IBlueprintService
         catch (Exception notifyEx)
         {
             _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Rollback)");
+        }
+    }
+
+    /// <summary>
+    /// Reads a seed-data YAML file from disk, deserialises it and stamps the
+    /// blueprint provenance attributes on every entity. Returns null and emits
+    /// errors via <paramref name="operationResult"/> when the file cannot be parsed.
+    /// </summary>
+    private async Task<RtModelRootTcDto?> LoadAndTagSeedAsync(
+        string seedDataPath,
+        BlueprintId blueprintId,
+        OperationResult operationResult)
+    {
+        try
+        {
+            using var stream = File.OpenRead(seedDataPath);
+            var root = await _rtYamlSerializer
+                .DeserializeAsync(stream, seedDataPath, operationResult)
+                .ConfigureAwait(false);
+
+            if (operationResult.HasErrors)
+            {
+                return null;
+            }
+
+            StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
+            return root;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to deserialise seed data from {Path}", seedDataPath);
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Error,
+                seedDataPath,
+                23,
+                $"Failed to deserialise seed data: {ex.Message}"));
+            return null;
         }
     }
 }

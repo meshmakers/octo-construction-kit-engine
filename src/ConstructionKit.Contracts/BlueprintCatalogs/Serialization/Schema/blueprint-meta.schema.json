@@ -28,15 +28,6 @@
         "description": "CK model dependency in format 'Name-[MinVersion,MaxVersion)'"
       }
     },
-    "composedBlueprints": {
-      "type": "array",
-      "description": "List of blueprints that this blueprint extends (composition)",
-      "items": {
-        "type": "string",
-        "pattern": "^[a-zA-Z0-9-]+-\\[[0-9]+\\.[0-9]+(\\.[0-9]+)?,([0-9]+\\.[0-9]+(\\.[0-9]+)?)?\\)$",
-        "description": "Blueprint dependency in format 'Name-[MinVersion,MaxVersion)'"
-      }
-    },
     "seedDataPath": {
       "type": "string",
       "description": "Path to the seed data file relative to the blueprint root directory"

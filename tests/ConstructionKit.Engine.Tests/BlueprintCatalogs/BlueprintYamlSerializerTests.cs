@@ -52,28 +52,6 @@ public class BlueprintYamlSerializerTests
     }
 
     [Fact]
-    public void Deserialize_WithComposedBlueprints_ParsesCorrectly()
-    {
-        var yaml = """
-            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
-            blueprintId: ECommerce-1.0.0
-            description: E-Commerce Blueprint
-            composedBlueprints:
-              - BaseEntities-[1.0,)
-              - ProductCatalog-[1.0,)
-            """;
-
-        var operationResult = new OperationResult();
-        var result = _serializer.DeserializeBlueprintMeta(yaml, "test.yaml", operationResult);
-
-        Assert.NotNull(result);
-        Assert.NotNull(result.ComposedBlueprints);
-        Assert.Equal(2, result.ComposedBlueprints.Count);
-        Assert.Equal("BaseEntities", result.ComposedBlueprints[0].Name);
-        Assert.Equal("ProductCatalog", result.ComposedBlueprints[1].Name);
-    }
-
-    [Fact]
     public void Deserialize_WithSeedDataPath_ParsesCorrectly()
     {
         var yaml = """
@@ -99,8 +77,6 @@ public class BlueprintYamlSerializerTests
             description: Infrastructure management starter blueprint
             ckModelDependencies:
               - System-[2.0,)
-            composedBlueprints:
-              - BaseEntities-[1.0,)
             seedDataPath: seed-data/initial-entities.yaml
             """;
 
@@ -112,8 +88,6 @@ public class BlueprintYamlSerializerTests
         Assert.Equal("Infrastructure management starter blueprint", result.Description);
         Assert.NotNull(result.CkModelDependencies);
         Assert.Single(result.CkModelDependencies);
-        Assert.NotNull(result.ComposedBlueprints);
-        Assert.Single(result.ComposedBlueprints);
         Assert.Equal("seed-data/initial-entities.yaml", result.SeedDataPath);
     }
 
@@ -169,32 +143,6 @@ public class BlueprintYamlSerializerTests
         Assert.Contains("System-[2.0,)", yaml);
     }
 
-    [Fact]
-    public async Task Serialize_WithComposedBlueprints_ProducesValidYaml()
-    {
-        var blueprint = new BlueprintMetaRootDto
-        {
-            BlueprintId = new BlueprintId("TestBlueprint", "1.0.0"),
-            Description = "A test blueprint",
-            ComposedBlueprints = new List<BlueprintIdVersionRange>
-            {
-                new("BaseEntities", "[1.0,)")
-            }
-        };
-
-        using var stream = new MemoryStream();
-        await using var writer = new StreamWriter(stream);
-        await _serializer.SerializeAsync(writer, blueprint);
-        await writer.FlushAsync(TestContext.Current.CancellationToken);
-
-        stream.Position = 0;
-        using var reader = new StreamReader(stream);
-        var yaml = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
-
-        Assert.Contains("composedBlueprints:", yaml);
-        Assert.Contains("BaseEntities-[1.0,)", yaml);
-    }
-
     #endregion
 
     #region Roundtrip Tests
@@ -209,10 +157,6 @@ public class BlueprintYamlSerializerTests
             CkModelDependencies = new List<CkModelIdVersionRange>
             {
                 new("System", "[2.0,)")
-            },
-            ComposedBlueprints = new List<BlueprintIdVersionRange>
-            {
-                new("BaseEntities", "[1.0,)")
             },
             SeedDataPath = "seed-data/test.yaml"
         };
@@ -234,8 +178,6 @@ public class BlueprintYamlSerializerTests
         Assert.Equal(original.SeedDataPath, deserialized.SeedDataPath);
         Assert.NotNull(deserialized.CkModelDependencies);
         Assert.Single(deserialized.CkModelDependencies);
-        Assert.NotNull(deserialized.ComposedBlueprints);
-        Assert.Single(deserialized.ComposedBlueprints);
     }
 
     #endregion

@@ -19,7 +19,6 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     public BlueprintMetaRootDto()
     {
         CkModelDependencies = [];
-        ComposedBlueprints = [];
     }
 
     /// <summary>
@@ -33,11 +32,6 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     ///     Gets or sets the CK model dependencies of the blueprint.
     /// </summary>
     public List<CkModelIdVersionRange>? CkModelDependencies { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the composed blueprints that this blueprint extends.
-    /// </summary>
-    public List<BlueprintIdVersionRange>? ComposedBlueprints { get; set; }
 
     /// <summary>
     ///     Gets or sets the path to the seed data file (relative to blueprint root).

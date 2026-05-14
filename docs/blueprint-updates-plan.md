@@ -1,5 +1,11 @@
 # Blueprint Update Feature - Implementation Plan
 
+> **Status (2026-05-14): abgelöst durch `blueprints-concept-v2.md`.**
+> Datenmodell-Teile (Tracking-Attribute auf der Entity, History-Service)
+> sind umgesetzt; Tool-Aufteilung, Multi-Blueprint und Konflikt-Detektion
+> werden in v2 anders geschnitten. Dieses Dokument bleibt als
+> historische Referenz erhalten.
+
 ## Overview
 
 Enable updating tenants with new blueprint versions while preserving user modifications.

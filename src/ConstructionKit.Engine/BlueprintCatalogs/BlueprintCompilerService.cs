@@ -57,7 +57,6 @@ public class BlueprintCompilerService : IBlueprintCompilerService
             {
                 new("System", "[2.0,)")
             },
-            ComposedBlueprints = new List<BlueprintIdVersionRange>(),
             SeedDataPath = $"{SeedDataDirectory}/entities.yaml"
         };
 

@@ -71,7 +71,6 @@ internal class GetCommand : Command<BpmToolOptions>
         Logger.LogInformation("Found blueprint '{BlueprintId}'", blueprintId.FullName);
         Logger.LogInformation("  Description: {Description}", blueprint.Description ?? "(none)");
         Logger.LogInformation("  CK Dependencies: {Count}", blueprint.CkModelDependencies?.Count ?? 0);
-        Logger.LogInformation("  Composed Blueprints: {Count}", blueprint.ComposedBlueprints?.Count ?? 0);
 
         if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
         {

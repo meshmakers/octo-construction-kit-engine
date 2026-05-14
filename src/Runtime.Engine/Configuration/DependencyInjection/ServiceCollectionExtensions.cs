@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITenantBlueprintHistory, InMemoryTenantBlueprintHistory>();
         services.AddSingleton<ITenantBlueprintInstallations, InMemoryTenantBlueprintInstallations>();
         services.AddTransient<IBlueprintService, BlueprintService>();
+        services.AddTransient<IBlueprintDependencyResolver, BlueprintDependencyResolver>();
         services.AddTransient<IBlueprintMigrationExecutor, BlueprintMigrationExecutor>();
         services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
         services.TryAddSingleton<IBlueprintNotifications, LoggingBlueprintNotifications>();

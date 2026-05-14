@@ -112,4 +112,18 @@ public interface IBlueprintService
     Task<IReadOnlyList<TenantBlueprintInfo>> GetHistoryAsync(
         string tenantId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Restores a tenant from a backup, returning the tenant to the state captured
+    /// in the backup. Wraps <see cref="ITenantBackupService.RestoreBackupAsync"/>
+    /// with audit-trail notifications.
+    /// </summary>
+    /// <param name="tenantId">Target tenant identifier</param>
+    /// <param name="backupId">Backup identifier to restore from</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Result of the rollback</returns>
+    Task<BackupRestoreResult> RollbackAsync(
+        string tenantId,
+        string backupId,
+        CancellationToken cancellationToken = default);
 }

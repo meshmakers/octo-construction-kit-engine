@@ -36,16 +36,18 @@ internal class BlueprintService : IBlueprintService
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
-    // RtCkId uses ModelId (no version) + ElementId, so these match against any version
-    // of the System model present in the tenant.
+    // RtCkId is "{ModelId}/{ElementId}" — the attribute lives at the model
+    // level (compiled CkAttributeId = "System-2.x.x/RtBlueprintSource-1"),
+    // so the element id is just the bare attribute name. The fact that the
+    // attribute is *declared* on the Entity type does not appear in its id.
     private static readonly RtCkId<CkAttributeId> RtBlueprintSourceAttrId =
-        new("System/Entity/RtBlueprintSource");
+        new("System/RtBlueprintSource");
 
     private static readonly RtCkId<CkAttributeId> RtBlueprintLockedAttrId =
-        new("System/Entity/RtBlueprintLocked");
+        new("System/RtBlueprintLocked");
 
     private static readonly RtCkId<CkAttributeId> RtBlueprintAppliedAtAttrId =
-        new("System/Entity/RtBlueprintAppliedAt");
+        new("System/RtBlueprintAppliedAt");
 
     /// <summary>
     /// Creates a new instance of <see cref="BlueprintService"/>
@@ -1203,10 +1205,12 @@ internal class BlueprintService : IBlueprintService
         var conflictOverrides = options.ConflictResolutions ?? new Dictionary<string, ConflictResolution>();
         ApplyConflictOverrides(diff, conflictOverrides, mode, result);
 
-        // Bucket counts after overrides — these become the recorded numbers.
+        // Bucket counts after overrides — these reflect what the mode actually
+        // performs: Safe imports adds only; Merge/Full also write the locked
+        // updates; only Full deletes orphan locked entries.
         result.EntitiesAdded += diff.EntitiesToAdd.Count;
-        result.EntitiesUpdated += diff.EntitiesToUpdate.Count;
-        result.EntitiesDeleted += diff.EntitiesToDelete.Count;
+        result.EntitiesUpdated += mode == BlueprintUpdateMode.Safe ? 0 : diff.EntitiesToUpdate.Count;
+        result.EntitiesDeleted += mode == BlueprintUpdateMode.Full ? diff.EntitiesToDelete.Count : 0;
         result.EntitiesSkipped += diff.Conflicts.Count(c => c.SuggestedResolution == ConflictResolution.Skip);
 
         // Build the import set: Safe = Add only; Merge/Full = Add + Update

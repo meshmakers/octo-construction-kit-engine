@@ -34,11 +34,6 @@ ckModelDependencies:
   - System-[2.0,)
   - Commerce-[1.0,2.0)
 
-# Composition: Include other blueprints
-composedBlueprints:
-  - BaseEntities-[1.0,)
-  - CommonTypes-[1.0,)
-
 # Path to seed data (relative to blueprint root)
 seedDataPath: seed-data/initial-entities.yaml
 ```
@@ -51,7 +46,6 @@ seedDataPath: seed-data/initial-entities.yaml
 | `blueprintId`         | string   | Unique ID with version (e.g., `MyBlueprint-1.0.0`) |
 | `description`         | string   | Description of the blueprint                       |
 | `ckModelDependencies` | string[] | List of required CK models with version range      |
-| `composedBlueprints`  | string[] | List of blueprints to compose                      |
 | `seedDataPath`        | string   | Relative path to seed data (optional)              |
 
 ## Version Ranges
@@ -66,43 +60,12 @@ Blueprints and CK model dependencies support semantic version ranges:
 | `(1.0.0,2.0.0]` | Version > 1.0.0 and <= 2.0.0 |
 | `[1.5.0]`       | Exactly version 1.5.0        |
 
-## Composition
-
-Blueprints can include other blueprints. Resolution is **depth-first**, so base blueprints are processed first.
-
-### Example Hierarchy
-
-```
-ECommerce-1.0.0
-├── composedBlueprints: [BaseEntities-1.0.0]
-└── ckModelDependencies: [Commerce-2.0]
-
-BaseEntities-1.0.0
-├── composedBlueprints: []
-└── ckModelDependencies: [System-2.0]
-```
-
-### Resolved Order
-
-1. `BaseEntities-1.0.0` (base first)
-2. `ECommerce-1.0.0` (child after)
-
-### Merged CK Dependencies
-
-```
-- System-[2.0,)    # from BaseEntities
-- Commerce-[2.0,)  # from ECommerce
-```
-
-In case of conflicts (same CK model in multiple blueprints), the first occurrence wins (base blueprint takes precedence).
-
 ## Blueprint Application Flow
 
 ```
 ApplyBlueprintAsync(tenantId, blueprintId)
 │
-├── 1. ComposeAsync(blueprintId)
-│       └── Resolve hierarchy, merge dependencies
+├── 1. Fetch blueprint from catalog
 │
 ├── 2. CreateTenant(tenantId) if not exists
 │
@@ -110,7 +73,7 @@ ApplyBlueprintAsync(tenantId, blueprintId)
 │       ├── HardResolveDependenciesAsync()
 │       └── LoadCkModelGraph(tenantId, graph)
 │
-└── 4. Apply seed data (in order)
+└── 4. Apply seed data
         ├── LoadSeedDataAsync(path)
         └── ImportModelAsync(repository, rtModel, Upsert)
 ```
@@ -150,28 +113,6 @@ public class TenantSetupService
 }
 ```
 
-### Compose Blueprint (without applying)
-
-```csharp
-public class BlueprintAnalyzer
-{
-    private readonly IBlueprintComposer _composer;
-
-    public async Task<ComposedBlueprintDto> AnalyzeBlueprintAsync(BlueprintId blueprintId)
-    {
-        var operationResult = new OperationResult();
-        var composed = await _composer.ComposeAsync(blueprintId, operationResult);
-
-        Console.WriteLine($"Root: {composed.RootBlueprintId}");
-        Console.WriteLine($"CK Dependencies: {composed.CkModelDependencies.Count}");
-        Console.WriteLine($"Resolved Blueprints: {composed.ResolvedBlueprints.Count}");
-        Console.WriteLine($"Seed Data Files: {composed.SeedDataReferences.Count}");
-
-        return composed;
-    }
-}
-```
-
 ## Seed Data Format
 
 Seed data are RT-Model YAML files:
@@ -194,19 +135,6 @@ entities:
 Seed data is applied with **upsert strategy**:
 - Existing entities are updated
 - New entities are created
-- Child blueprints can override base data
-
-## Circular References
-
-Circular blueprint references are detected and result in an error:
-
-```
-BlueprintA-1.0.0
-└── composedBlueprints: [BlueprintB-1.0.0]
-
-BlueprintB-1.0.0
-└── composedBlueprints: [BlueprintA-1.0.0]  # ERROR: Circular reference
-```
 
 ## Catalog Types
 
@@ -309,12 +237,6 @@ services.Configure<PrivateGitHubBlueprintCatalogOptions>(options =>
 ┌─────────────────────────────────────────────────────────────┐
 │                     IBlueprintService                       │
 │  (Orchestrates blueprint application to tenants)            │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    IBlueprintComposer                       │
-│  (Resolves blueprint hierarchy, merges dependencies)        │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼

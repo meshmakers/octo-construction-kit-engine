@@ -51,8 +51,6 @@ internal class ValidateCommand : Command<BpmToolOptions>
             Logger.LogInformation("  Description: {Description}", blueprintMeta.Description);
             Logger.LogInformation("  CK Dependencies: {Count}",
                 blueprintMeta.CkModelDependencies?.Count ?? 0);
-            Logger.LogInformation("  Composed Blueprints: {Count}",
-                blueprintMeta.ComposedBlueprints?.Count ?? 0);
 
             if (!string.IsNullOrEmpty(blueprintMeta.SeedDataPath))
             {

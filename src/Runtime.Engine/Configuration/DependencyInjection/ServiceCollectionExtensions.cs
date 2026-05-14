@@ -15,6 +15,7 @@ using Meshmakers.Octo.Runtime.Engine.RuleEngine;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Meshmakers.Octo.Runtime.Engine.TransportContainer;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 // ReSharper disable once CheckNamespace
@@ -58,6 +59,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintService, BlueprintService>();
         services.AddTransient<IBlueprintMigrationExecutor, BlueprintMigrationExecutor>();
         services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
+        services.TryAddSingleton<IBlueprintNotifications, LoggingBlueprintNotifications>();
 
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();

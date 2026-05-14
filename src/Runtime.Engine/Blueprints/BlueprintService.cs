@@ -4,8 +4,10 @@ using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferOb
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
+using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -16,13 +18,15 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 internal class BlueprintService : IBlueprintService
 {
     private readonly ICkCacheService _ckCacheService;
-    private readonly IBlueprintComposer _blueprintComposer;
     private readonly IBlueprintCatalogManager _blueprintCatalogManager;
     private readonly ITenantBlueprintHistory _blueprintHistory;
     private readonly ITenantBackupService _backupService;
     private readonly IBlueprintMigrationExecutor _migrationExecutor;
     private readonly IBlueprintMigrationParser _migrationParser;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
+    private readonly IRuntimeRepositoryProvider _runtimeRepositoryProvider;
+    private readonly IImportRtModelCommand _importRtModelCommand;
+    private readonly IBlueprintNotifications _notifications;
     private readonly ILogger<BlueprintService> _logger;
 
     /// <summary>
@@ -30,23 +34,27 @@ internal class BlueprintService : IBlueprintService
     /// </summary>
     public BlueprintService(
         ICkCacheService ckCacheService,
-        IBlueprintComposer blueprintComposer,
         IBlueprintCatalogManager blueprintCatalogManager,
         ITenantBlueprintHistory blueprintHistory,
         ITenantBackupService backupService,
         IBlueprintMigrationExecutor migrationExecutor,
         IBlueprintMigrationParser migrationParser,
         ICkModelUpgradeService ckModelUpgradeService,
+        IRuntimeRepositoryProvider runtimeRepositoryProvider,
+        IImportRtModelCommand importRtModelCommand,
+        IBlueprintNotifications notifications,
         ILogger<BlueprintService> logger)
     {
         _ckCacheService = ckCacheService;
-        _blueprintComposer = blueprintComposer;
         _blueprintCatalogManager = blueprintCatalogManager;
         _blueprintHistory = blueprintHistory;
         _backupService = backupService;
         _migrationExecutor = migrationExecutor;
         _migrationParser = migrationParser;
         _ckModelUpgradeService = ckModelUpgradeService;
+        _runtimeRepositoryProvider = runtimeRepositoryProvider;
+        _importRtModelCommand = importRtModelCommand;
+        _notifications = notifications;
         _logger = logger;
     }
 
@@ -60,19 +68,20 @@ internal class BlueprintService : IBlueprintService
         var loadedCkModels = new List<CkModelIdVersionRange>();
         var appliedSeedDataFiles = new List<string>();
         var entitiesCreated = 0;
+        var correlationId = Guid.NewGuid();
 
         try
         {
             _logger.LogInformation("Applying blueprint {BlueprintId} to tenant {TenantId}",
                 blueprintId, tenantId);
 
-            // 1. Compose blueprint (resolve hierarchy)
-            var composedBlueprint = await _blueprintComposer.ComposeAsync(
-                blueprintId, operationResult, cancellationToken)
+            // 1. Fetch blueprint from catalog
+            var blueprint = await _blueprintCatalogManager.GetAsync(blueprintId, operationResult)
                 .ConfigureAwait(false);
 
             if (operationResult.HasErrors)
             {
+                await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
                 return BlueprintApplicationResult.Failed(operationResult);
             }
 
@@ -86,7 +95,7 @@ internal class BlueprintService : IBlueprintService
             // 3. Load CK models into tenant cache and execute CK model migrations if needed
             // Note: The actual CK model loading would be done via the dependency resolver
             // For now, we record which models need to be loaded
-            foreach (var ckDependency in composedBlueprint.CkModelDependencies)
+            foreach (var ckDependency in blueprint.CkModelDependencies ?? [])
             {
                 _logger.LogDebug("Blueprint requires CK model: {CkModel}", ckDependency);
                 loadedCkModels.Add(ckDependency);
@@ -118,6 +127,7 @@ internal class BlueprintService : IBlueprintService
                             25,
                             $"CK model migration failed: {error}"));
                     }
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
                     return BlueprintApplicationResult.Failed(operationResult);
                 }
 
@@ -138,17 +148,16 @@ internal class BlueprintService : IBlueprintService
                     upgradeResult.TotalEntitiesAffected);
             }
 
-            // 4. Resolve and apply seed data in order (base -> child)
-            foreach (var seedDataRef in composedBlueprint.SeedDataReferences)
+            // 4. Resolve and apply seed data
+            if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
             {
                 try
                 {
                     var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(seedDataRef.BlueprintId)
+                        .GetBlueprintPathAsync(blueprintId)
                         .ConfigureAwait(false);
 
-                    var seedDataPath = Path.Combine(blueprintPath, seedDataRef.SeedDataPath);
-                    seedDataRef.ResolvedPath = seedDataPath;
+                    var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
 
                     if (!File.Exists(seedDataPath))
                     {
@@ -158,23 +167,44 @@ internal class BlueprintService : IBlueprintService
                             seedDataPath,
                             20,
                             "Seed data file not found"));
-                        continue;
                     }
+                    else
+                    {
+                        _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
 
-                    _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
+                        var repository = await _runtimeRepositoryProvider
+                            .GetRepositoryAsync(tenantId, cancellationToken)
+                            .ConfigureAwait(false);
 
-                    // Load and apply seed data
-                    // Note: The actual import would use ImportRtModelCommand
-                    // This is a placeholder for the integration point
-                    appliedSeedDataFiles.Add(seedDataPath);
+                        if (repository == null)
+                        {
+                            operationResult.AddMessage(new OperationMessage(
+                                MessageLevel.Error,
+                                seedDataPath,
+                                22,
+                                $"No runtime repository available for tenant {tenantId}"));
+                        }
+                        else
+                        {
+                            await _importRtModelCommand.ImportAsync(
+                                repository,
+                                seedDataPath,
+                                ExchangeMimeTypes.MimeTypeYaml,
+                                ImportStrategy.Upsert,
+                                cancellationToken).ConfigureAwait(false);
+
+                            appliedSeedDataFiles.Add(seedDataPath);
+                            entitiesCreated++;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
-                        seedDataRef.BlueprintId);
+                        blueprintId);
                     operationResult.AddMessage(new OperationMessage(
                         MessageLevel.Error,
-                        seedDataRef.SeedDataPath,
+                        blueprint.SeedDataPath,
                         21,
                         $"Error applying seed data: {ex.Message}"));
                 }
@@ -198,6 +228,18 @@ internal class BlueprintService : IBlueprintService
                 "Blueprint {BlueprintId} applied successfully to tenant {TenantId}: {SeedDataCount} seed data files applied",
                 blueprintId, tenantId, appliedSeedDataFiles.Count);
 
+            await _notifications.NotifyAppliedAsync(
+                new BlueprintAppliedNotification(
+                    tenantId,
+                    blueprintId,
+                    BlueprintApplicationMode.Initial,
+                    EntitiesAdded: entitiesCreated,
+                    EntitiesUpdated: 0,
+                    EntitiesDeleted: 0,
+                    correlationId,
+                    DateTime.UtcNow),
+                cancellationToken).ConfigureAwait(false);
+
             return BlueprintApplicationResult.Success(
                 tenantId,
                 blueprintId,
@@ -217,7 +259,36 @@ internal class BlueprintService : IBlueprintService
                 30,
                 $"Failed to apply blueprint: {ex.Message}"));
 
+            await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
             return BlueprintApplicationResult.Failed(operationResult);
+        }
+    }
+
+    private async Task NotifyApplyFailedAsync(
+        string tenantId,
+        BlueprintId blueprintId,
+        OperationResult operationResult,
+        Guid correlationId)
+    {
+        var errorMessage = string.Join("; ", operationResult.Messages
+            .Where(m => m.MessageLevel == MessageLevel.Error)
+            .Select(m => m.MessageText));
+
+        try
+        {
+            await _notifications.NotifyOperationFailedAsync(
+                new BlueprintOperationFailedNotification(
+                    tenantId,
+                    blueprintId,
+                    Operation: "Apply",
+                    ErrorMessage: errorMessage,
+                    correlationId,
+                    DateTime.UtcNow),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception notifyEx)
+        {
+            _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification");
         }
     }
 
@@ -248,23 +319,22 @@ internal class BlueprintService : IBlueprintService
                     blueprintId, missingCkModels, missingBlueprints, missingSeedDataFiles, operationResult);
             }
 
-            // Try to compose to check all dependencies
-            var composedBlueprint = await _blueprintComposer.ComposeAsync(
-                blueprintId, operationResult, cancellationToken)
+            // Fetch blueprint to inspect its dependencies and seed data
+            var blueprint = await _blueprintCatalogManager.GetAsync(blueprintId, operationResult)
                 .ConfigureAwait(false);
 
             // Validate CK model dependencies exist
             // Note: This would check against the CK catalog
             // For now, we just collect the dependencies for validation
 
-            // Validate seed data files exist
-            foreach (var seedDataRef in composedBlueprint.SeedDataReferences)
+            // Validate seed data file exists
+            if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
             {
                 var blueprintPath = await _blueprintCatalogManager
-                    .GetBlueprintPathAsync(seedDataRef.BlueprintId)
+                    .GetBlueprintPathAsync(blueprintId)
                     .ConfigureAwait(false);
 
-                var seedDataPath = Path.Combine(blueprintPath, seedDataRef.SeedDataPath);
+                var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
                 if (!File.Exists(seedDataPath))
                 {
                     missingSeedDataFiles.Add(seedDataPath);
@@ -364,17 +434,17 @@ internal class BlueprintService : IBlueprintService
             try
             {
                 var operationResult = new OperationResult();
-                var composedBlueprint = await _blueprintComposer.ComposeAsync(
-                    recommendedVersion, operationResult, cancellationToken)
+                var targetBlueprint = await _blueprintCatalogManager
+                    .GetAsync(recommendedVersion, operationResult)
                     .ConfigureAwait(false);
 
+                var migrations = targetBlueprint.Migrations ?? [];
+
                 // Check if there's a migration from current version
-                var migrationFromCurrent = composedBlueprint.AvailableMigrations
-                    .FirstOrDefault(m => m.FromVersion == currentInfo.BlueprintId.Version.ToString());
+                hasMigrationPath = migrations.Any(
+                    m => m.FromVersion == currentInfo.BlueprintId.Version.ToString());
 
-                hasMigrationPath = migrationFromCurrent != null;
-
-                availableMigrations = composedBlueprint.AvailableMigrations
+                availableMigrations = migrations
                     .Select(m => m.FromVersion)
                     .ToList();
             }
@@ -433,10 +503,10 @@ internal class BlueprintService : IBlueprintService
             return preview;
         }
 
-        // 3. Compose target blueprint
+        // 3. Fetch target blueprint
         var operationResult = new OperationResult();
-        var composedBlueprint = await _blueprintComposer.ComposeAsync(
-            targetVersion, operationResult, cancellationToken)
+        var targetBlueprint = await _blueprintCatalogManager
+            .GetAsync(targetVersion, operationResult)
             .ConfigureAwait(false);
 
         if (operationResult.HasErrors)
@@ -457,7 +527,7 @@ internal class BlueprintService : IBlueprintService
         // 4. Check for migration path if using Migration mode
         if (updateMode == BlueprintUpdateMode.Migration)
         {
-            var migrationRef = composedBlueprint.AvailableMigrations
+            var migrationRef = (targetBlueprint.Migrations ?? [])
                 .FirstOrDefault(m => m.FromVersion == currentInfo.BlueprintId.Version.ToString());
 
             if (migrationRef == null)
@@ -471,7 +541,7 @@ internal class BlueprintService : IBlueprintService
                 try
                 {
                     var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(migrationRef.BlueprintId)
+                        .GetBlueprintPathAsync(targetVersion)
                         .ConfigureAwait(false);
 
                     var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
@@ -516,7 +586,7 @@ internal class BlueprintService : IBlueprintService
         {
             // For non-migration modes, analyze seed data differences
             // This is a simplified preview - actual implementation would compare entities
-            preview.EntitiesToAdd = composedBlueprint.SeedDataReferences.Count;
+            preview.EntitiesToAdd = string.IsNullOrEmpty(targetBlueprint.SeedDataPath) ? 0 : 1;
             preview.EntitiesToUpdate = 0;
             preview.EntitiesToDelete = updateMode == BlueprintUpdateMode.Full ? 1 : 0; // Placeholder
 
@@ -615,10 +685,10 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            // 5. Compose target blueprint
+            // 5. Fetch target blueprint
             var operationResult = new OperationResult();
-            var composedBlueprint = await _blueprintComposer.ComposeAsync(
-                targetVersion, operationResult, cancellationToken)
+            var targetBlueprint = await _blueprintCatalogManager
+                .GetAsync(targetVersion, operationResult)
                 .ConfigureAwait(false);
 
             if (operationResult.HasErrors)
@@ -631,8 +701,10 @@ internal class BlueprintService : IBlueprintService
                 return result;
             }
 
+            var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
+
             // 5b. Execute CK model migrations if upgrading from a previous version
-            if (composedBlueprint.CkModelDependencies.Count > 0)
+            if (ckDependencies.Count > 0)
             {
                 var ckMigrationOptions = new CkMigrationOptions
                 {
@@ -642,7 +714,7 @@ internal class BlueprintService : IBlueprintService
                 };
 
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
-                    tenantId, composedBlueprint.CkModelDependencies, ckMigrationOptions, null, cancellationToken)
+                    tenantId, ckDependencies, ckMigrationOptions, null, cancellationToken)
                     .ConfigureAwait(false);
 
                 if (!upgradeResult.Success)
@@ -664,13 +736,13 @@ internal class BlueprintService : IBlueprintService
             if (updateMode == BlueprintUpdateMode.Migration)
             {
                 // Execute migration script
-                var migrationRef = composedBlueprint.AvailableMigrations
+                var migrationRef = (targetBlueprint.Migrations ?? [])
                     .FirstOrDefault(m => m.FromVersion == currentInfo?.BlueprintId.Version.ToString());
 
                 if (migrationRef != null)
                 {
                     var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(migrationRef.BlueprintId)
+                        .GetBlueprintPathAsync(targetVersion)
                         .ConfigureAwait(false);
 
                     var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
@@ -701,14 +773,14 @@ internal class BlueprintService : IBlueprintService
                 else
                 {
                     result.Warnings.Add("No migration script found - applying seed data with Merge mode");
-                    await ApplySeedDataAsync(tenantId, composedBlueprint, targetVersion, result, cancellationToken)
+                    await ApplySeedDataAsync(tenantId, targetBlueprint, targetVersion, result, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
             else
             {
                 // Apply seed data based on update mode
-                await ApplySeedDataAsync(tenantId, composedBlueprint, targetVersion, result, cancellationToken)
+                await ApplySeedDataAsync(tenantId, targetBlueprint, targetVersion, result, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -750,38 +822,54 @@ internal class BlueprintService : IBlueprintService
 
     private async Task ApplySeedDataAsync(
         string tenantId,
-        ComposedBlueprintDto composedBlueprint,
-        BlueprintId targetVersion,
+        BlueprintMetaRootDto blueprint,
+        BlueprintId blueprintId,
         BlueprintUpdateResult result,
         CancellationToken cancellationToken)
     {
-        // Apply seed data from composed blueprint
-        foreach (var seedDataRef in composedBlueprint.SeedDataReferences)
+        if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
         {
             try
             {
                 var blueprintPath = await _blueprintCatalogManager
-                    .GetBlueprintPathAsync(seedDataRef.BlueprintId)
+                    .GetBlueprintPathAsync(blueprintId)
                     .ConfigureAwait(false);
 
-                var seedDataPath = Path.Combine(blueprintPath, seedDataRef.SeedDataPath);
+                var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
 
                 if (!File.Exists(seedDataPath))
                 {
                     result.Warnings.Add($"Seed data file not found: {seedDataPath}");
-                    continue;
                 }
+                else
+                {
+                    _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
 
-                _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
+                    var repository = await _runtimeRepositoryProvider
+                        .GetRepositoryAsync(tenantId, cancellationToken)
+                        .ConfigureAwait(false);
 
-                // TODO: Integrate with IImportRtModelCommand to actually import entities
-                // For now, we just count the files
-                result.EntitiesAdded++;
+                    if (repository == null)
+                    {
+                        result.Errors.Add($"No runtime repository available for tenant {tenantId}");
+                    }
+                    else
+                    {
+                        await _importRtModelCommand.ImportAsync(
+                            repository,
+                            seedDataPath,
+                            ExchangeMimeTypes.MimeTypeYaml,
+                            ImportStrategy.Upsert,
+                            cancellationToken).ConfigureAwait(false);
+
+                        result.EntitiesAdded++;
+                    }
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
-                    seedDataRef.BlueprintId);
+                    blueprintId);
                 result.Warnings.Add($"Error applying seed data: {ex.Message}");
             }
         }

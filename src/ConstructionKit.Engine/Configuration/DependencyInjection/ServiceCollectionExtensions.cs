@@ -85,7 +85,6 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintCatalog, PrivateGitHubBlueprintCatalog>();
         services.AddTransient<IBlueprintSerializer, BlueprintYamlSerializer>();
         services.AddTransient<IBlueprintSchemaValidator, BlueprintSchemaValidator>();
-        services.AddTransient<IBlueprintComposer, BlueprintComposer>();
         services.AddTransient<IBlueprintCompilerService, BlueprintCompilerService>();
 
         return services;

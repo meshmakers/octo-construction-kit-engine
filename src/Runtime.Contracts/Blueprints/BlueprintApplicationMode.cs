@@ -18,5 +18,12 @@ public enum BlueprintApplicationMode
     /// <summary>
     /// Update using an explicit migration script
     /// </summary>
-    Migration
+    Migration,
+
+    /// <summary>
+    /// Re-apply of an already-installed blueprint version
+    /// (triggered via --force after storage corruption or manual cleanup).
+    /// Seed data is re-imported using upsert semantics.
+    /// </summary>
+    ReApply
 }

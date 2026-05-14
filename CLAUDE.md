@@ -166,7 +166,6 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
-- `IBlueprintComposer` - Resolves blueprint hierarchies
 - `ITenantBackupService` - Creates/restores backups
 
 ### CK Model Migrations

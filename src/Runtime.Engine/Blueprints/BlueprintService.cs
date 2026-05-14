@@ -8,6 +8,7 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
+using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
@@ -796,6 +797,7 @@ internal class BlueprintService : IBlueprintService
                 {
                     // Cannot match without an identity key — treat as new.
                     diff.ToAdd++;
+                    diff.EntitiesToAdd.Add(seed);
                     continue;
                 }
                 seedKeys.Add(key!);
@@ -807,6 +809,7 @@ internal class BlueprintService : IBlueprintService
                     if (locked)
                     {
                         diff.ToUpdate++;
+                        diff.EntitiesToUpdate.Add(seed);
                     }
                     else
                     {
@@ -824,6 +827,7 @@ internal class BlueprintService : IBlueprintService
                 else
                 {
                     diff.ToAdd++;
+                    diff.EntitiesToAdd.Add(seed);
                 }
             }
 
@@ -842,6 +846,11 @@ internal class BlueprintService : IBlueprintService
                     if (locked)
                     {
                         diff.ToDelete++;
+                        diff.EntitiesToDelete.Add(new DeletionTarget(
+                            ckTypeId,
+                            tenantEntity.RtId,
+                            kvp.Key,
+                            tenantEntity.RtWellKnownName));
                     }
                     else
                     {
@@ -881,7 +890,16 @@ internal class BlueprintService : IBlueprintService
         public int ToDelete { get; set; }
         public List<BlueprintUpdateConflict> Conflicts { get; } = [];
         public List<string> Warnings { get; } = [];
+        public List<RtEntityTcDto> EntitiesToAdd { get; } = [];
+        public List<RtEntityTcDto> EntitiesToUpdate { get; } = [];
+        public List<DeletionTarget> EntitiesToDelete { get; } = [];
     }
+
+    private sealed record DeletionTarget(
+        RtCkId<CkTypeId> CkTypeId,
+        OctoObjectId RtId,
+        string Key,
+        string? WellKnownName);
 
     /// <inheritdoc />
     public async Task<BlueprintUpdateResult> ApplyUpdateAsync(
@@ -1054,14 +1072,16 @@ internal class BlueprintService : IBlueprintService
                 else
                 {
                     result.Warnings.Add("No migration script found - applying seed data with Merge mode");
-                    await ApplySeedDataAsync(tenantId, targetBlueprint, targetVersion, result, cancellationToken)
+                    await ApplyDiffAsync(tenantId, targetVersion, targetBlueprint,
+                        BlueprintUpdateMode.Merge, options, result, cancellationToken)
                         .ConfigureAwait(false);
                 }
             }
             else
             {
-                // Apply seed data based on update mode
-                await ApplySeedDataAsync(tenantId, targetBlueprint, targetVersion, result, cancellationToken)
+                // Mode-specific apply against the diff
+                await ApplyDiffAsync(tenantId, targetVersion, targetBlueprint,
+                    updateMode, options, result, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -1144,74 +1164,177 @@ internal class BlueprintService : IBlueprintService
         }
     }
 
-    private async Task ApplySeedDataAsync(
+    /// <summary>
+    /// Mode-specific write path used by <see cref="ApplyUpdateAsync"/>. Computes
+    /// a diff (same logic as the preview) and applies the resulting buckets:
+    /// <list type="bullet">
+    /// <item><description>Safe — adds only entities not yet in the tenant.</description></item>
+    /// <item><description>Merge — adds new entities and upserts locked entities.</description></item>
+    /// <item><description>Full — adds, updates, and deletes orphan locked entities.</description></item>
+    /// </list>
+    /// Per-entity conflict resolutions from <paramref name="options"/> can promote
+    /// otherwise-skipped unlocked conflicts back into the apply set (KeepBlueprint).
+    /// </summary>
+    private async Task ApplyDiffAsync(
         string tenantId,
-        BlueprintMetaRootDto blueprint,
-        BlueprintId blueprintId,
+        BlueprintId targetVersion,
+        BlueprintMetaRootDto targetBlueprint,
+        BlueprintUpdateMode mode,
+        BlueprintUpdateOptions options,
         BlueprintUpdateResult result,
         CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
+        var repository = await _runtimeRepositoryProvider
+            .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+        if (repository == null)
+        {
+            result.Errors.Add($"No runtime repository available for tenant {tenantId}");
+            result.Success = false;
+            return;
+        }
+
+        var diff = await ComputeUpdateDiffAsync(
+            tenantId, targetVersion, targetBlueprint, mode, cancellationToken)
+            .ConfigureAwait(false);
+
+        result.Warnings.AddRange(diff.Warnings);
+
+        // Apply user-supplied conflict resolutions to override the default Skip.
+        var conflictOverrides = options.ConflictResolutions ?? new Dictionary<string, ConflictResolution>();
+        ApplyConflictOverrides(diff, conflictOverrides, mode, result);
+
+        // Bucket counts after overrides — these become the recorded numbers.
+        result.EntitiesAdded += diff.EntitiesToAdd.Count;
+        result.EntitiesUpdated += diff.EntitiesToUpdate.Count;
+        result.EntitiesDeleted += diff.EntitiesToDelete.Count;
+        result.EntitiesSkipped += diff.Conflicts.Count(c => c.SuggestedResolution == ConflictResolution.Skip);
+
+        // Build the import set: Safe = Add only; Merge/Full = Add + Update
+        var entitiesToImport = new List<RtEntityTcDto>(diff.EntitiesToAdd);
+        if (mode != BlueprintUpdateMode.Safe)
+        {
+            entitiesToImport.AddRange(diff.EntitiesToUpdate);
+        }
+
+        if (entitiesToImport.Count > 0)
         {
             try
             {
-                var blueprintPath = await _blueprintCatalogManager
-                    .GetBlueprintPathAsync(blueprintId)
-                    .ConfigureAwait(false);
-
-                var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
-
-                if (!File.Exists(seedDataPath))
+                var importRoot = new RtModelRootTcDto
                 {
-                    result.Warnings.Add($"Seed data file not found: {seedDataPath}");
-                }
-                else
-                {
-                    _logger.LogDebug("Applying seed data from {Path}", seedDataPath);
+                    Dependencies = targetBlueprint.CkModelDependencies?.ToList() ?? [],
+                    Entities = entitiesToImport
+                };
 
-                    var repository = await _runtimeRepositoryProvider
-                        .GetRepositoryAsync(tenantId, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (repository == null)
-                    {
-                        result.Errors.Add($"No runtime repository available for tenant {tenantId}");
-                    }
-                    else
-                    {
-                        var opResult = new OperationResult();
-                        var seedRoot = await LoadAndTagSeedAsync(
-                            seedDataPath, blueprintId, opResult).ConfigureAwait(false);
-
-                        if (seedRoot != null)
-                        {
-                            await _importRtModelCommand.ImportModelAsync(
-                                repository,
-                                seedRoot,
-                                ImportStrategy.Upsert,
-                                cancellationToken).ConfigureAwait(false);
-
-                            result.EntitiesAdded += seedRoot.Entities.Count;
-                        }
-
-                        result.Warnings.AddRange(opResult.Messages
-                            .Where(m => m.MessageLevel == MessageLevel.Warning)
-                            .Select(m => m.MessageText));
-                        result.Errors.AddRange(opResult.Messages
-                            .Where(m => m.MessageLevel == MessageLevel.Error)
-                            .Select(m => m.MessageText));
-                    }
-                }
+                await _importRtModelCommand.ImportModelAsync(
+                    repository,
+                    importRoot,
+                    ImportStrategy.Upsert,
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
-                    blueprintId);
-                result.Warnings.Add($"Error applying seed data: {ex.Message}");
+                _logger.LogError(ex, "Error importing blueprint entities for {BlueprintId}", targetVersion);
+                result.Errors.Add($"Failed to import blueprint entities: {ex.Message}");
+                if (!options.ContinueOnError)
+                {
+                    result.Success = false;
+                    return;
+                }
             }
         }
 
+        // Deletions only run in Full mode (or when an unlocked DeleteModified
+        // conflict was overridden to KeepBlueprint).
+        if (diff.EntitiesToDelete.Count > 0)
+        {
+            await DeleteOrphanEntitiesAsync(repository, diff.EntitiesToDelete, options, result, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         result.Success = result.Errors.Count == 0;
+    }
+
+    private static void ApplyConflictOverrides(
+        BlueprintUpdateDiff diff,
+        Dictionary<string, ConflictResolution> resolutions,
+        BlueprintUpdateMode mode,
+        BlueprintUpdateResult result)
+    {
+        if (resolutions.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var conflict in diff.Conflicts.ToList())
+        {
+            if (!resolutions.TryGetValue(conflict.EntityId, out var resolution))
+            {
+                continue;
+            }
+
+            if (resolution != ConflictResolution.KeepBlueprint)
+            {
+                // KeepUser / Skip / Merge — leave the conflict in place, no action.
+                conflict.SuggestedResolution = resolution;
+                continue;
+            }
+
+            // Promote: an unlocked update/delete now goes through.
+            conflict.SuggestedResolution = ConflictResolution.KeepBlueprint;
+
+            switch (conflict.ConflictType)
+            {
+                case ConflictType.UserModified:
+                    // We don't have the seed entity stashed on the conflict, so
+                    // surface a warning. The next preview/apply with KeepBlueprint
+                    // is the supported path for now.
+                    result.Warnings.Add(
+                        $"KeepBlueprint override on UserModified conflict for '{conflict.EntityId}' " +
+                        "is not yet supported in the same call — re-run with the entity re-locked.");
+                    break;
+                case ConflictType.DeleteModified when mode == BlueprintUpdateMode.Full:
+                    result.Warnings.Add(
+                        $"KeepBlueprint override on DeleteModified conflict for '{conflict.EntityId}' " +
+                        "is not yet supported in the same call — re-run with the entity re-locked.");
+                    break;
+            }
+        }
+    }
+
+    private async Task DeleteOrphanEntitiesAsync(
+        IRuntimeRepository repository,
+        List<DeletionTarget> targets,
+        BlueprintUpdateOptions options,
+        BlueprintUpdateResult result,
+        CancellationToken cancellationToken)
+    {
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        foreach (var target in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                await repository.DeleteOneRtEntityByRtIdAsync(
+                    session,
+                    target.CkTypeId,
+                    target.RtId,
+                    DeleteOptions.Erase).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to delete orphan blueprint entity {RtId} ({Key})",
+                    target.RtId, target.Key);
+                result.Errors.Add(
+                    $"Failed to delete orphan entity '{target.WellKnownName ?? target.Key}': {ex.Message}");
+
+                if (!options.ContinueOnError)
+                {
+                    return;
+                }
+            }
+        }
     }
 
     /// <inheritdoc />

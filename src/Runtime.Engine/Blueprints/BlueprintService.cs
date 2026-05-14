@@ -62,6 +62,7 @@ internal class BlueprintService : IBlueprintService
     public async Task<BlueprintApplicationResult> ApplyBlueprintAsync(
         string tenantId,
         BlueprintId blueprintId,
+        bool force = false,
         CancellationToken cancellationToken = default)
     {
         var operationResult = new OperationResult();
@@ -69,6 +70,7 @@ internal class BlueprintService : IBlueprintService
         var appliedSeedDataFiles = new List<string>();
         var entitiesCreated = 0;
         var correlationId = Guid.NewGuid();
+        var applicationMode = force ? BlueprintApplicationMode.ReApply : BlueprintApplicationMode.Initial;
 
         try
         {
@@ -215,7 +217,7 @@ internal class BlueprintService : IBlueprintService
             {
                 BlueprintId = blueprintId,
                 AppliedAt = DateTime.UtcNow,
-                ApplicationMode = BlueprintApplicationMode.Initial,
+                ApplicationMode = applicationMode,
                 EntitiesCreated = entitiesCreated,
                 EntitiesUpdated = 0,
                 EntitiesDeleted = 0
@@ -232,7 +234,7 @@ internal class BlueprintService : IBlueprintService
                 new BlueprintAppliedNotification(
                     tenantId,
                     blueprintId,
-                    BlueprintApplicationMode.Initial,
+                    applicationMode,
                     EntitiesAdded: entitiesCreated,
                     EntitiesUpdated: 0,
                     EntitiesDeleted: 0,

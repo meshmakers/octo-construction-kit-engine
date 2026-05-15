@@ -66,20 +66,4 @@ internal class InMemoryTenantBlueprintInstallations : ITenantBlueprintInstallati
 
         return Task.FromResult(false);
     }
-
-    /// <inheritdoc />
-    public Task<IReadOnlyList<(string TenantId, BlueprintInstallation Installation)>> GetAllAsync(
-        CancellationToken cancellationToken = default)
-    {
-        var result = new List<(string TenantId, BlueprintInstallation Installation)>();
-        foreach (var tenantEntry in _installations)
-        {
-            foreach (var installation in tenantEntry.Value.Values)
-            {
-                result.Add((tenantEntry.Key, installation));
-            }
-        }
-
-        return Task.FromResult<IReadOnlyList<(string TenantId, BlueprintInstallation Installation)>>(result);
-    }
 }

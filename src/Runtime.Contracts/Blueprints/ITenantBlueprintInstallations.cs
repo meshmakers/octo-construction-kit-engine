@@ -48,13 +48,6 @@ public interface ITenantBlueprintInstallations
         string tenantId,
         string blueprintName,
         CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// Lists every installation row across all tenants. Used by tooling /
-    /// audit; production code should prefer the tenant-scoped queries.
-    /// </summary>
-    Task<IReadOnlyList<(string TenantId, BlueprintInstallation Installation)>> GetAllAsync(
-        CancellationToken cancellationToken = default);
 }
 
 /// <summary>

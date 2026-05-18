@@ -30,6 +30,13 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     public EntityModOptions ModOption { get; }
 
     /// <summary>
+    ///     Optional optimistic-concurrency guard applied to <see cref="EntityModOptions.Update" />
+    ///     operations. When set, the write is skipped if the guard does not match — see
+    ///     <see cref="AttributeNewerThanGuard" />. Ignored for non-update mod options.
+    /// </summary>
+    public AttributeNewerThanGuard? UpdateGuard { get; }
+
+    /// <summary>
     /// Gets the runtime entity identifier.
     /// </summary>
     /// <returns></returns>

@@ -27,6 +27,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         var entitiesToUpdate = new ConcurrentDictionary<RtEntityId, TEntity>();
         var entitiesToReplace = new ConcurrentDictionary<RtEntityId, TEntity>();
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
+        var updateGuards = new ConcurrentDictionary<RtEntityId, AttributeNewerThanGuard>();
 
 #if NETSTANDARD2_0
         Parallel.ForEach(entityUpdateInfos, (info, _) =>
@@ -146,6 +147,11 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 #endif
                     }
 
+                    if (info.UpdateGuard != null)
+                    {
+                        updateGuards.TryAdd(info.GetRtEntityId(), info.UpdateGuard);
+                    }
+
                     break;
                 case EntityModOptions.Replace:
                     if (info.RtEntity == null)
@@ -190,7 +196,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
             new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
                 entitiesToUpdate.ToDictionary(k => k.Key, v => v.Value),
                 entitiesToReplace.ToDictionary(k => k.Key, v => v.Value),
-                entitiesToDelete.ToList());
+                entitiesToDelete.ToList(),
+                updateGuards.ToDictionary(k => k.Key, v => v.Value));
 
 #if NETSTANDARD2_0
         return Task.FromResult(entityValidatorResult);

@@ -45,6 +45,22 @@ public interface IDataSourceCollection<in TKey, TDocument> where TDocument : new
     Task UpdateOneAsync(IOctoSession session, IEnumerable<TDocument> documents);
 
     /// <summary>
+    ///     Updates a single document if the optimistic-concurrency guard matches the
+    ///     persisted state. The write is silently skipped if the guard does not match,
+    ///     so a stale write cannot overwrite a more-recent one.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="document">Document with the new values; the id is taken from this document</param>
+    /// <param name="guard">Guard expression that must be satisfied for the write to apply</param>
+    /// <returns>
+    ///     <c>true</c> if the document was updated; <c>false</c> if the guard did not
+    ///     match — the document was either absent or had a value at the guard's
+    ///     <see cref="AttributeNewerThanGuard.AttributePath" /> greater than the guard's
+    ///     <see cref="AttributeNewerThanGuard.NewValue" />.
+    /// </returns>
+    Task<bool> UpdateOneIfGuardMatchesAsync(IOctoSession session, TDocument document, AttributeNewerThanGuard guard);
+
+    /// <summary>
     /// Updates multiple documents in the collection based on a filter expression
     /// </summary>
     /// <param name="session">The session object</param>

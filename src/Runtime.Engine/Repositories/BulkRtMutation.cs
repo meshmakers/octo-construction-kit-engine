@@ -68,7 +68,8 @@ internal class BulkRtMutation(
         if (entityRuleEngineResult.RtEntitiesToUpdate.Any())
         {
             await UpdateRtEntities(session, repositoryDataSource, ckCacheService,
-                entityRuleEngineResult.RtEntitiesToUpdate).ConfigureAwait(false);
+                entityRuleEngineResult.RtEntitiesToUpdate, entityRuleEngineResult.UpdateGuards)
+                .ConfigureAwait(false);
         }
 
         if (entityRuleEngineResult.RtEntitiesToReplace.Any())
@@ -156,7 +157,8 @@ internal class BulkRtMutation(
 
     private async Task UpdateRtEntities(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities)
+        IReadOnlyDictionary<RtEntityId, RtEntity> rtEntities,
+        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards)
     {
         foreach (var rtEntityGrouping in rtEntities.GroupBy(x => x.Key.CkTypeId))
         {
@@ -166,13 +168,14 @@ internal class BulkRtMutation(
             }
 
             await UpdateRtEntitiesByCkId(session, repositoryDataSource, ckCacheService,
-                rtEntityGrouping.Key, rtEntityGrouping).ConfigureAwait(false);
+                rtEntityGrouping.Key, rtEntityGrouping, updateGuards).ConfigureAwait(false);
         }
     }
 
     private async Task UpdateRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,
         ICkCacheService ckCacheService,
-        RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping)
+        RtCkId<CkTypeId> ckTypeId, IGrouping<RtCkId<CkTypeId>, KeyValuePair<RtEntityId, RtEntity>> rtEntityGrouping,
+        IReadOnlyDictionary<RtEntityId, AttributeNewerThanGuard> updateGuards)
     {
         var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
         var collection = repositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
@@ -222,8 +225,27 @@ internal class BulkRtMutation(
             }
         }
 
+        // Guarded updates are applied one-by-one with the optimistic-concurrency filter; the
+        // write may be a no-op if the guard does not match (stale-write protection — see
+        // AttributeNewerThanGuard). Unguarded entities still go through the batch path.
+        var unguardedEntities = new List<RtEntity>();
+        foreach (var keyValuePair in rtEntityGrouping)
+        {
+            if (updateGuards.TryGetValue(keyValuePair.Key, out var guard))
+            {
+                await collection.UpdateOneIfGuardMatchesAsync(session, keyValuePair.Value, guard)
+                    .ConfigureAwait(false);
+            }
+            else
+            {
+                unguardedEntities.Add(keyValuePair.Value);
+            }
+        }
 
-        await collection.UpdateOneAsync(session, rtEntities).ConfigureAwait(false);
+        if (unguardedEntities.Count > 0)
+        {
+            await collection.UpdateOneAsync(session, unguardedEntities).ConfigureAwait(false);
+        }
     }
 
     private async Task ReplaceRtEntitiesByCkId(IOctoSession session, IRepositoryDataSource repositoryDataSource,

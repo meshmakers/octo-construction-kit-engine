@@ -67,6 +67,12 @@ public readonly struct OctoObjectId : IComparable<OctoObjectId>, IEquatable<Octo
             throw new ArgumentNullException(nameof(value));
         }
 
+        if (value.Length != 24)
+        {
+            throw new FormatException(
+                $"'{value}' is not a valid 24 digit hex string (got {value.Length} characters).");
+        }
+
         var bytes = value.ParseHexString();
         FromByteArray(bytes, 0, out _a, out _b, out _c);
     }

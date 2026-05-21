@@ -118,7 +118,49 @@ public abstract class CachedBlueprintCatalog(
         CancellationToken? cancellationToken = null);
 
     /// <inheritdoc />
+    public abstract Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+#pragma warning disable CS0809 // Obsolete member overrides non-obsolete member — the base interface is intentional.
+    [Obsolete("Use OpenBlueprintFileAsync.")]
     public abstract string GetBlueprintPath(BlueprintId blueprintId, object? sourceIdentifier = null);
+#pragma warning restore CS0809
+
+    /// <summary>
+    ///     Validates that <paramref name="relativePath" /> stays inside the blueprint root.
+    ///     Throws <see cref="BlueprintCatalogException" /> on any traversal / rooted / empty path.
+    /// </summary>
+    /// <param name="relativePath">The candidate relative path</param>
+    /// <returns>The normalised path (forward slashes, no leading separators).</returns>
+    protected static string ValidateBlueprintRelativePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+        {
+            throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath ?? "<null>");
+        }
+
+        // Normalise separators.
+        var normalised = relativePath.Replace('\\', '/').TrimStart('/');
+
+        if (string.IsNullOrWhiteSpace(normalised) || Path.IsPathRooted(relativePath))
+        {
+            throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath);
+        }
+
+        // Reject ".." segments anywhere in the path.
+        var segments = normalised.Split('/');
+        foreach (var segment in segments)
+        {
+            if (segment == ".." || segment == ".")
+            {
+                throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath);
+            }
+        }
+
+        return normalised;
+    }
 
     /// <inheritdoc />
     public abstract Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,

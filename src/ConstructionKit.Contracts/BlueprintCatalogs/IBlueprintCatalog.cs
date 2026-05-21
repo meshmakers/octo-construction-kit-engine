@@ -82,12 +82,39 @@ public interface IBlueprintCatalog
         CancellationToken? cancellationToken = null);
 
     /// <summary>
-    ///     Gets the absolute path to a blueprint's directory
+    ///     Opens a readable stream for a single file inside a blueprint's folder.
     /// </summary>
+    /// <remarks>
+    ///     This is the canonical way to read files (seed-data, migration scripts) that live alongside a
+    ///     blueprint's <c>blueprint.yaml</c>. Catalog implementations are free to back this with whatever
+    ///     storage they use — local file system, HTTP, embedded resources — without exposing a path.
+    /// </remarks>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="relativePath">Path to the file relative to the blueprint root, e.g.
+    ///     <c>seed-data/entities.yaml</c>. Must use forward-slash separators and must not contain
+    ///     <c>..</c> or rooted segments.</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
+    ///     set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>A stream positioned at the start of the file; the caller is responsible for disposing it.</returns>
+    Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the absolute path to a blueprint's directory.
+    /// </summary>
+    /// <remarks>
+    ///     Retained for the publish path (<see cref="PublishAsync" /> needs an on-disk source directory).
+    ///     New read code should use <see cref="OpenBlueprintFileAsync" /> instead — embedded-resource and
+    ///     remote catalogs cannot return a meaningful filesystem path.
+    /// </remarks>
     /// <param name="blueprintId">The blueprint id</param>
     /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
     ///     set it to null to use default</param>
     /// <returns>The absolute path to the blueprint directory</returns>
+    [Obsolete("Use OpenBlueprintFileAsync for reading files inside a blueprint. " +
+              "This API is retained only for the publish path that needs an on-disk source directory.")]
     string GetBlueprintPath(BlueprintId blueprintId, object? sourceIdentifier = null);
 
     /// <summary>

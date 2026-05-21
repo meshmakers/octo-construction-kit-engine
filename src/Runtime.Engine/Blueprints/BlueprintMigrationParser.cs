@@ -1,3 +1,4 @@
+using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -16,6 +17,18 @@ public interface IBlueprintMigrationParser
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Parsed migration DTO</returns>
     Task<BlueprintMigrationDto> ParseAsync(string filePath, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Parses a migration script from a stream. The caller owns the stream's lifetime — it is read
+    /// to end but not disposed by the parser.
+    /// </summary>
+    /// <param name="stream">Stream positioned at the start of the YAML content.</param>
+    /// <param name="sourceDescription">Human-readable identifier for the stream's origin (used in
+    /// error messages); for blueprint files use the form <c>"{blueprintId}/{relativePath}"</c>.</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Parsed migration DTO</returns>
+    Task<BlueprintMigrationDto> ParseAsync(Stream stream, string sourceDescription,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Parses a migration script from a string
@@ -59,6 +72,34 @@ internal class BlueprintMigrationParser : IBlueprintMigrationParser
 #endif
 
         return Parse(yaml);
+    }
+
+    /// <inheritdoc />
+    public async Task<BlueprintMigrationDto> ParseAsync(Stream stream, string sourceDescription,
+        CancellationToken cancellationToken = default)
+    {
+        if (stream == null)
+        {
+            throw new ArgumentNullException(nameof(stream));
+        }
+
+        using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true,
+            bufferSize: 1024, leaveOpen: true);
+#if NETSTANDARD2_0
+        var yaml = await reader.ReadToEndAsync().ConfigureAwait(false);
+#else
+        var yaml = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+#endif
+
+        try
+        {
+            return Parse(yaml);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException || ex is ArgumentException)
+        {
+            throw new InvalidOperationException(
+                $"Failed to parse migration YAML from '{sourceDescription}': {ex.Message}", ex);
+        }
     }
 
     /// <inheritdoc />

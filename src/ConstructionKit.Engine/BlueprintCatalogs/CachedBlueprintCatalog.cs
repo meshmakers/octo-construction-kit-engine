@@ -118,7 +118,26 @@ public abstract class CachedBlueprintCatalog(
         CancellationToken? cancellationToken = null);
 
     /// <inheritdoc />
+    public abstract Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null,
+        CancellationToken cancellationToken = default);
+
+    /// <inheritdoc />
+#pragma warning disable CS0809 // Obsolete member overrides non-obsolete member — the base interface is intentional.
+    [Obsolete("Use OpenBlueprintFileAsync.")]
     public abstract string GetBlueprintPath(BlueprintId blueprintId, object? sourceIdentifier = null);
+#pragma warning restore CS0809
+
+    /// <summary>
+    ///     Validates that <paramref name="relativePath" /> stays inside the blueprint root.
+    ///     Throws <see cref="BlueprintCatalogException" /> on any traversal / rooted / empty path.
+    ///     Thin wrapper around <see cref="BlueprintRelativePath.Validate" /> kept here for the
+    ///     benefit of derived classes; embedded / non-cached catalogs call the static directly.
+    /// </summary>
+    /// <param name="relativePath">The candidate relative path</param>
+    /// <returns>The normalised path (forward slashes, no leading separators).</returns>
+    protected static string ValidateBlueprintRelativePath(string relativePath)
+        => BlueprintRelativePath.Validate(relativePath);
 
     /// <inheritdoc />
     public abstract Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,

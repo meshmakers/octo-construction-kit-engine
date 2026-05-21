@@ -180,4 +180,48 @@
                  Text="Embedded migration files: @(_OctoMigrationResourceFilesNew->'%(Filename)%(Extension)', ', ')" />
     </Target>
 
+    <!--
+        BlueprintEmbed: discovers blueprint folders declared via <BlueprintFolder> items, validates
+        each blueprint.yaml, embeds every blueprint file as a manifest resource with a deterministic
+        LogicalName, and emits a blueprints-cache.json the BlueprintSourceGenerator consumes to
+        produce IBlueprintEmbeddedSource + AddBlueprint<Name>V<Major> DI extensions.
+
+        Expected folder layout per <BlueprintFolder> item:
+            <FolderName>/
+              <BlueprintName>-<Version>/
+                blueprint.yaml
+                seed-data/entities.yaml      (optional)
+                migrations/from-X.Y.Z.yaml   (optional)
+
+        Resource namespace convention:
+            $(RootNamespace).<FolderName>.<BlueprintName>-<Version>
+        with sibling files appended as '.' separated path segments.
+    -->
+    <PropertyGroup>
+        <OctoBlueprintsCacheFile Condition="'$(OctoBlueprintsCacheFile)' == ''">$(IntermediateOutputPath)octo-blueprints/blueprints-cache.json</OctoBlueprintsCacheFile>
+    </PropertyGroup>
+
+    <Target Name="BlueprintEmbed"
+            AfterTargets="ResolveProjectReferences"
+            BeforeTargets="CoreCompile;CoreGenerateMSBuildEditorConfigFileShouldRun"
+            Inputs="@(BlueprintFolder->'%(Identity)/**/*.yaml')"
+            Outputs="$(OctoBlueprintsCacheFile)"
+            Condition="'@(BlueprintFolder)' != ''">
+
+        <Message Importance="High" Text="Embedding blueprints (target framework $(TargetFramework))" />
+
+        <BlueprintEmbed BlueprintFolders="@(BlueprintFolder)"
+                        RootNamespace="$(RootNamespace)"
+                        CacheFilePath="$(OctoBlueprintsCacheFile)">
+            <Output TaskParameter="EmbeddedResourceItems" ItemName="_OctoBlueprintEmbeddedResourceItems" />
+        </BlueprintEmbed>
+
+        <ItemGroup>
+            <EmbeddedResource Include="@(_OctoBlueprintEmbeddedResourceItems)" />
+            <!-- AdditionalFiles lets the source generator pick up the cache without needing to know
+                 the IntermediateOutputPath. -->
+            <AdditionalFiles Include="$(OctoBlueprintsCacheFile)" />
+        </ItemGroup>
+    </Target>
+
 </Project>

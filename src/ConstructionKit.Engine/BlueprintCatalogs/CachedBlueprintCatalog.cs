@@ -39,13 +39,6 @@ public abstract class CachedBlueprintCatalog(
     public bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
-    /// <remarks>
-    /// Cached catalogs (local file system, GitHub) default to user-installable — operators add and
-    /// remove blueprints freely. Service-bundled catalogs override this to return <c>true</c>.
-    /// </remarks>
-    public virtual bool IsServiceManaged => false;
-
-    /// <inheritdoc />
     public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null);
 
     /// <inheritdoc />

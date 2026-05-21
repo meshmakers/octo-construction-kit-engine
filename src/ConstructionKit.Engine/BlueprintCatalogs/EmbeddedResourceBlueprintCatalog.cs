@@ -12,8 +12,10 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 /// <c>IBlueprintEmbeddedSource</c> implementation, and this catalog enumerates / opens them.
 /// </summary>
 /// <remarks>
-/// Embedded catalogs are <see cref="IsServiceManaged" /> — the Studio UI shows their blueprints
-/// for visibility but blocks install / uninstall buttons; the owning service runs the lifecycle.
+/// "Service-managed vs user-installable" is decided by the blueprint *name*
+/// (<see cref="BlueprintIdExtensions.IsServiceManaged" /> returns true for names starting with
+/// <c>System.</c>), not by which catalog hosts the blueprint. Studio uses that flag to hide
+/// install / uninstall actions for system blueprints regardless of where they were discovered.
 /// </remarks>
 public class EmbeddedResourceBlueprintCatalog : IBlueprintCatalog
 {
@@ -61,9 +63,6 @@ public class EmbeddedResourceBlueprintCatalog : IBlueprintCatalog
 
     /// <inheritdoc />
     public bool CanRead => true;
-
-    /// <inheritdoc />
-    public bool IsServiceManaged => true;
 
     /// <inheritdoc />
     public Task RefreshCatalogAsync(object? sourceIdentifier = null)

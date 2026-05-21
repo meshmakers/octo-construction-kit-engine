@@ -43,8 +43,8 @@
       "properties": {
         "name": {
           "type": "string",
-          "pattern": "^[a-zA-Z0-9]+$",
-          "description": "Blueprint name (without version). Mirrors blueprint.yaml's blueprintId prefix."
+          "pattern": "^[a-zA-Z0-9.]+$",
+          "description": "Blueprint name (without version). Mirrors blueprint.yaml's blueprintId prefix. May contain dots (e.g. System.Communication)."
         },
         "version": {
           "type": "string",

@@ -12,8 +12,8 @@
     },
     "blueprintId": {
       "type": "string",
-      "pattern": "^[a-zA-Z0-9-]+-[0-9]+\\.[0-9]+\\.[0-9]+$",
-      "description": "The unique identifier of the blueprint in format 'Name-Major.Minor.Patch'"
+      "pattern": "^[a-zA-Z0-9.-]+-[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "The unique identifier of the blueprint in format 'Name-Major.Minor.Patch'. Names may contain dots; the OctoMesh convention is that names starting with 'System.' are service-managed (e.g. System.Communication-1.0.0)."
     },
     "description": {
       "type": "string",
@@ -24,8 +24,8 @@
       "description": "List of CK model dependencies required by this blueprint",
       "items": {
         "type": "string",
-        "pattern": "^[a-zA-Z0-9-]+-\\[[0-9]+\\.[0-9]+(\\.[0-9]+)?,([0-9]+\\.[0-9]+(\\.[0-9]+)?)?\\)$",
-        "description": "CK model dependency in format 'Name-[MinVersion,MaxVersion)'"
+        "pattern": "^[a-zA-Z0-9.-]+-\\[[0-9]+\\.[0-9]+(\\.[0-9]+)?,([0-9]+\\.[0-9]+(\\.[0-9]+)?)?\\)$",
+        "description": "CK model dependency in format 'Name-[MinVersion,MaxVersion)' (Name may contain dots, e.g. System.Communication)."
       }
     },
     "blueprintDependencies": {
@@ -33,8 +33,8 @@
       "description": "Blueprints that must be installed before this one. Resolved transitively and topo-sorted at install time.",
       "items": {
         "type": "string",
-        "pattern": "^[a-zA-Z0-9-]+-\\[[0-9]+\\.[0-9]+(\\.[0-9]+)?,([0-9]+\\.[0-9]+(\\.[0-9]+)?)?\\)$",
-        "description": "Blueprint dependency in format 'Name-[MinVersion,MaxVersion)'"
+        "pattern": "^[a-zA-Z0-9.-]+-\\[[0-9]+\\.[0-9]+(\\.[0-9]+)?,([0-9]+\\.[0-9]+(\\.[0-9]+)?)?\\)$",
+        "description": "Blueprint dependency in format 'Name-[MinVersion,MaxVersion)' (Name may contain dots)."
       }
     },
     "seedDataPath": {

@@ -128,10 +128,106 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
     }
 
     /// <inheritdoc />
+    public override async Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanRead)
+        {
+            throw BlueprintCatalogException.CatalogCannotRead(CatalogName);
+        }
+
+        var normalised = ValidateBlueprintRelativePath(relativePath);
+        var blueprintDirectoryPath = CreateBlueprintDirectoryPath(blueprintId);
+        var fileRequestPath = $"{blueprintDirectoryPath}/{normalised}";
+
+        var httpClient = CreateHttpClient();
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await httpClient.GetAsync(fileRequestPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException)
+        {
+            throw BlueprintCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+        }
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw BlueprintCatalogException.RequestTimeout(CatalogName, _gitHubOptions.GitHubPagesUri);
+        }
+
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            response.Dispose();
+            throw BlueprintCatalogException.BlueprintFileNotFound(blueprintId, CatalogName, normalised);
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            response.Dispose();
+            throw BlueprintCatalogException.InvalidGitHubRepository(CatalogName, _gitHubOptions.GitHubPagesUri);
+        }
+
+        // The returned stream is owned by the caller; the HttpResponseMessage stays alive as long as
+        // the stream is, so wrap them together in a small bridge that disposes the response when the
+        // stream is disposed.
+        var contentStream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+        return new HttpResponseOwnedStream(response, contentStream);
+    }
+
+    /// <inheritdoc />
+    [Obsolete("Use OpenBlueprintFileAsync.")]
     public override string GetBlueprintPath(BlueprintId blueprintId, object? sourceIdentifier = null)
     {
         var baseUri = _gitHubOptions.GitHubPagesUri.TrimEnd('/');
         return $"{baseUri}/{CreateBlueprintDirectoryPath(blueprintId)}";
+    }
+
+    /// <summary>
+    ///     Wraps the content stream of an <see cref="HttpResponseMessage" /> so the response is disposed
+    ///     when the consumer disposes the stream — this avoids "response disposed before stream read"
+    ///     bugs at call sites that only see the stream.
+    /// </summary>
+    private sealed class HttpResponseOwnedStream : Stream
+    {
+        private readonly HttpResponseMessage _response;
+        private readonly Stream _inner;
+
+        public HttpResponseOwnedStream(HttpResponseMessage response, Stream inner)
+        {
+            _response = response;
+            _inner = inner;
+        }
+
+        public override bool CanRead => _inner.CanRead;
+        public override bool CanSeek => _inner.CanSeek;
+        public override bool CanWrite => _inner.CanWrite;
+        public override long Length => _inner.Length;
+        public override long Position
+        {
+            get => _inner.Position;
+            set => _inner.Position = value;
+        }
+
+        public override void Flush() => _inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+        public override long Seek(long offset, SeekOrigin origin) => _inner.Seek(offset, origin);
+        public override void SetLength(long value) => _inner.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => _inner.Write(buffer, offset, count);
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => _inner.ReadAsync(buffer, offset, count, cancellationToken);
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+                _response.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     /// <inheritdoc />

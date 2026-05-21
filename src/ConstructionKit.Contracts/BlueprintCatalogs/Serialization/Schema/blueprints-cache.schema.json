@@ -1,0 +1,78 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/blueprints-cache.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Embedded Blueprint Cache",
+  "description": "Build-time inventory written by the BlueprintEmbed MSBuild task. Lists every blueprint version embedded as a resource in the consuming assembly, with the metadata the BlueprintSourceGenerator needs to emit IBlueprintEmbeddedSource implementations.",
+  "type": "object",
+  "required": [
+    "version",
+    "blueprints"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "format": "uri",
+      "description": "URI of the schema for this cache file."
+    },
+    "version": {
+      "type": "string",
+      "enum": [
+        "1"
+      ],
+      "description": "Cache file format version. Bumped on breaking changes to the file shape."
+    },
+    "blueprints": {
+      "type": "array",
+      "description": "Every blueprint version discovered under one or more <BlueprintFolder> items in the host project.",
+      "items": {
+        "$ref": "#/$defs/blueprintEntry"
+      }
+    }
+  },
+  "$defs": {
+    "blueprintEntry": {
+      "type": "object",
+      "required": [
+        "name",
+        "version",
+        "resourceNamespace",
+        "files"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9.]+$",
+          "description": "Blueprint name (without version). Mirrors blueprint.yaml's blueprintId prefix. May contain dots (e.g. System.Communication)."
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "description": "Blueprint version (Major.Minor.Patch)."
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Optional description copied from blueprint.yaml. Surfaced in catalog listings without a manifest read."
+        },
+        "resourceNamespace": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dot-separated namespace under which the blueprint's files are embedded, e.g. 'Acme.Service.Blueprints.MyBlueprint-1.0.0'. The catalog appends '.blueprint.yaml' for the manifest and the relative path (slashes-as-dots) for sibling files."
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "description": "Relative paths of every file embedded for this blueprint (with forward slashes). Always contains 'blueprint.yaml' and zero or more sibling files like 'seed-data/entities.yaml' or 'migrations/from-1.0.0.yaml'.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

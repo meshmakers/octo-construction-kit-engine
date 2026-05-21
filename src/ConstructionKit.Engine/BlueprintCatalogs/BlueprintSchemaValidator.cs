@@ -38,6 +38,12 @@ public class BlueprintSchemaValidator : IBlueprintSchemaValidator
         return ValidateModelJson(stream, BlueprintSchema.GetLibraryVersionsSchema(), locationReference, operationResult);
     }
 
+    /// <inheritdoc />
+    public bool ValidateCacheInJson(Stream stream, string locationReference, OperationResult operationResult)
+    {
+        return ValidateModelJson(stream, BlueprintSchema.GetCacheSchema(), locationReference, operationResult);
+    }
+
     private static bool ValidateModelJson(Stream stream, JsonSchema schema, string locationReference, OperationResult operationResult)
     {
         using var document = System.Text.Json.JsonDocument.Parse(stream);

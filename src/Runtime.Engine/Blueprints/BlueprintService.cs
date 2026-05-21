@@ -421,14 +421,17 @@ internal class BlueprintService : IBlueprintService
             // Validate seed data file exists
             if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
             {
-                var blueprintPath = await _blueprintCatalogManager
-                    .GetBlueprintPathAsync(blueprintId)
+                var seedStream = await _blueprintCatalogManager
+                    .TryOpenBlueprintFileAsync(blueprintId, blueprint.SeedDataPath!)
                     .ConfigureAwait(false);
 
-                var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
-                if (!File.Exists(seedDataPath))
+                if (seedStream == null)
                 {
-                    missingSeedDataFiles.Add(seedDataPath);
+                    missingSeedDataFiles.Add(BlueprintFileDescription(blueprintId, blueprint.SeedDataPath!));
+                }
+                else
+                {
+                    seedStream.Dispose();
                 }
             }
 
@@ -631,12 +634,15 @@ internal class BlueprintService : IBlueprintService
                 // Load and validate migration
                 try
                 {
-                    var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(targetVersion)
+                    using var migrationStream = await _blueprintCatalogManager
+                        .OpenBlueprintFileAsync(targetVersion, migrationRef.ScriptPath,
+                            cancellationToken: cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
-                    var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
+                    var migration = await _migrationParser.ParseAsync(
+                            migrationStream,
+                            BlueprintFileDescription(targetVersion, migrationRef.ScriptPath),
+                            cancellationToken)
                         .ConfigureAwait(false);
 
                     var validationResult = await _migrationExecutor.ValidateAsync(
@@ -730,18 +736,20 @@ internal class BlueprintService : IBlueprintService
             return diff;
         }
 
-        var blueprintPath = await _blueprintCatalogManager
-            .GetBlueprintPathAsync(targetVersion).ConfigureAwait(false);
-        var seedPath = Path.Combine(blueprintPath, targetBlueprint.SeedDataPath);
+        var seedDescription = BlueprintFileDescription(targetVersion, targetBlueprint.SeedDataPath!);
+        var seedStream = await _blueprintCatalogManager
+            .TryOpenBlueprintFileAsync(targetVersion, targetBlueprint.SeedDataPath!,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
 
-        if (!File.Exists(seedPath))
+        if (seedStream == null)
         {
-            diff.Warnings.Add($"Seed data file not found: {seedPath}");
+            diff.Warnings.Add($"Seed data file not found: {seedDescription}");
             return diff;
         }
 
         var opResult = new OperationResult();
-        var seedRoot = await LoadAndTagSeedAsync(seedPath, targetVersion, opResult)
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, targetVersion, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1094,12 +1102,15 @@ internal class BlueprintService : IBlueprintService
 
                 if (migrationRef != null)
                 {
-                    var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(targetVersion)
+                    using var migrationStream = await _blueprintCatalogManager
+                        .OpenBlueprintFileAsync(targetVersion, migrationRef.ScriptPath,
+                            cancellationToken: cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
-                    var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
+                    var migration = await _migrationParser.ParseAsync(
+                            migrationStream,
+                            BlueprintFileDescription(targetVersion, migrationRef.ScriptPath),
+                            cancellationToken)
                         .ConfigureAwait(false);
 
                     var migrationOptions = new BlueprintMigrationExecutionOptions
@@ -1730,16 +1741,17 @@ internal class BlueprintService : IBlueprintService
             return 0;
         }
 
-        var blueprintPath = await _blueprintCatalogManager
-            .GetBlueprintPathAsync(blueprintId).ConfigureAwait(false);
-        var seedDataPath = Path.Combine(blueprintPath, catalogBlueprint.SeedDataPath);
+        var seedDescription = BlueprintFileDescription(blueprintId, catalogBlueprint.SeedDataPath!);
+        var seedStream = await _blueprintCatalogManager
+            .TryOpenBlueprintFileAsync(blueprintId, catalogBlueprint.SeedDataPath!)
+            .ConfigureAwait(false);
 
-        if (!File.Exists(seedDataPath))
+        if (seedStream == null)
         {
             return 0;
         }
 
-        var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprintId, opResult)
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1845,16 +1857,17 @@ internal class BlueprintService : IBlueprintService
 
         try
         {
-            var blueprintPath = await _blueprintCatalogManager
-                .GetBlueprintPathAsync(blueprint.BlueprintId)
+            var seedDescription = BlueprintFileDescription(blueprint.BlueprintId, blueprint.SeedDataPath!);
+            var seedStream = await _blueprintCatalogManager
+                .TryOpenBlueprintFileAsync(blueprint.BlueprintId, blueprint.SeedDataPath!,
+                    cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
 
-            if (!File.Exists(seedDataPath))
+            if (seedStream == null)
             {
-                _logger.LogWarning("Seed data file not found: {Path}", seedDataPath);
+                _logger.LogWarning("Seed data file not found: {Source}", seedDescription);
                 operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Warning, seedDataPath, 20, "Seed data file not found"));
+                    MessageLevel.Warning, seedDescription, 20, "Seed data file not found"));
                 return 0;
             }
 
@@ -1862,13 +1875,14 @@ internal class BlueprintService : IBlueprintService
                 .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
             if (repository == null)
             {
+                seedStream.Dispose();
                 operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Error, seedDataPath, 22,
+                    MessageLevel.Error, seedDescription, 22,
                     $"No runtime repository available for tenant {tenantId}"));
                 return 0;
             }
 
-            var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprint.BlueprintId, operationResult)
+            var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprint.BlueprintId, operationResult)
                 .ConfigureAwait(false);
             if (seedRoot == null)
             {
@@ -1878,7 +1892,7 @@ internal class BlueprintService : IBlueprintService
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 
-            appliedSeedDataFiles.Add(seedDataPath);
+            appliedSeedDataFiles.Add(seedDescription);
             return seedRoot.Entities.Count;
         }
         catch (Exception ex)
@@ -1893,39 +1907,53 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <summary>
-    /// Reads a seed-data YAML file from disk, deserialises it and stamps the
-    /// blueprint provenance attributes on every entity. Returns null and emits
-    /// errors via <paramref name="operationResult"/> when the file cannot be parsed.
+    /// Reads a seed-data YAML stream, deserialises it and stamps the blueprint provenance attributes
+    /// on every entity. Returns null and emits errors via <paramref name="operationResult"/> when the
+    /// stream cannot be parsed. The stream is disposed by this method.
     /// </summary>
     private async Task<RtModelRootTcDto?> LoadAndTagSeedAsync(
-        string seedDataPath,
+        Stream seedStream,
+        string sourceDescription,
         BlueprintId blueprintId,
         OperationResult operationResult)
     {
         try
         {
-            using var stream = File.OpenRead(seedDataPath);
-            var root = await _rtYamlSerializer
-                .DeserializeAsync(stream, seedDataPath, operationResult)
-                .ConfigureAwait(false);
-
-            if (operationResult.HasErrors)
+#if NETSTANDARD2_0
+            using (seedStream)
+#else
+            await using (seedStream)
+#endif
             {
-                return null;
-            }
+                var root = await _rtYamlSerializer
+                    .DeserializeAsync(seedStream, sourceDescription, operationResult)
+                    .ConfigureAwait(false);
 
-            StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
-            return root;
+                if (operationResult.HasErrors)
+                {
+                    return null;
+                }
+
+                StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
+                return root;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialise seed data from {Path}", seedDataPath);
+            _logger.LogError(ex, "Failed to deserialise seed data from {Source}", sourceDescription);
             operationResult.AddMessage(new OperationMessage(
                 MessageLevel.Error,
-                seedDataPath,
+                sourceDescription,
                 23,
                 $"Failed to deserialise seed data: {ex.Message}"));
             return null;
         }
     }
+
+    /// <summary>
+    /// Builds a human-readable description for a blueprint-rooted file. Used as the <c>sourceDescription</c>
+    /// argument for serializer / parser error reporting.
+    /// </summary>
+    private static string BlueprintFileDescription(BlueprintId blueprintId, string relativePath)
+        => $"{blueprintId.FullName}/{relativePath}";
 }

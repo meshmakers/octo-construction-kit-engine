@@ -40,4 +40,14 @@ public interface IBlueprintSchemaValidator
     /// <param name="operationResult">The result object that contains after call validation messages.</param>
     /// <returns>True if valid, false otherwise</returns>
     bool ValidateLibraryVersionsInJson(Stream stream, string locationReference, OperationResult operationResult);
+
+    /// <summary>
+    ///     Validates the embedded-blueprint cache (produced by the BlueprintEmbed MSBuild task and
+    ///     consumed by the BlueprintSourceGenerator) using JSON format.
+    /// </summary>
+    /// <param name="stream">Stream containing the cache JSON.</param>
+    /// <param name="locationReference">A reference used in messages to signal the position of a file or resource.</param>
+    /// <param name="operationResult">The result object that contains after-call validation messages.</param>
+    /// <returns>True if valid, false otherwise.</returns>
+    bool ValidateCacheInJson(Stream stream, string locationReference, OperationResult operationResult);
 }

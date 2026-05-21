@@ -120,6 +120,64 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     }
 
     /// <inheritdoc />
+    public async Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null, CancellationToken cancellationToken = default)
+    {
+        foreach (var catalog in _catalogs.OrderBy(c => c.Order))
+        {
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
+            {
+                continue;
+            }
+
+            var exists = await catalog.IsExistingAsync(blueprintId, sourceIdentifier).ConfigureAwait(false);
+            if (!exists)
+            {
+                continue;
+            }
+
+            return await catalog.OpenBlueprintFileAsync(blueprintId, relativePath, sourceIdentifier,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        throw BlueprintCatalogException.BlueprintNotFound(blueprintId);
+    }
+
+    /// <inheritdoc />
+    public async Task<Stream?> TryOpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null, CancellationToken cancellationToken = default)
+    {
+        foreach (var catalog in _catalogs.OrderBy(c => c.Order))
+        {
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
+            {
+                continue;
+            }
+
+            var exists = await catalog.IsExistingAsync(blueprintId, sourceIdentifier).ConfigureAwait(false);
+            if (!exists)
+            {
+                continue;
+            }
+
+            try
+            {
+                return await catalog.OpenBlueprintFileAsync(blueprintId, relativePath, sourceIdentifier,
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (BlueprintFileNotFoundException)
+            {
+                // Soft-not-found semantics: try the next catalog (in case a later catalog has a more
+                // complete copy of the same blueprint).
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
+    [Obsolete("Use OpenBlueprintFileAsync.")]
     public async Task<string> GetBlueprintPathAsync(BlueprintId blueprintId, object? sourceIdentifier = null)
     {
         foreach (var catalog in _catalogs.OrderBy(c => c.Order))
@@ -132,7 +190,9 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
             var exists = await catalog.IsExistingAsync(blueprintId, sourceIdentifier).ConfigureAwait(false);
             if (exists)
             {
+#pragma warning disable CS0618 // Forwarding to the deprecated catalog API is intentional here.
                 return catalog.GetBlueprintPath(blueprintId, sourceIdentifier);
+#pragma warning restore CS0618
             }
         }
 

@@ -145,7 +145,7 @@ public class LocalFileSystemBlueprintCatalog : CachedBlueprintCatalog
             throw BlueprintCatalogException.CatalogCannotRead(CatalogName);
         }
 
-        var blueprintPath = GetBlueprintPath(blueprintId, sourceIdentifier);
+        var blueprintPath = GetBlueprintPathInternal(blueprintId);
         var blueprintMetaPath = Path.Combine(blueprintPath, BlueprintMetaFileName);
 
         if (!File.Exists(blueprintMetaPath))
@@ -171,7 +171,34 @@ public class LocalFileSystemBlueprintCatalog : CachedBlueprintCatalog
     }
 
     /// <inheritdoc />
+    public override Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (!CanRead)
+        {
+            throw BlueprintCatalogException.CatalogCannotRead(CatalogName);
+        }
+
+        var normalised = ValidateBlueprintRelativePath(relativePath);
+        var blueprintPath = GetBlueprintPathInternal(blueprintId);
+        var filePath = Path.Combine(blueprintPath, normalised.Replace('/', Path.DirectorySeparatorChar));
+
+        if (!File.Exists(filePath))
+        {
+            throw BlueprintCatalogException.BlueprintFileNotFound(blueprintId, CatalogName, normalised);
+        }
+
+        Stream stream = File.OpenRead(filePath);
+        return Task.FromResult(stream);
+    }
+
+    /// <inheritdoc />
+    [Obsolete("Use OpenBlueprintFileAsync.")]
     public override string GetBlueprintPath(BlueprintId blueprintId, object? sourceIdentifier = null)
+        => GetBlueprintPathInternal(blueprintId);
+
+    private string GetBlueprintPathInternal(BlueprintId blueprintId)
     {
         return Path.Combine(
             _options.Value.RootPath,
@@ -189,7 +216,7 @@ public class LocalFileSystemBlueprintCatalog : CachedBlueprintCatalog
             throw BlueprintCatalogException.CatalogCannotWrite(Name);
         }
 
-        var targetPath = GetBlueprintPath(blueprintMetaRoot.BlueprintId, sourceIdentifier);
+        var targetPath = GetBlueprintPathInternal(blueprintMetaRoot.BlueprintId);
 
         if (Directory.Exists(targetPath) && !force)
         {

@@ -12,6 +12,7 @@
     <!--Register our custom task-->
     <UsingTask TaskName="$(MSBuildThisFileName).CkCompile" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
     <UsingTask TaskName="$(MSBuildThisFileName).CkRestore" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
+    <UsingTask TaskName="$(MSBuildThisFileName).BlueprintEmbed" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
 
     <!--Task parameters default values, this can be overridden-->
     <PropertyGroup>

@@ -39,6 +39,13 @@ public abstract class CachedBlueprintCatalog(
     public bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Cached catalogs (local file system, GitHub) default to user-installable — operators add and
+    /// remove blueprints freely. Service-bundled catalogs override this to return <c>true</c>.
+    /// </remarks>
+    public virtual bool IsServiceManaged => false;
+
+    /// <inheritdoc />
     public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null);
 
     /// <inheritdoc />
@@ -131,36 +138,13 @@ public abstract class CachedBlueprintCatalog(
     /// <summary>
     ///     Validates that <paramref name="relativePath" /> stays inside the blueprint root.
     ///     Throws <see cref="BlueprintCatalogException" /> on any traversal / rooted / empty path.
+    ///     Thin wrapper around <see cref="BlueprintRelativePath.Validate" /> kept here for the
+    ///     benefit of derived classes; embedded / non-cached catalogs call the static directly.
     /// </summary>
     /// <param name="relativePath">The candidate relative path</param>
     /// <returns>The normalised path (forward slashes, no leading separators).</returns>
     protected static string ValidateBlueprintRelativePath(string relativePath)
-    {
-        if (string.IsNullOrWhiteSpace(relativePath))
-        {
-            throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath ?? "<null>");
-        }
-
-        // Normalise separators.
-        var normalised = relativePath.Replace('\\', '/').TrimStart('/');
-
-        if (string.IsNullOrWhiteSpace(normalised) || Path.IsPathRooted(relativePath))
-        {
-            throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath);
-        }
-
-        // Reject ".." segments anywhere in the path.
-        var segments = normalised.Split('/');
-        foreach (var segment in segments)
-        {
-            if (segment == ".." || segment == ".")
-            {
-                throw BlueprintCatalogException.InvalidBlueprintRelativePath(relativePath);
-            }
-        }
-
-        return normalised;
-    }
+        => BlueprintRelativePath.Validate(relativePath);
 
     /// <inheritdoc />
     public abstract Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,

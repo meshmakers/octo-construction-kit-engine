@@ -34,6 +34,15 @@ public interface IBlueprintCatalog
     bool CanRead { get; }
 
     /// <summary>
+    ///     Returns true when the catalog ships blueprints that are managed by an OctoMesh service
+    ///     (e.g. embedded with the Communication Controller's NuGet package). Service-managed
+    ///     blueprints surface in the Studio for visibility but install / update / uninstall actions
+    ///     are blocked — the owning service runs the lifecycle automatically. User-installable
+    ///     catalogs (local file system, GitHub) return <c>false</c>.
+    /// </summary>
+    bool IsServiceManaged { get; }
+
+    /// <summary>
     ///     Refreshes the catalog, e.g., by reloading from disk or fetching from a remote source.
     /// </summary>
     /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,

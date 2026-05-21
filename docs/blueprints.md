@@ -357,14 +357,27 @@ services.AddMongoBlueprintSupport();     // wires MongoDB-backed history + insta
 
 The blueprint service ships in `Runtime.Engine`. The MongoDB-backed history / installations / backup persistence ships in `Runtime.Engine.MongoDb` and is registered with `AddMongoBlueprintSupport()`. For in-memory-only setups (unit tests), `AddRuntimeEngine()` registers in-memory defaults.
 
+## Service-Managed Blueprints (`System.*`)
+
+OctoMesh draws a convention line through the blueprint *name*:
+
+| Name prefix    | Lifecycle                                                                                     |
+|----------------|-----------------------------------------------------------------------------------------------|
+| `System.…`     | **Service-managed.** Applied and updated automatically by the owning OctoMesh service.        |
+| anything else  | **Admin-installable.** Picked up from a regular catalog; admin clicks Install in Studio.      |
+
+Use `BlueprintIdExtensions.IsServiceManaged(blueprintId)` to check at runtime. The matching constant is `BlueprintIdExtensions.ServiceManagedNamePrefix` (`"System."`). Studio mirrors the same check in TypeScript (`blueprint-management.ts`) to hide Install / Re-apply controls for service-managed blueprints — manual install on a system blueprint would race the service for ownership.
+
+The convention is on the name, not the catalog. A service-managed blueprint discovered through a `LocalFileSystemBlueprintCatalog` is still service-managed.
+
 ## Catalog Types
 
-| Catalog                            | Description                                                                       |
-|------------------------------------|-----------------------------------------------------------------------------------|
-| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system.                                            |
-| `EmbeddedResourceBlueprintCatalog` | Loads blueprints from assembly resources.                                         |
-| `PublicGitHubBlueprintCatalog`     | Reads blueprints from a public GitHub Pages site (default: `meshmakers.github.io`). |
-| `PrivateGitHubBlueprintCatalog`    | Reads blueprints from a private/internal GitHub repository (writes via Octokit).  |
+| Catalog                            | Description                                                                                       |
+|------------------------------------|---------------------------------------------------------------------------------------------------|
+| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system.                                                            |
+| `EmbeddedResourceBlueprintCatalog` | Read-only catalog that aggregates every DI-registered `IBlueprintEmbeddedSource` (see below).     |
+| `PublicGitHubBlueprintCatalog`     | Reads blueprints from a public GitHub Pages site (default: `meshmakers.github.io`).               |
+| `PrivateGitHubBlueprintCatalog`    | Reads blueprints from a private/internal GitHub repository (writes via Octokit).                  |
 
 ```csharp
 services.Configure<PublicGitHubBlueprintCatalogOptions>(o =>
@@ -380,6 +393,48 @@ services.Configure<PrivateGitHubBlueprintCatalogOptions>(o =>
 ```
 
 > The private GitHub catalog reads via HTTP against the Pages URI and writes via Octokit. If GitHub Pages is disabled on the source repository, reads will 404 and the catalog is effectively write-only until Pages is enabled.
+
+## Embedding Blueprints in a Service NuGet
+
+Service-managed blueprints typically ship *inside* the owning service's NuGet (so a service version bump automatically rolls every tenant's blueprint forward). The pattern mirrors how CK models are embedded:
+
+1. Lay out blueprint folders next to the CK model in the service's CK-model project:
+
+   ```
+   SystemCommunicationCkModel/
+   ├── ConstructionKit/         # CK model YAML (existing)
+   └── Blueprints/
+       └── System.Communication-1.0.0/
+           ├── blueprint.yaml
+           └── seed-data/entities.yaml
+   ```
+
+2. Add the folder to the project's MSBuild item set so the `BlueprintEmbed` task (shipped in the `Meshmakers.Octo.ConstructionKit.MsBuildTasks` NuGet) discovers it:
+
+   ```xml
+   <ItemGroup>
+       <BlueprintFolder Visible="false" Include="$(MSBuildProjectDirectory)\Blueprints" />
+   </ItemGroup>
+   ```
+
+   At build time the task validates each `blueprint.yaml` against `blueprint-meta.schema.json`, registers every file as an `EmbeddedResource` with a deterministic `LogicalName`, and emits an `obj/<Config>/<TFM>/octo-blueprints/blueprints-cache.json` inventory.
+
+3. The `BlueprintSourceGenerator` (shipped in the `Meshmakers.Octo.ConstructionKit.SourceGeneration` NuGet) consumes the cache via `AdditionalFiles` and emits, per blueprint version:
+   - an `IBlueprintEmbeddedSource` implementation under `{RootNamespace}.Generated.Blueprints.{Name}.v{Major}`
+   - a DI extension method `AddBlueprint{Name}V{Major}(this IServiceCollection)` under `Microsoft.Extensions.DependencyInjection`.
+
+4. The consuming service registers the embedded source with one line per blueprint and lets the engine discover them through the always-registered `EmbeddedResourceBlueprintCatalog`:
+
+   ```csharp
+   services.AddRuntimeEngine();                       // registers IBlueprintService + the catalog
+   services.AddBlueprintSystemCommunicationV1();      // generated extension
+   ```
+
+5. To apply (or re-apply) a service-managed blueprint per tenant, call `IBlueprintService.ApplyBlueprintAsync(tenantId, new BlueprintId("System.Communication-1.0.0"))` — typically on tenant Enable and again on tenant startup. `ApplyBlueprintAsync` is idempotent at the same version; bumping the embedded version is enough to roll every tenant forward on the next startup.
+
+The convention for picking what to embed:
+- `System.*` blueprints (production base, service-managed) → embed in the service's CK-model NuGet.
+- Demo / sample / opt-in blueprints → ship through a regular catalog (LocalFileSystem, GitHub) so admins decide per tenant.
 
 ## GitHub Catalog Layout
 

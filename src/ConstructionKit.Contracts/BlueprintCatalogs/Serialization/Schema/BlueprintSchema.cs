@@ -15,6 +15,7 @@ public static class BlueprintSchema
     private static readonly Lazy<JsonSchema> CatalogIndexSchemaLazy = new(CreateBundledCatalogIndexSchema);
     private static readonly Lazy<JsonSchema> LibraryVersionsSchemaLazy = new(CreateBundledLibraryVersionsSchema);
     private static readonly Lazy<JsonSchema> MigrationSchemaLazy = new(CreateBundledMigrationSchema);
+    private static readonly Lazy<JsonSchema> CacheSchemaLazy = new(CreateBundledCacheSchema);
 
     // Note: In JsonSchema.Net 8.0, schemas are automatically registered in SchemaRegistry.Global
     // when deserialized. Manual registration is no longer needed and would cause duplicate registration errors.
@@ -39,6 +40,12 @@ public static class BlueprintSchema
     /// </summary>
     public static JsonSchema GetMigrationSchema() => MigrationSchemaLazy.Value;
 
+    /// <summary>
+    ///     Returns the schema for the build-time embedded-blueprint cache file produced by the
+    ///     BlueprintEmbed MSBuild task and consumed by the BlueprintSourceGenerator.
+    /// </summary>
+    public static JsonSchema GetCacheSchema() => CacheSchemaLazy.Value;
+
     private static JsonSchema CreateBundledMetaSchema()
     {
         // Note: Bundle() was removed in JsonSchema.Net 8.0. Since sub-schemas are registered
@@ -59,6 +66,11 @@ public static class BlueprintSchema
     private static JsonSchema CreateBundledMigrationSchema()
     {
         return GetSchema(string.Format(SchemaPath, "blueprint-migration.schema"));
+    }
+
+    private static JsonSchema CreateBundledCacheSchema()
+    {
+        return GetSchema(string.Format(SchemaPath, "blueprints-cache.schema"));
     }
 
     private static JsonSchema GetSchema(string resourcesStreamPath)

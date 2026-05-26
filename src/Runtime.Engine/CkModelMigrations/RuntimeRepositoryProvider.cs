@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Microsoft.Extensions.Logging;
@@ -70,5 +71,21 @@ internal class RuntimeRepositoryProvider : IRuntimeRepositoryProvider
         // The MongoDB implementation provides the actual schema version lookup
         return Task.FromResult<IReadOnlyDictionary<string, string>>(
             new Dictionary<string, string>());
+    }
+
+    /// <inheritdoc />
+    public Task EnsureCkModelInstalledAsync(
+        string tenantId,
+        CkModelId modelId,
+        OperationResult operationResult,
+        CancellationToken cancellationToken = default)
+    {
+        // In-memory provider has no tenant-side CK schema collection to write into;
+        // tests preload the CK cache directly. The MongoDB implementation provides
+        // the actual install logic against the tenant database.
+        _logger.LogDebug(
+            "EnsureCkModelInstalledAsync is a no-op for the in-memory provider (tenant {TenantId}, model {ModelId})",
+            tenantId, modelId);
+        return Task.CompletedTask;
     }
 }

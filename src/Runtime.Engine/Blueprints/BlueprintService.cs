@@ -220,7 +220,7 @@ internal class BlueprintService : IBlueprintService
                             tenantId, concreteModelId, operationResult, cancellationToken)
                         .ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     _logger.LogError(ex,
                         "Failed to install CK model {ModelId} into tenant {TenantId}",
@@ -1151,7 +1151,7 @@ internal class BlueprintService : IBlueprintService
                                 tenantId, concreteModelId, installOpResult, cancellationToken)
                             .ConfigureAwait(false);
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         _logger.LogError(ex,
                             "Failed to install CK model {ModelId} into tenant {TenantId}",
@@ -1162,7 +1162,7 @@ internal class BlueprintService : IBlueprintService
                     if (installOpResult.HasErrors || installOpResult.HasFatalErrors)
                     {
                         result.Errors.AddRange(installOpResult.Messages
-                            .Where(m => m.MessageLevel == MessageLevel.Error)
+                            .Where(m => m.MessageLevel is MessageLevel.Error or MessageLevel.FatalError)
                             .Select(m => m.MessageText));
                     }
 

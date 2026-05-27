@@ -46,6 +46,11 @@ blueprintDependencies:
 # Optional path to seed data (relative to blueprint root)
 seedDataPath: seed-data/entities.yaml
 
+# Optional preconditions — see "Blueprint Variables" below
+requires:
+  octo.environment: [staging, production]
+  octo.isSystemTenant: "false"
+
 # Optional migrations from older versions of this blueprint
 migrations:
   - fromVersion: "0.9.0"
@@ -62,9 +67,109 @@ migrations:
 | `ckModelDependencies`   | string[] | CK models with version ranges (auto-imported on apply)                     |
 | `blueprintDependencies` | string[] | Other blueprints with version ranges (resolved transitively)               |
 | `seedDataPath`          | string   | Optional path to seed-data file (runtime-model format)                     |
+| `requires`              | object   | Optional preconditions evaluated against the tenant variable context       |
 | `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
 
 > Composition (`composedBlueprints`) was removed in favour of dependency-only resolution. The field is no longer accepted; the schema rejects manifests that still carry it.
+
+## Blueprint Variables
+
+Every blueprint apply runs against a **variable context** — a string→string dictionary
+resolved per tenant by `IBlueprintVariableProvider`. Variables are referenced from seed
+data and the manifest's `requires:` block using the same `${name}` syntax used by the CK
+compiler and the mesh-adapter `PlaceholderReplaceNode`.
+
+### Built-in variables
+
+The default `IBlueprintVariableProvider` exposes the following `octo.*` keys. Services
+can register a custom provider in DI to add their own keys (chart names, feature flags,
+secret indirection) — the default registration uses `TryAddTransient`, so a service-side
+`AddTransient<IBlueprintVariableProvider, MyProvider>()` before `AddRuntimeEngine()` wins.
+
+| Variable               | Source                                                                              |
+|------------------------|-------------------------------------------------------------------------------------|
+| `octo.version`         | `OctoBlueprintVariablesOptions.OctoVersion` (helm sets via `.Chart.AppVersion`)     |
+| `octo.environment`     | `OctoBlueprintVariablesOptions.Environment` — `dev` (default), `test`, `staging`, `production` |
+| `octo.tenantId`        | The tenant currently being initialised                                              |
+| `octo.systemTenantId`  | `OctoBlueprintVariablesOptions.SystemTenantId` (defaults to `OctoSystem`)           |
+| `octo.isSystemTenant`  | `"true"` when `tenantId == octo.systemTenantId`, otherwise `"false"`                |
+
+Options bind from the `Blueprints` configuration section. Helm / env-var override path:
+
+```bash
+OCTO_BLUEPRINTS__OCTOVERSION=3.5.2
+OCTO_BLUEPRINTS__ENVIRONMENT=production
+OCTO_BLUEPRINTS__SYSTEMTENANTID=OctoSystem
+```
+
+### Using variables in seed data
+
+`${name}` placeholders are resolved in two locations:
+
+- Every string-typed attribute `value` in `seed-data/entities.yaml`
+- Every entity's `rtWellKnownName`
+
+Non-string attribute values (numbers, booleans, embedded records) are left untouched.
+Unknown placeholders log a warning and are kept verbatim — so a typo is loud rather than
+quietly writing an empty string to MongoDB.
+
+```yaml
+# seed-data/entities.yaml
+entities:
+  - rtId: '670000000000000000000002'
+    ckTypeId: System.Communication/Adapter
+    rtWellKnownName: MeshAdapter
+    attributes:
+      - id: System.Communication/ChartName
+        value: octo-adapter-eda
+      - id: System.Communication/ChartVersion
+        value: "${octo.version}"   # ← rolled forward by helm with every release
+```
+
+### `requires:` preconditions
+
+`requires:` gates whether the **root** blueprint of an apply call runs. Each key is a
+variable name; the value is either a scalar shortcut or a YAML sequence of acceptable
+values. The blueprint is applied only when every key resolves to a value present in its
+allow-list; otherwise the apply is a successful no-op (no install row, no seed data, no
+history entry) and `BlueprintApplicationResult.WasSkipped` is `true`.
+
+```yaml
+# Only apply to the system tenant in staging or production
+requires:
+  octo.isSystemTenant: "true"        # scalar — normalised to ["true"]
+  octo.environment: [staging, production]
+```
+
+Semantics:
+
+- A variable referenced by `requires:` but missing from the context fails the check
+  (fail-closed — better than a silently misapplied blueprint).
+- An empty allow-list (`requires: { octo.environment: [] }`) cannot match anything and
+  fails — usually a typo, surfaced loudly.
+- Matching is case-sensitive (`StringComparer.Ordinal`). Normalise casing in the manifest.
+- `requires:` is evaluated only on the explicitly-requested root blueprint, not on
+  transitive dependencies — a dep that ships seed data is presumed to be required by
+  every consumer. Split blueprints if you need finer-grained gating.
+
+### Pattern: collapse "two-blueprints" into one with `requires:`
+
+Before `requires:`, a service that wanted to seed different data for the system tenant
+versus other tenants had to ship two blueprints and branch in code. With `requires:`,
+both blueprints are still shipped, both are auto-applied, and each filters itself:
+
+```yaml
+# System.UI.SystemCockpit-1.0.0/blueprint.yaml
+requires:
+  octo.isSystemTenant: "true"
+
+# System.UI.TenantCockpit-1.0.0/blueprint.yaml
+requires:
+  octo.isSystemTenant: "false"
+```
+
+The service-side `DefaultConfigurationCreatorService` then becomes a single loop that
+applies every embedded blueprint — the `requires:` block decides which one matches.
 
 ## Version Ranges
 
@@ -85,6 +190,10 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 │
 ├── 1. Resolve transitive blueprint dependency closure (topo-sorted)
 │
+├── 1b. Resolve variable context via IBlueprintVariableProvider
+│       Evaluate root blueprint's `requires:` against the context
+│       → mismatch → BlueprintApplicationResult.Skipped (success no-op)
+│
 ├── 2. Conflict-check (CK versions, entity ownership, rtId collisions)
 │       → BlueprintApplicationResult.Conflicts; abort on hard conflicts
 │
@@ -93,6 +202,7 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 │       │                 already installed, --force → ReApply (upsert)
 │       │                 already installed, different version → Update path
 │       ├── Import CK model dependencies (auto-resolve via ICkModelUpgradeService)
+│       ├── Load seed data, interpolate ${variable} placeholders
 │       ├── Apply seed data via IImportRtModelCommand (Upsert)
 │       ├── Tag entities with rtBlueprintSource / rtBlueprintLocked / rtBlueprintAppliedAt
 │       ├── Persist BlueprintInstallation

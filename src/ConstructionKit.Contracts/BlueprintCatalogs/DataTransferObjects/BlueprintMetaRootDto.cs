@@ -53,4 +53,16 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<BlueprintMigrationReferenceDto>? Migrations { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the optional preconditions evaluated before this blueprint is applied.
+    ///     Each key is the name of a blueprint variable (e.g. <c>octo.environment</c>,
+    ///     <c>octo.isSystemTenant</c>) and the value is the list of acceptable values. The
+    ///     blueprint is skipped when the resolved variable is missing from the tenant context
+    ///     or does not match any of the listed values. YAML accepts both scalar and sequence
+    ///     shapes per value — <see cref="Serialization.RequiresMapConverter"/> normalises
+    ///     scalars to a single-element list during deserialisation.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public RequiresMap? Requires { get; set; }
 }

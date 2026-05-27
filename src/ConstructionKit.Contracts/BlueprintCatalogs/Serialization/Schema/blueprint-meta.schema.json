@@ -43,13 +43,7 @@
     },
     "requires": {
       "type": "object",
-      "description": "Optional preconditions evaluated before a blueprint is applied. Each key is the name of a blueprint variable (e.g. octo.environment, octo.isSystemTenant) and the value is the expected value, or a list of acceptable values. The blueprint is skipped (success, no install row, no seed) when the resolved variable is missing from the tenant context or does not match any of the listed values. Requires are only evaluated on the root blueprint of an apply call — transitive dependencies are always installed.",
-      "additionalProperties": {
-        "oneOf": [
-          { "type": "string" },
-          { "type": "array", "items": { "type": "string" } }
-        ]
-      }
+      "description": "Optional preconditions evaluated before a blueprint is applied. Each key is the name of a blueprint variable (e.g. octo.environment, octo.isSystemTenant) and the value is the expected value, or a list of acceptable values. The blueprint is skipped (success, no install row, no seed) when the resolved variable is missing from the tenant context or does not match any of the listed values. Requires are only evaluated on the root blueprint of an apply call — transitive dependencies are always installed. Value structure (scalar vs. sequence) is enforced by RequiresMapConverter at deserialisation time, so the JSON schema deliberately leaves the per-key shape open."
     },
     "migrations": {
       "type": "array",

@@ -94,6 +94,11 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkModelMigrationService, CkModelMigrationService>();
         services.AddTransient<ICkModelUpgradeService, CkModelUpgradeService>();
 
+        // CK model import audit trail (WI #3324). Default writes structured warning logs; a host
+        // can replace it by registering an adapter that bridges to the platform event
+        // repository (see EventRepositoryCkModelImportAuditTrail in octo-common-services).
+        services.TryAddTransient<ICkModelImportAuditTrail, LoggingCkModelImportAuditTrail>();
+
         // StreamData archive lifecycle. Concept §3, §11. The lifecycle service itself is
         // constructed per-tenant by the host (e.g. Mongo TenantContext) because it requires a
         // tenant id; this registration only wires the audit-trail default. The default writes

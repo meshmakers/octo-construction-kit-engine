@@ -201,9 +201,20 @@ Developers only need to create migration scripts for versions that actually tran
 | `ICkModelMigrationService` | `Runtime.Contracts.CkModelMigrations` | Executes CK model migrations |
 | `ICkMigrationContentProvider` | `Runtime.Contracts.CkModelMigrations` | Provides migration content (embedded/file system) |
 | `ICkModelUpgradeService` | `Runtime.Contracts.CkModelMigrations` | Auto-checks and executes CK model upgrades |
+| `ICkModelImportAuditTrail` | `Runtime.Contracts.CkModelMigrations` | Records noteworthy CK-model import events (e.g. extensible-enum overrides). Default impl writes warning logs; host can register an event-repository adapter to surface entries in the platform event log. |
 | `IRuntimeRepositoryProvider` | `Runtime.Contracts` | Provides runtime repositories for tenants |
 | `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
 | `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
+
+## Extensible Enum Import (WI #3324)
+
+Enums marked `isExtensible: true` allow runtime additions via the customize-API. When a new
+CK model version is imported, custom extension values are preserved into the new model
+revision; if a custom value collides with a CK-defined value on the same numeric key, the
+custom value takes precedence and the collision is reported via `ICkModelImportAuditTrail`
+so it appears in the platform event log. The preservation/override logic itself lives in the
+MongoDB layer (`DatabaseCkModelRepository.PreserveExtensibleEnumValues`); the engine layer
+owns the audit-trail contract and a logging default.
 
 ## Important Notes
 

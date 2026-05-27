@@ -184,14 +184,7 @@ internal class BlueprintService : IBlueprintService
                     MessageLevel.Warning, null, 51, warning));
             }
 
-            // 2. Tenant cache bootstrap.
-            if (!_ckCacheService.IsTenantLoaded(tenantId))
-            {
-                _ckCacheService.CreateTenant(tenantId);
-                _logger.LogDebug("Created tenant {TenantId}", tenantId);
-            }
-
-            // 3. Aggregate all CK model dependencies across the install order and upgrade once.
+            // 2. Aggregate all CK model dependencies across the install order.
             var aggregatedCkDeps = resolution.InstallOrder
                 .SelectMany(bp => bp.CkModelDependencies ?? [])
                 .GroupBy(d => d.Name, StringComparer.Ordinal)
@@ -199,6 +192,52 @@ internal class BlueprintService : IBlueprintService
                 .ToList();
             loadedCkModels.AddRange(aggregatedCkDeps);
 
+            // 3. Install missing CK model schemas into the tenant. The blueprint contract
+            //    promises that ckModelDependencies are auto-imported on apply
+            //    (docs/blueprints.md); UpgradeModelsAsync only runs in-place version
+            //    migrations, so we have to materialize the schema first. The provider
+            //    implementation is idempotent — an already-installed model is a cheap
+            //    no-op aside from any pending migration retry.
+            foreach (var dep in aggregatedCkDeps)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var targetVersion = dep.ModelVersionRange.MinVersion;
+                if (targetVersion == null)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error, null, 24,
+                        $"CK model dependency '{dep.Name}' has no minimum version in range '{dep.ModelVersionRange}'"));
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                    return BlueprintApplicationResult.Failed(operationResult);
+                }
+
+                var concreteModelId = new CkModelId(dep.Name, targetVersion.ToString()!);
+
+                try
+                {
+                    await _runtimeRepositoryProvider.EnsureCkModelInstalledAsync(
+                            tenantId, concreteModelId, operationResult, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex,
+                        "Failed to install CK model {ModelId} into tenant {TenantId}",
+                        concreteModelId, tenantId);
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error, null, 24,
+                        $"Failed to install CK model '{concreteModelId}': {ex.Message}"));
+                }
+
+                if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                {
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                    return BlueprintApplicationResult.Failed(operationResult);
+                }
+            }
+
+            // 4. Run CK model migrations for any deps that are at an older version on the tenant.
             if (aggregatedCkDeps.Count > 0)
             {
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
@@ -225,6 +264,25 @@ internal class BlueprintService : IBlueprintService
                     operationResult.AddMessage(new OperationMessage(
                         MessageLevel.Warning, null, 26, $"CK model migration: {warning}"));
                 }
+            }
+
+            // 5. Load the in-memory CK cache for the tenant. EnsureCkModelInstalledAsync may
+            //    have unloaded the cache as part of installing a new schema; downstream steps
+            //    (seed import, ValidateCkModels) need the model graph populated. The load is
+            //    idempotent at the storage layer.
+            var tenantRepository = await _runtimeRepositoryProvider
+                .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            if (tenantRepository != null)
+            {
+                await tenantRepository.LoadCacheForTenantAsync(_ckCacheService).ConfigureAwait(false);
+            }
+            else if (!_ckCacheService.IsTenantLoaded(tenantId))
+            {
+                // No storage-managed repository (e.g. in-memory test setup) and the cache
+                // entry hasn't been pre-seeded by the test fixture — fall back to an empty
+                // cache entry so downstream type lookups have somewhere to write.
+                _ckCacheService.CreateTenant(tenantId);
+                _logger.LogDebug("Created tenant {TenantId} (no storage repository)", tenantId);
             }
 
             // 4. Walk the topo-sorted install order. Each blueprint becomes its own
@@ -1063,7 +1121,61 @@ internal class BlueprintService : IBlueprintService
 
             var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
 
-            // 5b. Execute CK model migrations if upgrading from a previous version
+            // 5b. Install missing CK model schemas. A blueprint update may introduce
+            //     new ckModelDependencies that the tenant has never seen — auto-import
+            //     those before the upgrade step, mirroring ApplyBlueprintAsync. Skipped
+            //     in DryRun mode (ImportCkModelAsync has no preview path; the update
+            //     preview already warns that real apply will install).
+            if (ckDependencies.Count > 0 && !options.DryRun)
+            {
+                foreach (var dep in ckDependencies)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var targetVersionRange = dep.ModelVersionRange.MinVersion;
+                    if (targetVersionRange == null)
+                    {
+                        result.Success = false;
+                        result.Errors.Add(
+                            $"CK model dependency '{dep.Name}' has no minimum version in range '{dep.ModelVersionRange}'");
+                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                        return result;
+                    }
+
+                    var concreteModelId = new CkModelId(dep.Name, targetVersionRange.ToString()!);
+                    var installOpResult = new OperationResult();
+
+                    try
+                    {
+                        await _runtimeRepositoryProvider.EnsureCkModelInstalledAsync(
+                                tenantId, concreteModelId, installOpResult, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogError(ex,
+                            "Failed to install CK model {ModelId} into tenant {TenantId}",
+                            concreteModelId, tenantId);
+                        result.Errors.Add($"Failed to install CK model '{concreteModelId}': {ex.Message}");
+                    }
+
+                    if (installOpResult.HasErrors || installOpResult.HasFatalErrors)
+                    {
+                        result.Errors.AddRange(installOpResult.Messages
+                            .Where(m => m.MessageLevel is MessageLevel.Error or MessageLevel.FatalError)
+                            .Select(m => m.MessageText));
+                    }
+
+                    if (result.Errors.Count > 0)
+                    {
+                        result.Success = false;
+                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                        return result;
+                    }
+                }
+            }
+
+            // 5c. Execute CK model migrations if upgrading from a previous version
             if (ckDependencies.Count > 0)
             {
                 var ckMigrationOptions = new CkMigrationOptions
@@ -1091,6 +1203,20 @@ internal class BlueprintService : IBlueprintService
                     "CK model upgrades completed during update: {Upgraded} upgraded, {TotalAffected} entities affected",
                     upgradeResult.UpgradedModels.Count,
                     upgradeResult.TotalEntitiesAffected);
+            }
+
+            // 5d. Load the in-memory CK cache for the tenant. If we installed a new
+            //     schema above, EnsureCkModelInstalledAsync unloaded the cache; the
+            //     subsequent ApplyDiffAsync seed import needs the model graph populated.
+            //     Skipped in DryRun mode since the diff path also no-ops there.
+            if (!options.DryRun)
+            {
+                var tenantRepository = await _runtimeRepositoryProvider
+                    .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                if (tenantRepository != null)
+                {
+                    await tenantRepository.LoadCacheForTenantAsync(_ckCacheService).ConfigureAwait(false);
+                }
             }
 
             // 6. Apply update based on mode

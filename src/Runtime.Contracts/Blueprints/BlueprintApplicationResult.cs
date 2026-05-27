@@ -54,6 +54,20 @@ public class BlueprintApplicationResult
     public OperationResult OperationResult { get; private init; }
 
     /// <summary>
+    /// True when the blueprint's <c>requires:</c> preconditions did not match the tenant's
+    /// variable context, so the apply was a no-op (no seed data was imported, no
+    /// installation row was recorded). <see cref="IsSuccess"/> is still <c>true</c> in this
+    /// case — the apply did not fail, it just had nothing to do.
+    /// </summary>
+    public bool WasSkipped { get; private init; }
+
+    /// <summary>
+    /// Human-readable reason why the apply was skipped, populated when
+    /// <see cref="WasSkipped"/> is <c>true</c>.
+    /// </summary>
+    public string? SkipReason { get; private init; }
+
+    /// <summary>
     /// Creates a successful result
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
@@ -93,6 +107,34 @@ public class BlueprintApplicationResult
         return new BlueprintApplicationResult
         {
             IsSuccess = false,
+            OperationResult = operationResult
+        };
+    }
+
+    /// <summary>
+    /// Creates a successful no-op result indicating the blueprint was skipped because its
+    /// <c>requires:</c> preconditions did not match the tenant's variable context. Callers
+    /// that loop over multiple blueprints can rely on <see cref="WasSkipped"/> to
+    /// distinguish "applied" from "skipped" without re-reading the manifest.
+    /// </summary>
+    /// <param name="tenantId">Target tenant identifier.</param>
+    /// <param name="blueprintId">Blueprint that was evaluated.</param>
+    /// <param name="reason">Human-readable reason why the apply was skipped.</param>
+    /// <param name="operationResult">Operation result with informational messages.</param>
+    /// <returns>A skipped result with <see cref="IsSuccess"/>=<c>true</c>.</returns>
+    public static BlueprintApplicationResult Skipped(
+        string tenantId,
+        BlueprintId blueprintId,
+        string reason,
+        OperationResult operationResult)
+    {
+        return new BlueprintApplicationResult
+        {
+            IsSuccess = true,
+            WasSkipped = true,
+            SkipReason = reason,
+            TenantId = tenantId,
+            BlueprintId = blueprintId,
             OperationResult = operationResult
         };
     }

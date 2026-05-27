@@ -63,6 +63,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
         services.TryAddSingleton<IBlueprintNotifications, LoggingBlueprintNotifications>();
 
+        // Blueprint variable resolution (overridable via TryAdd — services that need a richer
+        // provider, e.g. one that surfaces chart names or feature flags, can register their own
+        // IBlueprintVariableProvider before calling AddRuntimeEngine and win the registration.)
+        services.AddOptions<OctoBlueprintVariablesOptions>();
+        services.TryAddTransient<IBlueprintVariableProvider, DefaultBlueprintVariableProvider>();
+
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();
 

@@ -35,6 +35,7 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintNotifications _notifications;
     private readonly IBlueprintDependencyResolver _dependencyResolver;
     private readonly ITenantBlueprintInstallations _installations;
+    private readonly IBlueprintVariableProvider _variableProvider;
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
@@ -68,6 +69,7 @@ internal class BlueprintService : IBlueprintService
         IBlueprintNotifications notifications,
         IBlueprintDependencyResolver dependencyResolver,
         ITenantBlueprintInstallations installations,
+        IBlueprintVariableProvider variableProvider,
         ILogger<BlueprintService> logger)
     {
         _ckCacheService = ckCacheService;
@@ -83,6 +85,7 @@ internal class BlueprintService : IBlueprintService
         _notifications = notifications;
         _dependencyResolver = dependencyResolver;
         _installations = installations;
+        _variableProvider = variableProvider;
         _logger = logger;
     }
 
@@ -182,6 +185,34 @@ internal class BlueprintService : IBlueprintService
             {
                 operationResult.AddMessage(new OperationMessage(
                     MessageLevel.Warning, null, 51, warning));
+            }
+
+            // 1b. Resolve the tenant variable context once and gate the root blueprint on
+            //     its `requires:` block. Skipping is a successful no-op — no install row,
+            //     no seed data, no history entry — so callers iterating over a list of
+            //     blueprints can rely on WasSkipped to distinguish "filtered out" from
+            //     "applied". `requires:` is intentionally not evaluated on transitive deps:
+            //     a dep that ships seed data is presumed to be required by every consumer,
+            //     and re-evaluating its preconditions would only invite half-installed
+            //     deployments. Authors who need per-tenant variation should split the
+            //     blueprint, not gate its dependencies.
+            var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var rootBlueprint = resolution.InstallOrder.FirstOrDefault(bp => bp.BlueprintId.Equals(blueprintId));
+            if (rootBlueprint?.Requires is { Count: > 0 } requires)
+            {
+                var mismatch = RequiresEvaluator.FindMismatch(requires, variables);
+                if (mismatch != null)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Info, null, 28,
+                        $"Blueprint {blueprintId} skipped: {mismatch}"));
+                    _logger.LogInformation(
+                        "Blueprint {BlueprintId} skipped for tenant {TenantId}: {Reason}",
+                        blueprintId, tenantId, mismatch);
+                    return BlueprintApplicationResult.Skipped(tenantId, blueprintId, mismatch, operationResult);
+                }
             }
 
             // 2. Aggregate all CK model dependencies across the install order.
@@ -327,7 +358,7 @@ internal class BlueprintService : IBlueprintService
                 if (willImportSeed)
                 {
                     var perBlueprintEntities = await ApplySeedDataForBlueprintAsync(
-                        tenantId, blueprint, operationResult, appliedSeedDataFiles, cancellationToken)
+                        tenantId, blueprint, variables, operationResult, appliedSeedDataFiles, cancellationToken)
                         .ConfigureAwait(false);
 
                     if (operationResult.HasErrors)
@@ -807,7 +838,9 @@ internal class BlueprintService : IBlueprintService
         }
 
         var opResult = new OperationResult();
-        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, targetVersion, opResult)
+        var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, targetVersion, variables, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1877,7 +1910,9 @@ internal class BlueprintService : IBlueprintService
             return 0;
         }
 
-        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, opResult)
+        var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, variables, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1972,6 +2007,7 @@ internal class BlueprintService : IBlueprintService
     private async Task<int> ApplySeedDataForBlueprintAsync(
         string tenantId,
         BlueprintMetaRootDto blueprint,
+        IReadOnlyDictionary<string, string> variables,
         OperationResult operationResult,
         List<string> appliedSeedDataFiles,
         CancellationToken cancellationToken)
@@ -2008,7 +2044,7 @@ internal class BlueprintService : IBlueprintService
                 return 0;
             }
 
-            var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprint.BlueprintId, operationResult)
+            var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprint.BlueprintId, variables, operationResult)
                 .ConfigureAwait(false);
             if (seedRoot == null)
             {
@@ -2041,6 +2077,7 @@ internal class BlueprintService : IBlueprintService
         Stream seedStream,
         string sourceDescription,
         BlueprintId blueprintId,
+        IReadOnlyDictionary<string, string> variables,
         OperationResult operationResult)
     {
         try
@@ -2059,6 +2096,11 @@ internal class BlueprintService : IBlueprintService
                 {
                     return null;
                 }
+
+                // Resolve ${variable} placeholders in attribute string values and
+                // rtWellKnownName before stamping. Done in-place so the provenance
+                // attributes added by StampBlueprintTags can never be substituted.
+                BlueprintVariableInterpolator.Interpolate(root, variables, sourceDescription, operationResult);
 
                 StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
                 return root;
@@ -2082,4 +2124,5 @@ internal class BlueprintService : IBlueprintService
     /// </summary>
     private static string BlueprintFileDescription(BlueprintId blueprintId, string relativePath)
         => $"{blueprintId.FullName}/{relativePath}";
+
 }

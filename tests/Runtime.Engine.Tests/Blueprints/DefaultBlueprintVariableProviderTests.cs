@@ -28,6 +28,21 @@ public class DefaultBlueprintVariableProviderTests
     }
 
     [Fact]
+    public async Task GetVariables_IsSystemTenant_TolerantOfCasingDifference()
+    {
+        // Tenant ids are normalised to lowercase at the system context layer
+        // (StringExtensions.NormalizeString = Trim().ToLower()), so callers pass
+        // "octosystem" while helm-injected SystemTenantId is "OctoSystem". The
+        // mismatch was the root cause of every tenant — including OctoSystem —
+        // receiving TenantCockpit instead of SystemCockpit on the first deploy.
+        var provider = MakeProvider(systemTenantId: "OctoSystem");
+
+        var variables = await provider.GetVariablesAsync("octosystem", TestContext.Current.CancellationToken);
+
+        Assert.Equal("true", variables["octo.isSystemTenant"]);
+    }
+
+    [Fact]
     public async Task GetVariables_IsSystemTenant_ReportsFalseForOtherTenant()
     {
         var provider = MakeProvider(systemTenantId: "OctoSystem");

@@ -25,15 +25,22 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
         CancellationToken cancellationToken = default)
     {
         var snapshot = _options.CurrentValue;
-        var systemTenantId = snapshot.SystemTenantId;
-        var isSystemTenant = string.Equals(tenantId, systemTenantId, StringComparison.Ordinal);
+        var systemTenantId = snapshot.SystemTenantId ?? OctoBlueprintVariablesOptions.DefaultSystemTenantId;
+
+        // Tenant ids are normalised to lowercase at the system context layer
+        // (StringExtensions.NormalizeString → Trim().ToLower()), so the configured
+        // SystemTenantId (e.g. helm-injected "OctoSystem") will arrive here as
+        // "octosystem" at runtime. Compare case-insensitively so the configured value
+        // can be written in its display form without breaking the match — the same
+        // tolerance every other tenant-id check in the platform relies on.
+        var isSystemTenant = string.Equals(tenantId, systemTenantId, StringComparison.OrdinalIgnoreCase);
 
         IReadOnlyDictionary<string, string> variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["octo.version"] = snapshot.OctoVersion ?? string.Empty,
             ["octo.environment"] = snapshot.Environment ?? OctoBlueprintVariablesOptions.DefaultEnvironment,
             ["octo.tenantId"] = tenantId,
-            ["octo.systemTenantId"] = systemTenantId ?? OctoBlueprintVariablesOptions.DefaultSystemTenantId,
+            ["octo.systemTenantId"] = systemTenantId,
             ["octo.isSystemTenant"] = isSystemTenant ? "true" : "false",
         };
 

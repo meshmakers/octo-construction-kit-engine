@@ -216,6 +216,64 @@ so it appears in the platform event log. The preservation/override logic itself 
 MongoDB layer (`DatabaseCkModelRepository.PreserveExtensibleEnumValues`); the engine layer
 owns the audit-trail contract and a logging default.
 
+## Audit-Trail Architecture
+
+Engine code surfaces noteworthy events through typed audit-trail interfaces
+(`ICkModelImportAuditTrail`, `IArchiveAuditTrail`, …). All of them route through a single
+host-side extensibility point: `IAuditEventSink`.
+
+```
+Runtime.Contracts/AuditTrails/
+  AuditEvent       — discriminated event record (TenantId, Level, Category, Message, Metadata)
+  IAuditEventSink  — single host-replaceable surface
+
+Runtime.Engine/AuditTrails/
+  LoggingAuditEventSink   — default; writes structured logs via ILogger
+  NoOpAuditEventSink      — opt-in silence (tests, hosts that explicitly want events dropped)
+
+Runtime.Engine/{CkModelMigrations,StreamData}/
+  ForwardingCkModelImportAuditTrail  — implements ICkModelImportAuditTrail
+  ForwardingArchiveAuditTrail        — implements IArchiveAuditTrail
+  (both translate typed calls into AuditEvent and call IAuditEventSink.PublishAsync)
+```
+
+`AddRuntimeEngine` registers:
+
+1. `IAuditEventSink → LoggingAuditEventSink` (TryAddSingleton — hosts can override)
+2. `ICkModelImportAuditTrail → ForwardingCkModelImportAuditTrail` (TryAddTransient)
+3. `IArchiveAuditTrail → ForwardingArchiveAuditTrail` (AddTransient)
+
+A host that wants events in the platform event log replaces step 1 only — see
+`EventRepositoryAuditEventSink` in `octo-common-services`.
+
+**Why this shape (history matters):** WI #3324 originally landed a per-interface bridge
+(`EventRepositoryCkModelImportAuditTrail`) in `octo-common-services` that ctor-captured
+`IEventRepository`. That closed a DI bootstrap cycle:
+`SystemContext.ctor → IDatabaseCkModelRepository → ICkModelImportAuditTrail (bridge)
+→ IEventRepository → ISystemContext → …`. Host startup deadlocked in DI's `StackGuard`
+(detected via `dotnet-stack` dump on a stuck integration-test agent). Routing every
+audit-trail interface through one sink keeps the bridge surface a single point — the sink
+implementation in common-services lazy-resolves `IEventRepository` from
+`IServiceProvider`, so the bootstrap cycle cannot re-form, even if more audit-trail
+interfaces are added later.
+
+**Adding a new audit-trail interface:**
+
+1. Define a focused typed interface in `Runtime.Contracts` (no dependency on
+   `Microsoft.Extensions.Logging` or the notifications stack).
+2. Add a `Forwarding{Name}AuditTrail` in `Runtime.Engine` that takes `IAuditEventSink` in
+   its ctor and translates typed calls into `AuditEvent`s. Pick a stable
+   `Category = "{Domain}.{Event}"` and fill the `Metadata` dictionary so structured-log
+   consumers can pivot. Render `Message` in the same way as the existing forwarders.
+3. Register the forwarder in `AddRuntimeEngine` next to the existing ones.
+
+**Never** add a host-side bridge class that ctor-captures `IEventRepository` or
+`ISystemContext` — that re-introduces the WI #3324 cycle. Use the sink.
+
+`LoggingCkModelImportAuditTrail` and `LoggingArchiveAuditTrail` remain in `Runtime.Engine`
+for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
+`TenantContext` when no DI is wired) but are no longer the registered defaults.
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (devops-build/azure-pipelines.yml)

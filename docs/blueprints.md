@@ -90,6 +90,7 @@ secret indirection) — the default registration uses `TryAddTransient`, so a se
 |------------------------|-------------------------------------------------------------------------------------|
 | `octo.version`         | `OctoBlueprintVariablesOptions.OctoVersion` (helm sets via `.Chart.AppVersion`)     |
 | `octo.environment`     | `OctoBlueprintVariablesOptions.Environment` — `dev` (default), `test`, `staging`, `production` |
+| `octo.environmentMode` | Same value mapped to the matching `System/EnvironmentModes` CK-enum name (`Development`, `Testing`, `Staging`, `Production`). Unknown environments pass through unchanged so the runtime import surfaces a clear error. |
 | `octo.tenantId`        | The tenant currently being initialised                                              |
 | `octo.systemTenantId`  | `OctoBlueprintVariablesOptions.SystemTenantId` (defaults to `OctoSystem`)           |
 | `octo.isSystemTenant`  | `"true"` when `tenantId == octo.systemTenantId`, otherwise `"false"`                |

@@ -18,13 +18,17 @@ Blueprints are versioned, declarative bundles of Construction Kit models and run
 A blueprint is a directory containing a `blueprint.yaml`, optional seed data, and optional migration scripts:
 
 ```
-MyBlueprint-1.0.0/
-├── blueprint.yaml
+MyBlueprint/
+├── blueprint.yaml        # blueprintId: MyBlueprint-1.0.0
 ├── seed-data/
 │   └── entities.yaml
 └── migrations/
     └── from-1.0.0.yaml
 ```
+
+The folder name carries only the blueprint **Name**; the version lives exclusively
+in the manifest's `blueprintId`. Bumping the version is a manifest-only edit — no
+folder rename required.
 
 ## Blueprint YAML Schema
 
@@ -515,8 +519,8 @@ Service-managed blueprints typically ship *inside* the owning service's NuGet (s
    SystemCommunicationCkModel/
    ├── ConstructionKit/         # CK model YAML (existing)
    └── Blueprints/
-       └── System.Communication-1.0.0/
-           ├── blueprint.yaml
+       └── System.Communication/
+           ├── blueprint.yaml   # blueprintId: System.Communication-1.0.0
            └── seed-data/entities.yaml
    ```
 

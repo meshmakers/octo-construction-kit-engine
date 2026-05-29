@@ -22,15 +22,17 @@ namespace Meshmakers.Octo.ConstructionKit.MsBuildTasks;
 /// Expected folder layout under each <c>&lt;BlueprintFolder&gt;</c> item:
 /// <code>
 /// Blueprints/
-///   ├── MyBlueprint-1.0.0/
-///   │     ├── blueprint.yaml
+///   ├── MyBlueprint/
+///   │     ├── blueprint.yaml          # blueprintId: MyBlueprint-1.0.0
 ///   │     └── seed-data/entities.yaml
-///   └── OtherBlueprint-2.1.0/
-///         ├── blueprint.yaml
+///   └── OtherBlueprint/
+///         ├── blueprint.yaml          # blueprintId: OtherBlueprint-2.1.0
 ///         └── migrations/from-2.0.0.yaml
 /// </code>
-/// The version folder name <c>&lt;Name&gt;-&lt;Version&gt;</c> is the source of truth; the manifest's
-/// <c>blueprintId</c> must agree. Mismatches fail the build.
+/// The folder name carries only the blueprint <c>Name</c>; the version lives exclusively
+/// in the manifest's <c>blueprintId</c>. The task validates that the folder name matches
+/// <c>blueprintId.Name</c> so a typo in either side fails the build, but bumping the
+/// version is a manifest-only edit — no folder rename required.
 /// </summary>
 public class BlueprintEmbed : Microsoft.Build.Utilities.Task
 {
@@ -185,14 +187,17 @@ public class BlueprintEmbed : Microsoft.Build.Utilities.Task
 
         var blueprintId = new BlueprintId(manifest.BlueprintId!);
 
-        // 3. The directory name must match the manifest's blueprintId so runtime resolution stays
-        //    unambiguous (the runtime locates a blueprint via {ResourceNamespace}.blueprint.yaml).
-        var expectedDirName = blueprintId.FullName;
+        // 3. The directory name must match the manifest's blueprintId.Name (NOT the full
+        //    name-version). The version lives exclusively in blueprint.yaml — bumping it is a
+        //    manifest-only edit. The folder identifies which blueprint this is by name; the
+        //    runtime resource namespace below still uses blueprintId.FullName, so two folders
+        //    with the same name (different versions checked out side-by-side) would clash.
+        var expectedDirName = blueprintId.Name;
         var actualDirName = Path.GetFileName(blueprintDir);
         if (!string.Equals(expectedDirName, actualDirName, StringComparison.Ordinal))
         {
             Log.LogError(
-                "Blueprint directory name '{0}' does not match its blueprintId '{1}'. Rename the folder so the on-disk identity agrees with the manifest.",
+                "Blueprint directory name '{0}' does not match its blueprintId.Name '{1}'. Rename the folder to '{1}' (the version lives in the manifest's blueprintId only).",
                 actualDirName, expectedDirName);
             return false;
         }

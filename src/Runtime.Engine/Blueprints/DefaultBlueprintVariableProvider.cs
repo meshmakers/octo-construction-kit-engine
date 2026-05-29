@@ -26,6 +26,7 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
     {
         var snapshot = _options.CurrentValue;
         var systemTenantId = snapshot.SystemTenantId ?? OctoBlueprintVariablesOptions.DefaultSystemTenantId;
+        var environment = snapshot.Environment ?? OctoBlueprintVariablesOptions.DefaultEnvironment;
 
         // Tenant ids are normalised to lowercase at the system context layer
         // (StringExtensions.NormalizeString → Trim().ToLower()), so the configured
@@ -38,12 +39,36 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
         IReadOnlyDictionary<string, string> variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["octo.version"] = snapshot.OctoVersion ?? string.Empty,
-            ["octo.environment"] = snapshot.Environment ?? OctoBlueprintVariablesOptions.DefaultEnvironment,
+            ["octo.environment"] = environment,
+            ["octo.environmentMode"] = MapEnvironmentToMode(environment),
             ["octo.tenantId"] = tenantId,
             ["octo.systemTenantId"] = systemTenantId,
             ["octo.isSystemTenant"] = isSystemTenant ? "true" : "false",
         };
 
         return Task.FromResult(variables);
+    }
+
+    /// <summary>
+    /// Maps the helm-injected <c>octo.environment</c> token (kebab-friendly: dev/test/
+    /// staging/production) to the matching <c>System/EnvironmentModes</c> CK-enum value
+    /// name (PascalCase: Development/Testing/Staging/Production). Blueprints that seed a
+    /// <c>System/TenantModeConfiguration</c> can write
+    /// <c>value: "${octo.environmentMode}"</c> and rely on
+    /// <c>ImportRtModelCommand</c>'s tolerant enum-value match (Key | Key.ToString() |
+    /// Name OrdinalIgnoreCase) to land the correct numeric key on the entity.
+    /// Unknown environments pass through unchanged so the importer fails loudly with
+    /// "unknown enum value '&lt;raw&gt;'" rather than silently defaulting to Development.
+    /// </summary>
+    private static string MapEnvironmentToMode(string environment)
+    {
+        return environment.Trim().ToLowerInvariant() switch
+        {
+            "dev" => "Development",
+            "test" => "Testing",
+            "staging" => "Staging",
+            "production" => "Production",
+            _ => environment,
+        };
     }
 }

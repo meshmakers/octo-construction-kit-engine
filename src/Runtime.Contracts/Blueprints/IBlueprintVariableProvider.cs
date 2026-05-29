@@ -15,6 +15,12 @@ namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
 ///         <item><c>octo.environment</c> — deployment environment (<c>dev</c>, <c>test</c>,
 ///             <c>staging</c>, <c>production</c>); sourced from
 ///             <c>OctoBlueprintVariablesOptions.Environment</c>.</item>
+///         <item><c>octo.environmentMode</c> — same value mapped to the matching
+///             <c>System/EnvironmentModes</c> CK-enum value name (<c>Development</c>,
+///             <c>Testing</c>, <c>Staging</c>, <c>Production</c>) so blueprints can seed a
+///             <c>System/TenantModeConfiguration</c> entity from a single
+///             <c>value: "${octo.environmentMode}"</c> placeholder. Unknown environments
+///             pass through unchanged so the runtime import surfaces a clear error.</item>
 ///         <item><c>octo.tenantId</c> — the tenant currently being initialised.</item>
 ///         <item><c>octo.systemTenantId</c> — the tenant id treated as system tenant;
 ///             sourced from <c>OctoBlueprintVariablesOptions.SystemTenantId</c>.</item>

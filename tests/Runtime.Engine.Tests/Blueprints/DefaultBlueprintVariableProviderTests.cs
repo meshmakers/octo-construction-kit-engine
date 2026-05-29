@@ -67,6 +67,42 @@ public class DefaultBlueprintVariableProviderTests
         Assert.Equal("3.5.2", variables["octo.version"]);
     }
 
+    [Theory]
+    [InlineData("dev", "Development")]
+    [InlineData("test", "Testing")]
+    [InlineData("staging", "Staging")]
+    [InlineData("production", "Production")]
+    [InlineData("DEV", "Development")]            // tolerant of casing in helm value
+    [InlineData("  production  ", "Production")]  // tolerant of accidental padding
+    public async Task GetVariables_OctoEnvironmentMode_MapsKnownEnvironmentToEnumName(
+        string environment, string expectedMode)
+    {
+        // Pins the kebab-→-PascalCase mapping that lets
+        // System.TenantMode-1.0.0 seed `value: "${octo.environmentMode}"` resolve to a
+        // System/EnvironmentModes enum-value name. ImportRtModelCommand matches
+        // case-insensitively against the enum name, so a single placeholder lands the
+        // right numeric key on the entity.
+        var provider = MakeProvider(environment: environment);
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal(expectedMode, variables["octo.environmentMode"]);
+    }
+
+    [Fact]
+    public async Task GetVariables_OctoEnvironmentMode_UnknownEnvironmentPassesThrough()
+    {
+        // Misconfigured cluster (e.g. environment="prd" typo) — fail-loud is preferable to
+        // silently defaulting to Development. The pass-through value reaches
+        // ImportRtModelCommand which then errors with "unknown enum value 'prd'", pointing
+        // the operator straight at the values.yaml typo.
+        var provider = MakeProvider(environment: "prd");
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal("prd", variables["octo.environmentMode"]);
+    }
+
     [Fact]
     public async Task GetVariables_OctoVersionEmpty_StillExportsKey()
     {

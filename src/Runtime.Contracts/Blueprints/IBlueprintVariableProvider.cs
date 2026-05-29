@@ -20,7 +20,8 @@ namespace Meshmakers.Octo.Runtime.Contracts.Blueprints;
 ///             <c>Testing</c>, <c>Staging</c>, <c>Production</c>) so blueprints can seed a
 ///             <c>System/TenantModeConfiguration</c> entity from a single
 ///             <c>value: "${octo.environmentMode}"</c> placeholder. Unknown environments
-///             pass through unchanged so the runtime import surfaces a clear error.</item>
+///             fall back to <c>Development</c> with a warning log so the blueprint apply
+///             still succeeds and operators see the misconfiguration in service logs.</item>
 ///         <item><c>octo.tenantId</c> — the tenant currently being initialised.</item>
 ///         <item><c>octo.systemTenantId</c> — the tenant id treated as system tenant;
 ///             sourced from <c>OctoBlueprintVariablesOptions.SystemTenantId</c>.</item>

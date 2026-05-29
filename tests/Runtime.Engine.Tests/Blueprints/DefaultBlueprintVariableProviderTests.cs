@@ -1,6 +1,7 @@
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
 
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 using Xunit;
@@ -90,17 +91,18 @@ public class DefaultBlueprintVariableProviderTests
     }
 
     [Fact]
-    public async Task GetVariables_OctoEnvironmentMode_UnknownEnvironmentPassesThrough()
+    public async Task GetVariables_OctoEnvironmentMode_UnknownEnvironmentFallsBackToDevelopment()
     {
-        // Misconfigured cluster (e.g. environment="prd" typo) — fail-loud is preferable to
-        // silently defaulting to Development. The pass-through value reaches
-        // ImportRtModelCommand which then errors with "unknown enum value 'prd'", pointing
-        // the operator straight at the values.yaml typo.
+        // Misconfigured or yet-unmapped cluster environment (e.g. "prd" typo, "qa", "e2e"):
+        // the provider falls back to Development so the System.TenantMode blueprint apply
+        // still lands a valid enum value on the tenant. The fallback is logged at warning
+        // level (verified in service logs, not pinned here) so operators can still spot the
+        // misconfiguration without it taking the tenant offline.
         var provider = MakeProvider(environment: "prd");
 
         var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
 
-        Assert.Equal("prd", variables["octo.environmentMode"]);
+        Assert.Equal("Development", variables["octo.environmentMode"]);
     }
 
     [Fact]
@@ -130,7 +132,7 @@ public class DefaultBlueprintVariableProviderTests
             OctoVersion = octoVersion,
         };
         var monitor = new StaticOptionsMonitor<OctoBlueprintVariablesOptions>(options);
-        return new DefaultBlueprintVariableProvider(monitor);
+        return new DefaultBlueprintVariableProvider(monitor, NullLogger<DefaultBlueprintVariableProvider>.Instance);
     }
 
     /// <summary>

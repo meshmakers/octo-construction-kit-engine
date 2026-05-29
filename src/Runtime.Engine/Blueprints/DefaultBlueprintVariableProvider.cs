@@ -1,4 +1,5 @@
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
@@ -13,10 +14,14 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvider
 {
     private readonly IOptionsMonitor<OctoBlueprintVariablesOptions> _options;
+    private readonly ILogger<DefaultBlueprintVariableProvider> _logger;
 
-    public DefaultBlueprintVariableProvider(IOptionsMonitor<OctoBlueprintVariablesOptions> options)
+    public DefaultBlueprintVariableProvider(
+        IOptionsMonitor<OctoBlueprintVariablesOptions> options,
+        ILogger<DefaultBlueprintVariableProvider> logger)
     {
         _options = options;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -57,18 +62,31 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
     /// <c>value: "${octo.environmentMode}"</c> and rely on
     /// <c>ImportRtModelCommand</c>'s tolerant enum-value match (Key | Key.ToString() |
     /// Name OrdinalIgnoreCase) to land the correct numeric key on the entity.
-    /// Unknown environments pass through unchanged so the importer fails loudly with
-    /// "unknown enum value '&lt;raw&gt;'" rather than silently defaulting to Development.
+    /// Unknown environments fall back to <c>Development</c> so a tenant whose cluster has
+    /// a mistyped or yet-unmapped <c>environment</c> value still gets a valid mode rather
+    /// than failing the blueprint apply. The fallback is logged at warning level so the
+    /// misconfiguration is still visible in service logs.
     /// </summary>
-    private static string MapEnvironmentToMode(string environment)
+    private string MapEnvironmentToMode(string environment)
     {
-        return environment.Trim().ToLowerInvariant() switch
+        var mapped = environment.Trim().ToLowerInvariant() switch
         {
             "dev" => "Development",
             "test" => "Testing",
             "staging" => "Staging",
             "production" => "Production",
-            _ => environment,
+            _ => (string?)null,
         };
+
+        if (mapped != null)
+        {
+            return mapped;
+        }
+
+        _logger.LogWarning(
+            "Blueprint variable octo.environment='{Environment}' does not map to a known System/EnvironmentModes value (dev/test/staging/production). Falling back to 'Development' for ${{octo.environmentMode}}. Set OCTO_BLUEPRINTS__ENVIRONMENT to one of the known values to silence this warning.",
+            environment);
+
+        return "Development";
     }
 }

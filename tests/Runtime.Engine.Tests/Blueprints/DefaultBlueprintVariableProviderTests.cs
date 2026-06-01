@@ -105,6 +105,32 @@ public class DefaultBlueprintVariableProviderTests
         Assert.Equal("Development", variables["octo.environmentMode"]);
     }
 
+    [Theory]
+    [InlineData("3.3.109.0", "3.3.109")]                 // release-tag build: $major.$minor.$build.0
+    [InlineData("3.3.109.0-test1", "3.3.109-test1")]     // test-channel build keeps the prerelease tag
+    [InlineData("0.1.2606.1001-main", "0.1.2606-main")]  // main-CI build number is 4-segment too
+    [InlineData("3.3.109", "3.3.109")]                   // already 3-segment SemVer → untouched
+    [InlineData("3.3", "3.3")]                           // shorter than 3 segments → left alone (caller's problem)
+    [InlineData("3.3.109+build.42", "3.3.109+build.42")] // 3-segment with build metadata → untouched
+    [InlineData("3.3.109.0+build.42", "3.3.109+build.42")] // 4-segment with build metadata → trimmed core
+    public async Task GetVariables_OctoVersion_TrimsFourPartVersionToSemVer(
+        string rawOctoVersion, string expectedOctoVersion)
+    {
+        // Helm chart-version validation is strict SemVer (MAJOR.MINOR.PATCH[-pre][+meta]).
+        // The OctoMesh Azure-Pipelines convention assembles a 4-segment Build.BuildNumber
+        // and feeds it straight to `helm package --app-version`, so .Chart.AppVersion arrives
+        // here as e.g. "3.3.109.0". Blueprints that bind System.Communication/ChartVersion
+        // to ${octo.version} would otherwise persist an invalid 4-part value and break the
+        // very next adapter deploy. Normalisation happens at the variable boundary so the
+        // chart's appVersion can stay aligned with the Docker image tag while ${octo.version}
+        // is always Helm-safe.
+        var provider = MakeProvider(octoVersion: rawOctoVersion);
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal(expectedOctoVersion, variables["octo.version"]);
+    }
+
     [Fact]
     public async Task GetVariables_OctoVersionEmpty_StillExportsKey()
     {

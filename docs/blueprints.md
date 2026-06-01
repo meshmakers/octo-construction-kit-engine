@@ -92,7 +92,7 @@ secret indirection) — the default registration uses `TryAddTransient`, so a se
 
 | Variable               | Source                                                                              |
 |------------------------|-------------------------------------------------------------------------------------|
-| `octo.version`         | `OctoBlueprintVariablesOptions.OctoVersion` (helm sets via `.Chart.AppVersion`)     |
+| `octo.version`         | `OctoBlueprintVariablesOptions.OctoVersion` (helm sets via `.Chart.AppVersion`). Auto-trimmed to 3-segment SemVer — a 4-part input like `3.3.109.0` from `Build.BuildNumber` becomes `3.3.109` so Helm's strict chart-version validation accepts it. Pre-release / build-metadata suffixes are preserved (`3.3.109.0-test1` → `3.3.109-test1`). |
 | `octo.environment`     | `OctoBlueprintVariablesOptions.Environment` — `dev` (default), `test`, `staging`, `production` |
 | `octo.environmentMode` | Same value mapped to the matching `System/EnvironmentModes` CK-enum name (`Development`, `Testing`, `Staging`, `Production`). Unknown environments fall back to `Development` with a warning log — the blueprint apply still succeeds. |
 | `octo.tenantId`        | The tenant currently being initialised                                              |

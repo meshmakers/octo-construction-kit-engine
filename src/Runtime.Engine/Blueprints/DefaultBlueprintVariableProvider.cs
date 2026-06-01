@@ -43,7 +43,7 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
 
         IReadOnlyDictionary<string, string> variables = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            ["octo.version"] = snapshot.OctoVersion ?? string.Empty,
+            ["octo.version"] = NormalizeOctoVersion(snapshot.OctoVersion ?? string.Empty),
             ["octo.environment"] = environment,
             ["octo.environmentMode"] = MapEnvironmentToMode(environment),
             ["octo.tenantId"] = tenantId,
@@ -52,6 +52,40 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
         };
 
         return Task.FromResult(variables);
+    }
+
+    /// <summary>
+    /// Trims a .NET-style 4-segment version (<c>MAJOR.MINOR.PATCH.REVISION</c>, typically
+    /// fed in via <c>Build.BuildNumber</c> → helm <c>--app-version</c> → <c>.Chart.AppVersion</c>)
+    /// down to a Helm-compatible 3-segment SemVer (<c>MAJOR.MINOR.PATCH</c>). Any SemVer
+    /// pre-release (<c>-foo</c>) or build-metadata (<c>+bar</c>) suffix is preserved on the
+    /// trimmed core, so a test-channel build like <c>3.3.109.0-test1</c> still ends up valid
+    /// as <c>3.3.109-test1</c>.
+    ///
+    /// Blueprints write <c>${octo.version}</c> straight into <c>System.Communication/ChartVersion</c>
+    /// which the Communication Operator passes to Helm's strict SemVer-only chart-version
+    /// validator. Without this normalisation a release-tag build (<c>$major.$minor.$build.0</c>)
+    /// silently lands a 4-part value in the runtime entity and every subsequent deploy fails.
+    /// Strings already in 1- to 3-segment form are returned untouched.
+    /// </summary>
+    private static string NormalizeOctoVersion(string version)
+    {
+        if (string.IsNullOrEmpty(version))
+        {
+            return string.Empty;
+        }
+
+        var suffixStart = version.IndexOfAny(new[] { '-', '+' });
+        var core = suffixStart >= 0 ? version.Substring(0, suffixStart) : version;
+        var suffix = suffixStart >= 0 ? version.Substring(suffixStart) : string.Empty;
+
+        var parts = core.Split('.');
+        if (parts.Length <= 3)
+        {
+            return version;
+        }
+
+        return string.Join(".", parts.Take(3)) + suffix;
     }
 
     /// <summary>

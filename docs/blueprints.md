@@ -131,6 +131,20 @@ entities:
         value: "${octo.version}"   # ← rolled forward by helm with every release
 ```
 
+#### Empty-string sentinel for chart versions
+
+A seeded attribute whose value is the empty string is a valid runtime value, not a
+"missing" one. The Communication-controller workflow uses this deliberately for
+`System.Communication/ChartVersion`: an empty value tells the Communication
+Operator's `HelmRunner` to omit the `--version` argument entirely, so helm picks
+the newest chart in the configured repository. Paired with `requires:` this lets
+a single blueprint family ship two variants — one with `ChartVersion:
+"${octo.version}"` for staging/production (matches the release-channel chart 1:1)
+and one with `ChartVersion: ""` for dev/test (tracks the rolling dev-channel
+chart, gets overwritten by the CD pipeline on every main-CI run). See
+`octo-communication-controller-services/CLAUDE.md` "Service-Managed Blueprints"
+and "Empty ChartVersion" for the full contract.
+
 ### `requires:` preconditions
 
 `requires:` gates whether the **root** blueprint of an apply call runs. Each key is a

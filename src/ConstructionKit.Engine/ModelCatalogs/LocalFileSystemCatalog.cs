@@ -398,7 +398,7 @@ public class LocalFileSystemCatalog : CachedCatalog
                 Directory.CreateDirectory(directoryPath);
             }
 
-            using var fileStream = File.OpenWrite(catalogPath);
+            using var fileStream = File.Create(catalogPath);
 
             // Serialize catalog to JSON
             await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
@@ -445,7 +445,7 @@ public class LocalFileSystemCatalog : CachedCatalog
                 Directory.CreateDirectory(directoryPath);
             }
 
-            using var fileStream = File.OpenWrite(catalogPath);
+            using var fileStream = File.Create(catalogPath);
             await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
             {
                 WriteIndented = true,
@@ -487,7 +487,7 @@ public class LocalFileSystemCatalog : CachedCatalog
             catalogData.Models = catalogData.Models.OrderBy(m => m.ModelName).ToList();
             catalogData.UpdatedAt = DateTime.UtcNow;
 
-            using var fileStream = File.OpenWrite(catalogPath);
+            using var fileStream = File.Create(catalogPath);
             await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
             {
                 WriteIndented = true,

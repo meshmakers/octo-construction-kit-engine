@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -333,6 +334,36 @@ public class LocalFileSystemCatalogTests : IDisposable
         var exception = await Assert.ThrowsAsync<ModelCatalogException>(() => _repository.PublishAsync(compiledModel));
 
         Assert.Contains("failed", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PublishModelAsync_RepublishWithShorterDescription_CatalogRemainsValidJson()
+    {
+        // Republishing with a shorter description shrinks the per-major catalog.json.
+        // If the writer opens the file without truncation, leftover bytes from the
+        // previous (longer) write trail the new content and the next read throws
+        // `'}' is invalid after a single JSON value`.
+        var modelId = new CkModelId("TestModel", "1.0.0");
+
+        A.CallTo(() => _mockJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
+            .Returns(Task.CompletedTask);
+
+        var longModel = new CkCompiledModelRoot { ModelId = modelId, Description = new string('x', 500) };
+        await _repository.PublishAsync(longModel);
+
+        var catalogPath = Path.Combine(_tempDirectory, "ck-models", "v2", "t", "TestModel", "1", "catalog.json");
+        var sizeAfterFirst = new FileInfo(catalogPath).Length;
+
+        var shortModel = new CkCompiledModelRoot { ModelId = modelId, Description = "y" };
+        await _repository.PublishAsync(shortModel, force: true);
+
+        var sizeAfterSecond = new FileInfo(catalogPath).Length;
+        Assert.True(sizeAfterSecond < sizeAfterFirst,
+            $"Test premise broken: expected smaller catalog after replacing description, got {sizeAfterSecond} vs {sizeAfterFirst} bytes.");
+
+        await using var fileStream = File.OpenRead(catalogPath);
+        using var doc = await JsonDocument.ParseAsync(fileStream, cancellationToken: TestContext.Current.CancellationToken);
+        Assert.NotNull(doc);
     }
 
     #endregion

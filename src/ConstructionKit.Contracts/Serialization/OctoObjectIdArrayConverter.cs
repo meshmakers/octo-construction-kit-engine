@@ -37,7 +37,7 @@ public class OctoObjectIdArrayConverter : JsonConverter<OctoObjectId[]>
         writer.WriteStartArray();
         foreach (var octoObjectId in value)
         {
-            writer.WriteStringValue(octoObjectId != OctoObjectId.Empty ? value.ToString() : string.Empty);
+            writer.WriteStringValue(octoObjectId != OctoObjectId.Empty ? octoObjectId.ToString() : string.Empty);
         }
 
         writer.WriteEndArray();

@@ -21,6 +21,7 @@ public class RtRecord : RtTypeWithAttributes
     /// </summary>
     /// <param name="ckRecordId">Construction kit record id</param>
     /// <param name="attributes">List of attributes</param>
+    [System.Text.Json.Serialization.JsonConstructor]
     public RtRecord(RtCkId<CkRecordId> ckRecordId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {

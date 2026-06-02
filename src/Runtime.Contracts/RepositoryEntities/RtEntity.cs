@@ -36,6 +36,7 @@ public class RtEntity : RtTypeWithAttributes
     /// <param name="ckTypeId">Construction kit type id</param>
     /// <param name="rtId">Object id</param>
     /// <param name="attributes">List of attributes</param>
+    [System.Text.Json.Serialization.JsonConstructor]
     public RtEntity(RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId, IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {

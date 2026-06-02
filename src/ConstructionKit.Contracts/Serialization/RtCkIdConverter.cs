@@ -54,7 +54,7 @@ public class RtCkIdConverter<TKey> : JsonConverter<RtCkId<TKey>>, IYamlTypeConve
     public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer rootSerializer)
     {
         var ckId = (RtCkId<TKey>)value!;
-        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckId.FullName, ScalarStyle.Any, true, false));
+        emitter.Emit(new Scalar(AnchorName.Empty, TagName.Empty, ckId.SemanticVersionedFullName, ScalarStyle.Any, true, false));
     }
 
     /// <inheritdoc />
@@ -73,7 +73,7 @@ public class RtCkIdConverter<TKey> : JsonConverter<RtCkId<TKey>>, IYamlTypeConve
     /// <inheritdoc />
     public override void WriteAsPropertyName(Utf8JsonWriter writer, RtCkId<TKey> value, JsonSerializerOptions options)
     {
-        writer.WritePropertyName(value.FullName);
+        writer.WritePropertyName(value.SemanticVersionedFullName);
     }
 
     /// <inheritdoc />
@@ -91,6 +91,6 @@ public class RtCkIdConverter<TKey> : JsonConverter<RtCkId<TKey>>, IYamlTypeConve
     /// <inheritdoc />
     public override void Write(Utf8JsonWriter writer, RtCkId<TKey> value, JsonSerializerOptions options)
     {
-        writer.WriteStringValue(value.FullName);
+        writer.WriteStringValue(value.SemanticVersionedFullName);
     }
 }

@@ -104,6 +104,49 @@ When modifying CK models:
 3. After changes, recompile the model using the compiler
 4. Generated code will be created based on the model definitions
 
+## JSON Serialization & Newtonsoft Parity
+
+The Rt-model serialization rules are split across two canonical options bundles, both in
+`Runtime.Contracts/Serialization/`:
+
+- `RtNewtonsoftSerializer.DefaultSerializer` — pre-migration Newtonsoft setup (used by tests and
+  legacy callers). `RtNewtonsoftAttributesConverter` preserves source CLR types through the
+  in-memory `JObject.FromObject` / `JToken.ToObject` round-trip (e.g. `int 1` stays `Int32` in
+  `JValue.Value`).
+- `RtSystemTextJsonSerializer.Default` — STJ counterpart. Has `RtAttributesConverter` for the
+  attribute dict, the CK / Rt ID converters, and the **`NewtonsoftParityDoubleConverter` /
+  `…SingleConverter` / `…DecimalConverter`** that emit `.0` for whole-number reals (mirroring
+  `JsonConvert.ToString`). Without these, `double 0.0` would serialize as `0` and re-deserialize
+  as `long` via `JsonScalar.ToClr` — observable as `BsonInt64` regressions in MongoDB.
+  It also sets **`Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping`** so serialized output
+  matches Newtonsoft byte-for-byte on non-ASCII (umlauts/ß) and HTML chars (`< > &`); STJ's default
+  `JavaScriptEncoder` would `\uXXXX`-escape those and diverge from the legacy wire form (breaking
+  hash/HMAC parity over serialized bytes). This encoder is the single source of truth and flows into
+  `SystemTextJsonOptions.Default` (octo-sdk) and every wire node. **Any consumer that serializes Rt
+  data with a raw `Utf8JsonWriter` (e.g. SDK `IDataContext.WriteJsonTo`) must honour it** — pass
+  `new JsonWriterOptions { Encoder = SystemTextJsonOptions.Default.Encoder }`.
+
+`JsonScalar.ToClr` is the single source of scalar boxing (`Runtime.Contracts/Serialization/`).
+Rules:
+- Integers prefer `Int32` (fits in 32 bits), then `Int64`. Matches Newtonsoft's
+  `JObject.FromObject(int)` → `JValue.Value=Int32`.
+- Reals box to `double`.
+- ISO-8601 strings parse to `DateTime` when `parseDateStrings=true`.
+
+The parity contract is enforced by `Sdk.Common.PipelineParityTests` (in octo-sdk) using
+Newtonsoft as the oracle. Irreducible divergences (float vs double, decimal vs double,
+DateTimeOffset vs DateTime — JSON has no source-CLR-type marker) are listed by name in
+`AttributeValueParityCorpus.IrreducibleDivergences`. Consumers needing exact source-CLR-type
+preservation must use typed accessors (`GetAttributeValue<decimal>`, typed properties on DTOs).
+
+**RtCkId virtual-property shim.** On the wire an `RtCkId<T>` serialises to a bare
+`SemanticVersionedFullName` string, but legacy pipeline YAML drills `.SemanticVersionedFullName` /
+`.FullName` expecting the historical object shape. The rule that those two property names on a JSON
+string are virtual self-aliases is centralised in **`RtCkIdJsonShim`**
+(`ConstructionKit.Contracts/RtCkIdJsonShim.cs`), next to `RtCkId<T>` where the wire shape is decided.
+It replaces magic strings formerly duplicated across the SDK walkers (`JsonPathWalker`, `DataOverlay`,
+`LayeredSource`), `RtNewtonsoftAttributesConverter`, and the mesh-adapter `CreateUpdateInfoNode`.
+
 ## N:M Association Query Columns
 
 N:M (many-to-many) associations are exposed as query columns with `totalCount` and `exists` meta-properties. These allow listing and filtering entities based on whether associations exist and how many there are.

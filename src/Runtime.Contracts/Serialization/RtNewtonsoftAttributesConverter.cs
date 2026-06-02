@@ -85,7 +85,7 @@ public class RtNewtonsoftAttributesConverter : JsonConverter<Dictionary<string, 
         {
             if (ckRecordIdToken is JObject ckObj)
             {
-                var svfn = ckObj["SemanticVersionedFullName"]?.ToString();
+                var svfn = ckObj[RtCkIdJsonShim.SemanticVersionedFullNameKey]?.ToString();
                 if (svfn != null)
                 {
                     ckRecordId = new RtCkId<CkRecordId>(svfn);

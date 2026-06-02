@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -778,16 +779,17 @@ internal class BlueprintMigrationExecutor : IBlueprintMigrationExecutor
         }
         foreach (var property in data.EnumerateObject())
         {
-            updates[property.Name] = property.Value.ValueKind switch
-            {
-                JsonValueKind.String => property.Value.GetString(),
-                JsonValueKind.Number when property.Value.TryGetInt64(out var l) => (object)l,
-                JsonValueKind.Number => property.Value.GetDouble(),
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.Null => null,
-                _ => property.Value.GetRawText()
-            };
+            // Route through JsonScalar.ToClr so integer boxing matches the rest of the
+            // Rt-model deserialization (Int32 preferred, falling back to Int64 for values
+            // that don't fit). Hand-rolling the switch here previously widened every
+            // integer to Int64, producing BsonInt64 attributes for any blueprint runtime
+            // update — observable as a sibling of the EDA pipeline regression. Object/Array
+            // values are not Rt scalars here; preserve the existing raw-text fallback for
+            // those, matching the prior behaviour for non-scalar payloads.
+            updates[property.Name] = property.Value.ValueKind == JsonValueKind.Object
+                                     || property.Value.ValueKind == JsonValueKind.Array
+                ? property.Value.GetRawText()
+                : JsonScalar.ToClr(property.Value);
         }
         return updates;
     }

@@ -23,6 +23,7 @@ public class StreamDataEntity : RtTypeWithAttributes
     /// <summary>
     ///     Creates a new instance of <see cref="StreamDataEntity"/> with the attribute bag pre-populated.
     /// </summary>
+    [System.Text.Json.Serialization.JsonConstructor]
     public StreamDataEntity(IReadOnlyDictionary<string, object?> attributes)
         : base(attributes)
     {

@@ -18,13 +18,17 @@ Blueprints are versioned, declarative bundles of Construction Kit models and run
 A blueprint is a directory containing a `blueprint.yaml`, optional seed data, and optional migration scripts:
 
 ```
-MyBlueprint-1.0.0/
-├── blueprint.yaml
+MyBlueprint/
+├── blueprint.yaml        # blueprintId: MyBlueprint-1.0.0
 ├── seed-data/
 │   └── entities.yaml
 └── migrations/
     └── from-1.0.0.yaml
 ```
+
+The folder name carries only the blueprint **Name**; the version lives exclusively
+in the manifest's `blueprintId`. Bumping the version is a manifest-only edit — no
+folder rename required.
 
 ## Blueprint YAML Schema
 
@@ -46,6 +50,11 @@ blueprintDependencies:
 # Optional path to seed data (relative to blueprint root)
 seedDataPath: seed-data/entities.yaml
 
+# Optional preconditions — see "Blueprint Variables" below
+requires:
+  octo.environment: [staging, production]
+  octo.isSystemTenant: "false"
+
 # Optional migrations from older versions of this blueprint
 migrations:
   - fromVersion: "0.9.0"
@@ -62,9 +71,124 @@ migrations:
 | `ckModelDependencies`   | string[] | CK models with version ranges (auto-imported on apply)                     |
 | `blueprintDependencies` | string[] | Other blueprints with version ranges (resolved transitively)               |
 | `seedDataPath`          | string   | Optional path to seed-data file (runtime-model format)                     |
+| `requires`              | object   | Optional preconditions evaluated against the tenant variable context       |
 | `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
 
 > Composition (`composedBlueprints`) was removed in favour of dependency-only resolution. The field is no longer accepted; the schema rejects manifests that still carry it.
+
+## Blueprint Variables
+
+Every blueprint apply runs against a **variable context** — a string→string dictionary
+resolved per tenant by `IBlueprintVariableProvider`. Variables are referenced from seed
+data and the manifest's `requires:` block using the same `${name}` syntax used by the CK
+compiler and the mesh-adapter `PlaceholderReplaceNode`.
+
+### Built-in variables
+
+The default `IBlueprintVariableProvider` exposes the following `octo.*` keys. Services
+can register a custom provider in DI to add their own keys (chart names, feature flags,
+secret indirection) — the default registration uses `TryAddTransient`, so a service-side
+`AddTransient<IBlueprintVariableProvider, MyProvider>()` before `AddRuntimeEngine()` wins.
+
+| Variable               | Source                                                                              |
+|------------------------|-------------------------------------------------------------------------------------|
+| `octo.version`         | `OctoBlueprintVariablesOptions.OctoVersion` (helm sets via `.Chart.AppVersion`). Auto-trimmed to 3-segment SemVer — a 4-part input like `3.3.109.0` from `Build.BuildNumber` becomes `3.3.109` so Helm's strict chart-version validation accepts it. Pre-release / build-metadata suffixes are preserved (`3.3.109.0-test1` → `3.3.109-test1`). |
+| `octo.environment`     | `OctoBlueprintVariablesOptions.Environment` — `dev` (default), `test`, `staging`, `production` |
+| `octo.environmentMode` | Same value mapped to the matching `System/EnvironmentModes` CK-enum name (`Development`, `Testing`, `Staging`, `Production`). Unknown environments fall back to `Development` with a warning log — the blueprint apply still succeeds. |
+| `octo.tenantId`        | The tenant currently being initialised                                              |
+| `octo.systemTenantId`  | `OctoBlueprintVariablesOptions.SystemTenantId` (defaults to `OctoSystem`)           |
+| `octo.isSystemTenant`  | `"true"` when `tenantId == octo.systemTenantId`, otherwise `"false"`                |
+
+Options bind from the `Blueprints` configuration section. Helm / env-var override path:
+
+```bash
+OCTO_BLUEPRINTS__OCTOVERSION=3.5.2
+OCTO_BLUEPRINTS__ENVIRONMENT=production
+OCTO_BLUEPRINTS__SYSTEMTENANTID=OctoSystem
+```
+
+### Using variables in seed data
+
+`${name}` placeholders are resolved in two locations:
+
+- Every string-typed attribute `value` in `seed-data/entities.yaml`
+- Every entity's `rtWellKnownName`
+
+Non-string attribute values (numbers, booleans, embedded records) are left untouched.
+Unknown placeholders log a warning and are kept verbatim — so a typo is loud rather than
+quietly writing an empty string to MongoDB.
+
+```yaml
+# seed-data/entities.yaml
+entities:
+  - rtId: '670000000000000000000002'
+    ckTypeId: System.Communication/Adapter
+    rtWellKnownName: MeshAdapter
+    attributes:
+      - id: System.Communication/ChartName
+        value: octo-adapter-eda
+      - id: System.Communication/ChartVersion
+        value: "${octo.version}"   # ← rolled forward by helm with every release
+```
+
+#### Empty-string sentinel for chart versions
+
+A seeded attribute whose value is the empty string is a valid runtime value, not a
+"missing" one. The Communication-controller workflow uses this deliberately for
+`System.Communication/ChartVersion`: an empty value tells the Communication
+Operator's `HelmRunner` to omit the `--version` argument entirely, so helm picks
+the newest chart in the configured repository. Paired with `requires:` this lets
+a single blueprint family ship two variants — one with `ChartVersion:
+"${octo.version}"` for staging/production (matches the release-channel chart 1:1)
+and one with `ChartVersion: ""` for dev/test (tracks the rolling dev-channel
+chart, gets overwritten by the CD pipeline on every main-CI run). See
+`octo-communication-controller-services/CLAUDE.md` "Service-Managed Blueprints"
+and "Empty ChartVersion" for the full contract.
+
+### `requires:` preconditions
+
+`requires:` gates whether the **root** blueprint of an apply call runs. Each key is a
+variable name; the value is either a scalar shortcut or a YAML sequence of acceptable
+values. The blueprint is applied only when every key resolves to a value present in its
+allow-list; otherwise the apply is a successful no-op (no install row, no seed data, no
+history entry) and `BlueprintApplicationResult.WasSkipped` is `true`.
+
+```yaml
+# Only apply to the system tenant in staging or production
+requires:
+  octo.isSystemTenant: "true"        # scalar — normalised to ["true"]
+  octo.environment: [staging, production]
+```
+
+Semantics:
+
+- A variable referenced by `requires:` but missing from the context fails the check
+  (fail-closed — better than a silently misapplied blueprint).
+- An empty allow-list (`requires: { octo.environment: [] }`) cannot match anything and
+  fails — usually a typo, surfaced loudly.
+- Matching is case-sensitive (`StringComparer.Ordinal`). Normalise casing in the manifest.
+- `requires:` is evaluated only on the explicitly-requested root blueprint, not on
+  transitive dependencies — a dep that ships seed data is presumed to be required by
+  every consumer. Split blueprints if you need finer-grained gating.
+
+### Pattern: collapse "two-blueprints" into one with `requires:`
+
+Before `requires:`, a service that wanted to seed different data for the system tenant
+versus other tenants had to ship two blueprints and branch in code. With `requires:`,
+both blueprints are still shipped, both are auto-applied, and each filters itself:
+
+```yaml
+# System.UI.SystemCockpit-1.0.0/blueprint.yaml
+requires:
+  octo.isSystemTenant: "true"
+
+# System.UI.TenantCockpit-1.0.0/blueprint.yaml
+requires:
+  octo.isSystemTenant: "false"
+```
+
+The service-side `DefaultConfigurationCreatorService` then becomes a single loop that
+applies every embedded blueprint — the `requires:` block decides which one matches.
 
 ## Version Ranges
 
@@ -85,6 +209,10 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 │
 ├── 1. Resolve transitive blueprint dependency closure (topo-sorted)
 │
+├── 1b. Resolve variable context via IBlueprintVariableProvider
+│       Evaluate root blueprint's `requires:` against the context
+│       → mismatch → BlueprintApplicationResult.Skipped (success no-op)
+│
 ├── 2. Conflict-check (CK versions, entity ownership, rtId collisions)
 │       → BlueprintApplicationResult.Conflicts; abort on hard conflicts
 │
@@ -93,6 +221,7 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 │       │                 already installed, --force → ReApply (upsert)
 │       │                 already installed, different version → Update path
 │       ├── Import CK model dependencies (auto-resolve via ICkModelUpgradeService)
+│       ├── Load seed data, interpolate ${variable} placeholders
 │       ├── Apply seed data via IImportRtModelCommand (Upsert)
 │       ├── Tag entities with rtBlueprintSource / rtBlueprintLocked / rtBlueprintAppliedAt
 │       ├── Persist BlueprintInstallation
@@ -357,14 +486,27 @@ services.AddMongoBlueprintSupport();     // wires MongoDB-backed history + insta
 
 The blueprint service ships in `Runtime.Engine`. The MongoDB-backed history / installations / backup persistence ships in `Runtime.Engine.MongoDb` and is registered with `AddMongoBlueprintSupport()`. For in-memory-only setups (unit tests), `AddRuntimeEngine()` registers in-memory defaults.
 
+## Service-Managed Blueprints (`System.*`)
+
+OctoMesh draws a convention line through the blueprint *name*:
+
+| Name prefix    | Lifecycle                                                                                     |
+|----------------|-----------------------------------------------------------------------------------------------|
+| `System.…`     | **Service-managed.** Applied and updated automatically by the owning OctoMesh service.        |
+| anything else  | **Admin-installable.** Picked up from a regular catalog; admin clicks Install in Studio.      |
+
+Use `BlueprintIdExtensions.IsServiceManaged(blueprintId)` to check at runtime. The matching constant is `BlueprintIdExtensions.ServiceManagedNamePrefix` (`"System."`). Studio mirrors the same check in TypeScript (`blueprint-management.ts`) to hide Install / Re-apply controls for service-managed blueprints — manual install on a system blueprint would race the service for ownership.
+
+The convention is on the name, not the catalog. A service-managed blueprint discovered through a `LocalFileSystemBlueprintCatalog` is still service-managed.
+
 ## Catalog Types
 
-| Catalog                            | Description                                                                       |
-|------------------------------------|-----------------------------------------------------------------------------------|
-| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system.                                            |
-| `EmbeddedResourceBlueprintCatalog` | Loads blueprints from assembly resources.                                         |
-| `PublicGitHubBlueprintCatalog`     | Reads blueprints from a public GitHub Pages site (default: `meshmakers.github.io`). |
-| `PrivateGitHubBlueprintCatalog`    | Reads blueprints from a private/internal GitHub repository (writes via Octokit).  |
+| Catalog                            | Description                                                                                       |
+|------------------------------------|---------------------------------------------------------------------------------------------------|
+| `LocalFileSystemBlueprintCatalog`  | Loads blueprints from the file system.                                                            |
+| `EmbeddedResourceBlueprintCatalog` | Read-only catalog that aggregates every DI-registered `IBlueprintEmbeddedSource` (see below).     |
+| `PublicGitHubBlueprintCatalog`     | Reads blueprints from a public GitHub Pages site (default: `meshmakers.github.io`).               |
+| `PrivateGitHubBlueprintCatalog`    | Reads blueprints from a private/internal GitHub repository (writes via Octokit).                  |
 
 ```csharp
 services.Configure<PublicGitHubBlueprintCatalogOptions>(o =>
@@ -380,6 +522,48 @@ services.Configure<PrivateGitHubBlueprintCatalogOptions>(o =>
 ```
 
 > The private GitHub catalog reads via HTTP against the Pages URI and writes via Octokit. If GitHub Pages is disabled on the source repository, reads will 404 and the catalog is effectively write-only until Pages is enabled.
+
+## Embedding Blueprints in a Service NuGet
+
+Service-managed blueprints typically ship *inside* the owning service's NuGet (so a service version bump automatically rolls every tenant's blueprint forward). The pattern mirrors how CK models are embedded:
+
+1. Lay out blueprint folders next to the CK model in the service's CK-model project:
+
+   ```
+   SystemCommunicationCkModel/
+   ├── ConstructionKit/         # CK model YAML (existing)
+   └── Blueprints/
+       └── System.Communication/
+           ├── blueprint.yaml   # blueprintId: System.Communication-1.0.0
+           └── seed-data/entities.yaml
+   ```
+
+2. Add the folder to the project's MSBuild item set so the `BlueprintEmbed` task (shipped in the `Meshmakers.Octo.ConstructionKit.MsBuildTasks` NuGet) discovers it:
+
+   ```xml
+   <ItemGroup>
+       <BlueprintFolder Visible="false" Include="$(MSBuildProjectDirectory)\Blueprints" />
+   </ItemGroup>
+   ```
+
+   At build time the task validates each `blueprint.yaml` against `blueprint-meta.schema.json`, registers every file as an `EmbeddedResource` with a deterministic `LogicalName`, and emits an `obj/<Config>/<TFM>/octo-blueprints/blueprints-cache.json` inventory.
+
+3. The `BlueprintSourceGenerator` (shipped in the `Meshmakers.Octo.ConstructionKit.SourceGeneration` NuGet) consumes the cache via `AdditionalFiles` and emits, per blueprint version:
+   - an `IBlueprintEmbeddedSource` implementation under `{RootNamespace}.Generated.Blueprints.{Name}.v{Major}`
+   - a DI extension method `AddBlueprint{Name}V{Major}(this IServiceCollection)` under `Microsoft.Extensions.DependencyInjection`.
+
+4. The consuming service registers the embedded source with one line per blueprint and lets the engine discover them through the always-registered `EmbeddedResourceBlueprintCatalog`:
+
+   ```csharp
+   services.AddRuntimeEngine();                       // registers IBlueprintService + the catalog
+   services.AddBlueprintSystemCommunicationV1();      // generated extension
+   ```
+
+5. To apply (or re-apply) a service-managed blueprint per tenant, call `IBlueprintService.ApplyBlueprintAsync(tenantId, new BlueprintId("System.Communication-1.0.0"))` — typically on tenant Enable and again on tenant startup. `ApplyBlueprintAsync` is idempotent at the same version; bumping the embedded version is enough to roll every tenant forward on the next startup.
+
+The convention for picking what to embed:
+- `System.*` blueprints (production base, service-managed) → embed in the service's CK-model NuGet.
+- Demo / sample / opt-in blueprints → ship through a regular catalog (LocalFileSystem, GitHub) so admins decide per tenant.
 
 ## GitHub Catalog Layout
 

@@ -209,4 +209,31 @@ public class BlueprintCatalogException : Exception
         return new BlueprintCatalogException(
             $"Blueprint '{blueprintId}' already exists in catalog '{catalogName}'. Use force option to overwrite.");
     }
+
+    /// <summary>
+    /// Creates an exception for a file that does not exist inside a blueprint's folder. Returns the
+    /// dedicated <see cref="BlueprintFileNotFoundException" /> subtype so soft-not-found call sites
+    /// can distinguish it from other catalog failures without inspecting the message.
+    /// </summary>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="catalogName">The catalog name</param>
+    /// <param name="relativePath">The relative path of the missing file</param>
+    /// <returns>A new exception instance</returns>
+    public static BlueprintFileNotFoundException BlueprintFileNotFound(
+        BlueprintId blueprintId, string catalogName, string relativePath)
+    {
+        return new BlueprintFileNotFoundException(blueprintId, catalogName, relativePath);
+    }
+
+    /// <summary>
+    /// Creates an exception for an invalid relative path in a blueprint file lookup.
+    /// </summary>
+    /// <param name="relativePath">The offending relative path</param>
+    /// <returns>A new exception instance</returns>
+    public static BlueprintCatalogException InvalidBlueprintRelativePath(string relativePath)
+    {
+        return new BlueprintCatalogException(
+            $"Blueprint file relative path '{relativePath}' is invalid. " +
+            $"Paths must be relative to the blueprint root and may not contain '..' or rooted segments.");
+    }
 }

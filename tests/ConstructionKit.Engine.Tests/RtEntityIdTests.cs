@@ -12,13 +12,13 @@ public class RtEntityIdTests
     {
         var r = JsonSerializer.Serialize(RtEntityId, new JsonSerializerOptions { WriteIndented = false });
         
-        Assert.Equal(@"{""CkTypeId"":""Demo/Test-1"",""RtId"":""66004fda527ac79a03ecedd7""}", r);
+        Assert.Equal(@"{""CkTypeId"":""Demo/Test"",""RtId"":""66004fda527ac79a03ecedd7""}", r);
     }
     
     [Fact]
     public void Deserialize_Ok()
     {
-        var s = @"{""CkTypeId"":""Demo/Test-1"",""RtId"":""66004fda527ac79a03ecedd7""}";
+        var s = @"{""CkTypeId"":""Demo/Test"",""RtId"":""66004fda527ac79a03ecedd7""}";
         
         var rtEntityId = JsonSerializer.Deserialize<RtEntityId>(s);
         

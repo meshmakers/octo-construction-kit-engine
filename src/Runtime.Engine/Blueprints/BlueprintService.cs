@@ -35,6 +35,7 @@ internal class BlueprintService : IBlueprintService
     private readonly IBlueprintNotifications _notifications;
     private readonly IBlueprintDependencyResolver _dependencyResolver;
     private readonly ITenantBlueprintInstallations _installations;
+    private readonly IBlueprintVariableProvider _variableProvider;
     private readonly ILogger<BlueprintService> _logger;
 
     // System CK attribute identifiers for blueprint tracking.
@@ -68,6 +69,7 @@ internal class BlueprintService : IBlueprintService
         IBlueprintNotifications notifications,
         IBlueprintDependencyResolver dependencyResolver,
         ITenantBlueprintInstallations installations,
+        IBlueprintVariableProvider variableProvider,
         ILogger<BlueprintService> logger)
     {
         _ckCacheService = ckCacheService;
@@ -83,6 +85,7 @@ internal class BlueprintService : IBlueprintService
         _notifications = notifications;
         _dependencyResolver = dependencyResolver;
         _installations = installations;
+        _variableProvider = variableProvider;
         _logger = logger;
     }
 
@@ -184,14 +187,35 @@ internal class BlueprintService : IBlueprintService
                     MessageLevel.Warning, null, 51, warning));
             }
 
-            // 2. Tenant cache bootstrap.
-            if (!_ckCacheService.IsTenantLoaded(tenantId))
+            // 1b. Resolve the tenant variable context once and gate the root blueprint on
+            //     its `requires:` block. Skipping is a successful no-op — no install row,
+            //     no seed data, no history entry — so callers iterating over a list of
+            //     blueprints can rely on WasSkipped to distinguish "filtered out" from
+            //     "applied". `requires:` is intentionally not evaluated on transitive deps:
+            //     a dep that ships seed data is presumed to be required by every consumer,
+            //     and re-evaluating its preconditions would only invite half-installed
+            //     deployments. Authors who need per-tenant variation should split the
+            //     blueprint, not gate its dependencies.
+            var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+                .ConfigureAwait(false);
+
+            var rootBlueprint = resolution.InstallOrder.FirstOrDefault(bp => bp.BlueprintId.Equals(blueprintId));
+            if (rootBlueprint?.Requires is { Count: > 0 } requires)
             {
-                _ckCacheService.CreateTenant(tenantId);
-                _logger.LogDebug("Created tenant {TenantId}", tenantId);
+                var mismatch = RequiresEvaluator.FindMismatch(requires, variables);
+                if (mismatch != null)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Info, null, 28,
+                        $"Blueprint {blueprintId} skipped: {mismatch}"));
+                    _logger.LogInformation(
+                        "Blueprint {BlueprintId} skipped for tenant {TenantId}: {Reason}",
+                        blueprintId, tenantId, mismatch);
+                    return BlueprintApplicationResult.Skipped(tenantId, blueprintId, mismatch, operationResult);
+                }
             }
 
-            // 3. Aggregate all CK model dependencies across the install order and upgrade once.
+            // 2. Aggregate all CK model dependencies across the install order.
             var aggregatedCkDeps = resolution.InstallOrder
                 .SelectMany(bp => bp.CkModelDependencies ?? [])
                 .GroupBy(d => d.Name, StringComparer.Ordinal)
@@ -199,12 +223,67 @@ internal class BlueprintService : IBlueprintService
                 .ToList();
             loadedCkModels.AddRange(aggregatedCkDeps);
 
+            // 3. Install missing CK model schemas into the tenant. The blueprint contract
+            //    promises that ckModelDependencies are auto-imported on apply
+            //    (docs/blueprints.md); UpgradeModelsAsync only runs in-place version
+            //    migrations, so we have to materialize the schema first. The provider
+            //    implementation is idempotent — an already-installed model is a cheap
+            //    no-op aside from any pending migration retry.
+            foreach (var dep in aggregatedCkDeps)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var targetVersion = dep.ModelVersionRange.MinVersion;
+                if (targetVersion == null)
+                {
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error, null, 24,
+                        $"CK model dependency '{dep.Name}' has no minimum version in range '{dep.ModelVersionRange}'"));
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                    return BlueprintApplicationResult.Failed(operationResult);
+                }
+
+                var concreteModelId = new CkModelId(dep.Name, targetVersion.ToString()!);
+
+                try
+                {
+                    await _runtimeRepositoryProvider.EnsureCkModelInstalledAsync(
+                            tenantId, concreteModelId, operationResult, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogError(ex,
+                        "Failed to install CK model {ModelId} into tenant {TenantId}",
+                        concreteModelId, tenantId);
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Error, null, 24,
+                        $"Failed to install CK model '{concreteModelId}': {ex.Message}"));
+                }
+
+                if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                {
+                    await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                    return BlueprintApplicationResult.Failed(operationResult);
+                }
+            }
+
+            // 4. Run CK model migrations for any deps that are at an older version on the tenant.
+            // CreateBackup is OFF: tenant backups are expected to be driven by the
+            // infrastructure layer (mongodump cronjobs / MongoDB Atlas snapshots /
+            // velero, etc.), not synthesized inline from the service pod on every
+            // CK bump. Requiring `mongodump` inside every consuming service image
+            // added ~50MB of tooling to each container and made additive
+            // no-op-migration bumps (e.g. System.Communication 3.20.0 -> 3.21.0)
+            // crash startup on images that did not ship the binary. A pre-migration
+            // backup made sense when destructive data migrations were the norm; for
+            // additive bumps it is pure overhead.
             if (aggregatedCkDeps.Count > 0)
             {
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
                         tenantId,
                         aggregatedCkDeps,
-                        new CkMigrationOptions { CreateBackup = true, DryRun = false, ContinueOnError = false },
+                        new CkMigrationOptions { CreateBackup = false, DryRun = false, ContinueOnError = false },
                         null,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -225,6 +304,25 @@ internal class BlueprintService : IBlueprintService
                     operationResult.AddMessage(new OperationMessage(
                         MessageLevel.Warning, null, 26, $"CK model migration: {warning}"));
                 }
+            }
+
+            // 5. Load the in-memory CK cache for the tenant. EnsureCkModelInstalledAsync may
+            //    have unloaded the cache as part of installing a new schema; downstream steps
+            //    (seed import, ValidateCkModels) need the model graph populated. The load is
+            //    idempotent at the storage layer.
+            var tenantRepository = await _runtimeRepositoryProvider
+                .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+            if (tenantRepository != null)
+            {
+                await tenantRepository.LoadCacheForTenantAsync(_ckCacheService).ConfigureAwait(false);
+            }
+            else if (!_ckCacheService.IsTenantLoaded(tenantId))
+            {
+                // No storage-managed repository (e.g. in-memory test setup) and the cache
+                // entry hasn't been pre-seeded by the test fixture — fall back to an empty
+                // cache entry so downstream type lookups have somewhere to write.
+                _ckCacheService.CreateTenant(tenantId);
+                _logger.LogDebug("Created tenant {TenantId} (no storage repository)", tenantId);
             }
 
             // 4. Walk the topo-sorted install order. Each blueprint becomes its own
@@ -269,7 +367,7 @@ internal class BlueprintService : IBlueprintService
                 if (willImportSeed)
                 {
                     var perBlueprintEntities = await ApplySeedDataForBlueprintAsync(
-                        tenantId, blueprint, operationResult, appliedSeedDataFiles, cancellationToken)
+                        tenantId, blueprint, variables, operationResult, appliedSeedDataFiles, cancellationToken)
                         .ConfigureAwait(false);
 
                     if (operationResult.HasErrors)
@@ -421,14 +519,17 @@ internal class BlueprintService : IBlueprintService
             // Validate seed data file exists
             if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
             {
-                var blueprintPath = await _blueprintCatalogManager
-                    .GetBlueprintPathAsync(blueprintId)
+                var seedStream = await _blueprintCatalogManager
+                    .TryOpenBlueprintFileAsync(blueprintId, blueprint.SeedDataPath!)
                     .ConfigureAwait(false);
 
-                var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
-                if (!File.Exists(seedDataPath))
+                if (seedStream == null)
                 {
-                    missingSeedDataFiles.Add(seedDataPath);
+                    missingSeedDataFiles.Add(BlueprintFileDescription(blueprintId, blueprint.SeedDataPath!));
+                }
+                else
+                {
+                    seedStream.Dispose();
                 }
             }
 
@@ -631,12 +732,15 @@ internal class BlueprintService : IBlueprintService
                 // Load and validate migration
                 try
                 {
-                    var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(targetVersion)
+                    using var migrationStream = await _blueprintCatalogManager
+                        .OpenBlueprintFileAsync(targetVersion, migrationRef.ScriptPath,
+                            cancellationToken: cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
-                    var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
+                    var migration = await _migrationParser.ParseAsync(
+                            migrationStream,
+                            BlueprintFileDescription(targetVersion, migrationRef.ScriptPath),
+                            cancellationToken)
                         .ConfigureAwait(false);
 
                     var validationResult = await _migrationExecutor.ValidateAsync(
@@ -730,18 +834,22 @@ internal class BlueprintService : IBlueprintService
             return diff;
         }
 
-        var blueprintPath = await _blueprintCatalogManager
-            .GetBlueprintPathAsync(targetVersion).ConfigureAwait(false);
-        var seedPath = Path.Combine(blueprintPath, targetBlueprint.SeedDataPath);
+        var seedDescription = BlueprintFileDescription(targetVersion, targetBlueprint.SeedDataPath!);
+        var seedStream = await _blueprintCatalogManager
+            .TryOpenBlueprintFileAsync(targetVersion, targetBlueprint.SeedDataPath!,
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
 
-        if (!File.Exists(seedPath))
+        if (seedStream == null)
         {
-            diff.Warnings.Add($"Seed data file not found: {seedPath}");
+            diff.Warnings.Add($"Seed data file not found: {seedDescription}");
             return diff;
         }
 
         var opResult = new OperationResult();
-        var seedRoot = await LoadAndTagSeedAsync(seedPath, targetVersion, opResult)
+        var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, targetVersion, variables, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1055,7 +1163,61 @@ internal class BlueprintService : IBlueprintService
 
             var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
 
-            // 5b. Execute CK model migrations if upgrading from a previous version
+            // 5b. Install missing CK model schemas. A blueprint update may introduce
+            //     new ckModelDependencies that the tenant has never seen — auto-import
+            //     those before the upgrade step, mirroring ApplyBlueprintAsync. Skipped
+            //     in DryRun mode (ImportCkModelAsync has no preview path; the update
+            //     preview already warns that real apply will install).
+            if (ckDependencies.Count > 0 && !options.DryRun)
+            {
+                foreach (var dep in ckDependencies)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var targetVersionRange = dep.ModelVersionRange.MinVersion;
+                    if (targetVersionRange == null)
+                    {
+                        result.Success = false;
+                        result.Errors.Add(
+                            $"CK model dependency '{dep.Name}' has no minimum version in range '{dep.ModelVersionRange}'");
+                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                        return result;
+                    }
+
+                    var concreteModelId = new CkModelId(dep.Name, targetVersionRange.ToString()!);
+                    var installOpResult = new OperationResult();
+
+                    try
+                    {
+                        await _runtimeRepositoryProvider.EnsureCkModelInstalledAsync(
+                                tenantId, concreteModelId, installOpResult, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        _logger.LogError(ex,
+                            "Failed to install CK model {ModelId} into tenant {TenantId}",
+                            concreteModelId, tenantId);
+                        result.Errors.Add($"Failed to install CK model '{concreteModelId}': {ex.Message}");
+                    }
+
+                    if (installOpResult.HasErrors || installOpResult.HasFatalErrors)
+                    {
+                        result.Errors.AddRange(installOpResult.Messages
+                            .Where(m => m.MessageLevel is MessageLevel.Error or MessageLevel.FatalError)
+                            .Select(m => m.MessageText));
+                    }
+
+                    if (result.Errors.Count > 0)
+                    {
+                        result.Success = false;
+                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
+                        return result;
+                    }
+                }
+            }
+
+            // 5c. Execute CK model migrations if upgrading from a previous version
             if (ckDependencies.Count > 0)
             {
                 var ckMigrationOptions = new CkMigrationOptions
@@ -1085,6 +1247,20 @@ internal class BlueprintService : IBlueprintService
                     upgradeResult.TotalEntitiesAffected);
             }
 
+            // 5d. Load the in-memory CK cache for the tenant. If we installed a new
+            //     schema above, EnsureCkModelInstalledAsync unloaded the cache; the
+            //     subsequent ApplyDiffAsync seed import needs the model graph populated.
+            //     Skipped in DryRun mode since the diff path also no-ops there.
+            if (!options.DryRun)
+            {
+                var tenantRepository = await _runtimeRepositoryProvider
+                    .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
+                if (tenantRepository != null)
+                {
+                    await tenantRepository.LoadCacheForTenantAsync(_ckCacheService).ConfigureAwait(false);
+                }
+            }
+
             // 6. Apply update based on mode
             if (updateMode == BlueprintUpdateMode.Migration)
             {
@@ -1094,12 +1270,15 @@ internal class BlueprintService : IBlueprintService
 
                 if (migrationRef != null)
                 {
-                    var blueprintPath = await _blueprintCatalogManager
-                        .GetBlueprintPathAsync(targetVersion)
+                    using var migrationStream = await _blueprintCatalogManager
+                        .OpenBlueprintFileAsync(targetVersion, migrationRef.ScriptPath,
+                            cancellationToken: cancellationToken)
                         .ConfigureAwait(false);
 
-                    var migrationPath = Path.Combine(blueprintPath, migrationRef.ScriptPath);
-                    var migration = await _migrationParser.ParseAsync(migrationPath, cancellationToken)
+                    var migration = await _migrationParser.ParseAsync(
+                            migrationStream,
+                            BlueprintFileDescription(targetVersion, migrationRef.ScriptPath),
+                            cancellationToken)
                         .ConfigureAwait(false);
 
                     var migrationOptions = new BlueprintMigrationExecutionOptions
@@ -1730,16 +1909,19 @@ internal class BlueprintService : IBlueprintService
             return 0;
         }
 
-        var blueprintPath = await _blueprintCatalogManager
-            .GetBlueprintPathAsync(blueprintId).ConfigureAwait(false);
-        var seedDataPath = Path.Combine(blueprintPath, catalogBlueprint.SeedDataPath);
+        var seedDescription = BlueprintFileDescription(blueprintId, catalogBlueprint.SeedDataPath!);
+        var seedStream = await _blueprintCatalogManager
+            .TryOpenBlueprintFileAsync(blueprintId, catalogBlueprint.SeedDataPath!)
+            .ConfigureAwait(false);
 
-        if (!File.Exists(seedDataPath))
+        if (seedStream == null)
         {
             return 0;
         }
 
-        var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprintId, opResult)
+        var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, variables, opResult)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -1834,6 +2016,7 @@ internal class BlueprintService : IBlueprintService
     private async Task<int> ApplySeedDataForBlueprintAsync(
         string tenantId,
         BlueprintMetaRootDto blueprint,
+        IReadOnlyDictionary<string, string> variables,
         OperationResult operationResult,
         List<string> appliedSeedDataFiles,
         CancellationToken cancellationToken)
@@ -1845,16 +2028,17 @@ internal class BlueprintService : IBlueprintService
 
         try
         {
-            var blueprintPath = await _blueprintCatalogManager
-                .GetBlueprintPathAsync(blueprint.BlueprintId)
+            var seedDescription = BlueprintFileDescription(blueprint.BlueprintId, blueprint.SeedDataPath!);
+            var seedStream = await _blueprintCatalogManager
+                .TryOpenBlueprintFileAsync(blueprint.BlueprintId, blueprint.SeedDataPath!,
+                    cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
-            var seedDataPath = Path.Combine(blueprintPath, blueprint.SeedDataPath);
 
-            if (!File.Exists(seedDataPath))
+            if (seedStream == null)
             {
-                _logger.LogWarning("Seed data file not found: {Path}", seedDataPath);
+                _logger.LogWarning("Seed data file not found: {Source}", seedDescription);
                 operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Warning, seedDataPath, 20, "Seed data file not found"));
+                    MessageLevel.Warning, seedDescription, 20, "Seed data file not found"));
                 return 0;
             }
 
@@ -1862,13 +2046,14 @@ internal class BlueprintService : IBlueprintService
                 .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
             if (repository == null)
             {
+                seedStream.Dispose();
                 operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Error, seedDataPath, 22,
+                    MessageLevel.Error, seedDescription, 22,
                     $"No runtime repository available for tenant {tenantId}"));
                 return 0;
             }
 
-            var seedRoot = await LoadAndTagSeedAsync(seedDataPath, blueprint.BlueprintId, operationResult)
+            var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprint.BlueprintId, variables, operationResult)
                 .ConfigureAwait(false);
             if (seedRoot == null)
             {
@@ -1878,7 +2063,7 @@ internal class BlueprintService : IBlueprintService
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 
-            appliedSeedDataFiles.Add(seedDataPath);
+            appliedSeedDataFiles.Add(seedDescription);
             return seedRoot.Entities.Count;
         }
         catch (Exception ex)
@@ -1893,39 +2078,60 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <summary>
-    /// Reads a seed-data YAML file from disk, deserialises it and stamps the
-    /// blueprint provenance attributes on every entity. Returns null and emits
-    /// errors via <paramref name="operationResult"/> when the file cannot be parsed.
+    /// Reads a seed-data YAML stream, deserialises it and stamps the blueprint provenance attributes
+    /// on every entity. Returns null and emits errors via <paramref name="operationResult"/> when the
+    /// stream cannot be parsed. The stream is disposed by this method.
     /// </summary>
     private async Task<RtModelRootTcDto?> LoadAndTagSeedAsync(
-        string seedDataPath,
+        Stream seedStream,
+        string sourceDescription,
         BlueprintId blueprintId,
+        IReadOnlyDictionary<string, string> variables,
         OperationResult operationResult)
     {
         try
         {
-            using var stream = File.OpenRead(seedDataPath);
-            var root = await _rtYamlSerializer
-                .DeserializeAsync(stream, seedDataPath, operationResult)
-                .ConfigureAwait(false);
-
-            if (operationResult.HasErrors)
+#if NETSTANDARD2_0
+            using (seedStream)
+#else
+            await using (seedStream)
+#endif
             {
-                return null;
-            }
+                var root = await _rtYamlSerializer
+                    .DeserializeAsync(seedStream, sourceDescription, operationResult)
+                    .ConfigureAwait(false);
 
-            StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
-            return root;
+                if (operationResult.HasErrors)
+                {
+                    return null;
+                }
+
+                // Resolve ${variable} placeholders in attribute string values and
+                // rtWellKnownName before stamping. Done in-place so the provenance
+                // attributes added by StampBlueprintTags can never be substituted.
+                BlueprintVariableInterpolator.Interpolate(root, variables, sourceDescription, operationResult);
+
+                StampBlueprintTags(root, blueprintId, DateTime.UtcNow);
+                return root;
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to deserialise seed data from {Path}", seedDataPath);
+            _logger.LogError(ex, "Failed to deserialise seed data from {Source}", sourceDescription);
             operationResult.AddMessage(new OperationMessage(
                 MessageLevel.Error,
-                seedDataPath,
+                sourceDescription,
                 23,
                 $"Failed to deserialise seed data: {ex.Message}"));
             return null;
         }
     }
+
+    /// <summary>
+    /// Builds a human-readable description for a blueprint-rooted file. Used as the <c>sourceDescription</c>
+    /// argument for serializer / parser error reporting.
+    /// </summary>
+    private static string BlueprintFileDescription(BlueprintId blueprintId, string relativePath)
+        => $"{blueprintId.FullName}/{relativePath}";
+
 }

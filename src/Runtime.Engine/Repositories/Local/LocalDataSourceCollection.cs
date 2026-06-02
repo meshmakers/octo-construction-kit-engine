@@ -111,6 +111,17 @@ internal class LocalDataSourceCollection<TKey, TDocument, TDto>(
         await SaveAsync().ConfigureAwait(false);
     }
 
+    public async Task<bool> UpdateOneIfGuardMatchesAsync(IOctoSession session, TDocument document,
+        AttributeNewerThanGuard guard)
+    {
+        // The local file-based store is single-process: the cross-process race that
+        // AttributeNewerThanGuard protects against (e.g. a controller pod committing late
+        // during a rolling restart) cannot happen here. Apply the update unconditionally
+        // — the guard is a no-op in this backend.
+        await UpdateOneAsync(session, new[] { document }).ConfigureAwait(false);
+        return true;
+    }
+
     public async Task UpdateManyAsync(IOctoSession session, Expression<Func<TDocument, bool>> expression,
         TDocument document)
     {

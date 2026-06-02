@@ -1,0 +1,86 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: BlueprintInstallation
+    description: "Records a blueprint that is currently installed in the tenant. One entity per installed blueprint; replaced on update or re-apply, removed on uninstall."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/BlueprintInstallation.BlueprintName
+        name: BlueprintName
+      - id: ${this}/BlueprintInstallation.BlueprintVersion
+        name: BlueprintVersion
+      - id: ${this}/BlueprintInstallation.InstalledAt
+        name: InstalledAt
+      - id: ${this}/BlueprintInstallation.LastUpdatedAt
+        name: LastUpdatedAt
+      - id: ${this}/BlueprintInstallation.SeedDataChecksum
+        name: SeedDataChecksum
+        isOptional: true
+      - id: ${this}/BlueprintInstallation.IsDependency
+        name: IsDependency
+      - id: ${this}/BlueprintInstallation.ResolvedDependencies
+        name: ResolvedDependencies
+        isOptional: true
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - BlueprintName
+
+  - typeId: BlueprintHistory
+    description: "Append-only audit log of blueprint apply operations in the tenant. One entity per apply (install, update, rollback, re-apply)."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/BlueprintHistory.BlueprintName
+        name: BlueprintName
+      - id: ${this}/BlueprintHistory.BlueprintVersion
+        name: BlueprintVersion
+      - id: ${this}/BlueprintHistory.AppliedAt
+        name: AppliedAt
+      - id: ${this}/BlueprintHistory.ApplicationMode
+        name: ApplicationMode
+      - id: ${this}/BlueprintHistory.PreviousBlueprintName
+        name: PreviousBlueprintName
+        isOptional: true
+      - id: ${this}/BlueprintHistory.PreviousVersion
+        name: PreviousVersion
+        isOptional: true
+      - id: ${this}/BlueprintHistory.EntitiesCreated
+        name: EntitiesCreated
+      - id: ${this}/BlueprintHistory.EntitiesUpdated
+        name: EntitiesUpdated
+      - id: ${this}/BlueprintHistory.EntitiesDeleted
+        name: EntitiesDeleted
+      - id: ${this}/BlueprintHistory.SeedDataChecksum
+        name: SeedDataChecksum
+        isOptional: true
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - BlueprintName
+              - AppliedAt
+
+  - typeId: BlueprintBackup
+    description: "Snapshot of seed entities captured immediately before a blueprint apply, used to support rollback."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/BlueprintBackup.BlueprintName
+        name: BlueprintName
+      - id: ${this}/BlueprintBackup.BlueprintVersion
+        name: BlueprintVersion
+      - id: ${this}/BlueprintBackup.CreatedAt
+        name: CreatedAt
+      - id: ${this}/BlueprintBackup.SnapshotJson
+        name: SnapshotJson
+    indexes:
+      - indexType: "Ascending"
+        fields:
+          - attributePaths:
+              - BlueprintName
+              - CreatedAt

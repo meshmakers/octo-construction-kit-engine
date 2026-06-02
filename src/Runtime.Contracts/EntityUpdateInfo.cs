@@ -19,13 +19,21 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
         ModOption = modOption;
         RtEntity = rtEntity;
     }
-    
+
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
         : this(rtEntityId, modOption)
     {
         RtEntity = rtEntity;
     }
-    
+
+    private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption,
+        AttributeNewerThanGuard updateGuard)
+        : this(rtEntityId, modOption)
+    {
+        RtEntity = rtEntity;
+        UpdateGuard = updateGuard;
+    }
+
     private EntityUpdateInfo(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
     {
         CkTypeId = ckTypeId;
@@ -54,6 +62,16 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     /// </summary>
     [Newtonsoft.Json.JsonProperty(DefaultValueHandling = Newtonsoft.Json.DefaultValueHandling.Include)]
     public EntityModOptions ModOption { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Not serialized — the guard is meaningful only in-process at write time, not on the
+    ///     wire. Cross-process consumers should call <see cref="CreateConditionalUpdate" />
+    ///     themselves if they need OCC.
+    /// </remarks>
+    [Newtonsoft.Json.JsonIgnore]
+    [System.Text.Json.Serialization.JsonIgnore]
+    public AttributeNewerThanGuard? UpdateGuard { get; }
 
     /// <inheritdoc />
     public RtEntityId GetRtEntityId()
@@ -106,6 +124,24 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     public static EntityUpdateInfo<TEntity> CreateUpdate(RtEntityId rtEntityId, TEntity rtEntity)
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for a
+    ///     conditional update guarded by <paramref name="updateGuard" />. The write is
+    ///     applied only if the persisted value at <see cref="AttributeNewerThanGuard.AttributePath" />
+    ///     is missing, null, or less than or equal to
+    ///     <see cref="AttributeNewerThanGuard.NewValue" />. Otherwise the write is silently
+    ///     skipped — the caller can detect this via the matched-count returned from the
+    ///     repository.
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity to update</param>
+    /// <param name="updateGuard">Guard that gates the write — see <see cref="AttributeNewerThanGuard" /></param>
+    public static EntityUpdateInfo<TEntity> CreateConditionalUpdate(RtEntityId rtEntityId, TEntity rtEntity,
+        AttributeNewerThanGuard updateGuard)
+    {
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, updateGuard);
     }
 
     /// <summary>

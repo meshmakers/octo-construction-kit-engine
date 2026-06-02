@@ -104,6 +104,49 @@ When modifying CK models:
 3. After changes, recompile the model using the compiler
 4. Generated code will be created based on the model definitions
 
+## JSON Serialization & Newtonsoft Parity
+
+The Rt-model serialization rules are split across two canonical options bundles, both in
+`Runtime.Contracts/Serialization/`:
+
+- `RtNewtonsoftSerializer.DefaultSerializer` — pre-migration Newtonsoft setup (used by tests and
+  legacy callers). `RtNewtonsoftAttributesConverter` preserves source CLR types through the
+  in-memory `JObject.FromObject` / `JToken.ToObject` round-trip (e.g. `int 1` stays `Int32` in
+  `JValue.Value`).
+- `RtSystemTextJsonSerializer.Default` — STJ counterpart. Has `RtAttributesConverter` for the
+  attribute dict, the CK / Rt ID converters, and the **`NewtonsoftParityDoubleConverter` /
+  `…SingleConverter` / `…DecimalConverter`** that emit `.0` for whole-number reals (mirroring
+  `JsonConvert.ToString`). Without these, `double 0.0` would serialize as `0` and re-deserialize
+  as `long` via `JsonScalar.ToClr` — observable as `BsonInt64` regressions in MongoDB.
+  It also sets **`Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping`** so serialized output
+  matches Newtonsoft byte-for-byte on non-ASCII (umlauts/ß) and HTML chars (`< > &`); STJ's default
+  `JavaScriptEncoder` would `\uXXXX`-escape those and diverge from the legacy wire form (breaking
+  hash/HMAC parity over serialized bytes). This encoder is the single source of truth and flows into
+  `SystemTextJsonOptions.Default` (octo-sdk) and every wire node. **Any consumer that serializes Rt
+  data with a raw `Utf8JsonWriter` (e.g. SDK `IDataContext.WriteJsonTo`) must honour it** — pass
+  `new JsonWriterOptions { Encoder = SystemTextJsonOptions.Default.Encoder }`.
+
+`JsonScalar.ToClr` is the single source of scalar boxing (`Runtime.Contracts/Serialization/`).
+Rules:
+- Integers prefer `Int32` (fits in 32 bits), then `Int64`. Matches Newtonsoft's
+  `JObject.FromObject(int)` → `JValue.Value=Int32`.
+- Reals box to `double`.
+- ISO-8601 strings parse to `DateTime` when `parseDateStrings=true`.
+
+The parity contract is enforced by `Sdk.Common.PipelineParityTests` (in octo-sdk) using
+Newtonsoft as the oracle. Irreducible divergences (float vs double, decimal vs double,
+DateTimeOffset vs DateTime — JSON has no source-CLR-type marker) are listed by name in
+`AttributeValueParityCorpus.IrreducibleDivergences`. Consumers needing exact source-CLR-type
+preservation must use typed accessors (`GetAttributeValue<decimal>`, typed properties on DTOs).
+
+**RtCkId virtual-property shim.** On the wire an `RtCkId<T>` serialises to a bare
+`SemanticVersionedFullName` string, but legacy pipeline YAML drills `.SemanticVersionedFullName` /
+`.FullName` expecting the historical object shape. The rule that those two property names on a JSON
+string are virtual self-aliases is centralised in **`RtCkIdJsonShim`**
+(`ConstructionKit.Contracts/RtCkIdJsonShim.cs`), next to `RtCkId<T>` where the wire shape is decided.
+It replaces magic strings formerly duplicated across the SDK walkers (`JsonPathWalker`, `DataOverlay`,
+`LayeredSource`), `RtNewtonsoftAttributesConverter`, and the mesh-adapter `CreateUpdateInfoNode`.
+
 ## N:M Association Query Columns
 
 N:M (many-to-many) associations are exposed as query columns with `totalCount` and `exists` meta-properties. These allow listing and filtering entities based on whether associations exist and how many there are.
@@ -201,9 +244,78 @@ Developers only need to create migration scripts for versions that actually tran
 | `ICkModelMigrationService` | `Runtime.Contracts.CkModelMigrations` | Executes CK model migrations |
 | `ICkMigrationContentProvider` | `Runtime.Contracts.CkModelMigrations` | Provides migration content (embedded/file system) |
 | `ICkModelUpgradeService` | `Runtime.Contracts.CkModelMigrations` | Auto-checks and executes CK model upgrades |
+| `ICkModelImportAuditTrail` | `Runtime.Contracts.CkModelMigrations` | Records noteworthy CK-model import events (e.g. extensible-enum overrides). Default impl writes warning logs; host can register an event-repository adapter to surface entries in the platform event log. |
 | `IRuntimeRepositoryProvider` | `Runtime.Contracts` | Provides runtime repositories for tenants |
 | `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
 | `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
+
+## Extensible Enum Import (WI #3324)
+
+Enums marked `isExtensible: true` allow runtime additions via the customize-API. When a new
+CK model version is imported, custom extension values are preserved into the new model
+revision; if a custom value collides with a CK-defined value on the same numeric key, the
+custom value takes precedence and the collision is reported via `ICkModelImportAuditTrail`
+so it appears in the platform event log. The preservation/override logic itself lives in the
+MongoDB layer (`DatabaseCkModelRepository.PreserveExtensibleEnumValues`); the engine layer
+owns the audit-trail contract and a logging default.
+
+## Audit-Trail Architecture
+
+Engine code surfaces noteworthy events through typed audit-trail interfaces
+(`ICkModelImportAuditTrail`, `IArchiveAuditTrail`, …). All of them route through a single
+host-side extensibility point: `IAuditEventSink`.
+
+```
+Runtime.Contracts/AuditTrails/
+  AuditEvent       — discriminated event record (TenantId, Level, Category, Message, Metadata)
+  IAuditEventSink  — single host-replaceable surface
+
+Runtime.Engine/AuditTrails/
+  LoggingAuditEventSink   — default; writes structured logs via ILogger
+  NoOpAuditEventSink      — opt-in silence (tests, hosts that explicitly want events dropped)
+
+Runtime.Engine/{CkModelMigrations,StreamData}/
+  ForwardingCkModelImportAuditTrail  — implements ICkModelImportAuditTrail
+  ForwardingArchiveAuditTrail        — implements IArchiveAuditTrail
+  (both translate typed calls into AuditEvent and call IAuditEventSink.PublishAsync)
+```
+
+`AddRuntimeEngine` registers:
+
+1. `IAuditEventSink → LoggingAuditEventSink` (TryAddSingleton — hosts can override)
+2. `ICkModelImportAuditTrail → ForwardingCkModelImportAuditTrail` (TryAddTransient)
+3. `IArchiveAuditTrail → ForwardingArchiveAuditTrail` (AddTransient)
+
+A host that wants events in the platform event log replaces step 1 only — see
+`EventRepositoryAuditEventSink` in `octo-common-services`.
+
+**Why this shape (history matters):** WI #3324 originally landed a per-interface bridge
+(`EventRepositoryCkModelImportAuditTrail`) in `octo-common-services` that ctor-captured
+`IEventRepository`. That closed a DI bootstrap cycle:
+`SystemContext.ctor → IDatabaseCkModelRepository → ICkModelImportAuditTrail (bridge)
+→ IEventRepository → ISystemContext → …`. Host startup deadlocked in DI's `StackGuard`
+(detected via `dotnet-stack` dump on a stuck integration-test agent). Routing every
+audit-trail interface through one sink keeps the bridge surface a single point — the sink
+implementation in common-services lazy-resolves `IEventRepository` from
+`IServiceProvider`, so the bootstrap cycle cannot re-form, even if more audit-trail
+interfaces are added later.
+
+**Adding a new audit-trail interface:**
+
+1. Define a focused typed interface in `Runtime.Contracts` (no dependency on
+   `Microsoft.Extensions.Logging` or the notifications stack).
+2. Add a `Forwarding{Name}AuditTrail` in `Runtime.Engine` that takes `IAuditEventSink` in
+   its ctor and translates typed calls into `AuditEvent`s. Pick a stable
+   `Category = "{Domain}.{Event}"` and fill the `Metadata` dictionary so structured-log
+   consumers can pivot. Render `Message` in the same way as the existing forwarders.
+3. Register the forwarder in `AddRuntimeEngine` next to the existing ones.
+
+**Never** add a host-side bridge class that ctor-captures `IEventRepository` or
+`ISystemContext` — that re-introduces the WI #3324 cycle. Use the sink.
+
+`LoggingCkModelImportAuditTrail` and `LoggingArchiveAuditTrail` remain in `Runtime.Engine`
+for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
+`TenantContext` when no DI is wired) but are no longer the registered defaults.
 
 ## Important Notes
 

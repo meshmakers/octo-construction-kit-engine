@@ -161,8 +161,47 @@ public class EntityRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<
         Assert.Empty(ruleEngineResult.RtEntitiesToInsert);
         Assert.Single(ruleEngineResult.RtEntitiesToUpdate);
         Assert.Empty(ruleEngineResult.RtEntitiesToDelete);
+        Assert.Empty(ruleEngineResult.UpdateGuards);
         Assert.False(operationResult.HasErrors);
         Assert.False(operationResult.HasFatalErrors);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_ConditionalUpdate_GuardFlowsToResult()
+    {
+        // The rule engine drops the EntityUpdateInfo wrapper and keeps only entity dicts
+        // on its result. Pinning that the guard side-channel (UpdateGuards dictionary) is
+        // populated for conditional updates and stays empty for regular ones — this is
+        // what BulkRtMutation reads to decide between unguarded and guarded write paths.
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var operationResult = new OperationResult();
+        var originFileResolver = new OriginFileResolver("Test");
+        var ruleEngine = new EntityRuleEngine(ckCacheService);
+
+        var conditionalId = new RtEntityId("Test/Country", OctoObjectId.GenerateNewId());
+        var unguardedId = new RtEntityId("Test/Country", OctoObjectId.GenerateNewId());
+        var newTimestamp = new DateTime(2026, 5, 18, 12, 0, 0, DateTimeKind.Utc);
+        var guard = new AttributeNewerThanGuard("attributes.communicationStateTimestamp", newTimestamp);
+
+        var ruleEngineResult = await ruleEngine.ValidateAsync(fixture.TenantId, [
+            EntityUpdateInfo<RtEntity>.CreateConditionalUpdate(
+                conditionalId,
+                new RtEntity("Test/Country", conditionalId.RtId,
+                    new Dictionary<string, object?> { { "Designation", "Test" } }),
+                guard),
+            EntityUpdateInfo<RtEntity>.CreateUpdate(
+                unguardedId,
+                new RtEntity("Test/Country", unguardedId.RtId,
+                    new Dictionary<string, object?> { { "Designation", "Other" } }))
+        ], originFileResolver, operationResult);
+
+        Assert.Empty(operationResult.Messages);
+        Assert.Equal(2, ruleEngineResult.RtEntitiesToUpdate.Count);
+        Assert.Single(ruleEngineResult.UpdateGuards);
+        Assert.True(ruleEngineResult.UpdateGuards.ContainsKey(conditionalId));
+        Assert.False(ruleEngineResult.UpdateGuards.ContainsKey(unguardedId));
+        Assert.Same(guard, ruleEngineResult.UpdateGuards[conditionalId]);
     }
 
     [Fact]

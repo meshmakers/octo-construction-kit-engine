@@ -55,11 +55,49 @@ public interface IBlueprintCatalogManager
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>
-    /// Gets the absolute path to a blueprint's directory
+    /// Opens a readable stream for a file inside a blueprint's folder (e.g. seed data, migration script).
     /// </summary>
+    /// <remarks>
+    /// Resolves through the same priority order as <see cref="GetAsync" />: catalogs are queried by
+    /// ascending <c>Order</c> and the first one carrying the blueprint serves the file. The returned
+    /// stream is positioned at the start of the file; the caller is responsible for disposing it.
+    /// Throws when the blueprint is missing from every catalog or when the file does not exist inside
+    /// the blueprint — use <see cref="TryOpenBlueprintFileAsync" /> for soft-not-found semantics.
+    /// </remarks>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="relativePath">Path to the file relative to the blueprint root, e.g.
+    /// <c>seed-data/entities.yaml</c>. Must use forward-slash separators and must not contain
+    /// <c>..</c> or rooted segments.</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>A stream positioned at the start of the file.</returns>
+    Task<Stream> OpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Soft-not-found variant of <see cref="OpenBlueprintFileAsync" /> that returns <c>null</c> when
+    /// either the blueprint or the requested file is missing. Use this for validation paths or
+    /// optional content (e.g. checking whether a seed-data file is shipped before trying to import).
+    /// </summary>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="relativePath">Path to the file relative to the blueprint root.</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>A stream positioned at the start of the file, or <c>null</c> when missing.</returns>
+    Task<Stream?> TryOpenBlueprintFileAsync(BlueprintId blueprintId, string relativePath,
+        object? sourceIdentifier = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the absolute path to a blueprint's directory.
+    /// </summary>
+    /// <remarks>
+    /// Retained for the publish path. New read code should use <see cref="OpenBlueprintFileAsync" />.
+    /// </remarks>
     /// <param name="blueprintId">The blueprint id</param>
     /// <param name="sourceIdentifier">Source identifier, null for default</param>
     /// <returns>The path to the blueprint directory</returns>
+    [Obsolete("Use OpenBlueprintFileAsync for reading files inside a blueprint. " +
+              "This API is retained only for the publish path that needs an on-disk source directory.")]
     Task<string> GetBlueprintPathAsync(BlueprintId blueprintId, object? sourceIdentifier = null);
 
     /// <summary>

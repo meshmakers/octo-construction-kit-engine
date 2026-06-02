@@ -52,6 +52,81 @@ public class BlueprintYamlSerializerTests
     }
 
     [Fact]
+    public void Deserialize_Requires_AcceptsScalarShortcut()
+    {
+        // Manifest authors prefer `key: value` for single-value requires; the converter
+        // normalises that to a single-element list so the runtime always sees a uniform
+        // shape. This is the friendliest knob for the common case (e.g. gating on a single
+        // environment or on isSystemTenant).
+        var yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            requires:
+              octo.isSystemTenant: "true"
+            """;
+
+        var operationResult = new OperationResult();
+        var result = _serializer.DeserializeBlueprintMeta(yaml, "test.yaml", operationResult);
+
+        Assert.NotNull(result.Requires);
+        Assert.True(result.Requires.ContainsKey("octo.isSystemTenant"));
+        Assert.Equal(new[] { "true" }, result.Requires["octo.isSystemTenant"]);
+    }
+
+    [Fact]
+    public void Deserialize_Requires_AcceptsSequence()
+    {
+        // Manifest authors who need multiple acceptable values write a YAML sequence;
+        // verifying both shapes ensures the scalar fast-path doesn't accidentally pre-empt
+        // the sequence path.
+        var yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            requires:
+              octo.environment:
+                - staging
+                - production
+            """;
+
+        var operationResult = new OperationResult();
+        var result = _serializer.DeserializeBlueprintMeta(yaml, "test.yaml", operationResult);
+
+        Assert.NotNull(result.Requires);
+        Assert.Equal(new[] { "staging", "production" }, result.Requires["octo.environment"]);
+    }
+
+    [Fact]
+    public async Task Serialize_Requires_AlwaysEmitsSequence()
+    {
+        // Round-trip stability: regardless of how the manifest was originally written, the
+        // serializer should emit a canonical sequence per key. Locks in the round-trip
+        // contract documented on RequiresMapConverter.
+        var blueprint = new BlueprintMetaRootDto
+        {
+            BlueprintId = new BlueprintId("TestBlueprint-1.0.0"),
+            Requires = new RequiresMap
+            {
+                ["octo.isSystemTenant"] = ["true"],
+                ["octo.environment"] = ["staging", "production"],
+            }
+        };
+
+        using var stream = new MemoryStream();
+        await using (var writer = new StreamWriter(stream, leaveOpen: true))
+        {
+            await _serializer.SerializeAsync(writer, blueprint);
+        }
+        stream.Position = 0;
+        var emitted = await new StreamReader(stream).ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("octo.isSystemTenant:", emitted);
+        Assert.Contains("- true", emitted);
+        Assert.Contains("octo.environment:", emitted);
+        Assert.Contains("- staging", emitted);
+        Assert.Contains("- production", emitted);
+    }
+
+    [Fact]
     public void Deserialize_WithSeedDataPath_ParsesCorrectly()
     {
         var yaml = """

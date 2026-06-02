@@ -19,6 +19,7 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
         RtEntitiesToUpdate = new Dictionary<RtEntityId, TEntity>();
         RtEntitiesToReplace = new Dictionary<RtEntityId, TEntity>();
         RtEntitiesToDelete = [];
+        UpdateGuards = new Dictionary<RtEntityId, AttributeNewerThanGuard>();
     }
 
     /// <summary>
@@ -28,13 +29,20 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     /// <param name="rtEntitiesToUpdate">List of entities to update.</param>
     /// <param name="rtEntitiesToReplace">List of entities to replace.</param>
     /// <param name="rtEntitiesToDelete">List of entities to delete.</param>
+    /// <param name="updateGuards">
+    ///     Optional optimistic-concurrency guards keyed by entity id. Entries are present
+    ///     only for entries in <paramref name="rtEntitiesToUpdate" /> that were created via
+    ///     <see cref="EntityUpdateInfo{TEntity}.CreateConditionalUpdate" />.
+    /// </param>
     public EntityRuleEngineResult(List<TEntity> rtEntitiesToInsert, Dictionary<RtEntityId, TEntity> rtEntitiesToUpdate,
-        Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete)
+        Dictionary<RtEntityId, TEntity> rtEntitiesToReplace, List<RtEntityId> rtEntitiesToDelete,
+        Dictionary<RtEntityId, AttributeNewerThanGuard>? updateGuards = null)
     {
         RtEntitiesToInsert = rtEntitiesToInsert;
         RtEntitiesToUpdate = rtEntitiesToUpdate;
         RtEntitiesToReplace = rtEntitiesToReplace;
         RtEntitiesToDelete = rtEntitiesToDelete;
+        UpdateGuards = updateGuards ?? new Dictionary<RtEntityId, AttributeNewerThanGuard>();
     }
 
     /// <summary>
@@ -56,4 +64,12 @@ public record EntityRuleEngineResult<TEntity> where TEntity : RtEntity
     ///     Returns a list of entities to delete.
     /// </summary>
     public List<RtEntityId> RtEntitiesToDelete { get; }
+
+    /// <summary>
+    ///     Optimistic-concurrency guards keyed by entity id. An entry indicates that the
+    ///     corresponding update in <see cref="RtEntitiesToUpdate" /> must be applied
+    ///     conditionally — see <see cref="AttributeNewerThanGuard" /> for semantics.
+    ///     Entities without a guard are updated unconditionally.
+    /// </summary>
+    public Dictionary<RtEntityId, AttributeNewerThanGuard> UpdateGuards { get; }
 }

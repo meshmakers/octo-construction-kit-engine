@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -33,5 +35,22 @@ public interface IRuntimeRepositoryProvider
     /// <returns>Dictionary mapping model names to their installed version strings</returns>
     Task<IReadOnlyDictionary<string, string>> GetSchemaVersionsAsync(
         string tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ensures the specified CK model is installed in the tenant's schema. Idempotent:
+    /// if the exact model id is already present, this is a no-op apart from running any
+    /// pending migrations. Otherwise the compiled model is fetched from a catalog and
+    /// written into the tenant database, and the in-memory CK cache is invalidated so the
+    /// next access reloads the model graph.
+    /// </summary>
+    /// <param name="tenantId">The tenant identifier</param>
+    /// <param name="modelId">The concrete CK model id (name + exact version) to install</param>
+    /// <param name="operationResult">Collects validation messages from catalog lookup and install</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task EnsureCkModelInstalledAsync(
+        string tenantId,
+        CkModelId modelId,
+        OperationResult operationResult,
         CancellationToken cancellationToken = default);
 }

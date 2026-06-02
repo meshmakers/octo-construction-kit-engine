@@ -80,7 +80,11 @@ internal class GetCommand : Command<BpmToolOptions>
         if (CommandArgumentValue.IsArgumentUsed(_outputArg))
         {
             var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_outputArg);
+#pragma warning disable CS0618 // GetBlueprintPathAsync is intentional here: this CLI's job is to
+            // hand the user an on-disk folder to copy, which only file-system catalogs can
+            // produce. Embedded catalogs don't expose a directory and would throw correctly.
             var sourcePath = await _catalogManager.GetBlueprintPathAsync(blueprintId);
+#pragma warning restore CS0618
 
             if (!Directory.Exists(outputPath))
             {

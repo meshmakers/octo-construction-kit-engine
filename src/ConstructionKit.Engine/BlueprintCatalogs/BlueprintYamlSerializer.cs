@@ -27,6 +27,7 @@ internal class BlueprintYamlSerializer : IBlueprintSerializer
             .WithTypeConverter(new BlueprintIdConverter())
             .WithTypeConverter(new BlueprintIdVersionRangeConverter())
             .WithTypeConverter(new CkModelIdVersionRangeConverter())
+            .WithTypeConverter(new RequiresMapConverter())
             .Build();
 
         _deserializer = new DeserializerBuilder()
@@ -34,6 +35,7 @@ internal class BlueprintYamlSerializer : IBlueprintSerializer
             .WithTypeConverter(new BlueprintIdConverter())
             .WithTypeConverter(new BlueprintIdVersionRangeConverter())
             .WithTypeConverter(new CkModelIdVersionRangeConverter())
+            .WithTypeConverter(new RequiresMapConverter())
             .IgnoreUnmatchedProperties()
             .Build();
     }

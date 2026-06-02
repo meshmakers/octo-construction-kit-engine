@@ -1,4 +1,5 @@
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
@@ -6,6 +7,7 @@ using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
+using Meshmakers.Octo.Runtime.Engine.AuditTrails;
 using Meshmakers.Octo.Runtime.Engine.Blueprints;
 using Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
@@ -63,6 +65,12 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintMigrationParser, BlueprintMigrationParser>();
         services.TryAddSingleton<IBlueprintNotifications, LoggingBlueprintNotifications>();
 
+        // Blueprint variable resolution (overridable via TryAdd — services that need a richer
+        // provider, e.g. one that surfaces chart names or feature flags, can register their own
+        // IBlueprintVariableProvider before calling AddRuntimeEngine and win the registration.)
+        services.AddOptions<OctoBlueprintVariablesOptions>();
+        services.TryAddTransient<IBlueprintVariableProvider, DefaultBlueprintVariableProvider>();
+
         // CK model migration services
         services.AddSingleton<IRuntimeRepositoryProvider, RuntimeRepositoryProvider>();
 
@@ -88,13 +96,26 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkModelMigrationService, CkModelMigrationService>();
         services.AddTransient<ICkModelUpgradeService, CkModelUpgradeService>();
 
+        // Audit-trail sink (WI #3324 follow-up). Every typed audit-trail interface below is
+        // implemented by a Forwarding* class that translates its calls into a generic
+        // AuditEvent and publishes through IAuditEventSink. Hosts that want events to land in
+        // the platform event log register a single replacement IAuditEventSink (e.g.
+        // EventRepositoryAuditEventSink in octo-common-services) instead of per-interface
+        // bridges; that keeps IEventRepository / ISystemContext out of the audit-trail ctor
+        // chain and avoids reintroducing the DI bootstrap cycle that bit us when WI #3324
+        // landed. TryAdd so test fixtures or hosts can pre-register a substitute (e.g.
+        // NoOpAuditEventSink) and have this no-op out.
+        services.TryAddSingleton<IAuditEventSink, LoggingAuditEventSink>();
+
+        // CK model import audit trail (WI #3324). Default forwards every call through
+        // IAuditEventSink.
+        services.TryAddTransient<ICkModelImportAuditTrail, ForwardingCkModelImportAuditTrail>();
+
         // StreamData archive lifecycle. Concept §3, §11. The lifecycle service itself is
         // constructed per-tenant by the host (e.g. Mongo TenantContext) because it requires a
-        // tenant id; this registration only wires the audit-trail default. The default writes
-        // structured log entries; a host can replace it by registering a different
-        // IArchiveAuditTrail implementation (e.g. EventBusArchiveAuditTrail in
-        // octo-common-services).
-        services.AddTransient<IArchiveAuditTrail, LoggingArchiveAuditTrail>();
+        // tenant id; this registration only wires the audit-trail default, which forwards via
+        // IAuditEventSink.
+        services.AddTransient<IArchiveAuditTrail, ForwardingArchiveAuditTrail>();
 
         return new RuntimeEngineBuilder(services);
     }

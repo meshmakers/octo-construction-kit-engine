@@ -269,12 +269,21 @@ internal class BlueprintService : IBlueprintService
             }
 
             // 4. Run CK model migrations for any deps that are at an older version on the tenant.
+            // CreateBackup is OFF: tenant backups are expected to be driven by the
+            // infrastructure layer (mongodump cronjobs / MongoDB Atlas snapshots /
+            // velero, etc.), not synthesized inline from the service pod on every
+            // CK bump. Requiring `mongodump` inside every consuming service image
+            // added ~50MB of tooling to each container and made additive
+            // no-op-migration bumps (e.g. System.Communication 3.20.0 -> 3.21.0)
+            // crash startup on images that did not ship the binary. A pre-migration
+            // backup made sense when destructive data migrations were the norm; for
+            // additive bumps it is pure overhead.
             if (aggregatedCkDeps.Count > 0)
             {
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
                         tenantId,
                         aggregatedCkDeps,
-                        new CkMigrationOptions { CreateBackup = true, DryRun = false, ContinueOnError = false },
+                        new CkMigrationOptions { CreateBackup = false, DryRun = false, ContinueOnError = false },
                         null,
                         cancellationToken)
                     .ConfigureAwait(false);

@@ -20,10 +20,11 @@ public class TextWrapperTests
 
         var result = TextWrapper.EscapeMdxSpecialCharacters(input);
 
-        // `<` is escaped to `\<`; `>` is not in the escape set and must survive verbatim.
+        // Both `<` and `>` are escaped (`\<`, `\>`) for symmetry with the MDX/JSX tag pair.
         Assert.NotNull(result);
-        Assert.Equal(@"https://\<hostname>/\<tenantId>", result);
-        Assert.Equal(2, result.Count(c => c == '>'));
+        Assert.Equal(@"https://\<hostname\>/\<tenantId\>", result);
+        // Regression guard: no unescaped angle bracket should remain.
+        Assert.DoesNotMatch(@"(?<!\\)[<>]", result);
     }
 
     [Fact]

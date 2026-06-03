@@ -12,7 +12,7 @@ internal static class TextWrapper
 
     /// <summary>
     /// Escapes special characters that would be interpreted by MDX as JSX expressions.
-    /// Curly braces {} and the less-than sign are escaped with backslashes to prevent
+    /// Curly braces {} and angle brackets &lt;&gt; are escaped with backslashes to prevent
     /// acorn parser errors (e.g. literal placeholders like &lt;tenantId&gt; in URLs).
     /// </summary>
     public static string? EscapeMdxSpecialCharacters(string? text)
@@ -22,6 +22,6 @@ internal static class TextWrapper
             return text;
         }
 
-        return text.Replace("{", "\\{").Replace("}", "\\}").Replace("<", "\\<");
+        return text.Replace("{", "\\{").Replace("}", "\\}").Replace("<", "\\<").Replace(">", "\\>");
     }
 }

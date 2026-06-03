@@ -16,10 +16,16 @@
             <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" />
             <!-- Include the compiler assembly itself as an input so engine/schema updates invalidate stale outputs. -->
             <ConstructionKitFolderInputCompileFiles Include="$(OctoCkCompileTasksAssembly)" />
-            <!-- File-only outputs: MSBuild's Inputs/Outputs incremental check needs file timestamps, not a bare
-                 directory path. Listing the directory here makes the check unreliable so the target re-runs even
-                 when outputs are up to date — and the re-run hits remote CK catalogs again, which can hang. -->
-            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
+            <!-- The bare directory entry on the left of the semicolon is intentional: it forces CkCompile to re-run
+                 every build (the incremental check sees a "missing file" for the directory path), which keeps the
+                 EmbeddedResource + AdditionalFiles added inside CkCompile's body present on every invocation. A
+                 cleaner "file-only" outputs list correctly fixes the incremental check, but then the SourceGenerator
+                 has no AdditionalFiles inputs on the rebuild-skipped path and the generated types vanish from the
+                 model DLLs (regression observed in octo-construction-kit-engine-CI build 33240). The duplicate
+                 execution from GeneratePackageOnBuild's Pack target is handled by gating OctoPublishCkModel on
+                 _IsPacking != 'true' in the consuming csproj (see SystemCommunicationCkModel.csproj), and by the
+                 60 s Octokit timeout in GitHubClientWrapper so even an unguarded re-run fails fast. -->
+            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
 
@@ -28,8 +34,8 @@
             <ConstructionKitFolderInputImportFiles Include="@(ConstructionKitConfigFile)" />
             <!-- Include the compiler assembly itself as an input so engine/schema updates invalidate stale outputs. -->
             <ConstructionKitFolderInputImportFiles Include="$(OctoCkCompileTasksAssembly)" />
-            <!-- File-only outputs (see GatherCompileFiles for the rationale). -->
-            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml"/>
+            <!-- Bare directory entry retained on purpose; see GatherCompileFiles for the source-gen rationale. -->
+            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
     

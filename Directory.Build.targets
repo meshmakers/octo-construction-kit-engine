@@ -18,18 +18,20 @@
     <Target Name="GatherCompileFiles">
         <ItemGroup>
             <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" />
-            <!-- File-only outputs: MSBuild's Inputs/Outputs incremental check needs file timestamps, not a bare
-                 directory path. Listing the directory here makes the check unreliable so the target re-runs even
-                 when outputs are up to date — and the re-run hits remote CK catalogs again, which can hang. -->
-            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
+            <!-- The bare directory entry on the left of the semicolon is intentional: keeping it forces CkCompile
+                 to re-run every build (the incremental check sees a "missing file" for the directory path), which
+                 in turn re-populates the obj/octo-ck-cache/.../*.json files that the SourceGenerator pulls in via
+                 AdditionalFiles. Removing it correctly fixes the incremental check, but then the SourceGenerator
+                 has no AdditionalFiles inputs on the rebuild-skipped path and the generated types vanish from the
+                 model DLLs — broke octo-construction-kit-engine-CI build 33240. -->
+            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
 
     <Target Name="GatherImportFiles">
         <ItemGroup>
             <ConstructionKitFolderInputImportFiles Include="@(ConstructionKitConfigFile)" />
-            <!-- File-only outputs (see GatherCompileFiles for the rationale). -->
-            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml"/>
+            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
     

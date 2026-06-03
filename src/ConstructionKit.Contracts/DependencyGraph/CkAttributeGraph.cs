@@ -38,13 +38,19 @@ public class CkAttributeGraph
     /// <param name="valueCkRecordId"></param>
     /// <param name="valueCkEnumId"></param>
     /// <param name="defaultValues"></param>
-    /// <param name="isRuntimeState">When true, blueprint re-apply preserves the existing runtime value of this attribute</param>
     /// <param name="description">An optional description to the attribute</param>
     /// <param name="metaData">Optional meta data of the attribute</param>
+    /// <param name="isRuntimeState">
+    /// When true, blueprint re-apply preserves the existing runtime value of this attribute.
+    /// Trailing + defaulted so existing positional callers (e.g. the mesh-adapter SDK tests
+    /// that instantiate <see cref="CkTypeAttributeGraph"/> / <see cref="CkAttributeGraph"/>
+    /// directly) compile unchanged. STJ binds the constructor by parameter name, so the JSON
+    /// wire format is unaffected.
+    /// </param>
     [JsonConstructor]
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId,
-        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, bool isRuntimeState, string? description,
-        ICollection<CkAttributeMetaDataDto>? metaData)
+        CkId<CkEnumId>? valueCkEnumId, ICollection<object>? defaultValues, string? description,
+        ICollection<CkAttributeMetaDataDto>? metaData, bool isRuntimeState = false)
     {
         CkAttributeId = ckAttributeId;
         ValueType = valueType;

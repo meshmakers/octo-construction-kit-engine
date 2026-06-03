@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
@@ -2060,6 +2061,17 @@ internal class BlueprintService : IBlueprintService
                 return 0;
             }
 
+            // Preserve runtime-state attributes before the seed import. The
+            // import path runs a full ReplaceOne, so without this step every
+            // CK-flagged runtime-state attribute (deployment status, sync
+            // counters, last-error fields, …) would be reset to the seed value
+            // on every blueprint version bump — even though those attributes
+            // are owned by services/operators at runtime, not by the blueprint
+            // author. Fresh tenants and new entities are no-ops; only entities
+            // that already exist in the tenant repo trigger the preserve.
+            await PreserveRuntimeStateAttributesAsync(tenantId, seedRoot, repository, cancellationToken)
+                .ConfigureAwait(false);
+
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 
@@ -2133,5 +2145,160 @@ internal class BlueprintService : IBlueprintService
     /// </summary>
     private static string BlueprintFileDescription(BlueprintId blueprintId, string relativePath)
         => $"{blueprintId.FullName}/{relativePath}";
+
+    /// <summary>
+    /// For every seed entity that already exists in the tenant repo, replaces seed values for
+    /// CK-attributes flagged <c>isRuntimeState</c> (see
+    /// <see cref="ConstructionKit.Contracts.DataTransferObjects.CkAttributeDto.IsRuntimeState"/>)
+    /// with the existing runtime value. Fresh tenants and brand-new entities are silent no-ops.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Why this exists: <see cref="ApplySeedDataForBlueprintAsync"/> imports the seed via
+    /// <see cref="IImportRtModelCommand.ImportModelAsync"/> with <see cref="ImportStrategy.Upsert"/>,
+    /// which the MongoDB layer maps to a full <c>ReplaceOne</c> — every attribute on the existing
+    /// document is overwritten by the seed's values, even for attributes that carry runtime state
+    /// the blueprint author never meant to manage (deployment status, communication status,
+    /// last-error fields, sync sequence numbers). Without preservation, every blueprint version
+    /// bump resets those attributes to whatever default the seed YAML carries, which manifests
+    /// as visible-in-UI regressions like a "Deployed" adapter flipping back to "Undeployed" on
+    /// the next controller restart that picks up a bumped blueprint.
+    /// </para>
+    /// <para>
+    /// Per-attribute preservation is orthogonal to the per-entity <c>rtBlueprintLocked</c> lock:
+    /// the entity lock decides whether the blueprint touches an entity at all; <c>isRuntimeState</c>
+    /// decides whether — assuming the blueprint is touching the entity — a specific attribute is
+    /// preserved or overwritten. Both compose; preservation simply rewrites the seed DTO in place
+    /// so the downstream import path stays unchanged.
+    /// </para>
+    /// </remarks>
+    private async Task PreserveRuntimeStateAttributesAsync(
+        string tenantId,
+        RtModelRootTcDto seedRoot,
+        IRuntimeRepository repository,
+        CancellationToken cancellationToken)
+    {
+        // Group by CkTypeId so we can batch one repo query per type instead of per entity.
+        // Entities with an empty rtId can't be looked up — they are always treated as new.
+        var seedEntitiesByType = seedRoot.Entities
+            .Where(e => !e.RtId.Equals(OctoObjectId.Empty))
+            .GroupBy(e => e.CkTypeId)
+            .ToList();
+
+        if (seedEntitiesByType.Count == 0)
+        {
+            return;
+        }
+
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        var totalPreserved = 0;
+
+        foreach (var typeGroup in seedEntitiesByType)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // Look up the CK type to find which attributes are flagged. If the type isn't in
+            // the cache the import would fail downstream anyway — let it surface there with
+            // the existing error path instead of swallowing it here.
+            if (!_ckCacheService.TryGetRtCkType(tenantId, typeGroup.Key, out var ckTypeGraph))
+            {
+                continue;
+            }
+
+            // Materialize the flagged-attribute set once per type.
+            var flaggedAttributes = ckTypeGraph!.AllAttributes.Values
+                .Where(a => a.IsRuntimeState)
+                .ToList();
+
+            if (flaggedAttributes.Count == 0)
+            {
+                // Cheap fast path: this type has no runtime-state attrs, nothing to preserve.
+                continue;
+            }
+
+            var seedEntities = typeGroup.ToList();
+            var rtIds = seedEntities.Select(e => e.RtId).ToList();
+
+            IResultSet<RtEntity> existingEntities;
+            try
+            {
+                existingEntities = await repository.GetRtEntitiesByIdAsync(
+                    session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Don't fail the whole apply — if we can't look up existing entities the
+                // import will still proceed with seed values (i.e. the old behaviour).
+                _logger.LogWarning(ex,
+                    "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; falling back to seed values",
+                    typeGroup.Key);
+                continue;
+            }
+
+            var existingByRtId = existingEntities.Items.ToDictionary(e => e.RtId);
+
+            foreach (var seedEntity in seedEntities)
+            {
+                if (!existingByRtId.TryGetValue(seedEntity.RtId, out var existing))
+                {
+                    // New entity — let the seed value land as-is.
+                    continue;
+                }
+
+                var preservedForEntity = PreserveAttributesForEntity(seedEntity, existing, flaggedAttributes);
+                if (preservedForEntity > 0)
+                {
+                    totalPreserved += preservedForEntity;
+                    _logger.LogDebug(
+                        "Preserved {PreservedCount} runtime-state attribute(s) on existing entity {RtId} (type {CkTypeId}) during blueprint re-apply",
+                        preservedForEntity, seedEntity.RtId, typeGroup.Key);
+                }
+            }
+        }
+
+        if (totalPreserved > 0)
+        {
+            _logger.LogInformation(
+                "Blueprint re-apply preserved {TotalPreserved} runtime-state attribute value(s) across the seed for tenant {TenantId}",
+                totalPreserved, tenantId);
+        }
+    }
+
+    /// <summary>
+    /// Per-entity preserve loop. For each <paramref name="flaggedAttributes"/> entry that has a
+    /// value on <paramref name="existing"/> AND a value on <paramref name="seedEntity"/>, copies
+    /// the existing value over the seed value in-place on <paramref name="seedEntity"/>. Returns
+    /// the count of attributes preserved. Pure function so it can be unit-tested without mocking
+    /// the repository / cache surface.
+    /// </summary>
+    internal static int PreserveAttributesForEntity(
+        RtEntityTcDto seedEntity,
+        RtEntity existing,
+        IReadOnlyList<CkTypeAttributeGraph> flaggedAttributes)
+    {
+        var preserved = 0;
+        foreach (var flaggedAttr in flaggedAttributes)
+        {
+            var seedAttr = seedEntity.Attributes.FirstOrDefault(a =>
+                a.Id.Equals(flaggedAttr.CkAttributeId));
+            if (seedAttr == null)
+            {
+                // Seed doesn't carry this attribute (e.g. additive CK bump) — nothing to overwrite.
+                continue;
+            }
+
+            if (!existing.Attributes.TryGetValue(flaggedAttr.AttributeName, out var existingValue))
+            {
+                // Existing entity doesn't have a value for this attr (e.g. the attr was just added
+                // in this CK bump on a pre-existing entity); fall through to seed value so the new
+                // attr lands with its seed default.
+                continue;
+            }
+
+            seedAttr.Value = existingValue;
+            preserved++;
+        }
+        return preserved;
+    }
 
 }

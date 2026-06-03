@@ -26,6 +26,16 @@ variables:
   value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
 - name: isTest
   value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
+# Public catalog publishing is restricted to main and release tags. Feature/dev branches
+# build and validate but must never write to the shared gh-pages catalog — incident:
+# Industry.Basic-2.1.1 pinned by Industry.Energy/Fluid/Maintenance/Manufacturing without
+# Industry.Basic-2.1.1 itself ever being published, leaving the catalog dep graph broken.
+- ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/r')) }}:
+  - name: effectivePublishCatalog
+    value: $(OctoPublishCatalog)
+- ${{ else }}:
+  - name: effectivePublishCatalog
+    value: LocalFileSystemCatalog
 
 stages:
  - stage: Build
@@ -46,7 +56,7 @@ stages:
           projects: |
             src/**/*.csproj
             !src/**/Generated*.csproj
-          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(OctoPublishCatalog)" /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
+          arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
       - task: DotNetCoreCLI@2
         displayName: 'Build samples'
         inputs:

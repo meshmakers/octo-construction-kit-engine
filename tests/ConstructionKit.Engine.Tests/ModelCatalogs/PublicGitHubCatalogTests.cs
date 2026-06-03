@@ -352,23 +352,28 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         Assert.Equal("test-token", CatalogOptions.GitHubApiToken);
     }
 
+    // Reads always go through the static gh-pages HTTP path (no GitHub REST quota
+    // consumed) regardless of whether the catalog is also configured with a write-token.
+    // Token is only used for publish/update mutations.
+
     [Fact]
-    public async Task GetAsync_WithValidModelId_UsesGitHubClient()
+    public async Task GetAsync_WithValidModelId_UsesHttpClient()
     {
         var modelId = CreateTestModelId();
         var operationResult = new OperationResult();
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
-            .Returns(Task.FromResult<(string, string)?>(null));
+        A.CallTo(() =>
+                HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
+                    A<CancellationToken>.Ignored))
+            .Returns(new HttpResponseMessage(HttpStatusCode.NotFound));
 
         var exception =
             await Assert.ThrowsAsync<ModelCatalogException>(() => Catalog.GetAsync(modelId, operationResult));
 
         Assert.Contains("Model 'TestModel-1.0.0' not found in catalog 'PublicGitHubCatalog'", exception.Message);
 
-        // Verify GitHub client was used, NOT HTTP client
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
-        A.CallTo(() => HttpClientWrapper.GetAsync(A<string>._, A<CancellationToken>._)).MustNotHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetAsync(A<string>._, A<CancellationToken>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -379,71 +384,75 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         var expectedModel = CreateTestCompiledModel();
         var jsonContent = "{\"modelId\":\"TestModel-1.0.0\"}";
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
-            .Returns((jsonContent, "sha123"));
-        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._, A<bool>._))
+        A.CallTo(() =>
+                HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
+                    A<CancellationToken>.Ignored))
+            .Returns(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(jsonContent)
+            });
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
             .Returns(expectedModel);
 
         var result = await Catalog.GetAsync(modelId, operationResult);
 
         Assert.NotNull(result);
 
-        // Verify GitHub client was used
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetAsync(A<string>._, A<CancellationToken>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task IsExistingAsync_WithValidModelId_UsesGitHubClient()
+    public async Task IsExistingAsync_WithValidModelId_UsesHttpClient()
     {
         var modelId = CreateTestModelId();
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog1, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1, "sha3"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1);
 
         bool result = await Catalog.IsExistingAsync(modelId);
 
         Assert.True(result);
 
-        // Verify GitHub client was used
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task RefreshCatalogAsync_UsesGitHubClient()
+    public async Task RefreshCatalogAsync_UsesHttpClient()
     {
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog3, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/2/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog2Multiple, "sha4"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/3/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog3Multiple, "sha5"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog3);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/2/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog2Multiple);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/3/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog3Multiple);
 
         await Catalog.RefreshCatalogAsync();
 
-        // Verify GitHub client was used
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
-        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustNotHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
-    public void ListAsync_UsesGitHubClient()
+    public void ListAsync_UsesHttpClient()
     {
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog2, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/2/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog2Multiple, "sha4"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog2);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/2/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog2Multiple);
 
         var result = Catalog.ListAsync(null)
             .ToBlockingEnumerable(cancellationToken: TestContext.Current.CancellationToken).ToList();
@@ -452,21 +461,21 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         Assert.Equal("TestModel-1.0.0", result.ElementAt(0).ModelId);
         Assert.Equal("TestModel-2.1.2", result.ElementAt(11).ModelId);
 
-        // Verify GitHub client was used
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task IsExistingAsync_WithVersionRange_UsesGitHubClient()
+    public async Task IsExistingAsync_WithVersionRange_UsesHttpClient()
     {
         var versionRange = CreateTestVersionRange(range: "[1.0.5]");
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog1, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
 
         var result = await Catalog.IsExistingAsync(versionRange);
 
@@ -474,9 +483,8 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         Assert.True(result.Exists);
         Assert.Equal("TestModel-1.0.5", result.ModelId);
 
-        // Verify GitHub client was used
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustHaveHappened();
-        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustNotHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustHaveHappened();
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync(A<string>._)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -544,10 +552,15 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         var modelId = CreateTestModelId();
         var jsonContent = "{\"modelId\":\"TestModel-1.0.0\"}";
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
-            .Returns((jsonContent, "sha123"));
-        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<string>._, A<string>._, A<OperationResult>._, A<bool>._))
-            .Invokes((string s, string p, OperationResult r, bool _) =>
+        A.CallTo(() =>
+                HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
+                    A<CancellationToken>.Ignored))
+            .Returns(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(jsonContent)
+            });
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
+            .Invokes((Stream _, string _, OperationResult r, bool _) =>
             {
                 r.AddMessage(new OperationMessage(MessageLevel.Error, "TestLocation", 1001, "Test error occurred"));
             })
@@ -588,12 +601,12 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0.3]");
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog1, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
 
         var result = await Catalog.IsExistingAsync(versionRange);
 
@@ -607,14 +620,14 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0,2.0]");
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog2, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/2/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog2Multiple, "sha4"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog2);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/2/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog2Multiple);
 
         var result = await Catalog.IsExistingAsync(versionRange);
 
@@ -628,14 +641,14 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "1.0.0");
 
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/catalog.json"))
-            .Returns((Data.RootCatalog, "sha1"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/catalog.json"))
-            .Returns((Data.TestModelModelCatalog2, "sha2"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog1Multiple, "sha3"));
-        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/2/catalog.json"))
-            .Returns((Data.TestModelVersionsCatalog2Multiple, "sha4"));
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
+            .Returns(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog2);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/2/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog2Multiple);
 
         var result = await Catalog.IsExistingAsync(versionRange);
 

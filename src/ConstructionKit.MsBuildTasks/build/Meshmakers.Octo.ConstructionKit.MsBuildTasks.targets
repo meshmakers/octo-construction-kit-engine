@@ -63,7 +63,8 @@
                    PrivateGitHubApiKey="$(OctoPrivateGitHubApiKey)"
                    PublicGitHubApiKey="$(OctoPublicGitHubApiKey)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
-                   CkLinkPath="$(OctoCkLinkPath)">
+                   CkLinkPath="$(OctoCkLinkPath)"
+                   RefreshRemoteCatalogs="$(OctoRefreshRemoteCatalogs)">
             <Output TaskParameter="CompiledModelFiles" PropertyName="CompiledModelFiles" />
             <Output TaskParameter="CacheFiles" PropertyName="CacheFiles" />
         </CkCompile>

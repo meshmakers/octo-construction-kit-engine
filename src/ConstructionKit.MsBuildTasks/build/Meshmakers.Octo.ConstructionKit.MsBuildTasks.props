@@ -25,6 +25,14 @@
         <OctoPrivateGitHubCatalogIsEnabled Condition="'$(OctoPrivateGitHubCatalogIsEnabled)' == ''">true</OctoPrivateGitHubCatalogIsEnabled>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
+        <!--
+            Refresh the remote (Public / Private GitHub) catalogs at the start of each CK
+            compile. Default true preserves the historical behaviour. Set false on feature/dev
+            branches that only consume LocalFs deps populated by sibling projects in the same
+            solution build — avoids hammering the shared GitHub PAT's 5000/h rate quota when
+            many parallel CI pipelines build at once.
+        -->
+        <OctoRefreshRemoteCatalogs Condition="'$(OctoRefreshRemoteCatalogs)' == ''">true</OctoRefreshRemoteCatalogs>
     </PropertyGroup>
     <!--Additional Parameters for Generate Docs-->
     <PropertyGroup>

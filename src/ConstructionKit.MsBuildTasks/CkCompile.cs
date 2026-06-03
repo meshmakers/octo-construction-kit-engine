@@ -74,6 +74,14 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public string PublishCatalogName { get; set; } = LocalFileSystemCatalog.Name;
 
     /// <summary>
+    /// When true, refresh the registered remote catalogs (Public/Private GitHub) at the start
+    /// of the compile step. Set to false on feature/dev branches that only consume LocalFs deps
+    /// from sibling projects in the same solution build — skipping the refresh cuts the GitHub
+    /// REST API quota that the catalog-walk consumes.
+    /// </summary>
+    public bool RefreshRemoteCatalogs { get; set; } = true;
+
+    /// <summary>
     /// Defines the Public GitHub API Key for accessing public GitHub catalogs
     /// </summary>
     public string? PublicGitHubApiKey { get; set; }
@@ -178,8 +186,18 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                         }
                         else
                         {
-                            Log.LogMessage(MessageImportance.High, "Refreshing construction kit model library cache");
-                            await catalogService.RefreshAllCatalogCachesAsync();
+                            if (RefreshRemoteCatalogs)
+                            {
+                                Log.LogMessage(MessageImportance.High,
+                                    "Refreshing construction kit model library cache");
+                                await catalogService.RefreshAllCatalogCachesAsync();
+                            }
+                            else
+                            {
+                                Log.LogMessage(MessageImportance.High,
+                                    "Skipping remote catalog refresh (OctoRefreshRemoteCatalogs=false). " +
+                                    "Construction kit dependencies must resolve from LocalFileSystemCatalog only.");
+                            }
 
                             Log.LogMessage(MessageImportance.High, "Compiling construction kit model in '{0}'",
                                 constructionKitFolderPath);

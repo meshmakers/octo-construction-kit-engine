@@ -43,7 +43,10 @@ public abstract class GitHubCatalog : CachedCatalog
     private readonly IGitHubClientFactory _gitHubClientFactory;
     private readonly GitHubCatalogOptions _gitHubOptions;
 
-    private readonly bool _isGitHubClientAvailable;
+    // Static gh-pages reads cost nothing against the per-user 5000/h GitHub REST quota
+    // that Octokit pulls from. Prefer the pages URL for every read; the Octokit client is
+    // only fallback for setups that explicitly disabled gh-pages, plus the publish path.
+    private bool IsPagesUriConfigured => !string.IsNullOrWhiteSpace(_gitHubOptions.GitHubPagesUri);
 
     /// <summary>
     /// Creates a new instance of the <see cref="Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs.GitHubCatalog"/> class.
@@ -57,12 +60,6 @@ public abstract class GitHubCatalog : CachedCatalog
         _httpClientFactory = httpClientFactory;
         _gitHubClientFactory = gitHubClientFactory;
         _gitHubOptions = gitHubOptions;
-
-        if (!string.IsNullOrWhiteSpace(_gitHubOptions.GitHubApiToken) &&
-            _gitHubOptions.GitHubApiToken != null)
-        {
-            _isGitHubClientAvailable = true;
-        }
     }
 
     /// <inheritdoc />
@@ -78,7 +75,7 @@ public abstract class GitHubCatalog : CachedCatalog
     {
         var pagesUrl = CreatePath(modelId);
 
-        if (!_isGitHubClientAvailable)
+        if (IsPagesUriConfigured)
         {
             var httpClient = CreateHttpClient();
             try
@@ -259,7 +256,7 @@ public abstract class GitHubCatalog : CachedCatalog
         var catalogPath = $"{RootPath}{modelName[0].ToString().ToLower()}/{modelName}/{majorVersion}/{CatalogFileName}";
 
         string? response;
-        if (!_isGitHubClientAvailable)
+        if (IsPagesUriConfigured)
         {
             var httpClient = CreateHttpClient();
             try
@@ -472,7 +469,7 @@ public abstract class GitHubCatalog : CachedCatalog
         var catalogPath = $"{RootPath}{CatalogFileName}";
 
         string? response;
-        if (!_isGitHubClientAvailable)
+        if (IsPagesUriConfigured)
         {
             var httpClient = CreateHttpClient();
             try
@@ -512,7 +509,7 @@ public abstract class GitHubCatalog : CachedCatalog
     private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath)
     {
         string? response;
-        if (!_isGitHubClientAvailable)
+        if (IsPagesUriConfigured)
         {
             var httpClient = CreateHttpClient();
             try

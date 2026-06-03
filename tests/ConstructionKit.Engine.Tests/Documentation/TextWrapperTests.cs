@@ -20,7 +20,10 @@ public class TextWrapperTests
 
         var result = TextWrapper.EscapeMdxSpecialCharacters(input);
 
-        Assert.Equal("https://\\<hostname>/\\<tenantId>", result);
+        // `<` is escaped to `\<`; `>` is not in the escape set and must survive verbatim.
+        Assert.NotNull(result);
+        Assert.Equal(@"https://\<hostname>/\<tenantId>", result);
+        Assert.Equal(2, result.Count(c => c == '>'));
     }
 
     [Fact]

@@ -46,14 +46,19 @@ public class CkTypeAttributeGraph
     /// <param name="autoIncrementReference"></param>
     /// <param name="metaData"></param>
     /// <param name="defaultValues"></param>
-    /// <param name="isRuntimeState">When true, blueprint re-apply preserves the existing runtime value of this attribute</param>
     /// <param name="isOptional"></param>
     /// <param name="description"></param>
+    /// <param name="isRuntimeState">
+    /// When true, blueprint re-apply preserves the existing runtime value of this attribute.
+    /// Trailing + defaulted so existing positional callers (e.g. the mesh-adapter SDK tests
+    /// that build a <see cref="CkTypeAttributeGraph"/> directly) compile unchanged. STJ binds
+    /// the constructor by parameter name, so the JSON wire format is unaffected.
+    /// </param>
     [JsonConstructor]
     public CkTypeAttributeGraph(CkId<CkAttributeId> ckAttributeId, string attributeName, IReadOnlyCollection<object>? autoCompleteValues,
         AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId, CkId<CkEnumId>? valueCkEnumId,
         string? autoIncrementReference, ICollection<CkAttributeMetaDataDto>? metaData,
-        ICollection<object>? defaultValues, bool isRuntimeState, bool isOptional, string? description)
+        ICollection<object>? defaultValues, bool isOptional, string? description, bool isRuntimeState = false)
     {
         CkAttributeId = ckAttributeId;
         AttributeName = attributeName;

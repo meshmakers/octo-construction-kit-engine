@@ -18,14 +18,18 @@
     <Target Name="GatherCompileFiles">
         <ItemGroup>
             <ConstructionKitFolderInputCompileFiles Include="@(ConstructionKitFolder->'%(Identity)/**/*.yaml')" />
-            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder);$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
+            <!-- File-only outputs: MSBuild's Inputs/Outputs incremental check needs file timestamps, not a bare
+                 directory path. Listing the directory here makes the check unreliable so the target re-runs even
+                 when outputs are up to date — and the re-run hits remote CK catalogs again, which can hang. -->
+            <ConstructionKitFolderOutCompileFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
 
     <Target Name="GatherImportFiles">
         <ItemGroup>
             <ConstructionKitFolderInputImportFiles Include="@(ConstructionKitConfigFile)" />
-            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder);$(OctoCkCompileOutputImportFolder)/*.yaml"/>
+            <!-- File-only outputs (see GatherCompileFiles for the rationale). -->
+            <ConstructionKitFolderOutImportFiles Include="$(OctoCkCompileOutputImportFolder)/*.yaml"/>
         </ItemGroup>
     </Target>
     

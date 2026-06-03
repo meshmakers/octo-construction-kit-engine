@@ -4,15 +4,29 @@ using Octokit;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 
-internal class GitHubClientWrapper(IGitHubOptions gitHubOptions) : IGitHubClientWrapper
+internal class GitHubClientWrapper : IGitHubClientWrapper
 {
     private const int MaxRetries = 5;
     private const int BaseDelayMs = 500;
 
-    private readonly GitHubClient _client = new(new ProductHeaderValue(gitHubOptions.ProductName))
+    // Octokit's underlying HttpClient defaults to 100 s per request. That is too long for build
+    // pipelines: when GitHub's API stalls or rate-limits, a single stuck call freezes CkCompile /
+    // ckc publish for the full timeout and bubbles up as a cryptic "A task was canceled". 60 s is
+    // generous for healthy paginated reads but fails fast on real hangs.
+    private static readonly TimeSpan RequestTimeout = TimeSpan.FromSeconds(60);
+
+    private readonly IGitHubOptions gitHubOptions;
+    private readonly GitHubClient _client;
+
+    public GitHubClientWrapper(IGitHubOptions gitHubOptions)
     {
-        Credentials = new Credentials(gitHubOptions.GitHubApiToken)
-    };
+        this.gitHubOptions = gitHubOptions;
+        _client = new GitHubClient(new ProductHeaderValue(gitHubOptions.ProductName))
+        {
+            Credentials = new Credentials(gitHubOptions.GitHubApiToken)
+        };
+        _client.SetRequestTimeout(RequestTimeout);
+    }
 
     public async Task<(string, string)?> GetFileAsync(string filePath)
     {

@@ -28,6 +28,7 @@ public class CkTypeAttributeGraph
         ValueCkRecordId = ckAttributeGraph.ValueCkRecordId;
         ValueCkEnumId = ckAttributeGraph.ValueCkEnumId;
         DefaultValues = ckAttributeGraph.DefaultValues;
+        IsRuntimeState = ckAttributeGraph.IsRuntimeState;
         IsOptional = ckTypeAttributeDto.IsOptional;
         Description = ckAttributeGraph.Description;
         MetaData = ckAttributeGraph.MetaData;
@@ -45,13 +46,14 @@ public class CkTypeAttributeGraph
     /// <param name="autoIncrementReference"></param>
     /// <param name="metaData"></param>
     /// <param name="defaultValues"></param>
+    /// <param name="isRuntimeState">When true, blueprint re-apply preserves the existing runtime value of this attribute</param>
     /// <param name="isOptional"></param>
     /// <param name="description"></param>
     [JsonConstructor]
     public CkTypeAttributeGraph(CkId<CkAttributeId> ckAttributeId, string attributeName, IReadOnlyCollection<object>? autoCompleteValues,
         AttributeValueTypesDto valueType, CkId<CkRecordId>? valueCkRecordId, CkId<CkEnumId>? valueCkEnumId,
         string? autoIncrementReference, ICollection<CkAttributeMetaDataDto>? metaData,
-        ICollection<object>? defaultValues, bool isOptional, string? description)
+        ICollection<object>? defaultValues, bool isRuntimeState, bool isOptional, string? description)
     {
         CkAttributeId = ckAttributeId;
         AttributeName = attributeName;
@@ -61,6 +63,7 @@ public class CkTypeAttributeGraph
         ValueCkRecordId = valueCkRecordId;
         ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
+        IsRuntimeState = isRuntimeState;
         MetaData = metaData;
         IsOptional = isOptional;
         Description = description;
@@ -105,6 +108,12 @@ public class CkTypeAttributeGraph
     ///     Default value of the attribute
     /// </summary>
     public ICollection<object>? DefaultValues { get; }
+
+    /// <summary>
+    ///     When true, blueprint re-apply preserves the existing runtime value of this attribute
+    ///     instead of overwriting it with the seed value. See <see cref="CkAttributeDto.IsRuntimeState"/>.
+    /// </summary>
+    public bool IsRuntimeState { get; }
 
     /// <summary>
     ///     If true, the attribute is optional, that means it can be null

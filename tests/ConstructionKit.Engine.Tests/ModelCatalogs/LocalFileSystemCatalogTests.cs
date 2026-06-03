@@ -1,4 +1,3 @@
-using System.Text.Json;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
@@ -337,33 +336,41 @@ public class LocalFileSystemCatalogTests : IDisposable
     }
 
     [Fact]
-    public async Task PublishModelAsync_RepublishWithShorterDescription_CatalogRemainsValidJson()
+    public async Task PublishModelAsync_OverwritingWithShorterCatalogContent_ShouldTruncateFile()
     {
-        // Republishing with a shorter description shrinks the per-major catalog.json.
-        // If the writer opens the file without truncation, leftover bytes from the
-        // previous (longer) write trail the new content and the next read throws
-        // `'}' is invalid after a single JSON value`.
+        // Regression: catalog writers used File.OpenWrite which does not truncate.
+        // Overwriting a long catalog.json with shorter content left trailing bytes
+        // from the previous write, producing JSON like "}\n  }" which broke
+        // GetModelLibraryVersionsCatalogAsync with "'}' is invalid after a single JSON value".
         var modelId = new CkModelId("TestModel", "1.0.0");
+        var longDescription = new string('x', 2000);
 
         A.CallTo(() => _mockJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
             .Returns(Task.CompletedTask);
+        A.CallTo(() =>
+                _mockJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._,
+                    A<bool>._))
+            .Returns(Task.FromResult(new CkCompiledModelRoot { ModelId = modelId }));
 
-        var longModel = new CkCompiledModelRoot { ModelId = modelId, Description = new string('x', 500) };
-        await _repository.PublishAsync(longModel);
+        await _repository.PublishAsync(new CkCompiledModelRoot { ModelId = modelId, Description = longDescription });
 
         var catalogPath = Path.Combine(_tempDirectory, "ck-models", "v2", "t", "TestModel", "1", "catalog.json");
-        var sizeAfterFirst = new FileInfo(catalogPath).Length;
+        var sizeAfterLongWrite = new FileInfo(catalogPath).Length;
 
-        var shortModel = new CkCompiledModelRoot { ModelId = modelId, Description = "y" };
-        await _repository.PublishAsync(shortModel, force: true);
+        // Force-overwrite with empty description — produces a strictly shorter catalog.
+        await _repository.PublishAsync(
+            new CkCompiledModelRoot { ModelId = modelId, Description = string.Empty },
+            force: true);
 
-        var sizeAfterSecond = new FileInfo(catalogPath).Length;
-        Assert.True(sizeAfterSecond < sizeAfterFirst,
-            $"Test premise broken: expected smaller catalog after replacing description, got {sizeAfterSecond} vs {sizeAfterFirst} bytes.");
+        var sizeAfterShortWrite = new FileInfo(catalogPath).Length;
+        Assert.True(sizeAfterShortWrite < sizeAfterLongWrite,
+            $"Catalog file must be truncated. Was {sizeAfterLongWrite}, now {sizeAfterShortWrite}.");
 
+        // Must be a single, well-formed JSON document — no trailing bytes from prior write.
         await using var fileStream = File.OpenRead(catalogPath);
-        using var doc = await JsonDocument.ParseAsync(fileStream, cancellationToken: TestContext.Current.CancellationToken);
-        Assert.NotNull(doc);
+        using var doc = await System.Text.Json.JsonDocument.ParseAsync(fileStream,
+            cancellationToken: TestContext.Current.CancellationToken);
+        Assert.Equal(System.Text.Json.JsonValueKind.Object, doc.RootElement.ValueKind);
     }
 
     #endregion

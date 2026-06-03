@@ -49,6 +49,16 @@ public class CkAttributeDto
     public ICollection<object>? DefaultValues { get; set; }
 
     /// <summary>
+    ///     When true, blueprint re-apply preserves the existing runtime value of this attribute
+    ///     instead of overwriting it with the seed value. Use for attributes that carry runtime
+    ///     state (e.g. deployment status, communication status, last-error fields, sync sequence
+    ///     numbers) that services / operators own at runtime and that the blueprint must not reset
+    ///     on a version bump. Defaults to <c>false</c> (the attribute is seed-managed).
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsRuntimeState { get; set; }
+
+    /// <summary>
     ///     An optional description of the attribute
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]

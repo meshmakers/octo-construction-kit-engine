@@ -93,6 +93,10 @@
             ]
           }
         },
+        "isRuntimeState": {
+          "type": "boolean",
+          "description": "When true, blueprint re-apply preserves the existing runtime value of this attribute instead of overwriting it with the seed value. Use for attributes that carry runtime state (deployment status, communication status, last-error fields, sync sequence numbers) that the operator/services own at runtime and that the blueprint must not reset on version bumps. Defaults to false (seed-managed)."
+        },
         "description": {
           "type": "string"
         },

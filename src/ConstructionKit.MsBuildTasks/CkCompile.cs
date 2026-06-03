@@ -214,6 +214,32 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
+                                // Pre-publish dependency check: refuse to publish a model whose pinned
+                                // dependencies cannot be located in any registered catalog. Without this,
+                                // a downstream model (e.g. Industry.Energy) can be published with a
+                                // dependency on an unpublished sibling version (e.g. Industry.Basic-2.1.1)
+                                // and leave the catalog graph permanently inconsistent — which the asset-
+                                // repo LibraryStatus endpoint and dependency resolver both stumble over.
+                                var missingDeps = new List<string>();
+                                foreach (var dep in ckCompiledModelRoot.Dependencies ?? Enumerable.Empty<CkModelId>())
+                                {
+                                    if (!await catalogService.IsExistingAsync(dep))
+                                    {
+                                        missingDeps.Add(dep.FullName);
+                                    }
+                                }
+
+                                if (missingDeps.Count > 0)
+                                {
+                                    Log.LogError(
+                                        $"Refusing to publish '{ckCompiledModelRoot.ModelId}' to '{PublishCatalogName}': "
+                                        + $"the following pinned dependencies are not available in any registered catalog: "
+                                        + $"{string.Join(", ", missingDeps)}. "
+                                        + "Either publish the missing dependency version first, or rebuild this model "
+                                        + "against a dependency version that is published.");
+                                    return;
+                                }
+
                                 await catalogService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
                                     originFileResolver, true);
                                 Log.LogMessage(MessageImportance.High,

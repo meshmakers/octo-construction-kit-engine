@@ -92,6 +92,8 @@ public class CkRestore : Microsoft.Build.Utilities.Task
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
+        // See CkCompile.Execute for the rationale on this fail-fast.
+        const int taskTimeoutMs = 5 * 60 * 1000;
         try
         {
             var task = Task.Run(async () =>
@@ -143,10 +145,27 @@ public class CkRestore : Microsoft.Build.Utilities.Task
                     }
                 }
             });
-            task.Wait();
+            if (!task.Wait(taskTimeoutMs))
+            {
+                Log.LogError(
+                    "Construction kit restore did not complete within {0} minutes. This usually means a remote " +
+                    "catalog (PublicGitHub/PrivateGitHub) call is hanging. Verify network connectivity to " +
+                    "api.github.com and that the catalog API tokens are not rate-limited.",
+                    taskTimeoutMs / 60_000);
+                return false;
+            }
 
             CompiledModelFiles = compiledModelFiles.ToArray();
             CacheFiles = cacheFiles.ToArray();
+        }
+        catch (AggregateException ae)
+            when (ae.GetBaseException() is TaskCanceledException or OperationCanceledException)
+        {
+            Log.LogError(
+                "Construction kit restore was canceled — likely an HttpClient timeout against a remote " +
+                "catalog (PublicGitHub/PrivateGitHub). Verify network connectivity to api.github.com and " +
+                "that OctoPrivateGitHubApiKey / OctoPublicGitHubApiKey are not rate-limited.");
+            return false;
         }
         catch (Exception ex)
         {

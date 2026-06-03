@@ -153,6 +153,10 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();
+        // Fail-fast for hung remote-catalog calls. HttpClient's own default is 100 s per request,
+        // but a stuck dependency chain (multiple sequential GitHub fetches) can still chain past that.
+        // 5 minutes is generous for the slowest healthy first-time fetch we've seen.
+        const int taskTimeoutMs = 5 * 60 * 1000;
         try
         {
             var task = Task.Run(async () =>
@@ -299,10 +303,29 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                     }
                 }
             });
-            task.Wait();
+            if (!task.Wait(taskTimeoutMs))
+            {
+                Log.LogError(
+                    "Construction kit compile did not complete within {0} minutes. This usually means a remote " +
+                    "catalog (PublicGitHub/PrivateGitHub) call is hanging. Verify network connectivity to " +
+                    "api.github.com and that the catalog API tokens are not rate-limited.",
+                    taskTimeoutMs / 60_000);
+                return false;
+            }
 
             CompiledModelFiles = compiledModelFiles.ToArray();
             CacheFiles = cacheFiles.ToArray();
+        }
+        catch (AggregateException ae)
+            when (ae.GetBaseException() is TaskCanceledException or OperationCanceledException)
+        {
+            // HttpClient's per-request timeout fires as TaskCanceledException; surface it as actionable rather
+            // than dumping a 40-frame async stack with the message "A task was canceled".
+            Log.LogError(
+                "Construction kit compile was canceled — likely an HttpClient timeout against a remote " +
+                "catalog (PublicGitHub/PrivateGitHub). Verify network connectivity to api.github.com and " +
+                "that OctoPrivateGitHubApiKey / OctoPublicGitHubApiKey are not rate-limited.");
+            return false;
         }
         catch (Exception ex)
         {

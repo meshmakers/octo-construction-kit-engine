@@ -9,8 +9,9 @@
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
         <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
-        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0'">true</OctoPublishCkModel>
-        <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net10.0'">true</OctoGenerateCkDocumentation>
+        <!-- See SystemCkModel.csproj for the rationale on _IsPacking. -->
+        <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoPublishCkModel>
+        <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoGenerateCkDocumentation>
     </PropertyGroup>
 
     <ItemGroup>

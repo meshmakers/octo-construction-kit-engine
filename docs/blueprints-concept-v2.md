@@ -15,7 +15,7 @@ verbindliche Grundlage für die Fertigstellung der Blueprint-Funktion.
 - MongoDB-Persistenz: `MongoTenantBlueprintHistory`, `MongoBlueprintBackupService`,
   `MongoRuntimeRepositoryProvider`.
 - CLI-Tool `octo-bpm` mit allen lokalen Commands (new, validate, pack,
-  list, catalogs, get, publish, config).
+  list, version, catalogs, get, publish, config).
 - System-Entity-Attribute: `RtBlueprintSource`, `RtBlueprintLocked`,
   `RtBlueprintAppliedAt` sind im SystemCkModel definiert.
 
@@ -133,11 +133,19 @@ zwischen Apply und Rollback.
 **Zweck:** Lokale Blueprint-Entwicklung, Paketierung, Veröffentlichung
 in Kataloge. Operiert **niemals** gegen einen Tenant-Service.
 
-**Commands:** `new`, `validate`, `pack`, `list`, `catalogs`, `get`,
-`publish`, `config`.
+**Commands:** `new`, `validate`, `pack`, `list`, `version`, `catalogs`,
+`get`, `publish`, `config`.
 
-**Aktuelle Commands, die hier *nicht* hingehören** (in Schritt 4 nach
-`octo-cli` migrieren): `status`, `preview`, `update`, `history`.
+**Entfernt; Äquivalent in `octo-cli`:** Die Runtime-Commands `status`,
+`preview`, `update`, `history` wurden aus `octo-bpm` entfernt. Sie operieren
+gegen einen Tenant und brauchen ein Runtime-Repository samt
+`ITenantBackupService` — beides hostet `octo-asset-repo-services`, nicht das
+Authoring-Tool. Würden sie hier registriert, zöge `IBlueprintService →
+ITenantBackupService` in den DI-Graphen des CLI und ließe den Tool-Start
+abstürzen. Die entsprechende Funktionalität bieten die `octo-cli`-Commands
+(`ServiceClientOctoCommand`, siehe §3.2): `history` → `GetBlueprintHistory`
+(deckt auch die frühere `status`-Ansicht ab), `preview` →
+`PreviewBlueprintUpdate`, `update` → `UpdateBlueprint`.
 
 ### 3.2 octo-cli — Runtime-Operations gegen Tenant-Services
 **Zweck:** Installation, Update, Rollback, Uninstall, Statusabfrage
@@ -354,7 +362,7 @@ octo-cli blueprintUninstall -t T1 -b ECommerce-2.0.0 [--cascade]
 | 3 | CK-Model-Auflösung | Auto-Install + Konfliktdetektion vor Install |
 | 4 | Audit-Trail | `IDistributionEventHubService` mit Record-Events |
 | 5 | Rollback | Voll, Backup-basiert |
-| 6 | Tool-Schnitt | `octo-cli` führt Runtime-Ops (Install/Update/Rollback/Uninstall). Authoring-CLI (`octo-bpm`) ist optional, derzeit nicht implementiert. |
+| 6 | Tool-Schnitt | `octo-cli` führt Runtime-Ops (Install/Update/Rollback/Uninstall). Authoring-CLI (`octo-bpm`) ist implementiert (new, validate, pack, list, version, catalogs, get, publish, config) und operiert nie gegen einen Tenant-Service. |
 | 7 | Hosting | `octo-asset-repo-services` (GraphQL-API) |
 | 8 | Entity-Ownership | Ein Owner pro Entity |
 | 9 | Re-Apply | `--force` flag, neuer Mode `ReApply` |

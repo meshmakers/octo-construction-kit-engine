@@ -43,14 +43,6 @@ internal static class Program
 
     private static IServiceProvider BuildDi()
     {
-        var services = new ServiceCollection();
-
-        // AddRuntimeEngine() internally calls AddConstructionKit()
-        services.AddRuntimeEngine();
-
-        // Runner is the custom class
-        services.AddTransient<Runner>();
-
         var config = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", true, true)
@@ -59,6 +51,31 @@ internal static class Program
                     $".{Constants.BpmToolUserFolderName}{Path.DirectorySeparatorChar}settings.json"),
                 true, true)
             .Build();
+
+        var services = new ServiceCollection();
+        ConfigureServices(services, config);
+        return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Registers every service octo-bpm needs. Extracted from <see cref="BuildDi"/> and exposed to
+    /// the test assembly so a unit test can assert the full command graph resolves — the regression
+    /// guard for the startup DI crash fixed under AB#4081 (a command pulling an unsatisfiable
+    /// <c>IBlueprintService -&gt; ITenantBackupService</c> dependency into the CLI container).
+    /// </summary>
+    internal static void ConfigureServices(IServiceCollection services, IConfiguration config)
+    {
+        // octo-bpm is an authoring-only tool (see docs/blueprints-concept-v2.md §3.1): it must
+        // never operate against a tenant. Register only the ConstructionKit authoring layer
+        // (blueprint compiler + catalog services). Deliberately NOT AddRuntimeEngine(), which
+        // pulls in the runtime/tenant surface (IBlueprintService -> ITenantBackupService,
+        // repository providers, CK-migration + audit services) — none of which this CLI can
+        // satisfy. Keeping the graph to the ConstructionKit layer structurally prevents a
+        // future runtime-only registration from re-crashing tool startup.
+        services.AddConstructionKit();
+
+        // Runner is the custom class
+        services.AddTransient<Runner>();
 
         services.Configure<BpmToolOptions>(options =>
             config.GetSection(Constants.BpmToolOptionsRootNode).Bind(options));
@@ -98,23 +115,22 @@ internal static class Program
         // Configuration command
         services.AddTransient<ICommand, ConfigCommand>();
 
-        // Blueprint commands (without "blueprint-" prefix)
+        // Blueprint authoring commands. octo-bpm is a local authoring/packaging tool and
+        // never operates against a tenant service (see docs/blueprints-concept-v2.md §3.1).
+        // Tenant runtime operations (status/preview/update/history) live in octo-cli as
+        // service-client commands against octo-asset-repo-services, which hosts the runtime
+        // repository + ITenantBackupService. Registering those commands here dragged
+        // IBlueprintService -> ITenantBackupService into the CLI's DI graph (no implementation
+        // in this tool's closure), crashing startup for every invocation.
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, ValidateCommand>();
         services.AddTransient<ICommand, PackCommand>();
         services.AddTransient<ICommand, ListCommand>();
-        services.AddTransient<ICommand, StatusCommand>();
-        services.AddTransient<ICommand, PreviewCommand>();
-        services.AddTransient<ICommand, UpdateCommand>();
-        services.AddTransient<ICommand, HistoryCommand>();
         services.AddTransient<ICommand, VersionCommand>();
 
         // Catalog commands
         services.AddTransient<ICommand, CatalogsCommand>();
         services.AddTransient<ICommand, GetCommand>();
         services.AddTransient<ICommand, PublishCommand>();
-
-        var serviceProvider = services.BuildServiceProvider();
-        return serviceProvider;
     }
 }

@@ -49,4 +49,8 @@
         <ProjectReference Include="..\Runtime.Engine\Runtime.Engine.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="Meshmakers.Octo.BlueprintManager.Tests" />
+    </ItemGroup>
+
 </Project>

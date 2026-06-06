@@ -50,12 +50,15 @@ variables:
   # catalog — incident: Industry.Basic-2.1.1 pinned by Industry.Energy/Fluid/
   # Maintenance/Manufacturing without Industry.Basic-2.1.1 itself ever being
   # published, leaving the catalog dep graph broken.
-  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/r')) }}:
-    - name: effectivePublishCatalog
-      value: $(OctoPublishCatalog)
-  - ${{ else }}:
-    - name: effectivePublishCatalog
-      value: LocalFileSystemCatalog
+  #
+  # effectivePublishCatalog is set at runtime by the bash step below — the
+  # previous compile-time pattern (assigning `value: $(OctoPublishCatalog)`
+  # inside a `${{ if }}` block) compiled but the runtime substitution didn't
+  # recurse: $(effectivePublishCatalog) resolved to the literal string
+  # `$(OctoPublishCatalog)`, which then leaked into MSBuild and into the
+  # octo-ckc `-c <catalog>` argument, where it failed with exit code 255
+  # (build 33595). Resolving the conditional in a bash step sidesteps the
+  # recursion entirely and is observable in the log.
 
 stages:
   - stage: Build
@@ -69,6 +72,20 @@ stages:
           - checkout: self
             clean: true
           - template: templates/steps/set-version.yml@pipelineTemplates
+          - bash: |
+              set -e
+              echo "Build.SourceBranch = $(Build.SourceBranch)"
+              echo "OctoPublishCatalog (via env) = ${OCTO_PUBLISH_CATALOG}"
+              if [[ "$(Build.SourceBranch)" == "refs/heads/main" ]] || [[ "$(Build.SourceBranch)" =~ ^refs/tags/r ]]; then
+                RESOLVED="${OCTO_PUBLISH_CATALOG}"
+              else
+                RESOLVED="LocalFileSystemCatalog"
+              fi
+              echo "Resolved effectivePublishCatalog = ${RESOLVED}"
+              echo "##vso[task.setvariable variable=effectivePublishCatalog]${RESOLVED}"
+            env:
+              OCTO_PUBLISH_CATALOG: $(OctoPublishCatalog)
+            displayName: 'Resolve effectivePublishCatalog'
           - task: DotNetCoreCLI@2
             displayName: 'Build src'
             inputs:

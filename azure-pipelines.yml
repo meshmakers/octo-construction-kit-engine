@@ -1,0 +1,113 @@
+# Root-level CI pipeline using shared templates from octo-pipeline-templates.
+#
+# Phase 1 pilot 2 of the YAML migration (see octo-mesh-deployment's
+# docs/pipeline-architecture-concept.md). The first pilot (DEH, PR #10/#11)
+# proved out the L1 templates for a Lib without Docker; this one adds the
+# consolidated build-and-push-docker template (tpl-v0.2.0) so the rest of the
+# Lib + Adapter migrations don't have to invent it again.
+#
+# devops-build/createDocumentation.ps1 is still referenced at its old path —
+# a follow-up cleanup PR moves it to scripts/ and deletes the legacy
+# devops-build/ folder, the same shape as octo-distributedEventHub PR #11.
+
+name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)-$(Build.SourceBranchName)
+
+resources:
+  repositories:
+    - repository: pipelineTemplates
+      type: github
+      name: meshmakers/octo-pipeline-templates
+      endpoint: meshmakers-access-token
+      ref: refs/tags/tpl-v0.2.0
+
+trigger:
+  batch: true
+  branches:
+    include:
+      - dev/*
+      - test/*
+      - main
+  tags:
+    exclude:
+      - '*'
+
+variables:
+  - group: ApiKeys-mm-cloud
+  - group: OctoDefault
+  - name: artifactsFrameworkVersion
+    value: 'net10.0'
+  - name: buildConfiguration
+    value: 'Release'
+  - name: buildPlatform
+    value: 'Any CPU'
+  - name: isRelease
+    value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/tags/r') }}
+  - name: isMain
+    value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
+  - name: isTest
+    value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
+  # Public catalog publishing is restricted to main and release tags. Feature/dev
+  # branches build and validate but must never write to the shared gh-pages
+  # catalog — incident: Industry.Basic-2.1.1 pinned by Industry.Energy/Fluid/
+  # Maintenance/Manufacturing without Industry.Basic-2.1.1 itself ever being
+  # published, leaving the catalog dep graph broken.
+  - ${{ if or(eq(variables['Build.SourceBranch'], 'refs/heads/main'), startsWith(variables['Build.SourceBranch'], 'refs/tags/r')) }}:
+    - name: effectivePublishCatalog
+      value: $(OctoPublishCatalog)
+  - ${{ else }}:
+    - name: effectivePublishCatalog
+      value: LocalFileSystemCatalog
+
+stages:
+  - stage: Build
+    jobs:
+      - job: buildAndTest
+        displayName: 'Build nuget and execute tests'
+        pool:
+          name: meshmakers-ci-agents
+        steps:
+          - template: templates/steps/update-build-number.yml@pipelineTemplates
+          - checkout: self
+            clean: true
+          - template: templates/steps/set-version.yml@pipelineTemplates
+          - task: DotNetCoreCLI@2
+            displayName: 'Build src'
+            inputs:
+              command: 'build'
+              projects: |
+                src/**/*.csproj
+                !src/**/Generated*.csproj
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
+          - task: DotNetCoreCLI@2
+            displayName: 'Build samples'
+            inputs:
+              command: 'build'
+              projects: 'samples/**/*.csproj'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+          - task: DotNetCoreCLI@2
+            displayName: 'Test'
+            inputs:
+              command: 'test'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+              projects: |
+                **/*Tests.csproj
+                !**/*SystemTests.csproj
+              testRunTitle: 'CI'
+          - template: templates/steps/build-and-push-docker.yml@pipelineTemplates
+            parameters:
+              publicRegistryServiceConnection: $(DockerRegistryPublicConnection)
+              privateRegistryName: $(DockerRegistryPrivateUri)
+              repository: meshmakers/octo-schema-provider
+              dockerfile: src/ConstructionKit.SchemaProvider/Dockerfile
+          - task: PowerShell@2
+            displayName: 'Create api documentation'
+            inputs:
+              filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'
+              arguments: '-configuration $(buildConfiguration) -frameworkVersion $(artifactsFrameworkVersion)'
+          - template: templates/steps/handle-artifacts.yml@pipelineTemplates
+            parameters:
+              constructionKitLibraryPaths:
+                - 'src/SystemCkModel/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/octo-ck-libraries/SystemCkModel'
+              apiDocumentationPaths:
+                - '$(Build.SourcesDirectory)/bin/$(buildConfiguration)/$(artifactsFrameworkVersion)/documentation'
+          - template: templates/steps/push-nuget-package.yml@pipelineTemplates

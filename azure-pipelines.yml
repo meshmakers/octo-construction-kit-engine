@@ -6,9 +6,8 @@
 # consolidated build-and-push-docker template (tpl-v0.2.0) so the rest of the
 # Lib + Adapter migrations don't have to invent it again.
 #
-# devops-build/createDocumentation.ps1 is still referenced at its old path —
-# a follow-up cleanup PR moves it to scripts/ and deletes the legacy
-# devops-build/ folder, the same shape as octo-distributedEventHub PR #11.
+# scripts/createDocumentation.ps1 was moved here from devops-build/ when the
+# legacy folder was deleted in the cleanup PR.
 
 name: $(MajorVersion).$(MinorVersion).$(date:yyMM).$(DayOfMonth)$(rev:rrr)-$(Build.SourceBranchName)
 
@@ -102,7 +101,7 @@ stages:
           - task: PowerShell@2
             displayName: 'Create api documentation'
             inputs:
-              filePath: '$(System.DefaultWorkingDirectory)/devops-build/createDocumentation.ps1'
+              filePath: '$(System.DefaultWorkingDirectory)/scripts/createDocumentation.ps1'
               arguments: '-configuration $(buildConfiguration) -frameworkVersion $(artifactsFrameworkVersion)'
           - template: templates/steps/handle-artifacts.yml@pipelineTemplates
             parameters:

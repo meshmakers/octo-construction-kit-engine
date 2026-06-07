@@ -69,6 +69,14 @@ stages:
           - checkout: self
             clean: true
           - template: templates/steps/set-version.yml@pipelineTemplates
+          # This repo builds interdependent CK models in the same run (StreamData ->
+          # System, Test/TestIdentity -> System). The glob compiles them alphabetically,
+          # so a dependent (e.g. StreamData) compiles before its dependency (System) is
+          # published, and resolves System back through the LocalFileSystemCatalog. That
+          # catalog is disabled-for-read by default (Directory.Build.props, AB#2826), which
+          # makes the compile throw "LocalFileSystemCatalog is not enabled for read
+          # operations". Opt the local catalog back in for the steps that compile CK models
+          # so dependency resolution succeeds (matches the MsBuild task default of true).
           - task: DotNetCoreCLI@2
             displayName: 'Build src'
             inputs:
@@ -76,7 +84,7 @@ stages:
               projects: |
                 src/**/*.csproj
                 !src/**/Generated*.csproj
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoLocalCatalogIsEnabled=true /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
           - task: DotNetCoreCLI@2
             displayName: 'Build samples'
             inputs:
@@ -87,7 +95,7 @@ stages:
             displayName: 'Test'
             inputs:
               command: 'test'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true'
               projects: |
                 **/*Tests.csproj
                 !**/*SystemTests.csproj

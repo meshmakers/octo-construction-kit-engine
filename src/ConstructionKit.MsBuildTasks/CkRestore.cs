@@ -5,6 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
@@ -38,6 +39,12 @@ public class CkRestore : Microsoft.Build.Utilities.Task
     /// When true, the local catalog is enabled.
     /// </summary>
     public bool IsLocalCatalogEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Root path of the local file system catalog. When empty, the catalog stays at its
+    /// default location (~/.octo/local-catalog).
+    /// </summary>
+    public string? LocalCatalogRootPath { get; set; }
 
     /// <summary>
     /// When true, the public GitHub catalog is consulted during dependency resolution.
@@ -74,6 +81,7 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         services.Configure<LocalFileSystemCatalogOptions>(options =>
         {
             options.IsEnabled = IsLocalCatalogEnabled;
+            options.ApplyRootPath(LocalCatalogRootPath);
         });
 
         services.Configure<PublicGitHubCatalogOptions>(options =>
@@ -89,6 +97,12 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         var serviceProvider = services.BuildServiceProvider();
 
         var catalogService = serviceProvider.GetRequiredService<ICatalogService>();
+
+        var localCatalogOptions =
+            serviceProvider.GetRequiredService<IOptions<LocalFileSystemCatalogOptions>>().Value;
+        Log.LogMessage(MessageImportance.High,
+            "Local file system catalog root: '{0}' (enabled: {1})",
+            localCatalogOptions.RootPath, localCatalogOptions.IsEnabled);
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();

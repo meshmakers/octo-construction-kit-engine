@@ -8,6 +8,10 @@
         <OctoCkCompileCacheImportFolder Condition="'$(OctoCkCompileCacheImportFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache/$(ProjectName)/imports</OctoCkCompileCacheImportFolder>
         <OctoCkCompileOutputCompilerFolder Condition="'$(OctoCkCompileOutputCompilerFolder)' == ''">$(OutputPath)octo-ck-libraries/$(ProjectName)/out</OctoCkCompileOutputCompilerFolder>
         <OctoCkCompileCacheCompileFolder Condition="'$(OctoCkCompileCacheCompileFolder)' == ''">$(IntermediateOutputPath)octo-ck-cache/$(ProjectName)/out</OctoCkCompileCacheCompileFolder>
+        <!-- One shared -lcr fragment for every octo-ckc invocation that touches the local catalog
+             (compile, publish, restore). A single definition keeps all of them on the SAME catalog
+             root — one Exec missing it would publish to one directory and resolve from another. -->
+        <_OctoLcrArg Condition="'$(OctoLocalCatalogRootPath)' != ''">-lcr &quot;$(OctoLocalCatalogRootPath)&quot;</_OctoLcrArg>
     </PropertyGroup>
     
     <!--Defining all the text files input parameters-->
@@ -41,6 +45,7 @@
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
         <Message Importance="High" Text="Location of OctoMesh compiler package: '$(MSBuildThisFileDirectory)'"/>
+        <Message Importance="High" Text="OctoLocalCatalogRootPath: '$(OctoLocalCatalogRootPath)'"/>
         <ItemGroup>
             <!-- Define a temporary item group to iterate through -->
             <_ConstructionKitFolder Include="@(ConstructionKitFolder)"/>
@@ -51,7 +56,7 @@
         </Exec>
 
         <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
-        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -lce $(OctoLocalCatalogIsEnabled) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -lce $(OctoLocalCatalogIsEnabled) $(_OctoLcrArg) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" ItemName="CompiledModelFiles" />
         </Exec>
         
@@ -63,8 +68,8 @@
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey) -ge true" />
         <!-- Publish to both LocalFileSystemCatalog and the specified catalog, so that the build can continue for this repo -->
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c LocalFileSystemCatalog -r" />
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c LocalFileSystemCatalog -r $(_OctoLcrArg)" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r $(_OctoLcrArg)" />
 
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
                  Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>
@@ -76,7 +81,7 @@
     <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
             DependsOnTargets="GatherImportFiles">      
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
-        <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder)">
+        <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder) $(_OctoLcrArg)">
         </Exec>
     </Target>
     

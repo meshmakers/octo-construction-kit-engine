@@ -15,6 +15,7 @@ internal class CompileCommand : CkcCommand
     private readonly IArgument _outputPathArg;
     private readonly IArgument _compileResultArg;
     private readonly IArgument _localCatalogEnabled;
+    private readonly IArgument _localCatalogRoot;
 
     public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options, IOptions<LocalFileSystemCatalogOptions> localCatalogOptions,
         ICompilerService compilerService)
@@ -40,6 +41,10 @@ internal class CompileCommand : CkcCommand
 
         _localCatalogEnabled = CommandArgumentValue.AddArgument("lce", "localCatalogEnabled",
             ["Enable or disable the local Construction Kit Library catalog"], false, 1);
+
+        _localCatalogRoot = CommandArgumentValue.AddArgument("lcr", "localCatalogRoot",
+            ["Root path of the local Construction Kit Library catalog for this invocation only (not persisted)"],
+            false, 1);
     }
 
     public override async Task Execute()
@@ -64,6 +69,13 @@ internal class CompileCommand : CkcCommand
             SetLocalCatalogEnabled(isEnabled);
         }
 
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogRoot))
+        {
+            _localCatalogOptions.Value.ApplyRootPath(
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
+        }
+
+        Logger.LogInformation("Local Construction Kit catalog root: {Path}", _localCatalogOptions.Value.RootPath);
 
         bool writeCompileResult = CommandArgumentValue.IsArgumentUsed(_compileResultArg);
 

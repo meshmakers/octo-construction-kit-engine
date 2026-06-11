@@ -11,7 +11,7 @@
         <!-- One shared -lcr fragment for every octo-ckc invocation that touches the local catalog
              (compile, publish, restore). A single definition keeps all of them on the SAME catalog
              root — one Exec missing it would publish to one directory and resolve from another. -->
-        <_OctoLcrArg Condition="'$(OctoLocalCatalogRootPath)' != ''">-lcr $(OctoLocalCatalogRootPath)</_OctoLcrArg>
+        <_OctoLcrArg Condition="'$(OctoLocalCatalogRootPath)' != ''">-lcr &quot;$(OctoLocalCatalogRootPath)&quot;</_OctoLcrArg>
     </PropertyGroup>
     
     <!--Defining all the text files input parameters-->

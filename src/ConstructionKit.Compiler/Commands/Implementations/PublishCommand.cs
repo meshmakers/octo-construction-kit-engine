@@ -1,5 +1,6 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
@@ -11,16 +12,20 @@ internal class PublishCommand : CkcCommand
 {
     private readonly ICatalogService _catalogService;
     private readonly ICkSerializer _ckSerializer;
+    private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
     private readonly IArgument _forceArg;
     private readonly IArgument _pathArg;
     private readonly IArgument _catalogArg;
+    private readonly IArgument _localCatalogRoot;
 
     public PublishCommand(ILogger<PublishCommand> logger, IOptions<OctoToolOptions> options,
-        ICatalogService catalogService, ICkSerializer ckSerializer)
+        ICatalogService catalogService, ICkSerializer ckSerializer,
+        IOptions<LocalFileSystemCatalogOptions> localCatalogOptions)
         : base(logger, "Publish", "Publish a compiled construction kit to a catalog", options)
     {
         _catalogService = catalogService;
         _ckSerializer = ckSerializer;
+        _localCatalogOptions = localCatalogOptions;
 
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of compiled construction kit model file"], true, 1);
@@ -30,6 +35,10 @@ internal class PublishCommand : CkcCommand
 
         _forceArg = CommandArgumentValue.AddArgument("r", "replace",
             ["Replaces construction kits models that may exists in repo."], 0);
+
+        _localCatalogRoot = CommandArgumentValue.AddArgument("lcr", "localCatalogRoot",
+            ["Root path of the local Construction Kit Library catalog for this invocation only (not persisted)"],
+            false, 1);
     }
 
     public override async Task Execute()
@@ -44,6 +53,14 @@ internal class PublishCommand : CkcCommand
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
         Logger.LogInformation("Path of compiled construction kit file: {FilePath}", filePath);
         Logger.LogInformation("Catalog '{CatalogName}'", catalogName);
+
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogRoot))
+        {
+            _localCatalogOptions.Value.ApplyRootPath(
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
+        }
+
+        Logger.LogInformation("Local Construction Kit catalog root: {Path}", _localCatalogOptions.Value.RootPath);
 
         var operationResult = new OperationResult();
         var originFileResolver = new OriginFileResolver(filePath);

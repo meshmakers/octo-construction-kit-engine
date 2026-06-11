@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,15 +11,18 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 public class RestoreCommand : Command<OctoToolOptions>
 {
     private readonly ICatalogService _catalogService;
+    private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
     private readonly IArgument _pathArg;
     private readonly IArgument _outputPathArg;
     private readonly IArgument _cachePathArg;
+    private readonly IArgument _localCatalogRoot;
 
     public RestoreCommand(ILogger<RestoreCommand> logger, IOptions<OctoToolOptions> options,
-        ICatalogService catalogService)
+        ICatalogService catalogService, IOptions<LocalFileSystemCatalogOptions> localCatalogOptions)
         : base(logger, "Restore", "Restores construction kits based on a construction kit model file.", options)
     {
         _catalogService = catalogService;
+        _localCatalogOptions = localCatalogOptions;
         _pathArg = CommandArgumentValue.AddArgument("f", "file",
             ["Path of the model configuration file"], true, 1);
         _outputPathArg = CommandArgumentValue.AddArgument("o", "outputPath",
@@ -29,6 +33,10 @@ public class RestoreCommand : Command<OctoToolOptions>
             "If used, at the defined path a cache file is created containing " +
             "all dependent construction kit models."
         ], false, 1);
+
+        _localCatalogRoot = CommandArgumentValue.AddArgument("lcr", "localCatalogRoot",
+            ["Root path of the local Construction Kit Library catalog for this invocation only (not persisted)"],
+            false, 1);
     }
 
     public override async Task Execute()
@@ -42,7 +50,15 @@ public class RestoreCommand : Command<OctoToolOptions>
         {
             cacheFilePath = CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_cachePathArg);
         }
-        
+
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogRoot))
+        {
+            _localCatalogOptions.Value.ApplyRootPath(
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
+        }
+
+        Logger.LogInformation("Local Construction Kit catalog root: {Path}", _localCatalogOptions.Value.RootPath);
+
         try
         {
             var operationResult = new OperationResult();

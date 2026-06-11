@@ -50,6 +50,7 @@
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework)) -> $(OctoCkCompileOutputCompilerFolder)" />
         <Message Importance="High" Text="Location of OctoMesh compiler package: '$(MSBuildThisFileDirectory)'"/>
+        <Message Importance="High" Text="OctoLocalCatalogRootPath: '$(OctoLocalCatalogRootPath)'"/>
         <!--Calling our custom task-->
         <CkCompile ConstructionKitFolders="@(ConstructionKitFolder)"
                    OutputPath="$(OctoCkCompileOutputCompilerFolder)"
@@ -58,6 +59,7 @@
                    PublishCkModel="$(OctoPublishCkModel)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
+                   LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"
                    IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"
                    IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
                    PrivateGitHubApiKey="$(OctoPrivateGitHubApiKey)"
@@ -95,6 +97,7 @@
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <CkRestore ConstructionKitModelConfigFiles="@(ConstructionKitConfigFile)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
+                   LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"
                    IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"
                    IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
                    OutputPath="$(OctoCkCompileOutputImportFolder)"

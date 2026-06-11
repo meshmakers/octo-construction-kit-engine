@@ -35,6 +35,13 @@
     </PropertyGroup>
     <PropertyGroup>
         <OctoLocalCatalogIsEnabled Condition="'$(OctoCompileCkModel)' == ''">false</OctoLocalCatalogIsEnabled>
+        <!--
+            Root of the local file system catalog. Defaults next to the repo checkout (one catalog
+            per branch/workspace, mirroring the ../nuget RestoreSources convention) so builds of
+            different branches/checkouts cannot leak CK models into each other. CI overrides this
+            with a per-run path (e.g. $(Agent.TempDirectory)).
+        -->
+        <OctoLocalCatalogRootPath Condition="'$(OctoLocalCatalogRootPath)' == '' And '$(OctoRepoRootPath)' != ''">$(OctoRepoRootPath)../.octo/local-catalog</OctoLocalCatalogRootPath>
         <OctoCompileCkModel Condition="'$(OctoCompileCkModel)' == ''">true</OctoCompileCkModel>
         <OctoCreateCacheFile Condition="'$(OctoCreateCacheFile)' == ''">true</OctoCreateCacheFile>
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>

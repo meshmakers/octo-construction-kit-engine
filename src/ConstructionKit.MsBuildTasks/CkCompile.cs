@@ -11,6 +11,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 // ReSharper disable UnusedAutoPropertyAccessor.Global
 // ReSharper disable AutoPropertyCanBeMadeGetOnly.Global
@@ -44,6 +45,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// When true, the local catalog is enabled.
     /// </summary>
     public bool IsLocalCatalogEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Root path of the local file system catalog. When empty, the catalog stays at its
+    /// default location (~/.octo/local-catalog).
+    /// </summary>
+    public string? LocalCatalogRootPath { get; set; }
 
     /// <summary>
     /// When true, the public GitHub catalog is consulted during dependency resolution. Set to false to ignore stale cache entries from public GitHub when working purely with locally built models.
@@ -129,6 +136,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         services.Configure<LocalFileSystemCatalogOptions>(options =>
         {
             options.IsEnabled = IsLocalCatalogEnabled;
+            options.ApplyRootPath(LocalCatalogRootPath);
         });
 
         services.Configure<PublicGitHubCatalogOptions>(options =>
@@ -171,6 +179,11 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             {
                 Log.LogMessage(MessageImportance.High, "Using construction kit compiler located at '{0}'",
                     compilerService.GetType().Assembly.Location);
+                var localCatalogOptions =
+                    serviceProvider.GetRequiredService<IOptions<LocalFileSystemCatalogOptions>>().Value;
+                Log.LogMessage(MessageImportance.High,
+                    "Local file system catalog root: '{0}' (enabled: {1})",
+                    localCatalogOptions.RootPath, localCatalogOptions.IsEnabled);
                 foreach (var constructionKitFolder in ConstructionKitFolders)
                 {
                     var operationResult = new OperationResult();

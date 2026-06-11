@@ -21,6 +21,15 @@
         <OctoPublishCkModel Condition="'$(OctoPublishCkModel)' == ''">false</OctoPublishCkModel>
         <OctoPublishCatalog Condition="'$(OctoPublishCatalog)' == ''">LocalFileSystemCatalog</OctoPublishCatalog>
         <OctoLocalCatalogIsEnabled Condition="'$(OctoLocalCatalogIsEnabled)' == ''">true</OctoLocalCatalogIsEnabled>
+        <!--
+            Root of the local file system catalog. Defaults next to the repo checkout (one
+            catalog per branch/workspace, mirroring the ../nuget RestoreSources convention) so
+            builds of different branches/checkouts cannot leak CK models into each other. CI
+            overrides this with a per-run path (e.g. $(Agent.TempDirectory)). When
+            OctoRepoRootPath is not defined (consumer without the meshmakers props convention)
+            the property stays empty and the catalog remains at ~/.octo/local-catalog.
+        -->
+        <OctoLocalCatalogRootPath Condition="'$(OctoLocalCatalogRootPath)' == '' And '$(OctoRepoRootPath)' != ''">$(OctoRepoRootPath)../.octo/local-catalog</OctoLocalCatalogRootPath>
         <OctoPublicGitHubCatalogIsEnabled Condition="'$(OctoPublicGitHubCatalogIsEnabled)' == ''">true</OctoPublicGitHubCatalogIsEnabled>
         <OctoPrivateGitHubCatalogIsEnabled Condition="'$(OctoPrivateGitHubCatalogIsEnabled)' == ''">true</OctoPrivateGitHubCatalogIsEnabled>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>

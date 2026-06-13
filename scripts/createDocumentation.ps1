@@ -1,14 +1,6 @@
 param ($configuration = "Release", $frameworkVersion = "net9.0")
 
-# Old package (MMXMLDoc2Markdown) and the renamed one both provide the 'mmxmldoc2md' command;
-# remove the old one first so the update below doesn't conflict on a reused build agent.
-# Only uninstall when it is actually present: an unconditional 'dotnet tool uninstall' exits 1
-# and writes to stderr when the tool is missing, which Windows PowerShell turns into a
-# terminating error under the pipeline's ErrorActionPreference=Stop ('2>$null' does not suppress
-# this for native commands) - failing the step on every agent that no longer has the old package.
-if (dotnet tool list --global | Select-String -Quiet 'mmxmldoc2markdown') {
-    dotnet tool uninstall --global MMXMLDoc2Markdown
-}
+# Install/update the API doc generator (provides the 'mmxmldoc2md' command used below).
 dotnet tool update --global Meshmakers.XMLDoc2Markdown
 
 $modulePath = Split-Path -Parent $MyInvocation.MyCommand.Definition

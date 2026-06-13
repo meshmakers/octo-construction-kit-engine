@@ -25,6 +25,12 @@
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
         <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <!-- MsBuild Framework + Utilities are needed by the CkLintRuntimeStateMarkers tests
+             to fabricate ITaskItem / IBuildEngine fakes; MsBuildTasks itself does not flow
+             these transitively because its csproj bundles them via CopyLocalLockFileAssemblies
+             for the NuGet packaging path. -->
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" />
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.7.1" />
     </ItemGroup>
 
 
@@ -127,6 +133,8 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
+        <ProjectReference Include="..\..\src\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
+                          SetTargetFramework="TargetFramework=net10.0" />
     </ItemGroup>
 
 

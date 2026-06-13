@@ -215,6 +215,28 @@
         <OctoBlueprintsCacheFile Condition="'$(OctoBlueprintsCacheFile)' == ''">$(IntermediateOutputPath)octo-blueprints/blueprints-cache.json</OctoBlueprintsCacheFile>
     </PropertyGroup>
 
+    <!--
+        Phase 2 of the platform-services initiative — opt-in lint that fails the build when a CK
+        attribute YAML declaration omits the `isRuntimeState` marker. Each CK model project
+        opts in by setting <OctoEnforceRuntimeStateMarkers>true</OctoEnforceRuntimeStateMarkers>;
+        the default is false so existing models that pre-date the marker stay green until
+        their owners sweep them. Concept doc:
+        octo-platform-services/docs/concepts/phase-2-ck-blueprint-seed-management.md §4.3.
+    -->
+    <PropertyGroup>
+        <OctoEnforceRuntimeStateMarkers Condition="'$(OctoEnforceRuntimeStateMarkers)' == ''">false</OctoEnforceRuntimeStateMarkers>
+    </PropertyGroup>
+
+    <Target Name="CkLintRuntimeStateMarkers"
+            AfterTargets="CkCompile"
+            BeforeTargets="CoreCompile"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoEnforceRuntimeStateMarkers)' == 'true'">
+
+        <Message Importance="High" Text="Linting isRuntimeState markers (target framework $(TargetFramework))" />
+
+        <CkLintRuntimeStateMarkers ConstructionKitFolders="@(ConstructionKitFolder)" />
+    </Target>
+
     <Target Name="BlueprintEmbed"
             AfterTargets="ResolveProjectReferences"
             BeforeTargets="CoreCompile;CoreGenerateMSBuildEditorConfigFileShouldRun"

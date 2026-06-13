@@ -13,6 +13,7 @@
     <UsingTask TaskName="$(MSBuildThisFileName).CkCompile" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
     <UsingTask TaskName="$(MSBuildThisFileName).CkRestore" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
     <UsingTask TaskName="$(MSBuildThisFileName).BlueprintEmbed" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
+    <UsingTask TaskName="$(MSBuildThisFileName).CkLintRuntimeStateMarkers" AssemblyFile="$(OctoCkCompileTasksAssembly)"/>
 
     <!--Task parameters default values, this can be overridden-->
     <PropertyGroup>

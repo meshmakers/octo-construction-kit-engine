@@ -130,6 +130,133 @@ public class BlueprintVariableInterpolatorTests
         Assert.Equal("price: $42.50", root.Entities[0].Attributes[0].Value);
     }
 
+    [Fact]
+    public void Interpolate_ReplacesPlaceholdersInsideListValuedAttribute()
+    {
+        // Attributes like RedirectUris, AllowedCorsOrigins and AllowedScopes carry a list of
+        // strings, each of which may contain its own placeholder. Without per-item
+        // interpolation the engine would silently write the literal "${...}" placeholder into
+        // MongoDB for every list entry, which is exactly the regression that surfaced on
+        // System.Identity.Bootstrap-1.0.0's RefineryStudioClient (the FrontChannelLogoutUri
+        // string was resolved but the list-valued RedirectUris / AllowedCorsOrigins were not,
+        // so OIDC redirect-URI validation rejected every login).
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["octo.identity.refineryStudioUrl"] = "https://studio.test.octo-mesh.com",
+        };
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Test/Sample-1"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Identity/RedirectUris"),
+                            Value = new List<object>
+                            {
+                                "${octo.identity.refineryStudioUrl}/",
+                                "${octo.identity.refineryStudioUrl}/signin-oidc",
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, variables, "test.yaml", op);
+
+        var resolved = Assert.IsType<List<object>>(root.Entities[0].Attributes[0].Value);
+        Assert.Equal("https://studio.test.octo-mesh.com/", resolved[0]);
+        Assert.Equal("https://studio.test.octo-mesh.com/signin-oidc", resolved[1]);
+        Assert.False(op.HasErrors);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_ListWithMixedStringsAndNonStrings_OnlyInterpolatesStrings()
+    {
+        // Defence in depth: a list-valued attribute can in principle hold non-string items
+        // (e.g. a CK enum stored as its numeric key, or an embedded record). The interpolator
+        // must walk every item but only rewrite the strings; numeric entries must round-trip.
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["octo.environment"] = "staging",
+        };
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Test/Sample-1"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Mixed"),
+                            Value = new List<object>
+                            {
+                                "env-${octo.environment}",
+                                42,
+                                true,
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, variables, "test.yaml", op);
+
+        var resolved = Assert.IsType<List<object>>(root.Entities[0].Attributes[0].Value);
+        Assert.Equal("env-staging", resolved[0]);
+        Assert.Equal(42, resolved[1]);
+        Assert.Equal(true, resolved[2]);
+    }
+
+    [Fact]
+    public void Interpolate_ListWithUnknownVariable_WarnsAndLeavesItemUnchanged()
+    {
+        // Same warn-and-leave-unchanged contract as for scalar string values — a typo in a
+        // list item must surface in the operation result so authors can spot it.
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal);
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Test/Sample-1"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Uris"),
+                            Value = new List<object> { "${octo.nope}/foo" },
+                        },
+                    },
+                },
+            },
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, variables, "test.yaml", op);
+
+        var resolved = Assert.IsType<List<object>>(root.Entities[0].Attributes[0].Value);
+        Assert.Equal("${octo.nope}/foo", resolved[0]);
+        Assert.Contains(op.Messages,
+            m => m.MessageLevel == MessageLevel.Warning && m.MessageText.Contains("octo.nope"));
+    }
+
     private static RtModelRootTcDto MakeRoot(string attributeValue, string? wellKnownName)
     {
         return new RtModelRootTcDto

@@ -23,7 +23,11 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 ///         <item><see cref="RtEntityTcDto.RtWellKnownName"/> — so well-known names can be
 ///             environment- or tenant-scoped (rarely useful, but consistent).</item>
 ///         <item>String-valued <see cref="RtAttributeTcDto.Value"/> entries — non-string
-///             values are left untouched (numbers, bools, enums, embedded records).</item>
+///             scalars (numbers, bools, enums, embedded records) are left untouched.</item>
+///         <item>String items inside list-valued <see cref="RtAttributeTcDto.Value"/>
+///             entries — needed for attributes like <c>RedirectUris</c>,
+///             <c>AllowedCorsOrigins</c>, <c>AllowedScopes</c> that carry one placeholder
+///             per item. Non-string items inside the list are left untouched.</item>
 ///     </list>
 ///     Unknown variables emit an
 ///     <see cref="MessageLevel.Warning"/> on the <see cref="OperationResult"/> and the
@@ -62,10 +66,27 @@ internal static class BlueprintVariableInterpolator
 
             foreach (var attribute in entity.Attributes)
             {
-                if (attribute.Value is string scalar)
+                switch (attribute.Value)
                 {
-                    attribute.Value = InterpolateString(
-                        scalar, variables, sourceDescription, operationResult);
+                    case string scalar:
+                        attribute.Value = InterpolateString(
+                            scalar, variables, sourceDescription, operationResult);
+                        break;
+                    case IList<object> list:
+                        // YAML deserialisation of a list-valued attribute (e.g. RedirectUris,
+                        // AllowedCorsOrigins, AllowedScopes) materialises as IList<object>.
+                        // Walk the items in place so string entries get interpolated while
+                        // non-string entries (numeric enum codes, embedded records) survive
+                        // untouched.
+                        for (var i = 0; i < list.Count; i++)
+                        {
+                            if (list[i] is string item)
+                            {
+                                list[i] = InterpolateString(
+                                    item, variables, sourceDescription, operationResult);
+                            }
+                        }
+                        break;
                 }
             }
         }

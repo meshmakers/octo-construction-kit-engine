@@ -348,7 +348,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         DeleteOptions deleteOptions)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
+        var resolvedCkTypeId =
+            await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
+        if (resolvedCkTypeId == null)
+        {
+            return;
+        }
+
+        var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
@@ -360,10 +367,66 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         var ckTypeId = RtEntityExtensions.GetRtCkTypeId<TEntity>();
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(ckTypeId, rtId)) };
+        var resolvedCkTypeId =
+            await ResolveConcreteCkTypeIdForDeleteAsync(session, cacheService, ckTypeId, rtId).ConfigureAwait(false);
+        if (resolvedCkTypeId == null)
+        {
+            return;
+        }
+
+        var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
         await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
+    }
+
+    // For delete-by-id with an abstract CK type, find the concrete CkTypeId of the entity at this
+    // RtId. The validator rejects abstract types on insert/update/replace (correct: a concrete
+    // subtype is required), but for delete the RtId is enough to identify the concrete entity.
+    // Returns null when the entity does not exist, so the caller can no-op (matches the idempotent
+    // semantics of the underlying collection.DeleteOneAsync).
+    //
+    // The probe order is backend-aware:
+    //   1. Try the abstract base's collection first. In storage backends that share a single
+    //      collection per inheritance tree (MongoDB: e.g. RtEntity_SystemIdentityIdentityProvider),
+    //      this is one cheap query that resolves the concrete type via the document's CkTypeId
+    //      discriminator. In per-concrete-type backends (LocalDirectory) it is a no-op miss.
+    //   2. Fall back to iterating concrete derived types, probing each collection by RtId. First
+    //      hit wins; misses are cheap.
+    private async Task<RtCkId<CkTypeId>?> ResolveConcreteCkTypeIdForDeleteAsync(IOctoSession session,
+        ICkCacheService cacheService, RtCkId<CkTypeId> ckTypeId, OctoObjectId rtId)
+    {
+        var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
+        if (ckTypeGraph == null || !ckTypeGraph.IsAbstract)
+        {
+            return ckTypeId;
+        }
+
+        var abstractCollection = RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph);
+        var existing = await abstractCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
+        if (existing?.CkTypeId != null)
+        {
+            return existing.CkTypeId;
+        }
+
+        foreach (var derivedTypeId in ckTypeGraph.GetAllDerivedTypes(false))
+        {
+            var derivedRtCkId = derivedTypeId.ToRtCkId();
+            var derivedGraph = cacheService.GetRtCkType(TenantId, derivedRtCkId);
+            if (derivedGraph == null || derivedGraph.IsAbstract)
+            {
+                continue;
+            }
+
+            var derivedCollection = RepositoryDataSource.GetRtCollection<RtEntity>(derivedGraph);
+            var match = await derivedCollection.DocumentAsync(session, rtId).ConfigureAwait(false);
+            if (match != null)
+            {
+                return match.CkTypeId ?? derivedRtCkId;
+            }
+        }
+
+        return null;
     }
 
     /// <inheritdoc />

@@ -286,4 +286,76 @@ public class BasicTests(CacheServiceFixture fixture) : IClassFixture<CacheServic
         Assert.Equal(rtZone.CkTypeId, assoc.TargetCkTypeId);
         Assert.Equal(SystemCkIds.RtCkParentChildRoleId, assoc.AssociationRoleId);
     }
+
+    // Repro for ADO #4199: a caller deleting via an abstract base CkTypeId
+    // (e.g. IdentityProviderStore.RemoveAsync<RtIdentityProvider>) used to fail with
+    // "CkTypeId '...' is abstract" because the validator rejects abstract types for any
+    // mutation. The engine now resolves the concrete CkTypeId from the RtId before
+    // routing the delete through the validator/mutation pipeline.
+    [Fact]
+    public async Task DeleteOneRtEntityByRtIdAsync_TypedWithAbstractGenericArg_DeletesConcreteEntity()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "Ocean_DeleteViaAbstractTyped";
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
+
+        // Delete via the abstract base type — RtLocation is abstract, RtOcean derives from it.
+        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtLocation>(new LocalSession(), rtOcean.RtId,
+            new DeleteOptions { Strategy = DeleteStrategies.Erase });
+
+        var retrieved =
+            await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtOcean.RtId);
+        Assert.Null(retrieved);
+    }
+
+    [Fact]
+    public async Task DeleteOneRtEntityByRtIdAsync_NonGenericWithAbstractCkTypeId_DeletesConcreteEntity()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        var rtOcean = await localDirectoryRepository.CreateTransientRtEntityAsync<RtOcean>();
+        rtOcean.Designation = "Ocean_DeleteViaAbstractCkTypeId";
+        await localDirectoryRepository.InsertOneRtEntityAsync(new LocalSession(), rtOcean);
+
+        // Use the explicit abstract ckTypeId — "Test/Location" is abstract.
+        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync(new LocalSession(),
+            (RtCkId<CkTypeId>)"Test/Location", rtOcean.RtId,
+            new DeleteOptions { Strategy = DeleteStrategies.Erase });
+
+        var retrieved =
+            await localDirectoryRepository.GetRtEntityByRtIdAsync<RtOcean>(new LocalSession(), rtOcean.RtId);
+        Assert.Null(retrieved);
+    }
+
+    [Fact]
+    public async Task DeleteOneRtEntityByRtIdAsync_AbstractTypeNonexistentRtId_IsNoOp()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtSerializer = fixture.GetRtRepositorySerializer();
+        var bulkRtMutation = fixture.GetBulkRtMutation();
+        var localDirectoryRepository = new LocalDirectoryRuntimeRepository(fixture.TenantId, fixture.RepositoryPath,
+            ckCacheService,
+            new LocalRepositoryDataSource(fixture.TenantId, fixture.RepositoryPath, ckCacheService, rtSerializer),
+            bulkRtMutation);
+
+        // Should silently no-op (consistent with the idempotent collection.DeleteOne semantics
+        // for concrete types), not throw the abstract-type validation error.
+        await localDirectoryRepository.DeleteOneRtEntityByRtIdAsync<RtLocation>(new LocalSession(),
+            OctoObjectId.GenerateNewId(),
+            new DeleteOptions { Strategy = DeleteStrategies.Erase });
+    }
 }

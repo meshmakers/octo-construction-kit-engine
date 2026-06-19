@@ -166,7 +166,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue"],
+          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue", "WrapScalarInRecord"],
           "description": "Type of transformation"
         },
         "targetAttribute": {
@@ -175,7 +175,7 @@
         },
         "sourceAttribute": {
           "type": "string",
-          "description": "Source attribute name (for Rename, Copy)"
+          "description": "Source attribute name (for Rename, Copy, WrapScalarInRecord)"
         },
         "value": {
           "description": "Value to set (for SetValue)"
@@ -188,6 +188,19 @@
         "newCkTypeId": {
           "type": "string",
           "description": "New CK type ID (for ChangeCkType)"
+        },
+        "targetRecordCkRecordId": {
+          "type": "string",
+          "description": "Target CK record ID that wraps each scalar entry (for WrapScalarInRecord), e.g. 'System.Identity/ClientUriEntry'"
+        },
+        "recordValueAttribute": {
+          "type": "string",
+          "description": "CK attribute id within the wrapper record that receives the original scalar value (for WrapScalarInRecord), e.g. 'System.Identity/Uri'"
+        },
+        "recordDefaults": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Literal default values for the remaining attributes on the wrapper record (for WrapScalarInRecord), keyed by CK attribute id"
         }
       },
       "required": ["type"],

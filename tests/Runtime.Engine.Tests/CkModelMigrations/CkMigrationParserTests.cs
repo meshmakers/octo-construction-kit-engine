@@ -274,6 +274,74 @@ public class CkMigrationParserTests
     }
 
     [Fact]
+    public void ParseScript_WithWrapScalarInRecordTransform_ShouldParseAllFields()
+    {
+        // Arrange — mirrors the planned Identity 2.8.0 -> 2.9.0 use case where every URI
+        // string in RedirectUris becomes a ClientUriEntry record.
+        var yaml = """
+            sourceVersion: "2.8.0"
+            targetVersion: "2.9.0"
+            steps:
+              - stepId: wrap-redirect-uris
+                description: Lift RedirectUris strings into ClientUriEntry records
+                action: Transform
+                target:
+                  ckTypeId: System.Identity/Client
+                transform:
+                  type: WrapScalarInRecord
+                  sourceAttribute: System.Identity/RedirectUris
+                  targetRecordCkRecordId: System.Identity/ClientUriEntry
+                  recordValueAttribute: System.Identity/Uri
+                  recordDefaults:
+                    System.Identity/Source: base
+            """;
+
+        // Act
+        var result = _sut.ParseScript(yaml);
+
+        // Assert
+        var step = result.Steps[0];
+        Assert.NotNull(step.Transform);
+        Assert.Equal(CkMigrationTransformType.WrapScalarInRecord, step.Transform.Type);
+        Assert.Equal("System.Identity/RedirectUris", step.Transform.SourceAttribute);
+        Assert.Equal("System.Identity/ClientUriEntry", step.Transform.TargetRecordCkRecordId);
+        Assert.Equal("System.Identity/Uri", step.Transform.RecordValueAttribute);
+        Assert.NotNull(step.Transform.RecordDefaults);
+        Assert.Single(step.Transform.RecordDefaults);
+        Assert.Equal("base", step.Transform.RecordDefaults["System.Identity/Source"]);
+    }
+
+    [Fact]
+    public void ParseScript_WithWrapScalarInRecordTransform_NoDefaults_ShouldParse()
+    {
+        // Arrange — recordDefaults is optional; the wrapper record can have a single
+        // value attribute and no extras.
+        var yaml = """
+            sourceVersion: "1.0.0"
+            targetVersion: "2.0.0"
+            steps:
+              - stepId: wrap-list
+                action: Transform
+                target:
+                  ckTypeId: Test/Holder
+                transform:
+                  type: WrapScalarInRecord
+                  sourceAttribute: Test/Values
+                  targetRecordCkRecordId: Test/Wrapper
+                  recordValueAttribute: Test/Value
+            """;
+
+        // Act
+        var result = _sut.ParseScript(yaml);
+
+        // Assert
+        var step = result.Steps[0];
+        Assert.NotNull(step.Transform);
+        Assert.Equal(CkMigrationTransformType.WrapScalarInRecord, step.Transform.Type);
+        Assert.Null(step.Transform.RecordDefaults);
+    }
+
+    [Fact]
     public void ParseScript_WithChangeCkTypeTransform_ShouldParseNewCkTypeId()
     {
         // Arrange

@@ -666,6 +666,19 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             "This method requires a repository that can drop collections without CK cache validation.");
     }
 
+    /// <inheritdoc />
+    public virtual Task RewriteAttributeValueForMigrationAsync(
+        IOctoSession session,
+        RtCkId<CkTypeId> rtCkTypeId,
+        OctoObjectId rtId,
+        string attributeId,
+        object? newValue)
+    {
+        throw new NotSupportedException(
+            "RewriteAttributeValueForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can mutate a single attribute slot without CK cache validation.");
+    }
+
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)
         where TEntity : RtEntity, new()
     {

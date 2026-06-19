@@ -56,4 +56,38 @@ public sealed class ForwardingCkModelImportAuditTrail : ICkModelImportAuditTrail
             }
         });
     }
+
+    /// <inheritdoc />
+    public Task RecordWrapScalarInRecordAsync(
+        string? tenantId,
+        RtCkId<CkTypeId> ckTypeId,
+        OctoObjectId rtId,
+        string sourceAttribute,
+        RtCkId<CkRecordId> targetRecordCkRecordId,
+        int wrappedCount,
+        string stepId)
+    {
+        var message =
+            $"CK migration step '{stepId}' wrapped {wrappedCount} scalar entr" +
+            (wrappedCount == 1 ? "y" : "ies") +
+            $" of attribute '{sourceAttribute}' on entity '{ckTypeId}@{rtId}' into records of " +
+            $"type '{targetRecordCkRecordId}'.";
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Information,
+            "CkModelMigration.WrapScalarInRecord",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["stepId"] = stepId,
+                ["ckTypeId"] = ckTypeId.ToString(),
+                ["rtId"] = rtId.ToString(),
+                ["sourceAttribute"] = sourceAttribute,
+                ["targetRecordCkRecordId"] = targetRecordCkRecordId.ToString(),
+                ["wrappedCount"] = wrappedCount,
+            }
+        });
+    }
 }

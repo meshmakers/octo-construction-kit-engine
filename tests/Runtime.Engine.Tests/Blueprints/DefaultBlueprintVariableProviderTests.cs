@@ -132,6 +132,63 @@ public class DefaultBlueprintVariableProviderTests
     }
 
     [Fact]
+    public async Task GetVariables_OctoScheme_DefaultsToHttps()
+    {
+        // Cluster URL composition relies on ${octo.scheme}://<slug>.${octo.domain}.
+        // The scheme defaults to "https" so a host that only configures the domain
+        // gets the right protocol without an explicit OCTO_BLUEPRINTS__SCHEME entry.
+        var provider = MakeProvider();
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal("https", variables["octo.scheme"]);
+    }
+
+    [Fact]
+    public async Task GetVariables_OctoScheme_HonoursExplicitOverride()
+    {
+        // Smoke-test / compose-up environments serve plain HTTP. The override flows
+        // straight through without re-validation — operator owns the choice.
+        var provider = MakeProvider(scheme: "http");
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal("http", variables["octo.scheme"]);
+    }
+
+    [Fact]
+    public async Task GetVariables_OctoDomain_DefaultsToEmpty()
+    {
+        // Local dev (Start-Octo on localhost) leaves the domain unset. Hosts that
+        // need explicit per-service URLs (e.g. Identity's RefineryStudioUrl) layer
+        // overrides via their own provider; the engine just surfaces what's there.
+        var provider = MakeProvider();
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.True(variables.ContainsKey("octo.domain"));
+        Assert.Equal(string.Empty, variables["octo.domain"]);
+    }
+
+    [Theory]
+    [InlineData("test-2.octo-mesh.com", "test-2.octo-mesh.com")]
+    [InlineData("test-2.octo-mesh.com/", "test-2.octo-mesh.com")]   // trailing slash stripped
+    [InlineData("test-2.octo-mesh.com///", "test-2.octo-mesh.com")] // extra trailing slashes stripped
+    public async Task GetVariables_OctoDomain_StripsTrailingSlashes(
+        string rawDomain, string expected)
+    {
+        // Blueprint authors compose ${octo.scheme}://<slug>.${octo.domain}/<path>.
+        // Operators paste cluster domain values with or without trailing slashes;
+        // stripping them at the provider boundary keeps blueprint authors out of
+        // that defensive coding loop.
+        var provider = MakeProvider(domain: rawDomain);
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, variables["octo.domain"]);
+    }
+
+    [Fact]
     public async Task GetVariables_OctoVersionEmpty_StillExportsKey()
     {
         // Helm chart hasn't injected OCTO_BLUEPRINTS__OCTOVERSION → we surface an empty
@@ -149,7 +206,9 @@ public class DefaultBlueprintVariableProviderTests
     private static DefaultBlueprintVariableProvider MakeProvider(
         string systemTenantId = "OctoSystem",
         string environment = "dev",
-        string octoVersion = "1.0.0")
+        string octoVersion = "1.0.0",
+        string? scheme = null,
+        string? domain = null)
     {
         var options = new OctoBlueprintVariablesOptions
         {
@@ -157,6 +216,8 @@ public class DefaultBlueprintVariableProviderTests
             Environment = environment,
             OctoVersion = octoVersion,
         };
+        if (scheme != null) options.Scheme = scheme;
+        if (domain != null) options.Domain = domain;
         var monitor = new StaticOptionsMonitor<OctoBlueprintVariablesOptions>(options);
         return new DefaultBlueprintVariableProvider(monitor, NullLogger<DefaultBlueprintVariableProvider>.Instance);
     }

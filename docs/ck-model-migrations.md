@@ -119,14 +119,76 @@ postValidations:
 
 ## Transform Types
 
-| Type              | Description                      | Parameters                           |
-|-------------------|----------------------------------|--------------------------------------|
-| `ChangeCkType`    | Changes the CK type of an entity | `newCkTypeId`                        |
-| `SetValue`        | Sets an attribute value           | `targetAttribute`, `value`           |
-| `RenameAttribute` | Renames an attribute             | `sourceAttribute`, `targetAttribute` |
-| `CopyAttribute`   | Copies an attribute value        | `sourceAttribute`, `targetAttribute` |
-| `DeleteAttribute` | Deletes an attribute             | `targetAttribute`                    |
-| `MapValue`        | Maps values to new values        | `targetAttribute`, `valueMapping`    |
+| Type                 | Description                                                                                | Parameters                                                                            |
+|----------------------|--------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `ChangeCkType`       | Changes the CK type of an entity                                                           | `newCkTypeId`                                                                         |
+| `SetValue`           | Sets an attribute value                                                                    | `targetAttribute`, `value`                                                            |
+| `RenameAttribute`    | Renames an attribute                                                                       | `sourceAttribute`, `targetAttribute`                                                  |
+| `CopyAttribute`      | Copies an attribute value                                                                  | `sourceAttribute`, `targetAttribute`                                                  |
+| `DeleteAttribute`    | Deletes an attribute                                                                       | `targetAttribute`                                                                     |
+| `MapValue`           | Maps values to new values                                                                  | `targetAttribute`, `valueMapping`                                                     |
+| `WrapScalarInRecord` | Wraps each scalar entry of a list-typed attribute into a record of the configured CK shape | `sourceAttribute`, `targetRecordCkRecordId`, `recordValueAttribute`, `recordDefaults` |
+
+### `WrapScalarInRecord`
+
+Lifts every scalar entry of a list-typed attribute into an entry of a record list, where the
+original scalar lands on a configured record attribute and the remaining record attributes
+are filled from a literal-defaults map. Designed for CK-model bumps that change a list
+attribute from `StringArray` (or `IntArray`, …) to `RecordArray<…>` — the canonical example
+is the Identity service's `RedirectUris` migration in Phase 3 of the platform-services
+initiative, where each URI string becomes a `{ Uri, Source }` record.
+
+Behaviour on each entity:
+
+- An empty / unset list slot is a no-op.
+- Each list entry that is **already** an `RtRecord` is left untouched (preserves overlay
+  markers, third-party-injected records, partial prior runs).
+- Each scalar entry is wrapped as
+  `{ ckRecordId: targetRecordCkRecordId, attributes: { recordValueAttribute: scalar, …recordDefaults } }`.
+- Idempotent re-run: a list that is already fully in record shape produces no rewrite — and
+  no audit-trail event.
+
+The transform bypasses the regular cache-bound update path
+(`UpdateOneRtEntityByIdAsync` → `BulkRtMutation.ApplyChangesAsync`) and instead writes via
+`IRuntimeRepository.RewriteAttributeValueForMigrationAsync`. That detour is load-bearing:
+at the time the migration runs, the CK cache already holds the *new* schema (the
+attribute is `RecordArray`-typed there), but the stored values are still scalars; the
+cache-bound path would fail type validation on the pre-rewrite shape. The cache-free
+write also touches *only* the one attribute slot — every other attribute, association
+edge, timestamp, and version counter on the entity is preserved.
+
+Worked example: Identity `RedirectUris` `StringArray` → `RecordArray<ClientUriEntry>`.
+
+```yaml
+- stepId: wrap-redirect-uris
+  description: Lift RedirectUris strings into ClientUriEntry records (Phase 3 follow-up)
+  action: Transform
+  target:
+    ckTypeId: System.Identity/Client
+  transform:
+    type: WrapScalarInRecord
+    sourceAttribute: RedirectUris
+    targetRecordCkRecordId: System.Identity/ClientUriEntry
+    recordValueAttribute: Uri
+    recordDefaults:
+      Source: base
+  onConflict: Skip
+  continueOnError: false
+```
+
+`sourceAttribute`, `recordValueAttribute`, and the keys in `recordDefaults` are the
+**runtime attribute names** (short form, e.g. `RedirectUris` / `Uri` / `Source`) — i.e. the
+keys under which the values live in `RtEntity.Attributes` / `RtRecord.Attributes`, not the
+fully-qualified CK attribute ids (`System.Identity/RedirectUris` etc.).
+`targetRecordCkRecordId` is the fully-qualified CK record id.
+
+Audit-trail: each entity actually mutated produces an
+`CkModelMigration.WrapScalarInRecord` audit event via
+`ICkModelImportAuditTrail.RecordWrapScalarInRecordAsync`. The event carries the step id,
+the entity's `ckTypeId` + `rtId`, the source attribute, the target record id, and the
+count of scalars wrapped on that entity (which can differ from the total list length when
+the list was already partially in record shape). No event is published for entities that
+the step left alone — making idempotent re-runs noise-free.
 
 ## Target Specification
 

@@ -20,6 +20,7 @@ public class CkModelMigrationServiceTests
     private readonly ICkMigrationContentProvider _contentProvider;
     private readonly IRuntimeRepositoryProvider _repositoryProvider;
     private readonly ICatalogService _catalogService;
+    private readonly ICkModelImportAuditTrail _auditTrail;
 
     public CkModelMigrationServiceTests()
     {
@@ -28,6 +29,7 @@ public class CkModelMigrationServiceTests
         _contentProvider = A.Fake<ICkMigrationContentProvider>();
         _repositoryProvider = A.Fake<IRuntimeRepositoryProvider>();
         _catalogService = A.Fake<ICatalogService>();
+        _auditTrail = A.Fake<ICkModelImportAuditTrail>();
         var logger = NullLogger<CkModelMigrationService>.Instance;
 
         _sut = new CkModelMigrationService(
@@ -36,6 +38,7 @@ public class CkModelMigrationServiceTests
             _contentProvider,
             _repositoryProvider,
             _catalogService,
+            _auditTrail,
             logger);
     }
 

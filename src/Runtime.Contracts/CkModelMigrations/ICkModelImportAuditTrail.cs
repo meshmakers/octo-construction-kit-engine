@@ -31,4 +31,28 @@ public interface ICkModelImportAuditTrail
         string ckEnumValueName,
         string extensionValueName,
         int extensionValueKey);
+
+    /// <summary>
+    /// Records that a CK migration <c>WrapScalarInRecord</c> step lifted a populated list
+    /// attribute from scalar entries to record entries on a runtime entity. Idempotent re-runs
+    /// (lists that already carry the target record shape) are intentionally NOT recorded —
+    /// only entities the step actually mutated produce an audit event.
+    /// </summary>
+    /// <param name="tenantId">Tenant whose entity was rewritten. <c>null</c> denotes the system
+    /// tenant.</param>
+    /// <param name="ckTypeId">The CK type of the rewritten entity.</param>
+    /// <param name="rtId">The runtime id of the rewritten entity.</param>
+    /// <param name="sourceAttribute">The CK attribute id of the list slot that was lifted.</param>
+    /// <param name="targetRecordCkRecordId">The CK record id used to wrap each scalar.</param>
+    /// <param name="wrappedCount">Number of scalar entries wrapped into records during this
+    /// invocation (entries already in record shape are not counted).</param>
+    /// <param name="stepId">Migration step id that drove the rewrite (for traceability).</param>
+    Task RecordWrapScalarInRecordAsync(
+        string? tenantId,
+        RtCkId<CkTypeId> ckTypeId,
+        OctoObjectId rtId,
+        string sourceAttribute,
+        RtCkId<CkRecordId> targetRecordCkRecordId,
+        int wrappedCount,
+        string stepId);
 }

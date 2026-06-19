@@ -49,6 +49,18 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
             ["octo.tenantId"] = tenantId,
             ["octo.systemTenantId"] = systemTenantId,
             ["octo.isSystemTenant"] = isSystemTenant ? "true" : "false",
+            // Per-cluster URL composition base — blueprints reference
+            // ${octo.scheme}://<slug>.${octo.domain} to derive per-service public URLs
+            // without carrying one explicit URL setting per service. Hosts (e.g.
+            // Identity) layer per-service overrides on top via their own provider.
+            //
+            // Whitespace-only configuration values are treated as unset, and both the
+            // scheme and domain values are trimmed before the slash strip so an operator
+            // entering e.g. `OCTO_BLUEPRINTS__DOMAIN="example.com/ "` still composes a
+            // well-formed URL instead of `https://<slug>.example.com/` with a stray
+            // trailing slash + whitespace.
+            ["octo.scheme"] = string.IsNullOrWhiteSpace(snapshot.Scheme) ? "https" : snapshot.Scheme.Trim(),
+            ["octo.domain"] = (snapshot.Domain ?? string.Empty).Trim().TrimEnd('/'),
         };
 
         return Task.FromResult(variables);

@@ -24,6 +24,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
     private readonly ICkMigrationContentProvider _contentProvider;
     private readonly IRuntimeRepositoryProvider _repositoryProvider;
     private readonly ICatalogService _catalogService;
+    private readonly ICkModelImportAuditTrail _auditTrail;
     private readonly ILogger<CkModelMigrationService> _logger;
 
     /// <summary>
@@ -52,6 +53,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
         ICkMigrationContentProvider contentProvider,
         IRuntimeRepositoryProvider repositoryProvider,
         ICatalogService catalogService,
+        ICkModelImportAuditTrail auditTrail,
         ILogger<CkModelMigrationService> logger)
     {
         _migrationParser = migrationParser;
@@ -59,6 +61,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
         _contentProvider = contentProvider;
         _repositoryProvider = repositoryProvider;
         _catalogService = catalogService;
+        _auditTrail = auditTrail;
         _logger = logger;
     }
 
@@ -805,6 +808,40 @@ internal class CkModelMigrationService : ICkModelMigrationService
                         Message = "Transform configuration is required for Transform action"
                     });
                 }
+
+                if (migrationStep is
+                    {
+                        Action: CkMigrationActionType.Transform,
+                        Transform: { Type: CkMigrationTransformType.WrapScalarInRecord } wrap
+                    })
+                {
+                    if (string.IsNullOrEmpty(wrap.SourceAttribute))
+                    {
+                        result.Errors.Add(new CkMigrationValidationIssue
+                        {
+                            StepId = migrationStep.StepId,
+                            Message = "WrapScalarInRecord transform requires sourceAttribute"
+                        });
+                    }
+
+                    if (string.IsNullOrEmpty(wrap.TargetRecordCkRecordId))
+                    {
+                        result.Errors.Add(new CkMigrationValidationIssue
+                        {
+                            StepId = migrationStep.StepId,
+                            Message = "WrapScalarInRecord transform requires targetRecordCkRecordId"
+                        });
+                    }
+
+                    if (string.IsNullOrEmpty(wrap.RecordValueAttribute))
+                    {
+                        result.Errors.Add(new CkMigrationValidationIssue
+                        {
+                            StepId = migrationStep.StepId,
+                            Message = "WrapScalarInRecord transform requires recordValueAttribute"
+                        });
+                    }
+                }
             }
 
             // Estimate affected entities
@@ -938,7 +975,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
             switch (step.Action)
             {
                 case CkMigrationActionType.Transform:
-                    return await ExecuteTransformAsync(repository, step, cancellationToken)
+                    return await ExecuteTransformAsync(tenantId, repository, step, cancellationToken)
                         .ConfigureAwait(false);
 
                 case CkMigrationActionType.Update:
@@ -964,6 +1001,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
     }
 
     private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)> ExecuteTransformAsync(
+        string tenantId,
         IRuntimeRepository repository,
         CkMigrationStepDto step,
         CancellationToken cancellationToken)
@@ -980,6 +1018,19 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
         _logger.LogInformation("Transform step {StepId}: Target={CkTypeId}, Transform={TransformType}",
             step.StepId, step.Target.CkTypeId, step.Transform.Type);
+
+        // WrapScalarInRecord cannot reuse the regular Transform path: the regular path calls
+        // UpdateOneRtEntityByIdAsync, which routes through BulkRtMutation.ApplyChangesAsync +
+        // the CK cache. At migration time the cache holds the *new* CK model, in which the
+        // attribute is RecordArray-typed, so persisting the still-scalar pre-rewrite list back
+        // through that path would fail type validation. Use the CkCache-free migration API
+        // family instead (GetRtEntitiesByTypeForMigrationAsync +
+        // RewriteAttributeValueForMigrationAsync) — same shape as ChangeCkType's special path.
+        if (step.Transform.Type == CkMigrationTransformType.WrapScalarInRecord)
+        {
+            return await ExecuteWrapScalarInRecordAsync(tenantId, repository, step, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         var sourceCkTypeId = ParseCkTypeId(step.Target.CkTypeId);
 
@@ -1142,6 +1193,231 @@ internal class CkModelMigrationService : ICkModelMigrationService
         }
 
         return (true, 0, updatedCount, 0, null);
+    }
+
+    /// <summary>
+    /// Executes a <see cref="CkMigrationTransformType.WrapScalarInRecord"/> transform: each
+    /// entry of a list-typed attribute that is still a scalar is wrapped into an
+    /// <see cref="RtRecord"/> of the configured target record type. Entries that are already
+    /// records of the target type are left untouched (idempotent re-run is a true no-op down
+    /// to the audit-trail level).
+    /// </summary>
+    private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)>
+        ExecuteWrapScalarInRecordAsync(
+            string tenantId,
+            IRuntimeRepository repository,
+            CkMigrationStepDto step,
+            CancellationToken cancellationToken)
+    {
+        // Transform input validation. Mirror the messages used by the rest of the action
+        // family so step-failure log lines stay grep-able by transform type.
+        if (step.Transform == null)
+        {
+            return (false, 0, 0, 0, "Transform step requires transform configuration");
+        }
+
+        var sourceAttribute = step.Transform.SourceAttribute;
+        var targetRecordIdString = step.Transform.TargetRecordCkRecordId;
+        var recordValueAttribute = step.Transform.RecordValueAttribute;
+
+        if (string.IsNullOrEmpty(sourceAttribute))
+        {
+            return (false, 0, 0, 0,
+                "WrapScalarInRecord transform requires sourceAttribute (the list-typed attribute to lift)");
+        }
+
+        if (string.IsNullOrEmpty(targetRecordIdString))
+        {
+            return (false, 0, 0, 0,
+                "WrapScalarInRecord transform requires targetRecordCkRecordId (the wrapper record type)");
+        }
+
+        if (string.IsNullOrEmpty(recordValueAttribute))
+        {
+            return (false, 0, 0, 0,
+                "WrapScalarInRecord transform requires recordValueAttribute (the record attribute that receives the scalar)");
+        }
+
+        RtCkId<CkRecordId> targetRecordCkRecordId;
+        try
+        {
+            targetRecordCkRecordId = new RtCkId<CkRecordId>(targetRecordIdString!);
+        }
+        catch (Exception ex)
+        {
+            return (false, 0, 0, 0,
+                $"WrapScalarInRecord targetRecordCkRecordId '{targetRecordIdString}' is not a valid CK record id: {ex.Message}");
+        }
+
+        var sourceCkTypeId = ParseCkTypeId(step.Target!.CkTypeId);
+        var recordDefaults = step.Transform.RecordDefaults ?? new Dictionary<string, object>();
+
+        _logger.LogInformation(
+            "WrapScalarInRecord step {StepId}: Target={CkTypeId}, SourceAttribute={SourceAttribute}, TargetRecord={TargetRecord}, ValueAttribute={ValueAttribute}, DefaultCount={DefaultCount}",
+            step.StepId, sourceCkTypeId, sourceAttribute, targetRecordCkRecordId,
+            recordValueAttribute, recordDefaults.Count);
+
+        var session = await repository.GetSessionAsync().ConfigureAwait(false);
+        session.StartTransaction();
+
+        int updatedCount = 0;
+        var perEntityEvents = new List<(OctoObjectId RtId, int WrappedCount)>();
+
+        try
+        {
+            // Use the CkCache-free migration read path: at this point the CK cache holds the
+            // *new* CK model where the attribute is RecordArray-typed, and the stored values
+            // are still scalars. The regular query path would happily return the entities
+            // because list deserialisation is forgiving, but persisting the post-rewrite
+            // entity through UpdateOneRtEntityByIdAsync would fail type validation.
+            var (entities, _) = await repository.GetRtEntitiesByTypeForMigrationAsync(session, sourceCkTypeId)
+                .ConfigureAwait(false);
+
+            foreach (var entity in entities)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                // Read raw — neither GetAttributeStringValuesOrDefault nor
+                // GetRtRecordAttributeValuesOrDefault works for a mixed list; we have to
+                // inspect each element's CLR type ourselves.
+                var rawValue = entity.GetAttributeValueOrDefault(sourceAttribute!);
+                if (rawValue == null)
+                {
+                    continue; // Empty / unset slot — nothing to lift.
+                }
+
+                if (rawValue is not System.Collections.IEnumerable enumerable || rawValue is string)
+                {
+                    // Step targeted an attribute whose stored shape is not list-like. Per the
+                    // step's onConflict policy: Skip = log+continue, anything else = surface.
+                    var msg =
+                        $"WrapScalarInRecord step '{step.StepId}': entity {sourceCkTypeId}@{entity.RtId} " +
+                        $"attribute '{sourceAttribute}' has non-list value of type '{rawValue.GetType().Name}', expected list.";
+                    if (step.OnConflict == CkMigrationConflictBehavior.Skip)
+                    {
+                        _logger.LogWarning("{Message} Skipping this entity per onConflict=Skip.", msg);
+                        continue;
+                    }
+
+                    throw new InvalidOperationException(msg);
+                }
+
+                var rewrittenList = new List<RtRecord>();
+                int wrappedThisEntity = 0;
+                bool changed = false;
+
+                foreach (var item in enumerable)
+                {
+                    if (item is RtRecord existingRecord)
+                    {
+                        // Already a record. Idempotency: leave it alone regardless of which
+                        // record-id it carries. (Mixed lists where a third party has added a
+                        // record of a different type would otherwise get silently rewritten;
+                        // out of scope for this transform.)
+                        rewrittenList.Add(existingRecord);
+                    }
+                    else
+                    {
+                        rewrittenList.Add(BuildWrapperRecord(targetRecordCkRecordId,
+                            recordValueAttribute!, item, recordDefaults));
+                        wrappedThisEntity++;
+                        changed = true;
+                    }
+                }
+
+                if (!changed)
+                {
+                    continue; // Idempotent re-run on already-lifted data — true no-op.
+                }
+
+                // Materialise as RecordArray and persist through the cache-free path.
+                var newValue = AttributeValueConverter.ConvertAttributeValue(
+                    AttributeValueTypesDto.RecordArray, rewrittenList.ToArray());
+
+                await repository.RewriteAttributeValueForMigrationAsync(
+                        session, sourceCkTypeId, entity.RtId, sourceAttribute!, newValue)
+                    .ConfigureAwait(false);
+
+                updatedCount++;
+                perEntityEvents.Add((entity.RtId, wrappedThisEntity));
+            }
+
+            await session.CommitTransactionAsync().ConfigureAwait(false);
+
+            _logger.LogDebug(
+                "WrapScalarInRecord step {StepId} completed: {Count} entities mutated, {Total} scalars wrapped",
+                step.StepId, updatedCount, perEntityEvents.Sum(e => e.WrappedCount));
+        }
+        catch (Exception ex)
+        {
+            await session.AbortTransactionAsync().ConfigureAwait(false);
+            _logger.LogError(ex, "Error executing WrapScalarInRecord step {StepId}", step.StepId);
+            return (false, 0, 0, 0, ex.Message);
+        }
+
+        // Emit audit events outside the transaction so a sink crash can't roll back the
+        // migration. Idempotent re-runs (perEntityEvents is empty) produce no events at all,
+        // satisfying the "no audit spam on no-op re-run" guarantee.
+        foreach (var (rtId, wrappedCount) in perEntityEvents)
+        {
+            try
+            {
+                await _auditTrail.RecordWrapScalarInRecordAsync(
+                        tenantId,
+                        sourceCkTypeId,
+                        rtId,
+                        sourceAttribute!,
+                        targetRecordCkRecordId,
+                        wrappedCount,
+                        step.StepId)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Audit-trail must not break the migration. The forwarder/sink already swallows
+                // transient errors per its own contract; if a typed audit-trail throws (e.g. a
+                // test fake), log and move on.
+                _logger.LogWarning(ex,
+                    "WrapScalarInRecord audit-trail emit failed for {CkTypeId}@{RtId} on step {StepId}",
+                    sourceCkTypeId, rtId, step.StepId);
+            }
+        }
+
+        return (true, 0, updatedCount, 0, null);
+    }
+
+    /// <summary>
+    /// Materialises a single wrapper record from a scalar entry. Visible to tests via
+    /// <c>InternalsVisibleTo</c>; deliberately a pure static helper so the per-entry shape
+    /// rules (idempotency check on existing records, default-value plumbing, scalar-into-value
+    /// slot) can be exercised without a Mongo repository.
+    /// </summary>
+    internal static RtRecord BuildWrapperRecord(
+        RtCkId<CkRecordId> targetRecordCkRecordId,
+        string recordValueAttribute,
+        object scalar,
+        IReadOnlyDictionary<string, object> recordDefaults)
+    {
+        var attributes = new Dictionary<string, object?>
+        {
+            [recordValueAttribute] = scalar,
+        };
+
+        foreach (var kvp in recordDefaults)
+        {
+            // recordValueAttribute wins over a same-named default — the scalar is the load-
+            // bearing value; an author who lists the value slot in recordDefaults is almost
+            // certainly making a mistake, but silently overwriting their default with the
+            // scalar is the safer policy than throwing mid-migration.
+            if (kvp.Key == recordValueAttribute)
+            {
+                continue;
+            }
+
+            attributes[kvp.Key] = kvp.Value;
+        }
+
+        return new RtRecord(targetRecordCkRecordId, attributes);
     }
 
     private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)> ExecuteUpdateAsync(

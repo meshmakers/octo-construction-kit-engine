@@ -696,5 +696,29 @@ public interface IRuntimeRepository
     /// <returns>True if the collection was dropped, false if it was not empty or does not exist</returns>
     Task<bool> DropCollectionIfEmptyForMigrationAsync(RtCkId<CkTypeId> rtCkTypeId);
 
+    /// <summary>
+    /// Rewrites a single attribute value on an existing entity without going through the CK
+    /// cache. Used by CK model migrations whose transform changes the shape of an attribute
+    /// (e.g. <c>WrapScalarInRecord</c>) — the cache-bound
+    /// <see cref="UpdateOneRtEntityByIdAsync(IOctoSession, RtCkId{CkTypeId}, OctoObjectId, RtEntity)"/>
+    /// path would validate the value against the *new* CK schema, which the migration is the
+    /// very thing that brings the runtime data into. Implementations must touch only the
+    /// specified attribute and leave the rest of the document — including associations,
+    /// timestamps, version counters and other attribute slots — untouched. The
+    /// <c>rtChangedDateTime</c> field is updated as part of the rewrite so downstream
+    /// change-detection still sees the entity as modified.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id of the entity's collection (may not exist in current CK cache)</param>
+    /// <param name="rtId">The runtime object id of the entity to rewrite</param>
+    /// <param name="attributeId">The CK attribute id of the slot to overwrite</param>
+    /// <param name="newValue">The new value to assign to the slot</param>
+    Task RewriteAttributeValueForMigrationAsync(
+        IOctoSession session,
+        RtCkId<CkTypeId> rtCkTypeId,
+        OctoObjectId rtId,
+        string attributeId,
+        object? newValue);
+
     #endregion Migration support
 }

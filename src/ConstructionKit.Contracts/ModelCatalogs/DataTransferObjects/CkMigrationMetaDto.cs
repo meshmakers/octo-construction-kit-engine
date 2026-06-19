@@ -350,7 +350,7 @@ public class CkMigrationTransformDto
     public string? TargetAttribute { get; set; }
 
     /// <summary>
-    /// Source attribute name (for Rename, Copy)
+    /// Source attribute name (for Rename, Copy, WrapScalarInRecord)
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? SourceAttribute { get; set; }
@@ -372,6 +372,28 @@ public class CkMigrationTransformDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? NewCkTypeId { get; set; }
+
+    /// <summary>
+    /// CK record ID that wraps each scalar entry (for WrapScalarInRecord).
+    /// Example: <c>System.Identity/ClientUriEntry</c>.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? TargetRecordCkRecordId { get; set; }
+
+    /// <summary>
+    /// CK attribute id within the wrapper record that receives the original scalar value
+    /// (for WrapScalarInRecord). Example: <c>System.Identity/Uri</c>.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? RecordValueAttribute { get; set; }
+
+    /// <summary>
+    /// Literal default values for the remaining attributes on the wrapper record
+    /// (for WrapScalarInRecord), keyed by CK attribute id. Attributes not listed here are
+    /// left unset; the record's CK schema is responsible for any further defaulting.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public Dictionary<string, object>? RecordDefaults { get; set; }
 }
 
 /// <summary>
@@ -408,7 +430,17 @@ public enum CkMigrationTransformType
     /// <summary>
     /// Map values using a lookup table
     /// </summary>
-    MapValue
+    MapValue,
+
+    /// <summary>
+    /// Wrap each scalar entry of a list-typed attribute into a record. The original scalar
+    /// value lands on <see cref="CkMigrationTransformDto.RecordValueAttribute"/>; the
+    /// remaining record attributes are filled from
+    /// <see cref="CkMigrationTransformDto.RecordDefaults"/>. Entries that are already a
+    /// record carrying the target <see cref="CkMigrationTransformDto.TargetRecordCkRecordId"/>
+    /// are left untouched (idempotent re-run).
+    /// </summary>
+    WrapScalarInRecord
 }
 
 /// <summary>

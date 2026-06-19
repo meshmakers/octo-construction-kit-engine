@@ -86,15 +86,42 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                 }
                 else if (installedVersions[kvp.Key] != kvp.Value)
                 {
-                    // Schema version differs from MigrationHistory - schema is the source of truth
-                    // This can happen when the schema was manually modified (e.g., downgraded)
-                    _logger.LogWarning(
-                        "Schema version {SchemaVersion} differs from MigrationHistory version {HistoryVersion} for CK model {CkModelName}. " +
-                        "Using schema version as it reflects the actual installed state.",
-                        kvp.Value, installedVersions[kvp.Key], kvp.Key);
-                    installedVersions[kvp.Key] = kvp.Value;
-                    // Remove from hasHistoryEntry so we'll record the new version
-                    hasHistoryEntry.Remove(kvp.Key);
+                    // Schema version differs from MigrationHistory.
+                    //
+                    // Two distinct cases:
+                    //  (a) schema > history  — the CK-model definition was bumped (and possibly
+                    //      a previous startup ran a no-op or schema-only upgrade) but no actual
+                    //      data migration has ever closed the history-to-schema gap. The data is
+                    //      still in the old shape; the MigrationHistory version is therefore the
+                    //      correct source for the migration path. Using schema here would
+                    //      conclude "already at target" and silently skip the data migration —
+                    //      the regression AB#4209 Step 1 hit when the very first data-transform
+                    //      migration on Identity 2.7.0/2.8.0 -> 2.9.0 was being skipped.
+                    //  (b) schema < history — operator manually downgraded the schema (the
+                    //      historical justification for this branch). The current data really
+                    //      lives at the schema version; trust schema, drop the now-too-recent
+                    //      history entry, and let the upgrade pipeline migrate forward.
+                    var schemaIsAhead = new CkVersion(kvp.Value)
+                        .CompareTo(new CkVersion(installedVersions[kvp.Key])) > 0;
+                    if (schemaIsAhead)
+                    {
+                        _logger.LogWarning(
+                            "Schema version {SchemaVersion} is ahead of MigrationHistory version {HistoryVersion} for CK model {CkModelName}. " +
+                            "Treating MigrationHistory as the source of truth so the data migration actually runs.",
+                            kvp.Value, installedVersions[kvp.Key], kvp.Key);
+                        // Leave installedVersions[kvp.Key] at the history version; do not
+                        // clear hasHistoryEntry, since the existing history row will be updated
+                        // (not inserted) when the migration completes.
+                    }
+                    else
+                    {
+                        _logger.LogWarning(
+                            "Schema version {SchemaVersion} is older than MigrationHistory version {HistoryVersion} for CK model {CkModelName}. " +
+                            "Treating schema as the source of truth (manual downgrade); MigrationHistory entry will be re-recorded at the schema version.",
+                            kvp.Value, installedVersions[kvp.Key], kvp.Key);
+                        installedVersions[kvp.Key] = kvp.Value;
+                        hasHistoryEntry.Remove(kvp.Key);
+                    }
                 }
             }
         }

@@ -36,4 +36,21 @@ public sealed class LoggingCkModelImportAuditTrail : ICkModelImportAuditTrail
             tenantId ?? "<system>");
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task RecordWrapScalarInRecordAsync(
+        string? tenantId,
+        RtCkId<CkTypeId> ckTypeId,
+        OctoObjectId rtId,
+        string sourceAttribute,
+        RtCkId<CkRecordId> targetRecordCkRecordId,
+        int wrappedCount,
+        string stepId)
+    {
+        _logger.LogInformation(
+            "CK migration step '{StepId}' wrapped {WrappedCount} scalar entries of attribute '{SourceAttribute}' on entity '{CkTypeId}@{RtId}' into records of type '{TargetRecordCkRecordId}' (tenant: {TenantId}).",
+            stepId, wrappedCount, sourceAttribute, ckTypeId, rtId, targetRecordCkRecordId,
+            tenantId ?? "<system>");
+        return Task.CompletedTask;
+    }
 }

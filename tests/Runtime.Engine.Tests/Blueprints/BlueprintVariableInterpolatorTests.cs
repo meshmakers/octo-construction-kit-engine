@@ -257,6 +257,116 @@ public class BlueprintVariableInterpolatorTests
             m => m.MessageLevel == MessageLevel.Warning && m.MessageText.Contains("octo.nope"));
     }
 
+    [Fact]
+    public void Interpolate_DescendsIntoRecordArrayItems()
+    {
+        // Regression guard for AB#4209 Step 1: Identity's RedirectUris /
+        // PostLogoutRedirectUris / AllowedCorsOrigins flipped from StringArray to
+        // RecordArray<ClientUriEntry>. Each list entry is now an RtRecordTcDto with a Uri
+        // string + Source string inside, and the seed YAML still carries ${...} placeholders
+        // on the Uri value. Without record-descent the placeholder lands in MongoDB
+        // verbatim and Duende's ValidatingClientStore rejects the client with
+        // "AllowedCorsOrigins contains invalid origin".
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["octo.mcp.publicUrl"] = "https://localhost:5017",
+        };
+        var record = new RtRecordTcDto
+        {
+            CkRecordId = new RtCkId<CkRecordId>("System.Identity/ClientUriEntry"),
+            Attributes =
+            {
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Identity/Uri"),
+                    Value = "${octo.mcp.publicUrl}/swagger/oauth2-redirect.html"
+                },
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Identity/Source"),
+                    Value = "base"
+                }
+            }
+        };
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Identity/Client"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Identity/RedirectUris"),
+                            Value = new List<object> { record }
+                        }
+                    }
+                }
+            }
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, variables, "test.yaml", op);
+
+        var resolvedList = Assert.IsType<List<object>>(root.Entities[0].Attributes[0].Value);
+        var resolvedRecord = Assert.IsType<RtRecordTcDto>(resolvedList[0]);
+        Assert.Equal("https://localhost:5017/swagger/oauth2-redirect.html", resolvedRecord.Attributes[0].Value);
+        Assert.Equal("base", resolvedRecord.Attributes[1].Value);
+        Assert.False(op.HasErrors);
+        Assert.Empty(op.Messages);
+    }
+
+    [Fact]
+    public void Interpolate_DescendsIntoSingleRecordValue()
+    {
+        // Sibling case to RecordArray descent: a single-Record-typed attribute
+        // (e.g. Basic/TimeRange) carrying a placeholder must also be interpolated.
+        var variables = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["octo.scheme"] = "https",
+        };
+        var record = new RtRecordTcDto
+        {
+            CkRecordId = new RtCkId<CkRecordId>("System.Test/Endpoint"),
+            Attributes =
+            {
+                new RtAttributeTcDto
+                {
+                    Id = new RtCkId<CkAttributeId>("System.Test/Url"),
+                    Value = "${octo.scheme}://example.com"
+                }
+            }
+        };
+        var root = new RtModelRootTcDto
+        {
+            Entities =
+            {
+                new RtEntityTcDto
+                {
+                    RtId = new OctoObjectId("abcdef1234567890abcdef12"),
+                    CkTypeId = new RtCkId<CkTypeId>("System.Test/Sample"),
+                    Attributes =
+                    {
+                        new RtAttributeTcDto
+                        {
+                            Id = new RtCkId<CkAttributeId>("System.Test/Endpoint"),
+                            Value = record
+                        }
+                    }
+                }
+            }
+        };
+
+        var op = new OperationResult();
+        BlueprintVariableInterpolator.Interpolate(root, variables, "test.yaml", op);
+
+        var resolved = Assert.IsType<RtRecordTcDto>(root.Entities[0].Attributes[0].Value);
+        Assert.Equal("https://example.com", resolved.Attributes[0].Value);
+    }
+
     private static RtModelRootTcDto MakeRoot(string attributeValue, string? wellKnownName)
     {
         return new RtModelRootTcDto

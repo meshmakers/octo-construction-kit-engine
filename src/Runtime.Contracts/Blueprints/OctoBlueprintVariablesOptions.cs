@@ -50,4 +50,37 @@ public class OctoBlueprintVariablesOptions
     ///     <see cref="DefaultSystemTenantId"/>.
     /// </summary>
     public string SystemTenantId { get; set; } = DefaultSystemTenantId;
+
+    /// <summary>
+    ///     URL scheme used when blueprints compose service URLs from
+    ///     <see cref="Domain"/>. Exposed as <c>${octo.scheme}</c>. Defaults to
+    ///     <c>"https"</c>; set to <c>"http"</c> in plain-HTTP environments
+    ///     (compose-up smoke tests).
+    /// </summary>
+    /// <remarks>
+    ///     This pair of variables (<see cref="Scheme"/> + <see cref="Domain"/>) lets
+    ///     blueprints compose per-service public URLs from a single per-cluster
+    ///     domain instead of carrying one explicit URL setting per service. The
+    ///     authoritative pattern is <c>${octo.scheme}://&lt;slug&gt;.${octo.domain}</c>.
+    ///     Hosts that need per-service overrides (e.g. dev environments where
+    ///     services run on localhost with different ports) layer them on top
+    ///     through the host-specific variable provider.
+    /// </remarks>
+    public string Scheme { get; set; } = "https";
+
+    /// <summary>
+    ///     Public DNS suffix for service URLs in cluster deployments. Exposed
+    ///     as <c>${octo.domain}</c>. Empty by default — local dev environments
+    ///     and hosts that do not use the per-cluster domain pattern leave it
+    ///     unset and rely on per-service overrides. Trailing slashes are
+    ///     stripped on the way out.
+    /// </summary>
+    /// <remarks>
+    ///     Example values: <c>"test-2.octo-mesh.com"</c>, <c>"staging-1.octo-mesh.com"</c>.
+    ///     Blueprints that depend on this variable being non-empty should
+    ///     declare a <c>requires:</c> guard so they fail loudly when the host
+    ///     forgets to set it instead of materialising an entity with a
+    ///     half-composed URL.
+    /// </remarks>
+    public string Domain { get; set; } = string.Empty;
 }

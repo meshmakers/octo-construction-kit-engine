@@ -49,6 +49,12 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
             ["octo.tenantId"] = tenantId,
             ["octo.systemTenantId"] = systemTenantId,
             ["octo.isSystemTenant"] = isSystemTenant ? "true" : "false",
+            // Per-cluster URL composition base — blueprints reference
+            // ${octo.scheme}://<slug>.${octo.domain} to derive per-service public URLs
+            // without carrying one explicit URL setting per service. Hosts (e.g.
+            // Identity) layer per-service overrides on top via their own provider.
+            ["octo.scheme"] = string.IsNullOrEmpty(snapshot.Scheme) ? "https" : snapshot.Scheme,
+            ["octo.domain"] = (snapshot.Domain ?? string.Empty).TrimEnd('/'),
         };
 
         return Task.FromResult(variables);

@@ -156,6 +156,21 @@ public class DefaultBlueprintVariableProviderTests
         Assert.Equal("http", variables["octo.scheme"]);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public async Task GetVariables_OctoScheme_WhitespaceOnlyFallsBackToDefault(string raw)
+    {
+        // OCTO_BLUEPRINTS__SCHEME="   " in an env file would otherwise compose
+        // "   ://<slug>.<domain>" — treat whitespace-only as unset.
+        var provider = MakeProvider(scheme: raw);
+
+        var variables = await provider.GetVariablesAsync("tenant", TestContext.Current.CancellationToken);
+
+        Assert.Equal("https", variables["octo.scheme"]);
+    }
+
     [Fact]
     public async Task GetVariables_OctoDomain_DefaultsToEmpty()
     {
@@ -174,6 +189,8 @@ public class DefaultBlueprintVariableProviderTests
     [InlineData("test-2.octo-mesh.com", "test-2.octo-mesh.com")]
     [InlineData("test-2.octo-mesh.com/", "test-2.octo-mesh.com")]   // trailing slash stripped
     [InlineData("test-2.octo-mesh.com///", "test-2.octo-mesh.com")] // extra trailing slashes stripped
+    [InlineData(" test-2.octo-mesh.com ", "test-2.octo-mesh.com")]   // leading + trailing whitespace stripped
+    [InlineData("test-2.octo-mesh.com/ ", "test-2.octo-mesh.com")]   // trailing slash followed by whitespace
     public async Task GetVariables_OctoDomain_StripsTrailingSlashes(
         string rawDomain, string expected)
     {

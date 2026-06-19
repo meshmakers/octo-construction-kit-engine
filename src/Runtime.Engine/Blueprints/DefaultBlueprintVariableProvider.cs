@@ -53,8 +53,14 @@ internal sealed class DefaultBlueprintVariableProvider : IBlueprintVariableProvi
             // ${octo.scheme}://<slug>.${octo.domain} to derive per-service public URLs
             // without carrying one explicit URL setting per service. Hosts (e.g.
             // Identity) layer per-service overrides on top via their own provider.
-            ["octo.scheme"] = string.IsNullOrEmpty(snapshot.Scheme) ? "https" : snapshot.Scheme,
-            ["octo.domain"] = (snapshot.Domain ?? string.Empty).TrimEnd('/'),
+            //
+            // Whitespace-only configuration values are treated as unset, and both the
+            // scheme and domain values are trimmed before the slash strip so an operator
+            // entering e.g. `OCTO_BLUEPRINTS__DOMAIN="example.com/ "` still composes a
+            // well-formed URL instead of `https://<slug>.example.com/` with a stray
+            // trailing slash + whitespace.
+            ["octo.scheme"] = string.IsNullOrWhiteSpace(snapshot.Scheme) ? "https" : snapshot.Scheme.Trim(),
+            ["octo.domain"] = (snapshot.Domain ?? string.Empty).Trim().TrimEnd('/'),
         };
 
         return Task.FromResult(variables);

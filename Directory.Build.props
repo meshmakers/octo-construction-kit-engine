@@ -57,6 +57,6 @@
         <Compile Include="$(MSBuildThisFileDirectory)DotNetStandardFix.cs" Visible="false" />
     </ItemGroup>
     <ItemGroup>
-        <None Include="$(OctoRepoRootPath)README.md" Pack="True" PackagePath="\" Visible="false" />
+        <None Include="$([System.IO.Path]::Combine('$(OctoRepoRootPath)','README.md'))" Pack="True" PackagePath="" Visible="false" />
     </ItemGroup>
 </Project>

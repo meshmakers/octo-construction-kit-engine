@@ -107,13 +107,16 @@ public class YamlSerializerTests
         var filePath = "sampleData/files/noSchema_malformed.yaml";
         await using var stream = File.OpenRead(filePath);
         var operationResult = new OperationResult();
-        await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
+        var ex = await Assert.ThrowsAsync<RuntimeModelParseException>(async () =>
             await rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult));
         Assert.Equal(2, operationResult.Messages.Count);
         Assert.False(operationResult.HasErrors);
         Assert.True(operationResult.HasFatalErrors);
         Assert.Equal(1, operationResult.Messages[0].MessageNumber);
         Assert.Equal(1, operationResult.Messages[1].MessageNumber);
+        // Exception message must surface validator details (was previously generic).
+        Assert.Contains("Details:", ex.Message);
+        Assert.Contains("Schema validation failed", ex.Message);
     }
 
     [Fact]

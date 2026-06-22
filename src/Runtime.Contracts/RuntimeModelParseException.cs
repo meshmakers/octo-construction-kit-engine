@@ -39,8 +39,11 @@ public class RuntimeModelParseException : PersistenceException
 
     internal static Exception SchemaValidationFailed(string locationReference, OperationResult operationResult)
     {
-        return new RuntimeModelParseException(
-            $"{locationReference}: Stream contains invalid runtime model so that the schema validation failed.", operationResult);
+        var details = operationResult.GetMessages();
+        var message = string.IsNullOrWhiteSpace(details)
+            ? $"{locationReference}: Stream contains invalid runtime model so that the schema validation failed."
+            : $"{locationReference}: Stream contains invalid runtime model so that the schema validation failed. Details: {details.Trim()}";
+        return new RuntimeModelParseException(message, operationResult);
     }
 
     internal static Exception InvalidStructure()

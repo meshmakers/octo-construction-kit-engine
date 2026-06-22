@@ -20,6 +20,7 @@
         <RepositoryUrl>https://github.com/meshmakers/octo-construction-kit-engine</RepositoryUrl>
         <PackageIcon>meshmakers64.png</PackageIcon>
         <PackageLicenseFile>LICENSE</PackageLicenseFile>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <PackageProjectUrl>https://www.meshmakers.io</PackageProjectUrl>
         <PackageTags>Octo data mesh iot</PackageTags>
         <OctoVersion Condition="'$(Configuration)'=='DebugL'">999.0.0</OctoVersion>
@@ -54,5 +55,8 @@
 
     <ItemGroup>
         <Compile Include="$(MSBuildThisFileDirectory)DotNetStandardFix.cs" Visible="false" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="$(OctoRepoRootPath)README.md" Pack="True" PackagePath="\" Visible="false" />
     </ItemGroup>
 </Project>

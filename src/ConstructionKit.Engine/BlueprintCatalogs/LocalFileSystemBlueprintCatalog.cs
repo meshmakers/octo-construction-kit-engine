@@ -40,9 +40,9 @@ public class LocalFileSystemBlueprintCatalog : CachedBlueprintCatalog
     }
 
     /// <inheritdoc />
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
-        return RefreshCatalogAsync(false, sourceIdentifier);
+        return RefreshCatalogAsync(forceRefresh, sourceIdentifier);
     }
 
     private async Task RefreshCatalogAsync(bool forceRefresh, object? sourceIdentifier = null)
@@ -242,6 +242,54 @@ public class LocalFileSystemBlueprintCatalog : CachedBlueprintCatalog
         }
 
         // Refresh cache to include new blueprint
+        await RefreshCatalogAsync(true).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public override async Task UnpublishAsync(BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        if (!CanWrite)
+        {
+            throw BlueprintCatalogException.CatalogCannotWrite(Name);
+        }
+
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        var versionPath = GetBlueprintPathInternal(blueprintId);
+        if (Directory.Exists(versionPath))
+        {
+            Directory.Delete(versionPath, recursive: true);
+
+            // Remove the now-empty blueprint folder so the directory scan no longer reports the blueprint.
+            var blueprintPath = Directory.GetParent(versionPath)?.FullName;
+            if (blueprintPath != null && Directory.Exists(blueprintPath) &&
+                !Directory.EnumerateFileSystemEntries(blueprintPath).Any())
+            {
+                Directory.Delete(blueprintPath, recursive: false);
+            }
+        }
+
+        await RefreshCatalogAsync(true).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public override async Task UnpublishAllVersionsAsync(string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        if (!CanWrite)
+        {
+            throw BlueprintCatalogException.CatalogCannotWrite(Name);
+        }
+
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        var blueprintPath = Path.Combine(_options.Value.RootPath, RootPath, blueprintName);
+        if (Directory.Exists(blueprintPath))
+        {
+            Directory.Delete(blueprintPath, recursive: true);
+        }
+
         await RefreshCatalogAsync(true).ConfigureAwait(false);
     }
 

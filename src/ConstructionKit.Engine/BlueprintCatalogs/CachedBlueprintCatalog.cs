@@ -39,7 +39,7 @@ public abstract class CachedBlueprintCatalog(
     public bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
-    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null);
+    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <inheritdoc />
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
@@ -142,6 +142,14 @@ public abstract class CachedBlueprintCatalog(
     /// <inheritdoc />
     public abstract Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <inheritdoc />
+    public abstract Task UnpublishAsync(BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <inheritdoc />
+    public abstract Task UnpublishAllVersionsAsync(string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
 
     /// <inheritdoc />
     public async IAsyncEnumerable<BlueprintCatalogResultItem> ListAsync(object? sourceIdentifier)

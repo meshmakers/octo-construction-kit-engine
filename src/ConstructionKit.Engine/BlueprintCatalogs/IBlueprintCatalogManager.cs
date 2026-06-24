@@ -120,6 +120,26 @@ public interface IBlueprintCatalogManager
         bool isForced, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>
+    /// Removes a single blueprint version from the named catalog. Inverse of <see cref="PublishAsync" />.
+    /// </summary>
+    /// <param name="catalogName">Name of catalog</param>
+    /// <param name="blueprintId">The blueprint id (name + version) to remove</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task UnpublishAsync(string catalogName, BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    /// Removes all versions of a blueprint from the named catalog.
+    /// </summary>
+    /// <param name="catalogName">Name of catalog</param>
+    /// <param name="blueprintName">The blueprint name (without version) to remove entirely</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task UnpublishAllVersionsAsync(string catalogName, string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
     /// Returns true if the blueprint exists in any catalog
     /// </summary>
     /// <param name="blueprintId">The blueprint id</param>
@@ -140,5 +160,7 @@ public interface IBlueprintCatalogManager
     /// Refreshes the catalog cache for all catalogs
     /// </summary>
     /// <param name="sourceIdentifier">Source identifier, null for default</param>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null);
+    /// <param name="force">When true, forces every catalog to rebuild its cache unconditionally,
+    ///     bypassing cache-TTL and unchanged-remote-timestamp short-circuits.</param>
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool force = false);
 }

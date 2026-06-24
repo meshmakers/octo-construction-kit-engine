@@ -167,6 +167,20 @@ public class BlueprintCatalogException : Exception
     }
 
     /// <summary>
+    /// Creates an exception for an unpublish failure
+    /// </summary>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="catalogName">The catalog name</param>
+    /// <param name="innerException">The inner exception</param>
+    /// <returns>A new exception instance</returns>
+    public static BlueprintCatalogException UnpublishFailed(BlueprintId blueprintId, string catalogName, Exception innerException)
+    {
+        return new BlueprintCatalogException(
+            $"Failed to unpublish blueprint '{blueprintId}' from catalog '{catalogName}': {innerException.Message}",
+            innerException);
+    }
+
+    /// <summary>
     /// Creates an exception for when an existing version catalog cannot be read
     /// </summary>
     /// <param name="blueprintId">The blueprint id</param>

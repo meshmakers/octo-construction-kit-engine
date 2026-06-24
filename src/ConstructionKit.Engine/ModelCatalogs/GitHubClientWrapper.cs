@@ -99,6 +99,62 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
         }
     }
 
+    public async Task DeleteFileAsync(string filePath, string commitMessage, string sha)
+    {
+        var currentSha = sha;
+        for (int attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                await _client.Repository.Content.DeleteFile(
+                    gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
+                    new DeleteFileRequest(commitMessage, currentSha, gitHubOptions.GitHubRepositoryBranch))
+                    .ConfigureAwait(false);
+                return;
+            }
+            catch (NotFoundException)
+            {
+                // Already gone — deletion is idempotent.
+                return;
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsShaConflict(ex))
+            {
+                await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
+                var refreshed = await GetFileAsync(filePath).ConfigureAwait(false);
+                if (!refreshed.HasValue)
+                {
+                    // File disappeared between attempts — nothing left to delete.
+                    return;
+                }
+                currentSha = refreshed.Value.Item2;
+            }
+        }
+    }
+
+    public async Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath)
+    {
+        var prefix = directoryPath.TrimEnd('/') + "/";
+
+        try
+        {
+            // One recursive tree read for the branch, then filter to blobs under the directory prefix.
+            // The blob SHA returned here is exactly what DeleteFile requires.
+            var tree = await _client.Git.Tree.GetRecursive(
+                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName,
+                gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+
+            return tree.Tree
+                .Where(item => item.Type == TreeType.Blob &&
+                               item.Path.StartsWith(prefix, StringComparison.Ordinal))
+                .Select(item => (item.Path, item.Sha))
+                .ToList();
+        }
+        catch (NotFoundException)
+        {
+            return [];
+        }
+    }
+
     private static bool IsShaConflict(ApiException ex)
     {
         return ex.Message.Contains("but expected", StringComparison.OrdinalIgnoreCase)

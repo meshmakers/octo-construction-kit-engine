@@ -275,6 +275,233 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         }
     }
 
+    /// <inheritdoc />
+    public override async Task UnpublishAsync(BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        var gitHubClient = CreateGitHubClient();
+
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        try
+        {
+            // Inverse of PublishAsync: drop the blueprint's files, then prune the version out of the
+            // index, cascading up to remove now-empty major-version / blueprint / root entries.
+            await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+            await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
+
+            await RefreshCatalogAsync(true).ConfigureAwait(false);
+        }
+        catch (ApiException e)
+        {
+            throw BlueprintCatalogException.UnpublishFailed(blueprintId, CatalogName, e);
+        }
+    }
+
+    /// <inheritdoc />
+    public override async Task UnpublishAllVersionsAsync(string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        var gitHubClient = CreateGitHubClient();
+
+        cancellationToken?.ThrowIfCancellationRequested();
+
+        try
+        {
+            // Enumerate every published version from the index (source of truth), then unpublish each.
+            // Removing the last version cascades the major / blueprint / root entries away.
+            var versions = await GetAllPublishedVersionsAsync(blueprintName, gitHubClient).ConfigureAwait(false);
+            foreach (var blueprintId in versions)
+            {
+                cancellationToken?.ThrowIfCancellationRequested();
+                await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+                await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
+            }
+
+            await RefreshCatalogAsync(true).ConfigureAwait(false);
+        }
+        catch (ApiException e)
+        {
+            throw BlueprintCatalogException.UnpublishFailed(new BlueprintId(blueprintName, "0.0.0"), CatalogName, e);
+        }
+    }
+
+    private async Task DeleteBlueprintFilesAsync(BlueprintId blueprintId, IGitHubClientWrapper gitHubClient,
+        CancellationToken? cancellationToken)
+    {
+        var directoryPath = CreateBlueprintDirectoryPath(blueprintId);
+        var files = await gitHubClient.ListFilesRecursiveAsync(directoryPath).ConfigureAwait(false);
+
+        foreach (var (path, sha) in files)
+        {
+            cancellationToken?.ThrowIfCancellationRequested();
+            await gitHubClient.DeleteFileAsync(path, $"Remove {path} for {blueprintId.FullName}", sha)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task<List<BlueprintId>> GetAllPublishedVersionsAsync(string blueprintName,
+        IGitHubClientWrapper gitHubClient)
+    {
+        var result = new List<BlueprintId>();
+
+        var libraryCatalogPath = $"{RootPath}{blueprintName[0].ToString().ToLower()}/{blueprintName}/{CatalogFileName}";
+        var libraryCatalog = await GetBlueprintLibraryCatalogWithClientAsync(libraryCatalogPath, gitHubClient)
+            .ConfigureAwait(false);
+        if (libraryCatalog == null)
+        {
+            return result;
+        }
+
+        foreach (var majorEntry in libraryCatalog.MajorVersions)
+        {
+            var versionsCatalog = await GetBlueprintLibraryVersionsCatalogWithClientAsync(
+                blueprintName, majorEntry.MajorVersion, gitHubClient).ConfigureAwait(false);
+            if (versionsCatalog == null)
+            {
+                continue;
+            }
+
+            foreach (var versionEntry in versionsCatalog.Versions)
+            {
+                result.Add(new BlueprintId(blueprintName, versionEntry.Version));
+            }
+        }
+
+        return result;
+    }
+
+    private async Task PruneVersionsCatalogAsync(BlueprintId blueprintId, IGitHubClientWrapper gitHubClient)
+    {
+        var catalogPath =
+            $"{RootPath}{blueprintId.Name[0].ToString().ToLower()}/{blueprintId.Name}/{blueprintId.Version.Major}/{CatalogFileName}";
+
+        var catalogData = await GetBlueprintLibraryVersionsCatalogWithClientAsync(
+                blueprintId.Name, blueprintId.Version.Major, gitHubClient)
+            .ConfigureAwait(false);
+        if (catalogData == null)
+        {
+            return;
+        }
+
+        var currentVersionString = blueprintId.Version.ToString();
+        if (catalogData.Versions.RemoveAll(v => v.Version == currentVersionString) == 0)
+        {
+            return;
+        }
+
+        var existing = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+
+        if (catalogData.Versions.Count == 0)
+        {
+            // Last version of this major gone: delete the versions catalog and cascade up.
+            if (existing.HasValue)
+            {
+                await gitHubClient.DeleteFileAsync(catalogPath,
+                        $"Remove versions catalog for {blueprintId.Name} v{blueprintId.Version.Major}",
+                        existing.Value.Item2)
+                    .ConfigureAwait(false);
+            }
+
+            await PruneLibraryCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
+            return;
+        }
+
+        var sortedVersions = catalogData.Versions
+            .OrderByDescending(v => new CkVersion(v.Version))
+            .ToList();
+        catalogData.LatestVersion = sortedVersions.FirstOrDefault()?.Version;
+        catalogData.UpdatedAt = DateTime.UtcNow;
+
+        if (existing.HasValue)
+        {
+            await gitHubClient.UpdateFileAsync(catalogPath,
+                    $"Update catalog for {blueprintId.Name} v{blueprintId.Version.Major}",
+                    SerializeCatalog(catalogData), existing.Value.Item2)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task PruneLibraryCatalogAsync(BlueprintId blueprintId, IGitHubClientWrapper gitHubClient)
+    {
+        var catalogPath = $"{RootPath}{blueprintId.Name[0].ToString().ToLower()}/{blueprintId.Name}/{CatalogFileName}";
+
+        var catalogData = await GetBlueprintLibraryCatalogWithClientAsync(catalogPath, gitHubClient)
+            .ConfigureAwait(false);
+        if (catalogData == null)
+        {
+            return;
+        }
+
+        if (catalogData.MajorVersions.RemoveAll(m => m.MajorVersion == blueprintId.Version.Major) == 0)
+        {
+            return;
+        }
+
+        var existing = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+
+        if (catalogData.MajorVersions.Count == 0)
+        {
+            // Last major of this blueprint gone: delete the library catalog and cascade to the root.
+            if (existing.HasValue)
+            {
+                await gitHubClient.DeleteFileAsync(catalogPath,
+                        $"Remove blueprint catalog for {blueprintId.Name}", existing.Value.Item2)
+                    .ConfigureAwait(false);
+            }
+
+            await PruneRootCatalogAsync(blueprintId.Name, gitHubClient).ConfigureAwait(false);
+            return;
+        }
+
+        catalogData.UpdatedAt = DateTime.UtcNow;
+
+        if (existing.HasValue)
+        {
+            await gitHubClient.UpdateFileAsync(catalogPath,
+                    $"Update blueprint catalog for {blueprintId.Name}",
+                    SerializeCatalog(catalogData), existing.Value.Item2)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private async Task PruneRootCatalogAsync(string blueprintName, IGitHubClientWrapper gitHubClient)
+    {
+        var catalogPath = $"{RootPath}{CatalogFileName}";
+
+        var catalogData = await GetRootCatalogWithClientAsync(gitHubClient).ConfigureAwait(false);
+        if (catalogData == null)
+        {
+            return;
+        }
+
+        if (catalogData.Blueprints.RemoveAll(b => b.BlueprintName == blueprintName) == 0)
+        {
+            return;
+        }
+
+        catalogData.UpdatedAt = DateTime.UtcNow;
+
+        var existing = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
+        if (existing.HasValue)
+        {
+            await gitHubClient.UpdateFileAsync(catalogPath,
+                    $"Update blueprint catalog after removing {blueprintName}",
+                    SerializeCatalog(catalogData), existing.Value.Item2)
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static string SerializeCatalog<T>(T catalogData)
+    {
+        return System.Text.Json.JsonSerializer.Serialize(catalogData,
+            new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
+    }
+
     private async Task UploadBlueprintFilesAsync(
         BlueprintId blueprintId,
         string blueprintDirectory,
@@ -608,9 +835,9 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
     }
 
     /// <inheritdoc />
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
-        return RefreshCatalogAsync(false);
+        return RefreshCatalogAsync(forceRefresh);
     }
 
     private async Task RefreshCatalogAsync(bool forceRefresh)

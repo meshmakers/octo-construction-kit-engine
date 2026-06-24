@@ -38,8 +38,10 @@ public interface IBlueprintCatalog
     /// </summary>
     /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
     ///     set it to null to use default</param>
+    /// <param name="forceRefresh">When true, bypasses any freshness short-circuit (cache TTL, unchanged
+    ///     remote timestamp) and rebuilds the cache from the source unconditionally.</param>
     /// <returns></returns>
-    Task RefreshCatalogAsync(object? sourceIdentifier = null);
+    Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <summary>
     ///     Returns true, if the defined source identifier is supported by the catalog.
@@ -129,6 +131,39 @@ public interface IBlueprintCatalog
     /// <returns></returns>
     Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,
         object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Removes a single blueprint version from the catalog. The inverse of <see cref="PublishAsync" />:
+    ///     it deletes the blueprint's files and prunes the version from the catalog index, cascading up to
+    ///     remove the now-empty major-version and blueprint index entries when this was the last version.
+    /// </summary>
+    /// <remarks>
+    ///     Idempotent: a version that does not exist is a successful no-op. Throws
+    ///     <see cref="BlueprintCatalogException" /> only when the catalog cannot be written to or the
+    ///     underlying store operation fails.
+    /// </remarks>
+    /// <param name="blueprintId">The blueprint id (name + version) to remove</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
+    ///     set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    Task UnpublishAsync(BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Removes all versions of a blueprint from the catalog, including every version's files and the
+    ///     blueprint's complete index subtree.
+    /// </summary>
+    /// <remarks>
+    ///     Idempotent: a blueprint name with no published versions is a successful no-op. Throws
+    ///     <see cref="BlueprintCatalogException" /> only when the catalog cannot be written to or the
+    ///     underlying store operation fails.
+    /// </remarks>
+    /// <param name="blueprintName">The blueprint name (without version) to remove entirely</param>
+    /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
+    ///     set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    Task UnpublishAllVersionsAsync(string blueprintName, object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null);
 
     /// <summary>

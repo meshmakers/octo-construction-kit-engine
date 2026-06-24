@@ -229,6 +229,44 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     }
 
     /// <inheritdoc />
+    public async Task UnpublishAsync(string catalogName, BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        var catalog = ResolveWritableCatalog(catalogName);
+
+        await catalog.UnpublishAsync(blueprintId, sourceIdentifier, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Unpublished blueprint {BlueprintId} from catalog {CatalogName}",
+            blueprintId, catalogName);
+    }
+
+    /// <inheritdoc />
+    public async Task UnpublishAllVersionsAsync(string catalogName, string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        var catalog = ResolveWritableCatalog(catalogName);
+
+        await catalog.UnpublishAllVersionsAsync(blueprintName, sourceIdentifier, cancellationToken).ConfigureAwait(false);
+        _logger.LogInformation("Unpublished all versions of blueprint {BlueprintName} from catalog {CatalogName}",
+            blueprintName, catalogName);
+    }
+
+    private IBlueprintCatalog ResolveWritableCatalog(string catalogName)
+    {
+        var catalog = _catalogs.FirstOrDefault(c => c.CatalogName == catalogName);
+        if (catalog == null)
+        {
+            throw BlueprintCatalogException.CatalogNotFound(catalogName);
+        }
+
+        if (!catalog.CanWrite)
+        {
+            throw BlueprintCatalogException.CatalogCannotWrite(catalogName);
+        }
+
+        return catalog;
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsExistingAsync(BlueprintId blueprintId, object? sourceIdentifier = null)
     {
         foreach (var catalog in _catalogs.OrderBy(c => c.Order))
@@ -274,13 +312,13 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     }
 
     /// <inheritdoc />
-    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null)
+    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool force = false)
     {
         foreach (var catalog in _catalogs)
         {
             if (catalog.IsSupportingSourceIdentifier(sourceIdentifier))
             {
-                await catalog.RefreshCatalogAsync(sourceIdentifier).ConfigureAwait(false);
+                await catalog.RefreshCatalogAsync(sourceIdentifier, force).ConfigureAwait(false);
             }
         }
     }

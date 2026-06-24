@@ -132,5 +132,6 @@ internal static class Program
         services.AddTransient<ICommand, CatalogsCommand>();
         services.AddTransient<ICommand, GetCommand>();
         services.AddTransient<ICommand, PublishCommand>();
+        services.AddTransient<ICommand, UnpublishCommand>();
     }
 }

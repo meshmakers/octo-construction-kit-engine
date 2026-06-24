@@ -11,9 +11,8 @@ namespace Meshmakers.Octo.BlueprintManager.Commands.Implementations;
 /// <summary>
 /// Command to get a blueprint from a catalog.
 /// </summary>
-internal class GetCommand : Command<BpmToolOptions>
+internal class GetCommand : CatalogReadCommand
 {
-    private readonly IBlueprintCatalogManager _catalogManager;
     private readonly IArgument _blueprintArg;
     private readonly IArgument _catalogArg;
     private readonly IArgument _outputArg;
@@ -22,10 +21,8 @@ internal class GetCommand : Command<BpmToolOptions>
         ILogger<GetCommand> logger,
         IOptions<BpmToolOptions> options,
         IBlueprintCatalogManager catalogManager)
-        : base(logger, "get", "Gets a blueprint from a catalog", options)
+        : base(logger, "get", "Gets a blueprint from a catalog", options, catalogManager)
     {
-        _catalogManager = catalogManager;
-
         _blueprintArg = CommandArgumentValue.AddArgument("b", "blueprint",
             ["Blueprint ID to get (e.g., 'MyBlueprint-1.0.0')"], true, 1);
 
@@ -53,7 +50,7 @@ internal class GetCommand : Command<BpmToolOptions>
         }
 
         var operationResult = new OperationResult();
-        var blueprint = await _catalogManager.TryGetAsync(blueprintId, operationResult);
+        var blueprint = await CatalogManager.TryGetAsync(blueprintId, operationResult);
 
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
@@ -83,7 +80,7 @@ internal class GetCommand : Command<BpmToolOptions>
 #pragma warning disable CS0618 // GetBlueprintPathAsync is intentional here: this CLI's job is to
             // hand the user an on-disk folder to copy, which only file-system catalogs can
             // produce. Embedded catalogs don't expose a directory and would throw correctly.
-            var sourcePath = await _catalogManager.GetBlueprintPathAsync(blueprintId);
+            var sourcePath = await CatalogManager.GetBlueprintPathAsync(blueprintId);
 #pragma warning restore CS0618
 
             if (!Directory.Exists(outputPath))

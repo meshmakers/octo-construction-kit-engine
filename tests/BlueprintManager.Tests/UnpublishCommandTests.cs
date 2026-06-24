@@ -60,11 +60,28 @@ public class UnpublishCommandTests
     }
 
     [Fact]
-    public async Task Execute_MissingBlueprint_DoesNotCallManager()
+    public async Task Execute_WithForce_CallsManagerEvenWhenIndexEmpty()
     {
-        var manager = ManagerWith(); // empty catalog
+        // Simulates the post-publish GitHub-Pages-lag window: the listing shows nothing yet, but --force
+        // must still remove directly via the authoritative (and idempotent) catalog layer rather than
+        // falsely reporting "nothing to unpublish".
+        var manager = ManagerWith(); // empty listing
         var cmd = CreateCommand(manager);
         cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "1.0.0", "-f"]);
+
+        await cmd.Execute();
+
+        A.CallTo(() => manager.UnpublishAsync(Catalog,
+                A<BlueprintId>.That.Matches(b => b.FullName == "MyBlueprint-1.0.0"), A<object?>._, A<CancellationToken?>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Execute_WithoutForce_EmptyIndex_DoesNotCallManager()
+    {
+        var manager = ManagerWith(); // empty listing
+        var cmd = CreateCommand(manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "1.0.0"]);
 
         await cmd.Execute();
 

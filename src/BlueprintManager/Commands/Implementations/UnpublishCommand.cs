@@ -38,6 +38,16 @@ internal class UnpublishCommand : CatalogReadCommand
             ["Actually perform the removal. Without this flag the command only prints what would be removed"], false, 0);
     }
 
+    /// <summary>
+    /// Only the dry-run preview reads the (cache / GitHub-Pages-backed) catalog listing, so it is the only
+    /// path that benefits from a pre-read refresh. A forced removal goes straight to the catalog's
+    /// authoritative store, so the refresh would be wasted network I/O on the common, destructive path.
+    /// </summary>
+    public override Task PreValidate()
+    {
+        return CommandArgumentValue.IsArgumentUsed(_forceArg) ? Task.CompletedTask : base.PreValidate();
+    }
+
     public override async Task Execute()
     {
         var blueprintName = CommandArgumentValue.GetArgumentScalarValue<string>(_blueprintArg);
@@ -53,36 +63,29 @@ internal class UnpublishCommand : CatalogReadCommand
 
         Logger.LogInformation("Unpublishing from catalog '{Catalog}'", catalogName);
 
-        // Resolve the actual targets in the catalog so the dry run is accurate and a missing blueprint is a
-        // clear no-op. The catalog layer is itself idempotent, so this is for reporting, not correctness.
-        var listResult = await CatalogManager.ListAsync(skip: 0, take: 10000);
-        var targets = listResult.Items
-            .Where(i => i.CatalogName == catalogName && i.BlueprintId.Name == blueprintName)
-            .Where(i => wholeBlueprint || i.BlueprintId.Version.ToString() == version)
-            .Select(i => i.BlueprintId)
-            .OrderBy(b => b)
-            .ToList();
-
-        if (targets.Count == 0)
-        {
-            if (wholeBlueprint)
-            {
-                Logger.LogInformation(
-                    "Blueprint '{Name}' has no published versions in catalog '{Catalog}'. Nothing to unpublish",
-                    blueprintName, catalogName);
-            }
-            else
-            {
-                Logger.LogInformation(
-                    "Blueprint '{Name}-{Version}' is not present in catalog '{Catalog}'. Nothing to unpublish",
-                    blueprintName, version, catalogName);
-            }
-
-            return;
-        }
-
         if (!isForced)
         {
+            // Dry run: preview from the catalog listing. GitHub catalogs serve that index from GitHub
+            // Pages, which can lag a just-published blueprint by up to a minute — so this preview is
+            // best-effort, and the forced path below deliberately does NOT depend on it.
+            var listResult = await CatalogManager.ListAsync(skip: 0, take: 10000);
+            var targets = listResult.Items
+                .Where(i => i.CatalogName == catalogName && i.BlueprintId.Name == blueprintName)
+                .Where(i => wholeBlueprint || i.BlueprintId.Version.ToString() == version)
+                .Select(i => i.BlueprintId)
+                .OrderBy(b => b)
+                .ToList();
+
+            if (targets.Count == 0)
+            {
+                Logger.LogInformation(
+                    "Dry run — nothing matches '{Name}{Version}' in catalog '{Catalog}'. " +
+                    "(A just-published blueprint can take a moment to appear in the index.) " +
+                    "Re-run with --force to remove it regardless of the index state",
+                    blueprintName, wholeBlueprint ? "" : $"-{version}", catalogName);
+                return;
+            }
+
             Logger.LogWarning(
                 "Dry run — the following would be PERMANENTLY removed from catalog '{Catalog}'. Re-run with --force to apply:",
                 catalogName);
@@ -94,11 +97,14 @@ internal class UnpublishCommand : CatalogReadCommand
             return;
         }
 
+        // Forced removal goes directly to the catalog's authoritative store. It is idempotent (a missing
+        // blueprint / version is a no-op) and does not consult the read-side index, so it is correct even
+        // immediately after a publish — before the index / cache has propagated.
         if (wholeBlueprint)
         {
             await CatalogManager.UnpublishAllVersionsAsync(catalogName, blueprintName);
-            Logger.LogInformation("Unpublished all {Count} version(s) of blueprint '{Name}' from catalog '{Catalog}'",
-                targets.Count, blueprintName, catalogName);
+            Logger.LogInformation("Unpublished all versions of blueprint '{Name}' from catalog '{Catalog}'",
+                blueprintName, catalogName);
         }
         else
         {

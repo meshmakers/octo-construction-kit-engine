@@ -36,13 +36,27 @@ public class CatalogReadCommandTests
     }
 
     [Fact]
-    public async Task UnpublishCommand_PreValidate_ForcesCatalogRefresh()
+    public async Task UnpublishCommand_PreValidate_DryRun_ForcesCatalogRefresh()
     {
         var manager = A.Fake<IBlueprintCatalogManager>();
         var cmd = new UnpublishCommand(NullLogger<UnpublishCommand>.Instance, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint"]); // no --force → dry run reads the index
 
         await cmd.PreValidate();
 
         A.CallTo(() => manager.RefreshAllCatalogCachesAsync(A<object?>._, true)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task UnpublishCommand_PreValidate_WithForce_SkipsRefresh()
+    {
+        // The forced path goes straight to the authoritative store, so it must not waste a network refresh.
+        var manager = A.Fake<IBlueprintCatalogManager>();
+        var cmd = new UnpublishCommand(NullLogger<UnpublishCommand>.Instance, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-f"]);
+
+        await cmd.PreValidate();
+
+        A.CallTo(() => manager.RefreshAllCatalogCachesAsync(A<object?>._, A<bool>._)).MustNotHaveHappened();
     }
 }

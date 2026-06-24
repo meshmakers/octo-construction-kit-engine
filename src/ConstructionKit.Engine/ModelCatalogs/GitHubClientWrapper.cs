@@ -99,6 +99,78 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
         }
     }
 
+    public async Task DeleteFileAsync(string filePath, string commitMessage, string sha)
+    {
+        var currentSha = sha;
+        for (int attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            try
+            {
+                await _client.Repository.Content.DeleteFile(
+                    gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
+                    new DeleteFileRequest(commitMessage, currentSha, gitHubOptions.GitHubRepositoryBranch))
+                    .ConfigureAwait(false);
+                return;
+            }
+            catch (NotFoundException)
+            {
+                // Already gone — deletion is idempotent.
+                return;
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsShaConflict(ex))
+            {
+                await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
+                var refreshed = await GetFileAsync(filePath).ConfigureAwait(false);
+                if (!refreshed.HasValue)
+                {
+                    // File disappeared between attempts — nothing left to delete.
+                    return;
+                }
+                currentSha = refreshed.Value.Item2;
+            }
+        }
+    }
+
+    public async Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath)
+    {
+        // Directory-scoped enumeration: walk the Contents API from the target directory down, instead of
+        // pulling the whole repository tree and filtering. This scales with the blueprint subtree rather
+        // than the repository, avoids the Git-Trees truncation cliff for large repos, and returns the blob
+        // SHA each file's DeleteFile call requires. A missing directory yields an empty list.
+        var files = new List<(string path, string sha)>();
+        await CollectFilesRecursiveAsync(directoryPath.TrimEnd('/'), files).ConfigureAwait(false);
+        return files;
+    }
+
+    private async Task CollectFilesRecursiveAsync(string directoryPath, List<(string path, string sha)> files)
+    {
+        IReadOnlyList<RepositoryContent> contents;
+        try
+        {
+            contents = await _client.Repository.Content.GetAllContentsByRef(
+                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, directoryPath,
+                gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+        }
+        catch (NotFoundException)
+        {
+            return;
+        }
+
+        foreach (var item in contents)
+        {
+            switch (item.Type.Value)
+            {
+                case ContentType.File:
+                    files.Add((item.Path, item.Sha));
+                    break;
+                case ContentType.Dir:
+                    await CollectFilesRecursiveAsync(item.Path, files).ConfigureAwait(false);
+                    break;
+                // Symlinks / submodules are not part of a blueprint payload; ignore them.
+            }
+        }
+    }
+
     private static bool IsShaConflict(ApiException ex)
     {
         return ex.Message.Contains("but expected", StringComparison.OrdinalIgnoreCase)

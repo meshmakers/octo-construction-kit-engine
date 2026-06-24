@@ -33,7 +33,7 @@ internal class PublishCommand : Command<BpmToolOptions>
             ["Path to the blueprint directory"], true, 1);
 
         _catalogArg = CommandArgumentValue.AddArgument("c", "catalog",
-            ["Name of the target catalog (default: LocalFileSystemCatalog)"], false, 1);
+            [$"Name of the target catalog (default: {LocalFileSystemBlueprintCatalog.Name})"], false, 1);
 
         _forceArg = CommandArgumentValue.AddArgument("f", "force",
             ["Replace existing blueprint if it exists"], false, 0);
@@ -43,8 +43,8 @@ internal class PublishCommand : Command<BpmToolOptions>
     {
         var path = CommandArgumentValue.GetArgumentScalarValue<string>(_pathArg);
         var catalogName = CommandArgumentValue.IsArgumentUsed(_catalogArg)
-            ? CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_catalogArg) ?? "LocalFileSystemCatalog"
-            : "LocalFileSystemCatalog";
+            ? CommandArgumentValue.GetArgumentScalarValueOrDefault<string>(_catalogArg) ?? LocalFileSystemBlueprintCatalog.Name
+            : LocalFileSystemBlueprintCatalog.Name;
         var isForced = CommandArgumentValue.IsArgumentUsed(_forceArg);
 
         Logger.LogInformation("Publishing blueprint");

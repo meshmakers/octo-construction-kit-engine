@@ -9,9 +9,8 @@ namespace Meshmakers.Octo.BlueprintManager.Commands.Implementations;
 /// <summary>
 /// Command to list available blueprints from catalogs.
 /// </summary>
-internal class ListCommand : Command<BpmToolOptions>
+internal class ListCommand : CatalogReadCommand
 {
-    private readonly IBlueprintCatalogManager _catalogManager;
     private readonly IArgument _searchArg;
     private readonly IArgument _catalogArg;
 
@@ -19,10 +18,8 @@ internal class ListCommand : Command<BpmToolOptions>
         ILogger<ListCommand> logger,
         IOptions<BpmToolOptions> options,
         IBlueprintCatalogManager catalogManager)
-        : base(logger, "list", "Lists available blueprints from catalogs", options)
+        : base(logger, "list", "Lists available blueprints from catalogs", options, catalogManager)
     {
-        _catalogManager = catalogManager;
-
         _searchArg = CommandArgumentValue.AddArgument("s", "search",
             ["Search term to filter blueprints"], false, 1);
 
@@ -53,7 +50,7 @@ internal class ListCommand : Command<BpmToolOptions>
         }
 
         // Get all blueprints (using a large take value to get all)
-        var result = await _catalogManager.ListAsync(skip: 0, take: 10000);
+        var result = await CatalogManager.ListAsync(skip: 0, take: 10000);
 
         var blueprintCount = 0;
         var currentCatalog = "";

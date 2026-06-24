@@ -65,7 +65,7 @@ public class EmbeddedResourceBlueprintCatalog : IBlueprintCatalog
     public bool CanRead => true;
 
     /// <inheritdoc />
-    public Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
         // Embedded resources are static at runtime, nothing to refresh.
         return Task.CompletedTask;
@@ -177,6 +177,20 @@ public class EmbeddedResourceBlueprintCatalog : IBlueprintCatalog
     /// <inheritdoc />
     public Task PublishAsync(BlueprintMetaRootDto blueprintMetaRoot, string blueprintDirectory, bool force = false,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        throw BlueprintCatalogException.CatalogCannotWrite(CatalogName);
+    }
+
+    /// <inheritdoc />
+    public Task UnpublishAsync(BlueprintId blueprintId, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
+    {
+        throw BlueprintCatalogException.CatalogCannotWrite(CatalogName);
+    }
+
+    /// <inheritdoc />
+    public Task UnpublishAllVersionsAsync(string blueprintName, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null)
     {
         throw BlueprintCatalogException.CatalogCannotWrite(CatalogName);
     }

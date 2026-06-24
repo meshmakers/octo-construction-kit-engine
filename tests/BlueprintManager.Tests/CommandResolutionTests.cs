@@ -71,6 +71,7 @@ public class CommandResolutionTests
             "NewCommand",
             "PackCommand",
             "PublishCommand",
+            "UnpublishCommand",
             "ValidateCommand",
             "VersionCommand"
         ];

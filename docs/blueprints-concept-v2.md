@@ -15,7 +15,7 @@ verbindliche Grundlage für die Fertigstellung der Blueprint-Funktion.
 - MongoDB-Persistenz: `MongoTenantBlueprintHistory`, `MongoBlueprintBackupService`,
   `MongoRuntimeRepositoryProvider`.
 - CLI-Tool `octo-bpm` mit allen lokalen Commands (new, validate, pack,
-  list, version, catalogs, get, publish, config).
+  list, version, catalogs, get, publish, unpublish, config).
 - System-Entity-Attribute: `RtBlueprintSource`, `RtBlueprintLocked`,
   `RtBlueprintAppliedAt` sind im SystemCkModel definiert.
 
@@ -134,7 +134,14 @@ zwischen Apply und Rollback.
 in Kataloge. Operiert **niemals** gegen einen Tenant-Service.
 
 **Commands:** `new`, `validate`, `pack`, `list`, `version`, `catalogs`,
-`get`, `publish`, `config`.
+`get`, `publish`, `unpublish`, `config`.
+
+`unpublish` ist die destruktive Umkehrung von `publish`: `-r <Version>`
+entfernt genau eine Version, ohne `-r` werden **alle** Versionen entfernt;
+ohne `-f` nur Vorschau (Dry-Run), mit `-f` wird angewendet. Nur für
+beschreibbare Kataloge (LocalFileSystem/PrivateGitHub; Embedded ist read-only).
+Auf GitHub-Katalogen werden zusätzlich die drei `catalog.json`-Indexebenen
+kaskadierend bereinigt.
 
 **Entfernt; Äquivalent in `octo-cli`:** Die Runtime-Commands `status`,
 `preview`, `update`, `history` wurden aus `octo-bpm` entfernt. Sie operieren
@@ -362,7 +369,7 @@ octo-cli blueprintUninstall -t T1 -b ECommerce-2.0.0 [--cascade]
 | 3 | CK-Model-Auflösung | Auto-Install + Konfliktdetektion vor Install |
 | 4 | Audit-Trail | `IDistributionEventHubService` mit Record-Events |
 | 5 | Rollback | Voll, Backup-basiert |
-| 6 | Tool-Schnitt | `octo-cli` führt Runtime-Ops (Install/Update/Rollback/Uninstall). Authoring-CLI (`octo-bpm`) ist implementiert (new, validate, pack, list, version, catalogs, get, publish, config) und operiert nie gegen einen Tenant-Service. |
+| 6 | Tool-Schnitt | `octo-cli` führt Runtime-Ops (Install/Update/Rollback/Uninstall). Authoring-CLI (`octo-bpm`) ist implementiert (new, validate, pack, list, version, catalogs, get, publish, unpublish, config) und operiert nie gegen einen Tenant-Service. |
 | 7 | Hosting | `octo-asset-repo-services` (GraphQL-API) |
 | 8 | Entity-Ownership | Ein Owner pro Entity |
 | 9 | Re-Apply | `--force` flag, neuer Mode `ReApply` |

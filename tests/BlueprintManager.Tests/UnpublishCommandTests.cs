@@ -89,6 +89,37 @@ public class UnpublishCommandTests
             .MustNotHaveHappened();
     }
 
+    [Fact]
+    public async Task Execute_DryRun_NormalizesVersion_PreviewsCanonicalEntry()
+    {
+        // The catalog stores the canonical "1.2.0"; the user asks for "1.2". The dry-run preview must
+        // normalize before comparing, otherwise it reports "nothing matches" while --force would delete it.
+        var manager = ManagerWith(("MyBlueprint", "1.2.0"));
+        var logger = new CapturingLogger<UnpublishCommand>();
+        var cmd = new UnpublishCommand(logger, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "1.2"]); // no --force → dry run
+
+        await cmd.Execute();
+
+        Assert.Contains(logger.Messages, m => m.Contains("MyBlueprint-1.2.0"));
+        Assert.DoesNotContain(logger.Messages, m => m.Contains("nothing matches"));
+    }
+
+    [Fact]
+    public async Task Execute_InvalidVersion_LogsErrorAndDoesNotCallManager()
+    {
+        var manager = ManagerWith(("MyBlueprint", "1.0.0"));
+        var logger = new CapturingLogger<UnpublishCommand>();
+        var cmd = new UnpublishCommand(logger, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "not-a-version", "-f"]);
+
+        await cmd.Execute();
+
+        Assert.Contains(logger.Messages, m => m.Contains("Invalid version"));
+        A.CallTo(() => manager.UnpublishAsync(A<string>._, A<BlueprintId>._, A<object?>._, A<CancellationToken?>._))
+            .MustNotHaveHappened();
+    }
+
     private static IBlueprintCatalogManager ManagerWith(params (string name, string version)[] items)
     {
         var manager = A.Fake<IBlueprintCatalogManager>();
@@ -107,4 +138,26 @@ public class UnpublishCommandTests
 
     private static UnpublishCommand CreateCommand(IBlueprintCatalogManager manager)
         => new(NullLogger<UnpublishCommand>.Instance, Options.Create(new BpmToolOptions()), manager);
+}
+
+/// <summary>
+/// Minimal <see cref="ILogger{T}" /> that records the formatted log messages, so tests can assert on
+/// command output. (FakeItEasy cannot proxy <c>ILogger&lt;internal-type&gt;</c>, hence a hand-rolled double.)
+/// </summary>
+internal sealed class CapturingLogger<T> : Microsoft.Extensions.Logging.ILogger<T>
+{
+    public List<string> Messages { get; } = [];
+
+    public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
+    public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+
+    public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+        TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+        => Messages.Add(formatter(state, exception));
+
+    private sealed class NullScope : IDisposable
+    {
+        public static readonly NullScope Instance = new();
+        public void Dispose() { }
+    }
 }

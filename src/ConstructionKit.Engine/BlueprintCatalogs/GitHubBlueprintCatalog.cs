@@ -285,10 +285,13 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
 
         try
         {
-            // Inverse of PublishAsync: drop the blueprint's files, then prune the version out of the
-            // index, cascading up to remove now-empty major-version / blueprint / root entries.
-            await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+            // Inverse of PublishAsync, but in the safe order: prune the version out of the index FIRST
+            // (cascading up to remove now-empty major-version / blueprint / root entries), THEN delete the
+            // blueprint's files. A partial failure between the two therefore leaves harmless orphan blobs
+            // that a re-run cleans up — never a live index entry pointing at files that are already gone
+            // (which would 404 a concurrent Get / install).
             await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
+            await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
 
             await RefreshCatalogAsync(true).ConfigureAwait(false);
         }
@@ -314,8 +317,10 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
             foreach (var blueprintId in versions)
             {
                 cancellationToken?.ThrowIfCancellationRequested();
-                await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+                // Prune the index entry before deleting files (see UnpublishAsync) so a partial failure
+                // leaves orphan blobs rather than dangling index pointers.
                 await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
+                await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
             }
 
             await RefreshCatalogAsync(true).ConfigureAwait(false);

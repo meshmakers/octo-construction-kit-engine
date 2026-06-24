@@ -1,5 +1,6 @@
 using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 using Microsoft.Extensions.Logging;
@@ -61,6 +62,24 @@ internal class UnpublishCommand : CatalogReadCommand
 
         var wholeBlueprint = string.IsNullOrWhiteSpace(version);
 
+        // Normalize the requested version once so the dry-run preview and the forced removal agree. CkVersion
+        // canonicalises to three components (e.g. "1.2" -> "1.2.0"), and the catalog listing / ids are always
+        // canonical; comparing the raw argument would make the dry run miss a version that --force would still
+        // delete — the worst direction for a safety preview.
+        string? normalizedVersion = null;
+        if (!wholeBlueprint)
+        {
+            try
+            {
+                normalizedVersion = new CkVersion(version!).ToString();
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                Logger.LogError("Invalid version '{Version}'. Expected 'Major.Minor.Revision' (e.g. 1.2.3)", version);
+                return;
+            }
+        }
+
         Logger.LogInformation("Unpublishing from catalog '{Catalog}'", catalogName);
 
         if (!isForced)
@@ -71,7 +90,7 @@ internal class UnpublishCommand : CatalogReadCommand
             var listResult = await CatalogManager.ListAsync(skip: 0, take: 10000);
             var targets = listResult.Items
                 .Where(i => i.CatalogName == catalogName && i.BlueprintId.Name == blueprintName)
-                .Where(i => wholeBlueprint || i.BlueprintId.Version.ToString() == version)
+                .Where(i => wholeBlueprint || i.BlueprintId.Version.ToString() == normalizedVersion)
                 .Select(i => i.BlueprintId)
                 .OrderBy(b => b)
                 .ToList();
@@ -82,7 +101,7 @@ internal class UnpublishCommand : CatalogReadCommand
                     "Dry run — nothing matches '{Name}{Version}' in catalog '{Catalog}'. " +
                     "(A just-published blueprint can take a moment to appear in the index.) " +
                     "Re-run with --force to remove it regardless of the index state",
-                    blueprintName, wholeBlueprint ? "" : $"-{version}", catalogName);
+                    blueprintName, wholeBlueprint ? "" : $"-{normalizedVersion}", catalogName);
                 return;
             }
 
@@ -108,9 +127,9 @@ internal class UnpublishCommand : CatalogReadCommand
         }
         else
         {
-            await CatalogManager.UnpublishAsync(catalogName, new BlueprintId(blueprintName, version!));
+            await CatalogManager.UnpublishAsync(catalogName, new BlueprintId(blueprintName, normalizedVersion!));
             Logger.LogInformation("Unpublished blueprint '{Name}-{Version}' from catalog '{Catalog}'",
-                blueprintName, version, catalogName);
+                blueprintName, normalizedVersion, catalogName);
         }
     }
 }

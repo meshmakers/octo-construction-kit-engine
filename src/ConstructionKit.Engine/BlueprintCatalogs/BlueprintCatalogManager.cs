@@ -316,9 +316,22 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     {
         foreach (var catalog in _catalogs)
         {
-            if (catalog.IsSupportingSourceIdentifier(sourceIdentifier))
+            // Mirror the read paths: a catalog that does not support this source or cannot be read is
+            // skipped, and a single catalog that fails to refresh (disabled, unreachable, misconfigured)
+            // must never abort the refresh — and therefore the read command — for the other catalogs.
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
+            {
+                continue;
+            }
+
+            try
             {
                 await catalog.RefreshCatalogAsync(sourceIdentifier, force).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to refresh catalog {CatalogName}; continuing with other catalogs",
+                    catalog.CatalogName);
             }
         }
     }

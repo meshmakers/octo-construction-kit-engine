@@ -143,6 +143,15 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
                 gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName,
                 gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
 
+            if (tree.Truncated)
+            {
+                // The Git Trees API silently truncates very large trees. A partial list would make callers
+                // (e.g. blueprint unpublish) delete only some files and leave orphans with no error, so fail
+                // loudly instead of returning a partial result.
+                throw new InvalidOperationException(
+                    $"GitHub returned a truncated tree for '{gitHubOptions.GitHubRepositoryName}'; cannot safely enumerate files under '{directoryPath}'.");
+            }
+
             return tree.Tree
                 .Where(item => item.Type == TreeType.Blob &&
                                item.Path.StartsWith(prefix, StringComparison.Ordinal))

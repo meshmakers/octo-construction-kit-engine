@@ -327,7 +327,7 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         }
         catch (ApiException e)
         {
-            throw BlueprintCatalogException.UnpublishFailed(new BlueprintId(blueprintName, "0.0.0"), CatalogName, e);
+            throw BlueprintCatalogException.UnpublishAllFailed(blueprintName, CatalogName, e);
         }
     }
 

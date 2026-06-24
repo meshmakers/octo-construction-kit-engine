@@ -73,7 +73,7 @@ internal class UnpublishCommand : CatalogReadCommand
             {
                 normalizedVersion = new CkVersion(version!).ToString();
             }
-            catch (ArgumentOutOfRangeException)
+            catch (Exception ex) when (ex is ArgumentOutOfRangeException or FormatException or OverflowException)
             {
                 Logger.LogError("Invalid version '{Version}'. Expected 'Major.Minor.Revision' (e.g. 1.2.3)", version);
                 return;

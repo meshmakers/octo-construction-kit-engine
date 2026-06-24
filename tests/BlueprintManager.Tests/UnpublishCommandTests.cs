@@ -105,13 +105,16 @@ public class UnpublishCommandTests
         Assert.DoesNotContain(logger.Messages, m => m.Contains("nothing matches"));
     }
 
-    [Fact]
-    public async Task Execute_InvalidVersion_LogsErrorAndDoesNotCallManager()
+    [Theory]
+    [InlineData("not-a-version")] // non-numeric major -> ArgumentOutOfRangeException
+    [InlineData("1.x")]           // non-numeric minor -> FormatException
+    [InlineData("1.2.99999999999")] // overflows Int32 -> OverflowException
+    public async Task Execute_InvalidVersion_LogsErrorAndDoesNotCallManager(string badVersion)
     {
         var manager = ManagerWith(("MyBlueprint", "1.0.0"));
         var logger = new CapturingLogger<UnpublishCommand>();
         var cmd = new UnpublishCommand(logger, Options.Create(new BpmToolOptions()), manager);
-        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "not-a-version", "-f"]);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", badVersion, "-f"]);
 
         await cmd.Execute();
 

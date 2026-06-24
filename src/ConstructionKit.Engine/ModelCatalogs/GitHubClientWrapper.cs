@@ -133,34 +133,41 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
 
     public async Task<IReadOnlyList<(string path, string sha)>> ListFilesRecursiveAsync(string directoryPath)
     {
-        var prefix = directoryPath.TrimEnd('/') + "/";
+        // Directory-scoped enumeration: walk the Contents API from the target directory down, instead of
+        // pulling the whole repository tree and filtering. This scales with the blueprint subtree rather
+        // than the repository, avoids the Git-Trees truncation cliff for large repos, and returns the blob
+        // SHA each file's DeleteFile call requires. A missing directory yields an empty list.
+        var files = new List<(string path, string sha)>();
+        await CollectFilesRecursiveAsync(directoryPath.TrimEnd('/'), files).ConfigureAwait(false);
+        return files;
+    }
 
+    private async Task CollectFilesRecursiveAsync(string directoryPath, List<(string path, string sha)> files)
+    {
+        IReadOnlyList<RepositoryContent> contents;
         try
         {
-            // One recursive tree read for the branch, then filter to blobs under the directory prefix.
-            // The blob SHA returned here is exactly what DeleteFile requires.
-            var tree = await _client.Git.Tree.GetRecursive(
-                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName,
+            contents = await _client.Repository.Content.GetAllContentsByRef(
+                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, directoryPath,
                 gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
-
-            if (tree.Truncated)
-            {
-                // The Git Trees API silently truncates very large trees. A partial list would make callers
-                // (e.g. blueprint unpublish) delete only some files and leave orphans with no error, so fail
-                // loudly instead of returning a partial result.
-                throw new InvalidOperationException(
-                    $"GitHub returned a truncated tree for '{gitHubOptions.GitHubRepositoryName}'; cannot safely enumerate files under '{directoryPath}'.");
-            }
-
-            return tree.Tree
-                .Where(item => item.Type == TreeType.Blob &&
-                               item.Path.StartsWith(prefix, StringComparison.Ordinal))
-                .Select(item => (item.Path, item.Sha))
-                .ToList();
         }
         catch (NotFoundException)
         {
-            return [];
+            return;
+        }
+
+        foreach (var item in contents)
+        {
+            switch (item.Type.Value)
+            {
+                case ContentType.File:
+                    files.Add((item.Path, item.Sha));
+                    break;
+                case ContentType.Dir:
+                    await CollectFilesRecursiveAsync(item.Path, files).ConfigureAwait(false);
+                    break;
+                // Symlinks / submodules are not part of a blueprint payload; ignore them.
+            }
         }
     }
 

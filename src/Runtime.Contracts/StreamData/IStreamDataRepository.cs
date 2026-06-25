@@ -100,6 +100,36 @@ public interface IStreamDataRepository
     Task<StreamDataQueryResult> ExecuteDownsamplingQueryAsync(
         OctoObjectId archiveRtId, StreamDataDownsamplingQueryOptions options);
 
+    // --- Bulk data export / import (AB#4230) --------------------------------------------------
+
+    /// <summary>
+    /// Streams the rows of the archive in a stable key order (keyset pagination on the natural
+    /// key) so the caller can serialise NDJSON without buffering the table. When
+    /// <paramref name="window"/> is non-null only rows whose <c>timestamp</c> (raw) or
+    /// <c>window_start</c> (windowed: rollup / time-range) fall in <c>[FromUtc, ToUtc)</c> are
+    /// emitted — the predicate rides on the already time-ordered keyset scan, so a windowed export
+    /// is no more expensive than a full one (and cheaper). Each row is yielded as a dictionary of
+    /// physical CrateDB column name → value (the standard columns plus the user columns). An archive
+    /// without a backing table (e.g. <c>Created</c>) yields no rows rather than throwing.
+    /// Archive data export/import concept (AB#4230) §4.1.
+    /// </summary>
+    IAsyncEnumerable<IReadOnlyDictionary<string, object?>> ExportRowsAsync(
+        OctoObjectId archiveRtId, TimeWindow? window, CancellationToken ct);
+
+    /// <summary>
+    /// Bulk-inserts pre-parsed archive rows (the inverse of <see cref="ExportRowsAsync"/>). Rows are
+    /// streamed in batches into the existing batched insert path (the single-timestamp insert for
+    /// raw archives, the <c>(window_start, window_end)</c> ON CONFLICT path for windowed archives).
+    /// <paramref name="mode"/> selects insert-only versus upsert semantics on the natural key. Each
+    /// row's <c>rtid</c> is validated as 24-char hex; a violation surfaces a per-field error rather
+    /// than a generic message. Archive data export/import concept (AB#4230) §4.1 / §7 / §10.
+    /// </summary>
+    Task ImportRowsAsync(
+        OctoObjectId archiveRtId,
+        IAsyncEnumerable<IReadOnlyDictionary<string, object?>> rows,
+        ArchiveImportMode mode,
+        CancellationToken ct);
+
     // --- Rollup data plane --------------------------------------------------------------------
 
     /// <summary>

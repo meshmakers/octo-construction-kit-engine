@@ -61,7 +61,7 @@ Required-args validation (`From`/`To`/`Limit` all mandatory) lives in `CrateDbSt
 | D7 | Resize | **Debounced (300 ms) re-query** with a new `limit` on width change. |
 | D8 | No time range (`from`/`to` missing) | **Raw fallback** (current behavior). Downsampling requires `from`/`to`/`limit`; without a time filter we do not downsample. |
 | D9 | `limit` sizing | `limit = clamp(round(widthPx / pxPerBin), 50, 4000)`, `pxPerBin ≈ 2`. |
-| D10 | Reducer SQL by type | numeric → `MIN`,`MAX`,`AVG`; string/enum/bool → **LAST** via `max_by(col, <time>)`; timestamp → the synthesized bin `"T"`. |
+| D10 | Reducer by type | numeric → `MIN`,`MAX`,`AVG` (envelope); string/enum/bool/temporal → **`MAX`** as a stable representative (exact for series-identifying columns that are constant within a `(bin, series)` group, e.g. `obisCode` — avoids the two-column-ref `max_by` d-prefix hazard); record/array/binary/geospatial → skipped; timestamp axis → the synthesized bin `"T"`. |
 | D11 | Empty bins | Unchanged: `__binCount = 0` → `NULL` per column; frontend already renders gaps. |
 | D12 | Windowed storage | Unchanged Phase-7 full-containment (straddling windows drop, not pro-rate). |
 
@@ -85,7 +85,15 @@ if (loaded is RtSimpleSdQuery simple
 
 ### 4.2 Synthesize per-type reducers + group by `rtId` (D2/D3/D4/D10)
 
-In `CrateDbStreamDataRepository.ExecuteDownsamplingQueryAsync` (or a sibling `ExecuteSimpleDownsamplingQueryAsync`): for each simple column, look up its `CrateColumnType` from the snapshot and add aggregation variable(s):
+**As built (2026-06-26): the per-type reducer synthesis lives in asset-repo, not the engine.**
+The GraphQL layer already knows each column's value type (`RtQueryColumnDto.AttributeValueType`
+on `StreamDataQueryDto.Columns` — `DOUBLE`/`STRING`/`ENUM`/…), whereas the engine's cheap field
+resolver does not (it would need a CK-type walk). So `StreamDataQueryDtoType` builds the reducer
+`AggregationColumn` set and passes it — plus `GroupByColumnPaths = [rtId]` — into the existing
+downsampling execution path. The engine stays thin: it only gained the `GroupByColumnPaths`
+option + the `WithDownsamplingGroupBy` query-builder primitive.
+
+Reducer choice per `AttributeValueTypesDto` (`StreamDataQueryDtoType.SynthesizeDownsamplingReducers`):
 
 | Value type | Reducer variable(s) | Resulting cell(s) |
 |---|---|---|
@@ -132,12 +140,13 @@ flowchart TB
 
 ## 7. Phasing (all under AB#4233)
 
-1. **BE-1** — `queryMode` overrides variant for `RtSimpleSdQuery` + transient `.simple` (D1).
-2. **BE-2** — simple-downsampling compile path: per-type reducers + `rtId` grouping + min/max envelope (D2–D4, D10).
-3. **FE-1** — width→limit + `queryMode` in line/bar/heatmap `buildStreamDataArgs()`, raw fallback (D5/D6/D8/D9).
-4. **FE-2** — debounced resize re-query (D7).
-5. **FE-3** — line-chart min/max envelope rendering (D3).
-6. **Docs** — `QueryModeDto.cs` XML doc; this concept; remove the "queryMode is ignored" caveat in `query-executor.service.ts` once D1 lands.
+- ✅ **Engine primitive** — `WithDownsamplingGroupBy` on the query builder + compiler per-series GROUP BY/ORDER BY (engine-mongodb `1150376`); `GroupByColumnPaths` option (engine `0f93da9`) wired through `ExecuteDownsamplingQueryAsync` (engine-mongodb `9fae4b2`). Unit tests cover the per-series shape + envelope.
+- ✅ **BE-1 (persistent)** — `StreamDataQueryDtoType`: `queryMode=DOWNSAMPLING` on `RtSimpleSdQuery` synthesizes per-type reducers (D2/D3/D10) + `GroupByColumnPaths=[rtId]` (D4) and routes to the downsampling variant; raw fallback without from/to/limit (D8).
+- ⏳ **BE-1 (transient)** — same override on the `streamData.transientStreamDataQuery.simple` sub-connection (`StreamDataTransientQuery`). Pending.
+- ⏳ **FE-1** — width→limit + `queryMode` in line/bar/heatmap `buildStreamDataArgs()`, raw fallback (D5/D6/D8/D9).
+- ⏳ **FE-2** — debounced resize re-query (D7).
+- ⏳ **FE-3** — line-chart min/max envelope rendering (D3).
+- ⏳ **Docs** — `QueryModeDto.cs` XML doc; remove the "queryMode is ignored" caveat in `query-executor.service.ts` now D1 has landed.
 
 ## 8. Out of scope
 

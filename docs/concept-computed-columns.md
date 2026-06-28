@@ -373,10 +373,15 @@ A `RollupArchive` may declare its own computed columns whose formula references 
 > - **Validation:** `ComputedColumnValidator` now runs for every archive shape (rollups included),
 >   resolving references against the aggregate columns' physical names + the computed names.
 >
-> **Status — evaluation pending (Phase 6 part 2):** the orchestrator bucket-write `.NET` pass
-> (approach **a**): after `AggregateBucketAsync`'s aggregate `INSERT`, read the just-written bucket
-> rows back (`StreamRawRowsAsync`), run `ApplyComputedColumns` over each, and `UPDATE` the computed
-> cells. Recompute / rewind of a bucket re-evaluates them via the same path (AB#4184).
+> **Status — evaluation done (Phase 6 part 2, approach a):** `AggregateBucketAsync` now runs a
+> `.NET` pass after the aggregate `INSERT` — `EvaluateRollupComputedColumnsAsync` loads the rollup's
+> archive snapshot, builds the same `BuildComputedPlan`, reads the just-written bucket rows back via
+> `StreamRawRowsAsync` (`RollupComputedColumnSqlBuilder.BuildSelect`), runs `ApplyComputedColumns`
+> over each, and `UPDATE`s the computed cells (`RollupComputedColumnSqlBuilder.BuildUpdate`).
+> Rollups without computed columns short-circuit (no read-back). The INSERT→SELECT→UPDATE steps are
+> not yet one transaction; a reader in the gap sees aggregates populated and computed columns still
+> NULL — the optimistic / atomic guarantee is AB#4184 (Phase 7). Recompute / rewind of a bucket
+> re-evaluates via the same path.
 
 ## §12 API surface
 

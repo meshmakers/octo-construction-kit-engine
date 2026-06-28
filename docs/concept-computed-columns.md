@@ -142,6 +142,13 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 
 ## §4 Storage layout
 
+> **Status: DDL implemented (Phase 2).** `ArchiveColumnDdl` gained an explicit `ColumnName`;
+> `ArchivePathTypeResolver` resolves computed columns (type from `ResultType`, name from `Name`
+> lower-cased via `ColumnNameMapper`, always nullable) and skips CK-type resolution for a
+> computed-only archive; `ArchiveDdlGenerator` emits them in both the raw and windowed
+> `CREATE TABLE`, and `GenerateAddColumn` provides the `ALTER TABLE … ADD COLUMN` statement for
+> Phase 7. Ingest-time evaluation is Phase 3.
+
 - Each computed column → one physical CrateDB column, **nullable**, typed from `ResultType`:
 
   | `ResultType` | CrateDB column type |

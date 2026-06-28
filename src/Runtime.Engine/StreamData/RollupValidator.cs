@@ -83,7 +83,9 @@ public static class RollupValidator
             {
                 if (!string.IsNullOrWhiteSpace(column.Name))
                 {
-                    sourcePaths.Add(column.Name);
+                    // Guarded above; null-forgiving keeps the netstandard2.0 target (whose
+                    // string.IsNullOrWhiteSpace lacks the [NotNullWhen] annotation) warning-clean.
+                    sourcePaths.Add(column.Name!);
                 }
             }
             else if (!string.IsNullOrWhiteSpace(column.Path))

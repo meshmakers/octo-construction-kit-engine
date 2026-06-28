@@ -82,6 +82,32 @@ public class CkTypeQueryColumnCollectorTests
         ], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }
 
+    [Fact]
+    public void RecordDescent_PreservesEnumIdOnNestedColumn()
+    {
+        CkModelGraph modelGraph = new();
+        modelGraph.AppendModel(Builder.Build());
+        modelGraph.AppendModel(sampleData.recordEnum.Builder.Build());
+        FixModelGraph(modelGraph);
+
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("TestRecordEnum/Demo1",
+            new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
+
+        // The nested enum column (amount.unit shape) must report ValueType=Enum AND carry the
+        // enum id so enum-name resolution can resolve it — record descent used to drop CkEnumId.
+        var unit = result.Single(x => x.Path == "amount.unit");
+        Assert.Equal(AttributeValueTypesDto.Enum, unit.ValueType);
+        Assert.NotNull(unit.CkEnumId);
+        Assert.Contains("UnitOfMeasure", unit.CkEnumId.ToString());
+
+        // The sibling non-enum nested column stays a plain value column with no enum id.
+        var value = result.Single(x => x.Path == "amount.value");
+        Assert.Equal(AttributeValueTypesDto.Double, value.ValueType);
+        Assert.Null(value.CkEnumId);
+    }
+
     private static CkModelGraph BuildResolvedModelGraph(params CkCompiledModelRoot[] models)
     {
         CkModelGraph modelGraph = new();

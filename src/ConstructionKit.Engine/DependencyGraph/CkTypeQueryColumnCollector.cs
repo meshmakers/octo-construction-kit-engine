@@ -242,8 +242,14 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     {
                         var l = c.AccessPathList.ToList();
                         l.Insert(0, new(attributeNamePascalCase, PathType.Attribute));
-                        return new CkTypeQueryColumn(attributeNameCamelCase + Separator + c.Path, l, c.ValueType,
-                            description: c.Description);
+                        var nestedPath = attributeNameCamelCase + Separator + c.Path;
+                        // Preserve the enum id through record descent so nested enum columns
+                        // (e.g. amount.unit) still report which CK enum to resolve against —
+                        // the generic constructor would drop CkEnumId and leave the column an
+                        // enum with no enum id, breaking enum-name resolution for nested paths.
+                        return c.CkEnumId != null
+                            ? new CkTypeQueryColumn(nestedPath, l, c.CkEnumId, c.Description)
+                            : new CkTypeQueryColumn(nestedPath, l, c.ValueType, description: c.Description);
                     }));
                     break;
                 case AttributeValueTypesDto.RecordArray:

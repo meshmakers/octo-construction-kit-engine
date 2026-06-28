@@ -1,7 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
   - recordId: CkArchiveColumn
-    description: "Single column definition inside a CkArchive: the attribute path to capture and whether it is required and indexed."
+    description: "Single column definition inside a CkArchive. Either an ingested column (Path set) or a computed column (Formula set): a formula referencing other columns of the same row by name, producing a typed value."
     attributes:
       - id: ${this}/CkArchiveColumn.Path
         name: Path
@@ -9,3 +9,11 @@ records:
         name: Required
       - id: ${this}/CkArchiveColumn.Indexed
         name: Indexed
+      - id: ${this}/CkArchiveColumn.Name
+        name: Name
+      - id: ${this}/CkArchiveColumn.Formula
+        name: Formula
+      - id: ${this}/CkArchiveColumn.ResultType
+        name: ResultType
+      - id: ${this}/CkArchiveColumn.ComputedState
+        name: ComputedState

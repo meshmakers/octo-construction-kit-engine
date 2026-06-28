@@ -1,0 +1,22 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkComputedColumnResultType
+    useFlags: false
+    isExtensible: false
+    description: "Declared output type a computed column's formula result is cast back to. The formula engine computes with double; booleans round-trip as 0/1 and DateTimes as ticks. String and non-scalar types are intentionally absent. Key values match the FormulaResultType code enum so the snapshot maps by a direct cast."
+    values:
+      - key: 0
+        name: Boolean
+        description: "Non-zero result is true. Stored as BOOLEAN."
+      - key: 1
+        name: Int
+        description: "Result truncated to a 32-bit integer. Stored as INTEGER."
+      - key: 2
+        name: Int64
+        description: "Result truncated to a 64-bit integer. Stored as BIGINT."
+      - key: 3
+        name: Double
+        description: "Stored as DOUBLE PRECISION."
+      - key: 4
+        name: DateTime
+        description: "Result interpreted as ticks. Stored as TIMESTAMP WITH TIME ZONE."

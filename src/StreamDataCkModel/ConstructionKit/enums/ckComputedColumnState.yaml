@@ -1,0 +1,19 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkComputedColumnState
+    useFlags: false
+    isExtensible: false
+    description: "Lifecycle state of a computed column on a CkArchive. Engine-managed (not set by the author): a computed column created together with its archive starts Active; one added to an already-active archive runs Pending -> Backfilling -> Active, or Failed if the backfill fails."
+    values:
+      - key: 0
+        name: Pending
+        description: "A backfill has been scheduled for this computed column but has not started yet. Consumers still see the previous archive state."
+      - key: 1
+        name: Backfilling
+        description: "The backfill is running. Consumers still see the previous archive state until it completes and is committed atomically."
+      - key: 2
+        name: Active
+        description: "The computed column is live: new rows include the value on ingest and readers see it."
+      - key: 3
+        name: Failed
+        description: "The backfill failed mid-run. The previous archive state is intact; consumers never see partial computed data."

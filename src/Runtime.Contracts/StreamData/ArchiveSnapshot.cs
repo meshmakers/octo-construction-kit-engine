@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Formulas;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
@@ -60,11 +61,44 @@ public sealed record ArchiveSnapshot(
 }
 
 /// <summary>
-/// Minimal projection of a <c>CkArchive.columns[]</c> entry — just enough for the data-store
-/// provider to resolve types via the CK model and generate DDL. The CK record carries more fields
-/// than this in some models, but the lifecycle service only cares about path / indexed / required.
+/// Minimal projection of a <c>CkArchive.columns[]</c> entry — enough for the data-store provider
+/// to resolve types via the CK model and generate DDL.
+/// <para>
+/// A column is either <em>ingested</em> (<see cref="Path"/> set, <see cref="Formula"/> null) or
+/// <em>computed</em> (<see cref="Formula"/> set, <see cref="Path"/> empty): a formula referencing
+/// other columns of the same row by name, producing a value of <see cref="ResultType"/>. Computed
+/// columns arrived with System.StreamData 1.5.0; on older models the computed fields are null.
+/// </para>
 /// </summary>
 public sealed record CkArchiveColumnSpec(
     string Path,
     bool Indexed,
-    bool Required);
+    bool Required)
+{
+    /// <summary>
+    /// Explicit output column name. For a computed column this is the formula-referenceable
+    /// identifier (required); for an ingested column it is optional and the name derives from
+    /// <see cref="Path"/>.
+    /// </summary>
+    public string? Name { get; init; }
+
+    /// <summary>
+    /// The formula when this is a computed column (mXparser dialect, see the Formula Expressions
+    /// reference). Null for ingested columns. Mutually exclusive with a non-empty <see cref="Path"/>.
+    /// </summary>
+    public string? Formula { get; init; }
+
+    /// <summary>
+    /// Declared output type the formula result is cast back to. Set for computed columns, null for
+    /// ingested columns.
+    /// </summary>
+    public FormulaResultType? ResultType { get; init; }
+
+    /// <summary>
+    /// Engine-managed lifecycle state of a computed column. Null for ingested columns.
+    /// </summary>
+    public ComputedColumnState? ComputedState { get; init; }
+
+    /// <summary>True when this is a computed column (has a <see cref="Formula"/>).</summary>
+    public bool IsComputed => !string.IsNullOrWhiteSpace(Formula);
+}

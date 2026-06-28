@@ -21,7 +21,7 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// its own dependents. A multi-level rollup-of-rollup chain therefore converges over successive
 /// ticks — the same eventual-consistency model the forward watermark orchestrator uses.
 /// </remarks>
-public sealed class RecomputeOrchestrator
+public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 {
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _archiveStore;

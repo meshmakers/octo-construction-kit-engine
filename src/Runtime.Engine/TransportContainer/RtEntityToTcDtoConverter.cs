@@ -42,6 +42,16 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
     {
         foreach (var ckTypeAttributeGraph in ckTypeWithAttributesGraph.AllAttributesByName.Values)
         {
+            // Bug #1458: runtime-state attributes (e.g. communication state timestamps,
+            // deployment/configuration status, sync counters, last-error fields) are volatile,
+            // per-tenant live state owned by services/operators at runtime. They must not be
+            // carried in an exported runtime model, otherwise a re-import would overwrite live
+            // state with stale exported values. Skip them on export.
+            if (ckTypeAttributeGraph.IsRuntimeState)
+            {
+                continue;
+            }
+
             if (!rtTypeWithAttributes.Attributes.TryGetValue(ckTypeAttributeGraph.AttributeName, out var value))
             {
                 continue;

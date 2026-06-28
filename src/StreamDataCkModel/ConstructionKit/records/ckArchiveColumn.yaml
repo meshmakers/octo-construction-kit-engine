@@ -11,9 +11,13 @@ records:
         name: Indexed
       - id: ${this}/CkArchiveColumn.Name
         name: Name
+        isOptional: true
       - id: ${this}/CkArchiveColumn.Formula
         name: Formula
+        isOptional: true
       - id: ${this}/CkArchiveColumn.ResultType
         name: ResultType
+        isOptional: true
       - id: ${this}/CkArchiveColumn.ComputedState
         name: ComputedState
+        isOptional: true

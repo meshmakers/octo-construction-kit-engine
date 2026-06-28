@@ -1,5 +1,6 @@
 using System;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Formulas;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 
@@ -122,5 +123,45 @@ public class RollupValidatorTests
 
         Assert.Throws<RollupAggregationsRequiredException>(
             () => RollupValidator.ValidateForActivation(rollup, Source(paths: "voltage")));
+    }
+
+    // ---- AB#4189: a rollup may aggregate a source computed column (by its Name) ----
+
+    private static ArchiveSnapshot SourceWithComputed() =>
+        new(
+            SourceRt, TargetType, CkArchiveStatus.Activated, null,
+            new[]
+            {
+                new CkArchiveColumnSpec("activePower", true, false),
+                new CkArchiveColumnSpec(string.Empty, Indexed: true, Required: false)
+                {
+                    Name = "powerFactor",
+                    Formula = "activepower / apparentpower",
+                    ResultType = FormulaResultType.Double,
+                },
+            });
+
+    [Fact]
+    public void ValidateForActivation_AggregatesSourceComputedColumn_DoesNotThrow()
+    {
+        var rollup = Rollup(aggregations: new[]
+        {
+            new CkRollupAggregationSpec("powerFactor", CkRollupFunction.Avg, null),
+        });
+
+        RollupValidator.ValidateForActivation(rollup, SourceWithComputed());
+    }
+
+    [Fact]
+    public void ValidateForActivation_UnknownComputedName_Throws()
+    {
+        var rollup = Rollup(aggregations: new[]
+        {
+            new CkRollupAggregationSpec("nonexistent", CkRollupFunction.Avg, null),
+        });
+
+        var ex = Assert.Throws<RollupSourcePathInvalidException>(
+            () => RollupValidator.ValidateForActivation(rollup, SourceWithComputed()));
+        Assert.Equal("nonexistent", ex.SourcePath);
     }
 }

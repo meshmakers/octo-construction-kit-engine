@@ -72,10 +72,24 @@ public static class RollupValidator
             throw new RollupSourceNotActivatedException(rollup.RtId, rollup.SourceArchiveRtId, source.Status);
         }
 
+        // A rollup aggregation references a source column by name: an ingested column by its Path,
+        // or a computed column by its Name (concept §10 / AB#4189). Both map to the same physical
+        // source column the rollup SQL aggregates over (ColumnNameMapper.PathToColumnName), so a
+        // rollup can aggregate a computed column exactly like a normal one.
         var sourcePaths = new HashSet<string>(StringComparer.Ordinal);
         foreach (var column in source.Columns)
         {
-            sourcePaths.Add(column.Path);
+            if (column.IsComputed)
+            {
+                if (!string.IsNullOrWhiteSpace(column.Name))
+                {
+                    sourcePaths.Add(column.Name);
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(column.Path))
+            {
+                sourcePaths.Add(column.Path);
+            }
         }
 
         foreach (var agg in rollup.Aggregations)

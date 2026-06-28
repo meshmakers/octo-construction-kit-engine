@@ -55,6 +55,34 @@ internal sealed class FormulaEngine : IFormulaEngine
     }
 
     /// <inheritdoc />
+    public FormulaSyntaxResult CheckSyntax(string expression, IReadOnlyCollection<string> argumentNames)
+    {
+        if (string.IsNullOrWhiteSpace(expression))
+        {
+            return new FormulaSyntaxResult(false, "Expression must not be empty.");
+        }
+
+        try
+        {
+            var normalized = ConvertTernaryToIf(expression);
+
+            var expr = new OctoExpression(normalized);
+            foreach (var name in argumentNames)
+            {
+                expr.addArguments(new Argument(name, 0d));
+            }
+
+            return expr.checkSyntax()
+                ? new FormulaSyntaxResult(true, NormalizedExpression: normalized)
+                : new FormulaSyntaxResult(false, expr.getErrorMessage(), NormalizedExpression: normalized);
+        }
+        catch (Exception ex)
+        {
+            return new FormulaSyntaxResult(false, ex.Message);
+        }
+    }
+
+    /// <inheritdoc />
     public double EvaluateRaw(string expression, IReadOnlyDictionary<string, double> arguments)
     {
         var expr = new OctoExpression(ConvertTernaryToIf(expression));

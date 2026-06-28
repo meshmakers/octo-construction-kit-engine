@@ -28,3 +28,17 @@ attributes:
     valueType: Boolean
     defaultValues:
       - true
+  - id: CkArchiveColumn.Name
+    description: "Explicit output column name. For a computed column this is the formula-referenceable identifier and is required; for an ingested column it is optional and the name is derived from Path."
+    valueType: String
+  - id: CkArchiveColumn.Formula
+    description: "When set, this is a computed column: an mXparser formula referencing one or more other columns of the same row by name (e.g. 'activePower / apparentPower'). Mutually exclusive with Path. See the Formula Expressions reference for the supported language."
+    valueType: String
+  - id: CkArchiveColumn.ResultType
+    description: "Declared output type a computed column's formula result is cast back to. Required for computed columns, null for ingested columns."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkComputedColumnResultType
+  - id: CkArchiveColumn.ComputedState
+    description: "Engine-managed lifecycle state of a computed column (Pending / Backfilling / Active / Failed). Null for ingested columns."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkComputedColumnState

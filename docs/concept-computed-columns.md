@@ -88,7 +88,22 @@ is written (§11).
 
 ## §3 CK Model changes (`System.StreamData`)
 
-The `CkArchiveColumn` record (today: `Path`, `Required`, `Indexed`) is extended so a column
+> **Status: implemented in System.StreamData 1.5.0 (Phase 1).** Additive bump (no migration
+> script — the engine's no-migrations bridge synthesises the path). The descriptor version flows
+> automatically through the generated `SystemStreamDataCkIds.CkModelId`, so every host promotes to
+> 1.5.0 on the next tenant resolve. The snapshot (`CkArchiveColumnSpec` + the new
+> `ComputedColumnState` contracts enum) and the Mongo mapping (`MongoArchiveRuntimeStore.MapColumnSpecs`)
+> carry the fields through; DDL / ingest consumption follows in Phase 2 / 3.
+>
+> **Two implementation details worth knowing:**
+> - `CkComputedColumnResultType` key values are **aligned with the `FormulaResultType` code enum**
+>   (`Boolean=0, Int=1, Int64=2, Double=3, DateTime=4`) so the snapshot maps by a direct cast.
+> - The generated runtime enum properties are **non-nullable**, so `ResultType` / `ComputedState`
+>   cannot be "null" on the runtime record. **`Formula` (a nullable string) is the authoritative
+>   computed-vs-ingested discriminator** (`IsComputed => Formula is not null`); the spec only
+>   surfaces `ResultType` / `ComputedState` when the column is computed.
+
+The `CkArchiveColumn` record (was: `Path`, `Required`, `Indexed`) is extended so a column
 can be a computed column. A computed column has **no source attribute path**; it has an
 output name and a formula.
 

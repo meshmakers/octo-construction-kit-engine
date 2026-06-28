@@ -299,6 +299,19 @@ ComputedState = Failed  +  drop the new physical column → readers never saw pa
 
 ## §9 Validation
 
+> **Status: implemented (Phase 4).** `ComputedColumnValidator.Validate` (in the CrateDB layer,
+> where `ColumnNameMapper` lives) runs at activation — `CrateDbStreamDataRepository.EnsureArchiveCreatedAsync`
+> calls it before provisioning, for raw / time-range archives (rollups are Phase 6). It throws
+> `ComputedColumnInvalidException` (a `StreamDataException`, so it surfaces as a stable GraphQL error
+> code) on: `Path` + `Formula` together, a `Required` computed column, a missing `Name` / `ResultType`,
+> a syntactically invalid formula or one referencing an unknown column, or a cyclic reference between
+> computed columns. Syntax + reference resolution use a new **`IFormulaEngine.CheckSyntax`** primitive
+> that validates *without evaluating* — so a formula that merely divides by zero at probe values is
+> not a false-positive (unlike `Validate`). References resolve against **physical** column names (§5).
+>
+> *Deferred (UX surface, not correctness):* a GraphQL operand-enumeration query for the Studio picker
+> and an optional user-facing logical→physical name translation at create time.
+
 On create / edit of a computed column (reusing the shared validator from §7, which already
 does `checkSyntax()` + NaN test-eval):
 

@@ -173,4 +173,42 @@ public class FormulaEngineTests
         var result = _engine.Validate("(value + 1", Args(("value", 42.0)));
         Assert.False(result.IsValid);
     }
+
+    // ---- CheckSyntax (no evaluation) --------------------------------------
+
+    [Fact]
+    public void CheckSyntax_ValidReferences_IsValid()
+    {
+        var result = _engine.CheckSyntax("a / b", new[] { "a", "b" });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void CheckSyntax_DoesNotEvaluate_NoNaNFalsePositive()
+    {
+        // 'a / (b - b)' is a division by zero at runtime, but syntactically valid — CheckSyntax must
+        // not reject it (unlike Validate, which evaluates and would see NaN).
+        var result = _engine.CheckSyntax("a / (b - b)", new[] { "a", "b" });
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void CheckSyntax_UnknownReference_IsInvalid()
+    {
+        var result = _engine.CheckSyntax("a / c", new[] { "a" });
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CheckSyntax_SyntaxError_IsInvalid()
+    {
+        var result = _engine.CheckSyntax("(a + ", new[] { "a" });
+        Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void CheckSyntax_Empty_IsInvalid()
+    {
+        Assert.False(_engine.CheckSyntax("  ", Array.Empty<string>()).IsValid);
+    }
 }

@@ -26,6 +26,15 @@ public interface IFormulaEngine
     FormulaSyntaxResult Validate(string expression, IReadOnlyDictionary<string, double> arguments);
 
     /// <summary>
+    /// Checks an expression's syntax and that every referenced name is in
+    /// <paramref name="argumentNames"/> — <b>without evaluating it</b>. Unlike <see cref="Validate"/>
+    /// this never fails for a finite-but-undefined-at-probe-values result (e.g. a division that is
+    /// zero only for the dummy values). Use for schema-time validation where only syntax and
+    /// reference resolution matter.
+    /// </summary>
+    FormulaSyntaxResult CheckSyntax(string expression, IReadOnlyCollection<string> argumentNames);
+
+    /// <summary>
     /// Evaluates the expression to a raw <see cref="double"/>. Returns <see cref="double.NaN"/> on
     /// evaluation failure; <see cref="double.NegativeInfinity"/> is the engine's <c>null</c> sentinel.
     /// </summary>

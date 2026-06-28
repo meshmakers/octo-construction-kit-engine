@@ -95,3 +95,22 @@ public sealed class ArchiveActivationFailedException : StreamDataException
     public ArchiveActivationFailedException(OctoObjectId archiveRtId, Exception inner)
         : base($"Activation of archive '{archiveRtId}' failed: {inner.Message}", archiveRtId, inner) { }
 }
+
+/// <summary>
+/// A computed column on the archive is invalid: a malformed formula (syntax error / unknown
+/// referenced column), a cyclic reference between computed columns, a missing <c>Name</c> or
+/// <c>ResultType</c>, or a column that sets both <c>Path</c> and <c>Formula</c> (or marks a computed
+/// column <c>Required</c>). Computed columns must be nullable and reference only existing columns of
+/// the same archive.
+/// </summary>
+public sealed class ComputedColumnInvalidException : StreamDataException
+{
+    /// <summary>The computed column's name (when known).</summary>
+    public string? ColumnName { get; }
+
+    public ComputedColumnInvalidException(OctoObjectId archiveRtId, string? columnName, string message)
+        : base($"Archive '{archiveRtId}' computed column '{columnName ?? "(unnamed)"}' is invalid: {message}", archiveRtId)
+    {
+        ColumnName = columnName;
+    }
+}

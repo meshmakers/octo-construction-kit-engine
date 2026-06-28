@@ -172,6 +172,23 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 
 ## §5 Ingest-time evaluation
 
+> **Status: implemented (Phase 3).** `CrateDbStreamDataRepository` takes `IFormulaEngine` and
+> evaluates computed columns on every ingest path (single / batch / time-range) via
+> `BuildComputedPlan` → `ApplyComputedColumns`, writing the result into the row under the computed
+> column's physical name. Per-row failures (exception / NaN / null sentinel) store `NULL` and log a
+> warning — the insert never fails. Plan building topologically sorts computed-vs-computed
+> dependencies (`TopologicalSort`); the common no-computed-column archive pays nothing (empty plan).
+>
+> **Binding-name decision (important):** a formula binds to columns by their **physical CrateDB
+> column name** — the lower-cased, dot-stripped form `ColumnNameMapper.PathToColumnName` produces
+> (e.g. CK path `ActivePower` → `activepower`). The row dictionary is already keyed this way, so
+> binding is direct and deterministic. Only columns with a numeric reading (number, bool→0/1,
+> DateTime→ticks, numeric string) are bound; a formula referencing a non-numeric / absent column
+> yields NaN → `NULL`. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
+> timestamp-derived computed column (#4190) would add `timestamp` to the argument set later.
+> Translating user-facing **logical** names → physical names at create time is **Phase 4** (the
+> stored formula already uses physical names by then).
+
 In `CrateDbStreamDataRepository.InsertAsync` / `InsertTimeRangeAsync`, after the producer's
 attributes are flattened into the per-row column dictionary and before the INSERT:
 

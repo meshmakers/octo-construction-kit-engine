@@ -52,4 +52,29 @@ public interface IArchiveAuditTrail
         OctoObjectId rollupRtId,
         DateTime frozenUntil,
         string? reason);
+
+    /// <summary>
+    /// Records a successfully committed recompute of an archive over a bucket-aligned range
+    /// (AB#4184). Emitted by the recompute orchestrator after the atomic swap. Concept §7.
+    /// </summary>
+    Task RecordRecomputeRunAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        int rowsProcessed,
+        int windowsProcessed,
+        TimeSpan elapsed);
+
+    /// <summary>
+    /// Records a failed recompute of an archive over a range (AB#4184). <paramref name="reason"/>
+    /// carries the failure message so a failed run is debuggable. The previous committed state is
+    /// left intact. Concept §7.
+    /// </summary>
+    Task RecordRecomputeFailureAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        string reason);
 }

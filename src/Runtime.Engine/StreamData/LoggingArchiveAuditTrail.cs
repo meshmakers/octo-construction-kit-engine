@@ -88,4 +88,34 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
         }
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task RecordRecomputeRunAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        int rowsProcessed,
+        int windowsProcessed,
+        TimeSpan elapsed)
+    {
+        _logger.LogInformation(
+            "Archive {ArchiveRtId} (tenant {TenantId}) recomputed range [{RangeStart:O}, {RangeEnd:O}): {WindowsProcessed} windows / {RowsProcessed} rows in {ElapsedMs}ms",
+            archiveRtId, tenantId, rangeStart, rangeEnd, windowsProcessed, rowsProcessed, elapsed.TotalMilliseconds);
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task RecordRecomputeFailureAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        string reason)
+    {
+        _logger.LogWarning(
+            "Archive {ArchiveRtId} (tenant {TenantId}) recompute of range [{RangeStart:O}, {RangeEnd:O}) failed: {Reason}",
+            archiveRtId, tenantId, rangeStart, rangeEnd, reason);
+        return Task.CompletedTask;
+    }
 }

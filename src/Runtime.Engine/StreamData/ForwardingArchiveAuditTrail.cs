@@ -122,4 +122,63 @@ public sealed class ForwardingArchiveAuditTrail : IArchiveAuditTrail
             }
         });
     }
+
+    /// <inheritdoc />
+    public Task RecordRecomputeRunAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        int rowsProcessed,
+        int windowsProcessed,
+        TimeSpan elapsed)
+    {
+        var message =
+            $"Archive {archiveRtId} recomputed range [{rangeStart:O}, {rangeEnd:O}): " +
+            $"{windowsProcessed} windows / {rowsProcessed} rows in {elapsed.TotalMilliseconds:F0}ms.";
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Information,
+            "Archive.Recompute",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["archiveRtId"] = archiveRtId.ToString(),
+                ["rangeStart"] = rangeStart,
+                ["rangeEnd"] = rangeEnd,
+                ["rowsProcessed"] = rowsProcessed,
+                ["windowsProcessed"] = windowsProcessed,
+                ["elapsedMs"] = elapsed.TotalMilliseconds,
+            }
+        });
+    }
+
+    /// <inheritdoc />
+    public Task RecordRecomputeFailureAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime rangeStart,
+        DateTime rangeEnd,
+        string reason)
+    {
+        var message =
+            $"Archive {archiveRtId} recompute of range [{rangeStart:O}, {rangeEnd:O}) failed: {reason}";
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Warning,
+            "Archive.RecomputeFailure",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["archiveRtId"] = archiveRtId.ToString(),
+                ["rangeStart"] = rangeStart,
+                ["rangeEnd"] = rangeEnd,
+                ["reason"] = reason,
+            }
+        });
+    }
 }

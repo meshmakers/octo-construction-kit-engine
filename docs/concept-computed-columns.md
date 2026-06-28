@@ -200,21 +200,32 @@ Because both operands and result span boolean / integer / double / DateTime (eve
 round-trips through a `double` — booleans as 0/1, DateTimes as ticks), the only CK primitive a
 computed column cannot read or produce is `String`.
 
-## §7 Shared evaluator / validator (refactor)
+## §7 Shared formula engine (refactor — **done**, Phase 0)
 
-Today the mXparser glue is split and partly duplicated:
-- `Runtime.Engine.MongoDb/Formulas/OctoExpression.cs` — the engine (+ `NowFunction`, `StartOfDayFunction`).
+The mXparser glue used to be split and partly duplicated:
+- `Runtime.Engine.MongoDb/Formulas/OctoExpression.cs` — the engine (+ `NowFunction`, `StartOfDayFunction`),
+  living in the **MongoDB** assembly only because `FieldFilterResolver` was its first consumer.
 - `ApplyDataPointMappingsNode` (mesh-adapter) and `ExpressionValidationService` (communication
-  controller) each carry their **own copy** of `ConvertTernaryToIf` + null/NaN handling.
+  controller) each carried their **own copy** of `ConvertTernaryToIf` + null/NaN handling.
 
-AB#4189 consolidates this into a single reusable surface so the asset-repo GraphQL layer can
-validate formulas without taking a direct mXparser dependency:
+AB#4189 consolidated this into a single reusable surface so any layer (incl. the asset-repo
+GraphQL layer) can evaluate / validate formulas without a direct mXparser dependency:
 
-- `IFormulaEvaluator` / `IFormulaValidator` (contracts) with one implementation in
-  `Runtime.Engine.MongoDb.Formulas` wrapping `OctoExpression`.
-- Move `ConvertTernaryToIf` into that implementation; the adapter node and the communication
-  controller's `ExpressionValidationService` become thin callers of the shared code
-  (removing the duplication).
+- **`IFormulaEngine`** + `FormulaResultType` + `FormulaSyntaxResult` in `Runtime.Contracts/Formulas`
+  (no mXparser dependency). One method set: `NormalizeTernary`, `Validate(expression, arguments)`,
+  `EvaluateRaw(expression, arguments)`, `Evaluate(expression, arguments, resultType)` (the cast-back
+  ladder of §5/§6).
+- **New project `Runtime.Engine.Formulas`** (net10.0, `PackageId
+  Meshmakers.Octo.Runtime.Engine.Formulas`) holds `OctoExpression` + the `internal` mXparser
+  function extensions + the `FormulaEngine` implementation + the `AddFormulaEngine()` DI extension.
+  It is a **dedicated net10.0 package** rather than part of `Runtime.Engine` because mXparser ships
+  `netstandard2.1` but **not** `netstandard2.0`, and `Runtime.Engine` must keep its `netstandard2.0`
+  target for the compiler / source-generation tooling.
+- `OctoExpression` moved out of the MongoDB assembly; `FieldFilterResolver` / `RtFieldFilterResolver`
+  now reference the new package. `ConvertTernaryToIf` lives in `FormulaEngine` only; the adapter node
+  and the communication controller's `ExpressionValidationService` are thin callers of `IFormulaEngine`
+  (duplication removed). `AddFormulaEngine()` is invoked from `AddMongoDbRuntimeRepository()`, so every
+  host that wires the runtime engine gets `IFormulaEngine` registered.
 
 ## §8 Active-archive lifecycle & backfill (builds on AB#4184)
 

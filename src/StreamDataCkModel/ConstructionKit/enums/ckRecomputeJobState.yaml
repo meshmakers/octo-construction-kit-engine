@@ -1,0 +1,25 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkRecomputeJobState
+    useFlags: false
+    isExtensible: false
+    description: "Lifecycle state of a single archive recompute run (AB#4184). Engine-managed. A job computes into a staging table (Running), commits via SWAP TABLE / generation-pointer flip (Swapping), then Completed; Failed leaves the previous archive state intact; Coalesced marks a trigger merged into an already-active job for the same archive."
+    values:
+      - key: 0
+        name: Pending
+        description: "The job is scheduled but compute has not started yet."
+      - key: 1
+        name: Running
+        description: "Recomputed buckets are being written into the per-job staging table. Readers still see the previous state."
+      - key: 2
+        name: Swapping
+        description: "Staging is complete and the atomic commit (full-archive SWAP TABLE or per-window generation-pointer flip) is in progress."
+      - key: 3
+        name: Completed
+        description: "The recompute committed atomically; readers now see the new values."
+      - key: 4
+        name: Failed
+        description: "The job failed before committing. Staging is discarded; the previous archive state is intact and consumers never saw a partial result."
+      - key: 5
+        name: Coalesced
+        description: "The triggering request was merged into an already-active job for the same archive (its range was folded into that job)."

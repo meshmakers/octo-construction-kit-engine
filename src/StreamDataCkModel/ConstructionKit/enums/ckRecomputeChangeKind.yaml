@@ -1,0 +1,13 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkRecomputeChangeKind
+    useFlags: false
+    isExtensible: false
+    description: "How a write touched an archive window, used to drive recompute of derived archives (AB#4184). Append is a normal forward write past the consumed high-water mark; RetroactiveModify is a correction / late value / re-ingest into an already-consumed window and is what marks dependents dirty."
+    values:
+      - key: 0
+        name: Append
+        description: "A forward write at or after the high-water mark already consumed by dependents. Does not, by itself, make a dependent stale."
+      - key: 1
+        name: RetroactiveModify
+        description: "A write into a window at or before the consumed high-water mark (correction, late value, re-ingest). Marks the covering window dirty so dependents are recomputed."

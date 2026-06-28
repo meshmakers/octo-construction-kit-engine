@@ -1,0 +1,42 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: RecomputeJob
+    description: "Persistent history record of a single archive recompute run (AB#4184). Kept as its own entity (not embedded on the archive) so the job history is queryable via recomputeJobsFor(archiveRtId) and prunable independently of the archive document. Captures enough context — state, trigger, range, scope, counts, timings, error reason, staging table — to debug a failed recompute after the fact."
+    derivedFromCkTypeId: ${System}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/RecomputeJob.ArchiveRtId
+        name: ArchiveRtId
+      - id: ${this}/RecomputeJob.State
+        name: State
+      - id: ${this}/RecomputeJob.Trigger
+        name: Trigger
+      - id: ${this}/RecomputeJob.RangeStart
+        name: RangeStart
+      - id: ${this}/RecomputeJob.RangeEnd
+        name: RangeEnd
+      - id: ${this}/RecomputeJob.RtIdScope
+        name: RtIdScope
+        isOptional: true
+      - id: ${this}/RecomputeJob.RowsProcessed
+        name: RowsProcessed
+        isOptional: true
+      - id: ${this}/RecomputeJob.WindowsProcessed
+        name: WindowsProcessed
+        isOptional: true
+      - id: ${this}/RecomputeJob.StartedAt
+        name: StartedAt
+        isOptional: true
+      - id: ${this}/RecomputeJob.FinishedAt
+        name: FinishedAt
+        isOptional: true
+      - id: ${this}/RecomputeJob.DurationMs
+        name: DurationMs
+        isOptional: true
+      - id: ${this}/RecomputeJob.ErrorReason
+        name: ErrorReason
+        isOptional: true
+      - id: ${this}/RecomputeJob.StagingTableName
+        name: StagingTableName
+        isOptional: true

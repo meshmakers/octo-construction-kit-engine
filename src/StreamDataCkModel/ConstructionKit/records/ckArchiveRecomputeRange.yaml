@@ -1,0 +1,15 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+  - recordId: CkArchiveRecomputeRange
+    description: "Information B of the recompute model (AB#4184): one pending recompute obligation, derived by propagating a dirty window through the rollup dependency graph. Identifies a dependent archive and the bucket-aligned range to recompute, optionally scoped to a single rtId. Held on the source archive's ledger until the recompute orchestrator picks it up."
+    attributes:
+      - id: ${this}/CkArchiveRecomputeRange.DependentArchiveRtId
+        name: DependentArchiveRtId
+      - id: ${this}/CkArchiveRecomputeRange.RangeStart
+        name: RangeStart
+      - id: ${this}/CkArchiveRecomputeRange.RangeEnd
+        name: RangeEnd
+      - id: ${this}/CkArchiveRecomputeRange.RtIdScope
+        name: RtIdScope
+      - id: ${this}/CkArchiveRecomputeRange.EnqueuedAt
+        name: EnqueuedAt

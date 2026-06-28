@@ -1,0 +1,16 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkRecomputeTrigger
+    useFlags: false
+    isExtensible: false
+    description: "What initiated an archive recompute run (AB#4184), recorded on each job for observability."
+    values:
+      - key: 0
+        name: Manual
+        description: "An operator forced the recompute via API / admin UI / octo-cli."
+      - key: 1
+        name: Periodic
+        description: "The recompute orchestrator picked up dirty windows on its scheduled tick."
+      - key: 2
+        name: ChainPropagation
+        description: "A successful recompute of an upstream archive marked this archive dirty and propagated downstream."

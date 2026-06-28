@@ -353,19 +353,30 @@ is AB#4184's job (the rollup's watermark range is recomputed downstream).
 ## §11 Rollup-internal computed columns (D2 — in scope)
 
 A `RollupArchive` may declare its own computed columns whose formula references the rollup's
-**aggregated output columns** (e.g. `powerFactor = activeAvg / apparentAvg`).
+**aggregated output columns** by their **physical name** (e.g.
+`(active_avg_sum / active_avg_count) / (apparent_avg_sum / apparent_avg_count)`).
 
-- The rollup's `Columns[]` is generated from `Aggregations[]` by `RollupColumnGenerator`. We
-  extend it to append the declared computed columns **after** the aggregation columns.
-- Evaluation happens in the orchestrator's bucket-write path: after the aggregates for a
-  bucket are computed, the rollup-internal formulas are evaluated in .NET over the aggregated
-  values, then included in the bucket INSERT.
-- **Avg operand subtlety.** `Avg` is stored as `{base}_sum` + `{base}_count` and read as
-  `sum/count`. A rollup-internal formula referencing an avg column binds to the **logical**
-  avg value (`sum/count`), not the raw storage columns — consistent with how
-  `RollupLogicalPathResolver` already reverses storage names to logical paths.
-- Recompute / rewind of a bucket re-evaluates the rollup-internal formulas atomically with the
-  aggregates (AB#4184).
+> **Decision — physical-name model (consistent with §5).** Rollup-internal formulas reference the
+> aggregate output columns by their **physical** storage name (`active_avg_sum`, `total_sum`, …),
+> exactly like raw computed columns reference physical ingested columns. This lets the whole
+> rollup-internal path **reuse** the raw machinery unchanged — `ComputedColumnValidator` (the
+> aggregate columns' Paths are already the physical names), `BuildComputedPlan` / `ApplyComputedColumns`
+> for evaluation, and the same `TryToDouble` binding. The ergonomic `Avg` shorthand
+> (`activeAvg` ⇒ `sum/count`) is deferred as a UX nicety alongside the §5 logical→physical
+> translation; for now the author writes the `sum`/`count` arithmetic explicitly.
+>
+> **Status — declaration done (Phase 6 part 1):**
+> - **Snapshot:** `MongoArchiveRuntimeStore` appends a rollup's stored computed columns to the
+>   generated aggregate columns.
+> - **DDL:** `RollupColumnTypeResolver` types a rollup computed column from its `ResultType` (shared
+>   `ComputedColumnDdl.Build`, also used by the raw resolver), nullable.
+> - **Validation:** `ComputedColumnValidator` now runs for every archive shape (rollups included),
+>   resolving references against the aggregate columns' physical names + the computed names.
+>
+> **Status — evaluation pending (Phase 6 part 2):** the orchestrator bucket-write `.NET` pass
+> (approach **a**): after `AggregateBucketAsync`'s aggregate `INSERT`, read the just-written bucket
+> rows back (`StreamRawRowsAsync`), run `ApplyComputedColumns` over each, and `UPDATE` the computed
+> cells. Recompute / rewind of a bucket re-evaluates them via the same path (AB#4184).
 
 ## §12 API surface
 

@@ -1,0 +1,116 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  # ---------- Archive base: recompute dirty-tracking + observability (AB#4184) ----------------
+  # All marked isRuntimeState so a blueprint re-apply never resets the engine-owned recompute
+  # state (see octo-construction-kit-engine/CLAUDE.md — runtime-state preservation).
+  - id: Archive.DirtyWindows
+    description: "Information A: windows on this archive whose data changed retroactively and that still need to propagate into dependent recomputes. Maintained by the storage layer on retroactive writes and cleared once consumed. Empty in the steady state."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkArchiveDirtyWindow
+    isRuntimeState: true
+  - id: Archive.PendingRecomputeRanges
+    description: "Information B: the recompute work list for this archive's dependents, derived by propagating DirtyWindows through the rollup dependency graph. Consumed by the recompute orchestrator. Empty in the steady state."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkArchiveRecomputeRange
+    isRuntimeState: true
+  - id: Archive.RecomputeInProgress
+    description: "True while a recompute job for this archive is running or swapping. Lets readers show a soft 'recompute in progress' hint without being required to. Engine-maintained."
+    valueType: Boolean
+    defaultValues:
+      - false
+    isRuntimeState: true
+  - id: Archive.LastRecomputeStartedAt
+    description: "Start timestamp of the most recent recompute run. Null before the first run. Engine-maintained."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: Archive.LastRecomputeSuccessAt
+    description: "Finish timestamp of the most recent successfully committed recompute run. Null before the first success. Engine-maintained."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: Archive.LastRecomputeFailureAt
+    description: "Timestamp of the most recent failed recompute run. Null if the last run succeeded. Engine-maintained."
+    valueType: DateTime
+    isRuntimeState: true
+  - id: Archive.LastRecomputeFailureReason
+    description: "Human-readable reason for the most recent recompute failure, for debugging. Null if the last run succeeded. Engine-maintained."
+    valueType: String
+    isRuntimeState: true
+
+  # ---------- CkArchiveDirtyWindow members ----------------------------------------------------
+  - id: CkArchiveDirtyWindow.WindowStart
+    description: "Inclusive start of the changed window (UTC)."
+    valueType: DateTime
+  - id: CkArchiveDirtyWindow.WindowEnd
+    description: "Exclusive end of the changed window (UTC)."
+    valueType: DateTime
+  - id: CkArchiveDirtyWindow.ChangeKind
+    description: "Whether the change was a forward Append or a RetroactiveModify (only the latter makes dependents dirty)."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkRecomputeChangeKind
+  - id: CkArchiveDirtyWindow.Source
+    description: "Through which path the change arrived (Manual / Pipeline / Import)."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkRecomputeChangeSource
+  - id: CkArchiveDirtyWindow.DetectedAt
+    description: "When the storage layer detected and recorded the change (UTC)."
+    valueType: DateTime
+
+  # ---------- CkArchiveRecomputeRange members -------------------------------------------------
+  - id: CkArchiveRecomputeRange.DependentArchiveRtId
+    description: "Runtime id of the dependent archive that must be recomputed for this range."
+    valueType: String
+  - id: CkArchiveRecomputeRange.RangeStart
+    description: "Inclusive, bucket-aligned start of the range to recompute on the dependent (UTC)."
+    valueType: DateTime
+  - id: CkArchiveRecomputeRange.RangeEnd
+    description: "Exclusive, bucket-aligned end of the range to recompute on the dependent (UTC)."
+    valueType: DateTime
+  - id: CkArchiveRecomputeRange.RtIdScope
+    description: "Optional single rtId (metering point / stream) the recompute is restricted to. Null means all rtIds in the range."
+    valueType: String
+  - id: CkArchiveRecomputeRange.EnqueuedAt
+    description: "When this obligation was enqueued (UTC)."
+    valueType: DateTime
+
+  # ---------- RecomputeJob members ------------------------------------------------------------
+  - id: RecomputeJob.ArchiveRtId
+    description: "Runtime id of the archive this job recomputed. Back-reference used by recomputeJobsFor(archiveRtId)."
+    valueType: String
+  - id: RecomputeJob.State
+    description: "Current lifecycle state of the job."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkRecomputeJobState
+  - id: RecomputeJob.Trigger
+    description: "What initiated the job (Manual / Periodic / ChainPropagation)."
+    valueType: Enum
+    valueCkEnumId: ${this}/CkRecomputeTrigger
+  - id: RecomputeJob.RangeStart
+    description: "Inclusive start of the recomputed range (UTC)."
+    valueType: DateTime
+  - id: RecomputeJob.RangeEnd
+    description: "Exclusive end of the recomputed range (UTC)."
+    valueType: DateTime
+  - id: RecomputeJob.RtIdScope
+    description: "Optional single rtId the job was scoped to. Null means all rtIds in the range."
+    valueType: String
+  - id: RecomputeJob.RowsProcessed
+    description: "Number of rows written into the staging table during compute."
+    valueType: Int
+  - id: RecomputeJob.WindowsProcessed
+    description: "Number of buckets / windows recomputed."
+    valueType: Int
+  - id: RecomputeJob.StartedAt
+    description: "When compute started (UTC)."
+    valueType: DateTime
+  - id: RecomputeJob.FinishedAt
+    description: "When the job reached a terminal state (Completed / Failed / Coalesced) (UTC). Null while running."
+    valueType: DateTime
+  - id: RecomputeJob.DurationMs
+    description: "Wall-clock duration from StartedAt to FinishedAt in milliseconds. Null while running."
+    valueType: Int
+  - id: RecomputeJob.ErrorReason
+    description: "Failure reason when State is Failed; null otherwise."
+    valueType: String
+  - id: RecomputeJob.StagingTableName
+    description: "Name of the per-job CrateDB staging table used for the compute, for post-mortem inspection. Null once swept."
+    valueType: String

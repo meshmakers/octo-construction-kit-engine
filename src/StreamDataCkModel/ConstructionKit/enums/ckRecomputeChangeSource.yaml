@@ -1,0 +1,16 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkRecomputeChangeSource
+    useFlags: false
+    isExtensible: false
+    description: "Through which path a retroactive archive change arrived (AB#4184). Kept separately from CkRecomputeChangeKind so the audit trail can distinguish a manual operator edit from an automated pipeline re-ingest or a bulk import."
+    values:
+      - key: 0
+        name: Manual
+        description: "An operator changed the data directly (manual correction)."
+      - key: 1
+        name: Pipeline
+        description: "A mesh-adapter pipeline re-ingested or corrected the data (e.g. a corrected DATEN_CRMSG from EDA)."
+      - key: 2
+        name: Import
+        description: "A bulk archive-data import wrote the change."

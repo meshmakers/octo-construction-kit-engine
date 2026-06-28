@@ -1,0 +1,15 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+  - recordId: CkArchiveDirtyWindow
+    description: "Information A of the recompute model (AB#4184): a window on a source archive whose data changed retroactively. Holds the affected half-open interval plus how (ChangeKind) and through which path (Source) the change arrived. Consumed and cleared by the recompute orchestrator once the covered range has been recomputed for all dependents."
+    attributes:
+      - id: ${this}/CkArchiveDirtyWindow.WindowStart
+        name: WindowStart
+      - id: ${this}/CkArchiveDirtyWindow.WindowEnd
+        name: WindowEnd
+      - id: ${this}/CkArchiveDirtyWindow.ChangeKind
+        name: ChangeKind
+      - id: ${this}/CkArchiveDirtyWindow.Source
+        name: Source
+      - id: ${this}/CkArchiveDirtyWindow.DetectedAt
+        name: DetectedAt

@@ -15,3 +15,24 @@ types:
       - id: ${this}/Archive.RawRetentionMs
         name: RawRetentionMs
         isOptional: true
+      # ---------- Recompute dirty-tracking + observability (AB#4184) ----------
+      - id: ${this}/Archive.DirtyWindows
+        name: DirtyWindows
+        isOptional: true
+      - id: ${this}/Archive.PendingRecomputeRanges
+        name: PendingRecomputeRanges
+        isOptional: true
+      - id: ${this}/Archive.RecomputeInProgress
+        name: RecomputeInProgress
+      - id: ${this}/Archive.LastRecomputeStartedAt
+        name: LastRecomputeStartedAt
+        isOptional: true
+      - id: ${this}/Archive.LastRecomputeSuccessAt
+        name: LastRecomputeSuccessAt
+        isOptional: true
+      - id: ${this}/Archive.LastRecomputeFailureAt
+        name: LastRecomputeFailureAt
+        isOptional: true
+      - id: ${this}/Archive.LastRecomputeFailureReason
+        name: LastRecomputeFailureReason
+        isOptional: true

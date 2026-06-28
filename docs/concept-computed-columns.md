@@ -331,6 +331,13 @@ saving, and offers the archive's existing column names as formula operands.
 
 ## §10 Rollup consumption of source computed columns
 
+> **Status: implemented (Phase 5).** The only change needed: `RollupValidator.ValidateForActivation`
+> now builds its accepted-source-name set from **both** ingested column `Path`s and computed column
+> `Name`s, so `CkRollupAggregation.SourcePath` may target a source computed column. No SQL change —
+> `RollupAggregationColumns.Resolve` already maps `SourcePath` through `ColumnNameMapper.PathToColumnName`,
+> so `AVG("powerfactor")` aggregates the stored computed column exactly like an ingested one.
+> Recompute propagation when the source computed column is rebuilt remains AB#4184's job.
+
 Because a computed column is a **real stored `DOUBLE`**, a rollup over a source archive
 aggregates it natively — `CkRollupAggregation.SourcePath` targets the computed column's name
 and `RollupAggregationSqlBuilder` emits `SUM/MIN/MAX/AVG/COUNT(...)` over it with no special

@@ -138,15 +138,20 @@ flowchart TB
 - **Backend** (`StreamData.UnitTests/CrateQueryBuilderTests.cs`, mirror `:246–332`): simple downsampling emits `generate_series` + per-type reducers; numeric MIN/MAX/AVG present; LAST via `max_by` for string/enum/bool; `GROUP BY bins.ts, "rtId"`; full / partial / empty range; windowed-storage containment; back-compat: `SimpleSdQuery` + `queryMode: DEFAULT` still returns raw rows up to `Limit`.
 - **Frontend** (octo-meshboard specs): `limit` computation from width incl. clamping; `queryMode` only when from/to present; envelope column mapping (`__min`/`__max`); debounced resize fires one reload; table widget untouched.
 
-## 7. Phasing (all under AB#4233)
+## 7. Phasing (all under AB#4233) — DELIVERED
+
+All phases shipped and live-verified against the windowed `energy-measurements` archive on
+voest (33 224 raw rows → `limit` bins per series, AVG line + MIN/MAX envelope).
 
 - ✅ **Engine primitive** — `WithDownsamplingGroupBy` on the query builder + compiler per-series GROUP BY/ORDER BY (engine-mongodb `1150376`); `GroupByColumnPaths` option (engine `0f93da9`) wired through `ExecuteDownsamplingQueryAsync` (engine-mongodb `9fae4b2`). Unit tests cover the per-series shape + envelope.
-- ✅ **BE-1 (persistent)** — `StreamDataQueryDtoType`: `queryMode=DOWNSAMPLING` on `RtSimpleSdQuery` synthesizes per-type reducers (D2/D3/D10) + `GroupByColumnPaths=[rtId]` (D4) and routes to the downsampling variant; raw fallback without from/to/limit (D8).
-- ⏳ **BE-1 (transient)** — same override on the `streamData.transientStreamDataQuery.simple` sub-connection (`StreamDataTransientQuery`). Pending.
-- ⏳ **FE-1** — width→limit + `queryMode` in line/bar/heatmap `buildStreamDataArgs()`, raw fallback (D5/D6/D8/D9).
-- ⏳ **FE-2** — debounced resize re-query (D7).
-- ⏳ **FE-3** — line-chart min/max envelope rendering (D3).
-- ⏳ **Docs** — `QueryModeDto.cs` XML doc; remove the "queryMode is ignored" caveat in `query-executor.service.ts` now D1 has landed.
+- ✅ **Runtime fixes surfaced by the first live run** (all engine/asset-repo): timestamp mapping built directly to avoid the windowed-archive `Resolve("timestamp")` NRE (asset-repo `e9e7aeb`); rtId scope on the downsampling path via an IN field-filter instead of `AddWhereIn` (engine `9e84006`); downsampling rows stamped with the query's Ck type so the non-null GraphQL `ckTypeId` resolves (engine `72a59ca`). These were latent bugs in the pre-existing downsampling path that no caller had hit.
+- ✅ **BE-1 (persistent)** — `StreamDataQueryDtoType`: `queryMode=DOWNSAMPLING` on `RtSimpleSdQuery` synthesizes per-type reducers (D2/D3/D10) + `GroupByColumnPaths=[rtId]` (D4), routes to the downsampling variant; raw fallback without from/to/limit (D8). asset-repo `b75d843`.
+- ✅ **BE-1 (transient)** — same override on `streamData.transientStreamDataQuery.simple`; reducer synthesis extracted to shared `StreamDataDownsamplingReducers`; transient Rows downsampling case fixed (direct timestamp mapping + `GroupByColumnPaths`). asset-repo `4d2908d`. Live-verified via a transient GraphQL query.
+- ✅ **FE-1** — `line-chart-widget` requests `queryMode=DOWNSAMPLING` + `limit = clamp(hostWidth/2, 50, 4000)` measured in `ngAfterViewInit`; raw fallback without a time range (D5/D6/D8/D9). frontend `059ec10`.
+- ✅ **FE-2** — debounced (300 ms) `ResizeObserver` re-query when the width-derived bucket count would change >15% (D7). frontend `990239f`. Live-verified by resizing the widget.
+- ✅ **FE-3** — bin timestamp as x-axis, `_avg` line, `_min`/`_max` Kendo `rangeArea` envelope band sharing each series' colour (D3). frontend `059ec10`.
+- ✅ **Tests** — `CrateQueryBuilderTests` (per-series group-by + envelope SQL); `StreamDataDownsamplingReducersTests` (per-type reducer choice — the reducer synthesis lives in asset-repo, not the engine, per §4.2); line-chart specs (limit request + avg/band mapping).
+- ☐ **Optional polish** — line-chart legend shows a `(min/max)` band entry per series (could be hidden); `QueryModeDto.cs` XML doc + dropping the "queryMode is ignored" caveat in `query-executor.service.ts` now that D1 has landed.
 
 ## 8. Out of scope
 

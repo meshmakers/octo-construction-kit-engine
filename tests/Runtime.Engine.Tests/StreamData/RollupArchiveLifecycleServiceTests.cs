@@ -20,8 +20,8 @@ public class RollupArchiveLifecycleServiceTests
     private readonly IArchiveRuntimeStore _archiveStore = A.Fake<IArchiveRuntimeStore>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
-    private RollupArchiveLifecycleService NewSut() =>
-        new(TenantId, _store, _archiveStore, _audit, NullLogger<RollupArchiveLifecycleService>.Instance);
+    private RollupArchiveLifecycleService NewSut(IStreamDataRepository? streamData = null) =>
+        new(TenantId, _store, _archiveStore, _audit, NullLogger<RollupArchiveLifecycleService>.Instance, streamData);
 
     private static RollupArchiveSnapshot Snapshot(
         DateTime? frozenUntil = null,
@@ -207,6 +207,41 @@ public class RollupArchiveLifecycleServiceTests
         await NewSut().RewindWatermarkAsync(Rt, passedIn);
 
         A.CallTo(() => _store.AdvanceWatermarkAsync(Rt, passedIn, true))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Rewind_WithStreamData_ClearsRecomputeGenerationsAtBucketBoundary()
+    {
+        // AB#4184, Phase 6: a rewind over a previously-recomputed range must clear the active
+        // generation pointers so the forward re-aggregation (generation 0) becomes authoritative.
+        // The clear is issued with the same truncated bucket boundary as the watermark advance.
+        var passedIn = new DateTime(2026, 5, 11, 14, 0, 42, DateTimeKind.Utc);
+        var expectedBucketEnd = new DateTime(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
+        var streamData = A.Fake<IStreamDataRepository>();
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(bucketSize: TimeSpan.FromMinutes(1)));
+
+        await NewSut(streamData).RewindWatermarkAsync(Rt, passedIn);
+
+        A.CallTo(() => _store.AdvanceWatermarkAsync(Rt, expectedBucketEnd, true))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => streamData.ClearRecomputeGenerationsAsync(
+                Rt, expectedBucketEnd, A<System.Threading.CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Rewind_WithoutStreamData_DoesNotThrow()
+    {
+        // Stream data disabled (null repository) ⇒ the rewind still advances the watermark and
+        // simply skips the generation-pointer reconciliation.
+        var passedIn = new DateTime(2026, 5, 11, 14, 0, 42, DateTimeKind.Utc);
+        var expectedBucketEnd = new DateTime(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(bucketSize: TimeSpan.FromMinutes(1)));
+
+        await NewSut().RewindWatermarkAsync(Rt, passedIn);
+
+        A.CallTo(() => _store.AdvanceWatermarkAsync(Rt, expectedBucketEnd, true))
             .MustHaveHappenedOnceExactly();
     }
 }

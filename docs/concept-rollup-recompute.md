@@ -154,7 +154,21 @@ forced by CrateDB's lack of partial-range atomicity.
 > CK-model version bump. The full mechanism lives in `octo-construction-kit-engine-mongodb`'s
 > `Runtime.Engine.CrateDb` layer (`GenerationMapSqlBuilder`, `CrateDbArchiveRecomputeExecutor`,
 > `CrateQueryCompiler`); see that repo's CLAUDE.md "Optimistic Recompute — Per-Window Generation
-> Pointer". **Status: implemented** (unit-tested; live-CrateDB validation pending).
+> Pointer". **Status: implemented** (unit-tested + end-to-end validated against a CrateDB
+> Testcontainer by `RollupRecomputeGenerationPointerTests` in `octo-asset-repo-services`).
+>
+> **Per-`rtId` scoped recompute (implemented):** the executor accepts an optional `rtId` scope. When
+> set, the staging aggregation, the genmap pointer (`rtid_scope`), and the post-flip sweep are all
+> restricted to that single metering point, so a late value for one stream never recomputes unrelated
+> streams sharing the same window. An unset scope (`rtid_scope = ''`) recomputes the whole range as
+> before.
+>
+> **Rewind reconciliation (implemented):** `RollupArchiveLifecycleService.RewindWatermarkAsync` now
+> calls `IStreamDataRepository.ClearRecomputeGenerationsAsync`, which drops the genmap pointers whose
+> range reaches past the rewind boundary and deletes the orphaned `generation > 0` rows there. The
+> forward re-aggregation then rewrites those windows at generation 0 and becomes authoritative again,
+> so a rewind over a previously-recomputed range can no longer leave readers pinned to a stale
+> recomputed generation. No-op when stream data is disabled or nothing was recomputed.
 
 ### Failure mode
 
@@ -276,7 +290,10 @@ Frameworks: xUnit v3 (`Runtime.Engine.Tests`, `StreamData.UnitTests`), integrati
 
 - **Generation-pointer GC cadence** — when to delete superseded generations (immediate sweep vs.
   retention window for rollback). Default: immediate sweep after the flip, configurable retention.
-- **Per-`rtId` generation granularity** — start per-window; refine to per-`(window, rtId)` only if
-  a single late metering point forces recompute of unrelated streams in the same window.
+- **Per-`rtId` generation granularity** — ~~start per-window; refine to per-`(window, rtId)`~~
+  **Done.** The executor takes an optional `rtId` scope; a scoped recompute restricts staging
+  aggregation, genmap pointer, and sweep to that single metering point. Remaining refinement: the
+  genmap `rtid_scope` is a single value per pointer row (one scoped point per pointer); a future
+  refinement could carry a set if many points need scoping in one job.
 - **Bounded retro reach** — cap how far back a single very-late row may drag a recompute (shared
   with AB#4196's guardrail).

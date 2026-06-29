@@ -28,6 +28,7 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
     private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<RollupArchiveLifecycleService> _logger;
+    private readonly IStreamDataRepository? _streamData;
 
     /// <summary>
     /// Constructs the rollup lifecycle service. <paramref name="rollupStore"/> and
@@ -35,19 +36,24 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
     /// <see cref="CreateAsync"/> uses the same Mongo polymorphism that handles both raw archives
     /// and chained rollups via the shared CkArchive base). The audit trail can be either
     /// tenant-scoped or shared (the tenant id is passed explicitly into every audit call).
+    /// <paramref name="streamData"/> is the tenant's stream-data repository (CrateDB); optional
+    /// (null when stream data is not enabled), used only by <see cref="RewindWatermarkAsync"/> to
+    /// clear recompute generation pointers over the rewound range (AB#4184, Phase 6).
     /// </summary>
     public RollupArchiveLifecycleService(
         string tenantId,
         IRollupArchiveRuntimeStore rollupStore,
         IArchiveRuntimeStore archiveStore,
         IArchiveAuditTrail audit,
-        ILogger<RollupArchiveLifecycleService> logger)
+        ILogger<RollupArchiveLifecycleService> logger,
+        IStreamDataRepository? streamData = null)
     {
         _tenantId = tenantId;
         _rollupStore = rollupStore;
         _archiveStore = archiveStore;
         _audit = audit;
         _logger = logger;
+        _streamData = streamData;
     }
 
     /// <inheritdoc />
@@ -163,6 +169,16 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         }
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
+
+        // AB#4184, Phase 6: if the rewound range was previously recomputed, the active-generation
+        // pointer still points readers at the recomputed generation. The forward re-aggregation the
+        // orchestrator is about to run writes generation 0, which the pointer would hide. Clear the
+        // recompute generations at/after the rewind boundary so the re-aggregated rows become the
+        // authoritative ones again. No-op when stream data is not enabled or nothing was recomputed.
+        if (_streamData is not null)
+        {
+            await _streamData.ClearRecomputeGenerationsAsync(rollupRtId, toBucketEnd);
+        }
 
         _logger.LogWarning(
             "Rollup {RollupRtId} watermark rewound to {Watermark:O} (previous {PreviousWatermark:O}). " +

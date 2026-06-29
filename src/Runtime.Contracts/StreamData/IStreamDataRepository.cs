@@ -155,6 +155,21 @@ public interface IStreamDataRepository
         CancellationToken cancellationToken);
 
     /// <summary>
+    /// Clears the per-window recompute generation pointers for a rollup archive at and after
+    /// <paramref name="fromBucketEnd"/>, so a subsequent forward re-aggregation (which writes
+    /// generation 0) becomes visible again. Called when a rollup watermark is rewound over a range
+    /// that was previously recomputed (AB#4184, Phase 6): the rewind re-aggregates forward at
+    /// generation 0, but the active-generation pointer would otherwise keep readers on the stale
+    /// recomputed generation. Implementations remove the generation-map entries whose range reaches
+    /// past <paramref name="fromBucketEnd"/> and the superseded (generation &gt; 0) rows in that
+    /// range. Idempotent — a no-op when there is no recompute state (no genmap / non-rollup).
+    /// </summary>
+    Task ClearRecomputeGenerationsAsync(
+        OctoObjectId rollupRtId,
+        DateTime fromBucketEnd,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns per-archive storage stats (row count, on-disk size, health) for each
     /// <paramref name="archiveRtIds"/> entry. Bulk call so the studio's archives list can render
     /// stats columns without an N+1 round-trip per row. Archives whose backing table doesn't

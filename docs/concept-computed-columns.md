@@ -266,7 +266,10 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
   (duplication removed). `AddFormulaEngine()` is invoked from `AddMongoDbRuntimeRepository()`, so every
   host that wires the runtime engine gets `IFormulaEngine` registered.
 
-## §8 Active-archive lifecycle & backfill (builds on AB#4184)
+## §8 Active-archive lifecycle & backfill (Phase 7 — reuses AB#4184 orchestration, **not** its row-generation pointer)
+
+> **Status: planned (Phase 7), AB#4184 complete (2026-06-29) → unblocked.** Design concretised
+> below after mapping the AB#4184 implementation.
 
 Adding a computed column, changing its formula, or removing it on an `Activated` archive:
 
@@ -274,28 +277,86 @@ Adding a computed column, changing its formula, or removing it on an `Activated`
 add / change formula
         │
         ▼
-ComputedState = Pending → ALTER TABLE ADD COLUMN (versioned physical name)
+ComputedState = Pending → ALTER TABLE ADD COLUMN (new / versioned physical name)
         │
         ▼
-Backfill job  (AB#4184 orchestration):
+ComputedState = Backfilling → backfill job:
    page through existing rows → read referenced columns →
    evaluate in .NET (mXparser) → write computed value into the new physical column
         │
         ▼
-ComputedState = Active  +  atomic logical→physical pointer flip (AB#4184)
+ComputedState = Active  +  atomic column-pointer flip (single Mongo write:
+   active physical name + ComputedState) → drop the superseded physical column
         │
    on failure ▼
 ComputedState = Failed  +  drop the new physical column → readers never saw partial data
 ```
 
-- **Triggers** are AB#4184's: implicit (column added / formula changed), periodic, manual
-  (API + Studio), optional event-driven. Concurrency / coalescing / idempotency semantics are
-  inherited from AB#4184.
-- **Reader contract during backfill** (AB#4184): a query returns either the previous state
-  (new column absent, or previous formula's values) or the new state — never a half-populated
-  mix. New-column case: the column is simply not in the logical projection until `Active`.
-- **Removing** a computed column: drop from the logical schema, then drop the physical
-  column. Dependent rollups (§10) must be revalidated.
+### §8.1 Two different swap models — the key design decision
+
+AB#4189 reuses AB#4184's **orchestration** (job model, coalescing, observability, audit, the
+periodic hosted-service tick) but deliberately **does not** reuse its row-level generation
+pointer. The two swap units are different granularities:
+
+| | AB#4184 (rollup recompute) | AB#4189 Phase 7 (computed column) |
+|---|---|---|
+| Swap unit | a **row/window range** | a whole **column** |
+| Atomic commit | `archive_<rtId>__genmap` side-table pointer per `(range_start, range_end, rtid_scope)` | logical→physical **column-name pointer** in the archive's Mongo runtime-state |
+| Storage cost | `generation` column keyed into the rollup PK | none — raw / time-range tables gain **no** `generation` column |
+| Read-path gate | `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END` (exists) | computed columns whose `ComputedState != Active` are **excluded from the SELECT projection**; the active physical name is resolved per column (**new**) |
+
+The generation pointer is window-granular and would force a `generation` column onto raw /
+time-range tables that have none — the wrong granularity for a column-scoped change. So the
+computed-column path is a **column-projection swap**, exactly as already sketched in §4: a brand
+-new computed column is simply absent from the logical projection until `Active`; a formula
+change writes a **versioned physical column** (`{base} → {base}__v2`) and flips the
+logical→physical name pointer atomically on completion.
+
+### §8.2 Design decisions (Phase 7)
+
+- **D-7.1 — Column pointer in Mongo runtime-state.** The active physical column name and
+  `ComputedState` per computed column live in the archive entity's runtime-state. Backfill
+  writes the new physical column; completion is **one** Mongo write (name pointer +
+  `ComputedState = Active`), after which the superseded physical column is dropped. Single-store
+  flip, no CrateDB side-table for the column case.
+- **D-7.2 — Read-path projection gating (new work).** The logical→physical column resolver that
+  builds the `SELECT` projection (`CrateQueryCompiler` / column resolver) must exclude computed
+  columns with `ComputedState != Active` and resolve the active physical name. This is **not**
+  covered by AB#4184's generation-CASE injection.
+- **D-7.3 — Dual-write during a formula-change backfill.** While `Backfilling` a formula change,
+  ingest must populate **both** physical columns — the old formula into the active column (so
+  current readers stay correct) and the new formula into `{base}__v2` (so recent rows are
+  already consistent at swap time). `BuildComputedPlan` (§5) is extended to carry the pending
+  column. A brand-new computed column needs **no** dual-write — readers don't see it until
+  `Active`.
+- **D-7.4 — Dedicated backfill executor, shared orchestration.** A new
+  `IArchiveColumnBackfillExecutor` (CrateDB layer) pages all rows of one archive, evaluates one
+  column via the existing `ApplyComputedColumns`, and writes it back. It reuses AB#4184's
+  `IRecomputeJobStore`, `IArchiveRecomputeStateStore`, the hosted-service tick, the audit trail
+  and the StreamData metrics — but **not** the `genmap` range logic.
+- **D-7.5 — Dependent rollups go through AB#4184.** After a raw / time-range computed-column
+  swap completes, rollups that aggregate it (§10) are marked dirty in the AB#4184
+  `DirtyWindows` / `PendingRecomputeRanges` ledger, so AB#4184's orchestrator recomputes them
+  downstream. This is the one place Phase 7 consumes AB#4184's recompute path directly.
+
+### §8.3 Triggers, reader contract, removal
+
+- **Triggers:** implicit (column added / formula changed), manual (API + Studio), periodic
+  (the AB#4184 hosted-service tick also drains pending computed-column backfills). Concurrency /
+  coalescing / idempotency semantics follow AB#4184's job model.
+- **Reader contract during backfill:** a query returns either the previous state (new column
+  absent from the projection, or the previous formula's values via the still-active physical
+  column) or the new state — never a half-populated mix. The gate is `ComputedState` +
+  active-physical-name (D-7.2), not the generation pointer.
+- **Removing** a computed column: drop from the logical projection (flip first), then drop the
+  physical column. Dependent rollups (§10) must be revalidated.
+
+### §8.4 Open items to verify during implementation
+
+1. Exact location of the logical→physical column projection on the read path (D-7.2).
+2. Whether `CkArchiveColumnSpec` / the archive runtime-state already carries an "active physical
+   name" field, or whether an additive `System.StreamData` 1.5.x bump is needed (D-7.1).
+3. The REST recompute-endpoint shape as the template for the computed-column REST mutations.
 
 ## §9 Validation
 

@@ -252,11 +252,18 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     }
                 }
 
-                if (changeDelta > 0)
+                if (changeDelta > 0 &&
+                    (multiplicity == MultiplicitiesDto.One ||
+                     multiplicity == MultiplicitiesDto.ZeroOrOne))
                 {
-                    if (currentMultiplicity == CurrentMultiplicity.One &&
-                        (multiplicity == MultiplicitiesDto.One ||
-                         multiplicity == MultiplicitiesDto.ZeroOrOne))
+                    // Validate the RESULTING cardinality after applying the batch, not just the current
+                    // DB state. A to-one role must end up with at most one association. This is violated if:
+                    //  - one association already exists and we net-add (result >= 2)
+                    //  - the state is already corrupt (Many) and we net-add (stays > 1)
+                    //  - no association exists yet but the batch creates two or more (result >= 2)
+                    if (currentMultiplicity == CurrentMultiplicity.One ||
+                        currentMultiplicity == CurrentMultiplicity.Many ||
+                        (currentMultiplicity == CurrentMultiplicity.Zero && changeDelta >= 2))
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(
                             originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,
@@ -367,11 +374,18 @@ internal class GraphRuleEngine(ICkCacheService ckCache) : IGraphRuleEngine
                     }
                 }
 
-                if (changeDelta > 0)
+                if (changeDelta > 0 &&
+                    (multiplicity == MultiplicitiesDto.One ||
+                     multiplicity == MultiplicitiesDto.ZeroOrOne))
                 {
-                    if (currentMultiplicity == CurrentMultiplicity.One &&
-                        (multiplicity == MultiplicitiesDto.One ||
-                         multiplicity == MultiplicitiesDto.ZeroOrOne))
+                    // Validate the RESULTING cardinality after applying the batch, not just the current
+                    // DB state. A to-one role must end up with at most one association. This is violated if:
+                    //  - one association already exists and we net-add (result >= 2)
+                    //  - the state is already corrupt (Many) and we net-add (stays > 1)
+                    //  - no association exists yet but the batch creates two or more (result >= 2)
+                    if (currentMultiplicity == CurrentMultiplicity.One ||
+                        currentMultiplicity == CurrentMultiplicity.Many ||
+                        (currentMultiplicity == CurrentMultiplicity.Zero && changeDelta >= 2))
                     {
                         operationResult.AddMessage(MessageCodes.AssociationCardinalityViolationOnModification(
                             originFileResolver.Resolve(repositoryDataSource.TenantId), repositoryDataSource.TenantId,

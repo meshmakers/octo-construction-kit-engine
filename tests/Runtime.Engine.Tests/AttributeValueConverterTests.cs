@@ -93,4 +93,41 @@ public class AttributeValueConverterTests
         Assert.Equal("tag2", result[1]);
         Assert.Equal("tag3", result[2]);
     }
+
+    [Fact]
+    public void ConvertAttributeValue_TimeSpan_PassesThroughTimeSpan()
+    {
+        var input = TimeSpan.FromMinutes(15);
+
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.TimeSpan, input);
+
+        Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_TimeSpan_BareTicksString_ParsedAsTicks()
+    {
+        // AB#4259: the ImportRt export/import JSON round-trip persists a TimeSpan attribute as a
+        // bare-integer ticks string. It must be read back as ticks, not handed to TimeSpan.Parse
+        // (which would read it as 9-billion days and overflow).
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.TimeSpan, "9000000000");
+
+        Assert.Equal(TimeSpan.FromMinutes(15), result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_TimeSpan_BareTicksLong_ParsedAsTicks()
+    {
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.TimeSpan, 9000000000L);
+
+        Assert.Equal(TimeSpan.FromMinutes(15), result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_TimeSpan_DotNetString_Parsed()
+    {
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.TimeSpan, "00:15:00");
+
+        Assert.Equal(TimeSpan.FromMinutes(15), result);
+    }
 }

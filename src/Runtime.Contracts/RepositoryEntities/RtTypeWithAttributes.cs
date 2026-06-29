@@ -122,12 +122,15 @@ public abstract class RtTypeWithAttributes
 
     /// <summary>
     ///     Coerces a Mongo-deserialised attribute value to <see cref="TimeSpan"/>. Accepts the value
-    ///     as-is, a tick count (Int64/Int32), or a string in either .NET (<c>00:15:00</c>) or
-    ///     ISO-8601 (<c>PT15M</c>) format. <see cref="Convert.ChangeType(object, Type)"/> on its own
-    ///     does not handle any of these conversions and would throw <see cref="InvalidCastException"/>
-    ///     on the <c>Dictionary&lt;string, object?&gt;</c> values that the runtime engine stores —
-    ///     they round-trip through <c>OctoObjectSerializer</c> which dispatches on BSON type, not
-    ///     on the consumer's expected CLR type, so strings/long stay strings/long after read.
+    ///     as-is, a tick count (Int64/Int32), a bare-integer tick count rendered as a string
+    ///     (<c>"9000000000"</c> — the shape ImportRt produces when a TimeSpan attribute is
+    ///     round-tripped through the export/import JSON, AB#4259), or a string in either .NET
+    ///     (<c>00:15:00</c>) or ISO-8601 (<c>PT15M</c>) format. <see cref="Convert.ChangeType(object, Type)"/>
+    ///     on its own does not handle any of these conversions and would throw
+    ///     <see cref="InvalidCastException"/> on the <c>Dictionary&lt;string, object?&gt;</c> values that
+    ///     the runtime engine stores — they round-trip through <c>OctoObjectSerializer</c> which
+    ///     dispatches on BSON type, not on the consumer's expected CLR type, so strings/long stay
+    ///     strings/long after read.
     /// </summary>
     private static bool TryCoerceTimeSpan(object value, out TimeSpan timeSpan)
     {
@@ -141,6 +144,13 @@ public abstract class RtTypeWithAttributes
                 return true;
             case int ticks32:
                 timeSpan = TimeSpan.FromTicks(ticks32);
+                return true;
+            // A bare-integer string is the canonical ticks form (matching the Int64/Int32 cases
+            // above), NOT a .NET TimeSpan literal — TimeSpan.Parse would read "9000000000" as
+            // 9-billion *days* and overflow. Must come before the TimeSpan.TryParse branch.
+            case string s when long.TryParse(s, System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out var tickString):
+                timeSpan = TimeSpan.FromTicks(tickString);
                 return true;
             case string s when TimeSpan.TryParse(s, System.Globalization.CultureInfo.InvariantCulture, out var parsed):
                 timeSpan = parsed;

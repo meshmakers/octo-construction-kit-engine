@@ -211,7 +211,18 @@ public static class AttributeValueConverter
                     return value;
                 }
 
-                if (TimeSpan.TryParse(value.ToString(), out var timeSpanResult))
+                // A bare-integer value is the canonical ticks form (e.g. an Int64 read straight from
+                // BSON, or "9000000000" produced by the ImportRt export/import JSON round-trip,
+                // AB#4259). It must be treated as ticks, NOT handed to TimeSpan.Parse — the latter
+                // reads "9000000000" as 9-billion *days* and overflows to a parse failure. Check
+                // this before the .NET / ISO-8601 string parse.
+                if (long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out var timeSpanTicks))
+                {
+                    return TimeSpan.FromTicks(timeSpanTicks);
+                }
+
+                if (TimeSpan.TryParse(value.ToString(), CultureInfo.InvariantCulture, out var timeSpanResult))
                 {
                     return timeSpanResult;
                 }

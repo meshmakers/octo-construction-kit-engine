@@ -21,3 +21,6 @@ records:
       - id: ${this}/CkArchiveColumn.ComputedState
         name: ComputedState
         isOptional: true
+      - id: ${this}/CkArchiveColumn.ComputedVersion
+        name: ComputedVersion
+        isOptional: true

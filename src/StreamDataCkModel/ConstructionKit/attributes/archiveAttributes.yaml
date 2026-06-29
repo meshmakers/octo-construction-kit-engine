@@ -42,3 +42,10 @@ attributes:
     description: "Engine-managed lifecycle state of a computed column (Pending / Backfilling / Active / Failed). Null for ingested columns."
     valueType: Enum
     valueCkEnumId: ${this}/CkComputedColumnState
+    isRuntimeState: true
+  - id: CkArchiveColumn.ComputedVersion
+    description: "Engine-managed physical-column version of a computed column (AB#4189 Phase 7). 0 (default) means the physical column carries the column's base name; a formula change writes the new values into a versioned physical column ({base}__v{N}) and flips this pointer atomically on backfill completion, so readers keep seeing the previous formula's values until the swap. 0 for ingested columns and for computed columns that have never been re-formulated."
+    valueType: Int
+    defaultValues:
+      - 0
+    isRuntimeState: true

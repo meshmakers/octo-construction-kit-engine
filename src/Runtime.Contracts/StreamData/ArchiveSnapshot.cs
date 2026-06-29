@@ -99,6 +99,16 @@ public sealed record CkArchiveColumnSpec(
     /// </summary>
     public ComputedColumnState? ComputedState { get; init; }
 
+    /// <summary>
+    /// Engine-managed physical-column version of a computed column (AB#4189 Phase 7). 0 means the
+    /// physical column carries the column's base name (the canonical column name derived from
+    /// <see cref="Name"/>); a value <c>N &gt; 0</c> means the active physical column is
+    /// <c>{base}__v{N}</c> — the result of one or more formula changes that each backfilled into a
+    /// fresh versioned physical column and flipped this pointer atomically on completion. 0 for
+    /// ingested columns. See <c>System.StreamData</c> 1.6.1.
+    /// </summary>
+    public int ComputedVersion { get; init; }
+
     /// <summary>True when this is a computed column (has a <see cref="Formula"/>).</summary>
     public bool IsComputed => !string.IsNullOrWhiteSpace(Formula);
 }

@@ -1,7 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Formulas;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Microsoft.Extensions.Logging;
 
@@ -149,6 +152,81 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         StreamDataDiagnostics.Deletions.Add(1,
             new("archive", archiveRtId.ToString()),
             new("from_status", snapshot.Status.ToString()));
+    }
+
+    /// <inheritdoc />
+    public async Task AddComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed)
+    {
+        var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.Status != CkArchiveStatus.Activated)
+        {
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status, "add a computed column to");
+        }
+
+        var newColumn = new CkArchiveColumnSpec(string.Empty, indexed, Required: false)
+        {
+            Name = name,
+            Formula = formula,
+            ResultType = resultType,
+            ComputedState = ComputedColumnState.Pending,
+            ComputedVersion = 0,
+        };
+
+        // Validate the prospective full set (existing + new) before any persistence or DDL.
+        var prospective = snapshot.Columns.Append(newColumn).ToList();
+        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective);
+
+        using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.addComputedColumn");
+        activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());
+        activity?.SetTag("streamdata.computedcolumn.name", name);
+
+        // Persist Pending, add the physical column, backfill while the column stays hidden, then flip
+        // to Active — the single SetComputedColumnStateAsync(Active) is the atomic switch (§8).
+        await _store.AddComputedColumnAsync(archiveRtId, newColumn);
+        var withColumn = await LoadAsync(archiveRtId);
+
+        try
+        {
+            await _repository.AddComputedColumnStorageAsync(withColumn, name);
+            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Backfilling);
+            await _repository.BackfillComputedColumnAsync(withColumn, name);
+            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Active);
+            _logger.LogInformation(
+                "Computed column '{Column}' added to archive {Archive} and backfilled (now Active).",
+                name, archiveRtId);
+        }
+        catch (Exception ex)
+        {
+            await _store.SetComputedColumnStateAsync(archiveRtId, name, ComputedColumnState.Failed);
+            _logger.LogError(ex,
+                "Backfill of computed column '{Column}' on archive {Archive} failed; column marked Failed.",
+                name, archiveRtId);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
+    public async Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name)
+    {
+        var snapshot = await LoadAsync(archiveRtId);
+
+        var target = snapshot.Columns.FirstOrDefault(
+            c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal));
+        if (target is null)
+        {
+            return; // idempotent: already gone (or never a computed column)
+        }
+
+        // Validate the post-removal set so a now-dangling reference from another computed column is
+        // rejected before we mutate anything (concept §9 / §14).
+        var remaining = snapshot.Columns
+            .Where(c => !(c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal)))
+            .ToList();
+        await _repository.ValidateComputedColumnsAsync(archiveRtId, remaining);
+
+        await _store.RemoveComputedColumnAsync(archiveRtId, name);
+        _logger.LogInformation("Computed column '{Column}' removed from archive {Archive}.", name, archiveRtId);
     }
 
     private async Task<ArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)

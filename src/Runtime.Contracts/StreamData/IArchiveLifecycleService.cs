@@ -1,5 +1,6 @@
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.Formulas;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 
@@ -50,4 +51,22 @@ public interface IArchiveLifecycleService
     /// <c>rtState = Archived</c>. Allowed from any status.
     /// </summary>
     Task DeleteAsync(OctoObjectId archiveRtId);
+
+    /// <summary>
+    /// Adds a computed column to an <c>Activated</c> raw or time-range archive and backfills it
+    /// (AB#4189 Phase 7, §8). Validates the prospective column set, persists the column
+    /// <c>Pending</c>, adds the physical column, backfills the existing rows while the column stays
+    /// hidden, then flips it to <c>Active</c> atomically. A backfill failure leaves the column
+    /// <c>Failed</c> and the previous archive state intact. Idempotent re-add of the same name reuses
+    /// the orphaned physical column.
+    /// </summary>
+    Task AddComputedColumnAsync(
+        OctoObjectId archiveRtId, string name, string formula, FormulaResultType resultType, bool indexed);
+
+    /// <summary>
+    /// Removes a computed column from an archive (AB#4189 Phase 7). Validates that no remaining
+    /// computed column references it, then drops it from the logical column set; the physical CrateDB
+    /// column is left as a harmless orphan the read path no longer projects.
+    /// </summary>
+    Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name);
 }

@@ -47,6 +47,38 @@ public interface IStreamDataRepository
     /// </summary>
     Task DeleteArchiveAsync(OctoObjectId archiveRtId);
 
+    /// <summary>
+    /// Validates a prospective computed-column set (AB#4189 Phase 7) — syntax, reference resolution,
+    /// acyclic dependencies, Path/Formula exclusivity, nullable, ResultType — without touching
+    /// storage. The lifecycle service calls this before persisting an add (existing columns + the
+    /// new one) or a remove (existing columns − the removed one, so a now-dangling reference is
+    /// rejected). Throws a <c>StreamDataException</c> (stable GraphQL error code) on the first issue.
+    /// </summary>
+    Task ValidateComputedColumnsAsync(
+        OctoObjectId archiveRtId,
+        IReadOnlyList<CkArchiveColumnSpec> prospectiveColumns,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Adds the physical CrateDB column for the computed column named <paramref name="columnName"/>
+    /// via <c>ALTER TABLE … ADD COLUMN</c> (AB#4189 Phase 7). Idempotent — tolerant of the column
+    /// already existing (e.g. a re-add reusing an orphaned column). The column on
+    /// <paramref name="snapshot"/> supplies the declared result type the physical column is typed from.
+    /// </summary>
+    Task AddComputedColumnStorageAsync(
+        ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Backfills the computed column named <paramref name="columnName"/> across the archive's
+    /// existing rows (AB#4189 Phase 7, §8): pages through the rows, evaluates the column's formula
+    /// per row, and writes the result into its physical cell. The physical column must already exist
+    /// (see <see cref="AddComputedColumnStorageAsync"/>). Readers keep seeing the previous state until
+    /// the lifecycle flips the column to <c>Active</c>, because the column is hidden while
+    /// non-active. Throws on a storage failure so the lifecycle can mark the column <c>Failed</c>.
+    /// </summary>
+    Task BackfillComputedColumnAsync(
+        ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
+
     // --- Data plane ---------------------------------------------------------------------------
 
     /// <summary>

@@ -39,4 +39,27 @@ public interface IArchiveRuntimeStore
     /// implementation-defined; callers must not rely on it.
     /// </summary>
     IAsyncEnumerable<ArchiveSnapshot> EnumerateAsync();
+
+    /// <summary>
+    /// Appends a computed column to the archive's column set (AB#4189 Phase 7). The caller supplies
+    /// the column already carrying its initial <see cref="CkArchiveColumnSpec.ComputedState"/>
+    /// (normally <see cref="ComputedColumnState.Pending"/> for an add to a live archive). Used by the
+    /// computed-column lifecycle on <see cref="IArchiveLifecycleService"/>.
+    /// </summary>
+    Task AddComputedColumnAsync(OctoObjectId archiveRtId, CkArchiveColumnSpec column);
+
+    /// <summary>
+    /// Sets the engine-managed lifecycle <see cref="ComputedColumnState"/> of the computed column
+    /// named <paramref name="name"/> on the archive (AB#4189 Phase 7). This single write is the
+    /// atomic switch for the add flow: while the state is <c>Pending</c> / <c>Backfilling</c> the
+    /// read path hides the column; flipping it to <c>Active</c> exposes the backfilled values.
+    /// </summary>
+    Task SetComputedColumnStateAsync(OctoObjectId archiveRtId, string name, ComputedColumnState state);
+
+    /// <summary>
+    /// Removes the computed column named <paramref name="name"/> from the archive's column set
+    /// (AB#4189 Phase 7). The physical CrateDB column is left in place (a harmless nullable orphan
+    /// the read path no longer projects); a later re-add of the same name reuses it.
+    /// </summary>
+    Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name);
 }

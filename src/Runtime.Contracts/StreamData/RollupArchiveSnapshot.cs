@@ -36,6 +36,46 @@ public sealed record RollupArchiveSnapshot(
     /// expressible. Concept-time-range §7.
     /// </summary>
     public BucketAlignment BucketAlignment { get; init; } = BucketAlignment.FixedSize;
+
+    // ---------- Recompute observability (AB#4184, Phase 5 follow-up) ----------
+    // Init-only so the positional ctor used by the orchestrator / lifecycle stays unchanged; these
+    // are projected from the engine-maintained recompute-state attributes on the Archive base and
+    // surfaced read-only through rollupsFor so a studio dashboard can show recompute health without
+    // a second round-trip. All default to the steady state (idle, nothing pending) for callers
+    // that build the snapshot without recompute context.
+
+    /// <summary>
+    /// True while a recompute job for this rollup is running or swapping. Mirrors
+    /// <c>Archive.RecomputeInProgress</c>.
+    /// </summary>
+    public bool RecomputeInProgress { get; init; }
+
+    /// <summary>Start timestamp of the most recent recompute run; null before the first run.</summary>
+    public DateTime? LastRecomputeStartedAt { get; init; }
+
+    /// <summary>
+    /// Finish timestamp of the most recent successfully committed recompute run; null before the
+    /// first success.
+    /// </summary>
+    public DateTime? LastRecomputeSuccessAt { get; init; }
+
+    /// <summary>Timestamp of the most recent failed recompute run; null if the last run succeeded.</summary>
+    public DateTime? LastRecomputeFailureAt { get; init; }
+
+    /// <summary>Human-readable reason for the most recent recompute failure; null if the last run succeeded.</summary>
+    public string? LastRecomputeFailureReason { get; init; }
+
+    /// <summary>
+    /// Number of dirty windows currently recorded on this archive (Information A — retroactive
+    /// changes not yet propagated). 0 in the steady state.
+    /// </summary>
+    public int DirtyWindowsPending { get; init; }
+
+    /// <summary>
+    /// Number of pending recompute ranges currently queued on this archive (Information B — the
+    /// recompute work list the orchestrator still has to drain). 0 in the steady state.
+    /// </summary>
+    public int PendingRecomputeRanges { get; init; }
 }
 
 /// <summary>

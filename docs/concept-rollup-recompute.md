@@ -182,7 +182,15 @@ recompute is debuggable after the fact.
 ### Per-archive fields (Mongo, exposed via `RollupArchiveInfo`)
 
 `LastRecomputeSuccessAt`, `LastRecomputeStartedAt`, `RecomputeInProgress`,
-`LastRecomputeFailureAt`, `LastRecomputeFailureReason`, `DirtyWindowsPending` (count).
+`LastRecomputeFailureAt`, `LastRecomputeFailureReason`, `DirtyWindowsPending` (count),
+`PendingRecomputeRanges` (count).
+
+**Status: implemented.** These are projected from the engine-maintained `Archive`-base
+attributes onto `RollupArchiveSnapshot` in `MongoRollupArchiveRuntimeStore.MapToSnapshot` and
+surfaced read-only through the existing `rollupsFor` query — GraphQL `RollupArchiveInfo`, REST
+`RollupArchiveInfoRestDto` (`GET …/archives/{rtId}/rollups`), SDK `RollupArchiveInfoDto`, and the
+`octo-cli ListRollupsForArchive` second output line. All counts default to 0 / idle in the steady
+state, so pre-1.6.0 rollups and rollups that have never been recomputed render cleanly.
 
 ### Persistent recompute-job history
 
@@ -224,7 +232,7 @@ The bump is additive; existing archives migrate via the no-migrations bridge (CL
 
 | Layer | Addition |
 |---|---|
-| GraphQL (`StreamDataMutation` / `StreamDataQuery`) | `recomputeArchive(rtId, from, to, rtId?)`, `recomputeJobsFor(archiveRtId)`; extend `RollupArchiveInfo` with the §7 fields. |
+| GraphQL (`StreamDataMutation` / `StreamDataQuery`) | `recomputeArchive(rtId, from, to, rtId?)`, `recomputeJobsFor(archiveRtId)`; `RollupArchiveInfo` extended with the §7 observability fields (done). |
 | REST (`StreamDataController` / `TimeSeriesServicesClient`) | `POST …/archives/{rtId}/recompute`, `GET …/archives/{rtId}/recompute-jobs`. |
 | octo-cli | new `RecomputeArchive` command + `ListRecomputeJobs` (next to `RewindRollupWatermark`). |
 | Engine | `RollupDependencyGraph` walker, `RecomputeOrchestrator` + `RecomputeOrchestratorHostedService`, staging-table builder + generation-pointer swap in `CrateDbStreamDataRepository`, Mongo dirty-ledger + job-history store. |

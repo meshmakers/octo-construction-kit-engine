@@ -138,13 +138,23 @@ forced by CrateDB's lack of partial-range atomicity.
 
 ### Generation pointer
 
-- The live rollup table gains a `generation` column (`BIGINT NOT NULL DEFAULT 0`). The orchestrator
-  writes recomputed buckets under `generation = N+1`.
-- The **active generation per window** is held in the source archive's Mongo metadata (small,
-  per-window or per-range, not per-row), written **after** the staging rows are confirmed.
-- The read path (§6) injects `WHERE generation = active(window)`; until the pointer flips,
-  readers see `generation = N` (previous values).
-- After the flip, a background sweep deletes `generation < active(window)` rows for that range.
+- The live rollup table gains a `generation` column (`BIGINT NOT NULL DEFAULT 0`) **keyed into the
+  PK** so a recomputed window's new rows coexist with the previous ones. The recompute writes the
+  staged rows under `generation = N+1`; forward aggregation always writes `generation = 0`.
+- The **active generation per range** is held in a small per-rollup CrateDB side-table
+  (`archive_<rtId>__genmap`: `range_start, range_end, rtid_scope, generation`), written **after** the
+  staging rows are confirmed.
+- The read path (§6) injects `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END`; until the
+  pointer flips, readers see `generation = N` (previous values).
+- After the flip, a background sweep deletes the superseded `generation` rows for that range.
+
+> **Implementation note (deviation from this doc):** the pointer was implemented in a **CrateDB
+> side-table**, not "Mongo metadata" as written above. Co-locating it with the rollup data makes the
+> flip a single-row write in the same store (atomicity without cross-store coordination) and avoids a
+> CK-model version bump. The full mechanism lives in `octo-construction-kit-engine-mongodb`'s
+> `Runtime.Engine.CrateDb` layer (`GenerationMapSqlBuilder`, `CrateDbArchiveRecomputeExecutor`,
+> `CrateQueryCompiler`); see that repo's CLAUDE.md "Optimistic Recompute — Per-Window Generation
+> Pointer". **Status: implemented** (unit-tested; live-CrateDB validation pending).
 
 ### Failure mode
 
@@ -163,11 +173,11 @@ state is ever observable. The failure is recorded in the job history (§7) with 
 Event-driven automatic threshold reset is **out of scope** (AB#4196); the ledger is the prepared
 data source for it.
 
-## §6 Read path (optimistic)
+## §6 Read path (optimistic) — implemented
 
-- `StreamDataQuery` / `StreamDataVariantExecutor` inject `WHERE generation = active(window)` for
-  generation-tracked archives, so a query during recompute returns a single consistent generation
-  per window.
+- The CrateDB read path (`CrateQueryCompiler`, driven by `CrateDbStreamDataRepository`'s four
+  windowed query methods) injects `generation = CASE WHEN <range> THEN <gen> … ELSE 0 END` for
+  rollup archives, so a query during recompute returns a single consistent generation per window.
 - No hard error, no `500`, no abort while a recompute runs (acceptance criterion). The mesh-adapter
   `GetQueryById` node (AB#4195) and the VOEST App (AB#4186) inherit this behavior for free.
 - **Optional soft hint**: the existing `was_updated` flag plus the new

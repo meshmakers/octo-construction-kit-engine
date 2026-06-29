@@ -268,8 +268,21 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
 
 ## §8 Active-archive lifecycle & backfill (Phase 7 — reuses AB#4184 orchestration, **not** its row-generation pointer)
 
-> **Status: planned (Phase 7), AB#4184 complete (2026-06-29) → unblocked.** Design concretised
-> below after mapping the AB#4184 implementation.
+> **Status: implemented (Phase 7, 2026-06-29).** Add / remove / formula-change land across engine
+> (`ArchiveLifecycleService` orchestration + `IArchiveRuntimeStore` / `IStreamDataRepository`
+> contracts), the CrateDb data plane (`ComputedColumnNaming` versioned names, dual-write
+> `BuildComputedPlan`, `BackfillComputedColumnAsync`, read-path gating via `ReadableComputedColumns`),
+> and the GraphQL / REST / SDK / octo-cli surface (`addComputedColumn` / `removeComputedColumn` /
+> `updateComputedColumnFormula`). `System.StreamData` 1.6.1 added `ComputedVersion`; 1.6.2 added the
+> transient `PendingFormula` marker.
+>
+> **MVP limitation (formula change):** a formula change re-versions the column's physical name
+> (`{base} → {base}__v{N+1}`), so changing the formula of a computed column that another computed
+> column references is **rejected** (`ComputedColumnInvalidException`) — re-point or remove the
+> dependent first. Direct-SQL / Grafana consumers that bind to the physical name must likewise follow
+> the rename. The root fix (logical-name binding with eval-time translation) is deferred; the add /
+> remove paths and formula changes on non-referenced columns are unaffected. Failure / removal leave
+> the superseded physical column as a harmless nullable orphan (CrateDB `DROP COLUMN` is avoided).
 
 Adding a computed column, changing its formula, or removing it on an `Activated` archive:
 

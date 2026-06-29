@@ -89,6 +89,7 @@ stages:
           # operations". Opt the local catalog back in for the steps that compile CK models
           # so dependency resolution succeeds (matches the MsBuild task default of true).
           - task: DotNetCoreCLI@2
+            retryCountOnTaskFailure: 2
             displayName: 'Build src'
             inputs:
               command: 'build'
@@ -97,12 +98,14 @@ stages:
                 !src/**/Generated*.csproj
               arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoLocalCatalogIsEnabled=true /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
           - task: DotNetCoreCLI@2
+            retryCountOnTaskFailure: 2
             displayName: 'Build samples'
             inputs:
               command: 'build'
               projects: 'samples/**/*.csproj'
               arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
           - task: DotNetCoreCLI@2
+            retryCountOnTaskFailure: 2
             displayName: 'Test'
             inputs:
               command: 'test'

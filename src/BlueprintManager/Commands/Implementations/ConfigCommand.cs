@@ -77,8 +77,11 @@ internal class ConfigCommand : Command<BpmToolOptions>
         if (CommandArgumentValue.IsArgumentUsed(_localCatalogPath))
         {
             Logger.LogInformation("Configuring local catalog path");
-            _localCatalogOptions.Value.RootPath =
-                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogPath).ToLower();
+            // Use ApplyRootPath (not a raw .ToLower() assignment): it preserves case — on
+            // case-sensitive file systems a lower-cased path is a different directory (instant
+            // split-brain) — and co-locates the catalog cache with the content under the new root.
+            _localCatalogOptions.Value.ApplyRootPath(
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogPath));
         }
         if (CommandArgumentValue.IsArgumentUsed(_localCatalogEnabled))
         {

@@ -246,7 +246,7 @@ The bump is additive; existing archives migrate via the no-migrations bridge (CL
 | REST (`StreamDataController` / `TimeSeriesServicesClient`) | `POST …/archives/{rtId}/recompute`, `GET …/archives/{rtId}/recompute-jobs`. |
 | octo-cli | new `RecomputeArchive` command + `ListRecomputeJobs` (next to `RewindRollupWatermark`). |
 | Engine | `RollupDependencyGraph` walker, `RecomputeOrchestrator` + `RecomputeOrchestratorHostedService`, staging-table builder + generation-pointer swap in `CrateDbStreamDataRepository`, Mongo dirty-ledger + job-history store. |
-| Studio (`octo-frontend-refinery-studio` + `octo-frontend-libraries`) | Archive detail: recompute action (optional range / rtId scope), `last success / in-progress / last failure (+reason)` panel, dirty-windows badge, job-history table. |
+| Studio (`octo-frontend-refinery-studio`) | **Done (Phase 7).** Archive-detail `rollups-panel` extended: a Recompute column (in-progress / pending dirty+range counts / last success+failure with reason), a recompute action with a from/to range picker, and a per-rollup recompute-job history table for debugging failures. |
 
 ## §10 Test matrix (acceptance criteria)
 

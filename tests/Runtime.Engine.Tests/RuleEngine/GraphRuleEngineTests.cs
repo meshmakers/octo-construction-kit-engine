@@ -273,6 +273,68 @@ public class GraphRuleEngineTests(CacheServiceFixture fixture) : IClassFixture<C
         Assert.Equal(14, operationResult.Messages[0].MessageNumber);
     }
 
+    [Fact]
+    public async Task ValidateAsync_CreateMultipleParentsFromEmpty_AddsError()
+    {
+        // Bug 1922: a to-one role (ParentChild outbound = Parent) must not gain multiple targets
+        // in a single mutation even when no association exists yet (currentMultiplicity == Zero).
+        // Arrange
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var target1 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+        var target2 = CreateEntity(TestCkIds.RtCkContinentTypeId);
+
+        SetupEntityRetrieval(dataSource, [origin, target1, target2]);
+        SetupEmptyAssociations(dataSource);
+        // Note: no SetupMultiplicity → currentMultiplicity defaults to Zero (node has no parent yet).
+
+        // Act — create two parents in one batch
+        await engine.ValidateAsync(session, dataSource,
+            [EntityUpdateInfo<RtEntity>.CreateUpdate(origin.ToRtEntityId(), origin)],
+            [
+                AssociationUpdateInfo.CreateInsert(origin.ToRtEntityId(), target1.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId),
+                AssociationUpdateInfo.CreateInsert(origin.ToRtEntityId(), target2.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId)
+            ],
+            originFileResolver, operationResult);
+
+        // Assert
+        Assert.Single(operationResult.Messages);
+        Assert.True(operationResult.HasFatalErrors);
+        Assert.Equal(14, operationResult.Messages[0].MessageNumber);
+    }
+
+    [Fact]
+    public async Task ValidateAsync_AddParentToExistingParent_AddsError()
+    {
+        // Bug 1922: adding a second parent to a node that already has one (currentMultiplicity == One)
+        // must be rejected for the to-one ParentChild role.
+        // Arrange
+        var (engine, session, dataSource, operationResult, originFileResolver) = CreateTestObjects();
+        var origin = CreateEntity(TestCkIds.RtCkCountryTypeId);
+        var newParent = CreateEntity(TestCkIds.RtCkContinentTypeId);
+
+        SetupEntityRetrieval(dataSource, [origin, newParent]);
+        SetupEmptyAssociations(dataSource);
+        SetupMultiplicity(dataSource, origin, SystemCkIds.RtCkParentChildRoleId, GraphDirections.Outbound,
+            CurrentMultiplicity.One);
+
+        // Act — add a single additional parent without removing the existing one
+        await engine.ValidateAsync(session, dataSource,
+            [EntityUpdateInfo<RtEntity>.CreateUpdate(origin.ToRtEntityId(), origin)],
+            [
+                AssociationUpdateInfo.CreateInsert(origin.ToRtEntityId(), newParent.ToRtEntityId(),
+                    SystemCkIds.RtCkParentChildRoleId)
+            ],
+            originFileResolver, operationResult);
+
+        // Assert
+        Assert.Single(operationResult.Messages);
+        Assert.True(operationResult.HasFatalErrors);
+        Assert.Equal(14, operationResult.Messages[0].MessageNumber);
+    }
+
     #endregion
 
     #region Entity Deletion Tests

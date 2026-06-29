@@ -23,7 +23,7 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9" />
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4" PrivateAssets="All" />
         <PackageReference Include="System.Text.Json" Version="10.0.9" />
-        <PackageReference Include="YamlDotNet" Version="18.0.0" />
+        <PackageReference Include="YamlDotNet" Version="18.1.0" />
     </ItemGroup>
 
     <ItemGroup>

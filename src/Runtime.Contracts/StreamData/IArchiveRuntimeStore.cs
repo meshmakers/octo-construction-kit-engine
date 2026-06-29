@@ -62,4 +62,27 @@ public interface IArchiveRuntimeStore
     /// the read path no longer projects); a later re-add of the same name reuses it.
     /// </summary>
     Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name);
+
+    /// <summary>
+    /// Sets the transient <c>PendingFormula</c> marker on a computed column (AB#4189 Phase 7),
+    /// starting a formula change: the column keeps serving its current formula while ingest begins
+    /// dual-writing the pending formula into the versioned physical column. The column stays
+    /// <c>Active</c> throughout.
+    /// </summary>
+    Task SetPendingFormulaAsync(OctoObjectId archiveRtId, string name, string pendingFormula);
+
+    /// <summary>
+    /// Atomically swaps a computed column to its new formula once the backfill completes (AB#4189
+    /// Phase 7): sets <c>Formula = newFormula</c>, <c>ComputedVersion = newVersion</c>, and clears
+    /// <c>PendingFormula</c> in one write. After this the read path resolves the column to the new
+    /// versioned physical column.
+    /// </summary>
+    Task SwapComputedColumnFormulaAsync(OctoObjectId archiveRtId, string name, string newFormula, int newVersion);
+
+    /// <summary>
+    /// Clears the <c>PendingFormula</c> marker without swapping (AB#4189 Phase 7), reverting a failed
+    /// formula change: the column keeps its previous formula / version and ingest stops dual-writing.
+    /// The orphaned pending physical column is left in place.
+    /// </summary>
+    Task ClearPendingFormulaAsync(OctoObjectId archiveRtId, string name);
 }

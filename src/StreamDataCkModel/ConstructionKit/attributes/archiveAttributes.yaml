@@ -49,3 +49,7 @@ attributes:
     defaultValues:
       - 0
     isRuntimeState: true
+  - id: CkArchiveColumn.PendingFormula
+    description: "Engine-managed transient marker for an in-progress formula change on a computed column (AB#4189 Phase 7). While set, the column keeps serving its previous formula's values (Formula at ComputedVersion N) and a backfill populates the new formula into the versioned physical column {base}__v{N+1}; ingest dual-writes both. Null in steady state. On backfill completion the engine swaps Formula <- PendingFormula, ComputedVersion <- N+1, and clears this field atomically."
+    valueType: String
+    isRuntimeState: true

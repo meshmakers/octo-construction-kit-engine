@@ -229,6 +229,68 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _logger.LogInformation("Computed column '{Column}' removed from archive {Archive}.", name, archiveRtId);
     }
 
+    /// <inheritdoc />
+    public async Task UpdateComputedColumnFormulaAsync(OctoObjectId archiveRtId, string name, string formula)
+    {
+        var snapshot = await LoadAsync(archiveRtId);
+        if (snapshot.Status != CkArchiveStatus.Activated)
+        {
+            throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status,
+                "change a computed column formula on");
+        }
+
+        var target = snapshot.Columns.FirstOrDefault(
+            c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal));
+        if (target is null)
+        {
+            throw new InvalidOperationException(
+                $"Computed column '{name}' does not exist on archive {archiveRtId}.");
+        }
+
+        if (string.Equals(target.Formula, formula, StringComparison.Ordinal))
+        {
+            return; // no-op: formula unchanged
+        }
+
+        // Validate the prospective set with the target's formula replaced (catches a now-cyclic or
+        // unresolvable reference) before touching anything.
+        var prospective = snapshot.Columns
+            .Select(c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal)
+                ? c with { Formula = formula }
+                : c)
+            .ToList();
+        await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective);
+
+        using var activity = StreamDataDiagnostics.ActivitySource.StartActivity("archive.updateComputedColumnFormula");
+        activity?.SetTag("streamdata.archive.rtid", archiveRtId.ToString());
+        activity?.SetTag("streamdata.computedcolumn.name", name);
+
+        // Order matters: add the pending physical column BEFORE marking PendingFormula, so ingest's
+        // dual-write (which starts the moment the marker is persisted) never targets a missing column.
+        await _repository.AddPendingComputedColumnStorageAsync(snapshot, name);
+        await _store.SetPendingFormulaAsync(archiveRtId, name, formula);
+        var withPending = await LoadAsync(archiveRtId);
+
+        try
+        {
+            await _repository.BackfillComputedColumnAsync(withPending, name);
+            // Atomic swap: the version pointer flip is the commit — readers move from the previous
+            // formula's values to the new ones in a single store write.
+            await _store.SwapComputedColumnFormulaAsync(archiveRtId, name, formula, target.ComputedVersion + 1);
+            _logger.LogInformation(
+                "Computed column '{Column}' on archive {Archive} re-formulated and backfilled (version {Version}).",
+                name, archiveRtId, target.ComputedVersion + 1);
+        }
+        catch (Exception ex)
+        {
+            await _store.ClearPendingFormulaAsync(archiveRtId, name);
+            _logger.LogError(ex,
+                "Formula-change backfill of computed column '{Column}' on archive {Archive} failed; reverted to the previous formula.",
+                name, archiveRtId);
+            throw;
+        }
+    }
+
     private async Task<ArchiveSnapshot> LoadAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await _store.GetAsync(archiveRtId);

@@ -69,6 +69,15 @@ public interface IStreamDataRepository
         ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Adds the physical CrateDB column for the <em>pending</em> version of a computed column
+    /// (<c>{base}__v{ComputedVersion+1}</c>) via <c>ALTER TABLE … ADD COLUMN</c> (AB#4189 Phase 7,
+    /// formula change). Idempotent. Must run before the pending formula is marked so ingest's
+    /// dual-write never targets a missing column.
+    /// </summary>
+    Task AddPendingComputedColumnStorageAsync(
+        ArchiveSnapshot snapshot, string columnName, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Backfills the computed column named <paramref name="columnName"/> across the archive's
     /// existing rows (AB#4189 Phase 7, §8): pages through the rows, evaluates the column's formula
     /// per row, and writes the result into its physical cell. The physical column must already exist

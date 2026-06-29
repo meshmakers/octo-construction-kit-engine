@@ -24,3 +24,6 @@ records:
       - id: ${this}/CkArchiveColumn.ComputedVersion
         name: ComputedVersion
         isOptional: true
+      - id: ${this}/CkArchiveColumn.PendingFormula
+        name: PendingFormula
+        isOptional: true

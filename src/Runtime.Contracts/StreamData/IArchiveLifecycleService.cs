@@ -69,4 +69,14 @@ public interface IArchiveLifecycleService
     /// column is left as a harmless orphan the read path no longer projects.
     /// </summary>
     Task RemoveComputedColumnAsync(OctoObjectId archiveRtId, string name);
+
+    /// <summary>
+    /// Changes the formula of an existing computed column on an active archive with optimistic /
+    /// atomic semantics (AB#4189 Phase 7, §8): readers keep seeing the previous formula's values
+    /// while a backfill populates the new formula into a fresh versioned physical column, then the
+    /// column-version pointer is swapped atomically. A backfill failure reverts to the previous
+    /// formula. The result type is unchanged (a formula edit cannot retype the column). No-op when
+    /// the formula is unchanged.
+    /// </summary>
+    Task UpdateComputedColumnFormulaAsync(OctoObjectId archiveRtId, string name, string formula);
 }

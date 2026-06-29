@@ -109,6 +109,18 @@ public sealed record CkArchiveColumnSpec(
     /// </summary>
     public int ComputedVersion { get; init; }
 
+    /// <summary>
+    /// Engine-managed transient marker for an in-progress formula change (AB#4189 Phase 7). While
+    /// non-null, the column keeps serving its <see cref="Formula"/> (active, at
+    /// <see cref="ComputedVersion"/>) and a backfill populates this new formula into the versioned
+    /// physical column <c>{base}__v{ComputedVersion+1}</c>; ingest dual-writes both. Null in steady
+    /// state. See <c>System.StreamData</c> 1.6.2.
+    /// </summary>
+    public string? PendingFormula { get; init; }
+
     /// <summary>True when this is a computed column (has a <see cref="Formula"/>).</summary>
     public bool IsComputed => !string.IsNullOrWhiteSpace(Formula);
+
+    /// <summary>True when a formula change is mid-flight (a backfill is populating the new formula).</summary>
+    public bool HasPendingFormula => !string.IsNullOrWhiteSpace(PendingFormula);
 }

@@ -30,6 +30,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     private readonly IArchiveRecomputeStateStore _stateStore;
     private readonly IRecomputeJobStore _jobStore;
     private readonly IArchiveRecomputeExecutor _executor;
+    private readonly IStreamDataRepository _streamData;
     private readonly IArchiveAuditTrail _audit;
     private readonly ILogger<RecomputeOrchestrator> _logger;
     private readonly Func<DateTime> _clock;
@@ -43,6 +44,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         IArchiveRecomputeStateStore stateStore,
         IRecomputeJobStore jobStore,
         IArchiveRecomputeExecutor executor,
+        IStreamDataRepository streamData,
         IArchiveAuditTrail audit,
         ILogger<RecomputeOrchestrator> logger,
         Func<DateTime> clock)
@@ -54,6 +56,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         _stateStore = stateStore;
         _jobStore = jobStore;
         _executor = executor;
+        _streamData = streamData;
         _audit = audit;
         _logger = logger;
         _clock = clock;
@@ -240,6 +243,58 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
             return failed;
         }
+    }
+
+    /// <summary>
+    /// Backfill (AB#4269): populate / reset a rollup over the entire history of its source archive.
+    /// Resolves the source archive's earliest stored timestamp, snaps it down to the rollup's bucket
+    /// boundary, and recomputes <c>[sourceMin, now)</c> through the optimistic recompute path. An
+    /// empty source archive is a no-op (returns <c>null</c>); a non-rollup target produces a failed
+    /// job, exactly as <see cref="RecomputeArchiveAsync"/> would.
+    /// </summary>
+    public async Task<RecomputeJobSnapshot?> BackfillRollupFromSourceAsync(
+        OctoObjectId rollupRtId, CancellationToken cancellationToken)
+    {
+        var rollup = await _rollupStore.GetAsync(rollupRtId);
+        if (rollup is null)
+        {
+            // Not a rollup (or deleted): delegate to the recompute path so the caller gets the same
+            // failed-job shape recomputeArchive would return for a non-rollup target.
+            var nowForFailure = _clock();
+            return await RecomputeArchiveAsync(
+                rollupRtId, nowForFailure, nowForFailure, rtIdScope: null, RecomputeTrigger.Manual, cancellationToken);
+        }
+
+        var sourceMin = await _streamData.GetArchiveMinTimestampAsync(rollup.SourceArchiveRtId, cancellationToken);
+        if (sourceMin is null)
+        {
+            _logger.LogInformation(
+                "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds no data — nothing to recompute (no-op).",
+                rollupRtId, rollup.SourceArchiveRtId);
+            return null;
+        }
+
+        var now = _clock();
+
+        // Snap the source's earliest timestamp down to the rollup's bucket boundary so the recompute
+        // starts on a clean bucket-start; recompute the whole history [from, now).
+        var (from, _) = RecomputePlanner.AlignRangeToBuckets(
+            sourceMin.Value, sourceMin.Value, rollup.BucketAlignment, rollup.BucketSize);
+
+        if (now <= from)
+        {
+            _logger.LogInformation(
+                "Backfill of rollup {RollupRtId}: aligned source start {From:O} is not before now {Now:O} — nothing to recompute (no-op).",
+                rollupRtId, from, now);
+            return null;
+        }
+
+        _logger.LogInformation(
+            "Backfill of rollup {RollupRtId}: recomputing entire history [{From:O}, {Now:O}) from source {SourceRtId} (earliest source ts {SourceMin:O}).",
+            rollupRtId, from, now, rollup.SourceArchiveRtId, sourceMin.Value);
+
+        return await RecomputeArchiveAsync(
+            rollupRtId, from, now, rtIdScope: null, RecomputeTrigger.Manual, cancellationToken);
     }
 
     private async Task EnqueueOnDirectDependentsAsync(

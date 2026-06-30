@@ -28,6 +28,7 @@ public class RecomputeOrchestratorTests
     private readonly IArchiveRecomputeStateStore _stateStore = A.Fake<IArchiveRecomputeStateStore>();
     private readonly IRecomputeJobStore _jobStore = A.Fake<IRecomputeJobStore>();
     private readonly IArchiveRecomputeExecutor _executor = A.Fake<IArchiveRecomputeExecutor>();
+    private readonly IStreamDataRepository _streamData = A.Fake<IStreamDataRepository>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
     public RecomputeOrchestratorTests()
@@ -47,7 +48,7 @@ public class RecomputeOrchestratorTests
     }
 
     private RecomputeOrchestrator NewSut() =>
-        new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _audit,
+        new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _streamData, _audit,
             NullLogger<RecomputeOrchestrator>.Instance, () => Now);
 
     private static RollupArchiveSnapshot Rollup(
@@ -215,6 +216,60 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
         A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // ---- BackfillRollupFromSourceAsync (AB#4269) ----------------------------------------------
+
+    [Fact]
+    public async Task Backfill_ResolvesSourceMin_AlignsDownToBucket_AndRecomputesToNow()
+    {
+        StubRollupAndSource(); // bucket size = 1h, FixedSize alignment
+        var sourceMin = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
+            .Returns(sourceMin);
+
+        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.NotNull(job);
+        Assert.Equal(RecomputeJobState.Completed, job!.State);
+        // Source min 10:15 snaps down to the 10:00 bucket boundary; the range ends at Now (14:00).
+        var expectedFrom = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, expectedFrom, Now, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Backfill_EmptySource_IsNoOp_ReturnsNullWithoutRunningExecutor()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
+            .Returns((DateTime?)null);
+
+        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.Null(job);
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Backfill_NotARollup_FailsWithoutResolvingSourceMin()
+    {
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns((RollupArchiveSnapshot?)null);
+
+        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.NotNull(job);
+        Assert.Equal(RecomputeJobState.Failed, job!.State);
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(A<OctoObjectId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
     }
 
     // ---- TickAsync ----------------------------------------------------------------------------

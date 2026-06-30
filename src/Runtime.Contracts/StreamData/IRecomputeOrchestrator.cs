@@ -36,4 +36,17 @@ public interface IRecomputeOrchestrator
     /// direct dependents, then clears the windows (Information A → B).
     /// </summary>
     Task PropagateDirtyWindowsAsync(OctoObjectId sourceArchiveRtId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Populates / resets a rollup over the <em>entire</em> history of its source archive without the
+    /// operator supplying a timestamp (AB#4269). Resolves the source archive's earliest stored
+    /// timestamp, snaps it down to the rollup's bucket boundary, and recomputes the rollup over
+    /// <c>[sourceMin, now)</c> via the existing optimistic recompute path
+    /// (<see cref="RecomputeArchiveAsync"/> with <see cref="RecomputeTrigger.Manual"/>) — so the
+    /// reader-safe atomic generation-swap and <see cref="RecomputeJobSnapshot"/> observability are
+    /// reused for both "create/populate" and "reset a populated rollup". Returns the resulting job
+    /// snapshot, or <c>null</c> when the source archive holds no data (no-op).
+    /// </summary>
+    Task<RecomputeJobSnapshot?> BackfillRollupFromSourceAsync(
+        OctoObjectId rollupRtId, CancellationToken cancellationToken);
 }

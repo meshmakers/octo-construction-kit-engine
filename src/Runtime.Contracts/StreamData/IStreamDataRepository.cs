@@ -211,6 +211,17 @@ public interface IStreamDataRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Resolves the earliest stored timestamp in the archive's backing table — <c>MIN(window_start)</c>
+    /// for windowed (rollup / time-range) archives, <c>MIN(timestamp)</c> for raw archives (AB#4269).
+    /// Used by rollup backfill to recompute a rollup over its source archive's entire history without
+    /// the operator supplying a start timestamp. Returns <c>null</c> when the archive has no backing
+    /// table yet (e.g. <c>Created</c>) or the table is empty.
+    /// </summary>
+    Task<DateTime?> GetArchiveMinTimestampAsync(
+        OctoObjectId archiveRtId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Returns per-archive storage stats (row count, on-disk size, health) for each
     /// <paramref name="archiveRtIds"/> entry. Bulk call so the studio's archives list can render
     /// stats columns without an N+1 round-trip per row. Archives whose backing table doesn't

@@ -15,6 +15,13 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 public static class RecomputePlanner
 {
     /// <summary>
+    /// Upper bound on bucket-stepping iterations in <see cref="PlanChunks"/>, mirroring the executor's
+    /// bucket enumerator. A 10-year hourly range is ~87k buckets, far below this — the guard only trips
+    /// on a pathological (mis-configured sub-second) bucket size.
+    /// </summary>
+    private const int RunawayGuard = 10_000_000;
+
+    /// <summary>
     /// Builds one <see cref="ArchiveRecomputeRange"/> per dependent for the given dirty window, each
     /// snapped to that dependent's own bucket boundaries. Returns an empty list when the change was
     /// a forward <see cref="RecomputeChangeKind.Append"/> (which the watermark orchestrator already
@@ -67,6 +74,76 @@ public static class RecomputePlanner
     }
 
     /// <summary>
+    /// Splits a bucket-aligned recompute range <c>[from, to)</c> into contiguous, non-overlapping
+    /// sub-ranges of at most <paramref name="maxBucketsPerChunk"/> whole buckets each (AB#4283). This
+    /// is the chunk planner that keeps every executor sub-run's staging→swap statements well under the
+    /// CrateDB per-statement / Polly timeout: a 10-year hourly recompute (~87k buckets) processed in
+    /// one shot exhausts the 30s statement timeout on the staging→live copy and sweep, so the
+    /// orchestrator drives the executor once per chunk instead. Chunk boundaries always fall on bucket
+    /// boundaries (walked via the same arithmetic the executor's bucket enumerator uses), so no bucket
+    /// is ever split across two chunks and none is processed twice.
+    /// </summary>
+    /// <remarks>
+    /// Returns a single chunk when the whole range fits in <paramref name="maxBucketsPerChunk"/>
+    /// buckets (the common small-range case — identical to the pre-chunking behaviour), and an empty
+    /// list for an empty or inverted range. The final chunk mirrors the executor's bucket enumerator:
+    /// if <paramref name="to"/> is not bucket-aligned the last bucket extends past it, exactly as a
+    /// single un-chunked call would.
+    /// </remarks>
+    public static IReadOnlyList<(DateTime Start, DateTime End)> PlanChunks(
+        DateTime from, DateTime to, BucketAlignment alignment, TimeSpan bucketSize, int maxBucketsPerChunk)
+    {
+        if (maxBucketsPerChunk <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxBucketsPerChunk), maxBucketsPerChunk, "Chunk size must be positive.");
+        }
+
+        var chunks = new List<(DateTime Start, DateTime End)>();
+        var fromUtc = ToUtc(from);
+        var toUtc = ToUtc(to);
+        if (toUtc <= fromUtc)
+        {
+            return chunks;
+        }
+
+        var chunkStart = fromUtc;
+        var cursor = fromUtc;
+        var bucketsInChunk = 0;
+        var guard = 0;
+        while (cursor < toUtc)
+        {
+            var next = BucketBoundary.NextBucketEnd(cursor, alignment, bucketSize);
+            if (next <= cursor)
+            {
+                break; // defensive: zero / negative bucket would loop forever
+            }
+
+            cursor = next;
+            bucketsInChunk++;
+
+            if (bucketsInChunk >= maxBucketsPerChunk)
+            {
+                chunks.Add((chunkStart, cursor));
+                chunkStart = cursor;
+                bucketsInChunk = 0;
+            }
+
+            if (++guard > RunawayGuard)
+            {
+                break;
+            }
+        }
+
+        if (bucketsInChunk > 0)
+        {
+            chunks.Add((chunkStart, cursor));
+        }
+
+        return chunks;
+    }
+
+    /// <summary>
     /// Coalesces overlapping or touching <c>[Start, End)</c> intervals into the minimal set of
     /// disjoint intervals, ordered by start. Used by the recompute orchestrator's coalesce policy to
     /// fold a freshly triggered range into the ranges already pending for the same archive.
@@ -106,4 +183,11 @@ public static class RecomputePlanner
 
         return merged;
     }
+
+    private static DateTime ToUtc(DateTime value) => value.Kind switch
+    {
+        DateTimeKind.Utc => value,
+        DateTimeKind.Local => value.ToUniversalTime(),
+        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+    };
 }

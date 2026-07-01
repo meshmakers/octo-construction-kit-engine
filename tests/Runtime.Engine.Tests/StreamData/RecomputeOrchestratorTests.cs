@@ -47,9 +47,9 @@ public class RecomputeOrchestratorTests
             .Returns(new RecomputeExecutionResult(42, 3));
     }
 
-    private RecomputeOrchestrator NewSut() =>
+    private RecomputeOrchestrator NewSut(int maxBucketsPerChunk = RecomputeOrchestrator.DefaultMaxBucketsPerChunk) =>
         new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _streamData, _audit,
-            NullLogger<RecomputeOrchestrator>.Instance, () => Now);
+            NullLogger<RecomputeOrchestrator>.Instance, () => Now, maxBucketsPerChunk);
 
     private static RollupArchiveSnapshot Rollup(
         OctoObjectId rtId, OctoObjectId sourceRtId, CkArchiveStatus status = CkArchiveStatus.Activated) =>
@@ -106,6 +106,71 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(directChild.RtId, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustHaveHappenedOnceExactly();
         A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(grandChild.RtId, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    // ---- Chunking (AB#4283) ------------------------------------------------------------------
+
+    [Fact]
+    public async Task Recompute_LargeRange_SplitsIntoChunks_AndAccumulatesTotals()
+    {
+        StubRollupAndSource(); // bucket size = 1h, FixedSize alignment
+
+        // 5 hourly buckets with a chunk cap of 2 → 3 chunks: [0,2h), [2,4h), [4,5h).
+        var from = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 5, 0, 0, DateTimeKind.Utc);
+
+        var job = await NewSut(maxBucketsPerChunk: 2)
+            .RecomputeArchiveAsync(RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Completed, job.State);
+        // Executor returns (42, 3) per call; three chunks → totals accumulate.
+        Assert.Equal(126, job.RowsProcessed);
+        Assert.Equal(9, job.WindowsProcessed);
+
+        // Exactly three executor calls, one per contiguous chunk, no bucket split or overlap.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                from, new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc), null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc), null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc), to, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustHaveHappened(3, Times.Exactly);
+
+        // Audit records the whole [from, to) range with the accumulated totals.
+        A.CallTo(() => _audit.RecordRecomputeRunAsync(TenantId, RollupRt, from, to, 126, 9, A<TimeSpan>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_LargeRange_MidChunkFailure_LeavesPriorChunksCommitted()
+    {
+        StubRollupAndSource();
+        var from = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 5, 0, 0, DateTimeKind.Utc);
+
+        // Second chunk starts at 02:00 → throw there; first chunk (00:00) has already committed.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc), A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("chunk 2 exploded"));
+
+        var job = await NewSut(maxBucketsPerChunk: 2)
+            .RecomputeArchiveAsync(RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.Equal("chunk 2 exploded", job.ErrorReason);
+        // The first chunk committed before the failure (partial-progress semantics).
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                from, new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc), null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        // No chain propagation on failure.
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
     }
 

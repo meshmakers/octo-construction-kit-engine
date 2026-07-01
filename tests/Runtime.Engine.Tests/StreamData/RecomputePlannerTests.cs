@@ -163,4 +163,113 @@ public class RecomputePlannerTests
 
         Assert.Empty(merged);
     }
+
+    // ---- PlanChunks (AB#4283) ----------------------------------------------------------------
+
+    [Fact]
+    public void PlanChunks_RangeFitsInOneChunk_ReturnsSingleWholeRange()
+    {
+        // 5 hourly buckets, chunk cap 10 → one chunk covering the whole range (small-range case).
+        var chunks = RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 0), Utc(2026, 5, 11, 5), BucketAlignment.FixedSize, TimeSpan.FromHours(1), 10);
+
+        Assert.Single(chunks);
+        Assert.Equal((Utc(2026, 5, 11, 0), Utc(2026, 5, 11, 5)), chunks[0]);
+    }
+
+    [Fact]
+    public void PlanChunks_ManyBuckets_SplitsIntoContiguousBoundedChunks()
+    {
+        // 5 hourly buckets, chunk cap 2 → [0,2), [2,4), [4,5).
+        var chunks = RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 0), Utc(2026, 5, 11, 5), BucketAlignment.FixedSize, TimeSpan.FromHours(1), 2);
+
+        Assert.Equal(3, chunks.Count);
+        Assert.Equal((Utc(2026, 5, 11, 0), Utc(2026, 5, 11, 2)), chunks[0]);
+        Assert.Equal((Utc(2026, 5, 11, 2), Utc(2026, 5, 11, 4)), chunks[1]);
+        Assert.Equal((Utc(2026, 5, 11, 4), Utc(2026, 5, 11, 5)), chunks[2]);
+    }
+
+    [Fact]
+    public void PlanChunks_ChunksAreContiguousCoverTheWholeRangeAndDoNotSplitBuckets()
+    {
+        var from = Utc(2026, 5, 11, 0);
+        var to = Utc(2026, 5, 11, 7); // 7 hourly buckets
+        var bucket = TimeSpan.FromHours(1);
+
+        var chunks = RecomputePlanner.PlanChunks(from, to, BucketAlignment.FixedSize, bucket, 3);
+
+        // Contiguous, no gaps or overlaps: first starts at from, last ends at to, each chunk's end
+        // equals the next chunk's start.
+        Assert.Equal(from, chunks[0].Start);
+        Assert.Equal(to, chunks[^1].End);
+        for (var i = 1; i < chunks.Count; i++)
+        {
+            Assert.Equal(chunks[i - 1].End, chunks[i].Start);
+        }
+
+        // Every chunk boundary lands on a whole-bucket boundary (no bucket is split) and no chunk
+        // exceeds the cap of 3 buckets.
+        foreach (var (start, end) in chunks)
+        {
+            Assert.Equal(0, (start - from).Ticks % bucket.Ticks);
+            Assert.Equal(0, (end - from).Ticks % bucket.Ticks);
+            var buckets = (int)((end - start).Ticks / bucket.Ticks);
+            Assert.InRange(buckets, 1, 3);
+        }
+
+        // The chunks tile exactly [from, to): total buckets == 7.
+        Assert.Equal(7, chunks.Sum(c => (int)((c.End - c.Start).Ticks / bucket.Ticks)));
+    }
+
+    [Fact]
+    public void PlanChunks_CalendarMonthAlignment_StepsWholeMonths()
+    {
+        // 5 calendar months, cap 2 → [Jan,Mar), [Mar,May), [May,Jun).
+        var chunks = RecomputePlanner.PlanChunks(
+            Utc(2026, 1, 1), Utc(2026, 6, 1), BucketAlignment.CalendarMonth, TimeSpan.FromDays(30), 2);
+
+        Assert.Equal(3, chunks.Count);
+        Assert.Equal((Utc(2026, 1, 1), Utc(2026, 3, 1)), chunks[0]);
+        Assert.Equal((Utc(2026, 3, 1), Utc(2026, 5, 1)), chunks[1]);
+        Assert.Equal((Utc(2026, 5, 1), Utc(2026, 6, 1)), chunks[2]);
+    }
+
+    [Fact]
+    public void PlanChunks_InvertedOrEmptyRange_ReturnsEmpty()
+    {
+        Assert.Empty(RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 5), Utc(2026, 5, 11, 5), BucketAlignment.FixedSize, TimeSpan.FromHours(1), 4));
+        Assert.Empty(RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 6), Utc(2026, 5, 11, 5), BucketAlignment.FixedSize, TimeSpan.FromHours(1), 4));
+    }
+
+    [Fact]
+    public void PlanChunks_NonPositiveChunkSize_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 0), Utc(2026, 5, 11, 5), BucketAlignment.FixedSize, TimeSpan.FromHours(1), 0));
+    }
+
+    [Fact]
+    public void PlanChunks_DecadeHourlyRange_TilesEveryBucketExactlyOnce()
+    {
+        // Regression guard for the AB#4283 use case: ~10y of hourly buckets chunked at the default
+        // 2000 must tile the whole range with contiguous, non-overlapping chunks.
+        var from = Utc(2016, 1, 1);
+        var to = Utc(2026, 1, 1);
+        var bucket = TimeSpan.FromHours(1);
+        var expectedBuckets = (int)((to - from).Ticks / bucket.Ticks);
+
+        var chunks = RecomputePlanner.PlanChunks(from, to, BucketAlignment.FixedSize, bucket, 2000);
+
+        Assert.Equal(from, chunks[0].Start);
+        Assert.Equal(to, chunks[^1].End);
+        for (var i = 1; i < chunks.Count; i++)
+        {
+            Assert.Equal(chunks[i - 1].End, chunks[i].Start);
+        }
+        Assert.All(chunks, c => Assert.InRange((int)((c.End - c.Start).Ticks / bucket.Ticks), 1, 2000));
+        Assert.Equal(expectedBuckets, chunks.Sum(c => (int)((c.End - c.Start).Ticks / bucket.Ticks)));
+    }
 }

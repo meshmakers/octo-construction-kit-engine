@@ -30,13 +30,19 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// etc.). A rollup rung is a valid source only when its stored function equals this; on the base
 /// archive it is the only semantic source and drives the downsampling reducer.
 /// </param>
+/// <param name="SourcePath">
+/// The logical CK attribute path of the measured column the series reduces (e.g.
+/// <c>Amount.Value</c>). Used to match a rollup's aggregation spec: a rollup rung is eligible only
+/// when it aggregates this path with <see cref="RequiredAggregation"/>.
+/// </param>
 public sealed record SeriesResolutionRequest(
     OctoObjectId? BaseArchiveRtId,
     RtCkId<CkTypeId>? TargetCkTypeId,
     DateTime From,
     DateTime To,
     int TargetPoints,
-    CkRollupFunction RequiredAggregation)
+    CkRollupFunction RequiredAggregation,
+    string SourcePath)
 {
     /// <summary>
     /// Optional runtime scope override — the source entity rtIds the series is restricted to (e.g. the

@@ -48,7 +48,10 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
         SeriesResolutionRequest request,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(request);
+        if (request is null)
+        {
+            throw new ArgumentNullException(nameof(request));
+        }
 
         if (request.BaseArchiveRtId is not { } baseRtId)
         {

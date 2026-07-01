@@ -41,8 +41,16 @@ internal static class SeriesResolutionPlanner
         CkRollupFunction requiredAggregation,
         Func<ResolutionRung, DateTime, DateTime, long?> effectiveGrainMs)
     {
-        ArgumentNullException.ThrowIfNull(ladder);
-        ArgumentNullException.ThrowIfNull(effectiveGrainMs);
+        if (ladder is null)
+        {
+            throw new ArgumentNullException(nameof(ladder));
+        }
+
+        if (effectiveGrainMs is null)
+        {
+            throw new ArgumentNullException(nameof(effectiveGrainMs));
+        }
+
         if (targetPoints <= 0)
         {
             throw new ArgumentOutOfRangeException(nameof(targetPoints), targetPoints, "TargetPoints must be positive.");

@@ -621,8 +621,23 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             var (start, end) = RecomputePlanner.AlignRangeToBuckets(
                 from, to, dependent.BucketAlignment, dependent.BucketSize);
 
+            // Clamp to what this dependent has actually aggregated (AB#4288). The retroactive-write
+            // detector flags a write when it is retroactive for the MOST-advanced dependent (max
+            // watermark), so a source can hand this dependent a window it has not reached yet. A
+            // dependent whose own LastAggregatedBucketEnd is at or before the window start has not
+            // aggregated it — recomputing would write a partial, not-yet-closed bucket; skip it and
+            // let its normal forward aggregation consume the corrected source data. Otherwise keep
+            // only the already-aggregated prefix [start, min(end, LastAggregatedBucketEnd)). Both
+            // bounds are bucket boundaries for this dependent, so the clamp stays bucket-aligned.
+            if (dependent.LastAggregatedBucketEnd is not { } aggregatedEnd || start >= aggregatedEnd)
+            {
+                continue;
+            }
+
+            var clampedEnd = end < aggregatedEnd ? end : aggregatedEnd;
+
             await _stateStore.EnqueueRecomputeRangesAsync(dependent.RtId,
-                new[] { new ArchiveRecomputeRange(dependent.RtId, start, end, null, _clock()) });
+                new[] { new ArchiveRecomputeRange(dependent.RtId, start, clampedEnd, null, _clock()) });
         }
     }
 

@@ -62,9 +62,10 @@ public class RecomputeOrchestratorTests
             delay: (_, _) => Task.CompletedTask);
 
     private static RollupArchiveSnapshot Rollup(
-        OctoObjectId rtId, OctoObjectId sourceRtId, CkArchiveStatus status = CkArchiveStatus.Activated) =>
+        OctoObjectId rtId, OctoObjectId sourceRtId, CkArchiveStatus status = CkArchiveStatus.Activated,
+        DateTime? lastAggregatedBucketEnd = null) =>
         new(rtId, TargetType, status, null, sourceRtId,
-            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), lastAggregatedBucketEnd,
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }, null);
 
     private static ArchiveSnapshot Source() =>
@@ -106,8 +107,9 @@ public class RecomputeOrchestratorTests
     public async Task Recompute_Success_PropagatesToDirectDependentsOnly()
     {
         StubRollupAndSource();
-        var directChild = Rollup(OctoObjectId.GenerateNewId(), RollupRt);
-        var grandChild = Rollup(OctoObjectId.GenerateNewId(), directChild.RtId);
+        // Watermark after the window so the AB#4288 per-dependent clamp keeps the full range.
+        var directChild = Rollup(OctoObjectId.GenerateNewId(), RollupRt, lastAggregatedBucketEnd: Now);
+        var grandChild = Rollup(OctoObjectId.GenerateNewId(), directChild.RtId, lastAggregatedBucketEnd: Now);
         A.CallTo(() => _graph.GetTransitiveDependentsAsync(RollupRt))
             .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { directChild, grandChild });
 
@@ -322,7 +324,8 @@ public class RecomputeOrchestratorTests
     [Fact]
     public async Task Propagate_RetroactiveWindow_EnqueuesAlignedRangeOnDependentAndClears()
     {
-        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt);
+        // Watermark well after the window so the AB#4288 clamp keeps the full aligned bucket.
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
         A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
             .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
         A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
@@ -341,6 +344,84 @@ public class RecomputeOrchestratorTests
                     rs.Count == 1
                     && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
                     && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // AB#4288: the retroactive-write detector flags a write when it is retroactive for the
+    // MOST-advanced dependent (max watermark), so a lagging dependent (e.g. a yearly rollup whose
+    // current bucket has not closed) can be handed a window it has not aggregated yet. Such a
+    // dependent must be skipped — recomputing would materialise a partial, not-yet-closed bucket.
+    [Fact]
+    public async Task Propagate_RetroactiveWindow_DependentWatermarkBehindWindow_IsSkipped()
+    {
+        // Aligned window is [10:00, 11:00); this dependent has only aggregated up to 09:00.
+        var laggingChild = Rollup(OctoObjectId.GenerateNewId(), SourceRt,
+            lastAggregatedBucketEnd: new DateTime(2026, 5, 11, 9, 0, 0, DateTimeKind.Utc));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { laggingChild });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Propagate_RetroactiveWindow_DependentNeverAggregated_IsSkipped()
+    {
+        // Null watermark: the dependent has never aggregated anything, so nothing is stale for it.
+        var freshChild = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: null);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { freshChild });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Propagate_RetroactiveWindow_DependentWatermarkMidWindow_ClampsRangeToWatermark()
+    {
+        // Aligned window is [10:00, 14:00); the dependent has aggregated only up to 12:00, so the
+        // enqueued range is clamped to [10:00, 12:00) — the already-aggregated prefix.
+        var partialChild = Rollup(OctoObjectId.GenerateNewId(), SourceRt,
+            lastAggregatedBucketEnd: new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { partialChild });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 13, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                partialChild.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc))))
             .MustHaveHappenedOnceExactly();
         A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
     }

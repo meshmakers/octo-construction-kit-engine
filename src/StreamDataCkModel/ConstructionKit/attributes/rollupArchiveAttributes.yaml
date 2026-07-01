@@ -28,6 +28,9 @@ attributes:
     valueCkEnumId: ${this}/BucketAlignment
     defaultValues:
       - 0
+  - id: RollupArchive.ReferenceTimeZone
+    description: "Optional IANA time-zone id (e.g. 'Europe/Vienna') used to align calendar bucket boundaries (day / week / month / year) to local wall-clock time so they are DST-correct across countries. Null (the default) keeps UTC calendar boundaries — the pre-1.6.4 behaviour. Only meaningful for calendar BucketAlignment variants; ignored for FixedSize. AB#4290 / decision O6."
+    valueType: String
 
   # ---------- CkRollupAggregation (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) -
   - id: CkRollupAggregation.SourcePath

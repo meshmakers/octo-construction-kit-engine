@@ -130,10 +130,37 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             return rung.GrainMs;
         }
 
-        var start = BucketBoundary.AlignDown(from, rung.Alignment, TimeSpan.Zero);
-        var end = BucketBoundary.NextBucketEnd(start, rung.Alignment, TimeSpan.Zero);
+        var zone = ResolveZone(rung.ReferenceTimeZone);
+        var start = BucketBoundary.AlignDown(from, rung.Alignment, TimeSpan.Zero, zone);
+        var end = BucketBoundary.NextBucketEnd(start, rung.Alignment, TimeSpan.Zero, zone);
         var ms = (long)(end - start).TotalMilliseconds;
         return ms > 0 ? ms : null;
+    }
+
+    /// <summary>
+    /// Resolves an IANA reference-time-zone id (O6) to a <see cref="TimeZoneInfo"/>, or null (⇒ UTC)
+    /// when unset or unknown. An unknown id is tolerated rather than fatal — the rung falls back to
+    /// UTC calendar alignment.
+    /// </summary>
+    private static TimeZoneInfo? ResolveZone(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+        {
+            return null;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(id);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            return null;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return null;
+        }
     }
 
     private static long? ToMs(TimeSpan? period) =>

@@ -11,11 +11,13 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// FixedSize uses. Concept-time-range §7.
 /// </summary>
 /// <remarks>
-/// All operations work in UTC and return UTC <see cref="DateTime"/> values. Callers should pass
-/// UTC inputs — the helpers normalise to UTC defensively but a non-UTC input would otherwise lead
-/// to subtle day/month-boundary drift. <c>BucketSize</c> is only consulted for
-/// <see cref="BucketAlignment.FixedSize"/>; the calendar variants ignore it entirely (the
-/// attribute is kept informational for monitoring / UI).
+/// All operations return UTC <see cref="DateTime"/> values. When <c>zone</c> is <c>null</c> the
+/// calendar variants align to UTC calendar boundaries — the legacy behaviour, preserved
+/// byte-for-byte. When a reference <see cref="TimeZoneInfo"/> is supplied (AB#4290 / O6), calendar
+/// boundaries snap to <em>local</em> wall-clock day / week / month / year boundaries and are
+/// DST-correct (a local calendar day across a DST transition is 23 h or 25 h, not a fixed 24 h).
+/// <c>BucketSize</c> is only consulted for <see cref="BucketAlignment.FixedSize"/>; the calendar
+/// variants ignore it entirely (the attribute is kept informational for monitoring / UI).
 /// </remarks>
 internal static class BucketBoundary
 {
@@ -23,66 +25,94 @@ internal static class BucketBoundary
     /// Computes the exclusive end of the bucket that starts at <paramref name="bucketStart"/>.
     /// For <see cref="BucketAlignment.FixedSize"/> this is the legacy
     /// <c>bucketStart + bucketSize</c> arithmetic; for calendar variants it's the next calendar
-    /// boundary (next day / Monday / first-of-month / Jan 1).
+    /// boundary (next day / Monday / first-of-month / Jan 1), in <paramref name="zone"/> if supplied.
     /// </summary>
-    public static DateTime NextBucketEnd(DateTime bucketStart, BucketAlignment alignment, TimeSpan bucketSize)
+    public static DateTime NextBucketEnd(
+        DateTime bucketStart, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
     {
-        var utc = ToUtc(bucketStart);
-        return alignment switch
+        if (alignment == BucketAlignment.FixedSize)
         {
-            BucketAlignment.FixedSize => bucketStart + bucketSize,
-            BucketAlignment.CalendarDay => utc.AddDays(1),
-            BucketAlignment.Iso8601Week => utc.AddDays(7),
-            BucketAlignment.CalendarMonth => utc.AddMonths(1),
-            BucketAlignment.CalendarYear => utc.AddYears(1),
-            _ => throw new ArgumentOutOfRangeException(nameof(alignment), alignment, "Unknown BucketAlignment value.")
+            return bucketStart + bucketSize;
+        }
+
+        var utc = ToUtc(bucketStart);
+        if (zone is null)
+        {
+            return alignment switch
+            {
+                BucketAlignment.CalendarDay => utc.AddDays(1),
+                BucketAlignment.Iso8601Week => utc.AddDays(7),
+                BucketAlignment.CalendarMonth => utc.AddMonths(1),
+                BucketAlignment.CalendarYear => utc.AddYears(1),
+                _ => throw UnknownAlignment(alignment)
+            };
+        }
+
+        // Zone-aware: advance one local calendar unit from the local boundary, then back to UTC.
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, zone);
+        var nextLocal = alignment switch
+        {
+            BucketAlignment.CalendarDay => local.AddDays(1),
+            BucketAlignment.Iso8601Week => local.AddDays(7),
+            BucketAlignment.CalendarMonth => local.AddMonths(1),
+            BucketAlignment.CalendarYear => local.AddYears(1),
+            _ => throw UnknownAlignment(alignment)
         };
+        return ToUtcFromLocal(nextLocal, zone);
     }
 
     /// <summary>
     /// Computes the initial value for <c>LastAggregatedBucketEnd</c> when a rollup activates.
     /// Result is the exclusive end of the last fully-completed bucket at <paramref name="now"/>
-    /// — so the orchestrator's next tick processes that bucket as a backlog of one. For FixedSize
-    /// this matches the legacy <c>truncate(now - bucketSize, bucketSize)</c> formula; for
-    /// calendar variants it returns the start of the period containing <paramref name="now"/>
-    /// (e.g. first-of-this-month for CalendarMonth — that's the exclusive end of last month).
+    /// — so the orchestrator's next tick processes that bucket as a backlog of one.
     /// </summary>
-    public static DateTime InitialWatermark(DateTime now, BucketAlignment alignment, TimeSpan bucketSize)
+    public static DateTime InitialWatermark(
+        DateTime now, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
     {
         var utc = ToUtc(now);
-        return alignment switch
-        {
-            // Subtract one bucket, then snap down — preserves the legacy "seed one bucket behind"
-            // semantic so the first tick after activation has a complete bucket to process.
-            BucketAlignment.FixedSize => AlignDownFixed(utc - bucketSize, bucketSize),
-
-            // For calendar variants the "start of period containing now" already IS the exclusive
-            // end of the previous (fully-completed) period — no extra subtraction needed.
-            BucketAlignment.CalendarDay => AlignDownToDay(utc),
-            BucketAlignment.Iso8601Week => AlignDownToIso8601Week(utc),
-            BucketAlignment.CalendarMonth => AlignDownToMonth(utc),
-            BucketAlignment.CalendarYear => AlignDownToYear(utc),
-            _ => throw new ArgumentOutOfRangeException(nameof(alignment), alignment, "Unknown BucketAlignment value.")
-        };
+        return alignment == BucketAlignment.FixedSize
+            ? AlignDownFixed(utc - bucketSize, bucketSize)
+            : AlignDownCalendar(utc, alignment, zone);
     }
 
     /// <summary>
     /// Snaps <paramref name="target"/> down to the start of the period containing it. Used by
     /// <c>RewindWatermarkAsync</c> so a rewind target lands on a valid bucket boundary regardless
-    /// of which arbitrary timestamp the caller passes.
+    /// of which arbitrary timestamp the caller passes, and by the resolution-aware grain probe.
     /// </summary>
-    public static DateTime AlignDown(DateTime target, BucketAlignment alignment, TimeSpan bucketSize)
+    public static DateTime AlignDown(
+        DateTime target, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
     {
         var utc = ToUtc(target);
-        return alignment switch
+        return alignment == BucketAlignment.FixedSize
+            ? (bucketSize.Ticks > 0 ? AlignDownFixed(utc, bucketSize) : utc)
+            : AlignDownCalendar(utc, alignment, zone);
+    }
+
+    private static DateTime AlignDownCalendar(DateTime utc, BucketAlignment alignment, TimeZoneInfo? zone)
+    {
+        if (zone is null)
         {
-            BucketAlignment.FixedSize => bucketSize.Ticks > 0 ? AlignDownFixed(utc, bucketSize) : utc,
-            BucketAlignment.CalendarDay => AlignDownToDay(utc),
-            BucketAlignment.Iso8601Week => AlignDownToIso8601Week(utc),
-            BucketAlignment.CalendarMonth => AlignDownToMonth(utc),
-            BucketAlignment.CalendarYear => AlignDownToYear(utc),
-            _ => throw new ArgumentOutOfRangeException(nameof(alignment), alignment, "Unknown BucketAlignment value.")
+            return alignment switch
+            {
+                BucketAlignment.CalendarDay => AlignDownToDay(utc),
+                BucketAlignment.Iso8601Week => AlignDownToIso8601Week(utc),
+                BucketAlignment.CalendarMonth => AlignDownToMonth(utc),
+                BucketAlignment.CalendarYear => AlignDownToYear(utc),
+                _ => throw UnknownAlignment(alignment)
+            };
+        }
+
+        var local = TimeZoneInfo.ConvertTimeFromUtc(utc, zone);
+        var alignedLocal = alignment switch
+        {
+            BucketAlignment.CalendarDay => AlignDownToDay(local),
+            BucketAlignment.Iso8601Week => AlignDownToIso8601Week(local),
+            BucketAlignment.CalendarMonth => AlignDownToMonth(local),
+            BucketAlignment.CalendarYear => AlignDownToYear(local),
+            _ => throw UnknownAlignment(alignment)
         };
+        return ToUtcFromLocal(alignedLocal, zone);
     }
 
     private static DateTime AlignDownFixed(DateTime utc, TimeSpan bucketSize)
@@ -91,22 +121,33 @@ internal static class BucketBoundary
         return new DateTime((utc.Ticks / ticks) * ticks, DateTimeKind.Utc);
     }
 
-    private static DateTime AlignDownToDay(DateTime utc) =>
-        new(utc.Year, utc.Month, utc.Day, 0, 0, 0, DateTimeKind.Utc);
+    private static DateTime AlignDownToDay(DateTime t) =>
+        new(t.Year, t.Month, t.Day, 0, 0, 0, t.Kind);
 
-    private static DateTime AlignDownToIso8601Week(DateTime utc)
+    private static DateTime AlignDownToIso8601Week(DateTime t)
     {
         // ISO-8601 weeks start on Monday. DayOfWeek: Sun=0, Mon=1, ..., Sat=6.
-        var daysSinceMonday = ((int)utc.DayOfWeek + 6) % 7;
-        var monday = new DateTime(utc.Year, utc.Month, utc.Day, 0, 0, 0, DateTimeKind.Utc);
+        var daysSinceMonday = ((int)t.DayOfWeek + 6) % 7;
+        var monday = new DateTime(t.Year, t.Month, t.Day, 0, 0, 0, t.Kind);
         return monday.AddDays(-daysSinceMonday);
     }
 
-    private static DateTime AlignDownToMonth(DateTime utc) =>
-        new(utc.Year, utc.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static DateTime AlignDownToMonth(DateTime t) =>
+        new(t.Year, t.Month, 1, 0, 0, 0, t.Kind);
 
-    private static DateTime AlignDownToYear(DateTime utc) =>
-        new(utc.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static DateTime AlignDownToYear(DateTime t) =>
+        new(t.Year, 1, 1, 0, 0, 0, t.Kind);
+
+    private static DateTime ToUtcFromLocal(DateTime local, TimeZoneInfo zone)
+    {
+        // The aligners preserve Kind; normalise to Unspecified so ConvertTimeToUtc treats the value
+        // as wall-clock time in `zone` rather than machine-local.
+        var unspecified = DateTime.SpecifyKind(local, DateTimeKind.Unspecified);
+        return TimeZoneInfo.ConvertTimeToUtc(unspecified, zone);
+    }
+
+    private static ArgumentOutOfRangeException UnknownAlignment(BucketAlignment alignment) =>
+        new(nameof(alignment), alignment, "Unknown BucketAlignment value.");
 
     private static DateTime ToUtc(DateTime t) => t.Kind switch
     {

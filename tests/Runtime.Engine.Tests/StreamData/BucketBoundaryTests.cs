@@ -156,4 +156,69 @@ public class BucketBoundaryTests
 
         Assert.Equal(new DateTime(2026, 5, 1, 0, 0, 0, DateTimeKind.Utc), aligned);
     }
+
+    // ---- Zone-aware calendar (AB#4290 / O6) ------------------------------------------------
+
+    private static readonly TimeZoneInfo Vienna = TimeZoneInfo.FindSystemTimeZoneById("Europe/Vienna");
+
+    [Fact]
+    public void NextBucketEnd_CalendarDay_ZoneAware_SpringForwardDayIs23Hours()
+    {
+        // Local midnight 2026-03-29 in Vienna (winter, UTC+1) = 2026-03-28 23:00 UTC. The DST
+        // spring-forward (02:00→03:00) makes that local day 23 h long; the next local midnight
+        // (summer, UTC+2) is 2026-03-29 22:00 UTC.
+        var bucketStart = new DateTime(2026, 3, 28, 23, 0, 0, DateTimeKind.Utc);
+
+        var end = BucketBoundary.NextBucketEnd(bucketStart, BucketAlignment.CalendarDay, OneHour, Vienna);
+
+        Assert.Equal(new DateTime(2026, 3, 29, 22, 0, 0, DateTimeKind.Utc), end);
+        Assert.Equal(TimeSpan.FromHours(23), end - bucketStart);
+    }
+
+    [Fact]
+    public void NextBucketEnd_CalendarDay_ZoneAware_FallBackDayIs25Hours()
+    {
+        // Local midnight 2026-10-25 in Vienna (summer, UTC+2) = 2026-10-24 22:00 UTC. The DST
+        // fall-back (03:00→02:00) makes that local day 25 h long; the next local midnight
+        // (winter, UTC+1) is 2026-10-25 23:00 UTC.
+        var bucketStart = new DateTime(2026, 10, 24, 22, 0, 0, DateTimeKind.Utc);
+
+        var end = BucketBoundary.NextBucketEnd(bucketStart, BucketAlignment.CalendarDay, OneHour, Vienna);
+
+        Assert.Equal(new DateTime(2026, 10, 25, 23, 0, 0, DateTimeKind.Utc), end);
+        Assert.Equal(TimeSpan.FromHours(25), end - bucketStart);
+    }
+
+    [Fact]
+    public void AlignDown_CalendarDay_ZoneAware_SnapsToLocalMidnight()
+    {
+        // 2026-03-29 12:00 Vienna (summer, UTC+2) = 2026-03-29 10:00 UTC. Local-day start is
+        // 2026-03-29 00:00 Vienna (winter side of the transition, UTC+1) = 2026-03-28 23:00 UTC.
+        var target = new DateTime(2026, 3, 29, 10, 0, 0, DateTimeKind.Utc);
+
+        var aligned = BucketBoundary.AlignDown(target, BucketAlignment.CalendarDay, OneHour, Vienna);
+
+        Assert.Equal(new DateTime(2026, 3, 28, 23, 0, 0, DateTimeKind.Utc), aligned);
+    }
+
+    [Fact]
+    public void NullZone_ReproducesUtcCalendarExactly()
+    {
+        // The zone=null path must be byte-identical to the no-zone overload (the UTC calendar
+        // behaviour the orchestrator depends on).
+        var start = new DateTime(2026, 3, 28, 23, 0, 0, DateTimeKind.Utc);
+        foreach (var alignment in new[]
+                 {
+                     BucketAlignment.CalendarDay, BucketAlignment.Iso8601Week,
+                     BucketAlignment.CalendarMonth, BucketAlignment.CalendarYear,
+                 })
+        {
+            Assert.Equal(
+                BucketBoundary.NextBucketEnd(start, alignment, OneHour),
+                BucketBoundary.NextBucketEnd(start, alignment, OneHour, zone: null));
+            Assert.Equal(
+                BucketBoundary.AlignDown(start, alignment, OneHour),
+                BucketBoundary.AlignDown(start, alignment, OneHour, zone: null));
+        }
+    }
 }

@@ -37,6 +37,15 @@ public sealed record RollupArchiveSnapshot(
     /// </summary>
     public BucketAlignment BucketAlignment { get; init; } = BucketAlignment.FixedSize;
 
+    /// <summary>
+    /// IANA reference time-zone id (e.g. <c>Europe/Vienna</c>) used to align calendar bucket
+    /// boundaries (day / week / month / year) to local wall-clock time so they are DST-correct
+    /// across countries. <c>null</c> ⇒ UTC calendar boundaries (the pre-AB#4290 behaviour). Only
+    /// meaningful for calendar <see cref="BucketAlignment"/> variants; ignored for
+    /// <see cref="BucketAlignment.FixedSize"/>. System.StreamData 1.6.4 / decision O6.
+    /// </summary>
+    public string? ReferenceTimeZone { get; init; }
+
     // ---------- Recompute observability (AB#4184, Phase 5 follow-up) ----------
     // Init-only so the positional ctor used by the orchestrator / lifecycle stays unchanged; these
     // are projected from the engine-maintained recompute-state attributes on the Archive base and

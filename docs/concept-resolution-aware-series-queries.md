@@ -87,20 +87,26 @@ The **native grain** of each rung is derivable without new metadata:
 Given the bound time range `[from, to)` (`timespan = to − from`) and a `targetPoints` (default ~600):
 
 ```
-reducer       = the series' declared aggregation function (O2, from the rollup)
-eligible      = rungs whose stored function is compatible with `reducer`
-                (additive series → only rungs with a SUM aggregation; see O2-followup)
-if eligible is empty:
-    → REFUSE to reduce: return the finest raw rung + a "no suitable rollup" signal   (O2-followup)
-for each rung: nativePoints(rung) = timespan / grain(rung)
-candidates    = eligible rungs where nativePoints(rung) >= targetPoints
-chosen        = the COARSEST candidate            (largest grain that still has enough resolution)
-                or, if candidates is empty,
-                the FINEST eligible rung           (deliver fewer points + "resolution-limited" signal, O4)
-then          = downsample the chosen rung with limit = targetPoints   (AB#4233 path)
+reducer     = requiredAggregation                     (O2, caller-supplied; never guessed)
+eligible    = compatible rollup rungs                 (stored function == reducer, grain known)
+ideal       = timespan / targetPoints
+baseNative  = timespan / basePeriod                   (null if the base grain is undeclared)
+
+1. fineEnough = eligible rungs with grain <= ideal
+   if fineEnough → the COARSEST fineEnough rung, downsample to targetPoints        (Ok)
+2. else if baseNative <= targetPoints → the BASE rung unreduced (raw fits)          (Ok)
+       # checked BEFORE ResolutionLimited: raw is finer and delivers more points
+       # than any coarser rollup when it already fits (e.g. 1 day of 15-min = 96
+       # points, not the hourly rollup's 24).
+3. else if eligible non-empty → the FINEST eligible rung's native buckets           (ResolutionLimited, O4)
+4. else                       # no compatible rollup and the base does not fit
+       base grain unknown → return base                                            (UnknownBaseGrain)
+       else               → return base raw, refuse to reduce                       (NoSuitableRollup, O2-followup)
+   # no base rung at all → EmptyLadder
+then = downsample the chosen rung with limit = targetPoints   (AB#4233 path)
 ```
 
-Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands the exact point count. Picking a rung *finer* than necessary only inflates the scan for an identical picture. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
+Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands the exact point count. Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
 
 ### §4.3 Worked example (1 year, targetPoints = 600)
 

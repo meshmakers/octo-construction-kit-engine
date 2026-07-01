@@ -98,16 +98,20 @@ public class SeriesResolutionPlannerTests
     }
 
     [Fact]
-    public void OnlyDailyRollup_OneDayTo600_ResolutionLimited_SinglePoint()
+    public void ShortWindow_BaseFits_PreferredOverCoarserRollup()
     {
-        var daily = Rollup(OneDay, CkRollupFunction.Sum);
-        var ladder = new[] { Base(FifteenMin), daily };
+        // 1 day of 15-min data = 96 points <= 600. No rollup is fine enough (daily/hourly are coarser
+        // than the ~2.4-min ideal). The base (96 points, finest) must win over a ResolutionLimited
+        // coarse rollup (hourly would give only 24, daily only 1) — raw-fits is checked first.
+        var baseRung = Base(FifteenMin);
+        var ladder = new[] { baseRung, Rollup(OneHour, CkRollupFunction.Sum), Rollup(OneDay, CkRollupFunction.Sum) };
 
         var result = Plan(ladder, DayFrom, DayTo, 600, CkRollupFunction.Sum);
 
-        Assert.Equal(SeriesResolutionSignal.ResolutionLimited, result.Signal);
-        Assert.Equal(1, result.Points);
-        Assert.Equal(1, result.ActualPoints);
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(baseRung.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(96, result.Points);
+        Assert.Equal(FifteenMin, result.EffectiveBucketMs);
     }
 
     // ---- O2 compatibility + refuse (O2-followup) -------------------------------------------

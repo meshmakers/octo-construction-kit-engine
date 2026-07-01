@@ -70,6 +70,11 @@ internal static class SeriesResolutionPlanner
             .Select(x => (x.Rung, Grain: x.Grain!.Value))
             .ToList();
 
+        // Base-archive native grain (O5): known from Period; null for a raw archive or an undeclared
+        // time-range period. When known, baseNative is how many raw points the window already holds.
+        var baseGrain = baseRung is null ? null : effectiveGrainMs(baseRung, from, to);
+        int? baseNative = baseGrain is > 0 ? (int)Math.Max(1L, spanMs / baseGrain.Value) : null;
+
         // 1. A compatible rollup fine enough to hit the target → pick the COARSEST such (least scan).
         var fineEnough = eligible.Where(x => x.Grain <= idealBucketMs).ToList();
         if (fineEnough.Count > 0)
@@ -80,8 +85,24 @@ internal static class SeriesResolutionPlanner
                 SeriesResolutionSignal.Ok);
         }
 
-        // 2. Compatible rollups exist but all are coarser than ideal → deliver the finest one's native
-        //    buckets (fewer points). Do NOT fall through to a finer, costlier source (decision O4).
+        // 2. No rollup is fine enough. If the base archive's native resolution already fits within the
+        //    target, return it unreduced (raw fits) — it is finer and delivers more points than any
+        //    coarser rollup, so it is preferred over a ResolutionLimited rollup. Checked BEFORE the
+        //    ResolutionLimited branch so a short window doesn't get a coarse rollup when the raw data
+        //    already fits (e.g. one day of 15-min data = 96 points, not the hourly rollup's 24).
+        if (baseRung is not null && baseNative is not null && baseNative.Value <= targetPoints)
+        {
+            return new SeriesResolutionResult(
+                baseRung.ArchiveRtId, baseGrain!.Value, baseNative.Value, requiredAggregation,
+                SeriesResolutionSignal.Ok)
+            {
+                Diagnostic = $"Base archive native resolution yields {baseNative.Value} points (<= {targetPoints}); no reduction needed.",
+            };
+        }
+
+        // 3. Compatible rollups exist but all are coarser than ideal, and the base does not fit → deliver
+        //    the finest rollup's native buckets (fewer points). Do NOT reduce the base directly
+        //    (decision O2-followup) or fall through to a finer, costlier source (decision O4).
         if (eligible.Count > 0)
         {
             var finest = eligible.OrderBy(x => x.Grain).First();
@@ -97,8 +118,7 @@ internal static class SeriesResolutionPlanner
             };
         }
 
-        // 3. No compatible rollup. The base archive is never reduced by the resolver (decision
-        //    O2-followup) — decide how to return it.
+        // 4. No compatible rollup and the base did not fit — decide how to return the base.
         if (baseRung is null)
         {
             return new SeriesResolutionResult(
@@ -108,8 +128,7 @@ internal static class SeriesResolutionPlanner
             };
         }
 
-        var baseGrain = effectiveGrainMs(baseRung, from, to);
-        if (baseGrain is not > 0)
+        if (baseNative is null)
         {
             // Base grain not declared → cannot tell whether reduction is even needed.
             return new SeriesResolutionResult(
@@ -121,27 +140,15 @@ internal static class SeriesResolutionPlanner
             };
         }
 
-        var baseNative = (int)Math.Max(1L, spanMs / baseGrain.Value);
-        if (baseNative <= targetPoints)
-        {
-            // The raw data already fits within the target — no reduction needed, return the base as-is.
-            return new SeriesResolutionResult(
-                baseRung.ArchiveRtId, baseGrain.Value, baseNative, requiredAggregation,
-                SeriesResolutionSignal.Ok)
-            {
-                Diagnostic = $"Base archive native resolution yields {baseNative} points (<= {targetPoints}); no reduction needed.",
-            };
-        }
-
         // The base has more points than the target, but no compatible rollup exists to reduce it and
         // the base is not reduced directly (decision O2-followup) → refuse and signal.
         return new SeriesResolutionResult(
-            baseRung.ArchiveRtId, baseGrain.Value, baseNative, requiredAggregation,
+            baseRung.ArchiveRtId, baseGrain!.Value, baseNative.Value, requiredAggregation,
             SeriesResolutionSignal.NoSuitableRollup)
         {
-            ActualPoints = baseNative,
+            ActualPoints = baseNative.Value,
             Diagnostic =
-                $"No {requiredAggregation} rollup available; the base archive would return {baseNative} points "
+                $"No {requiredAggregation} rollup available; the base archive would return {baseNative.Value} points "
                 + $"(> {targetPoints}). Provision a matching rollup or query raw explicitly.",
         };
     }

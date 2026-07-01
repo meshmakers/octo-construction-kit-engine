@@ -155,6 +155,13 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 continue;
             }
 
+            // AB#4286: a durable background backfill / manual recompute pre-creates a Pending job for
+            // pollability (the client that queued the work is handed that job id). Adopt it here so the
+            // client polls one job id from Pending → Completed, instead of the pre-created Pending job
+            // lingering while a throwaway Periodic job actually runs the range.
+            var active = await _jobStore.GetActiveForArchiveAsync(rollup.RtId);
+            var adoptJob = active is { State: RecomputeJobState.Pending } ? active : null;
+
             var merged = RecomputePlanner.MergeIntervals(pending.Select(r => (r.RangeStart, r.RangeEnd)));
 
             // Clear the consumed work first; a failed interval is re-enqueued below so it retries on
@@ -163,8 +170,13 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
             foreach (var (start, end) in merged)
             {
-                var job = await RecomputeArchiveAsync(
-                    rollup.RtId, start, end, rtIdScope: null, RecomputeTrigger.Periodic, cancellationToken);
+                // The first merged interval adopts the pre-created Pending job (keeping its trigger,
+                // e.g. Manual for a backfill); any further disjoint intervals run as fresh Periodic
+                // jobs. Only one pre-created job exists per rollup.
+                var trigger = adoptJob?.Trigger ?? RecomputeTrigger.Periodic;
+                var job = await RecomputeArchiveInternalAsync(
+                    rollup.RtId, start, end, rtIdScope: null, trigger, cancellationToken, adoptJob);
+                adoptJob = null;
 
                 if (job.State == RecomputeJobState.Failed)
                 {
@@ -241,49 +253,93 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// deterministic error fails the chunk immediately.
     /// </para>
     /// </remarks>
-    public async Task<RecomputeJobSnapshot> RecomputeArchiveAsync(
+    public Task<RecomputeJobSnapshot> RecomputeArchiveAsync(
         OctoObjectId rollupRtId,
         DateTime from,
         DateTime to,
         OctoObjectId? rtIdScope,
         RecomputeTrigger trigger,
         CancellationToken cancellationToken)
+        => RecomputeArchiveInternalAsync(
+            rollupRtId, from, to, rtIdScope, trigger, cancellationToken, adoptExistingJob: null);
+
+    /// <summary>
+    /// Core recompute worker shared by the public <see cref="RecomputeArchiveAsync"/> entry point and
+    /// the background <see cref="TickAsync"/> drain. When <paramref name="adoptExistingJob"/> is
+    /// supplied (AB#4286) the coalesce check is skipped and that pre-created Pending job is transitioned
+    /// Pending → Running → Completed/Failed <em>in place</em> — so a client that queued a durable
+    /// background backfill polls a single, stable job id through to completion. When it is <c>null</c>
+    /// the classic behaviour applies: an already-active job coalesces the range, otherwise a fresh
+    /// Running job is created.
+    /// </summary>
+    private async Task<RecomputeJobSnapshot> RecomputeArchiveInternalAsync(
+        OctoObjectId rollupRtId,
+        DateTime from,
+        DateTime to,
+        OctoObjectId? rtIdScope,
+        RecomputeTrigger trigger,
+        CancellationToken cancellationToken,
+        RecomputeJobSnapshot? adoptExistingJob)
     {
         var now = _clock();
 
-        var active = await _jobStore.GetActiveForArchiveAsync(rollupRtId);
-        if (active is not null)
+        if (adoptExistingJob is null)
         {
-            await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
-                new[] { new ArchiveRecomputeRange(rollupRtId, from, to, rtIdScope, now) });
+            var active = await _jobStore.GetActiveForArchiveAsync(rollupRtId);
+            if (active is not null)
+            {
+                await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
+                    new[] { new ArchiveRecomputeRange(rollupRtId, from, to, rtIdScope, now) });
 
-            _logger.LogInformation(
-                "Recompute of {RollupRtId} range [{From:O},{To:O}) coalesced into active job {ActiveJob}",
-                rollupRtId, from, to, active.RtId);
+                _logger.LogInformation(
+                    "Recompute of {RollupRtId} range [{From:O},{To:O}) coalesced into active job {ActiveJob}",
+                    rollupRtId, from, to, active.RtId);
 
-            return await PersistNewJobAsync(new RecomputeJobSnapshot(
-                OctoObjectId.Empty, rollupRtId, RecomputeJobState.Coalesced, trigger,
-                from, to, rtIdScope, null, null, now, now, 0, null, null));
+                return await PersistNewJobAsync(new RecomputeJobSnapshot(
+                    OctoObjectId.Empty, rollupRtId, RecomputeJobState.Coalesced, trigger,
+                    from, to, rtIdScope, null, null, now, now, 0, null, null));
+            }
         }
 
         var rollup = await _rollupStore.GetAsync(rollupRtId);
         if (rollup is null)
         {
             return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
-                "Archive is not a rollup (or has been deleted).");
+                "Archive is not a rollup (or has been deleted).", adoptExistingJob);
         }
 
         var source = await _archiveStore.GetAsync(rollup.SourceArchiveRtId);
         if (source is null)
         {
             return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
-                $"Source archive {rollup.SourceArchiveRtId} not found.");
+                $"Source archive {rollup.SourceArchiveRtId} not found.", adoptExistingJob);
         }
 
         var startedAt = now;
-        var job = await PersistNewJobAsync(new RecomputeJobSnapshot(
-            OctoObjectId.Empty, rollupRtId, RecomputeJobState.Running, trigger,
-            from, to, rtIdScope, null, null, startedAt, null, null, null, null));
+        RecomputeJobSnapshot job;
+        if (adoptExistingJob is not null)
+        {
+            // Transition the pre-created Pending job to Running in place — its RtId is what the client
+            // is polling, so a fresh CreateAsync would strand the caller on a job that never advances.
+            job = adoptExistingJob with
+            {
+                State = RecomputeJobState.Running,
+                Trigger = trigger,
+                RangeStart = from,
+                RangeEnd = to,
+                RtIdScope = rtIdScope,
+                StartedAt = startedAt,
+                FinishedAt = null,
+                ErrorReason = null,
+            };
+            await _jobStore.UpdateAsync(job);
+        }
+        else
+        {
+            job = await PersistNewJobAsync(new RecomputeJobSnapshot(
+                OctoObjectId.Empty, rollupRtId, RecomputeJobState.Running, trigger,
+                from, to, rtIdScope, null, null, startedAt, null, null, null, null));
+        }
 
         await _stateStore.MarkRecomputeStartedAsync(rollupRtId, startedAt);
 
@@ -373,30 +429,39 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     }
 
     /// <summary>
-    /// Backfill (AB#4269): populate / reset a rollup over the entire history of its source archive.
-    /// Resolves the source archive's earliest stored timestamp, snaps it down to the rollup's bucket
-    /// boundary, and recomputes <c>[sourceMin, now)</c> through the optimistic recompute path. An
-    /// empty source archive is a no-op (returns <c>null</c>); a non-rollup target produces a failed
-    /// job, exactly as <see cref="RecomputeArchiveAsync"/> would.
+    /// Durable, background backfill (AB#4269 / AB#4286): queue a whole-history recompute of a rollup
+    /// without running it inline. Resolves the source archive's earliest stored timestamp, snaps it
+    /// down to the rollup's bucket boundary, pre-creates a <see cref="RecomputeJobState.Pending"/> job
+    /// and enqueues a persisted pending recompute range <c>[sourceMin, now)</c> — then returns the
+    /// Pending job immediately. The heavy recompute runs later on the background <see cref="TickAsync"/>
+    /// (which adopts the Pending job and drives it to Completed under the host application-lifetime
+    /// token), so it is never bound to — and can never be cancelled by — the client HTTP request.
+    /// <para>
+    /// An empty source archive is a no-op (returns <c>null</c>). A non-rollup target produces a failed
+    /// job, exactly as <see cref="RecomputeArchiveAsync"/> would. When a recompute job is already active
+    /// for the rollup, the range is folded into it and that active job is returned so the caller polls a
+    /// single job id.
+    /// </para>
     /// </summary>
-    public async Task<RecomputeJobSnapshot?> BackfillRollupFromSourceAsync(
+    public async Task<RecomputeJobSnapshot?> EnqueueBackfillFromSourceAsync(
         OctoObjectId rollupRtId, CancellationToken cancellationToken)
     {
         var rollup = await _rollupStore.GetAsync(rollupRtId);
         if (rollup is null)
         {
-            // Not a rollup (or deleted): delegate to the recompute path so the caller gets the same
-            // failed-job shape recomputeArchive would return for a non-rollup target.
+            // Not a rollup (or deleted): return the same failed-job shape recomputeArchive would for a
+            // non-rollup target, without resolving source-min.
             var nowForFailure = _clock();
-            return await RecomputeArchiveAsync(
-                rollupRtId, nowForFailure, nowForFailure, rtIdScope: null, RecomputeTrigger.Manual, cancellationToken);
+            return await FailImmediatelyAsync(
+                rollupRtId, nowForFailure, nowForFailure, rtIdScope: null, RecomputeTrigger.Manual,
+                nowForFailure, "Archive is not a rollup (or has been deleted).");
         }
 
         var sourceMin = await _streamData.GetArchiveMinTimestampAsync(rollup.SourceArchiveRtId, cancellationToken);
         if (sourceMin is null)
         {
             _logger.LogInformation(
-                "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds no data — nothing to recompute (no-op).",
+                "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds no data — nothing to queue (no-op).",
                 rollupRtId, rollup.SourceArchiveRtId);
             return null;
         }
@@ -411,17 +476,40 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         if (now <= from)
         {
             _logger.LogInformation(
-                "Backfill of rollup {RollupRtId}: aligned source start {From:O} is not before now {Now:O} — nothing to recompute (no-op).",
+                "Backfill of rollup {RollupRtId}: aligned source start {From:O} is not before now {Now:O} — nothing to queue (no-op).",
                 rollupRtId, from, now);
             return null;
         }
 
-        _logger.LogInformation(
-            "Backfill of rollup {RollupRtId}: recomputing entire history [{From:O}, {Now:O}) from source {SourceRtId} (earliest source ts {SourceMin:O}).",
-            rollupRtId, from, now, rollup.SourceArchiveRtId, sourceMin.Value);
+        // Coalesce: if a recompute job is already queued/running for this rollup, fold the whole-history
+        // range into its pending work list and hand the caller that job so they poll a single id.
+        var active = await _jobStore.GetActiveForArchiveAsync(rollupRtId);
+        if (active is not null)
+        {
+            await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
+                new[] { new ArchiveRecomputeRange(rollupRtId, from, now, null, now) });
+            _logger.LogInformation(
+                "Backfill of rollup {RollupRtId} over [{From:O}, {Now:O}) folded into already-active recompute job {JobId}.",
+                rollupRtId, from, now, active.RtId);
+            return active;
+        }
 
-        return await RecomputeArchiveAsync(
-            rollupRtId, from, now, rtIdScope: null, RecomputeTrigger.Manual, cancellationToken);
+        // Pre-create the Pending job first (persisted → survives an asset-repo restart), then enqueue
+        // the persisted pending range. Ordering matters: if a tick fires between the two writes it sees
+        // the Pending job but no range yet and simply skips — no orphaned throwaway job is created.
+        var pending = await PersistNewJobAsync(new RecomputeJobSnapshot(
+            OctoObjectId.Empty, rollupRtId, RecomputeJobState.Pending, RecomputeTrigger.Manual,
+            from, now, null, null, null, null, null, null, null, null));
+
+        await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
+            new[] { new ArchiveRecomputeRange(rollupRtId, from, now, null, now) });
+
+        _logger.LogInformation(
+            "Backfill of rollup {RollupRtId} queued as job {JobId} over [{From:O}, {Now:O}) from source {SourceRtId} " +
+            "(earliest source ts {SourceMin:O}); background recompute orchestrator will run it.",
+            rollupRtId, pending.RtId, from, now, rollup.SourceArchiveRtId, sourceMin.Value);
+
+        return pending;
     }
 
     /// <summary>
@@ -546,11 +634,32 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
     private async Task<RecomputeJobSnapshot> FailImmediatelyAsync(
         OctoObjectId rollupRtId, DateTime from, DateTime to, OctoObjectId? rtIdScope,
-        RecomputeTrigger trigger, DateTime now, string reason)
+        RecomputeTrigger trigger, DateTime now, string reason,
+        RecomputeJobSnapshot? adoptExistingJob = null)
     {
-        var failed = await PersistNewJobAsync(new RecomputeJobSnapshot(
-            OctoObjectId.Empty, rollupRtId, RecomputeJobState.Failed, trigger,
-            from, to, rtIdScope, null, null, now, now, 0, reason, null));
+        RecomputeJobSnapshot failed;
+        if (adoptExistingJob is not null)
+        {
+            // Fail the pre-created Pending job in place so the polling client sees the terminal state.
+            failed = adoptExistingJob with
+            {
+                State = RecomputeJobState.Failed,
+                Trigger = trigger,
+                RangeStart = from,
+                RangeEnd = to,
+                RtIdScope = rtIdScope,
+                FinishedAt = now,
+                DurationMs = 0,
+                ErrorReason = reason,
+            };
+            await _jobStore.UpdateAsync(failed);
+        }
+        else
+        {
+            failed = await PersistNewJobAsync(new RecomputeJobSnapshot(
+                OctoObjectId.Empty, rollupRtId, RecomputeJobState.Failed, trigger,
+                from, to, rtIdScope, null, null, now, now, 0, reason, null));
+        }
 
         await _audit.RecordRecomputeFailureAsync(_tenantId, rollupRtId, from, to, reason);
         _logger.LogWarning("Recompute of {RollupRtId} not started: {Reason}", rollupRtId, reason);

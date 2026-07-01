@@ -363,40 +363,52 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
     }
 
-    // ---- BackfillRollupFromSourceAsync (AB#4269) ----------------------------------------------
+    // ---- EnqueueBackfillFromSourceAsync (AB#4269 / AB#4286: durable background) ----------------
 
     [Fact]
-    public async Task Backfill_ResolvesSourceMin_AlignsDownToBucket_AndRecomputesToNow()
+    public async Task Backfill_ResolvesSourceMin_AlignsDownToBucket_AndEnqueuesPendingJob()
     {
         StubRollupAndSource(); // bucket size = 1h, FixedSize alignment
         var sourceMin = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
         A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
             .Returns(sourceMin);
 
-        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
 
+        // Returns immediately with a Pending job — the recompute does NOT run inline.
         Assert.NotNull(job);
-        Assert.Equal(RecomputeJobState.Completed, job!.State);
+        Assert.Equal(RecomputeJobState.Pending, job!.State);
+        Assert.Equal(JobRt, job.RtId);
+
         // Source min 10:15 snaps down to the 10:00 bucket boundary; the range ends at Now (14:00).
         var expectedFrom = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
-        A.CallTo(() => _executor.ExecuteAsync(
-                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, expectedFrom, Now, null, A<CancellationToken>._))
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.State == RecomputeJobState.Pending && j.Trigger == RecomputeTrigger.Manual
+                     && j.RangeStart == expectedFrom && j.RangeEnd == Now)))
             .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(
+                    r => r.Count == 1 && r[0].RangeStart == expectedFrom && r[0].RangeEnd == Now)))
+            .MustHaveHappenedOnceExactly();
+        // The heavy executor must NOT run on the request path.
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task Backfill_EmptySource_IsNoOp_ReturnsNullWithoutRunningExecutor()
+    public async Task Backfill_EmptySource_IsNoOp_ReturnsNullWithoutEnqueue()
     {
         StubRollupAndSource();
         A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
             .Returns((DateTime?)null);
 
-        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
 
         Assert.Null(job);
-        A.CallTo(() => _executor.ExecuteAsync(
-                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
-                A<OctoObjectId?>._, A<CancellationToken>._))
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
     }
 
@@ -405,7 +417,7 @@ public class RecomputeOrchestratorTests
     {
         A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns((RollupArchiveSnapshot?)null);
 
-        var job = await NewSut().BackfillRollupFromSourceAsync(RollupRt, CancellationToken.None);
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
 
         Assert.NotNull(job);
         Assert.Equal(RecomputeJobState.Failed, job!.State);
@@ -415,6 +427,57 @@ public class RecomputeOrchestratorTests
                 A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
                 A<OctoObjectId?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Backfill_WhenJobAlreadyActive_FoldsRangeIntoActiveJob()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
+            .Returns(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc));
+        var activeJob = new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Running, RecomputeTrigger.Manual,
+            From, To, null, null, null, Now, null, null, null, null);
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(activeJob);
+
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        // The already-active job is handed back so the caller polls a single id — no second job created.
+        Assert.NotNull(job);
+        Assert.Equal(JobRt, job!.RtId);
+        Assert.Equal(RecomputeJobState.Running, job.State);
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_AdoptsPreCreatedPendingJob_DrivesItToCompletedInPlace()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _archiveStore.EnumerateAsync()).Returns(ToAsync(Array.Empty<ArchiveSnapshot>()));
+        A.CallTo(() => _rollupStore.EnumerateAsync()).Returns(ToAsync(new[] { Rollup(RollupRt, SourceRt) }));
+        A.CallTo(() => _stateStore.GetPendingRecomputeRangesAsync(RollupRt))
+            .Returns((IReadOnlyList<ArchiveRecomputeRange>)new[] { new ArchiveRecomputeRange(RollupRt, From, To, null, Now) });
+
+        // A background backfill pre-created this Pending job; the tick must adopt it.
+        var pendingJob = new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Pending, RecomputeTrigger.Manual,
+            From, To, null, null, null, null, null, null, null, null);
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(pendingJob);
+
+        var count = await NewSut().TickAsync(CancellationToken.None);
+
+        Assert.Equal(1, count);
+        // Adopted job is advanced in place (UpdateAsync), never re-created (CreateAsync).
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.RtId == JobRt && j.State == RecomputeJobState.Running))).MustHaveHappened();
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.RtId == JobRt && j.State == RecomputeJobState.Completed))).MustHaveHappened();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, From, To, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
 
     // ---- TickAsync ----------------------------------------------------------------------------

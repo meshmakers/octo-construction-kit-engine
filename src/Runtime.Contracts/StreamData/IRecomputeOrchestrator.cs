@@ -38,15 +38,27 @@ public interface IRecomputeOrchestrator
     Task PropagateDirtyWindowsAsync(OctoObjectId sourceArchiveRtId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Populates / resets a rollup over the <em>entire</em> history of its source archive without the
-    /// operator supplying a timestamp (AB#4269). Resolves the source archive's earliest stored
-    /// timestamp, snaps it down to the rollup's bucket boundary, and recomputes the rollup over
-    /// <c>[sourceMin, now)</c> via the existing optimistic recompute path
-    /// (<see cref="RecomputeArchiveAsync"/> with <see cref="RecomputeTrigger.Manual"/>) — so the
-    /// reader-safe atomic generation-swap and <see cref="RecomputeJobSnapshot"/> observability are
-    /// reused for both "create/populate" and "reset a populated rollup". Returns the resulting job
-    /// snapshot, or <c>null</c> when the source archive holds no data (no-op).
+    /// Queues a <em>durable, background</em> backfill of a rollup over the <em>entire</em> history of
+    /// its source archive without the operator supplying a timestamp (AB#4269 / AB#4286). Resolves the
+    /// source archive's earliest stored timestamp, snaps it down to the rollup's bucket boundary, and
+    /// <b>enqueues a persisted pending recompute range</b> <c>[sourceMin, now)</c> plus a
+    /// <see cref="RecomputeJobState.Pending"/> <see cref="RecomputeJobSnapshot"/>, then returns
+    /// <em>immediately</em> — it does <b>not</b> run the recompute inline.
+    /// <para>
+    /// The heavy recompute is executed later by the background recompute orchestrator tick
+    /// (<see cref="TickAsync"/>), which adopts the pre-created Pending job and drives it
+    /// Pending → Running → Completed under the host's application-lifetime cancellation token, never a
+    /// caller's HTTP request token. This decouples a multi-minute (e.g. decade-long) backfill from the
+    /// client request lifetime so a client HTTP timeout / disconnect can no longer cancel it, and the
+    /// persisted pending range survives an asset-repo restart (picked up on the next tick).
+    /// </para>
+    /// <para>
+    /// The returned Pending job is pollable via the recompute-jobs query so the caller can watch its
+    /// own backfill progress. When a recompute job is already active for the rollup, the range is
+    /// folded into it and that active job is returned instead. Returns <c>null</c> when the source
+    /// archive holds no data (no-op).
+    /// </para>
     /// </summary>
-    Task<RecomputeJobSnapshot?> BackfillRollupFromSourceAsync(
+    Task<RecomputeJobSnapshot?> EnqueueBackfillFromSourceAsync(
         OctoObjectId rollupRtId, CancellationToken cancellationToken);
 }

@@ -186,17 +186,38 @@ public static class AttributeValueConverter
 
                 break;
             case AttributeValueTypesDto.Int64:
-                if (value is int)
+                // AB#4281: an Int64 attribute must persist a >Int32 integer (e.g. a calendar-month
+                // BucketSizeMs of 2,419,200,000) as a number, never coerced to a string. Handle every
+                // shape the import / setter paths deliver — boxed long/int, a JSON number *or* string
+                // element (the ImportRt export/import round-trip re-materialises numbers as JSON
+                // strings), and a bare string — parsing in the invariant culture as Int64 throughout.
+                if (value is long)
                 {
                     return value;
                 }
 
-                if (value is JsonElement i64Element)
+                if (value is int i32ToInt64)
                 {
-                    return i64Element.GetInt64();
+                    return (long)i32ToInt64;
                 }
 
-                if (long.TryParse(value.ToString(), out var longResult))
+                if (value is JsonElement i64Element)
+                {
+                    if (i64Element.ValueKind == JsonValueKind.Number)
+                    {
+                        return i64Element.GetInt64();
+                    }
+
+                    if (i64Element.ValueKind == JsonValueKind.String
+                        && long.TryParse(i64Element.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture,
+                            out var svi64))
+                    {
+                        return svi64;
+                    }
+                }
+
+                if (long.TryParse(value.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture,
+                        out var longResult))
                 {
                     return longResult;
                 }

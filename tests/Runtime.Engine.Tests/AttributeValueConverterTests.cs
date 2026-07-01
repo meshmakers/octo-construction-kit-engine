@@ -130,4 +130,74 @@ public class AttributeValueConverterTests
 
         Assert.Equal(TimeSpan.FromMinutes(15), result);
     }
+
+    // ---- AB#4281: Int64 attribute (RollupArchive.BucketSizeMs / WatermarkLagMs) ------------------
+    // A >Int32 integer for an Int64 attribute must persist as a number (long), never a string, so the
+    // subsequent read (Convert.ChangeType to long) never throws the "too large for Int32" overflow.
+
+    [Theory]
+    [InlineData(2_419_200_000L)]   // calendar-month bucket width in ms
+    [InlineData(31_536_000_000L)]  // calendar-year bucket width in ms
+    public void ConvertAttributeValue_Int64_LongBeyondInt32_PassesThroughAsLong(long input)
+    {
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Int64, input);
+
+        Assert.IsType<long>(result);
+        Assert.Equal(input, result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_Int64_Int32Value_WidensToLong()
+    {
+        // Existing (pre-1.6.3) rows stored the value as a boxed Int32; it must still load as Int64.
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Int64, 300_000);
+
+        Assert.IsType<long>(result);
+        Assert.Equal(300_000L, result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_Int64_BareString_ParsedAsLong()
+    {
+        // The ImportRt export/import round-trip can deliver the value as a bare string. A >Int32
+        // string must parse to long, not throw the Int32 overflow that motivated AB#4281/AB#4282.
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Int64, "2419200000");
+
+        Assert.IsType<long>(result);
+        Assert.Equal(2_419_200_000L, result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_Int64_JsonNumberElement_ParsedAsLong()
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse("31536000000");
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Int64, doc.RootElement);
+
+        Assert.IsType<long>(result);
+        Assert.Equal(31_536_000_000L, result);
+    }
+
+    [Fact]
+    public void ConvertAttributeValue_Int64_JsonStringElement_ParsedAsLong()
+    {
+        using var doc = System.Text.Json.JsonDocument.Parse("\"2419200000\"");
+        var result = AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Int64, doc.RootElement);
+
+        Assert.IsType<long>(result);
+        Assert.Equal(2_419_200_000L, result);
+    }
+
+    [Fact]
+    public void Int64Attribute_RoundTripsBeyondInt32_WithoutOverflow()
+    {
+        // End-to-end at the entity level: the setter stores it via ConvertAttributeValue(Int64) and
+        // the generated-style read (GetAttributeValue<long>) returns it — no Int32 overflow. This is
+        // the read path that previously threw OverflowException on a calendar rollup (AB#4282).
+        var rtEntity = new RtEntity();
+        rtEntity.SetAttributeValueNonNullable("BucketSizeMs", AttributeValueTypesDto.Int64, 2_419_200_000L);
+
+        var result = rtEntity.GetAttributeValue<long>("BucketSizeMs");
+
+        Assert.Equal(2_419_200_000L, result);
+    }
 }

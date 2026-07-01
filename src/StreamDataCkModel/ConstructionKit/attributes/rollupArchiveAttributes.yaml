@@ -5,11 +5,11 @@ attributes:
     description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated."
     valueType: String
   - id: RollupArchive.BucketSizeMs
-    description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. Immutable after activation."
-    valueType: Int
+    description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. Immutable after activation. Int64 (AB#4281): calendar-month (2,419,200,000) and calendar-year (31,536,000,000) bucket widths exceed Int32.MaxValue (≈24.85 days), so the value type is 64-bit."
+    valueType: Int64
   - id: RollupArchive.WatermarkLagMs
-    description: "Lower bound on how far behind real-time the orchestrator stays before closing a bucket, in milliseconds. Absorbs late-arriving source inserts. Default 300000 (five minutes). Mutable."
-    valueType: Int
+    description: "Lower bound on how far behind real-time the orchestrator stays before closing a bucket, in milliseconds. Absorbs late-arriving source inserts. Default 300000 (five minutes). Mutable. Int64 (AB#4281) for consistency with BucketSizeMs — a lag can legitimately be sized against a calendar bucket."
+    valueType: Int64
     defaultValues:
       - 300000
   - id: RollupArchive.LastAggregatedBucketEnd

@@ -32,6 +32,23 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// </summary>
     public const int DefaultMaxBucketsPerChunk = 2000;
 
+    /// <summary>
+    /// Default number of attempts per chunk (AB#4278) before the chunk — and therefore the job —
+    /// fails. One initial try plus three retries. Each chunk is idempotent under the per-window
+    /// generation pointer, so replaying it after a dropped CrateDB connection ("Exception while
+    /// reading from stream" / <c>EndOfStreamException</c>) re-commits the same rows without
+    /// duplication. This guarantees a single intermittent connection drop can never abort a
+    /// decade-long backfill.
+    /// </summary>
+    public const int DefaultMaxChunkAttempts = 4;
+
+    /// <summary>
+    /// Default base delay for the per-chunk retry backoff (AB#4278). Exponential: attempt <c>n</c>
+    /// waits <c>base * 2^(n-1)</c> before retrying, giving a struggling / re-electing CrateDB cluster
+    /// time to recover between attempts.
+    /// </summary>
+    public static readonly TimeSpan DefaultChunkRetryBaseDelay = TimeSpan.FromSeconds(2);
+
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IRollupArchiveRuntimeStore _rollupStore;
@@ -44,13 +61,20 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     private readonly ILogger<RecomputeOrchestrator> _logger;
     private readonly Func<DateTime> _clock;
     private readonly int _maxBucketsPerChunk;
+    private readonly int _maxChunkAttempts;
+    private readonly TimeSpan _chunkRetryBaseDelay;
+    private readonly Func<TimeSpan, CancellationToken, Task> _delay;
 
     /// <summary>Constructs the orchestrator for one tenant.</summary>
     /// <remarks>
-    /// <c>maxBucketsPerChunk</c> (AB#4283) caps how many buckets a single executor sub-run recomputes.
-    /// A large <c>[from, to)</c> recompute is split into contiguous chunks of at most this many buckets
-    /// so no single CrateDB statement exceeds the per-statement timeout. Defaults to
-    /// <see cref="DefaultMaxBucketsPerChunk"/>. Must be positive.
+    /// <para><c>maxBucketsPerChunk</c> (AB#4283) caps how many buckets a single executor sub-run
+    /// recomputes. A large <c>[from, to)</c> recompute is split into contiguous chunks of at most this
+    /// many buckets so no single CrateDB statement exceeds the per-statement timeout. Defaults to
+    /// <see cref="DefaultMaxBucketsPerChunk"/>. Must be positive.</para>
+    /// <para><c>maxChunkAttempts</c> / <c>chunkRetryBaseDelay</c> (AB#4278) bound the per-chunk retry
+    /// that makes a decade-long backfill survive intermittent CrateDB connection drops. Must be ≥ 1.
+    /// <c>delay</c> is the (injectable, for tests) backoff sleep; defaults to
+    /// <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</para>
     /// </remarks>
     public RecomputeOrchestrator(
         string tenantId,
@@ -64,12 +88,21 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         IArchiveAuditTrail audit,
         ILogger<RecomputeOrchestrator> logger,
         Func<DateTime> clock,
-        int maxBucketsPerChunk = DefaultMaxBucketsPerChunk)
+        int maxBucketsPerChunk = DefaultMaxBucketsPerChunk,
+        int maxChunkAttempts = DefaultMaxChunkAttempts,
+        TimeSpan? chunkRetryBaseDelay = null,
+        Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         if (maxBucketsPerChunk <= 0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxBucketsPerChunk), maxBucketsPerChunk, "Chunk size must be positive.");
+        }
+
+        if (maxChunkAttempts <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxChunkAttempts), maxChunkAttempts, "Chunk attempts must be positive.");
         }
 
         _tenantId = tenantId;
@@ -84,6 +117,9 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         _logger = logger;
         _clock = clock;
         _maxBucketsPerChunk = maxBucketsPerChunk;
+        _maxChunkAttempts = maxChunkAttempts;
+        _chunkRetryBaseDelay = chunkRetryBaseDelay ?? DefaultChunkRetryBaseDelay;
+        _delay = delay ?? Task.Delay;
     }
 
     /// <summary>
@@ -196,6 +232,14 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// resumable-by-retry rather than all-or-nothing. A subsequent recompute of the same range simply
     /// re-processes and re-commits the chunks (idempotent under the generation pointer).
     /// </para>
+    /// <para>
+    /// <b>Connection stability (AB#4278).</b> Each chunk's executor call is additionally wrapped in a
+    /// bounded per-chunk retry: an intermittent CrateDB connection drop ("Exception while reading from
+    /// stream" / <c>EndOfStreamException</c>) mid-backfill retries the whole (idempotent) chunk with
+    /// exponential backoff instead of aborting the job, so a decade-long backfill completes reliably
+    /// over an unstable connection. Only a transient connection-class failure is retried; a
+    /// deterministic error fails the chunk immediately.
+    /// </para>
     /// </remarks>
     public async Task<RecomputeJobSnapshot> RecomputeArchiveAsync(
         OctoObjectId rollupRtId,
@@ -265,8 +309,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var chunkResult = await _executor.ExecuteAsync(
-                    source, rollup, chunkStart, chunkEnd, rtIdScope, cancellationToken);
+                var chunkResult = await ExecuteChunkWithRetryAsync(
+                    source, rollup, chunkStart, chunkEnd, rtIdScope, chunkIndex + 1, chunks.Count, cancellationToken);
                 totalRows += chunkResult.RowsProcessed;
                 totalWindows += chunkResult.WindowsProcessed;
                 chunkIndex++;
@@ -378,6 +422,98 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
         return await RecomputeArchiveAsync(
             rollupRtId, from, now, rtIdScope: null, RecomputeTrigger.Manual, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs one chunk's executor call under a bounded retry (AB#4278). Each chunk is idempotent — its
+    /// staging→live swap is keyed by the per-window generation pointer — so replaying the whole chunk
+    /// after a transient CrateDB connection drop re-commits the same rows without duplication. Only a
+    /// transient connection-class failure (a dropped connector, <c>EndOfStreamException</c>,
+    /// socket/IO error, or a CrateDB health blip) is retried; a deterministic error (bad SQL, missing
+    /// table, cancellation) is rethrown immediately so the job fails fast with the real cause. When the
+    /// attempt budget is exhausted the last exception propagates and fails the job.
+    /// </summary>
+    private async Task<RecomputeExecutionResult> ExecuteChunkWithRetryAsync(
+        ArchiveSnapshot source,
+        RollupArchiveSnapshot rollup,
+        DateTime chunkStart,
+        DateTime chunkEnd,
+        OctoObjectId? rtIdScope,
+        int chunkNumber,
+        int chunkCount,
+        CancellationToken cancellationToken)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await _executor.ExecuteAsync(
+                    source, rollup, chunkStart, chunkEnd, rtIdScope, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Deliberate shutdown / caller cancellation — never retry.
+                throw;
+            }
+            catch (Exception ex) when (attempt < _maxChunkAttempts && IsTransientConnectionFailure(ex))
+            {
+                var backoff = TimeSpan.FromTicks(_chunkRetryBaseDelay.Ticks * (1L << (attempt - 1)));
+                _logger.LogWarning(ex,
+                    "Recompute of rollup {RollupRtId}: chunk {ChunkNumber}/{ChunkCount} [{ChunkStart:O},{ChunkEnd:O}) " +
+                    "attempt {Attempt}/{MaxAttempts} hit a transient CrateDB connection failure — retrying in {BackoffMs}ms.",
+                    rollup.RtId, chunkNumber, chunkCount, chunkStart, chunkEnd,
+                    attempt, _maxChunkAttempts, (long)backoff.TotalMilliseconds);
+
+                await _delay(backoff, cancellationToken);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Classifies an exception as a transient CrateDB connection failure worth retrying the whole
+    /// chunk for (AB#4278). Walks the inner-exception chain. A server-side rejection
+    /// (<c>PostgresException</c>) is explicitly NOT transient — the SQL is wrong and a retry can't fix
+    /// it. Otherwise the dropped-connection class is matched by type (Npgsql connector exceptions,
+    /// <see cref="System.IO.IOException"/> incl. <see cref="System.IO.EndOfStreamException"/>, socket
+    /// errors) and by message signature (the exact strings CrateDB/Npgsql emit on a mid-read drop and
+    /// on a health blip). Matched by name/message because this engine layer does not reference Npgsql.
+    /// </summary>
+    private static bool IsTransientConnectionFailure(Exception exception)
+    {
+        for (var ex = exception; ex is not null; ex = ex.InnerException)
+        {
+            var typeName = ex.GetType().FullName ?? string.Empty;
+
+            // Server rejected the statement — deterministic, retrying won't help.
+            if (typeName.Contains("PostgresException", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            // IOException covers EndOfStreamException ("Attempted to read past the end of the stream").
+            if (ex is System.IO.IOException)
+            {
+                return true;
+            }
+
+            if (typeName.Contains("NpgsqlException", StringComparison.Ordinal)
+                || typeName.Contains("SocketException", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            var message = ex.Message ?? string.Empty;
+            if (message.Contains("reading from stream", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("read past the end of the stream", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("connection reset", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("broken", StringComparison.OrdinalIgnoreCase)
+                || message.Contains("is unhealthy", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private async Task EnqueueOnDirectDependentsAsync(

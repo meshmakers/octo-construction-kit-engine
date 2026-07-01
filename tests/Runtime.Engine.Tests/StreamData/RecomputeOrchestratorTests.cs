@@ -51,6 +51,16 @@ public class RecomputeOrchestratorTests
         new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _streamData, _audit,
             NullLogger<RecomputeOrchestrator>.Instance, () => Now, maxBucketsPerChunk);
 
+    // Retry-configured SUT (AB#4278): a no-op delay keeps the test synchronous/fast so the backoff
+    // schedule doesn't add real wall-clock time.
+    private RecomputeOrchestrator NewRetrySut(int maxChunkAttempts) =>
+        new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _streamData, _audit,
+            NullLogger<RecomputeOrchestrator>.Instance, () => Now,
+            RecomputeOrchestrator.DefaultMaxBucketsPerChunk,
+            maxChunkAttempts,
+            chunkRetryBaseDelay: TimeSpan.Zero,
+            delay: (_, _) => Task.CompletedTask);
+
     private static RollupArchiveSnapshot Rollup(
         OctoObjectId rtId, OctoObjectId sourceRtId, CkArchiveStatus status = CkArchiveStatus.Activated) =>
         new(rtId, TargetType, status, null, sourceRtId,
@@ -172,6 +182,76 @@ public class RecomputeOrchestratorTests
         // No chain propagation on failure.
         A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
+    }
+
+    // ---- Per-chunk retry (AB#4278) -----------------------------------------------------------
+
+    [Fact]
+    public async Task Recompute_ChunkHitsTransientDrop_RetriesWholeChunk_AndJobSucceeds()
+    {
+        StubRollupAndSource();
+
+        // Single chunk (1h range < default cap). The executor drops the connection on the first two
+        // attempts (the exact transient class the live backfill saw), then succeeds on the third.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .Throws(new System.IO.EndOfStreamException("Attempted to read past the end of the stream.")).Once()
+            .Then.Throws(new System.IO.IOException("Exception while reading from stream")).Once()
+            .Then.Returns(new RecomputeExecutionResult(42, 3));
+
+        var job = await NewRetrySut(maxChunkAttempts: 4)
+            .RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Completed, job.State);
+        Assert.Equal(42, job.RowsProcessed);
+        Assert.Equal(3, job.WindowsProcessed);
+        // Three executor invocations: two failed attempts + the successful retry.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .MustHaveHappened(3, Times.Exactly);
+        A.CallTo(() => _stateStore.MarkRecomputeSucceededAsync(RollupRt, Now)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_ChunkTransientDropExceedsBudget_FailsJobWithRealError()
+    {
+        StubRollupAndSource();
+
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .Throws(new System.IO.IOException("Exception while reading from stream"));
+
+        var job = await NewRetrySut(maxChunkAttempts: 3)
+            .RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.Equal("Exception while reading from stream", job.ErrorReason);
+        // Exactly the attempt budget was consumed (1 initial + 2 retries).
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .MustHaveHappened(3, Times.Exactly);
+        A.CallTo(() => _stateStore.MarkRecomputeFailedAsync(RollupRt, Now, "Exception while reading from stream"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_ChunkDeterministicError_FailsFastWithoutRetry()
+    {
+        StubRollupAndSource();
+
+        // A server-side rejection is not transient — must not be retried even with a retry budget.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("column does not exist"));
+
+        var job = await NewRetrySut(maxChunkAttempts: 4)
+            .RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.Equal("column does not exist", job.ErrorReason);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                From, To, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
 
     // ---- Coalesce -----------------------------------------------------------------------------

@@ -26,7 +26,8 @@ public class RollupArchiveLifecycleServiceTests
     private static RollupArchiveSnapshot Snapshot(
         DateTime? frozenUntil = null,
         DateTime? watermark = null,
-        TimeSpan? bucketSize = null) =>
+        TimeSpan? bucketSize = null,
+        BucketAlignment alignment = BucketAlignment.FixedSize) =>
         new(
             Rt,
             TargetType,
@@ -37,7 +38,10 @@ public class RollupArchiveLifecycleServiceTests
             TimeSpan.FromMinutes(5),
             watermark,
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
-            frozenUntil);
+            frozenUntil)
+        {
+            BucketAlignment = alignment
+        };
 
     // ---- Create ----
 
@@ -190,6 +194,24 @@ public class RollupArchiveLifecycleServiceTests
         var passedIn = new DateTime(2026, 5, 11, 14, 0, 42, DateTimeKind.Utc);
         var expectedBucketEnd = new DateTime(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
         A.CallTo(() => _store.GetAsync(Rt)).Returns(Snapshot(bucketSize: TimeSpan.FromMinutes(1)));
+
+        await NewSut().RewindWatermarkAsync(Rt, passedIn);
+
+        A.CallTo(() => _store.AdvanceWatermarkAsync(Rt, expectedBucketEnd, true))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Rewind_CalendarDayAlignment_SnapsToStartOfDay()
+    {
+        // Regression: a CalendarDay rollup must snap the rewind target to the start of its calendar
+        // day (00:00:00), not preserve the wall-clock time-of-day. The previous FixedSize-only modulo
+        // arithmetic ignored BucketAlignment and left the watermark — and every re-aggregated bucket —
+        // offset by the passed-in seconds. BucketSize is informational for calendar variants.
+        var passedIn = new DateTime(2026, 6, 24, 0, 0, 48, 554, DateTimeKind.Utc);
+        var expectedBucketEnd = new DateTime(2026, 6, 24, 0, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _store.GetAsync(Rt)).Returns(
+            Snapshot(bucketSize: TimeSpan.FromDays(1), alignment: BucketAlignment.CalendarDay));
 
         await NewSut().RewindWatermarkAsync(Rt, passedIn);
 

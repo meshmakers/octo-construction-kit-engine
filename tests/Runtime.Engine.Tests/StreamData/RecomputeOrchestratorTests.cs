@@ -104,6 +104,28 @@ public class RecomputeOrchestratorTests
     }
 
     [Fact]
+    public async Task Recompute_UnalignedRange_FloorsToBucketBoundaryBeforeExecuting()
+    {
+        // Regression: the Studio recompute dialog pre-fills `from`/`to` with a wall-clock "now"
+        // (time-of-day incl. sub-second). The manual entry point must snap the range onto the rollup's
+        // bucket grid — exactly like the automatic and backfill paths — before the executor's bucket
+        // enumerator (which steps from `from`) consumes it. Otherwise every regenerated bucket lands at
+        // 10:00:48.554 instead of 10:00:00, poisoning the whole series. BucketSize here is 1h.
+        StubRollupAndSource();
+        var unalignedFrom = new DateTime(2026, 5, 11, 10, 0, 48, 554, DateTimeKind.Utc);
+
+        await NewSut().RecomputeArchiveAsync(
+            RollupRt, unalignedFrom, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        // Executor sees the floored From (10:00:00), never the raw 10:00:48.554.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, From, To, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, unalignedFrom, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Recompute_Success_PropagatesToDirectDependentsOnly()
     {
         StubRollupAndSource();

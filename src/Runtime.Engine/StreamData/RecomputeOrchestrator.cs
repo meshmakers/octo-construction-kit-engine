@@ -283,6 +283,22 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     {
         var now = _clock();
 
+        var rollup = await _rollupStore.GetAsync(rollupRtId);
+        if (rollup is null)
+        {
+            return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
+                "Archive is not a rollup (or has been deleted).", adoptExistingJob);
+        }
+
+        // Floor the requested [from, to) onto this rollup's own bucket grid before anything downstream
+        // consumes it. The executor's bucket enumerator assumes a bucket-aligned range — it steps from
+        // `from` one bucket at a time — so an un-aligned `from` (e.g. an operator picking "now", with a
+        // wall-clock time-of-day, in the Studio recompute dialog) would anchor the entire regenerated
+        // series off-grid, writing buckets at HH:MM:SS instead of on the bucket boundary. The automatic
+        // dirty-window and backfill paths already snap via AlignRangeToBuckets; the manual entry point
+        // must do the same so the coalesce-enqueue and PlanChunks below both see aligned bounds.
+        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize);
+
         if (adoptExistingJob is null)
         {
             var active = await _jobStore.GetActiveForArchiveAsync(rollupRtId);
@@ -299,13 +315,6 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                     OctoObjectId.Empty, rollupRtId, RecomputeJobState.Coalesced, trigger,
                     from, to, rtIdScope, null, null, now, now, 0, null, null));
             }
-        }
-
-        var rollup = await _rollupStore.GetAsync(rollupRtId);
-        if (rollup is null)
-        {
-            return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
-                "Archive is not a rollup (or has been deleted).", adoptExistingJob);
         }
 
         var source = await _archiveStore.GetAsync(rollup.SourceArchiveRtId);

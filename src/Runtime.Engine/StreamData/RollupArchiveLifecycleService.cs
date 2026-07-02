@@ -160,13 +160,11 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
 
         // Truncate toBucketEnd down to the bucket boundary so the next orchestrator tick re-picks
         // a clean bucket-start. The store enforces the actual write; this normalisation is just
-        // input-shaping so callers can pass any timestamp inside (or at) the target bucket.
-        var bucketSize = snapshot.BucketSize;
-        if (bucketSize > TimeSpan.Zero)
-        {
-            var ticks = bucketSize.Ticks;
-            toBucketEnd = new DateTime((toBucketEnd.Ticks / ticks) * ticks, toBucketEnd.Kind);
-        }
+        // input-shaping so callers can pass any timestamp inside (or at) the target bucket. The
+        // alignment-aware helper handles FixedSize (legacy modulo arithmetic) and the calendar
+        // variants (snap to the start of the period containing the target) uniformly — the plain
+        // modulo below only floored correctly for FixedSize and left calendar rollups off-grid.
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 

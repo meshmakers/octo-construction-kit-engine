@@ -297,7 +297,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // series off-grid, writing buckets at HH:MM:SS instead of on the bucket boundary. The automatic
         // dirty-window and backfill paths already snap via AlignRangeToBuckets; the manual entry point
         // must do the same so the coalesce-enqueue and PlanChunks below both see aligned bounds.
-        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize);
+        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize,
+            BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
 
         if (adoptExistingJob is null)
         {
@@ -358,7 +359,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             // executor sub-run keeps its CrateDB statements under the per-statement timeout. Each chunk
             // swap is atomic on its own sub-range; totals accumulate into this one job.
             var chunks = RecomputePlanner.PlanChunks(
-                from, to, rollup.BucketAlignment, rollup.BucketSize, _maxBucketsPerChunk);
+                from, to, rollup.BucketAlignment, rollup.BucketSize, _maxBucketsPerChunk,
+                BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
 
             if (chunks.Count > 1)
             {
@@ -480,7 +482,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // Snap the source's earliest timestamp down to the rollup's bucket boundary so the recompute
         // starts on a clean bucket-start; recompute the whole history [from, now).
         var (from, _) = RecomputePlanner.AlignRangeToBuckets(
-            sourceMin.Value, sourceMin.Value, rollup.BucketAlignment, rollup.BucketSize);
+            sourceMin.Value, sourceMin.Value, rollup.BucketAlignment, rollup.BucketSize,
+            BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
 
         if (now <= from)
         {
@@ -628,7 +631,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             }
 
             var (start, end) = RecomputePlanner.AlignRangeToBuckets(
-                from, to, dependent.BucketAlignment, dependent.BucketSize);
+                from, to, dependent.BucketAlignment, dependent.BucketSize,
+                BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
 
             // Clamp to what this dependent has actually aggregated (AB#4288). The retroactive-write
             // detector flags a write when it is retroactive for the MOST-advanced dependent (max

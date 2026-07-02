@@ -63,7 +63,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
-        BucketAlignment bucketAlignment = BucketAlignment.FixedSize)
+        BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
+        string? referenceTimeZone = null)
     {
         if (aggregations is null) throw new ArgumentNullException(nameof(aggregations));
         if (aggregations.Count == 0)
@@ -84,6 +85,28 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
                 "BucketAlignment value is not a known enum member.");
         }
 
+        // Normalise + validate the optional reference time-zone (AB#4300 / decision O6). Unlike the
+        // read-side resolver — which tolerates an unknown id and silently falls back to UTC — the
+        // create boundary fails fast: a typo'd zone must not be accepted and then behave as UTC with
+        // no signal to the operator. Empty/whitespace collapses to null (⇒ UTC calendar boundaries).
+        // `?.Trim()` (rather than `referenceTimeZone.Trim()`) so the netstandard2.0 target — whose
+        // BCL lacks the [NotNullWhen(false)] annotation on string.IsNullOrWhiteSpace — doesn't warn
+        // CS8602 on a possible null dereference in the else branch.
+        var normalizedTimeZone = string.IsNullOrWhiteSpace(referenceTimeZone) ? null : referenceTimeZone?.Trim();
+        if (normalizedTimeZone is not null)
+        {
+            try
+            {
+                _ = TimeZoneInfo.FindSystemTimeZoneById(normalizedTimeZone);
+            }
+            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException)
+            {
+                throw new ArgumentException(
+                    $"ReferenceTimeZone '{normalizedTimeZone}' is not a known IANA time-zone id (e.g. 'Europe/Vienna').",
+                    nameof(referenceTimeZone));
+            }
+        }
+
         // Source archive lookup goes through the shared CkArchive store: thanks to Mongo
         // polymorphism the result is the same regardless of whether the source is a raw archive
         // or another rollup (chained rollups, concept §10). The snapshot carries the inherited
@@ -102,11 +125,12 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             watermarkLag,
             aggregations,
             columns,
-            bucketAlignment);
+            bucketAlignment,
+            normalizedTimeZone);
 
         _logger.LogInformation(
-            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment} (tenant {TenantId})",
-            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, bucketAlignment, _tenantId);
+            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment}, referenceTimeZone={ReferenceTimeZone} (tenant {TenantId})",
+            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, bucketAlignment, normalizedTimeZone ?? "UTC", _tenantId);
 
         return rtId;
     }
@@ -164,7 +188,9 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         // alignment-aware helper handles FixedSize (legacy modulo arithmetic) and the calendar
         // variants (snap to the start of the period containing the target) uniformly — the plain
         // modulo below only floored correctly for FixedSize and left calendar rollups off-grid.
-        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize);
+        // The reference time-zone (AB#4300 / O6) aligns calendar boundaries to local midnight.
+        var zone = BucketBoundary.ResolveZone(snapshot.ReferenceTimeZone);
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize, zone);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 

@@ -120,8 +120,10 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
 
         // Truncate down to the bucket boundary so the next tick starts cleanly. The alignment-
         // aware helper handles FixedSize (legacy modulo arithmetic) and calendar variants
-        // (snap to start of period containing the target) uniformly.
-        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize);
+        // (snap to start of period containing the target) uniformly. The reference time-zone
+        // (AB#4300 / O6) makes calendar boundaries land on local wall-clock midnight, not UTC.
+        var rewindZone = BucketBoundary.ResolveZone(snapshot.ReferenceTimeZone);
+        toBucketEnd = BucketBoundary.AlignDown(toBucketEnd, snapshot.BucketAlignment, snapshot.BucketSize, rewindZone);
 
         await _rollupStore.AdvanceWatermarkAsync(rollupRtId, toBucketEnd, allowRewind: true);
 
@@ -169,13 +171,15 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         var now = _clock();
         var watermark = rollup.LastAggregatedBucketEnd.Value;
         var committed = 0;
+        // Reference time-zone for calendar bucket boundaries (AB#4300 / O6); null ⇒ UTC.
+        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
 
         for (var i = 0; i < _maxBucketsPerTick; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
             var bucketStart = watermark;
-            var bucketEnd = BucketBoundary.NextBucketEnd(bucketStart, rollup.BucketAlignment, rollup.BucketSize);
+            var bucketEnd = BucketBoundary.NextBucketEnd(bucketStart, rollup.BucketAlignment, rollup.BucketSize, zone);
 
             // Wait until the bucket is fully past + lag so late-arriving inserts are captured.
             if (bucketEnd > now - rollup.WatermarkLag)

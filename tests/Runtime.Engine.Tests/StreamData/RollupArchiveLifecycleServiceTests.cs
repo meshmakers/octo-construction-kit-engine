@@ -112,6 +112,55 @@ public class RollupArchiveLifecycleServiceTests
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }));
     }
 
+    [Fact]
+    public async Task Create_PassesAlignmentAndReferenceTimeZoneToStore()
+    {
+        // AB#4300 — a calendar-aligned rollup with an IANA reference zone must reach the store so the
+        // orchestrator can produce DST-correct local-day buckets.
+        var sourceSnapshot = new ArchiveSnapshot(
+            SourceRt, TargetType, CkArchiveStatus.Activated, "SourceArchive",
+            new[] { new CkArchiveColumnSpec("voltage", Indexed: true, Required: false) });
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(sourceSnapshot);
+        A.CallTo(() => _store.InsertAsync(
+                A<string?>._, A<RtCkId<CkTypeId>>._, A<OctoObjectId>._, A<TimeSpan>._, A<TimeSpan>._,
+                A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+                A<BucketAlignment>._, A<string?>._))
+            .Returns(OctoObjectId.GenerateNewId());
+
+        var aggregations = new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) };
+
+        await NewSut().CreateAsync(
+            "DailyLocal", SourceRt, TimeSpan.FromDays(1), TimeSpan.FromMinutes(15), aggregations,
+            BucketAlignment.CalendarDay, "Europe/Vienna");
+
+        A.CallTo(() => _store.InsertAsync(
+                "DailyLocal", TargetType, SourceRt,
+                TimeSpan.FromDays(1), TimeSpan.FromMinutes(15),
+                aggregations, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+                BucketAlignment.CalendarDay, "Europe/Vienna"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Create_InvalidReferenceTimeZone_ThrowsArgumentException()
+    {
+        var sourceSnapshot = new ArchiveSnapshot(
+            SourceRt, TargetType, CkArchiveStatus.Activated, "SourceArchive",
+            new[] { new CkArchiveColumnSpec("voltage", Indexed: true, Required: false) });
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(sourceSnapshot);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => NewSut().CreateAsync(
+            "BadZone", SourceRt, TimeSpan.FromDays(1), TimeSpan.FromMinutes(15),
+            new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
+            BucketAlignment.CalendarDay, "Europe/Nowhere"));
+
+        A.CallTo(() => _store.InsertAsync(
+                A<string?>._, A<RtCkId<CkTypeId>>._, A<OctoObjectId>._, A<TimeSpan>._, A<TimeSpan>._,
+                A<IReadOnlyList<CkRollupAggregationSpec>>._, A<IReadOnlyList<CkArchiveColumnSpec>>._,
+                A<BucketAlignment>._, A<string?>._))
+            .MustNotHaveHappened();
+    }
+
     // ---- Freeze ----
 
     [Fact]

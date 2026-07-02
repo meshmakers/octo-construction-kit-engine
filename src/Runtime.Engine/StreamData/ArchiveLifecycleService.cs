@@ -347,7 +347,9 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         var now = _clock();
-        var initialBucketEnd = BucketBoundary.InitialWatermark(now, rollup.BucketAlignment, rollup.BucketSize);
+        // Reference time-zone for calendar bucket boundaries (AB#4300 / O6); null ⇒ UTC.
+        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
+        var initialBucketEnd = BucketBoundary.InitialWatermark(now, rollup.BucketAlignment, rollup.BucketSize, zone);
 
         await _rollupStore.AdvanceWatermarkAsync(archiveRtId, initialBucketEnd);
 

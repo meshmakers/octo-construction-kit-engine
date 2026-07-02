@@ -29,7 +29,8 @@ public interface IRollupArchiveLifecycleService
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
-        BucketAlignment bucketAlignment = BucketAlignment.FixedSize);
+        BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
+        string? referenceTimeZone = null);
 
     /// <summary>
     /// Sets <see cref="RollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.

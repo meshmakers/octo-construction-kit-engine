@@ -41,7 +41,8 @@ public static class RecomputePlanner
         foreach (var dependent in dependents)
         {
             var (start, end) = AlignRangeToBuckets(
-                window.WindowStart, window.WindowEnd, dependent.BucketAlignment, dependent.BucketSize);
+                window.WindowStart, window.WindowEnd, dependent.BucketAlignment, dependent.BucketSize,
+                BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
 
             ranges.Add(new ArchiveRecomputeRange(
                 dependent.RtId, start, end, RtIdScope: null, enqueuedAt));
@@ -57,17 +58,18 @@ public static class RecomputePlanner
     /// window still yields at least one bucket so the change is never silently dropped.
     /// </summary>
     public static (DateTime Start, DateTime End) AlignRangeToBuckets(
-        DateTime windowStart, DateTime windowEnd, BucketAlignment alignment, TimeSpan bucketSize)
+        DateTime windowStart, DateTime windowEnd, BucketAlignment alignment, TimeSpan bucketSize,
+        TimeZoneInfo? zone = null)
     {
-        var start = BucketBoundary.AlignDown(windowStart, alignment, bucketSize);
-        var alignedEnd = BucketBoundary.AlignDown(windowEnd, alignment, bucketSize);
+        var start = BucketBoundary.AlignDown(windowStart, alignment, bucketSize, zone);
+        var alignedEnd = BucketBoundary.AlignDown(windowEnd, alignment, bucketSize, zone);
         var end = alignedEnd >= windowEnd
             ? alignedEnd
-            : BucketBoundary.NextBucketEnd(alignedEnd, alignment, bucketSize);
+            : BucketBoundary.NextBucketEnd(alignedEnd, alignment, bucketSize, zone);
 
         if (end <= start)
         {
-            end = BucketBoundary.NextBucketEnd(start, alignment, bucketSize);
+            end = BucketBoundary.NextBucketEnd(start, alignment, bucketSize, zone);
         }
 
         return (start, end);
@@ -91,7 +93,8 @@ public static class RecomputePlanner
     /// single un-chunked call would.
     /// </remarks>
     public static IReadOnlyList<(DateTime Start, DateTime End)> PlanChunks(
-        DateTime from, DateTime to, BucketAlignment alignment, TimeSpan bucketSize, int maxBucketsPerChunk)
+        DateTime from, DateTime to, BucketAlignment alignment, TimeSpan bucketSize, int maxBucketsPerChunk,
+        TimeZoneInfo? zone = null)
     {
         if (maxBucketsPerChunk <= 0)
         {
@@ -113,7 +116,7 @@ public static class RecomputePlanner
         var guard = 0;
         while (cursor < toUtc)
         {
-            var next = BucketBoundary.NextBucketEnd(cursor, alignment, bucketSize);
+            var next = BucketBoundary.NextBucketEnd(cursor, alignment, bucketSize, zone);
             if (next <= cursor)
             {
                 break; // defensive: zero / negative bucket would loop forever

@@ -221,4 +221,23 @@ public class BucketBoundaryTests
                 BucketBoundary.AlignDown(start, alignment, OneHour, zone: null));
         }
     }
+
+    // ---- ResolveZone (AB#4300 / O6) --------------------------------------------------------------
+
+    [Fact]
+    public void ResolveZone_KnownIana_ReturnsZone()
+    {
+        Assert.NotNull(BucketBoundary.ResolveZone("Europe/Vienna"));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Europe/Nowhere")]
+    public void ResolveZone_NullEmptyOrUnknown_ReturnsNull(string? id)
+    {
+        // Tolerant on the write path: an unknown/empty id falls back to UTC (null) rather than throw.
+        Assert.Null(BucketBoundary.ResolveZone(id));
+    }
 }

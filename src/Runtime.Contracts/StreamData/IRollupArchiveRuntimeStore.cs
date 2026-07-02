@@ -51,6 +51,12 @@ public interface IRollupArchiveRuntimeStore
     /// Bucket-boundary alignment. Defaults to <see cref="BucketAlignment.FixedSize"/> for callers
     /// (and pre-1.4.0 entities) that don't need calendar-aware buckets. Concept-time-range §7.
     /// </param>
+    /// <param name="referenceTimeZone">
+    /// Optional IANA reference time-zone (e.g. <c>Europe/Vienna</c>) that aligns calendar bucket
+    /// boundaries to local wall-clock time so they are DST-correct. <c>null</c> keeps UTC calendar
+    /// boundaries. Only meaningful for calendar <paramref name="bucketAlignment"/> variants; ignored
+    /// for <see cref="BucketAlignment.FixedSize"/>. AB#4300 / decision O6.
+    /// </param>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
     Task<OctoObjectId> InsertAsync(
         string? rtWellKnownName,
@@ -60,7 +66,8 @@ public interface IRollupArchiveRuntimeStore
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         IReadOnlyList<CkArchiveColumnSpec> columns,
-        BucketAlignment bucketAlignment = BucketAlignment.FixedSize);
+        BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
+        string? referenceTimeZone = null);
 
     /// <summary>
     /// Soft-deletes the rollup entity by setting <c>rtState = Archived</c>. The Crate table is

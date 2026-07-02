@@ -19,8 +19,33 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// <c>BucketSize</c> is only consulted for <see cref="BucketAlignment.FixedSize"/>; the calendar
 /// variants ignore it entirely (the attribute is kept informational for monitoring / UI).
 /// </remarks>
-internal static class BucketBoundary
+public static class BucketBoundary
 {
+    /// <summary>
+    /// Resolves an IANA reference-time-zone id (AB#4290 / O6) to a <see cref="TimeZoneInfo"/>, or
+    /// <c>null</c> (⇒ UTC calendar boundaries) when the id is empty or unknown. Tolerant by design:
+    /// this is the write/aggregation path, where an unknown stored id must fall back to UTC rather
+    /// than crash a background orchestrator. Create-time input is validated fail-fast elsewhere
+    /// (<c>RollupArchiveLifecycleService.CreateAsync</c>). Single source of truth for zone resolution,
+    /// shared by the engine write path, the CrateDb recompute executor, and the read-side resolver.
+    /// </summary>
+    public static TimeZoneInfo? ResolveZone(string? referenceTimeZone)
+    {
+        if (string.IsNullOrWhiteSpace(referenceTimeZone))
+        {
+            return null;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(referenceTimeZone);
+        }
+        catch (Exception e) when (e is TimeZoneNotFoundException or InvalidTimeZoneException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>
     /// Computes the exclusive end of the bucket that starts at <paramref name="bucketStart"/>.
     /// For <see cref="BucketAlignment.FixedSize"/> this is the legacy

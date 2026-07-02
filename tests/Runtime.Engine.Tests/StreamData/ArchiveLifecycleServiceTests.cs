@@ -213,13 +213,74 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => _audit.RecordDeletionAsync(A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
     }
 
+    // ---- Recompute-work purge on disable/delete (AB#4300) ----
+
+    private static readonly OctoObjectId JobRt = OctoObjectId.GenerateNewId();
+    private static readonly DateTime PurgeFrom = new(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime PurgeTo = new(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
+
+    private ArchiveLifecycleService NewSutWithRecomputeStores(
+        IArchiveRecomputeStateStore stateStore, IRecomputeJobStore jobStore) =>
+        new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance,
+            recomputeStateStore: stateStore, recomputeJobStore: jobStore);
+
+    private static RecomputeJobSnapshot PendingJob() =>
+        new(JobRt, Rt, RecomputeJobState.Pending, RecomputeTrigger.Manual,
+            PurgeFrom, PurgeTo, null, null, null, null, null, null, null, null);
+
+    [Fact]
+    public async Task Disable_PurgesPendingRangesAndTerminatesActiveJob()
+    {
+        Stub(CkArchiveStatus.Activated);
+        var stateStore = A.Fake<IArchiveRecomputeStateStore>();
+        var jobStore = A.Fake<IRecomputeJobStore>();
+        A.CallTo(() => jobStore.GetActiveForArchiveAsync(Rt)).Returns(PendingJob());
+
+        await NewSutWithRecomputeStores(stateStore, jobStore).DisableAsync(Rt);
+
+        A.CallTo(() => stateStore.ClearPendingRecomputeRangesAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.State == RecomputeJobState.Failed && j.ErrorReason!.Contains("disabled"))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Delete_PurgesPendingRangesAndTerminatesActiveJob()
+    {
+        Stub(CkArchiveStatus.Activated);
+        var stateStore = A.Fake<IArchiveRecomputeStateStore>();
+        var jobStore = A.Fake<IRecomputeJobStore>();
+        A.CallTo(() => jobStore.GetActiveForArchiveAsync(Rt)).Returns(PendingJob());
+
+        await NewSutWithRecomputeStores(stateStore, jobStore).DeleteAsync(Rt);
+
+        A.CallTo(() => stateStore.ClearPendingRecomputeRangesAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.State == RecomputeJobState.Failed && j.ErrorReason!.Contains("deleted"))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Disable_NoActiveJob_ClearsRangesWithoutUpdatingJob()
+    {
+        Stub(CkArchiveStatus.Activated);
+        var stateStore = A.Fake<IArchiveRecomputeStateStore>();
+        var jobStore = A.Fake<IRecomputeJobStore>();
+        A.CallTo(() => jobStore.GetActiveForArchiveAsync(Rt)).Returns((RecomputeJobSnapshot?)null);
+
+        await NewSutWithRecomputeStores(stateStore, jobStore).DisableAsync(Rt);
+
+        A.CallTo(() => stateStore.ClearPendingRecomputeRangesAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => jobStore.UpdateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+    }
+
     // ---- Initial-watermark seeding on activation (rollup-archives concept §4) ----
 
     private static readonly DateTime FixedNow = new(2026, 5, 11, 14, 0, 42, DateTimeKind.Utc);
 
     private ArchiveLifecycleService NewSutWithRollupAndClock(IRollupArchiveRuntimeStore rollupStore) =>
         new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance,
-            rollupStore, () => FixedNow);
+            rollupStore, clock: () => FixedNow);
 
     private static readonly OctoObjectId SourceRt = OctoObjectId.GenerateNewId();
 

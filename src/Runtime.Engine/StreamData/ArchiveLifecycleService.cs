@@ -36,6 +36,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly IStreamDataRepository _repository;
     private readonly IArchiveAuditTrail _audit;
     private readonly IRollupArchiveRuntimeStore? _rollupStore;
+    private readonly IArchiveRecomputeStateStore? _recomputeStateStore;
+    private readonly IRecomputeJobStore? _recomputeJobStore;
     private readonly ILogger<ArchiveLifecycleService> _logger;
     private readonly Func<DateTime> _clock;
 
@@ -55,6 +57,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         IArchiveAuditTrail audit,
         ILogger<ArchiveLifecycleService> logger,
         IRollupArchiveRuntimeStore? rollupStore = null,
+        IArchiveRecomputeStateStore? recomputeStateStore = null,
+        IRecomputeJobStore? recomputeJobStore = null,
         Func<DateTime>? clock = null)
     {
         _tenantId = tenantId;
@@ -62,6 +66,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _repository = repository;
         _audit = audit;
         _rollupStore = rollupStore;
+        _recomputeStateStore = recomputeStateStore;
+        _recomputeJobStore = recomputeJobStore;
         _logger = logger;
         _clock = clock ?? (() => DateTime.UtcNow);
     }
@@ -101,6 +107,11 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         }
 
         await TransitionAsync(snapshot, CkArchiveStatus.Disabled);
+
+        // AB#4300: the background recompute drain skips non-activated rollups, so any queued backfill /
+        // recompute would sit at Pending forever once this archive is disabled. Purge it now so it
+        // can't linger as an un-processable ghost job.
+        await PurgeRecomputeWorkAsync(archiveRtId, "Archive was disabled — pending recompute cancelled.");
     }
 
     /// <inheritdoc />
@@ -147,11 +158,60 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // Crate first (idempotent), entity store last; matches §11.
         await _repository.DeleteArchiveAsync(archiveRtId);
         await _store.ArchiveEntityAsync(archiveRtId);
+
+        // AB#4300: drop any queued recompute work so a re-import that reuses this rtId doesn't inherit
+        // a stale Pending job + range (the drain would skip the freshly-imported-and-still-Created
+        // rollup and the ghost job would sit at Pending until it is activated).
+        await PurgeRecomputeWorkAsync(archiveRtId, "Archive was deleted — pending recompute cancelled.");
+
         await _audit.RecordDeletionAsync(_tenantId, archiveRtId, snapshot.Status);
 
         StreamDataDiagnostics.Deletions.Add(1,
             new("archive", archiveRtId.ToString()),
             new("from_status", snapshot.Status.ToString()));
+    }
+
+    /// <summary>
+    /// AB#4300: purge queued recompute work for an archive that is being disabled or deleted so a
+    /// leftover Pending job + range can't linger forever. The background drain skips non-activated
+    /// rollups, so without this a queued backfill/recompute would sit at Pending with no feedback (and
+    /// a delete+re-import that reuses the rtId would inherit it). Clears the pending recompute ranges
+    /// and terminates the single active (Pending/Running/Swapping) job as Failed with an explanatory
+    /// reason. A no-op for archives with no queued work (raw / time-range, or an idle rollup) and when
+    /// the stores are not wired (backward-compatible ctor).
+    /// </summary>
+    private async Task PurgeRecomputeWorkAsync(OctoObjectId archiveRtId, string reason)
+    {
+        if (_recomputeStateStore is not null)
+        {
+            await _recomputeStateStore.ClearPendingRecomputeRangesAsync(archiveRtId);
+        }
+
+        if (_recomputeJobStore is null)
+        {
+            return;
+        }
+
+        var active = await _recomputeJobStore.GetActiveForArchiveAsync(archiveRtId);
+        if (active is null)
+        {
+            return;
+        }
+
+        var now = _clock();
+        await _recomputeJobStore.UpdateAsync(active with
+        {
+            State = RecomputeJobState.Failed,
+            FinishedAt = now,
+            DurationMs = active.StartedAt is { } startedAt
+                ? (int)(now - startedAt).TotalMilliseconds
+                : 0,
+            ErrorReason = reason,
+        });
+
+        _logger.LogInformation(
+            "Cancelled active recompute job {JobId} for archive {ArchiveRtId}: {Reason}",
+            active.RtId, archiveRtId, reason);
     }
 
     /// <inheritdoc />

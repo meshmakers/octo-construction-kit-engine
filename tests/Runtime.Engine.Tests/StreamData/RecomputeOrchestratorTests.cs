@@ -283,6 +283,7 @@ public class RecomputeOrchestratorTests
     [Fact]
     public async Task Recompute_WhenJobActive_CoalescesWithoutRunningExecutor()
     {
+        StubRollupAndSource();
         var activeJob = new RecomputeJobSnapshot(
             OctoObjectId.GenerateNewId(), RollupRt, RecomputeJobState.Running, RecomputeTrigger.Periodic,
             From, To, null, null, null, Now, null, null, null, null);
@@ -326,6 +327,22 @@ public class RecomputeOrchestratorTests
         var job = await NewSut().RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
 
         Assert.Equal(RecomputeJobState.Failed, job.State);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Recompute_NotActivated_FailsWithoutRunningExecutor()
+    {
+        // A manual recompute of a non-activated rollup must fail fast (the background drain skips
+        // non-activated rollups, so accepting it would strand the caller on a job stuck at Pending).
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt))
+            .Returns(Rollup(RollupRt, SourceRt, CkArchiveStatus.Disabled));
+
+        var job = await NewSut().RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.Contains("not activated", job.ErrorReason!, StringComparison.OrdinalIgnoreCase);
         A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
@@ -529,6 +546,25 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _executor.ExecuteAsync(
                 A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
                 A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Backfill_NotActivated_FailsWithoutResolvingSourceMin()
+    {
+        // Backfilling a non-activated rollup must fail fast instead of pre-creating a Pending job +
+        // range that the background drain silently skips forever.
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt))
+            .Returns(Rollup(RollupRt, SourceRt, CkArchiveStatus.Disabled));
+
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.NotNull(job);
+        Assert.Equal(RecomputeJobState.Failed, job!.State);
+        Assert.Contains("not activated", job.ErrorReason!, StringComparison.OrdinalIgnoreCase);
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(A<OctoObjectId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
     }
 

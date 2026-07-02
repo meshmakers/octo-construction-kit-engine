@@ -290,6 +290,18 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 "Archive is not a rollup (or has been deleted).", adoptExistingJob);
         }
 
+        // Fail fast on a non-activated rollup. The background drain (TickAsync) already skips
+        // non-activated rollups so a transiently-disabled rollup keeps its queued work; this guard is
+        // for the manual entry point, where silently accepting the request and returning a job that the
+        // drain will never pick up strands the caller on a job stuck at Pending with no feedback. Only
+        // reachable when adoptExistingJob is null (the drain pre-filters Activated before adopting).
+        if (rollup.Status != CkArchiveStatus.Activated)
+        {
+            return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
+                $"Archive is not activated (status {rollup.Status}) — activate it before recomputing.",
+                adoptExistingJob);
+        }
+
         // Floor the requested [from, to) onto this rollup's own bucket grid before anything downstream
         // consumes it. The executor's bucket enumerator assumes a bucket-aligned range — it steps from
         // `from` one bucket at a time — so an un-aligned `from` (e.g. an operator picking "now", with a
@@ -489,6 +501,18 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             return await FailImmediatelyAsync(
                 rollupRtId, nowForFailure, nowForFailure, rtIdScope: null, RecomputeTrigger.Manual,
                 nowForFailure, "Archive is not a rollup (or has been deleted).");
+        }
+
+        // Fail fast on a non-activated rollup instead of pre-creating a Pending job + range that the
+        // background drain (TickAsync) will silently skip forever — the caller would otherwise poll a
+        // job stuck at Pending with no error. Mirror the non-rollup fail shape above.
+        if (rollup.Status != CkArchiveStatus.Activated)
+        {
+            var nowForFailure = _clock();
+            return await FailImmediatelyAsync(
+                rollupRtId, nowForFailure, nowForFailure, rtIdScope: null, RecomputeTrigger.Manual,
+                nowForFailure,
+                $"Archive is not activated (status {rollup.Status}) — activate it before backfilling.");
         }
 
         var sourceMin = await _streamData.GetArchiveMinTimestampAsync(rollup.SourceArchiveRtId, cancellationToken);

@@ -297,8 +297,31 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // series off-grid, writing buckets at HH:MM:SS instead of on the bucket boundary. The automatic
         // dirty-window and backfill paths already snap via AlignRangeToBuckets; the manual entry point
         // must do the same so the coalesce-enqueue and PlanChunks below both see aligned bounds.
-        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize,
-            BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
+        var zone = BucketBoundary.ResolveZone(rollup.ReferenceTimeZone);
+        (from, to) = RecomputePlanner.AlignRangeToBuckets(from, to, rollup.BucketAlignment, rollup.BucketSize, zone);
+
+        // AB#4306: never recompute the CURRENT open bucket — it is the open-bucket refresh's exclusive
+        // domain (the forward tick re-aggregates it every tick at generation 0, RollupOrchestrator).
+        // If a recompute claimed it, BuildUpsertPointer would flip the per-window generation pointer
+        // for the range to a higher generation, and the read path (which picks the highest generation)
+        // would mask the refresh's generation-0 write — so a "this month / this year so far" total
+        // would freeze at the recompute instead of tracking new source data. Cap the end at the start
+        // of the bucket containing `now`, leaving only fully-past (closed) buckets for the recompute.
+        var openBucketStart = BucketBoundary.AlignDown(now, rollup.BucketAlignment, rollup.BucketSize, zone);
+        if (to > openBucketStart)
+        {
+            to = openBucketStart;
+        }
+        if (to <= from)
+        {
+            _logger.LogDebug(
+                "Recompute of {RollupRtId}: requested range is entirely within the current open bucket " +
+                "(from {From:O}) — nothing closed to recompute; the open-bucket refresh owns it.",
+                rollupRtId, from);
+            return await PersistNewJobAsync(new RecomputeJobSnapshot(
+                OctoObjectId.Empty, rollupRtId, RecomputeJobState.Completed, trigger,
+                from, from, rtIdScope, null, null, now, now, 0, null, null));
+        }
 
         if (adoptExistingJob is null)
         {

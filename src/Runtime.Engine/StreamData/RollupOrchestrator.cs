@@ -36,6 +36,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
     private readonly ILogger<RollupOrchestrator> _logger;
     private readonly int _maxBucketsPerTick;
     private readonly Func<DateTime> _clock;
+    private readonly bool _refreshOpenBucket;
 
     /// <summary>Constructs the orchestrator with tenant-scoped dependencies.</summary>
     public RollupOrchestrator(
@@ -46,7 +47,8 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         IArchiveAuditTrail audit,
         ILogger<RollupOrchestrator> logger,
         int maxBucketsPerTick = DefaultMaxBucketsPerTick,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        bool refreshOpenBucket = false)
     {
         if (maxBucketsPerTick <= 0)
         {
@@ -62,6 +64,7 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         _logger = logger;
         _maxBucketsPerTick = maxBucketsPerTick;
         _clock = clock ?? (() => DateTime.UtcNow);
+        _refreshOpenBucket = refreshOpenBucket;
     }
 
     /// <inheritdoc />
@@ -210,6 +213,31 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
 
             watermark = bucketEnd;
             committed++;
+        }
+
+        // AB#4306: keep the CURRENT open bucket fresh. The loop above only commits CLOSED buckets
+        // (bucketEnd <= now - lag) and stops at the first not-yet-closed one, leaving `watermark` at
+        // its start. When enabled, re-aggregate that one open bucket every tick as a provisional row
+        // WITHOUT advancing the watermark — so a "this month / this year so far" total tracks new
+        // source data instead of only materialising once the period closes. AggregateBucketAsync is
+        // an idempotent generation-0 upsert (ON CONFLICT), so repeating it is safe, and the forward
+        // loop finalises the bucket normally once it closes. Cheap on a cascaded ladder (the open
+        // bucket reads only a handful of rows from the finer level below).
+        if (_refreshOpenBucket)
+        {
+            var openEnd = BucketBoundary.NextBucketEnd(watermark, rollup.BucketAlignment, rollup.BucketSize, zone);
+            // openEnd > now - lag ⇔ this is exactly the not-yet-finalised bucket the loop stopped at.
+            // If the loop instead stopped on the per-tick cap (backlog), openEnd is still past-and-
+            // finalisable and we skip, letting the closed loop catch up first. Respect freeze too.
+            var isCurrentOpenBucket = openEnd > now - rollup.WatermarkLag;
+            var isFrozen = rollup.FrozenUntil is { } frozenUntil && openEnd <= frozenUntil;
+            if (isCurrentOpenBucket && !isFrozen)
+            {
+                var rows = await _repository.AggregateBucketAsync(source, rollup, watermark, openEnd, cancellationToken);
+                _logger.LogDebug(
+                    "Rollup {RollupRtId}: refreshed open bucket [{Start:O}, {End:O}) provisionally — {Rows} rows",
+                    rollup.RtId, watermark, openEnd, rows);
+            }
         }
 
         if (committed > 0)

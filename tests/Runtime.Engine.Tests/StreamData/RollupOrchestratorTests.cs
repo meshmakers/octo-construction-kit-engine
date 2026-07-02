@@ -289,4 +289,60 @@ public class RollupOrchestratorTests
         A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, expected, true))
             .MustHaveHappenedOnceExactly();
     }
+
+    // ---- Open-bucket refresh (AB#4306) -----------------------------------------------------
+
+    private RollupOrchestrator NewSutWithRefresh(DateTime now, int maxBucketsPerTick = 60) =>
+        new(TenantId, _archiveStore, _rollupStore, _repo, _audit,
+            NullLogger<RollupOrchestrator>.Instance, maxBucketsPerTick, () => now, refreshOpenBucket: true);
+
+    [Fact]
+    public async Task Tick_RefreshOpenBucket_UpsertsCurrentOpenBucketWithoutAdvancingWatermark()
+    {
+        // watermark at 14:00, now 14:00:30 → the [14:00,14:01) bucket is still open (end > now-lag),
+        // so the closed loop commits nothing. With refresh on, that one open bucket is re-aggregated.
+        var bucketSize = TimeSpan.FromMinutes(1);
+        StubActivatedSource();
+        StubRollups(Rollup(BaseTime, bucketSize, TimeSpan.FromMinutes(5)));
+
+        var committed = await NewSutWithRefresh(BaseTime + TimeSpan.FromSeconds(30)).TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, committed); // no CLOSED bucket committed
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, BaseTime, BaseTime + bucketSize, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        // The open bucket must NOT advance the watermark — it stays open for the next tick.
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(A<OctoObjectId>._, A<DateTime>._, A<bool>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_RefreshOpenBucketDisabled_DoesNotUpsertOpenBucket()
+    {
+        StubActivatedSource();
+        StubRollups(Rollup(BaseTime, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5)));
+
+        await NewSut(BaseTime + TimeSpan.FromSeconds(30)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_RefreshOpenBucket_SkippedWhileClosedBacklogStillDraining()
+    {
+        // watermark far behind + a per-tick cap of 2 → the loop commits 2 CLOSED buckets and stops on
+        // the cap, not at the current open bucket. The refresh must then NOT fire (no 3rd aggregate):
+        // openEnd is still ≤ now-lag, so the closed loop owns it on the next tick.
+        var bucketSize = TimeSpan.FromMinutes(1);
+        StubActivatedSource();
+        StubRollups(Rollup(BaseTime - TimeSpan.FromMinutes(10), bucketSize, TimeSpan.FromMinutes(5)));
+
+        await NewSutWithRefresh(BaseTime, maxBucketsPerTick: 2).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .MustHaveHappened(2, Times.Exactly); // exactly the 2 closed buckets, no open-bucket upsert
+    }
 }

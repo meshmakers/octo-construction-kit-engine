@@ -101,6 +101,49 @@ public sealed class RollupCycleException : StreamDataException
 }
 
 /// <summary>
+/// The rollup's target bucket interval is finer than — or not an integer multiple of — the source
+/// archive's native window length (AB#4289). A finer or misaligned bucket is effectively
+/// upsampling and always a configuration mistake: a raw source yields a sparse table (only buckets
+/// that happen to contain a source row materialise), a windowed source (TimeRange / rollup) yields
+/// an empty one (no source window is fully contained in a smaller target bucket). Enforced at
+/// activation only when the source granularity is known; raw archives with an undeclared sampling
+/// interval are not checked.
+/// </summary>
+public sealed class RollupBucketIntervalException : StreamDataException
+{
+    public TimeSpan BucketSize { get; }
+    public TimeSpan SourceGranularity { get; }
+
+    public RollupBucketIntervalException(OctoObjectId rollupArchiveRtId, TimeSpan bucketSize, TimeSpan sourceGranularity)
+        : base(
+            $"Rollup archive '{rollupArchiveRtId}' bucket interval ({FormatInterval(bucketSize)}) must be greater " +
+            $"than or equal to and an integer multiple of the source granularity ({FormatInterval(sourceGranularity)}).",
+            rollupArchiveRtId)
+    {
+        BucketSize = bucketSize;
+        SourceGranularity = sourceGranularity;
+    }
+
+    /// <summary>Renders a TimeSpan in its most natural whole unit (d / h / min / s) for the message.</summary>
+    private static string FormatInterval(TimeSpan value)
+    {
+        if (value.Ticks % TimeSpan.TicksPerDay == 0 && value.TotalDays >= 1)
+        {
+            return $"{value.TotalDays:0} d";
+        }
+        if (value.Ticks % TimeSpan.TicksPerHour == 0 && value.TotalHours >= 1)
+        {
+            return $"{value.TotalHours:0} h";
+        }
+        if (value.Ticks % TimeSpan.TicksPerMinute == 0 && value.TotalMinutes >= 1)
+        {
+            return $"{value.TotalMinutes:0} min";
+        }
+        return $"{value.TotalSeconds:0.###} s";
+    }
+}
+
+/// <summary>
 /// A source archive deletion was attempted while at least one non-soft-deleted rollup references
 /// it. The operator must delete or freeze the rollups first; this prevents accidental destruction
 /// of aggregated history. Concept §6, §10.

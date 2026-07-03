@@ -72,6 +72,21 @@ public static class RollupValidator
             throw new RollupSourceNotActivatedException(rollup.RtId, rollup.SourceArchiveRtId, source.Status);
         }
 
+        // AB#4289: the target bucket must be no finer than — and an integer multiple of — the
+        // source's native window length. A finer/misaligned bucket upsamples (a raw source yields a
+        // sparse table, a windowed source an empty one). The source granularity is its window length
+        // (TimeRangeArchive Period / rollup BucketSize, both surfaced via Period). It is null for raw
+        // archives whose sampling interval is undeclared — those cannot be validated and are skipped
+        // rather than rejected on a guess.
+        if (source.Period is { } sourceGranularity && sourceGranularity > TimeSpan.Zero)
+        {
+            if (rollup.BucketSize < sourceGranularity ||
+                rollup.BucketSize.Ticks % sourceGranularity.Ticks != 0)
+            {
+                throw new RollupBucketIntervalException(rollup.RtId, rollup.BucketSize, sourceGranularity);
+            }
+        }
+
         // A rollup aggregation references a source column by name: an ingested column by its Path,
         // or a computed column by its Name (concept §10 / AB#4189). Both map to the same physical
         // source column the rollup SQL aggregates over (ColumnNameMapper.PathToColumnName), so a

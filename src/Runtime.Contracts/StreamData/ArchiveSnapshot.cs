@@ -45,9 +45,12 @@ public sealed record ArchiveSnapshot(
     public bool IsTimeRange { get; init; }
 
     /// <summary>
-    /// Advisory period for a <c>TimeRangeArchive</c>'s windows (e.g. 15 min, 1 h, 1 d).
-    /// Optional and descriptive only — the engine does not enforce that incoming windows match
-    /// the declared period. Null for raw and rollup archives.
+    /// The archive's native window length (e.g. 15 min, 1 h, 1 d): a <c>TimeRangeArchive</c>'s
+    /// declared window <c>Period</c>, or a <c>RollupArchive</c>'s <c>BucketSize</c>. Null for raw
+    /// archives, whose sampling interval is undeclared. For time-range ingestion it stays advisory
+    /// (the engine does not enforce that incoming windows match it); it is authoritative for the
+    /// AB#4289 rollup activation guard (a rollup's bucket must be a multiple of its source's window
+    /// length) and feeds the AB#4290 resolver's base-rung grain.
     /// </summary>
     public System.TimeSpan? Period { get; init; }
 

@@ -125,6 +125,47 @@ public class RollupValidatorTests
             () => RollupValidator.ValidateForActivation(rollup, Source(paths: "voltage")));
     }
 
+    // ---- AB#4289: bucket interval vs source granularity ----
+
+    [Theory]
+    [InlineData(5)]   // finer than the 15-min source window
+    [InlineData(7)]   // finer and not aligned
+    [InlineData(20)]  // coarser but not an integer multiple of 15 min
+    [InlineData(25)]
+    public void ValidateForActivation_BucketFinerOrNotMultipleOfWindowedSource_Throws(int bucketMinutes)
+    {
+        var rollup = Rollup() with { BucketSize = TimeSpan.FromMinutes(bucketMinutes) };
+        var source = Source(paths: "voltage") with { Period = TimeSpan.FromMinutes(15) };
+
+        var ex = Assert.Throws<RollupBucketIntervalException>(
+            () => RollupValidator.ValidateForActivation(rollup, source));
+        Assert.Equal(TimeSpan.FromMinutes(bucketMinutes), ex.BucketSize);
+        Assert.Equal(TimeSpan.FromMinutes(15), ex.SourceGranularity);
+    }
+
+    [Theory]
+    [InlineData(15)]  // equal to the source granularity
+    [InlineData(30)]  // an integer multiple
+    [InlineData(60)]
+    public void ValidateForActivation_BucketEqualOrMultipleOfWindowedSource_DoesNotThrow(int bucketMinutes)
+    {
+        var rollup = Rollup() with { BucketSize = TimeSpan.FromMinutes(bucketMinutes) };
+        var source = Source(paths: "voltage") with { Period = TimeSpan.FromMinutes(15) };
+
+        RollupValidator.ValidateForActivation(rollup, source);
+    }
+
+    [Fact]
+    public void ValidateForActivation_RawSourceUndeclaredGranularity_DoesNotThrow()
+    {
+        // A raw source carries no Period, so the bucket-vs-source relationship cannot be validated;
+        // an otherwise-fine 1-min bucket must not be rejected on a guess.
+        var rollup = Rollup() with { BucketSize = TimeSpan.FromMinutes(1) };
+        var source = Source(paths: "voltage"); // Period == null
+
+        RollupValidator.ValidateForActivation(rollup, source);
+    }
+
     // ---- AB#4189: a rollup may aggregate a source computed column (by its Name) ----
 
     private static ArchiveSnapshot SourceWithComputed() =>

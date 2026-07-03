@@ -85,7 +85,13 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 (long)rollup.BucketSize.TotalMilliseconds,
                 rollup.BucketAlignment,
                 StoredFunctionForSeries: MatchStoredFunction(rollup, baseRtId, request.SourcePath),
-                IsBase: false));
+                IsBase: false)
+            {
+                // The rung carries the rollup's STORED zone (AB#4190 / O6). The resolution zone the
+                // query is answered in (query zone vs. this stored zone) is applied by the grain probe
+                // per the comparison policy — see EffectiveGrainMs.
+                ReferenceTimeZone = rollup.ReferenceTimeZone,
+            });
         }
 
         return SeriesResolutionPlanner.Plan(
@@ -94,7 +100,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             request.To,
             request.TargetPoints,
             request.RequiredAggregation,
-            EffectiveGrainMs);
+            (rung, from, to) => EffectiveGrainMs(rung, from, to, request.QueryTimeZone, request.ComparisonPolicy));
     }
 
     /// <summary>
@@ -122,11 +128,27 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
     }
 
     /// <summary>
-    /// Effective bucket width of a rung over the query window. Fixed rungs use their declared grain;
-    /// calendar rungs derive a representative width from the wall clock via <see cref="BucketBoundary"/>
-    /// (UTC in Phase 1; reference-time-zone alignment lands in Phase 4 / O6).
+    /// Effective bucket width of a rung over the query window, in the query's resolution zone
+    /// (AB#4190 / O6). Fixed-size rungs use their declared grain and are time-zone-independent
+    /// (decision T3 — sub-day binning stays UTC; the zone only affects axis labels). Calendar rungs
+    /// derive a DST-correct representative width from the wall clock via <see cref="BucketBoundary"/>.
     /// </summary>
-    private static long? EffectiveGrainMs(ResolutionRung rung, DateTime from, DateTime to)
+    /// <remarks>
+    /// The <b>resolution zone</b> a calendar rung must be answered in is:
+    /// <list type="bullet">
+    /// <item><see cref="SeriesComparisonPolicy.PerQuery"/> ⇒ the query zone
+    /// (<paramref name="queryTimeZone"/>), applied uniformly. A calendar rung whose stored
+    /// <see cref="ResolutionRung.ReferenceTimeZone"/> resolves to a <em>different</em> zone holds a
+    /// different zone's civil buckets, so it cannot answer this query's civil day/week/month — the
+    /// probe returns <c>null</c> (indeterminate), which the planner filters out. This is the
+    /// zone-match exclusion of decision T3.</item>
+    /// <item><see cref="SeriesComparisonPolicy.PerSeries"/> ⇒ the rung's own stored zone; the query
+    /// zone is ignored and every calendar rung is eligible.</item>
+    /// </list>
+    /// </remarks>
+    private static long? EffectiveGrainMs(
+        ResolutionRung rung, DateTime from, DateTime to,
+        string? queryTimeZone, SeriesComparisonPolicy policy)
     {
         if (rung.Alignment == BucketAlignment.FixedSize)
         {
@@ -134,11 +156,36 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
         }
 
         // Single source of zone resolution (AB#4300) — shared with the write path via BucketBoundary.
-        var zone = BucketBoundary.ResolveZone(rung.ReferenceTimeZone);
+        var storedZone = BucketBoundary.ResolveZone(rung.ReferenceTimeZone);
+
+        if (policy == SeriesComparisonPolicy.PerQuery)
+        {
+            var queryZone = BucketBoundary.ResolveZone(queryTimeZone);
+            if (!ZonesEquivalent(storedZone, queryZone))
+            {
+                // Stored civil buckets are a different zone's — not a valid civil source for this query.
+                return null;
+            }
+        }
+
+        var zone = policy == SeriesComparisonPolicy.PerSeries ? storedZone : BucketBoundary.ResolveZone(queryTimeZone);
         var start = BucketBoundary.AlignDown(from, rung.Alignment, TimeSpan.Zero, zone);
         var end = BucketBoundary.NextBucketEnd(start, rung.Alignment, TimeSpan.Zero, zone);
         var ms = (long)(end - start).TotalMilliseconds;
         return ms > 0 ? ms : null;
+    }
+
+    /// <summary>
+    /// Two resolution zones are equivalent when they impose the same civil boundaries. <c>null</c>
+    /// means UTC on both sides; two named zones match when their adjustment rules coincide (so
+    /// <c>Europe/Vienna</c> and <c>Europe/Berlin</c>, which share offset and DST rules, are treated as
+    /// the same civil calendar).
+    /// </summary>
+    private static bool ZonesEquivalent(TimeZoneInfo? a, TimeZoneInfo? b)
+    {
+        a ??= TimeZoneInfo.Utc;
+        b ??= TimeZoneInfo.Utc;
+        return a.Equals(b) || a.HasSameRules(b);
     }
 
     private static long? ToMs(TimeSpan? period) =>

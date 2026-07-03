@@ -56,4 +56,21 @@ public sealed record SeriesResolutionRequest(
     /// forwarded by the caller to the downsampling query's field filter.
     /// </summary>
     public string? ObisFilter { get; init; }
+
+    /// <summary>
+    /// Optional IANA time zone (e.g. <c>Europe/Vienna</c>) the query is resolved in (AB#4190,
+    /// decision T1). Under <see cref="SeriesComparisonPolicy.PerQuery"/> it is applied uniformly so
+    /// calendar (day/week/month/year) rungs are selected and aligned on this zone's DST-correct civil
+    /// boundaries; a calendar rung whose stored zone differs holds a different zone's civil buckets
+    /// and is excluded. <c>null</c> ⇒ UTC calendar boundaries (legacy behaviour). Sub-day fixed-size
+    /// rungs are unaffected (decision T3). Ignored under
+    /// <see cref="SeriesComparisonPolicy.PerSeries"/>, where each rung uses its own stored zone.
+    /// </summary>
+    public string? QueryTimeZone { get; init; }
+
+    /// <summary>
+    /// How civil boundaries are resolved when the series spans multiple reference time zones
+    /// (AB#4190, decision T2). Defaults to <see cref="SeriesComparisonPolicy.PerQuery"/>.
+    /// </summary>
+    public SeriesComparisonPolicy ComparisonPolicy { get; init; } = SeriesComparisonPolicy.PerQuery;
 }

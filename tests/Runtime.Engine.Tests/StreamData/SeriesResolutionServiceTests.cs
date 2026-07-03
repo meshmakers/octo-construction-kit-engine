@@ -47,6 +47,17 @@ public class SeriesResolutionServiceTests
     private static SeriesResolutionRequest Request(OctoObjectId baseRtId, DateTime from, DateTime to, int target) =>
         new(baseRtId, null, from, to, target, CkRollupFunction.Sum, Path);
 
+    private static RollupArchiveSnapshot CalendarRollup(
+        OctoObjectId sourceRtId, BucketAlignment alignment, string? tz,
+        CkRollupFunction fn = CkRollupFunction.Sum, string path = Path) =>
+        new(OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, sourceRtId,
+            TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
+            new[] { new CkRollupAggregationSpec(path, fn, null) }, null)
+        {
+            BucketAlignment = alignment,
+            ReferenceTimeZone = tz,
+        };
+
     [Fact]
     public async Task SingleStepSumRollup_Matched_PicksIt()
     {
@@ -129,6 +140,63 @@ public class SeriesResolutionServiceTests
             Request(missing, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
 
         Assert.Equal(SeriesResolutionSignal.EmptyLadder, result.Signal);
+    }
+
+    // ---------- AB#4190: timezone-aware resolution (decisions T2 / T3) ----------
+
+    [Fact]
+    public async Task PerQuery_CalendarRollup_ZoneMatchesQuery_Selected()
+    {
+        // 365 days, target 200 → ideal bucket ≈ 1.8 d, so a 1-day calendar rung is fine enough.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var dailyVienna = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarDay, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, dailyVienna);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 200) with { QueryTimeZone = "Europe/Vienna" };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(dailyVienna.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task PerQuery_CalendarRollup_ZoneMismatch_ExcludedFromSelection()
+    {
+        // Same daily rollup, but stored in Vienna while the query asks for a New York civil day —
+        // the stored buckets are a different zone's civil days, so the rung is not a valid source.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var dailyVienna = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarDay, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, dailyVienna);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 200) with { QueryTimeZone = "America/New_York" };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        // Calendar rung excluded → no eligible rollup, 15-min base (35 040 pts) > 200 → refuse.
+        Assert.Equal(SeriesResolutionSignal.NoSuitableRollup, result.Signal);
+        Assert.Equal(baseArchive.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task PerSeries_CalendarRollup_UsesOwnZone_RegardlessOfQueryZone()
+    {
+        // Under PerSeries the query zone is ignored; the calendar rung aligns to its own stored zone
+        // and is eligible even when the query zone differs.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var dailyVienna = CalendarRollup(baseArchive.RtId, BucketAlignment.CalendarDay, "Europe/Vienna");
+        StubRollups(baseArchive.RtId, dailyVienna);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 200) with
+        {
+            QueryTimeZone = "America/New_York",
+            ComparisonPolicy = SeriesComparisonPolicy.PerSeries,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(dailyVienna.RtId, result.ArchiveRtId);
     }
 
     [Fact]

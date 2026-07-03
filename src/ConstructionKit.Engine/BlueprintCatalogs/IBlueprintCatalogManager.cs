@@ -157,10 +157,25 @@ public interface IBlueprintCatalogManager
         object? sourceIdentifier = null);
 
     /// <summary>
-    /// Refreshes the catalog cache for all catalogs
+    /// Refreshes the catalog cache for all catalogs. A failing catalog never aborts the refresh of
+    /// the other catalogs; its failure is reported in the returned results.
     /// </summary>
     /// <param name="sourceIdentifier">Source identifier, null for default</param>
     /// <param name="force">When true, forces every catalog to rebuild its cache unconditionally,
     ///     bypassing cache-TTL and unchanged-remote-timestamp short-circuits.</param>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool force = false);
+    /// <returns>One result per known catalog (refreshed, skipped or failed), ordered by catalog order</returns>
+    Task<IReadOnlyList<BlueprintCatalogRefreshResult>> RefreshAllCatalogCachesAsync(
+        object? sourceIdentifier = null, bool force = false);
+
+    /// <summary>
+    /// Refreshes the catalog cache of a single catalog, resolved by name (case-insensitive)
+    /// </summary>
+    /// <param name="catalogName">Name of the catalog to refresh</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="force">When true, forces the catalog to rebuild its cache unconditionally,
+    ///     bypassing cache-TTL and unchanged-remote-timestamp short-circuits.</param>
+    /// <returns>The refresh result for the catalog (refreshed, skipped or failed)</returns>
+    /// <exception cref="BlueprintCatalogException">Thrown when no catalog with the given name exists</exception>
+    Task<BlueprintCatalogRefreshResult> RefreshCatalogCacheAsync(string catalogName,
+        object? sourceIdentifier = null, bool force = false);
 }

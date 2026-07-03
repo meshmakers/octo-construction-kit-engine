@@ -217,7 +217,16 @@ public abstract class CachedBlueprintCatalog(
         {
             if (createCacheIfNotExists)
             {
-                await RefreshCatalogAsync().ConfigureAwait(false);
+                try
+                {
+                    await RefreshCatalogAsync().ConfigureAwait(false);
+                }
+                catch (Exception)
+                {
+                    // Cache bootstrap is best-effort: read paths served an empty catalog on fetch
+                    // failures before refresh started propagating transport errors (AB#4309), and
+                    // they must keep doing so — only explicit refreshes report the failure.
+                }
             }
 
             if (!File.Exists(cachePath))

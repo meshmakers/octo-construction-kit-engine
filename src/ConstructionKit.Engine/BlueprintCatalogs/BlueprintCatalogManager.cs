@@ -312,27 +312,69 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     }
 
     /// <inheritdoc />
-    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool force = false)
+    public async Task<IReadOnlyList<BlueprintCatalogRefreshResult>> RefreshAllCatalogCachesAsync(
+        object? sourceIdentifier = null, bool force = false)
     {
-        foreach (var catalog in _catalogs)
-        {
-            // Mirror the read paths: a catalog that does not support this source or cannot be read is
-            // skipped, and a single catalog that fails to refresh (disabled, unreachable, misconfigured)
-            // must never abort the refresh — and therefore the read command — for the other catalogs.
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
-            {
-                continue;
-            }
+        var results = new List<BlueprintCatalogRefreshResult>();
 
-            try
+        foreach (var catalog in _catalogs.OrderBy(c => c.Order))
+        {
+            results.Add(await RefreshSingleCatalogAsync(catalog, sourceIdentifier, force).ConfigureAwait(false));
+        }
+
+        return results;
+    }
+
+    /// <inheritdoc />
+    public async Task<BlueprintCatalogRefreshResult> RefreshCatalogCacheAsync(string catalogName,
+        object? sourceIdentifier = null, bool force = false)
+    {
+        var catalog = _catalogs.FirstOrDefault(c =>
+            string.Equals(c.CatalogName, catalogName, StringComparison.OrdinalIgnoreCase));
+        if (catalog == null)
+        {
+            throw BlueprintCatalogException.CatalogNotFound(catalogName);
+        }
+
+        return await RefreshSingleCatalogAsync(catalog, sourceIdentifier, force).ConfigureAwait(false);
+    }
+
+    private async Task<BlueprintCatalogRefreshResult> RefreshSingleCatalogAsync(IBlueprintCatalog catalog,
+        object? sourceIdentifier, bool force)
+    {
+        // Mirror the read paths: a catalog that does not support this source or cannot be read is
+        // skipped, and a single catalog that fails to refresh (disabled, unreachable, misconfigured)
+        // must never abort the refresh for the other catalogs — the failure is reported instead.
+        if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
+        {
+            return new BlueprintCatalogRefreshResult
             {
-                await catalog.RefreshCatalogAsync(sourceIdentifier, force).ConfigureAwait(false);
-            }
-            catch (Exception ex)
+                CatalogName = catalog.CatalogName,
+                Status = BlueprintCatalogRefreshStatus.Skipped,
+                Message = !catalog.CanRead
+                    ? "Catalog is not readable."
+                    : "Catalog does not support the requested source identifier."
+            };
+        }
+
+        try
+        {
+            await catalog.RefreshCatalogAsync(sourceIdentifier, force).ConfigureAwait(false);
+            return new BlueprintCatalogRefreshResult
             {
-                _logger.LogWarning(ex, "Failed to refresh catalog {CatalogName}; continuing with other catalogs",
-                    catalog.CatalogName);
-            }
+                CatalogName = catalog.CatalogName,
+                Status = BlueprintCatalogRefreshStatus.Refreshed
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to refresh catalog {CatalogName}", catalog.CatalogName);
+            return new BlueprintCatalogRefreshResult
+            {
+                CatalogName = catalog.CatalogName,
+                Status = BlueprintCatalogRefreshStatus.Failed,
+                Message = ex.Message
+            };
         }
     }
 }

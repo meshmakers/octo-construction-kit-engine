@@ -942,32 +942,29 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         return _httpClientFactory.CreateClient(new Uri($"{baseUri}"));
     }
 
+    // The fetch helpers below intentionally let transport failures (HttpRequestException after
+    // retries: DNS/TLS/5xx) propagate. A missing catalog file (404) is already mapped to an empty
+    // response by the HTTP client wrapper and yields null. Swallowing transport failures here would
+    // make a refresh silently replace a previously good cache with an empty/partial one and report
+    // success (AB#4309).
     private async Task<SharedBlueprintCatalogTypes.RootCatalog?> GetRootCatalogAsync()
     {
         var catalogPath = $"{RootPath}{CatalogFileName}";
         var httpClient = CreateHttpClient();
 
-        try
-        {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+        var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
 
-            if (string.IsNullOrEmpty(response))
-            {
-                return null;
-            }
-
-            return System.Text.Json.JsonSerializer.Deserialize<SharedBlueprintCatalogTypes.RootCatalog>(
-                response!,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                });
-        }
-        catch (HttpRequestException)
+        if (string.IsNullOrEmpty(response))
         {
-            // Catalog doesn't exist or couldn't be fetched
             return null;
         }
+
+        return System.Text.Json.JsonSerializer.Deserialize<SharedBlueprintCatalogTypes.RootCatalog>(
+            response!,
+            new System.Text.Json.JsonSerializerOptions
+            {
+                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+            });
     }
 
     private async Task<SharedBlueprintCatalogTypes.BlueprintLibraryCatalog?> GetBlueprintLibraryCatalogAsync(
@@ -975,24 +972,17 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
     {
         var httpClient = CreateHttpClient();
 
-        try
-        {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+        var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
 
-            if (!string.IsNullOrWhiteSpace(response))
-            {
-                return System.Text.Json.JsonSerializer
-                    .Deserialize<SharedBlueprintCatalogTypes.BlueprintLibraryCatalog>(
-                        response!,
-                        new System.Text.Json.JsonSerializerOptions
-                        {
-                            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                        });
-            }
-        }
-        catch (HttpRequestException)
+        if (!string.IsNullOrWhiteSpace(response))
         {
-            // Catalog doesn't exist or couldn't be fetched
+            return System.Text.Json.JsonSerializer
+                .Deserialize<SharedBlueprintCatalogTypes.BlueprintLibraryCatalog>(
+                    response!,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                    });
         }
 
         return null;
@@ -1005,24 +995,17 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         var catalogPath = $"{RootPath}{blueprintName[0].ToString().ToLower()}/{blueprintName}/{majorVersion}/{CatalogFileName}";
         var httpClient = CreateHttpClient();
 
-        try
-        {
-            var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+        var response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
 
-            if (!string.IsNullOrWhiteSpace(response))
-            {
-                return System.Text.Json.JsonSerializer
-                    .Deserialize<SharedBlueprintCatalogTypes.BlueprintLibraryVersionsCatalog>(
-                        response!,
-                        new System.Text.Json.JsonSerializerOptions
-                        {
-                            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                        });
-            }
-        }
-        catch (HttpRequestException)
+        if (!string.IsNullOrWhiteSpace(response))
         {
-            // Catalog doesn't exist or couldn't be fetched
+            return System.Text.Json.JsonSerializer
+                .Deserialize<SharedBlueprintCatalogTypes.BlueprintLibraryVersionsCatalog>(
+                    response!,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                    });
         }
 
         return null;

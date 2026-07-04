@@ -188,6 +188,27 @@ fieldFilter: [{
 }]
 ```
 
+## Query Column Collector Guardrails
+
+`CkTypeQueryColumnCollector` walks the association graph to build navigation columns
+(`a.Type->b`). Two guardrails protect against pathological CK models (root cause of a production-class
+incident: a single transient stream-data query on a tenant with a 0..1 self-association on
+the root `System/Entity` type allocated >60 GB and killed the asset-repo service):
+
+- **`CkTypeQueryColumnOptions.MaxColumns`** (default `50_000`, `null` = unlimited): hard cap
+  on the total number of produced columns. The per-path cycle guard (`ignoredNavigations`)
+  only prevents revisiting the same `(targetType, role)` tuple *within one path* — sibling
+  branches re-explore the same subgraph, and `GetAllDerivedTypes` fans each 0..1/1 navigation
+  out over every derived type of the target, so densely connected models expand
+  combinatorially. When the cap is exceeded the collector throws a `DependencyGraphException`
+  (fail fast) instead of allocating unbounded memory. Callers that only need physical
+  attribute columns (e.g. stream-data archives) should pass
+  `IgnoreNavigationProperties = true` instead of relying on the cap.
+- **Record cycle detection**: record descent (`Record` / `RecordArray` attributes) tracks the
+  records on the current descent path and throws a `DependencyGraphException` on a cycle
+  (a record containing itself directly or transitively) instead of recursing to stack
+  overflow.
+
 ## Repository Structure
 
 ```

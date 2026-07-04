@@ -20,16 +20,41 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string SystemAttributeRtChangedDateTime = "RtChangedDateTime";
     private const string SystemAttributeCkTypeId = "CkTypeId";
 
+    private CkTypeQueryColumnOptions _options = CkTypeQueryColumnOptions.Default;
+    private CkId<CkTypeId>? _rootCkTypeId;
+    private int _totalColumns;
+
     public List<CkTypeQueryColumn> GetColumns(CkId<CkTypeId> ckTypeId, CkTypeQueryColumnOptions? options = null)
     {
-        return GetColumns(ckTypeId, options ?? CkTypeQueryColumnOptions.Default,
-            [], 0);
+        _options = options ?? CkTypeQueryColumnOptions.Default;
+        _rootCkTypeId = ckTypeId;
+        _totalColumns = 0;
+        return GetColumns(ckTypeId, _options, [], 0);
     }
 
     public List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions? options = null)
     {
-        return GetColumnsByRtCkId(rtCkTypeId, options ?? CkTypeQueryColumnOptions.Default,
-            [], 0);
+        _options = options ?? CkTypeQueryColumnOptions.Default;
+        _rootCkTypeId = null;
+        _totalColumns = 0;
+        return GetColumnsByRtCkId(rtCkTypeId, _options, [], 0);
+    }
+
+    /// <summary>
+    /// Budget guard against combinatorial column explosion. Densely connected, cyclic association
+    /// graphs (e.g. a 0..1 self-association on a root type all other types derive from, combined
+    /// with the derived-type fan-out per navigation) make the per-path cycle guard insufficient —
+    /// sibling branches re-explore the same subgraph, so the total path count grows exponentially.
+    /// Counting every produced column and failing fast turns a multi-gigabyte runaway allocation
+    /// into an immediate, actionable exception.
+    /// </summary>
+    private void TrackProducedColumns(int added)
+    {
+        _totalColumns += added;
+        if (_options.MaxColumns is { } maxColumns && _totalColumns > maxColumns)
+        {
+            throw DependencyGraphException.QueryColumnLimitExceeded(_rootCkTypeId, maxColumns);
+        }
     }
 
     private List<CkTypeQueryColumn> GetColumnsByRtCkId(RtCkId<CkTypeId> rtCkTypeId, CkTypeQueryColumnOptions options,
@@ -41,6 +66,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             throw DependencyGraphException.RtCkTypeIdNotFound(rtCkTypeId);
         }
 
+        _rootCkTypeId ??= ckTypeGraph.CkTypeId;
         return GetColumns(ckTypeGraph, options, ignoredNavigations, currentDepth);
     }
 
@@ -85,6 +111,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtChangedDateTime.ToCamelCase(),
             [new(SystemAttributeRtChangedDateTime, PathType.Attribute)],
             AttributeValueTypesDto.DateTime));
+        TrackProducedColumns(6);
         return columns;
     }
 
@@ -149,6 +176,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                             ], subColumn.ValueType, subColumn.AssociationTuple, subColumn.Description);
                         columns.Add(queryColumn);
                     }
+
+                    TrackProducedColumns(subColumns.Count);
                 }
             }
         }
@@ -208,9 +237,12 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 new(navigationPropertyName, PathType.Navigation),
                 new(targetTypeName, PathType.TargetCkTypeId),
             ], AttributeValueTypesDto.Boolean, firstNtoM));
+
+        TrackProducedColumns(2);
     }
 
-    private void CollectTypeColumns(CkTypeWithAttributesGraph current, List<CkTypeQueryColumn> columns)
+    private void CollectTypeColumns(CkTypeWithAttributesGraph current, List<CkTypeQueryColumn> columns,
+        HashSet<CkId<CkRecordId>>? recordPath = null)
     {
         foreach (var attribute in current.AllAttributes.Values)
         {
@@ -236,8 +268,15 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         throw DependencyGraphException.RecordNotFound(attributeGraph.ValueCkRecordId);
                     }
 
+                    recordPath ??= [];
+                    if (!recordPath.Add(attributeGraph.ValueCkRecordId))
+                    {
+                        throw DependencyGraphException.RecordCycleDetected(attributeGraph.ValueCkRecordId);
+                    }
+
                     var recordColumns = new List<CkTypeQueryColumn>();
-                    CollectTypeColumns(recordGraph, recordColumns);
+                    CollectTypeColumns(recordGraph, recordColumns, recordPath);
+                    recordPath.Remove(attributeGraph.ValueCkRecordId);
                     columns.AddRange(recordColumns.Select(c =>
                     {
                         var l = c.AccessPathList.ToList();
@@ -251,6 +290,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                             ? new CkTypeQueryColumn(nestedPath, l, c.CkEnumId, c.Description)
                             : new CkTypeQueryColumn(nestedPath, l, c.ValueType, description: c.Description);
                     }));
+                    TrackProducedColumns(recordColumns.Count);
                     break;
                 case AttributeValueTypesDto.RecordArray:
                     if (attributeGraph.ValueCkRecordId == null)
@@ -263,8 +303,15 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                         throw DependencyGraphException.RecordNotFound(attributeGraph.ValueCkRecordId);
                     }
 
+                    recordPath ??= [];
+                    if (!recordPath.Add(attributeGraph.ValueCkRecordId))
+                    {
+                        throw DependencyGraphException.RecordCycleDetected(attributeGraph.ValueCkRecordId);
+                    }
+
                     recordColumns = [];
-                    CollectTypeColumns(recordGraph, recordColumns);
+                    CollectTypeColumns(recordGraph, recordColumns, recordPath);
+                    recordPath.Remove(attributeGraph.ValueCkRecordId);
 
                     columns.AddRange(recordColumns.Select(c =>
                     {
@@ -286,6 +333,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                             true, c.Description);
                     }));
 
+                    TrackProducedColumns(recordColumns.Count * 2);
                     break;
                 case AttributeValueTypesDto.StringArray:
                 case AttributeValueTypesDto.IntArray:
@@ -298,6 +346,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     l = [new(attributeNamePascalCase, PathType.Attribute), new(AllElements, PathType.ArrayIndex)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase + string.Format(Array, AllElements), l,
                         attributeGraph.ValueType, description: description));
+                    TrackProducedColumns(2);
                     break;
                 case AttributeValueTypesDto.Enum:
                     if (attributeGraph.ValueCkEnumId == null)
@@ -308,11 +357,13 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueCkEnumId,
                         description));
+                    TrackProducedColumns(1);
                     break;
                 default:
                     l = [new(attributeNamePascalCase, PathType.Attribute)];
                     columns.Add(new CkTypeQueryColumn(attributeNameCamelCase, l, attributeGraph.ValueType,
                         description: description));
+                    TrackProducedColumns(1);
                     break;
             }
         }

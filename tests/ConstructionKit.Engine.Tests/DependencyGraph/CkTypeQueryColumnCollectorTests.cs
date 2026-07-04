@@ -361,6 +361,46 @@ public class CkTypeQueryColumnCollectorTests
     }
 
     [Fact]
+    public void MaxColumns_Exceeded_ThrowsInsteadOfExploding()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.withDescriptions.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        // A tiny budget must fail fast with a clear exception — this is the guard that turns a
+        // combinatorial navigation explosion (dense cyclic association graphs) into an error
+        // instead of a multi-gigabyte runaway allocation.
+        var ex = Assert.Throws<DependencyGraphException>(() =>
+            collector.GetColumns("Described/Device", new CkTypeQueryColumnOptions { MaxColumns = 3 }));
+        Assert.Contains("exceeded the limit of 3", ex.Message);
+    }
+
+    [Fact]
+    public void MaxColumns_Null_DisablesTheCap()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.withDescriptions.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var resultDefault = collector.GetColumns("Described/Device");
+        var resultUncapped = collector.GetColumns("Described/Device",
+            new CkTypeQueryColumnOptions { MaxColumns = null });
+
+        Assert.Equal(resultDefault.Select(x => x.Path).OrderBy(x => x),
+            resultUncapped.Select(x => x.Path).OrderBy(x => x));
+    }
+
+    [Fact]
+    public void RecordCycle_Detected_ThrowsInsteadOfStackOverflow()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.recordCycle.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var ex = Assert.Throws<DependencyGraphException>(() =>
+            collector.GetColumns("TestRecordCycle/Demo1",
+                new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true }));
+        Assert.Contains("Cyclic record reference", ex.Message);
+    }
+
+    [Fact]
     public void NtoM_AccessPathList_ContainsNavigationAndTargetCkTypeId()
     {
         var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());

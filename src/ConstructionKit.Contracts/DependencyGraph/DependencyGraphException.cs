@@ -38,4 +38,20 @@ public class DependencyGraphException : CkModelException
     {
         return new DependencyGraphException($"CkEnumId not defined for attribute '{ckAttributeId}'.");
     }
+
+    internal static Exception QueryColumnLimitExceeded(CkId<CkTypeId>? ckTypeId, int maxColumns)
+    {
+        return new DependencyGraphException(
+            $"Query column expansion for type '{ckTypeId}' exceeded the limit of {maxColumns} columns. " +
+            "The association graph is too densely connected for unbounded navigation traversal. " +
+            "Restrict the expansion via CkTypeQueryColumnOptions (MaxDepth, IgnoreNavigationProperties) " +
+            "or raise MaxColumns.");
+    }
+
+    internal static Exception RecordCycleDetected(CkId<CkRecordId> ckRecordId)
+    {
+        return new DependencyGraphException(
+            $"Cyclic record reference detected while expanding record '{ckRecordId}'. " +
+            "Records must not contain themselves directly or transitively.");
+    }
 }

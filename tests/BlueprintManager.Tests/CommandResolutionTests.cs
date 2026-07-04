@@ -9,8 +9,8 @@ namespace Meshmakers.Octo.BlueprintManager.Tests;
 /// <see cref="System.Collections.Generic.IEnumerable{T}" /> of <see cref="ICommand" /> at startup,
 /// so a single command with an unsatisfiable dependency crashes the whole tool for every invocation
 /// — not just for that command. The original crash was a tenant command pulling
-/// <c>IBlueprintService -&gt; ITenantBackupService</c> (implemented only in the MongoDB layer the CLI
-/// does not reference) into the container. These tests build the real production DI graph via
+/// <c>IBlueprintService</c> and its runtime dependency chain (implemented only in the MongoDB
+/// layer the CLI does not reference) into the container. These tests build the real production DI graph via
 /// <see cref="Program.ConfigureServices" /> and assert the whole command surface resolves.
 /// </summary>
 public class CommandResolutionTests
@@ -93,7 +93,7 @@ public class CommandResolutionTests
             .ToArray();
 
         // These operate against a tenant and live in octo-cli, not the authoring CLI. Registering
-        // them here re-introduces the IBlueprintService -> ITenantBackupService startup crash.
+        // them here re-introduces the IBlueprintService runtime-dependency startup crash.
         Assert.DoesNotContain(removedCommandTypeName, commandTypeNames);
     }
 }

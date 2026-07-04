@@ -16,7 +16,6 @@ public class CkModelMigrationServiceTests
 {
     private readonly ICkModelMigrationService _sut;
     private readonly ICkMigrationParser _parser;
-    private readonly ITenantBackupService _backupService;
     private readonly ICkMigrationContentProvider _contentProvider;
     private readonly IRuntimeRepositoryProvider _repositoryProvider;
     private readonly ICatalogService _catalogService;
@@ -25,7 +24,6 @@ public class CkModelMigrationServiceTests
     public CkModelMigrationServiceTests()
     {
         _parser = A.Fake<ICkMigrationParser>();
-        _backupService = A.Fake<ITenantBackupService>();
         _contentProvider = A.Fake<ICkMigrationContentProvider>();
         _repositoryProvider = A.Fake<IRuntimeRepositoryProvider>();
         _catalogService = A.Fake<ICatalogService>();
@@ -34,7 +32,6 @@ public class CkModelMigrationServiceTests
 
         _sut = new CkModelMigrationService(
             _parser,
-            _backupService,
             _contentProvider,
             _repositoryProvider,
             _catalogService,
@@ -877,60 +874,6 @@ public class CkModelMigrationServiceTests
         Assert.True(result.Success);
         A.CallTo(() => _repositoryProvider.GetRepositoryAsync(A<string>._, A<CancellationToken>._))
             .MustNotHaveHappened();
-        A.CallTo(() => _backupService.CreateBackupAsync(A<string>._, A<string>._, A<CancellationToken>._))
-            .MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task MigrateAsync_WithBackupOption_ShouldCreateBackup()
-    {
-        // Arrange
-        var fromModel = new CkModelId("TestModel", "1.0.0");
-        var toModel = new CkModelId("TestModel", "2.0.0");
-
-        var meta = new CkMigrationMetaDto
-        {
-            CkModelId = "TestModel-2.0.0",
-            Migrations =
-            [
-                new CkMigrationReferenceDto
-                {
-                    FromVersion = "1.0.0",
-                    ToVersion = "2.0.0",
-                    ScriptPath = "1.0.0-to-2.0.0.yaml"
-                }
-            ]
-        };
-
-        var script = new CkMigrationScriptDto
-        {
-            SourceVersion = "1.0.0",
-            TargetVersion = "2.0.0",
-            Steps = []
-        };
-
-        A.CallTo(() => _contentProvider.HasMigrationsAsync(toModel, A<CancellationToken>._))
-            .Returns(true);
-        A.CallTo(() => _contentProvider.GetMigrationMetaAsync(toModel, A<CancellationToken>._))
-            .Returns(meta);
-        A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "1.0.0", "2.0.0", A<CancellationToken>._))
-            .Returns(script);
-
-        var backupInfo = new BackupInfo { BackupId = "backup-123", TenantId = "tenant1", CreatedAt = DateTime.UtcNow };
-        A.CallTo(() => _backupService.CreateBackupAsync("tenant1", A<string>._, A<CancellationToken>._))
-            .Returns(backupInfo);
-
-        var options = new CkMigrationOptions { CreateBackup = true, DryRun = false };
-        var ct = TestContext.Current.CancellationToken;
-
-        // Act
-        var result = await _sut.MigrateAsync("tenant1", fromModel, toModel, options, ct);
-
-        // Assert
-        Assert.True(result.Success);
-        Assert.Equal("backup-123", result.BackupId);
-        A.CallTo(() => _backupService.CreateBackupAsync("tenant1", A<string>._, A<CancellationToken>._))
-            .MustHaveHappenedOnceExactly();
     }
 
     #endregion

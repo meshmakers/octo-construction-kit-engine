@@ -168,11 +168,6 @@ public class BlueprintUpdateOptions
     public bool DryRun { get; set; } = false;
 
     /// <summary>
-    /// If true, create a backup before applying changes
-    /// </summary>
-    public bool CreateBackup { get; set; } = true;
-
-    /// <summary>
     /// Manual conflict resolutions (entity ID -> resolution)
     /// </summary>
     public Dictionary<string, ConflictResolution>? ConflictResolutions { get; set; }
@@ -222,11 +217,6 @@ public class BlueprintUpdateResult
     /// Warnings generated during the update
     /// </summary>
     public List<string> Warnings { get; set; } = [];
-
-    /// <summary>
-    /// ID of the backup created (if CreateBackup was true)
-    /// </summary>
-    public string? BackupId { get; set; }
 
     /// <summary>
     /// The new blueprint info after update

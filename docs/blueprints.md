@@ -10,7 +10,6 @@ Blueprints are versioned, declarative bundles of Construction Kit models and run
 | **Dependency-aware** | A blueprint may depend on other blueprints, resolved transitively at install time.           |
 | **Owner-tracked**    | Every seed entity is tagged with `rtBlueprintSource` and `rtBlueprintLocked`.                |
 | **Updatable**        | Tenants are moved to newer versions via Safe / Merge / Full / Migration modes.               |
-| **Rollback-able**    | Destructive operations create a tenant backup; `Rollback` restores the snapshot.             |
 | **Multi-install**    | A tenant can host several blueprints concurrently. Refcounted, cascade-uninstall optional.   |
 
 ## Blueprint Structure
@@ -290,14 +289,14 @@ public async Task UpdateTenantAsync(string tenantId)
         tenantId,
         info.RecommendedVersion,
         BlueprintUpdateMode.Merge,
-        new BlueprintUpdateOptions { CreateBackup = true });
+        new BlueprintUpdateOptions());
 
     if (result.Success)
-        Console.WriteLine($"Backup: {result.BackupId}");
+        Console.WriteLine("Update applied");
 }
 ```
 
-A pre-update backup is created by default (`CreateBackup = true`); disable it with `CreateBackup = false` if you have an external safety net.
+Updates do not create a tenant backup — take an external snapshot (e.g. the platform's tenant dump/backup jobs) beforehand if you need a safety net.
 
 ## Conflict Resolution
 
@@ -447,17 +446,7 @@ foreach (var i in installations)
 
 ## Backup and Rollback
 
-Every update creates a pre-update backup by default. Rollback restores the entire tenant snapshot:
-
-```csharp
-var backups = await _blueprintService.ListBackupsAsync(tenantId);
-var latest = backups.First();
-
-var result = await _blueprintService.RollbackAsync(tenantId, latest.BackupId, ct);
-Console.WriteLine($"Restored {result.EntitiesRestored} entities from {latest.CreatedAt:u}");
-```
-
-Rollback is a full tenant restore, not a semantic undo of migration steps. After rollback, the `BlueprintInstallations` rows match the snapshot — partial undo is not supported (see concept-v2 §2.5).
+The blueprint-level backup/rollback feature was removed (AB#4317): updates never create tenant snapshots, and there is no `RollbackAsync`. Tenant-level safety nets are the infrastructure layer's job — use the platform's tenant dump/restore jobs (bot services) or database-level snapshots instead.
 
 ## Blueprint History
 
@@ -470,7 +459,7 @@ foreach (var e in history)
 }
 ```
 
-`ApplicationMode` values: `Initial`, `ReApply`, `Update`, `Rollback`, `Uninstall`.
+`ApplicationMode` values: `Initial`, `Update`, `Migration`, `ReApply`.
 
 ## DI Configuration
 
@@ -595,8 +584,6 @@ Runtime blueprint operations against a tenant service are handled by `octo-cli`.
 | `ListBlueprintInstallations`  | List blueprints currently installed on the tenant.                     |
 | `PreviewBlueprintUpdate`      | Preview the diff for a target version + mode (Safe/Merge/Full).        |
 | `UpdateBlueprint`             | Apply an update. `-m <mode>`, `-dr` (dry-run), `-nb` (no backup).      |
-| `ListBlueprintBackups`        | List backups created before updates.                                   |
-| `RollbackBlueprint`           | Restore a tenant from a backup (`-bid <backupId>`).                    |
 | `UninstallBlueprint`          | Uninstall a blueprint. `-c` to cascade-uninstall dependents.           |
 
 See `octo-cli/CLAUDE.md` § "Blueprints" for the exact argument forms.
@@ -609,4 +596,4 @@ See `octo-cli/CLAUDE.md` § "Blueprints" for the exact argument forms.
 4. **Lock managed entities.** Default `rtBlueprintLocked` is `true`; only override to `false` when you genuinely intend the user to take ownership immediately.
 5. **Migration scripts for breaking changes.** Schema renames, deletes, and value transformations need an explicit script. Additive changes work via Merge alone.
 6. **Test with `-dr`.** Use `UpdateBlueprint -dr` (dry-run) before applying to production tenants.
-7. **Keep backups.** Default backup creation is on; only disable it when you have an alternate snapshot mechanism.
+7. **Keep backups.** Blueprint updates do not snapshot the tenant — rely on the infrastructure-level tenant dump/restore jobs or database snapshots before risky updates.

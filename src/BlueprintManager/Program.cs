@@ -61,16 +61,16 @@ internal static class Program
     /// Registers every service octo-bpm needs. Extracted from <see cref="BuildDi"/> and exposed to
     /// the test assembly so a unit test can assert the full command graph resolves — the regression
     /// guard for the startup DI crash fixed under AB#4081 (a command pulling an unsatisfiable
-    /// <c>IBlueprintService -&gt; ITenantBackupService</c> dependency into the CLI container).
+    /// <c>IBlueprintService</c> runtime dependency chain into the CLI container).
     /// </summary>
     internal static void ConfigureServices(IServiceCollection services, IConfiguration config)
     {
         // octo-bpm is an authoring-only tool (see docs/blueprints-concept-v2.md §3.1): it must
         // never operate against a tenant. Register only the ConstructionKit authoring layer
         // (blueprint compiler + catalog services). Deliberately NOT AddRuntimeEngine(), which
-        // pulls in the runtime/tenant surface (IBlueprintService -> ITenantBackupService,
-        // repository providers, CK-migration + audit services) — none of which this CLI can
-        // satisfy. Keeping the graph to the ConstructionKit layer structurally prevents a
+        // pulls in the runtime/tenant surface (IBlueprintService with its history/installation
+        // stores, repository providers, CK-migration + audit services) — none of which this CLI
+        // can satisfy. Keeping the graph to the ConstructionKit layer structurally prevents a
         // future runtime-only registration from re-crashing tool startup.
         services.AddConstructionKit();
 
@@ -119,9 +119,9 @@ internal static class Program
         // never operates against a tenant service (see docs/blueprints-concept-v2.md §3.1).
         // Tenant runtime operations (status/preview/update/history) live in octo-cli as
         // service-client commands against octo-asset-repo-services, which hosts the runtime
-        // repository + ITenantBackupService. Registering those commands here dragged
-        // IBlueprintService -> ITenantBackupService into the CLI's DI graph (no implementation
-        // in this tool's closure), crashing startup for every invocation.
+        // repository. Registering those commands here dragged IBlueprintService and its
+        // runtime dependency chain into the CLI's DI graph (no implementation in this
+        // tool's closure), crashing startup for every invocation.
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, ValidateCommand>();
         services.AddTransient<ICommand, PackCommand>();

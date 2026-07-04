@@ -50,11 +50,6 @@ public class BlueprintMigrationExecutionOptions
     public bool ContinueOnError { get; set; } = false;
 
     /// <summary>
-    /// If true, create a backup before executing the migration
-    /// </summary>
-    public bool CreateBackup { get; set; } = true;
-
-    /// <summary>
     /// The blueprint ID that initiated this migration (for tagging entities)
     /// </summary>
     public string? BlueprintSource { get; set; }
@@ -119,11 +114,6 @@ public class BlueprintMigrationExecutionResult
     /// Warnings generated during execution
     /// </summary>
     public List<string> Warnings { get; set; } = [];
-
-    /// <summary>
-    /// ID of the backup created (if CreateBackup was true)
-    /// </summary>
-    public string? BackupId { get; set; }
 }
 
 /// <summary>

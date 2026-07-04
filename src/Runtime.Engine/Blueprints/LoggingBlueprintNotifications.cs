@@ -30,18 +30,10 @@ internal sealed class LoggingBlueprintNotifications : IBlueprintNotifications
     public Task NotifyUpdatedAsync(BlueprintUpdatedNotification notification, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation(
-            "Blueprint updated: tenant={TenantId} blueprint={BlueprintId} from={FromVersion} mode={UpdateMode} added={Added} updated={Updated} deleted={Deleted} backup={BackupId} correlation={CorrelationId}",
+            "Blueprint updated: tenant={TenantId} blueprint={BlueprintId} from={FromVersion} mode={UpdateMode} added={Added} updated={Updated} deleted={Deleted} correlation={CorrelationId}",
             notification.TenantId, notification.BlueprintId, notification.FromVersion, notification.UpdateMode,
             notification.EntitiesAdded, notification.EntitiesUpdated, notification.EntitiesDeleted,
-            notification.BackupId, notification.CorrelationId);
-        return Task.CompletedTask;
-    }
-
-    public Task NotifyRolledBackAsync(BlueprintRolledBackNotification notification, CancellationToken cancellationToken = default)
-    {
-        _logger.LogInformation(
-            "Blueprint rolled back: tenant={TenantId} blueprint={BlueprintId} backup={BackupId} correlation={CorrelationId}",
-            notification.TenantId, notification.BlueprintId, notification.BackupId, notification.CorrelationId);
+            notification.CorrelationId);
         return Task.CompletedTask;
     }
 

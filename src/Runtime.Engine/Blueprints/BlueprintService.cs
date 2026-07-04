@@ -26,7 +26,6 @@ internal class BlueprintService : IBlueprintService
     private readonly ICkCacheService _ckCacheService;
     private readonly IBlueprintCatalogManager _blueprintCatalogManager;
     private readonly ITenantBlueprintHistory _blueprintHistory;
-    private readonly ITenantBackupService _backupService;
     private readonly IBlueprintMigrationExecutor _migrationExecutor;
     private readonly IBlueprintMigrationParser _migrationParser;
     private readonly ICkModelUpgradeService _ckModelUpgradeService;
@@ -60,7 +59,6 @@ internal class BlueprintService : IBlueprintService
         ICkCacheService ckCacheService,
         IBlueprintCatalogManager blueprintCatalogManager,
         ITenantBlueprintHistory blueprintHistory,
-        ITenantBackupService backupService,
         IBlueprintMigrationExecutor migrationExecutor,
         IBlueprintMigrationParser migrationParser,
         ICkModelUpgradeService ckModelUpgradeService,
@@ -76,7 +74,6 @@ internal class BlueprintService : IBlueprintService
         _ckCacheService = ckCacheService;
         _blueprintCatalogManager = blueprintCatalogManager;
         _blueprintHistory = blueprintHistory;
-        _backupService = backupService;
         _migrationExecutor = migrationExecutor;
         _migrationParser = migrationParser;
         _ckModelUpgradeService = ckModelUpgradeService;
@@ -270,21 +267,15 @@ internal class BlueprintService : IBlueprintService
             }
 
             // 4. Run CK model migrations for any deps that are at an older version on the tenant.
-            // CreateBackup is OFF: tenant backups are expected to be driven by the
-            // infrastructure layer (mongodump cronjobs / MongoDB Atlas snapshots /
-            // velero, etc.), not synthesized inline from the service pod on every
-            // CK bump. Requiring `mongodump` inside every consuming service image
-            // added ~50MB of tooling to each container and made additive
-            // no-op-migration bumps (e.g. System.Communication 3.20.0 -> 3.21.0)
-            // crash startup on images that did not ship the binary. A pre-migration
-            // backup made sense when destructive data migrations were the norm; for
-            // additive bumps it is pure overhead.
+            // No inline tenant backup here: backups are the infrastructure layer's job
+            // (mongodump cronjobs / MongoDB Atlas snapshots / velero, etc.), not
+            // synthesized from the service pod on every CK bump.
             if (aggregatedCkDeps.Count > 0)
             {
                 var upgradeResult = await _ckModelUpgradeService.UpgradeModelsAsync(
                         tenantId,
                         aggregatedCkDeps,
-                        new CkMigrationOptions { CreateBackup = false, DryRun = false, ContinueOnError = false },
+                        new CkMigrationOptions { DryRun = false, ContinueOnError = false },
                         null,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -1117,35 +1108,7 @@ internal class BlueprintService : IBlueprintService
                 return result;
             }
 
-            // 4. Create backup if requested
-            if (options.CreateBackup)
-            {
-                try
-                {
-                    var backupReason = $"Before update to {targetVersion.FullName}";
-                    var backupInfo = await _backupService.CreateBackupAsync(
-                        tenantId, backupReason, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    result.BackupId = backupInfo.BackupId;
-                    _logger.LogInformation("Created backup {BackupId} before update", backupInfo.BackupId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to create backup before update");
-                    result.Warnings.Add($"Failed to create backup: {ex.Message}");
-
-                    if (!options.ContinueOnError)
-                    {
-                        result.Success = false;
-                        result.Errors.Add("Backup creation failed and ContinueOnError is false");
-                        await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId).ConfigureAwait(false);
-                        return result;
-                    }
-                }
-            }
-
-            // 5. Fetch target blueprint
+            // 4. Fetch target blueprint
             var operationResult = new OperationResult();
             var targetBlueprint = await _blueprintCatalogManager
                 .GetAsync(targetVersion, operationResult)
@@ -1164,7 +1127,7 @@ internal class BlueprintService : IBlueprintService
 
             var ckDependencies = targetBlueprint.CkModelDependencies ?? [];
 
-            // 5b. Install missing CK model schemas. A blueprint update may introduce
+            // 4b. Install missing CK model schemas. A blueprint update may introduce
             //     new ckModelDependencies that the tenant has never seen — auto-import
             //     those before the upgrade step, mirroring ApplyBlueprintAsync. Skipped
             //     in DryRun mode (ImportCkModelAsync has no preview path; the update
@@ -1218,12 +1181,11 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            // 5c. Execute CK model migrations if upgrading from a previous version
+            // 4c. Execute CK model migrations if upgrading from a previous version
             if (ckDependencies.Count > 0)
             {
                 var ckMigrationOptions = new CkMigrationOptions
                 {
-                    CreateBackup = options.CreateBackup,
                     DryRun = options.DryRun,
                     ContinueOnError = options.ContinueOnError
                 };
@@ -1248,7 +1210,7 @@ internal class BlueprintService : IBlueprintService
                     upgradeResult.TotalEntitiesAffected);
             }
 
-            // 5d. Load the in-memory CK cache for the tenant. If we installed a new
+            // 4d. Load the in-memory CK cache for the tenant. If we installed a new
             //     schema above, EnsureCkModelInstalledAsync unloaded the cache; the
             //     subsequent ApplyDiffAsync seed import needs the model graph populated.
             //     Skipped in DryRun mode since the diff path also no-ops there.
@@ -1262,7 +1224,7 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
-            // 6. Apply update based on mode
+            // 5. Apply update based on mode
             if (updateMode == BlueprintUpdateMode.Migration)
             {
                 // Execute migration script
@@ -1286,7 +1248,6 @@ internal class BlueprintService : IBlueprintService
                     {
                         DryRun = options.DryRun,
                         ContinueOnError = options.ContinueOnError,
-                        CreateBackup = options.CreateBackup,
                         BlueprintSource = targetVersion.FullName
                     };
 
@@ -1301,7 +1262,6 @@ internal class BlueprintService : IBlueprintService
                     result.EntitiesSkipped = migrationResult.SkippedSteps;
                     result.Errors.AddRange(migrationResult.Errors);
                     result.Warnings.AddRange(migrationResult.Warnings);
-                    result.BackupId = migrationResult.BackupId;
                 }
                 else
                 {
@@ -1353,7 +1313,6 @@ internal class BlueprintService : IBlueprintService
                         result.EntitiesAdded,
                         result.EntitiesUpdated,
                         result.EntitiesDeleted,
-                        result.BackupId,
                         correlationId,
                         DateTime.UtcNow),
                     cancellationToken).ConfigureAwait(false);
@@ -1614,81 +1573,6 @@ internal class BlueprintService : IBlueprintService
 
         return await _blueprintHistory.GetHistoryAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task<BackupRestoreResult> RollbackAsync(
-        string tenantId,
-        string backupId,
-        CancellationToken cancellationToken = default)
-    {
-        var correlationId = Guid.NewGuid();
-
-        _logger.LogInformation("Rolling back tenant {TenantId} to backup {BackupId}", tenantId, backupId);
-
-        // Capture the active blueprint id BEFORE the restore so the notification carries it.
-        var currentInfo = await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
-            .ConfigureAwait(false);
-
-        BackupRestoreResult result;
-        try
-        {
-            result = await _backupService.RestoreBackupAsync(tenantId, backupId, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Rollback failed for tenant {TenantId} backup {BackupId}", tenantId, backupId);
-            await NotifyRollbackFailedAsync(tenantId, currentInfo?.BlueprintId, ex.Message, correlationId)
-                .ConfigureAwait(false);
-            throw;
-        }
-
-        if (result.Success)
-        {
-            await _notifications.NotifyRolledBackAsync(
-                new BlueprintRolledBackNotification(
-                    tenantId,
-                    currentInfo?.BlueprintId,
-                    backupId,
-                    correlationId,
-                    DateTime.UtcNow),
-                cancellationToken).ConfigureAwait(false);
-        }
-        else
-        {
-            await NotifyRollbackFailedAsync(
-                tenantId,
-                currentInfo?.BlueprintId,
-                string.Join("; ", result.Errors),
-                correlationId).ConfigureAwait(false);
-        }
-
-        return result;
-    }
-
-    private async Task NotifyRollbackFailedAsync(
-        string tenantId,
-        BlueprintId? blueprintId,
-        string errorMessage,
-        Guid correlationId)
-    {
-        try
-        {
-            await _notifications.NotifyOperationFailedAsync(
-                new BlueprintOperationFailedNotification(
-                    tenantId,
-                    blueprintId,
-                    Operation: "Rollback",
-                    ErrorMessage: errorMessage,
-                    correlationId,
-                    DateTime.UtcNow),
-                CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception notifyEx)
-        {
-            _logger.LogWarning(notifyEx, "Failed to publish BlueprintOperationFailed notification (Rollback)");
-        }
     }
 
     /// <inheritdoc />

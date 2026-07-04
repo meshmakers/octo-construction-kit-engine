@@ -43,7 +43,6 @@ public class WrapScalarInRecordTransformTests
         _session = A.Fake<IOctoSession>();
         _auditTrail = A.Fake<ICkModelImportAuditTrail>();
         var parser = A.Fake<ICkMigrationParser>();
-        var backupService = A.Fake<ITenantBackupService>();
         var catalogService = A.Fake<ICatalogService>();
 
         A.CallTo(() => _repositoryProvider.GetRepositoryAsync(A<string>._, A<CancellationToken>._))
@@ -61,7 +60,6 @@ public class WrapScalarInRecordTransformTests
 
         _sut = new CkModelMigrationService(
             parser,
-            backupService,
             _contentProvider,
             _repositoryProvider,
             catalogService,

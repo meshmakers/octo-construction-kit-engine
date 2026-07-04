@@ -23,11 +23,6 @@ public interface IBlueprintNotifications
         BlueprintUpdatedNotification notification,
         CancellationToken cancellationToken = default);
 
-    /// <summary>Raised after a tenant was rolled back from a backup.</summary>
-    Task NotifyRolledBackAsync(
-        BlueprintRolledBackNotification notification,
-        CancellationToken cancellationToken = default);
-
     /// <summary>Raised after a blueprint was uninstalled from a tenant.</summary>
     Task NotifyUninstalledAsync(
         BlueprintUninstalledNotification notification,
@@ -64,7 +59,6 @@ public record BlueprintAppliedNotification(
 /// <param name="EntitiesAdded">Entities created during update.</param>
 /// <param name="EntitiesUpdated">Entities updated during update.</param>
 /// <param name="EntitiesDeleted">Entities deleted during update.</param>
-/// <param name="BackupId">Backup created before the update, if any.</param>
 /// <param name="CorrelationId">Correlates this notification with other events from the same operation.</param>
 /// <param name="Timestamp">When the operation completed.</param>
 public record BlueprintUpdatedNotification(
@@ -75,19 +69,6 @@ public record BlueprintUpdatedNotification(
     int EntitiesAdded,
     int EntitiesUpdated,
     int EntitiesDeleted,
-    string? BackupId,
-    Guid CorrelationId,
-    DateTime Timestamp);
-
-/// <param name="TenantId">Target tenant.</param>
-/// <param name="BlueprintId">Blueprint the tenant carried before rollback, or null if unknown.</param>
-/// <param name="BackupId">Backup that was restored.</param>
-/// <param name="CorrelationId">Correlates this notification with other events from the same operation.</param>
-/// <param name="Timestamp">When the operation completed.</param>
-public record BlueprintRolledBackNotification(
-    string TenantId,
-    BlueprintId? BlueprintId,
-    string BackupId,
     Guid CorrelationId,
     DateTime Timestamp);
 
@@ -105,7 +86,7 @@ public record BlueprintUninstalledNotification(
 
 /// <param name="TenantId">Target tenant.</param>
 /// <param name="BlueprintId">Blueprint involved, or null if the failure happened before identification.</param>
-/// <param name="Operation">Operation name, e.g. "Apply", "Update", "Rollback", "Uninstall".</param>
+/// <param name="Operation">Operation name, e.g. "Apply", "Update", "Uninstall".</param>
 /// <param name="ErrorMessage">Human-readable error description.</param>
 /// <param name="CorrelationId">Correlates this notification with other events from the same operation.</param>
 /// <param name="Timestamp">When the failure occurred.</param>

@@ -20,7 +20,6 @@ namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
 internal class CkModelMigrationService : ICkModelMigrationService
 {
     private readonly ICkMigrationParser _migrationParser;
-    private readonly ITenantBackupService _backupService;
     private readonly ICkMigrationContentProvider _contentProvider;
     private readonly IRuntimeRepositoryProvider _repositoryProvider;
     private readonly ICatalogService _catalogService;
@@ -49,7 +48,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
     /// </summary>
     public CkModelMigrationService(
         ICkMigrationParser migrationParser,
-        ITenantBackupService backupService,
         ICkMigrationContentProvider contentProvider,
         IRuntimeRepositoryProvider repositoryProvider,
         ICatalogService catalogService,
@@ -57,7 +55,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
         ILogger<CkModelMigrationService> logger)
     {
         _migrationParser = migrationParser;
-        _backupService = backupService;
         _contentProvider = contentProvider;
         _repositoryProvider = repositoryProvider;
         _catalogService = catalogService;
@@ -101,30 +98,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
         try
         {
-            // Create backup if requested
-            if (options is { CreateBackup: true, DryRun: false })
-            {
-                try
-                {
-                    var backupReason = $"Before CK migration {fromModel} -> {toModel}";
-                    var backupInfo = await _backupService.CreateBackupAsync(tenantId, backupReason, cancellationToken)
-                        .ConfigureAwait(false);
-                    result.BackupId = backupInfo.BackupId;
-                    _logger.LogInformation("Created backup {BackupId} before migration", backupInfo.BackupId);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to create backup before migration");
-                    result.Warnings.Add($"Failed to create backup: {ex.Message}");
-
-                    if (!options.ContinueOnError)
-                    {
-                        result.Success = false;
-                        result.Errors.Add("Backup creation failed and ContinueOnError is false");
-                        return result;
-                    }
-                }
-            }
 
             // Execute each migration step in the path
             foreach (var step in migrationPath.Steps)
@@ -1845,13 +1818,6 @@ internal class CkModelMigrationService : ICkModelMigrationService
                     historyEntity.SetAttributeValue(AttributeErrors,
                         AttributeValueTypesDto.StringArray,
                         result.Errors.ToList());
-                }
-
-                if (!string.IsNullOrEmpty(result.BackupId))
-                {
-                    historyEntity.SetAttributeValue(AttributeBackupId,
-                        AttributeValueTypesDto.String,
-                        result.BackupId);
                 }
 
                 await repository.InsertOneRtEntityAsync(session, ckTypeId, historyEntity)

@@ -31,6 +31,16 @@ public record CkTypeQueryColumnOptions
     public const int DefaultMaxColumns = 50_000;
 
     /// <summary>
+    ///     When true, attribute value navigation columns (<c>nav.type-&gt;attribute</c>) are also
+    ///     produced for inbound associations and for navigations with multiplicity N. Such columns
+    ///     resolve per row to the first matching target entity (deterministic order, optionally
+    ///     narrowed by an entity selector in the path). Off by default because the inbound/N
+    ///     fan-out multiplies the column count on densely connected models — pickers should
+    ///     request these columns explicitly.
+    /// </summary>
+    public bool IncludeManyNavigations { get; init; }
+
+    /// <summary>
     ///     Returns the default options.
     /// </summary>
     public static CkTypeQueryColumnOptions Default => new();

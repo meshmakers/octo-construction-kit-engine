@@ -161,37 +161,34 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
                 if (ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.ZeroOrOne ||
                     ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.One)
                 {
-                    var subColumns = GetColumns(ckTypeAssociationDirectionTuple.CkTypeId, options with { IgnoreNavigationProperties = false },
-                        new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>(ignoredNavigations), currentDepth + 1);
-                    foreach (var subColumn in subColumns)
-                    {
-                        var queryColumn = new CkTypeQueryColumn(
-                            ckTypeAssociationGraphGrouping.Key.ToCamelCase() + Separator +
-                            ckTypeAssociationDirectionTuple.CkTypeId.ToRtCkId().GetTypeName() + NavigationSeparator +
-                            subColumn.Path,
-                            [
-                                new(ckTypeAssociationGraphGrouping.Key, PathType.Navigation),
-                                new(ckTypeAssociationDirectionTuple.CkTypeId.ToRtCkId().GetTypeName(), PathType.TargetCkTypeId),
-                                ..subColumn.AccessPathList
-                            ], subColumn.ValueType, subColumn.AssociationTuple, subColumn.Description);
-                        columns.Add(queryColumn);
-                    }
-
-                    TrackProducedColumns(subColumns.Count);
+                    CollectValueNavigationColumns(ckTypeAssociationGraphGrouping.Key,
+                        ckTypeAssociationDirectionTuple, null, columns, ignoredNavigations, options, currentDepth);
+                }
+                else if (options.IncludeManyNavigations &&
+                         ckTypeAssociationDirectionTuple.Multiplicity == MultiplicitiesDto.N)
+                {
+                    // N navigations resolve per row to the first matching target (deterministic
+                    // order); the association tuple marks the column so consumers can tell it
+                    // apart from plain 0..1 navigation (read-only, first-match semantics).
+                    CollectValueNavigationColumns(ckTypeAssociationGraphGrouping.Key,
+                        ckTypeAssociationDirectionTuple, ckTypeAssociationDirectionTuple, columns,
+                        ignoredNavigations, options, currentDepth);
                 }
             }
         }
 
-        // Also collect N:M columns for inbound associations
+        // Also collect columns for inbound associations. The reachable end of an inbound
+        // navigation is the association's ORIGIN type (the type that declares the association),
+        // not the graph's TargetCkTypeId — that one points at the type the graph is attached to.
         foreach (var ckTypeAssociationGraphGrouping in typeGraph.Associations.In.All.GroupBy(x =>
                      x.NavigationPropertyName))
         {
             var ckTypeAssociationDirectionTuples = new List<CkTypeAssociationTuple>();
             foreach (var typeAssociationGraph in ckTypeAssociationGraphGrouping)
             {
-                if (!ckModelGraph.Types.TryGetValue(typeAssociationGraph.TargetCkTypeId, out var ckType))
+                if (!ckModelGraph.Types.TryGetValue(typeAssociationGraph.OriginCkTypeId, out var ckType))
                 {
-                    throw DependencyGraphException.CkTypeIdNotFound(typeAssociationGraph.TargetCkTypeId);
+                    throw DependencyGraphException.CkTypeIdNotFound(typeAssociationGraph.OriginCkTypeId);
                 }
 
                 ckTypeAssociationDirectionTuples.AddRange(ckType.GetAllDerivedTypes(true)
@@ -206,7 +203,65 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             }
 
             CollectNtoMColumns(ckTypeAssociationGraphGrouping.Key, ckTypeAssociationDirectionTuples, columns);
+
+            if (!options.IncludeManyNavigations)
+            {
+                continue;
+            }
+
+            foreach (var ckTypeAssociationDirectionTuple in ckTypeAssociationDirectionTuples)
+            {
+                var ignoreTuple = new Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>(
+                    ckTypeAssociationDirectionTuple.CkTypeId, ckTypeAssociationDirectionTuple.CkAssociationRoleId);
+                if (!ignoredNavigations.Add(ignoreTuple))
+                {
+                    continue;
+                }
+
+                CollectValueNavigationColumns(ckTypeAssociationGraphGrouping.Key,
+                    ckTypeAssociationDirectionTuple, ckTypeAssociationDirectionTuple, columns,
+                    ignoredNavigations, options, currentDepth);
+            }
         }
+    }
+
+    /// <summary>
+    /// Produces the attribute value columns (<c>nav.type-&gt;attribute</c>) reached through one
+    /// navigation tuple. <paramref name="associationTuple"/> is stamped on every produced column
+    /// when the navigation crosses an N-multiplicity association (first-match semantics);
+    /// pass <c>null</c> for plain 0..1/1 navigation to keep the historical column shape.
+    /// </summary>
+    private void CollectValueNavigationColumns(string navigationPropertyName,
+        CkTypeAssociationTuple navigationTuple, CkTypeAssociationTuple? associationTuple,
+        List<CkTypeQueryColumn> columns,
+        HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>> ignoredNavigations,
+        CkTypeQueryColumnOptions options, int currentDepth)
+    {
+        var subColumns = GetColumns(navigationTuple.CkTypeId, options with { IgnoreNavigationProperties = false },
+            new HashSet<Tuple<CkId<CkTypeId>, CkId<CkAssociationRoleId>>>(ignoredNavigations), currentDepth + 1);
+        foreach (var subColumn in subColumns)
+        {
+            var path = navigationPropertyName.ToCamelCase() + Separator +
+                       navigationTuple.CkTypeId.ToRtCkId().GetTypeName() + NavigationSeparator +
+                       subColumn.Path;
+            var accessPathList = new List<PathTerm>
+            {
+                new(navigationPropertyName, PathType.Navigation),
+                new(navigationTuple.CkTypeId.ToRtCkId().GetTypeName(), PathType.TargetCkTypeId)
+            };
+            accessPathList.AddRange(subColumn.AccessPathList);
+
+            // Preserve the enum id through navigation descent (mirrors the record-descent rule):
+            // the generic constructor would drop CkEnumId and break enum-name resolution for
+            // navigated enum columns.
+            var queryColumn = subColumn.CkEnumId != null
+                ? new CkTypeQueryColumn(path, accessPathList, subColumn.CkEnumId, subColumn.Description)
+                : new CkTypeQueryColumn(path, accessPathList, subColumn.ValueType,
+                    associationTuple ?? subColumn.AssociationTuple, subColumn.Description);
+            columns.Add(queryColumn);
+        }
+
+        TrackProducedColumns(subColumns.Count);
     }
 
     private void CollectNtoMColumns(string navigationPropertyName,

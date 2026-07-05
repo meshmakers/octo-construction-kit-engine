@@ -416,4 +416,84 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal(PathType.TargetCkTypeId, accessPath[1].Type);
     }
 
+    // AB#4323 — value navigation across inbound / N-multiplicity associations
+
+    [Fact]
+    public void Inbound_NtoM_TypeSegment_NamesReachedOriginSide()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        // Transaction has an inbound N:M from Document ("Documents"). The type segment must
+        // name the REACHED origin side (Document) — before AB#4323 it carried the type the
+        // navigation started from (Transaction itself).
+        var result = collector.GetColumns("NToMTest/Transaction");
+        var paths = result.Select(x => x.Path).ToList();
+
+        Assert.Contains("documents.nToMTestDocument::totalCount", paths);
+        Assert.Contains("documents.nToMTestDocument::exists", paths);
+    }
+
+    [Fact]
+    public void ManyNavigations_Default_NoInboundOrNValueColumns()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var transactionPaths = collector.GetColumns("NToMTest/Transaction").Select(x => x.Path).ToList();
+        var documentPaths = collector.GetColumns("NToMTest/Document").Select(x => x.Path).ToList();
+
+        // Inbound value columns are opt-in
+        Assert.DoesNotContain("documents.nToMTestDocument->name", transactionPaths);
+        // Outbound N value columns are opt-in too
+        Assert.DoesNotContain("transactions.nToMTestTransaction->amount", documentPaths);
+    }
+
+    [Fact]
+    public void ManyNavigations_Inbound_ValueColumns_CarryAssociationTuple()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Transaction",
+            new CkTypeQueryColumnOptions { IncludeManyNavigations = true });
+
+        var nameColumn = result.Single(x => x.Path == "documents.nToMTestDocument->name");
+        Assert.Equal(AttributeValueTypesDto.String, nameColumn.ValueType);
+        Assert.NotNull(nameColumn.AssociationTuple);
+        Assert.Equal(MultiplicitiesDto.N, nameColumn.AssociationTuple.Multiplicity);
+
+        var accessPath = nameColumn.AccessPathList.ToList();
+        Assert.Equal(PathType.Navigation, accessPath[0].Type);
+        Assert.Equal(PathType.TargetCkTypeId, accessPath[1].Type);
+        Assert.Equal(PathType.Attribute, accessPath[2].Type);
+    }
+
+    [Fact]
+    public void ManyNavigations_OutboundN_ValueColumns_CarryAssociationTuple()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        var result = collector.GetColumns("NToMTest/Document",
+            new CkTypeQueryColumnOptions { IncludeManyNavigations = true });
+
+        var amountColumn = result.Single(x => x.Path == "transactions.nToMTestTransaction->amount");
+        Assert.Equal(AttributeValueTypesDto.Double, amountColumn.ValueType);
+        Assert.NotNull(amountColumn.AssociationTuple);
+        Assert.Equal(MultiplicitiesDto.N, amountColumn.AssociationTuple.Multiplicity);
+    }
+
+    [Fact]
+    public void ManyNavigations_InboundZeroOrOne_ValueColumns_Emitted()
+    {
+        var modelGraph = BuildResolvedModelGraph(Builder.Build(), sampleData.nToMAssociations.Builder.Build());
+        var collector = new CkTypeQueryColumnCollector(modelGraph);
+
+        // Document has an inbound 0..1 "Category" (CategoryLink) — reached side is Category.
+        var result = collector.GetColumns("NToMTest/Document",
+            new CkTypeQueryColumnOptions { IncludeManyNavigations = true });
+
+        Assert.Contains(result, x => x.Path == "category.nToMTestCategory->name");
+    }
 }

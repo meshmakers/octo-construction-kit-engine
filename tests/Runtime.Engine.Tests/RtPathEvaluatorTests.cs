@@ -1156,12 +1156,17 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     {
         var ckCacheService = await fixture.GetCacheServiceAsync();
 
+        // Inbound navigation: the type segment names the REACHED entity type — the association's
+        // origin side (Sensor declares ParentChild -> LocationWithSensor), consistent with
+        // outbound navigation. AB#4323 changed this from the former declared-target semantics
+        // (children.testLocationWithSensor), which named the type the navigation started from
+        // while the loaded entities were sensors.
         var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkZoneTypeId,
-            "children.testLocationWithSensor->Designation");
+            "children.testSensor->Designation");
 
         Assert.NotNull(r);
         Assert.Equal(SystemCkIds.RtCkParentChildRoleId, r.CkRoleId);
-        Assert.Equal(TestCkIds.RtCkLocationWithSensorTypeId, r.TargetCkTypeId);
+        Assert.Equal(TestCkIds.RtCkSensorTypeId, r.TargetCkTypeId);
         Assert.Equal(GraphDirections.Inbound, r.Direction);
     }
 
@@ -1270,4 +1275,161 @@ public class RtPathEvaluatorTests(CacheServiceFixture fixture) : IClassFixture<C
     }
 
     #endregion TokenizeAndGetNavigationPairs
+
+    #region EntitySelector and first-match navigation (AB#4323)
+
+    [Fact]
+    public void TokenizePath_EntitySelector_OK()
+    {
+        var tokens = RtPathEvaluator.TokenizePath("children.testSensor[wellKnownName='S1']->Designation");
+
+        Assert.Equal(
+            new[] { PathType.Navigation, PathType.TargetCkTypeId, PathType.EntitySelector, PathType.Attribute },
+            tokens.Select(t => t.Type).ToArray());
+        Assert.Equal("wellKnownName='S1'", tokens[2].Value);
+
+        // Round trip keeps the selector attached to the type segment and the -> separator intact.
+        Assert.Equal("children.testSensor[wellKnownName='S1']->designation", RtPathEvaluator.GetPath(tokens));
+    }
+
+    [Theory]
+    [InlineData("rtId=6789a00000000000010012a1", NavigationEntitySelectorKind.RtId, null, "6789a00000000000010012a1")]
+    [InlineData("wellKnownName='Sensor 1'", NavigationEntitySelectorKind.WellKnownName, null, "Sensor 1")]
+    [InlineData("rtWellKnownName=\"Sensor 1\"", NavigationEntitySelectorKind.WellKnownName, null, "Sensor 1")]
+    [InlineData("designation=Main", NavigationEntitySelectorKind.Attribute, "Designation", "Main")]
+    public void ParseEntitySelector_OK(string rawSelector, NavigationEntitySelectorKind expectedKind,
+        string? expectedAttributeName, string expectedValue)
+    {
+        var selector = RtPathEvaluator.ParseEntitySelector(rawSelector);
+
+        Assert.Equal(expectedKind, selector.Kind);
+        Assert.Equal(expectedAttributeName, selector.AttributeName);
+        Assert.Equal(expectedValue, selector.Value);
+    }
+
+    [Fact]
+    public async Task TokenizeAndGetNavigationPairs_InboundWithEntitySelector_OK()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+
+        var r = RtPathEvaluator.TokenizeAndGetNavigationPair(ckCacheService, fixture.TenantId, TestCkIds.CkZoneTypeId,
+            "children.testSensor[wellKnownName='S1']->Designation");
+
+        Assert.NotNull(r);
+        Assert.Equal(GraphDirections.Inbound, r.Direction);
+        Assert.Equal(TestCkIds.RtCkSensorTypeId, r.TargetCkTypeId);
+        Assert.NotNull(r.EntitySelector);
+        Assert.Equal(NavigationEntitySelectorKind.WellKnownName, r.EntitySelector.Kind);
+        Assert.Equal("S1", r.EntitySelector.Value);
+
+        // The selector is mirrored as a field filter so the MongoDB inner lookup narrows server-side.
+        Assert.NotNull(r.FieldFilters);
+        var fieldFilter = Assert.Single(r.FieldFilters);
+        Assert.Equal("RtWellKnownName", fieldFilter.AttributePath);
+        Assert.Equal("S1", fieldFilter.ComparisonValue);
+    }
+
+    private static RtEntityGraphItem CreateZoneWithTwoSensorChildren()
+    {
+        var sensorA = new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId,
+            OctoObjectId.Parse("100000000000000000000001"),
+            new Dictionary<string, object?> { { "Designation", "A" } })
+        {
+            RtWellKnownName = "S1"
+        };
+        var sensorB = new RtEntityGraphItem(TestCkIds.RtCkSensorTypeId,
+            OctoObjectId.Parse("100000000000000000000002"),
+            new Dictionary<string, object?> { { "Designation", "B" } })
+        {
+            RtWellKnownName = "S2"
+        };
+
+        // One navigation end per association edge, deliberately supplied B-first to prove
+        // deterministic ordering by RtId.
+        var associations = new List<NavigationEnd>
+        {
+            new()
+            {
+                AssociationId = OctoObjectId.GenerateNewId(),
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
+                NavigationPropertyName = "Children",
+                Targets = [sensorB]
+            },
+            new()
+            {
+                AssociationId = OctoObjectId.GenerateNewId(),
+                RtAssociationRoleId = SystemCkIds.RtCkParentChildRoleId,
+                TargetRtCkTypeId = TestCkIds.RtCkSensorTypeId,
+                NavigationPropertyName = "Children",
+                Targets = [sensorA]
+            }
+        };
+
+        return new RtEntityGraphItem(TestCkIds.RtCkZoneTypeId, OctoObjectId.GenerateNewId(),
+            new Dictionary<string, object?> { { "Designation", "Zone" } }, associations);
+    }
+
+    [Fact]
+    public async Task GetValue_MultipleNavigationEnds_WithoutFirstMatch_Fails()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = CreateZoneWithTwoSensorChildren();
+
+        Assert.Throws<InvalidPathException>(() => RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId,
+            rtEntity, "children.testSensor->Designation"));
+    }
+
+    [Fact]
+    public async Task GetValue_MultipleNavigationEnds_FirstMatch_ReturnsDeterministicFirst()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = CreateZoneWithTwoSensorChildren();
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
+            "children.testSensor->Designation", AttributeValueResolveFlags.FirstMatchNavigation);
+
+        Assert.Equal("A", result);
+    }
+
+    [Fact]
+    public async Task GetValue_EntitySelector_ByWellKnownName_PicksSelectedTarget()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = CreateZoneWithTwoSensorChildren();
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
+            "children.testSensor[wellKnownName='S2']->Designation",
+            AttributeValueResolveFlags.FirstMatchNavigation);
+
+        Assert.Equal("B", result);
+    }
+
+    [Fact]
+    public async Task GetValue_EntitySelector_ByAttribute_PicksSelectedTarget()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = CreateZoneWithTwoSensorChildren();
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
+            "children.testSensor[designation=B]->Designation",
+            AttributeValueResolveFlags.FirstMatchNavigation);
+
+        Assert.Equal("B", result);
+    }
+
+    [Fact]
+    public async Task GetValue_EntitySelector_NoMatch_ReturnsNull()
+    {
+        var ckCacheService = await fixture.GetCacheServiceAsync();
+        var rtEntity = CreateZoneWithTwoSensorChildren();
+
+        var result = RtPathEvaluator.GetValue(ckCacheService, fixture.TenantId, rtEntity,
+            "children.testSensor[wellKnownName='S3']->Designation",
+            AttributeValueResolveFlags.FirstMatchNavigation);
+
+        Assert.Null(result);
+    }
+
+    #endregion EntitySelector and first-match navigation (AB#4323)
 }

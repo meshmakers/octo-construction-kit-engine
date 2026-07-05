@@ -44,14 +44,15 @@ public static class RtPathEvaluator
     }
 
     private const string PatternString =
-        @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->:]+)(?=\.[^.\[\]\->:]+(?:->|::))
-          | \.(?<targetCkTypeId>[^.\[\]\->:]+)(?=->|::)
+        @"(?:(?<=^)|(?<=->)|(?<=\.))(?<navigationProperty>[^.\[\]\->:]+)(?=\.[^.\[\]\->:]+(?:\[[^\[\]]+\])*(?:->|::))
+          | \.(?<targetCkTypeId>[^.\[\]\->:]+)(?=(?:\[[^\[\]]+\])*(?:->|::))
           | ::(?<associationMeta>[^.\[\]\->:]+)
           | \[(?<arrayIndex>-?\d+|\*)\]
+          | \[(?<entitySelector>[^\[\]=]+=[^\[\]]*)\]
           | (?:(?<=^)|(?<=\.|->))(?<property>[^.\[\]\->:]+)(?!->|::)";
 
     private const string MatchPatternString =
-        @"^(?:[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)(?:(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)->[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*)\])*)::(?:[^.\[\]\->:]+))*$";
+        @"^(?:[^.\[\]\->:]+(?:\[(?:-?\d+|\*|[^\[\]=]+=[^\[\]]*)\])*)(?:(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*|[^\[\]=]+=[^\[\]]*)\])*)|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*|[^\[\]=]+=[^\[\]]*)\])*)->[^.\[\]\->:]+(?:\[(?:-?\d+|\*|[^\[\]=]+=[^\[\]]*)\])*|(?:\.[^.\[\]\->:]+(?:\[(?:-?\d+|\*|[^\[\]=]+=[^\[\]]*)\])*)::(?:[^.\[\]\->:]+))*$";
 
     // This regex is used to parse a path expression in the form of "property1.property2.property3[0]"
     // or "property1->property2.property3" or "property1[0].property2.property3"
@@ -82,7 +83,11 @@ public static class RtPathEvaluator
         PathType? lastPathType = null;
         foreach (var pathTerm in pathTerms)
         {
-            if (lastPathType != null)
+            // Bracket terms attach directly to the preceding segment (attr[0], type[key=value])
+            // and must neither emit a separator nor shift the separator context for the term
+            // that follows them (type[key=value]->attr still separates with ->).
+            var isBracketTerm = pathTerm.Type is PathType.ArrayIndex or PathType.EntitySelector;
+            if (lastPathType != null && !isBracketTerm)
             {
                 if (pathTerm.Type == PathType.AssociationMeta)
                 {
@@ -97,6 +102,7 @@ public static class RtPathEvaluator
             switch (pathTerm.Type)
             {
                 case PathType.ArrayIndex:
+                case PathType.EntitySelector:
                     sb.Append($"[{pathTerm.Value}]");
                     break;
                 default:
@@ -104,7 +110,10 @@ public static class RtPathEvaluator
                     break;
             }
 
-            lastPathType = pathTerm.Type;
+            if (!isBracketTerm)
+            {
+                lastPathType = pathTerm.Type;
+            }
         }
 
 
@@ -159,6 +168,12 @@ public static class RtPathEvaluator
             else if (match.Groups["arrayIndex"].Success)
             {
                 tokens.Add(new PathTerm(match.Groups["arrayIndex"].Value, PathType.ArrayIndex));
+            }
+            else if (match.Groups["entitySelector"].Success)
+            {
+                // Raw key=value payload; parsed by ParseEntitySelector when the navigation pair
+                // is built. Do not camel-case — the value part is a literal.
+                tokens.Add(new PathTerm(match.Groups["entitySelector"].Value, PathType.EntitySelector));
             }
         }
 
@@ -501,9 +516,12 @@ public static class RtPathEvaluator
             var navigationProperty = combination.Item1;
             var targetTypeProperty = combination.Item2;
 
+            // The reachable end of an inbound navigation is the association's ORIGIN type
+            // (the type that declares the association) — the In graph's TargetCkTypeId points
+            // at the type the graph is attached to, not at the other end.
             var inAssociations = ckTypeGraph.Associations.In.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
-                            ckCacheService.GetCkType(tenantId, a.TargetCkTypeId).GetAllDerivedTypes(true)
+                            ckCacheService.GetCkType(tenantId, a.OriginCkTypeId).GetAllDerivedTypes(true)
                                 .Select(t => t.ToRtCkId().GetTypeName()).Contains(targetTypeProperty.Value)).ToList();
             var outAssociations = ckTypeGraph.Associations.Out.All
                 .Where(a => a.NavigationPropertyName == navigationProperty.Value.ToPascalCase() &&
@@ -515,9 +533,11 @@ public static class RtPathEvaluator
                 throw InvalidPathException.AssociationNotFound(tokens, navigationProperty, targetTypeProperty);
             }
 
+            var entitySelector = TryGetEntitySelector(tokens, targetTypeProperty);
+
             foreach (var association in inAssociations)
             {
-                var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.TargetCkTypeId)
+                var realTargetCkTypeId = ckCacheService.GetCkType(tenantId, association.OriginCkTypeId)
                     .GetAllDerivedTypes(true)
                     .First(t => t.ToRtCkId().GetTypeName() == targetTypeProperty.Value);
                 ckTypeGraph = ckCacheService.GetCkType(tenantId, realTargetCkTypeId);
@@ -527,7 +547,11 @@ public static class RtPathEvaluator
                 var roleIdDirectionPair = new NavigationPair(pathTerms,
                     [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId.ToRtCkId(),
                     GraphDirections.Inbound,
-                    realTargetCkTypeId.ToRtCkId());
+                    realTargetCkTypeId.ToRtCkId())
+                {
+                    EntitySelector = entitySelector
+                };
+                AddEntitySelectorFieldFilter(roleIdDirectionPair);
 
                 if (currentNavigationPair != null)
                 {
@@ -549,7 +573,11 @@ public static class RtPathEvaluator
                 var roleIdDirectionPair = new NavigationPair(pathTerms,
                     [tokens.SkipWhile(t => t != targetTypeProperty).Skip(1)], association.CkRoleId.ToRtCkId(),
                     GraphDirections.Outbound,
-                    realTargetCkTypeId.ToRtCkId());
+                    realTargetCkTypeId.ToRtCkId())
+                {
+                    EntitySelector = entitySelector
+                };
+                AddEntitySelectorFieldFilter(roleIdDirectionPair);
 
                 if (currentNavigationPair != null)
                 {
@@ -576,6 +604,74 @@ public static class RtPathEvaluator
         }
 
         return navigationPair;
+    }
+
+    /// <summary>
+    /// Mirrors the pair's entity selector as a field filter so the MongoDB inner lookup
+    /// narrows the loaded target entities server-side (the walker additionally applies the
+    /// selector in memory for ends loaded through other pairs).
+    /// </summary>
+    private static void AddEntitySelectorFieldFilter(NavigationPair pair)
+    {
+        if (pair.EntitySelector is not { } selector)
+        {
+            return;
+        }
+
+        switch (selector.Kind)
+        {
+            case NavigationEntitySelectorKind.RtId:
+                object comparisonValue = OctoObjectId.TryParse(selector.Value, out var rtId)
+                    ? rtId
+                    : selector.Value;
+                pair.AddFieldFilter("RtId", FieldFilterOperator.Equals, comparisonValue);
+                break;
+            case NavigationEntitySelectorKind.WellKnownName:
+                pair.AddFieldFilter("RtWellKnownName", FieldFilterOperator.Equals, selector.Value);
+                break;
+            case NavigationEntitySelectorKind.Attribute:
+                pair.AddFieldFilter(selector.AttributeName!, FieldFilterOperator.Equals, selector.Value);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Returns the entity selector following the given target type term, if present.
+    /// </summary>
+    private static NavigationEntitySelector? TryGetEntitySelector(List<PathTerm> tokens, PathTerm targetTypeProperty)
+    {
+        var index = tokens.IndexOf(targetTypeProperty);
+        if (index < 0 || index + 1 >= tokens.Count || tokens[index + 1].Type != PathType.EntitySelector)
+        {
+            return null;
+        }
+
+        return ParseEntitySelector(tokens[index + 1].Value);
+    }
+
+    /// <summary>
+    /// Parses the raw <c>key=value</c> payload of an entity selector path term
+    /// (<c>[rtId=...]</c>, <c>[wellKnownName=...]</c> or <c>[attributeName=value]</c>).
+    /// Values may be quoted with single or double quotes; quotes are stripped.
+    /// </summary>
+    public static NavigationEntitySelector ParseEntitySelector(string rawSelector)
+    {
+        var separatorIndex = rawSelector.IndexOf('=');
+        if (separatorIndex <= 0)
+        {
+            throw InvalidPathException.InvalidPathTerm(rawSelector);
+        }
+
+        var key = rawSelector.Substring(0, separatorIndex).Trim();
+        var value = rawSelector.Substring(separatorIndex + 1).Trim().Trim('\'', '"');
+
+        return key.ToLowerInvariant() switch
+        {
+            "rtid" => new NavigationEntitySelector(NavigationEntitySelectorKind.RtId, null, value),
+            "wellknownname" or "rtwellknownname" => new NavigationEntitySelector(
+                NavigationEntitySelectorKind.WellKnownName, null, value),
+            _ => new NavigationEntitySelector(NavigationEntitySelectorKind.Attribute, key.ToPascalCase(), value)
+        };
     }
 
     /// <summary>
@@ -840,9 +936,14 @@ public static class RtPathEvaluator
             new PathTuple(null, [new PathLocator(rtTypeWithAttributes, null, null, rtTypeWithAttributes)])
         ]);
 
+        var firstMatchNavigation =
+            attributeValueResolveFlags.HasFlag(AttributeValueResolveFlags.FirstMatchNavigation);
+
         // We evaluate the path terms to find the target attribute
-        foreach (var token in tokens)
+        for (var tokenIndex = 0; tokenIndex < tokens.Count; tokenIndex++)
         {
+            var token = tokens[tokenIndex];
+            var nextToken = tokenIndex + 1 < tokens.Count ? tokens[tokenIndex + 1] : null;
             var lastPathTuple = evaluatedPath.Last();
             var newPathLocators = new List<PathLocator>();
             evaluatedPath.Add(new PathTuple(token, newPathLocators));
@@ -868,25 +969,31 @@ public static class RtPathEvaluator
                                     throw InvalidPathException.RtCkTypeIdNotFound(tenantId, rtEntityGraphItem.CkTypeId);
                                 }
 
-                                var ckTypeAssociationGraphs = ckTypeGraph.Associations.Out.All
+                                // The reachable end of an outbound navigation is the graph's
+                                // TargetCkTypeId; for an inbound navigation it is the
+                                // association's ORIGIN type (the In graph's TargetCkTypeId
+                                // points at the type the graph is attached to).
+                                var candidateNavigations = ckTypeGraph.Associations.Out.All
                                     .Where(x => x.NavigationPropertyName == token.Value.ToPascalCase())
+                                    .Select(x => (Graph: x, ReachableCkTypeId: x.TargetCkTypeId))
                                     .ToList();
-                                ckTypeAssociationGraphs.AddRange(ckTypeGraph.Associations.In.All
-                                    .Where(x => x.NavigationPropertyName == token.Value.ToPascalCase()));
+                                candidateNavigations.AddRange(ckTypeGraph.Associations.In.All
+                                    .Where(x => x.NavigationPropertyName == token.Value.ToPascalCase())
+                                    .Select(x => (Graph: x, ReachableCkTypeId: x.OriginCkTypeId)));
 
-                                if (ckTypeAssociationGraphs.Count == 0)
+                                if (candidateNavigations.Count == 0)
                                 {
                                     throw InvalidPathException.NavigationPropertyNotFound(tokens, token);
                                 }
 
-                                foreach (var ckTypeAssociationGraph in ckTypeAssociationGraphs)
+                                foreach (var candidateNavigation in candidateNavigations)
                                 {
                                     navigationEnds.Add(new NavigationEnd
                                     {
-                                        RtAssociationRoleId = ckTypeAssociationGraph.CkRoleId.ToRtCkId(),
+                                        RtAssociationRoleId = candidateNavigation.Graph.CkRoleId.ToRtCkId(),
                                         AssociationId = OctoObjectId.Empty,
-                                        NavigationPropertyName = ckTypeAssociationGraph.NavigationPropertyName,
-                                        TargetRtCkTypeId = ckTypeAssociationGraph.TargetCkTypeId.ToRtCkId(),
+                                        NavigationPropertyName = candidateNavigation.Graph.NavigationPropertyName,
+                                        TargetRtCkTypeId = candidateNavigation.ReachableCkTypeId.ToRtCkId(),
                                         Targets = new List<RtEntityGraphItem>()
                                     });
                                 }
@@ -926,32 +1033,69 @@ public static class RtPathEvaluator
                         throw InvalidPathException.TargetCkTypeIdNotFound(tokens, token);
                     }
 
-                    if (filteredNavigationEnds.Count == 1)
-                    {
-                        var navigationEnd = navigationEnds.First();
-                        navigationEnd.TargetRtCkTypeId = ckCacheService
-                            .GetRtCkType(tenantId, navigationEnd.TargetRtCkTypeId)
-                            .GetAllDerivedTypes(true).Single(t => t.ToRtCkId().GetTypeName() == token.Value).ToRtCkId();
-                        if (navigationEnd.Targets.Count() == 1)
-                        {
-                            newPathLocators.Add(new PathLocator(navigationEnd.Targets.First(), null,
-                                null, navigationEnd.Targets.First()));
-                        }
-                        else
-                        {
-                            var targets = navigationEnd.Targets.ToList();
-                            for (int i = 0; i < targets.Count; i++)
-                            {
-                                var target = targets[i];
-                                newPathLocators.Add(new PathLocator(target, null,
-                                    i, target));
-                            }
-                        }
-                    }
-                    else
+                    if (filteredNavigationEnds.Count > 1 && !firstMatchNavigation)
                     {
                         throw InvalidPathException.MultipleNavigationEndsUnsupported(locator.RtTypeWithAttributes,
                             token);
+                    }
+
+                    // Narrow every matching end to the addressed subtype and collect its targets
+                    // of that subtype — an N navigation carries one end per association edge and
+                    // may mix target types under one role (e.g. all sensors of a space).
+                    var matchingTargets = new List<RtEntityGraphItem>();
+                    foreach (var navigationEnd in filteredNavigationEnds)
+                    {
+                        var addressedCkTypeId = ckCacheService
+                            .GetRtCkType(tenantId, navigationEnd.TargetRtCkTypeId)
+                            .GetAllDerivedTypes(true).Single(t => t.ToRtCkId().GetTypeName() == token.Value);
+                        navigationEnd.TargetRtCkTypeId = addressedCkTypeId.ToRtCkId();
+
+                        var addressedTypeNames = new HashSet<string>(
+                            ckCacheService.GetCkType(tenantId, addressedCkTypeId)
+                                .GetAllDerivedTypes(true).Select(t => t.ToRtCkId().GetTypeName()),
+                            StringComparer.Ordinal);
+                        matchingTargets.AddRange(navigationEnd.Targets.Where(t =>
+                            t.CkTypeId == null || addressedTypeNames.Contains(t.CkTypeId.GetTypeName())));
+                    }
+
+                    if (firstMatchNavigation && matchingTargets.Count > 1)
+                    {
+                        matchingTargets = matchingTargets
+                            .OrderBy(t => t.RtId.ToString(), StringComparer.Ordinal).ToList();
+
+                        // Reduce to the deterministic first match unless an entity selector
+                        // follows — the selector must see all candidates to pick from.
+                        if (nextToken?.Type != PathType.EntitySelector)
+                        {
+                            matchingTargets = [matchingTargets[0]];
+                        }
+                    }
+
+                    if (matchingTargets.Count == 1)
+                    {
+                        newPathLocators.Add(new PathLocator(matchingTargets[0], null,
+                            null, matchingTargets[0]));
+                    }
+                    else
+                    {
+                        for (int i = 0; i < matchingTargets.Count; i++)
+                        {
+                            var target = matchingTargets[i];
+                            newPathLocators.Add(new PathLocator(target, null,
+                                i, target));
+                        }
+                    }
+                }
+                else if (token.Type == PathType.EntitySelector)
+                {
+                    if (locator.RtTypeWithAttributes is not RtEntityGraphItem targetEntity)
+                    {
+                        throw InvalidPathException.InvalidTokenType(token);
+                    }
+
+                    if (EntitySelectorMatches(targetEntity, ParseEntitySelector(token.Value)))
+                    {
+                        newPathLocators.Add(new PathLocator(targetEntity, null, locator.Index, targetEntity));
                     }
                 }
                 // Attribute
@@ -1169,9 +1313,44 @@ public static class RtPathEvaluator
                     throw InvalidPathException.InvalidTokenType(token);
                 }
             }
+
+            // An entity selector may leave several matches (e.g. attribute selector matching
+            // more than one target); with first-match semantics reduce deterministically.
+            if (token.Type == PathType.EntitySelector && firstMatchNavigation && newPathLocators.Count > 1)
+            {
+                var firstLocator = newPathLocators
+                    .OrderBy(l => (l.RtTypeWithAttributes as RtEntityGraphItem)?.RtId.ToString() ?? string.Empty,
+                        StringComparer.Ordinal)
+                    .First();
+                newPathLocators.Clear();
+                newPathLocators.Add(firstLocator);
+            }
         }
 
         return evaluatedPath;
+    }
+
+    /// <summary>
+    /// Checks whether a navigation target entity matches an entity selector from the path
+    /// (<c>[rtId=...]</c>, <c>[wellKnownName=...]</c> or <c>[attributeName=value]</c>).
+    /// Attribute values are compared via their invariant string representation.
+    /// </summary>
+    private static bool EntitySelectorMatches(RtEntityGraphItem entity, NavigationEntitySelector selector)
+    {
+        switch (selector.Kind)
+        {
+            case NavigationEntitySelectorKind.RtId:
+                return string.Equals(entity.RtId.ToString(), selector.Value, StringComparison.OrdinalIgnoreCase);
+            case NavigationEntitySelectorKind.WellKnownName:
+                return string.Equals(entity.RtWellKnownName, selector.Value, StringComparison.Ordinal);
+            case NavigationEntitySelectorKind.Attribute:
+                var attributeValue = entity.GetAttributeValueOrDefault(selector.AttributeName!);
+                return attributeValue != null && string.Equals(
+                    Convert.ToString(attributeValue, System.Globalization.CultureInfo.InvariantCulture),
+                    selector.Value, StringComparison.Ordinal);
+            default:
+                return false;
+        }
     }
 
     private static object? ConvertAttributeValue(ICkCacheService ckCacheService, string tenantId,

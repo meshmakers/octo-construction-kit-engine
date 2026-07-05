@@ -48,6 +48,13 @@ public record NavigationPair : FieldFilterCriteria
     public AssociationCountFilter? AssociationCountFilter { get; set; }
 
     /// <summary>
+    /// Gets the entity selector pinning the navigation target entity for value navigation across
+    /// N-multiplicity associations (path syntax <c>nav.type[key=value]-&gt;attr</c>).
+    /// When set, the MongoDB lookup narrows the loaded target entities to the selected one.
+    /// </summary>
+    public NavigationEntitySelector? EntitySelector { get; set; }
+
+    /// <summary>
     ///     Creates a new <see cref="NavigationPair" /> from the given <paramref name="ckRoleId" />, <paramref name="direction" />, and <paramref name="targetCkTypeId" />.
     /// </summary>
     /// <param name="pathTerms">Path terms to the navigation pair</param>

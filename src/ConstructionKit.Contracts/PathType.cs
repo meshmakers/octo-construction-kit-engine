@@ -30,4 +30,11 @@ public enum PathType
     /// Used with the :: separator in path syntax.
     /// </summary>
     AssociationMeta = 4,
+
+    /// <summary>
+    /// An entity selector pinning the navigation target entity, e.g. [rtId=...],
+    /// [wellKnownName=...] or [attributeName=value]. Follows a TargetCkTypeId term
+    /// in bracket syntax.
+    /// </summary>
+    EntitySelector = 5,
 }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -19,10 +20,12 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// determines the width; calendar variants derive an effective width from the wall clock (and the
 /// reference time zone) instead.
 /// </param>
-/// <param name="StoredFunctionForSeries">
-/// The aggregation function this rung stores for the requested series' column, or <c>null</c> for a
-/// base archive (which stores no aggregation). A rollup rung is a valid reduction source only when
-/// this equals the caller's requested aggregation.
+/// <param name="StoredFunctionsForSeries">
+/// All aggregation functions this rung stores for the requested series' column — a rollup may carry
+/// several aggregations on the same source path (AB#4188), e.g. AVG and MAX side by side. Empty for
+/// a base archive (which stores no aggregation) or when the rung does not aggregate the requested
+/// path. A rollup rung is a valid reduction source only when this contains the caller's requested
+/// aggregation.
 /// </param>
 /// <param name="IsBase">
 /// True for the base archive (raw or time-range) the rollups are derived from; false for rollups.
@@ -33,7 +36,7 @@ public sealed record ResolutionRung(
     OctoObjectId ArchiveRtId,
     long? GrainMs,
     BucketAlignment Alignment,
-    CkRollupFunction? StoredFunctionForSeries,
+    IReadOnlyCollection<CkRollupFunction> StoredFunctionsForSeries,
     bool IsBase)
 {
     /// <summary>

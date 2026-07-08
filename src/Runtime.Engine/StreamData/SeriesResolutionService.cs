@@ -72,7 +72,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 baseRtId,
                 ToMs(baseArchive.Period),
                 BucketAlignment.FixedSize,
-                StoredFunctionForSeries: null,
+                StoredFunctionsForSeries: Array.Empty<CkRollupFunction>(),
                 IsBase: true),
         };
 
@@ -84,7 +84,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 rollup.RtId,
                 (long)rollup.BucketSize.TotalMilliseconds,
                 rollup.BucketAlignment,
-                StoredFunctionForSeries: MatchStoredFunction(rollup, baseRtId, request.SourcePath),
+                StoredFunctionsForSeries: MatchStoredFunctions(rollup, baseRtId, request.SourcePath),
                 IsBase: false)
             {
                 // The rung carries the rollup's STORED zone (AB#4190 / O6). The resolution zone the
@@ -105,26 +105,29 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
 
     /// <summary>
     /// Single-step function-matching: a rollup sourced directly from the base archive stores the
-    /// aggregation the operator declared for the requested path. A rollup sourced from another rollup
-    /// (cascade) is not matched in Phase 1 — its function is reported as unknown (null).
+    /// aggregations the operator declared for the requested path — possibly several on the same path
+    /// (AB#4188), all of which are valid reduction sources. A rollup sourced from another rollup
+    /// (cascade) is not matched in Phase 1 — its functions are reported as unknown (empty).
     /// </summary>
-    private static CkRollupFunction? MatchStoredFunction(
+    private static IReadOnlyCollection<CkRollupFunction> MatchStoredFunctions(
         RollupArchiveSnapshot rollup, OctoObjectId baseRtId, string sourcePath)
     {
         if (rollup.SourceArchiveRtId != baseRtId)
         {
-            return null; // cascade rollup — deferred (see class remarks)
+            return Array.Empty<CkRollupFunction>(); // cascade rollup — deferred (see class remarks)
         }
 
+        List<CkRollupFunction>? functions = null;
         foreach (var spec in rollup.Aggregations)
         {
             if (string.Equals(spec.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
             {
-                return spec.Function;
+                (functions ??= new List<CkRollupFunction>()).Add(spec.Function);
             }
         }
 
-        return null; // this rollup does not aggregate the requested path
+        // Empty ⇒ this rollup does not aggregate the requested path.
+        return functions ?? (IReadOnlyCollection<CkRollupFunction>)Array.Empty<CkRollupFunction>();
     }
 
     /// <summary>

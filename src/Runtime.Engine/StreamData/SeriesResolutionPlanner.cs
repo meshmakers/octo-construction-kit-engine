@@ -26,7 +26,8 @@ internal static class SeriesResolutionPlanner
     /// <param name="targetPoints">Desired output point count; must be positive.</param>
     /// <param name="requiredAggregation">
     /// The caller-supplied aggregation semantics (decision O2). A rollup rung is a valid source only
-    /// when its stored function equals this.
+    /// when its stored functions for the series include this — a rollup may carry several
+    /// aggregations on the same source path (AB#4188).
     /// </param>
     /// <param name="effectiveGrainMs">
     /// Probe returning a rung's effective bucket width in milliseconds over <paramref name="from"/>..
@@ -61,10 +62,11 @@ internal static class SeriesResolutionPlanner
 
         var baseRung = ladder.FirstOrDefault(r => r.IsBase);
 
-        // Eligible reduction sources: rollups whose stored function matches the requested aggregation
-        // and whose effective grain is determinate.
+        // Eligible reduction sources: rollups whose stored functions include the requested aggregation
+        // (a rollup may carry several aggregations on the same path, AB#4188) and whose effective
+        // grain is determinate.
         var eligible = ladder
-            .Where(r => !r.IsBase && r.StoredFunctionForSeries == requiredAggregation)
+            .Where(r => !r.IsBase && r.StoredFunctionsForSeries.Contains(requiredAggregation))
             .Select(r => (Rung: r, Grain: effectiveGrainMs(r, from, to)))
             .Where(x => x.Grain is > 0)
             .Select(x => (x.Rung, Grain: x.Grain!.Value))

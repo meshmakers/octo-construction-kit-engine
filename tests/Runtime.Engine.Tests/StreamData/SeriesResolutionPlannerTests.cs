@@ -23,10 +23,11 @@ public class SeriesResolutionPlannerTests
     private static long? FixedProbe(ResolutionRung r, DateTime from, DateTime to) => r.GrainMs;
 
     private static ResolutionRung Base(long? grainMs) =>
-        new(OctoObjectId.GenerateNewId(), grainMs, BucketAlignment.FixedSize, null, IsBase: true);
+        new(OctoObjectId.GenerateNewId(), grainMs, BucketAlignment.FixedSize,
+            Array.Empty<CkRollupFunction>(), IsBase: true);
 
-    private static ResolutionRung Rollup(long grainMs, CkRollupFunction fn) =>
-        new(OctoObjectId.GenerateNewId(), grainMs, BucketAlignment.FixedSize, fn, IsBase: false);
+    private static ResolutionRung Rollup(long grainMs, params CkRollupFunction[] fns) =>
+        new(OctoObjectId.GenerateNewId(), grainMs, BucketAlignment.FixedSize, fns, IsBase: false);
 
     private static SeriesResolutionResult Plan(
         IReadOnlyList<ResolutionRung> ladder, DateTime from, DateTime to, int target, CkRollupFunction agg) =>
@@ -152,6 +153,33 @@ public class SeriesResolutionPlannerTests
 
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(oneHourSum.ArchiveRtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public void MultiAggregationRollup_RequestedFunctionAmongStored_Eligible()
+    {
+        // AB#4336 regression: a rollup carrying AVG *and* MAX on the same source path must match a
+        // MAX request regardless of the order the aggregations were declared in.
+        var avgMax = Rollup(OneHour, CkRollupFunction.Avg, CkRollupFunction.Max);
+        var ladder = new[] { Base(FifteenMin), avgMax };
+
+        var result = Plan(ladder, YearFrom, YearTo, 600, CkRollupFunction.Max);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(avgMax.ArchiveRtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public void MultiAggregationRollup_RequestedFunctionNotStored_Ineligible()
+    {
+        // AVG+MAX rollup must still NOT satisfy a SUM request.
+        var baseRung = Base(FifteenMin);
+        var ladder = new[] { baseRung, Rollup(OneHour, CkRollupFunction.Avg, CkRollupFunction.Max) };
+
+        var result = Plan(ladder, YearFrom, YearTo, 600, CkRollupFunction.Sum);
+
+        Assert.Equal(SeriesResolutionSignal.NoSuitableRollup, result.Signal);
+        Assert.Equal(baseRung.ArchiveRtId, result.ArchiveRtId);
     }
 
     [Fact]

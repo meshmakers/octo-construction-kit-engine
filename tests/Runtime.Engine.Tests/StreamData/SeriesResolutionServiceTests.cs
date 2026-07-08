@@ -74,6 +74,34 @@ public class SeriesResolutionServiceTests
     }
 
     [Fact]
+    public async Task MultiAggregationRollup_LaterFunctionRequested_Matched()
+    {
+        // AB#4336 regression: the rollup declares AVG *before* MAX on the same source path. The old
+        // first-match logic returned AVG and the MAX request fell through to "no compatible rollup";
+        // all functions of the path must be considered.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var avgMax = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
+            new[]
+            {
+                new CkRollupAggregationSpec(Path, CkRollupFunction.Avg, null),
+                new CkRollupAggregationSpec(Path, CkRollupFunction.Max, null),
+            }, null);
+        StubRollups(baseArchive.RtId, avgMax);
+
+        var request = Request(baseArchive.RtId, YearFrom, YearTo, 600) with
+        {
+            RequiredAggregation = CkRollupFunction.Max,
+        };
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(avgMax.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
     public async Task CascadeRollup_FunctionUnknown_ExcludedFromSelection()
     {
         // A rollup whose source is another rollup (not the base) is not matched in Phase 1 → ineligible.

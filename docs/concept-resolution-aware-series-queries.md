@@ -88,7 +88,9 @@ Given the bound time range `[from, to)` (`timespan = to − from`) and a `target
 
 ```
 reducer     = requiredAggregation                     (O2, caller-supplied; never guessed)
-eligible    = compatible rollup rungs                 (stored function == reducer, grain known)
+eligible    = compatible rollup rungs                 (stored functions of the path CONTAIN the
+                                                       reducer, grain known — a rollup may carry
+                                                       several aggregations on one path, AB#4188)
 ideal       = timespan / targetPoints
 baseNative  = timespan / basePeriod                   (null if the base grain is undeclared)
 

@@ -20,3 +20,6 @@ enums:
       - key: 4
         name: Count
         description: "Number of non-null values in the bucket."
+      - key: 5
+        name: TimeWeightedAvg
+        description: "Time-weighted average with LOCF interval weighting for event-based sources. Stored as integral (value*ms) and covered-duration (ms) columns; the average is computed on read. Yields the duty cycle on 0/100 or boolean-like signals. AB#4336."

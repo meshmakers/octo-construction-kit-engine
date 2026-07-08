@@ -13,7 +13,10 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// <remarks>
 /// <see cref="CkRollupFunction.Avg"/> materialises as <em>two</em> columns
 /// (<c>{base}_sum</c> + <c>{base}_count</c>) so chained rollups stay numerically correct — the
-/// average is recomputed on read as <c>sum / NULLIF(count, 0)</c>. The other functions map 1:1.
+/// average is recomputed on read as <c>sum / NULLIF(count, 0)</c>.
+/// <see cref="CkRollupFunction.TimeWeightedAvg"/> follows the same pattern with
+/// <c>{base}_integral</c> + <c>{base}_duration</c> (AB#4336); its default base name uses the short
+/// token <c>twavg</c>, not the lower-cased enum name. The other functions map 1:1.
 /// All generated columns are <c>Indexed = true</c> and <c>Required = false</c>: aggregations can
 /// be null for empty buckets and the orchestrator's upsert is the only writer, so a missing
 /// value never indicates user error.
@@ -71,7 +74,7 @@ public static class RollupColumnGenerator
 
         var baseName = !string.IsNullOrWhiteSpace(spec.TargetColumnName)
             ? spec.TargetColumnName!.ToLowerInvariant()
-            : $"{SanitisePath(spec.SourcePath)}_{spec.Function.ToString().ToLowerInvariant()}";
+            : $"{SanitisePath(spec.SourcePath)}_{FunctionToken(spec.Function)}";
 
         return spec.Function switch
         {
@@ -80,8 +83,22 @@ public static class RollupColumnGenerator
             CkRollupFunction.Max => new[] { baseName },
             CkRollupFunction.Sum => new[] { baseName },
             CkRollupFunction.Count => new[] { baseName },
+            CkRollupFunction.TimeWeightedAvg => new[] { $"{baseName}_integral", $"{baseName}_duration" },
             _ => throw new ArgumentOutOfRangeException(nameof(spec), spec.Function, "Unknown rollup function.")
         };
+    }
+
+    /// <summary>
+    /// Default-name token per function: the lower-cased enum name, except
+    /// <see cref="CkRollupFunction.TimeWeightedAvg"/> which uses the short token <c>twavg</c>
+    /// (AB#4336 decision D5) so default column names stay readable
+    /// (<c>dimminglevel_twavg_integral</c>, not <c>dimminglevel_timeweightedavg_integral</c>).
+    /// </summary>
+    private static string FunctionToken(CkRollupFunction function)
+    {
+        return function == CkRollupFunction.TimeWeightedAvg
+            ? "twavg"
+            : function.ToString().ToLowerInvariant();
     }
 
     /// <summary>

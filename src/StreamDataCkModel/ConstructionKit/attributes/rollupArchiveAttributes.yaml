@@ -31,6 +31,9 @@ attributes:
   - id: RollupArchive.ReferenceTimeZone
     description: "Optional IANA time-zone id (e.g. 'Europe/Vienna') used to align calendar bucket boundaries (day / week / month / year) to local wall-clock time so they are DST-correct across countries. Null (the default) keeps UTC calendar boundaries — the pre-1.6.4 behaviour. Only meaningful for calendar BucketAlignment variants; ignored for FixedSize. AB#4290 / decision O6."
     valueType: String
+  - id: RollupArchive.CarryLookbackMs
+    description: "How far before a bucket's start the TimeWeightedAvg carry-in scan (last observation carried forward) looks for the opening state, in milliseconds. Bounds the per-bucket source scan; a signal silent for longer than this loses its carry and the bucket becomes partially covered. Null (the default) uses the engine default of 35 days. Only consulted by TimeWeightedAvg aggregations; ignored otherwise. Mutable. AB#4336 / decision D1."
+    valueType: Int64
 
   # ---------- CkRollupAggregation (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) -
   - id: CkRollupAggregation.SourcePath

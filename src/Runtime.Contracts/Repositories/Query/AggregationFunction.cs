@@ -21,5 +21,12 @@ public enum AggregationFunction
     Average = 3,
 
     /// <summary>Sum of values.</summary>
-    Sum = 4
+    Sum = 4,
+
+    /// <summary>
+    /// Time-weighted average (LOCF interval weighting) for event-based archives. Resolvable
+    /// against rollup archives that materialise a <c>TimeWeightedAvg</c> aggregation
+    /// (integral/duration pair). AB#4336.
+    /// </summary>
+    TimeWeightedAverage = 5
 }

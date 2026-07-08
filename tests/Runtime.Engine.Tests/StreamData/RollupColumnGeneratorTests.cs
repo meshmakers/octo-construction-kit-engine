@@ -101,4 +101,31 @@ public class RollupColumnGeneratorTests
     {
         Assert.Throws<ArgumentNullException>(() => RollupColumnGenerator.Generate(null!));
     }
+
+    // ---- TimeWeightedAvg (AB#4336) ----
+
+    [Fact]
+    public void Generate_TimeWeightedAvgSpec_ProducesIntegralAndDurationColumns_WithShortToken()
+    {
+        var aggregations = new[] { new CkRollupAggregationSpec("dimming.level", CkRollupFunction.TimeWeightedAvg, null) };
+
+        var columns = RollupColumnGenerator.Generate(aggregations);
+
+        // Default base name uses the short token "twavg" (decision D5), not the enum name.
+        Assert.Equal(2, columns.Count);
+        Assert.Equal("dimminglevel_twavg_integral", columns[0].Path);
+        Assert.Equal("dimminglevel_twavg_duration", columns[1].Path);
+    }
+
+    [Fact]
+    public void Generate_TimeWeightedAvgSpec_ExplicitTargetColumnName_UsedAsBase()
+    {
+        var aggregations = new[] { new CkRollupAggregationSpec("dimming.level", CkRollupFunction.TimeWeightedAvg, "Burn") };
+
+        var columns = RollupColumnGenerator.Generate(aggregations);
+
+        Assert.Equal(2, columns.Count);
+        Assert.Equal("burn_integral", columns[0].Path);
+        Assert.Equal("burn_duration", columns[1].Path);
+    }
 }

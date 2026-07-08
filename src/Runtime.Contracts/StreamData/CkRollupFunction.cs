@@ -9,6 +9,8 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// <see cref="Avg"/> is materialised at storage time as two columns (<c>{name}_sum</c> and
 /// <c>{name}_count</c>) so chained re-aggregation (rollup-of-a-rollup) stays numerically correct.
 /// The single-column average is computed on read as <c>sum / NULLIF(count, 0)</c>.
+/// <see cref="TimeWeightedAvg"/> follows the same pattern with an integral/duration pair —
+/// see <c>concept-time-weighted-aggregation.md</c> (AB#4336).
 /// </remarks>
 public enum CkRollupFunction
 {
@@ -26,4 +28,13 @@ public enum CkRollupFunction
 
     /// <summary>Number of non-null values in the bucket.</summary>
     Count = 4,
+
+    /// <summary>
+    /// Time-weighted average with last-observation-carried-forward interval weighting, for
+    /// event-based sources (one row per state change). Stored as an integral (Σ value × Δt in
+    /// value·milliseconds) + covered-duration (milliseconds) pair; the average is computed on
+    /// read as <c>integral / NULLIF(duration, 0)</c>. On a 0/100 or boolean-like signal this
+    /// yields the duty cycle per bucket. AB#4336.
+    /// </summary>
+    TimeWeightedAvg = 5,
 }

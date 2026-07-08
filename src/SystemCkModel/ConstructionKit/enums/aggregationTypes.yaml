@@ -18,3 +18,6 @@ enums:
   - key: 4
     name: Sum
     description: Calculates the sum of values
+  - key: 5
+    name: TimeWeightedAverage
+    description: Time-weighted average with last-observation-carried-forward interval weighting, for event-based archives. Yields the duty cycle on 0/100 or boolean-like signals. Resolvable against rollup archives that materialise a TimeWeightedAvg aggregation. AB#4336.

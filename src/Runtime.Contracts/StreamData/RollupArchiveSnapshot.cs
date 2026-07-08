@@ -46,6 +46,15 @@ public sealed record RollupArchiveSnapshot(
     /// </summary>
     public string? ReferenceTimeZone { get; init; }
 
+    /// <summary>
+    /// How far before a bucket's start the <see cref="CkRollupFunction.TimeWeightedAvg"/>
+    /// carry-in scan (LOCF opening state) looks for the latest source observation. Bounds the
+    /// per-bucket source scan. <c>null</c> ⇒ the engine default of 35 days. Only consulted by
+    /// TimeWeightedAvg aggregations; ignored otherwise. System.StreamData 1.6.5 / AB#4336
+    /// decision D1.
+    /// </summary>
+    public TimeSpan? CarryLookback { get; init; }
+
     // ---------- Recompute observability (AB#4184, Phase 5 follow-up) ----------
     // Init-only so the positional ctor used by the orchestrator / lifecycle stays unchanged; these
     // are projected from the engine-maintained recompute-state attributes on the Archive base and

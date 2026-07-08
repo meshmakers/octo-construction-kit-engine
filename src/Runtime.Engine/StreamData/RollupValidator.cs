@@ -43,6 +43,12 @@ public static class RollupValidator
             {
                 throw new DuplicateRollupAggregationException(rollup.RtId, agg.SourcePath, agg.Function);
             }
+
+            // AB#4336: a StateDuration without a state literal has nothing to measure.
+            if (agg.Function == CkRollupFunction.StateDuration && string.IsNullOrWhiteSpace(agg.ComparisonValue))
+            {
+                throw new RollupComparisonValueRequiredException(rollup.RtId, agg.SourcePath);
+            }
         }
     }
 

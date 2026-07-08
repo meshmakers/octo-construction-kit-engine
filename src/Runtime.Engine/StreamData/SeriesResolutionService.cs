@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -14,12 +15,12 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Phase 1 scope (AB#4290): function-matching covers <b>single-step</b> rollups (a rollup whose
-/// source is the base archive). A <b>cascade</b> rollup (rollup-of-rollup) has its stored function
-/// treated as unknown, so it is conservatively excluded from selection — the resolver may fall back
-/// to a direct rollup or signal <see cref="SeriesResolutionSignal.NoSuitableRollup"/>, but never
-/// reduces with the wrong function. Cascade function-matching (which needs the storage-column
-/// reverse-walk that lives in the CrateDb layer) is a documented follow-up.
+/// Function-matching covers single-step rollups and <b>cascades</b> (rollup-of-rollup): the
+/// DB-neutral <see cref="RollupLadderFunctionResolver"/> walks each rung's source chain down to
+/// the base archive using the shared column-naming rule, so a daily rollup that accumulates an
+/// hourly TWA pair via SUM specs is a valid TimeWeightedAvg source (AB#4336, lifting the AB#4290
+/// Phase-1 limitation). A rung whose chain is broken or leaves the resolution family reports no
+/// stored functions and stays conservatively excluded.
 /// </para>
 /// <para>
 /// The base archive is identified by <see cref="SeriesResolutionRequest.BaseArchiveRtId"/>;
@@ -77,6 +78,7 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
         };
 
         var rollups = await _dependencyGraph.GetTransitiveDependentsAsync(baseRtId).ConfigureAwait(false);
+        var ladderByRtId = rollups.ToDictionary(r => r.RtId);
         foreach (var rollup in rollups)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -84,7 +86,8 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 rollup.RtId,
                 (long)rollup.BucketSize.TotalMilliseconds,
                 rollup.BucketAlignment,
-                StoredFunctionsForSeries: MatchStoredFunctions(rollup, baseRtId, request.SourcePath),
+                StoredFunctionsForSeries: RollupLadderFunctionResolver.StoredFunctionsFor(
+                    rollup, baseRtId, request.SourcePath, ladderByRtId),
                 IsBase: false)
             {
                 // The rung carries the rollup's STORED zone (AB#4190 / O6). The resolution zone the
@@ -101,33 +104,6 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
             request.TargetPoints,
             request.RequiredAggregation,
             (rung, from, to) => EffectiveGrainMs(rung, from, to, request.QueryTimeZone, request.ComparisonPolicy));
-    }
-
-    /// <summary>
-    /// Single-step function-matching: a rollup sourced directly from the base archive stores the
-    /// aggregations the operator declared for the requested path — possibly several on the same path
-    /// (AB#4188), all of which are valid reduction sources. A rollup sourced from another rollup
-    /// (cascade) is not matched in Phase 1 — its functions are reported as unknown (empty).
-    /// </summary>
-    private static IReadOnlyCollection<CkRollupFunction> MatchStoredFunctions(
-        RollupArchiveSnapshot rollup, OctoObjectId baseRtId, string sourcePath)
-    {
-        if (rollup.SourceArchiveRtId != baseRtId)
-        {
-            return Array.Empty<CkRollupFunction>(); // cascade rollup — deferred (see class remarks)
-        }
-
-        List<CkRollupFunction>? functions = null;
-        foreach (var spec in rollup.Aggregations)
-        {
-            if (string.Equals(spec.SourcePath, sourcePath, StringComparison.OrdinalIgnoreCase))
-            {
-                (functions ??= new List<CkRollupFunction>()).Add(spec.Function);
-            }
-        }
-
-        // Empty ⇒ this rollup does not aggregate the requested path.
-        return functions ?? (IReadOnlyCollection<CkRollupFunction>)Array.Empty<CkRollupFunction>();
     }
 
     /// <summary>

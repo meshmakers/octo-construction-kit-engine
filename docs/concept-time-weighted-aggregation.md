@@ -1,12 +1,13 @@
 # Concept: Time-Weighted Aggregation for Event-Based Archives
 
-**Status:** Implemented (see §11) — engine enums + CK model bump (System.StreamData 1.6.5,
-System 2.2.1), rollup materialisation, LOCF forward-aggregation SQL, read-path chain mapping,
-query-surface enum plumbing, direct TWA over raw archives (§6.2), the dirty-window carry
-extension (D2), and `carryLookbackMs` on `createRollupArchive`. Live-validated on the energyiq
-`LuminaireArchive`: forward aggregation and recompute reproduce a hand-computed interval sum
-bit-identically; the grouped query returns the recombined duty cycle. Open: CrateDB integration
-tests in CI, Studio UI, Docusaurus user docs, and the §10 follow-ups.
+**Status:** Implemented (see §11). Third increment (AB#4336): `StateDuration(comparisonValue)`
+(System.StreamData 1.6.5 → **1.6.6**, LOCF-carried single BIGINT ms column, SUM-chained), field
+filters on the direct raw-archive TWA path (filters select the event set on both scans), and
+cascade function-matching in the series resolver (`RollupLadderFunctionResolver`, lifting the
+AB#4290 Phase-1 limitation). Live-validated on the energyiq `LuminaireArchive`: forward
+aggregation and recompute reproduce a hand-computed interval sum bit-identically; the grouped
+query returns the recombined duty cycle. Open: CrateDB integration tests in CI, Studio UI,
+TWA in downsampling bins, linear interpolation.
 **Work item:** **AB#4336** (Stream data: time-weighted state-duration aggregation for event-based archives).
 **Related:**
 - [`concept-rollup-archives.md`](concept-rollup-archives.md) — the rollup orchestrator + SQL-per-bucket model this concept extends; the AVG `_sum`/`_count` two-column materialisation is the precedent for the new integral/duration pair.
@@ -331,14 +332,22 @@ Integration (`AssetRepositoryServices.IntegrationTests`, CrateDB Testcontainer �
 
 ## §10 Open items / follow-ups
 
-- `StateDuration(comparisonValue)` for enum-state signals ("time in state 2").
-- TWA in downsampling (AB#4233) bins.
-- Field filters on the direct raw-archive TWA path (§6.2) — currently rejected with a clear
-  error (filtering the event set changes the carry semantics; needs a decision); scope via
-  `rtIds` or query a TWA rollup instead.
-- Cascade function-matching in the series resolver (pre-existing Phase-1 limitation — a TWA
-  rollup-of-rollup is not matched; see `SeriesResolutionService` class remarks).
+- TWA in downsampling (AB#4233) bins over raw archives — the `generate_series` LEFT-JOIN bin
+  machine has no per-bin carry; needs its own design. Downsampling over a TWA *rollup* works
+  today via the chain-aware raw-expression path.
 - Linear interpolation as an alternative weighting for continuous (non-state) signals.
+- Studio UI (rollup editor function dropdown incl. comparison-value field) and Docusaurus user
+  docs.
+- CrateDB integration tests in CI (Testcontainer) for the LOCF statements.
+
+Resolved in the third increment: `StateDuration(comparisonValue)` — absolute ms-in-state per
+bucket with the same LOCF carry (`CkRollupFunction.StateDuration` = 6,
+`CkRollupAggregation.ComparisonValue`, model 1.6.6; single BIGINT column, cascade via SUM, read
+back with target SUM); field filters on the §6.2 raw TWA path (they select the event set — both
+the carry and the in-window scan share the exact predicate rendering with the standard path via
+`CompileFieldFilter`); cascade function-matching in the series resolver via the DB-neutral
+`RollupLadderFunctionResolver` (an incomplete pair — e.g. only the integral half accumulated —
+stays excluded).
 
 Resolved since the first increment: direct TWA over raw archives in
 `AggregationSdQuery`/`GroupingAggregationSdQuery` (`TimeWeightedQuerySqlBuilder` +

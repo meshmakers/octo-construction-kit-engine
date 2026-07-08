@@ -37,4 +37,12 @@ public enum CkRollupFunction
     /// yields the duty cycle per bucket. AB#4336.
     /// </summary>
     TimeWeightedAvg = 5,
+
+    /// <summary>
+    /// Absolute time (milliseconds) the signal held the aggregation's
+    /// <c>ComparisonValue</c> within the bucket, with the same LOCF carry as
+    /// <see cref="TimeWeightedAvg"/>. Stored as a single BIGINT column; chained rollups
+    /// re-aggregate it with SUM. AB#4336.
+    /// </summary>
+    StateDuration = 6,
 }

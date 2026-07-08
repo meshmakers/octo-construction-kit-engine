@@ -46,3 +46,6 @@ attributes:
   - id: CkRollupAggregation.TargetColumnName
     description: "Optional explicit storage column name. Default is '{sourcePath}_{function}' lower-cased; for AVG, two columns are created with suffixes _sum and _count derived from this base name."
     valueType: String
+  - id: CkRollupAggregation.ComparisonValue
+    description: "State literal a StateDuration aggregation matches the source column against — a number ('2', '100'), a boolean ('true'/'false'), or a string state name. Required when Function is StateDuration; ignored for every other function. AB#4336."
+    valueType: String

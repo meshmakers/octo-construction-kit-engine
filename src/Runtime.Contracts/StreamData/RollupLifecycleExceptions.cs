@@ -92,6 +92,22 @@ public sealed class RollupSchemaImmutableException : StreamDataException
 }
 
 /// <summary>
+/// A <see cref="CkRollupFunction.StateDuration"/> aggregation is missing its
+/// <c>ComparisonValue</c> — without a state literal there is nothing to measure the duration of.
+/// AB#4336.
+/// </summary>
+public sealed class RollupComparisonValueRequiredException : StreamDataException
+{
+    public string SourcePath { get; }
+
+    public RollupComparisonValueRequiredException(OctoObjectId rollupArchiveRtId, string sourcePath)
+        : base($"Rollup archive '{rollupArchiveRtId}': the StateDuration aggregation on '{sourcePath}' requires a ComparisonValue.", rollupArchiveRtId)
+    {
+        SourcePath = sourcePath;
+    }
+}
+
+/// <summary>
 /// The rollup chain forms a cycle (rollup references itself, directly or transitively). Concept §10.
 /// </summary>
 public sealed class RollupCycleException : StreamDataException

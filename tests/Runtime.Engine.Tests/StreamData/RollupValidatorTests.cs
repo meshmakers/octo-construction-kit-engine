@@ -205,4 +205,28 @@ public class RollupValidatorTests
             () => RollupValidator.ValidateForActivation(rollup, SourceWithComputed()));
         Assert.Equal("nonexistent", ex.SourcePath);
     }
+
+    // ---- StateDuration (AB#4336) ----
+
+    [Fact]
+    public void ValidateForSave_StateDurationWithoutComparisonValue_Throws()
+    {
+        var rollup = Rollup(aggregations: new[]
+        {
+            new CkRollupAggregationSpec("isOn", CkRollupFunction.StateDuration, null),
+        });
+
+        Assert.Throws<RollupComparisonValueRequiredException>(() => RollupValidator.ValidateForSave(rollup));
+    }
+
+    [Fact]
+    public void ValidateForSave_StateDurationWithComparisonValue_Passes()
+    {
+        var rollup = Rollup(aggregations: new[]
+        {
+            new CkRollupAggregationSpec("isOn", CkRollupFunction.StateDuration, null, "true"),
+        });
+
+        RollupValidator.ValidateForSave(rollup); // must not throw
+    }
 }

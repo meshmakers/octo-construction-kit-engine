@@ -128,4 +128,18 @@ public class RollupColumnGeneratorTests
         Assert.Equal("burn_integral", columns[0].Path);
         Assert.Equal("burn_duration", columns[1].Path);
     }
+
+    [Fact]
+    public void Generate_StateDurationSpec_ProducesSingleColumn()
+    {
+        var aggregations = new[]
+        {
+            new CkRollupAggregationSpec("isOn", CkRollupFunction.StateDuration, null, "true"),
+        };
+
+        var columns = RollupColumnGenerator.Generate(aggregations);
+
+        Assert.Single(columns);
+        Assert.Equal("ison_stateduration", columns[0].Path);
+    }
 }

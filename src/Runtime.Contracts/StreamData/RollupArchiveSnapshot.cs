@@ -112,7 +112,13 @@ public sealed record RollupArchiveSnapshot(
 /// <c>"{sourcePath}_{function}"</c> lower-cased. For <see cref="CkRollupFunction.Avg"/>, two
 /// columns are emitted with suffixes <c>_sum</c> and <c>_count</c> derived from this base name.
 /// </param>
+/// <param name="ComparisonValue">
+/// State literal a <see cref="CkRollupFunction.StateDuration"/> aggregation matches the source
+/// column against — a number (<c>"2"</c>, <c>"100"</c>), a boolean (<c>"true"</c>/<c>"false"</c>)
+/// or a string state name. Required for StateDuration; ignored for every other function. AB#4336.
+/// </param>
 public sealed record CkRollupAggregationSpec(
     string SourcePath,
     CkRollupFunction Function,
-    string? TargetColumnName);
+    string? TargetColumnName,
+    string? ComparisonValue = null);

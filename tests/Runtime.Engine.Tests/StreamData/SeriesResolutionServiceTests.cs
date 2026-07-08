@@ -237,4 +237,66 @@ public class SeriesResolutionServiceTests
 
         Assert.Equal(SeriesResolutionSignal.EmptyLadder, result.Signal);
     }
+
+    // ---- AB#4336: cascade function-matching via RollupLadderFunctionResolver ----
+
+    [Fact]
+    public async Task CascadeRollup_TwaPairChainedViaSum_MatchedForTimeWeightedAvg()
+    {
+        // Hourly materialises TWA over the base; Daily accumulates the pair via SUM specs on the
+        // hourly physical columns. The daily rung must now be a valid TWA source (Phase-1
+        // limitation lifted) — and being coarser AND fine enough for the year window, it wins.
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var hourly = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
+            new[] { new CkRollupAggregationSpec("DimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
+        var daily = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, hourly.RtId,
+            TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
+            new[]
+            {
+                new CkRollupAggregationSpec("dimminglevel_twavg_integral", CkRollupFunction.Sum, "dimminglevel_twavg_integral"),
+                new CkRollupAggregationSpec("dimminglevel_twavg_duration", CkRollupFunction.Sum, "dimminglevel_twavg_duration"),
+            }, null);
+        StubRollups(baseArchive.RtId, hourly, daily);
+
+        var request = new SeriesResolutionRequest(
+            baseArchive.RtId, null, YearFrom, YearTo, 300, CkRollupFunction.TimeWeightedAvg, "DimmingLevel");
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(daily.RtId, result.ArchiveRtId);
+    }
+
+    [Fact]
+    public async Task CascadeRollup_IncompleteTwaPair_NotMatched()
+    {
+        // Daily only accumulates the integral half — the pair cannot be recombined, so the daily
+        // rung must not satisfy a TWA request (the hourly rung still does).
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var hourly = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
+            new[] { new CkRollupAggregationSpec("DimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
+        var brokenDaily = new RollupArchiveSnapshot(
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, hourly.RtId,
+            TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
+            new[]
+            {
+                new CkRollupAggregationSpec("dimminglevel_twavg_integral", CkRollupFunction.Sum, "dimminglevel_twavg_integral"),
+            }, null);
+        StubRollups(baseArchive.RtId, hourly, brokenDaily);
+
+        var request = new SeriesResolutionRequest(
+            baseArchive.RtId, null, YearFrom, YearTo, 300, CkRollupFunction.TimeWeightedAvg, "DimmingLevel");
+        var result = await NewSut().ResolveAsync(request, TestContext.Current.CancellationToken);
+
+        // Ideal bucket for 365 d / 300 points is ~1.2 d: the broken daily rung would have been the
+        // coarsest sufficient rung — with it excluded, the hourly TWA rung is chosen instead.
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(hourly.RtId, result.ArchiveRtId);
+    }
 }

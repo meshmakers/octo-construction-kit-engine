@@ -10,3 +10,6 @@ records:
       - id: ${this}/CkRollupAggregation.TargetColumnName
         name: TargetColumnName
         isOptional: true
+      - id: ${this}/CkRollupAggregation.ComparisonValue
+        name: ComparisonValue
+        isOptional: true

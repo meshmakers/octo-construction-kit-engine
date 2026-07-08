@@ -23,3 +23,6 @@ enums:
       - key: 5
         name: TimeWeightedAvg
         description: "Time-weighted average with LOCF interval weighting for event-based sources. Stored as integral (value*ms) and covered-duration (ms) columns; the average is computed on read. Yields the duty cycle on 0/100 or boolean-like signals. AB#4336."
+      - key: 6
+        name: StateDuration
+        description: "Absolute time (milliseconds) the signal held the ComparisonValue within the bucket, with the same LOCF carry as TimeWeightedAvg. Stored as a single BIGINT column; chained rollups re-aggregate it with SUM. Requires CkRollupAggregation.ComparisonValue. AB#4336."

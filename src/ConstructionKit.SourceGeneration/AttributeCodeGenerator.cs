@@ -20,18 +20,22 @@ internal static class AttributeCodeGenerator
                               "), AttributeValueTypesDto.String, value);");
                 sb.AppendLine("  }");
                 break;
+            // Int / Int64 CLR mapping was historically swapped here (long? for Int, int? for
+            // Int64) — the non-nullable generator below always had it right. Fixed with AB#4336
+            // when RollupArchive.CarryLookbackMs became the first optional Int64 attribute whose
+            // int? property could not hold a 35-day millisecond value.
             case AttributeValueTypesDto.Int:
-                sb.AppendLine($"  public long? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public int? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<int>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.Int, value);");
                 sb.AppendLine("  }");
                 break;
             case AttributeValueTypesDto.Int64:
-                sb.AppendLine($"  public int? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine($"  public long? {ckTypeAttributeDto.AttributeName}");
                 sb.AppendLine("  {");
-                sb.AppendLine("      get => GetAttributeValueOrDefault<int>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      get => GetAttributeValueOrDefault<long>(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.Int64, value);");
                 sb.AppendLine("  }");

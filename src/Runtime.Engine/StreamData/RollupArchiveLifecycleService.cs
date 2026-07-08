@@ -64,8 +64,14 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
-        string? referenceTimeZone = null)
+        string? referenceTimeZone = null,
+        TimeSpan? carryLookback = null)
     {
+        if (carryLookback is { } cl && cl <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(carryLookback), "CarryLookback must be positive when set.");
+        }
+
         if (aggregations is null) throw new ArgumentNullException(nameof(aggregations));
         if (aggregations.Count == 0)
         {
@@ -126,7 +132,8 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             aggregations,
             columns,
             bucketAlignment,
-            normalizedTimeZone);
+            normalizedTimeZone,
+            carryLookback);
 
         _logger.LogInformation(
             "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment}, referenceTimeZone={ReferenceTimeZone} (tenant {TenantId})",

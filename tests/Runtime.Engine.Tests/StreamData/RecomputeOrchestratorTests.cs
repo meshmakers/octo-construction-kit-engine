@@ -657,4 +657,66 @@ public class RecomputeOrchestratorTests
     {
         foreach (var item in items) { yield return item; await Task.Yield(); }
     }
+
+    // ---- AB#4336 decision D2: TWA carry extension --------------------------------------------
+
+    private static RollupArchiveSnapshot TwaRollup(
+        OctoObjectId rtId, OctoObjectId sourceRtId, DateTime? lastAggregatedBucketEnd) =>
+        new(rtId, TargetType, CkArchiveStatus.Activated, null, sourceRtId,
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), lastAggregatedBucketEnd,
+            new[] { new CkRollupAggregationSpec("dimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
+
+    [Fact]
+    public async Task Propagate_RetroactiveWindow_TwaDependent_ExtendsRangeByOneBucket()
+    {
+        // A retroactive change inside [10:00, 11:00) also changes the LOCF carry-in of the NEXT
+        // bucket — the enqueued range must reach 12:00, not 11:00.
+        var child = TwaRollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Propagate_RetroactiveWindow_TwaDependent_ExtensionStillClampedToWatermark()
+    {
+        // The successor bucket has not been aggregated yet (watermark 11:00) — the extension is
+        // clamped back; forward aggregation will derive the fresh carry for [11:00, 12:00) itself.
+        var child = TwaRollup(OctoObjectId.GenerateNewId(), SourceRt,
+            lastAggregatedBucketEnd: new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
 }

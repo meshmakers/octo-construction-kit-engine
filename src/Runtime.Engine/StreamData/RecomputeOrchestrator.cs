@@ -681,6 +681,20 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 from, to, dependent.BucketAlignment, dependent.BucketSize,
                 BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
 
+            // AB#4336 decision D2: a retroactive source change inside a bucket also changes the
+            // LOCF carry-in of the NEXT bucket when this dependent materialises a TimeWeightedAvg —
+            // the opening state is derived from the last source row before the bucket. Extend the
+            // stale range by one bucket; a correction followed by a longer silent stretch is the
+            // operator's manual recomputeArchive escape hatch (concept-time-weighted §5.4). The
+            // AB#4288 clamp below still applies — a not-yet-aggregated successor bucket gets its
+            // fresh carry from normal forward aggregation anyway.
+            if (dependent.Aggregations.Any(a => a.Function == CkRollupFunction.TimeWeightedAvg))
+            {
+                end = BucketBoundary.NextBucketEnd(
+                    end, dependent.BucketAlignment, dependent.BucketSize,
+                    BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+            }
+
             // Clamp to what this dependent has actually aggregated (AB#4288). The retroactive-write
             // detector flags a write when it is retroactive for the MOST-advanced dependent (max
             // watermark), so a source can hand this dependent a window it has not reached yet. A

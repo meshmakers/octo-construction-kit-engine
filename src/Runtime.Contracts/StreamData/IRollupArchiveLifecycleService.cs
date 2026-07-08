@@ -23,6 +23,11 @@ public interface IRollupArchiveLifecycleService
     /// <paramref name="sourceArchiveRtId"/> doesn't resolve.
     /// </summary>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
+    /// <remarks>
+    /// <c>carryLookback</c> optionally bounds the <see cref="CkRollupFunction.TimeWeightedAvg"/>
+    /// carry-in scan (LOCF opening state); <c>null</c> ⇒ the engine default of 35 days. Only
+    /// meaningful when the aggregations include TimeWeightedAvg. AB#4336 / decision D1.
+    /// </remarks>
     Task<OctoObjectId> CreateAsync(
         string? rtWellKnownName,
         OctoObjectId sourceArchiveRtId,
@@ -30,7 +35,8 @@ public interface IRollupArchiveLifecycleService
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
-        string? referenceTimeZone = null);
+        string? referenceTimeZone = null,
+        TimeSpan? carryLookback = null);
 
     /// <summary>
     /// Sets <see cref="RollupArchiveSnapshot.FrozenUntil"/> to <paramref name="until"/>.

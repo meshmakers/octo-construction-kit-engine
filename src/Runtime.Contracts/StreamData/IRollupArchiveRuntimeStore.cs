@@ -57,6 +57,11 @@ public interface IRollupArchiveRuntimeStore
     /// boundaries. Only meaningful for calendar <paramref name="bucketAlignment"/> variants; ignored
     /// for <see cref="BucketAlignment.FixedSize"/>. AB#4300 / decision O6.
     /// </param>
+    /// <param name="carryLookback">
+    /// Optional bound on the TimeWeightedAvg carry-in scan (LOCF opening state), persisted as
+    /// <c>CarryLookbackMs</c>. <c>null</c> ⇒ attribute unset ⇒ the engine default of 35 days.
+    /// AB#4336 / decision D1.
+    /// </param>
     /// <returns>The generated runtime id of the new rollup archive.</returns>
     Task<OctoObjectId> InsertAsync(
         string? rtWellKnownName,
@@ -67,7 +72,8 @@ public interface IRollupArchiveRuntimeStore
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
         IReadOnlyList<CkArchiveColumnSpec> columns,
         BucketAlignment bucketAlignment = BucketAlignment.FixedSize,
-        string? referenceTimeZone = null);
+        string? referenceTimeZone = null,
+        TimeSpan? carryLookback = null);
 
     /// <summary>
     /// Soft-deletes the rollup entity by setting <c>rtState = Archived</c>. The Crate table is

@@ -7,3 +7,6 @@ records:
       name: AttributePath
     - id: ${this}/AggregationType
       name: AggregationType
+    - id: ${this}/ComparisonValue
+      name: ComparisonValue
+      isOptional: true

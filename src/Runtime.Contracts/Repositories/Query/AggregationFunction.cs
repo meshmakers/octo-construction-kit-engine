@@ -28,5 +28,13 @@ public enum AggregationFunction
     /// against rollup archives that materialise a <c>TimeWeightedAvg</c> aggregation
     /// (integral/duration pair). AB#4336.
     /// </summary>
-    TimeWeightedAverage = 5
+    TimeWeightedAverage = 5,
+
+    /// <summary>
+    /// Absolute time (milliseconds) an event-based signal held the column's
+    /// <see cref="AggregationColumn.ComparisonValue"/> within the window, with LOCF semantics.
+    /// Supported over raw event archives (query-time LOCF) and rollup archives that materialise
+    /// a <c>StateDuration</c> aggregation. AB#4336 / AB#4341.
+    /// </summary>
+    StateDuration = 6
 }

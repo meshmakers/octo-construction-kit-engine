@@ -21,3 +21,6 @@ enums:
   - key: 5
     name: TimeWeightedAverage
     description: Time-weighted average with last-observation-carried-forward interval weighting, for event-based archives. Yields the duty cycle on 0/100 or boolean-like signals. Resolvable against rollup archives that materialise a TimeWeightedAvg aggregation. AB#4336.
+  - key: 6
+    name: StateDuration
+    description: Absolute time (milliseconds) an event-based signal held the column's ComparisonValue within the query window, with last-observation-carried-forward semantics. Requires AggregationQueryColumn.ComparisonValue. Supported over raw event archives and rollup archives that materialise a StateDuration aggregation. AB#4336/AB#4341.

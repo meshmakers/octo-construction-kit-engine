@@ -81,28 +81,13 @@ stages:
             clean: true
           - template: templates/steps/set-version.yml@pipelineTemplates
           # This repo builds interdependent CK models in the same run (StreamData ->
-          # System, Test/TestIdentity -> System). The glob below compiles them alphabetically,
-          # so a dependent (e.g. StreamData) would otherwise compile BEFORE its dependency
-          # (System) is published, and resolve System back through the LocalFileSystemCatalog.
-          # When they resolve System before the freshly-built version is published, they pin
-          # whichever System version is already available (the previously-published one). That
-          # is harmless while System's version is stable, but a System version bump makes the
-          # dependents pin a now-nonexistent version — e.g. StreamData-1.6.6 pinned System-2.2.1
-          # while only System-2.2.2 shipped, so the runtime import was skipped and archive types
-          # (RawArchive) never landed in the CkCache (AB#4340). Compile + publish SystemCkModel
-          # FIRST so every dependent resolves the freshly-built System from the local catalog.
-          #
-          # The local catalog is disabled-for-read by default (Directory.Build.props, AB#2826),
-          # which makes the CK compile throw "LocalFileSystemCatalog is not enabled for read
-          # operations". Opt it back in for every step that compiles CK models so dependency
-          # resolution succeeds (matches the MsBuild task default of true).
-          - task: DotNetCoreCLI@2
-            retryCountOnTaskFailure: 2
-            displayName: 'Build SystemCkModel (dependency of the other CK models — first)'
-            inputs:
-              command: 'build'
-              projects: 'src/SystemCkModel/SystemCkModel.csproj'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoLocalCatalogIsEnabled=true /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
+          # System, Test/TestIdentity -> System). The glob compiles them alphabetically,
+          # so a dependent (e.g. StreamData) compiles before its dependency (System) is
+          # published, and resolves System back through the LocalFileSystemCatalog. That
+          # catalog is disabled-for-read by default (Directory.Build.props, AB#2826), which
+          # makes the compile throw "LocalFileSystemCatalog is not enabled for read
+          # operations". Opt the local catalog back in for the steps that compile CK models
+          # so dependency resolution succeeds (matches the MsBuild task default of true).
           - task: DotNetCoreCLI@2
             retryCountOnTaskFailure: 2
             displayName: 'Build src'

@@ -1,6 +1,7 @@
 ﻿using Meshmakers.Common.CommandLineParser;
 using Meshmakers.Common.CommandLineParser.Commands;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
@@ -13,21 +14,24 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
 {
     private readonly ICatalogModelResolver _modelResolver;
     private readonly ICkYamlSerializer _ckYamlSerializer;
+    private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
     private readonly IArgument _modelSourcePathArg;
     private readonly IArgument _outputPathArg;
     private readonly IMermaidGenerator _mermaidGenerator;
     private readonly IContentGenerator _contentGenerator;
     private readonly ModeSelectionOptions _modeSelectionOptions;
     private readonly IArgument _linkPathArg;
+    private readonly IArgument _localCatalogRoot;
 
 
     public GenerateDocsCommand(ILogger<GenerateDocsCommand> logger, ICatalogModelResolver modelResolver, ICkYamlSerializer ckYamlSerializer,
-        IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator, 
-        IOptions<ModeSelectionOptions> modeSelectionOptions)
+        IOptions<OctoToolOptions> options, IMermaidGenerator mermaidGenerator, IContentGenerator contentGenerator,
+        IOptions<ModeSelectionOptions> modeSelectionOptions, IOptions<LocalFileSystemCatalogOptions> localCatalogOptions)
         : base(logger, "generateDocs", "Generates docs from an compiled construction kit library", options)
     {
         _modelResolver = modelResolver;
         _ckYamlSerializer = ckYamlSerializer;
+        _localCatalogOptions = localCatalogOptions;
         _mermaidGenerator = mermaidGenerator;
         _contentGenerator = contentGenerator;
         _modeSelectionOptions = modeSelectionOptions.Value;
@@ -40,6 +44,9 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
         
         _linkPathArg = CommandArgumentValue.AddArgument("l", "link", ["Additional Path Segments of Link root"], true, 1);
 
+        _localCatalogRoot = CommandArgumentValue.AddArgument("lcr", "localCatalogRoot",
+            ["Root path of the local Construction Kit Library catalog for this invocation only (not persisted)"],
+            false, 1);
     }
 
     public override async Task Execute()
@@ -49,7 +56,15 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
         var filePath = CommandArgumentValue.GetArgumentScalarValue<string>(_modelSourcePathArg);
         var outputPath = CommandArgumentValue.GetArgumentScalarValue<string>(_outputPathArg);
         var linkPath = CommandArgumentValue.GetArgumentScalarValue<string>(_linkPathArg);
-        
+
+        if (CommandArgumentValue.IsArgumentUsed(_localCatalogRoot))
+        {
+            _localCatalogOptions.Value.ApplyRootPath(
+                CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
+        }
+
+        Logger.LogInformation("Local Construction Kit catalog root: {Path}", _localCatalogOptions.Value.RootPath);
+
         await using var stream = File.OpenRead(filePath);
 
         OperationResult operationResult = new(); // operation result is used to collect errors and warnings.

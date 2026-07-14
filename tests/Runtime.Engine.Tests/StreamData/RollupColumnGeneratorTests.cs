@@ -25,6 +25,8 @@ public class RollupColumnGeneratorTests
     [InlineData(CkRollupFunction.Max, "voltage_max")]
     [InlineData(CkRollupFunction.Sum, "voltage_sum")]
     [InlineData(CkRollupFunction.Count, "voltage_count")]
+    [InlineData(CkRollupFunction.First, "voltage_first")]
+    [InlineData(CkRollupFunction.Last, "voltage_last")]
     public void Generate_SimpleSpec_ProducesSingleColumn(CkRollupFunction fn, string expectedName)
     {
         var aggregations = new[] { new CkRollupAggregationSpec("voltage", fn, null) };

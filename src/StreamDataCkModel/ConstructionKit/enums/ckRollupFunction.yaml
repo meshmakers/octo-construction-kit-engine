@@ -26,3 +26,9 @@ enums:
       - key: 6
         name: StateDuration
         description: "Absolute time (milliseconds) the signal held the ComparisonValue within the bucket, with the same LOCF carry as TimeWeightedAvg. Stored as a single BIGINT column; chained rollups re-aggregate it with SUM. Requires CkRollupAggregation.ComparisonValue. AB#4336."
+      - key: 7
+        name: First
+        description: "Value of the source column at the earliest timestamp in the bucket (arg_min over time). Stored as a single DOUBLE PRECISION column; chained rollups pick the child bucket with the smallest window boundary. Numeric source columns only. AB#4188."
+      - key: 8
+        name: Last
+        description: "Value of the source column at the latest timestamp in the bucket (arg_max over time). Stored as a single DOUBLE PRECISION column; chained rollups pick the child bucket with the largest window boundary. Numeric source columns only. AB#4188."

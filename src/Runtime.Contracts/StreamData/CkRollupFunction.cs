@@ -45,4 +45,20 @@ public enum CkRollupFunction
     /// re-aggregate it with SUM. AB#4336.
     /// </summary>
     StateDuration = 6,
+
+    /// <summary>
+    /// Value of the source column at the earliest timestamp in the bucket (arg_min over time).
+    /// Stored as a single column; forward aggregation over a raw source picks the value at
+    /// <c>MIN(timestamp)</c>, cascades pick the child bucket with the smallest window boundary.
+    /// Numeric source columns only. AB#4188.
+    /// </summary>
+    First = 7,
+
+    /// <summary>
+    /// Value of the source column at the latest timestamp in the bucket (arg_max over time).
+    /// Stored as a single column; forward aggregation over a raw source picks the value at
+    /// <c>MAX(timestamp)</c>, cascades pick the child bucket with the largest window boundary.
+    /// Numeric source columns only. AB#4188.
+    /// </summary>
+    Last = 8,
 }

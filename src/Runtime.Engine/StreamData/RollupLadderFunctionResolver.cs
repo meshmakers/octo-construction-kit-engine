@@ -190,6 +190,10 @@ internal static class RollupLadderFunctionResolver
             (CkRollupFunction.Min, CkRollupFunction.Min) => (CkRollupFunction.Min, null),
             (CkRollupFunction.Max, CkRollupFunction.Max) => (CkRollupFunction.Max, null),
             (CkRollupFunction.StateDuration, CkRollupFunction.Sum) => (CkRollupFunction.StateDuration, null),
+            // First / Last chain via themselves: a cascade re-picks the earliest / latest child
+            // bucket's stored value (arg over the child window boundary). AB#4188.
+            (CkRollupFunction.First, CkRollupFunction.First) => (CkRollupFunction.First, null),
+            (CkRollupFunction.Last, CkRollupFunction.Last) => (CkRollupFunction.Last, null),
             _ => null,
         };
     }

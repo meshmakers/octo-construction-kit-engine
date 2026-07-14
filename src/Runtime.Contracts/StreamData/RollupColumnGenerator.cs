@@ -85,6 +85,8 @@ public static class RollupColumnGenerator
             CkRollupFunction.Count => new[] { baseName },
             CkRollupFunction.TimeWeightedAvg => new[] { $"{baseName}_integral", $"{baseName}_duration" },
             CkRollupFunction.StateDuration => new[] { baseName },
+            CkRollupFunction.First => new[] { baseName },
+            CkRollupFunction.Last => new[] { baseName },
             _ => throw new ArgumentOutOfRangeException(nameof(spec), spec.Function, "Unknown rollup function.")
         };
     }

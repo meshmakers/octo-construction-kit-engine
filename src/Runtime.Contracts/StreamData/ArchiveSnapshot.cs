@@ -61,6 +61,16 @@ public sealed record ArchiveSnapshot(
     /// the single <c>timestamp</c> column. Concept-time-range §4 / §6.
     /// </summary>
     public bool UsesWindowedStorage => IsTimeRange || RollupAggregations is not null;
+
+    /// <summary>
+    /// Bounded retro reach (AB#4196): the maximum distance in milliseconds <b>before</b> the
+    /// consumed watermark that a single retroactive write to this archive may drag an
+    /// <b>automatic</b> recompute of its dependent rollups. <c>null</c> ⇒ unbounded (the pre-1.6.8
+    /// behaviour). The effective cap combines this with the host
+    /// <c>StreamData:Recompute:MaxRetroactiveReachHardLimitMs</c> ceiling. Only bounds the automatic
+    /// path; manual <c>recomputeArchive</c> / <c>rewindRollupWatermark</c> stay unbounded.
+    /// </summary>
+    public long? MaxRetroactiveReachMs { get; init; }
 }
 
 /// <summary>

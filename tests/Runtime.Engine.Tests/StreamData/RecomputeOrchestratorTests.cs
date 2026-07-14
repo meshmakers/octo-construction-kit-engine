@@ -72,6 +72,9 @@ public class RecomputeOrchestratorTests
         new(SourceRt, new RtCkId<CkTypeId>("Test", new CkTypeId("TempSensor")),
             CkArchiveStatus.Activated, null, Array.Empty<CkArchiveColumnSpec>());
 
+    // AB#4196: a source archive carrying a bounded-retro-reach cap.
+    private static ArchiveSnapshot SourceWithCap(long capMs) => Source() with { MaxRetroactiveReachMs = capMs };
+
     private void StubRollupAndSource() =>
         StubRollupAndSource(Rollup(RollupRt, SourceRt));
 
@@ -384,6 +387,65 @@ public class RecomputeOrchestratorTests
                     && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
                     && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
             .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // AB#4196: with the source carrying a bounded-retro-reach cap, a dirty window that reaches
+    // further back than (dependent watermark - cap) has its start floored to the cap, so a single
+    // very-late change can never drag the automatic recompute past the cap.
+    [Fact]
+    public async Task Propagate_RetroReachCap_FloorsStartToWatermarkMinusCap()
+    {
+        // Dependent watermark = Now (14:00), cap = 2h ⇒ floor = 12:00. The aligned window is
+        // [11:00, 14:00); the start is floored from 11:00 up to 12:00.
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(SourceWithCap(2 * 60 * 60 * 1000));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 11, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 13, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc)   // floored to watermark-cap
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // AB#4196: when the whole dirty window predates (dependent watermark - cap), nothing is in reach
+    // for the automatic path and the dependent is skipped — the manual recomputeArchive stays the
+    // unbounded escape hatch.
+    [Fact]
+    public async Task Propagate_RetroReachCap_EntireWindowBeyondCap_Skipped()
+    {
+        // Dependent watermark = Now (14:00), cap = 1h ⇒ floor = 13:00. Aligned window is
+        // [10:00, 11:00) — entirely older than the floor.
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(SourceWithCap(60 * 60 * 1000));
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt)).Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+        {
+            new ArchiveDirtyWindow(
+                new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc),
+                RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now),
+        });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
         A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
     }
 

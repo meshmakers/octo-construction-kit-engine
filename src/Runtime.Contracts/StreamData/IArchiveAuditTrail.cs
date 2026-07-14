@@ -77,4 +77,21 @@ public interface IArchiveAuditTrail
         DateTime rangeStart,
         DateTime rangeEnd,
         string reason);
+
+    /// <summary>
+    /// Records that a retroactive write to a source archive reached <b>beyond</b> the bounded
+    /// retro-reach cap (AB#4196), so the out-of-reach tail was <b>not</b> scheduled for an automatic
+    /// recompute. Surfaces the drop so an operator can run an unbounded manual
+    /// <c>recomputeArchive</c> for the deeper range if it must be corrected.
+    /// <paramref name="consumedWatermark"/> is the frontier the write was measured against;
+    /// <paramref name="cappedFloor"/> = <c>consumedWatermark - cap</c> is the earliest point still in
+    /// automatic reach; <paramref name="cap"/> is the effective cap
+    /// (<c>min(per-archive, fleet ceiling)</c>) that applied.
+    /// </summary>
+    Task RecordRetroReachCappedAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime consumedWatermark,
+        DateTime cappedFloor,
+        TimeSpan cap);
 }

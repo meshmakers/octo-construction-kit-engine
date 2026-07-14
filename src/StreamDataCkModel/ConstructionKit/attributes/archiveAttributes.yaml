@@ -16,6 +16,9 @@ attributes:
   - id: Archive.RawRetentionMs
     description: "Retention window for raw data points in milliseconds. When set, the partition pruner may drop source partitions older than (now - RawRetentionMs), but never ahead of the slowest attached rollup's watermark. Null means keep forever."
     valueType: Int
+  - id: Archive.MaxRetroactiveReachMs
+    description: "Bounded retro reach (AB#4196): the maximum distance in milliseconds BEFORE the consumed watermark that a single retroactive write may drag an AUTOMATIC recompute of dependent rollups. A late write older than (consumedWatermark - MaxRetroactiveReachMs) is capped: only the in-reach tail schedules an automatic recompute, and the dropped older tail is audited so an operator can run an unbounded manual recomputeArchive if truly needed. This caps only automatic reach; manual recomputeArchive / rewindRollupWatermark stay unbounded. Null means unbounded (the pre-1.6.8 behaviour). Operator configuration, not runtime state; the effective cap is min(this, the host StreamData:Recompute:MaxRetroactiveReachHardLimitMs ceiling)."
+    valueType: Int
   # ---------- CkArchiveColumn (record stays Ck-prefixed in Phase 2; renamed in Phase 2.5) ----
   - id: CkArchiveColumn.Path
     description: "Attribute path captured by this column. Supports nested record traversal (e.g. 'sensor.reading.value') and array projection (e.g. 'readings[*].value')."

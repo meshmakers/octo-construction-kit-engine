@@ -181,4 +181,34 @@ public sealed class ForwardingArchiveAuditTrail : IArchiveAuditTrail
             }
         });
     }
+
+    /// <inheritdoc />
+    public Task RecordRetroReachCappedAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime consumedWatermark,
+        DateTime cappedFloor,
+        TimeSpan cap)
+    {
+        var message =
+            $"Archive {archiveRtId}: a retroactive write reached beyond the automatic recompute cap " +
+            $"({cap.TotalMilliseconds:F0}ms before the consumed watermark {consumedWatermark:O}); the " +
+            $"out-of-reach tail (older than {cappedFloor:O}) was not scheduled automatically. Run a " +
+            $"manual recomputeArchive over the deeper range if it must be corrected.";
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Warning,
+            "Archive.RetroReachCapped",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["archiveRtId"] = archiveRtId.ToString(),
+                ["consumedWatermark"] = consumedWatermark,
+                ["cappedFloor"] = cappedFloor,
+                ["capMs"] = cap.TotalMilliseconds,
+            }
+        });
+    }
 }

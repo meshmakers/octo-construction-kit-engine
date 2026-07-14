@@ -118,4 +118,20 @@ public sealed class LoggingArchiveAuditTrail : IArchiveAuditTrail
             archiveRtId, tenantId, rangeStart, rangeEnd, reason);
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task RecordRetroReachCappedAsync(
+        string tenantId,
+        OctoObjectId archiveRtId,
+        DateTime consumedWatermark,
+        DateTime cappedFloor,
+        TimeSpan cap)
+    {
+        _logger.LogWarning(
+            "Archive {ArchiveRtId} (tenant {TenantId}): retroactive write reached beyond the automatic " +
+            "recompute cap ({CapMs}ms before consumed watermark {ConsumedWatermark:O}); out-of-reach tail " +
+            "older than {CappedFloor:O} not scheduled automatically — run a manual recomputeArchive to correct deeper history",
+            archiveRtId, tenantId, cap.TotalMilliseconds, consumedWatermark, cappedFloor);
+        return Task.CompletedTask;
+    }
 }

@@ -9,7 +9,7 @@ See also:
 - [concept-computed-columns.md](./concept-computed-columns.md) — **AB#4189**, which reuses this concept's backfill orchestration + atomic-swap + observability (its active-archive backfill, Phase 7, blocks on AB#4184).
 - AB#4188 — multiple aggregations per rollup archive (a recompute updates all declared aggregates of a window atomically).
 - AB#4190 — timezone-aware queries (must not break the recompute model).
-- AB#4196 — threshold-reset policy (manual vs. automatic); **builds on the dirty-tracking introduced here**.
+- AB#4196 — threshold-reset policy (manual vs. automatic); **builds on the dirty-tracking introduced here**. Decision recorded in [concept-rollup-threshold-reset.md](./concept-rollup-threshold-reset.md): both paths already ship (automatic dirty-window scoped recompute + manual `rewindRollupWatermark`); the remaining work is the *bounded retro reach* guardrail (§12 open item below).
 - AB#4186 / AB#4195 — App and mesh-adapter read paths that must tolerate an in-progress recompute.
 
 ## §1 Overview

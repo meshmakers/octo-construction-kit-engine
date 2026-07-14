@@ -206,6 +206,17 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             return;
         }
 
+        // AB#4196 belt-and-suspenders: the retroactive-write detector already floors an automatic
+        // dirty window at the source's bounded-retro-reach cap, so a freshly-detected window is
+        // in-reach by construction. Re-apply the source's per-archive cap here too, so a dirty window
+        // recorded before the cap existed (legacy / pre-1.6.8) — or from any future non-detector
+        // source — can still never drag an unbounded automatic recompute. The fleet-wide hard limit is
+        // enforced authoritatively at detection; here we only have the per-archive value.
+        var source = await _archiveStore.GetAsync(sourceArchiveRtId);
+        var maxRetroReach = source?.MaxRetroactiveReachMs is { } ms && ms > 0
+            ? TimeSpan.FromMilliseconds(ms)
+            : (TimeSpan?)null;
+
         foreach (var window in windows)
         {
             if (window.ChangeKind != RecomputeChangeKind.RetroactiveModify)
@@ -213,7 +224,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 continue;
             }
 
-            await EnqueueOnDirectDependentsAsync(sourceArchiveRtId, window.WindowStart, window.WindowEnd, cancellationToken);
+            await EnqueueOnDirectDependentsAsync(
+                sourceArchiveRtId, window.WindowStart, window.WindowEnd, cancellationToken, maxRetroReach);
         }
 
         await _stateStore.ClearDirtyWindowsAsync(sourceArchiveRtId);
@@ -663,8 +675,16 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         return false;
     }
 
+    /// <remarks>
+    /// <paramref name="maxRetroReach"/> is the AB#4196 bounded-retro-reach cap. When non-null, each
+    /// dependent's stale range start is floored at <c>dependentWatermark - maxRetroReach</c>, so a
+    /// single very-late change can never drag an automatic recompute further back than the cap. Null
+    /// (the default, used by chain propagation after a committed recompute) leaves the range unbounded
+    /// — a manual / chained recompute is deliberately not capped.
+    /// </remarks>
     private async Task EnqueueOnDirectDependentsAsync(
-        OctoObjectId sourceRtId, DateTime from, DateTime to, CancellationToken cancellationToken)
+        OctoObjectId sourceRtId, DateTime from, DateTime to, CancellationToken cancellationToken,
+        TimeSpan? maxRetroReach = null)
     {
         var dependents = await _dependencyGraph.GetTransitiveDependentsAsync(sourceRtId);
         foreach (var dependent in dependents)
@@ -709,6 +729,29 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             }
 
             var clampedEnd = end < aggregatedEnd ? end : aggregatedEnd;
+
+            // AB#4196: floor the stale-range start at (this dependent's watermark - cap) so a single
+            // very-late change can never drag an automatic recompute further back than the cap. The
+            // floor is snapped down to this dependent's bucket grid to keep both bounds bucket-aligned.
+            // Null cap (chain propagation) leaves start untouched.
+            if (maxRetroReach is { } reach)
+            {
+                var reachFloor = BucketBoundary.AlignDown(
+                    aggregatedEnd - reach, dependent.BucketAlignment, dependent.BucketSize,
+                    BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+                if (reachFloor > start)
+                {
+                    start = reachFloor;
+                }
+            }
+
+            // Nothing in reach: either the AB#4288 clamp or the AB#4196 floor pushed start to/past the
+            // effective end (e.g. the whole window predates the cap). Skip rather than enqueue an
+            // inverted range.
+            if (start >= clampedEnd)
+            {
+                continue;
+            }
 
             await _stateStore.EnqueueRecomputeRangesAsync(dependent.RtId,
                 new[] { new ArchiveRecomputeRange(dependent.RtId, start, clampedEnd, null, _clock()) });

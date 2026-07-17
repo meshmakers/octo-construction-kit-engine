@@ -38,6 +38,20 @@ public class LocalFileSystemCatalog : CachedCatalog
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     Evaluated live from <see cref="LocalFileSystemCatalogOptions.IsEnabled" /> rather than frozen at
+    ///     construction, so a runtime toggle (the CLI <c>-lce</c> switch applied after the singleton catalog
+    ///     was built) is honoured — otherwise a "disabled" local catalog would still be read.
+    /// </remarks>
+    public override bool CanRead => _options.Value.IsEnabled;
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Evaluated live from <see cref="LocalFileSystemCatalogOptions.IsEnabled" /> — see <see cref="CanRead" />.
+    /// </remarks>
+    public override bool CanWrite => _options.Value.IsEnabled;
+
+    /// <inheritdoc />
     public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
         return RefreshCatalogAsync(forceRefresh, sourceIdentifier);

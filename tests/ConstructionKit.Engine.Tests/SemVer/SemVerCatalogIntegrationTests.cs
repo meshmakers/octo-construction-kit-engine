@@ -6,6 +6,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer;
 
@@ -172,6 +173,29 @@ public class SemVerCatalogIntegrationTests : IDisposable
 
         Assert.Equal(CkSemVerVerdict.Valid, validation.Verdict);
         Assert.True(validation.IsValid);
+    }
+
+    [Fact]
+    public async Task LocalCatalogDisabledAfterConstruction_IsExcludedFromBaselineRetrieval()
+    {
+        // Regression for the frozen-ctor bug: LocalFileSystemCatalog.CanRead/CanWrite were captured at
+        // construction time, so toggling IsEnabled at runtime (the CLI -lce switch, applied after the
+        // singleton catalog had already been built) had no effect and the "disabled" local catalog was
+        // still read. CanRead/CanWrite are now evaluated live from the options.
+        await PublishAsync(BuildFixtureModel("1.0.0"));
+        Assert.True((await GetBaselineAsync()).Exists);
+
+        // Disable the local catalog AFTER the catalog singleton has been constructed and used.
+        _serviceProvider.GetRequiredService<IOptions<LocalFileSystemCatalogOptions>>().Value.IsEnabled = false;
+
+        var localCatalog = _serviceProvider.GetServices<ICatalog>()
+            .Single(c => c.CatalogName == LocalFileSystemCatalog.Name);
+        Assert.False(localCatalog.CanRead);
+        Assert.False(localCatalog.CanWrite);
+
+        // With the only enabled catalog that holds the model now disabled, the baseline must no longer
+        // resolve — the CatalogManager must skip the disabled catalog instead of querying it.
+        Assert.False((await GetBaselineAsync()).Exists);
     }
 
     [Fact]

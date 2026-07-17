@@ -60,7 +60,12 @@ internal class ValidateVersionCommand : CkcCommand
             true, 1, true);
 
         _catalogArg = CommandArgumentValue.AddArgument("cn", "catalogName",
-            ["Restricts baseline retrieval to the named catalog. By default, all readable catalogs are queried and the highest published version wins."],
+            [
+                "Restricts baseline retrieval and the dependency-existence check to the named catalog.",
+                "By default, all readable catalogs are queried and the highest published version wins.",
+                "Note: compile-stage dependency resolution still searches all catalogs — isolate a",
+                "stale local catalog via -lcr <empty-dir> (or disable it with -lce false)."
+            ],
             false, 1);
 
         _outputArg = CommandArgumentValue.AddArgument("o", "output",

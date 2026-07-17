@@ -287,6 +287,47 @@ public class CkSemVerClassifierTests
         Assert.Equal(CkSemVerLevel.Major, ClassifyHighest(baseline, current));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void NewMandatoryTypeAssociation_MultiplicityOne_IsMajor(bool outbound)
+    {
+        // Wiring a type to a role with multiplicity One imposes a new mandatory constraint on
+        // entity creation — the association-level equivalent of a new required attribute.
+        var baseline = SemVerTestModels.CreateModel();
+        var current = SemVerTestModels.CreateModel();
+        foreach (var model in new[] { baseline, current })
+        {
+            model.AssociationRoles!.Add(new CkAssociationRoleDto
+            {
+                AssociationRoleId = "Ownership", InboundName = "Owned", OutboundName = "Owner",
+                InboundMultiplicity = outbound ? MultiplicitiesDto.N : MultiplicitiesDto.One,
+                OutboundMultiplicity = outbound ? MultiplicitiesDto.One : MultiplicitiesDto.N
+            });
+        }
+
+        SemVerTestModels.GetMachine(current).Associations!.Add(new CkTypeAssociationDto
+        {
+            CkRoleId = $"{SemVerTestModels.ModelName}/Ownership", TargetCkTypeId = "Base/Entity"
+        });
+
+        Assert.Equal(CkSemVerLevel.Major, ClassifyHighest(baseline, current));
+    }
+
+    [Fact]
+    public void NewTypeAssociationWithForeignRole_IsMajorDefensively()
+    {
+        // The multiplicity of a role defined in another model cannot be inspected here
+        var baseline = SemVerTestModels.CreateModel();
+        var current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(current).Associations!.Add(new CkTypeAssociationDto
+        {
+            CkRoleId = "Base/Related", TargetCkTypeId = "Base/Entity"
+        });
+
+        Assert.Equal(CkSemVerLevel.Major, ClassifyHighest(baseline, current));
+    }
+
     // ── Minor rules ─────────────────────────────────────────────────────────────────────
 
     [Fact]

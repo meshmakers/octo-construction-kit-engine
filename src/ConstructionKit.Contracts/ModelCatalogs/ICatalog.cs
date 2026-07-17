@@ -38,8 +38,10 @@ public interface ICatalog
     /// </summary>
     /// <param name="sourceIdentifier">An object, which describes the source which the catalog should search,
     /// set it to null to use default</param>
+    /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
+    /// contacts the source</param>
     /// <returns></returns>
-    Task RefreshCatalogAsync(object? sourceIdentifier = null);
+    Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <summary>
     ///     Returns true, if the defined source identifier ist supported by the catalog.

@@ -242,14 +242,15 @@ internal class CatalogService : ICatalogService
         return compileResults;
     }
 
-    public Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null)
+    public Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null,
+        bool forceRefresh = false)
     {
-        return _catalogManager.RefreshCatalogCacheAsync(catalogName, sourceIdentifier);
+        return _catalogManager.RefreshCatalogCacheAsync(catalogName, sourceIdentifier, forceRefresh);
     }
 
-    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null)
+    public Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
-        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier);
+        return _catalogManager.RefreshAllCatalogCachesAsync(sourceIdentifier, forceRefresh);
     }
 
     private async Task<string> CreateCacheFileAsync(ICkModelGraph ckModelGraph, CkModelId ckModelId, string outputPath)

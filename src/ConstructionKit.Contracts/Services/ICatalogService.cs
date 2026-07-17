@@ -195,8 +195,10 @@ public interface ICatalogService
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
+    /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
+    /// contacts the source</param>
     /// <returns></returns>
-    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null);
+    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <summary>
     /// Refreshes the catalog cache for all catalogs
@@ -204,6 +206,8 @@ public interface ICatalogService
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
+    /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
+    /// contacts the source</param>
     /// <returns></returns>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null);
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 }

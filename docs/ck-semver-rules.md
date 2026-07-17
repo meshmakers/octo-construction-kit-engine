@@ -95,6 +95,8 @@ surface in the dependency diff.
 | Multiplicity **tightened** (permissiveness One < ZeroOrOne < N decreases) | Existing associations may become invalid |
 | `inboundName` / `outboundName` of an association role changed | Navigation/GraphQL breaks |
 | Type association removed | Consumers use the navigation |
+| Type association added referencing a role with multiplicity **One** (either direction) | New mandatory association — entity creation without it is rejected |
+| Type association added referencing a role of **another model** | Multiplicity not inspectable (defensive) |
 | `targetCkAttributeIds` of a type association changed | Referential integrity changes (defensive) |
 | Enum value **removed** or `key` of an existing `name` changed | Stored values become unreadable |
 | `useFlags` changed | Value semantics break |
@@ -123,7 +125,7 @@ surface in the dependency diff.
 | Attribute `metaData` changed | Metadata only, no data break |
 | `enableChangeStreamPreAndPostImages` changed | Change stream behavior, no data break |
 | Type becomes a collection root (`isCollectionRoot: false → true`) | Additive |
-| New type association | Additive |
+| New type association referencing a non-mandatory role of the same model (no multiplicity One) | Additive |
 | New dependency | Additive |
 | Dependency version changed without a major switch | Compatible |
 
@@ -177,5 +179,14 @@ command is fully read-only.
 - **Foreign attribute defaults:** whether a *required* attribute referencing an attribute
   definition of another model carries default values cannot be inspected — such additions are
   classified Major defensively.
+- **Dependency ranges are classified via their resolved versions.** The compiled baseline model
+  persists only the *resolved* dependency versions, not the declared ranges (and the compiled
+  model schema is closed, so persisting ranges is a catalog-format evolution). A range edit that
+  changes the resolved version is classified (major switch → Major, otherwise → Minor); a range
+  edit that leaves the resolved version unchanged (e.g. lowering the floor, or raising the
+  ceiling while no matching version is published yet) is not visible to the diff and requires no
+  bump. The declared ranges themselves are still validated for satisfiability (`OCTO-CK103`).
+  Persisting declared ranges in the compiled model is a follow-up alongside the catalog
+  `versionInfo` metadata.
 - The rule set is not configurable; catalog metadata (`versionInfo`, `IsBreaking` flags) is a
   follow-up.

@@ -392,9 +392,9 @@ public abstract class GitHubCatalog : CachedCatalog
     /// <summary>
     /// Refreshes the catalog file by scanning all model directories
     /// </summary>
-    public override Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public override Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
-        return RefreshCatalogAsync(false);
+        return RefreshCatalogAsync(forceRefresh);
     }
 
     private async Task RefreshCatalogAsync(bool forceRefresh)

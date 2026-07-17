@@ -301,6 +301,51 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     }
 
     [Fact]
+    public async Task RefreshCatalogAsync_WithForce_BypassesFreshCacheWindow()
+    {
+        StubRootCatalog(Data.RootCatalog);
+
+        // First refresh writes the cache; the second non-forced refresh within the 60s
+        // freshness window must be a no-op, a forced refresh must contact the source again.
+        await Catalog.RefreshCatalogAsync();
+        await Catalog.RefreshCatalogAsync();
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .MustHaveHappened(1, Times.Exactly);
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .MustHaveHappened(2, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_AfterUnreachableRefresh_FlagsSourceUnreachable()
+    {
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .Throws<HttpRequestException>();
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
+
+        Assert.False(result.Exists);
+        Assert.True(result.SourceUnreachable);
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_AfterNotFoundRefresh_ReportsEmptyButReachable()
+    {
+        // A 404 means the source responded and the catalog simply does not exist —
+        // this must NOT be flagged as unreachable (first-publication semantics)
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
+
+        Assert.False(result.Exists);
+        Assert.False(result.SourceUnreachable);
+    }
+
+    [Fact]
     public async Task GetAsync_WithTimeout_ThrowsException()
     {
         var modelId = CreateTestModelId();

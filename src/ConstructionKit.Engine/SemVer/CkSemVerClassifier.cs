@@ -119,7 +119,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
             // ── Type associations ───────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.TypeAssociation, ChangeKind: CkModelChangeKind.Added } =>
-                (CkSemVerLevel.Minor, "purely additive association"),
+                ClassifyTypeAssociationAdded(change, current),
             { ElementKind: CkModelElementKind.TypeAssociation, ChangeKind: CkModelChangeKind.Removed } =>
                 (CkSemVerLevel.Major, "consumers use the association navigation"),
             { ElementKind: CkModelElementKind.TypeAssociation, Property: "targetCkAttributeIds" } =>
@@ -229,6 +229,69 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             default:
                 return (CkSemVerLevel.Major, "no classification rule for this attribute assignment change — defensively classified as major");
         }
+    }
+
+    /// <summary>
+    ///     A new association assignment is only additive when the referenced role is not
+    ///     mandatory: the rule engine rejects entity creation when an association with
+    ///     multiplicity One is missing, so wiring a type to a One-multiplicity role is the
+    ///     association-level equivalent of a new required attribute without defaults.
+    ///     Roles defined in another model cannot be inspected here and are classified
+    ///     defensively.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyTypeAssociationAdded(CkModelChange change,
+        CkCompiledModelRoot current)
+    {
+        var role = FindAssociationRole(current, change.ElementId);
+        if (role == null)
+        {
+            return (CkSemVerLevel.Major,
+                "association role of another model — multiplicity not inspectable, defensively classified as major");
+        }
+
+        if (role.OutboundMultiplicity == MultiplicitiesDto.One || role.InboundMultiplicity == MultiplicitiesDto.One)
+        {
+            return (CkSemVerLevel.Major,
+                "new mandatory association (multiplicity One) — existing instances become invalid");
+        }
+
+        return (CkSemVerLevel.Minor, "purely additive association");
+    }
+
+    private static CkAssociationRoleDto? FindAssociationRole(CkCompiledModelRoot current, string elementId)
+    {
+        // Element ids of type associations have the shape "<typeFullName>/<roleRef> -> <targetRef>",
+        // where roleRef is "<modelName>/<roleFullName>" for self references and
+        // "<modelName-major>/<roleFullName>" for foreign references (see CkModelDiffService).
+        var arrowIndex = elementId.IndexOf(" -> ", StringComparison.Ordinal);
+        if (arrowIndex < 0)
+        {
+            return null;
+        }
+
+        var ownerAndRole = elementId.Substring(0, arrowIndex);
+        var ownerSeparator = ownerAndRole.IndexOf('/');
+        if (ownerSeparator < 0)
+        {
+            return null;
+        }
+
+        var roleReference = ownerAndRole.Substring(ownerSeparator + 1);
+        var roleSeparator = roleReference.IndexOf('/');
+        if (roleSeparator < 0)
+        {
+            return null;
+        }
+
+        var modelToken = roleReference.Substring(0, roleSeparator);
+        var roleFullName = roleReference.Substring(roleSeparator + 1);
+        if (modelToken != current.ModelId.Name)
+        {
+            // Foreign model — the role definition is not part of the diffed model pair
+            return null;
+        }
+
+        return current.AssociationRoles?.FirstOrDefault(r => r.AssociationRoleId.FullName == roleFullName);
     }
 
     private static (CkSemVerLevel, string) ClassifyMultiplicityChange(CkModelChange change)

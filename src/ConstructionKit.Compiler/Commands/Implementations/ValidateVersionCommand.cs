@@ -119,12 +119,12 @@ internal class ValidateVersionCommand : CkcCommand
             if (catalogName != null)
             {
                 Logger.LogInformation("Refreshing catalog cache of '{CatalogName}'", catalogName);
-                await _catalogService.RefreshCatalogCacheAsync(catalogName);
+                await _catalogService.RefreshCatalogCacheAsync(catalogName, forceRefresh: true);
             }
             else
             {
                 Logger.LogInformation("Refreshing all catalog caches");
-                await _catalogService.RefreshAllCatalogCachesAsync();
+                await _catalogService.RefreshAllCatalogCachesAsync(forceRefresh: true);
             }
         }
 

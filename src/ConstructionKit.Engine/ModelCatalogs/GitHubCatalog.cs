@@ -406,11 +406,12 @@ public abstract class GitHubCatalog : CachedCatalog
         }
 
         var cache = await ReadCacheAsync(false).ConfigureAwait(false);
-        var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
+        var (catalog, sourceUnreachable) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
 
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
-            UpdatedAt = DateTime.UtcNow
+            UpdatedAt = DateTime.UtcNow,
+            SourceUnreachable = sourceUnreachable
         };
 
         if (catalog != null)
@@ -466,6 +467,13 @@ public abstract class GitHubCatalog : CachedCatalog
 
     private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync()
     {
+        var (catalog, _) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
+        return catalog;
+    }
+
+    private async Task<(SharedCatalogTypes.RootCatalog? Catalog, bool SourceUnreachable)>
+        GetRootCatalogWithReachabilityAsync()
+    {
         var catalogPath = $"{RootPath}{CatalogFileName}";
 
         string? response;
@@ -474,22 +482,45 @@ public abstract class GitHubCatalog : CachedCatalog
             var httpClient = CreateHttpClient();
             try
             {
-                response = await httpClient.GetStringAsync(catalogPath).ConfigureAwait(false);
+                var httpResponse = await httpClient.GetAsync(catalogPath, CancellationToken.None)
+                    .ConfigureAwait(false);
+                if (httpResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // The source responded: the catalog simply does not exist (empty catalog)
+                    return (null, false);
+                }
+
+                if (!httpResponse.IsSuccessStatusCode)
+                {
+                    // Server error — the source of truth is unavailable.
+                    return (null, true);
+                }
+
+                response = await httpResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
             }
             catch (HttpRequestException)
             {
-                // Catalog doesn't exist or couldn't be fetched
-                return null;
+                // Network-level failure — the source of truth is unreachable.
+                // The refresh still writes a cache, but flags it so that a "model not found"
+                // answer is not mistaken for "model does not exist" (silent-failure guard).
+                return (null, true);
+            }
+            catch (TaskCanceledException)
+            {
+                // Request timeout — treat like an unreachable source
+                return (null, true);
             }
         }
         else
         {
+            // The Octokit path lets network failures propagate loudly; GetFileAsync only
+            // returns null for a missing file (404), which means "empty catalog".
             var gitHubClient = CreateGitHubClient();
 
             var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
             if (r == null)
             {
-                return null;
+                return (null, false);
             }
 
             response = r.Value.Item1;
@@ -497,13 +528,13 @@ public abstract class GitHubCatalog : CachedCatalog
 
         if (string.IsNullOrEmpty(response) || response == null)
         {
-            return null;
+            return (null, false);
         }
 
-        return System.Text.Json.JsonSerializer.Deserialize<SharedCatalogTypes.RootCatalog>(
+        return (System.Text.Json.JsonSerializer.Deserialize<SharedCatalogTypes.RootCatalog>(
             response,
             new System.Text.Json.JsonSerializerOptions
-                { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+                { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase }), false);
     }
 
     private async Task<SharedCatalogTypes.ModelLibraryCatalog?> GetModelLibraryCatalogAsync(string catalogPath)

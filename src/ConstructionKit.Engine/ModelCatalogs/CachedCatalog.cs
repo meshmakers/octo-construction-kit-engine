@@ -73,7 +73,10 @@ public abstract class CachedCatalog(
                     return new ModelExistingResult
                     {
                         Exists = true,
-                        ModelId = candidateVersions.OrderBy(v => v).Last()
+                        ModelId = candidateVersions.OrderBy(v => v).Last(),
+                        CatalogName = CatalogName,
+                        CacheUpdatedAt = catalog.UpdatedAt,
+                        SourceUnreachable = catalog.SourceUnreachable
                     };
                 }
 
@@ -84,7 +87,10 @@ public abstract class CachedCatalog(
         return new ModelExistingResult
         {
             Exists = false,
-            ModelId = null
+            ModelId = null,
+            CatalogName = CatalogName,
+            CacheUpdatedAt = catalog.UpdatedAt,
+            SourceUnreachable = catalog.SourceUnreachable
         };
     }
 

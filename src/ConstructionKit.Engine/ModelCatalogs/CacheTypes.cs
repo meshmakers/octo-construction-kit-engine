@@ -23,6 +23,13 @@ public class CacheTypes
         public DateTime? UpdatedAt { get; set; }
 
         /// <summary>
+        /// True when the catalog source could not be reached during the last refresh.
+        /// In that case the cached model list must not be interpreted as
+        /// "these models do not exist" — the source of truth was unavailable.
+        /// </summary>
+        public bool SourceUnreachable { get; set; }
+
+        /// <summary>
         /// Gets a dictionary of all models in the catalog, keyed by model id
         /// </summary>
         public Dictionary<string, CacheModelEntry> Models { get; set; } = [];

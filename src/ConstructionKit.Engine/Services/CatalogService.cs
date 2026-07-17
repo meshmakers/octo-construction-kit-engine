@@ -128,6 +128,13 @@ internal class CatalogService : ICatalogService
             .ConfigureAwait(false);
     }
 
+    public async Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange ckModelIdVersionRange,
+        object? sourceIdentifier = null)
+    {
+        return await _catalogManager.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task<IEnumerable<CompileResult>> RestoreConstructionKitModelsAsync(string modelConfigurationFilePath,
         string outputPath, string? createCacheFilePath, object? sourceIdentifier = null)

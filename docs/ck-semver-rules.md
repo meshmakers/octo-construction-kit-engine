@@ -21,12 +21,26 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 | Argument | Description |
 | -------- | ----------- |
 | `-p, --path` | Root path(s) of Construction Kit model directories. Multiple paths are validated in the given order — pass them in dependency order so cascade violations read comprehensibly. |
-| `-cn, --catalogName` | Restricts baseline retrieval (and the dependency check) to one catalog. Without it, all readable catalogs are queried and the highest published version wins (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub). |
+| `-cn, --catalogName` | Pins **baseline retrieval and the FR-9 dependency-existence check** (`OCTO-CK102`/`OCTO-CK103`) to the named catalog. Without it, all readable catalogs are queried and the highest published version wins (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub). **It does not pin the compile-stage dependency *resolution*** — see the note below. |
 | `-o, --output` | Additionally writes the report as Markdown (e.g. for PR comments). |
 | `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
 | `-cl, --changelog` | Writes/updates the `CHANGELOG.md` section of the declared version next to `ckModel.yaml`. Only runs after successful validation; older sections are never rewritten. |
 | `-rmm, --requireMigrationForMajor` | Escalates a missing migration for a required major bump from a warning to an error. |
 | `-lce, -lcr` | Enable/point the local file system catalog for this invocation (same semantics as `Compile`). |
+
+> **`-cn` pins the baseline, not the compile-stage dependency resolution.** Determining the
+> baseline (which version is "the last published one") and the FR-9 dependency-existence check are
+> restricted to the named catalog. Compiling the current model in memory, however, resolves its
+> dependency closure across **all** readable catalogs — this is by design (the compiler is the same
+> one used everywhere), but it means a stale entry in another catalog (typically a leftover local
+> `LocalFileSystemCatalog` model with different content) can still poison transitive resolution and
+> flip the diff of a *dependent* model to a spurious level, even though `-cn` was given. Combine
+> `-cn` with a clean, per-run local catalog to eliminate this.
+>
+> **Recommended for CI and reproducible local runs:** `-cn <catalog> -rf -lcr <empty-dir>` — pin the
+> baseline to one catalog, force a cache refresh, and point the local catalog at a fresh empty
+> directory so no stale local content participates in resolution. The shipped CI step in
+> `octo-construction-kit` does exactly this via a per-run `$(OctoLocalCatalogRootPath)`.
 
 ### Validation rule
 
@@ -51,7 +65,11 @@ highest level in the diff:
 | `OCTO-CK103` | A dependency range is satisfied by no published version | Publish the dependency first or correct the range |
 | `OCTO-CK104` | Major bump without a matching migration (only with `--requireMigrationForMajor`) | Add a migration with `toVersion` == declared version |
 
-Exit codes: `0` = valid, non-zero = violation or error (CI-friendly).
+Exit codes: `0` = valid, non-zero = violation or error (CI-friendly). Concretely, a version
+violation (any `OCTO-CK1xx` finding, an unknown catalog, or a compile failure) exits with the
+process code `-6` (`ModelValidationException`); because process exit codes are unsigned bytes this
+surfaces as `250` in PowerShell's `$LASTEXITCODE` and `250` in a POSIX shell's `$?`. **CI must gate
+on `-ne 0`, never on `-eq 1`** — the command never exits with `1`.
 
 ### First publication vs. unreachable catalogs
 
@@ -161,6 +179,14 @@ If the diff requires a major bump, the command checks whether the model defines 
 `toVersion` equal to the declared version. If not, a warning lists the breaking changes — the
 engine's no-migrations bridge allows schema-only majors, so this is not an error by default.
 `--requireMigrationForMajor` escalates it to `OCTO-CK104`.
+
+Migration reconciliation is **skipped while the declared version itself is still wrong** (verdict
+`VersionTooLow` or a downgrade). In that state `OCTO-CK100`/`OCTO-CK101` already require the
+developer to raise the version; reconciling migrations at the same time would name the (too-low)
+*declared* version as the missing migration's `toVersion` while `OCTO-CK100` simultaneously demands a
+higher minimum — a contradictory hint. Once the version is corrected, the next run reconciles
+against the now-correct `toVersion` (the check self-heals). For an already-valid version the
+reconciliation runs normally.
 
 ## Changelog generation
 

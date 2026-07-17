@@ -116,15 +116,27 @@ internal class ValidateVersionCommand : CkcCommand
 
         if (CommandArgumentValue.IsArgumentUsed(_refreshArg))
         {
-            if (catalogName != null)
+            try
             {
-                Logger.LogInformation("Refreshing catalog cache of '{CatalogName}'", catalogName);
-                await _catalogService.RefreshCatalogCacheAsync(catalogName, forceRefresh: true);
+                if (catalogName != null)
+                {
+                    Logger.LogInformation("Refreshing catalog cache of '{CatalogName}'", catalogName);
+                    await _catalogService.RefreshCatalogCacheAsync(catalogName, forceRefresh: true);
+                }
+                else
+                {
+                    Logger.LogInformation("Refreshing all catalog caches");
+                    await _catalogService.RefreshAllCatalogCachesAsync(forceRefresh: true);
+                }
             }
-            else
+            catch (ModelCatalogException ex)
             {
-                Logger.LogInformation("Refreshing all catalog caches");
-                await _catalogService.RefreshAllCatalogCachesAsync(forceRefresh: true);
+                // An unknown --catalogName (or other catalog-configuration problem) is a caller error,
+                // not an internal fault: fail with a clean, actionable one-line message instead of the
+                // raw stack trace the Runner's generic exception handler would emit. The Runner surfaces
+                // ModelValidationException as a single-line error with a non-zero exit code.
+                throw new ModelValidationException(
+                    $"Catalog cache refresh failed: {ex.Message} Available catalogs: {DescribeAvailableCatalogs()}.", ex);
             }
         }
 
@@ -143,9 +155,13 @@ internal class ValidateVersionCommand : CkcCommand
                                            or ModelCatalogException)
             {
                 // Keep validating the remaining packages so that the report is comprehensive;
-                // the collected failures fail the command at the end.
+                // the collected failures fail the command at the end. These are expected
+                // validation-type failures — emit a clean one-line error at default verbosity and
+                // keep the full exception (stack trace) for --verbosity Detailed only.
                 var message = $"'{rootPath}': {ex.Message}";
-                Logger.LogError(ex, "Validation of construction kit at '{RootPath}' failed", rootPath);
+                Logger.LogError("Validation of construction kit at '{RootPath}' failed: {Message}", rootPath,
+                    ex.Message);
+                Logger.LogDebug(ex, "Validation of construction kit at '{RootPath}' failed", rootPath);
                 markdownReport.Append($"\n## {rootPath} — ERROR\n\n{ex.Message}\n");
                 failures.Add(message);
             }
@@ -243,7 +259,19 @@ internal class ValidateVersionCommand : CkcCommand
                 $"'{publishedModelId.FullName}' may be stale. Retry with --refresh once the source is reachable.");
         }
 
-        // 3. Load the baseline model
+        // 3. Dependency existence check (FR-9) — run BEFORE loading the baseline and compiling. An
+        //    unsatisfiable dependency range otherwise aborts the in-memory compile with a raw
+        //    ModelValidationException before OCTO-CK103 can be emitted. On failure we skip
+        //    compile/diff for this package, write a clean report and continue with the next package.
+        await CheckDependenciesAsync(meta, modelName, catalogName, errors);
+        if (errors.Count > 0)
+        {
+            WriteReport(markdownReport, modelName, rootPath, existingResult, declaredVersion, null, [],
+                errors, warnings, notes);
+            return errors.Select(e => $"{modelName}: {e}").ToList();
+        }
+
+        // 4. Load the baseline model
         var baselineOperationResult = new OperationResult();
         var baselineCatalogName = catalogName ?? existingResult.CatalogName;
         var baseline = baselineCatalogName != null
@@ -256,35 +284,17 @@ internal class ValidateVersionCommand : CkcCommand
                 baselineOperationResult);
         }
 
-        // 4. Compile the current model in-memory (validation always runs against the compiled,
+        // 5. Compile the current model in-memory (validation always runs against the compiled,
         //    canonically sorted model, never against raw source YAMLs)
         var compileOperationResult = new OperationResult();
         var current = await _compilerService.CompileInMemoryAsync(rootPath, compileOperationResult);
 
-        // 5./6. Diff and classify
+        // 6. Diff and classify
         var changes = _diffService.Diff(baseline, current);
         var classifiedChanges = _classifier.Classify(changes, baseline, current);
         var requiredLevel = _classifier.GetRequiredLevel(classifiedChanges);
 
-        // 7. Dependency validation (check only, never modify)
-        foreach (var dependencyRange in meta.Dependencies ?? [])
-        {
-            var dependencyResult = catalogName != null
-                ? await _catalogService.IsExistingAsync(catalogName, dependencyRange)
-                : await _catalogService.IsExistingAsync(dependencyRange);
-            if (dependencyResult.Exists)
-            {
-                continue;
-            }
-
-            errors.Add(dependencyResult.SourceUnreachable
-                ? $"OCTO-CK102: Dependency '{dependencyRange.FullName}' of model '{modelName}' could not be checked " +
-                  "because the catalog source was unreachable. Check connectivity and retry with --refresh."
-                : $"OCTO-CK103: Dependency range '{dependencyRange.FullName}' of model '{modelName}' is not satisfied " +
-                  "by any published version. Publish the dependency first or correct the range in ckModel.yaml.");
-        }
-
-        // 8. Apply the validation rule and reconcile migrations for major bumps
+        // 7. Apply the validation rule and reconcile migrations for major bumps
         var validationResult = _classifier.ValidateDeclaredVersion(publishedModelId.Version, declaredVersion,
             requiredLevel);
         switch (validationResult.Verdict)
@@ -308,7 +318,13 @@ internal class ValidateVersionCommand : CkcCommand
 
         AddRenameHints(classifiedChanges, warnings);
 
-        if (requiredLevel == CkSemVerLevel.Major)
+        // Migration reconciliation (FR-10). Skip it while the declared version itself is still wrong
+        // (too low, or a downgrade): OCTO-CK100/OCTO-CK101 already tell the developer to raise the
+        // version, and reconciling here would name the *declared* version as the missing migration's
+        // toVersion while OCTO-CK100 simultaneously demands a higher minimum — a contradictory hint.
+        // Once the version is corrected the reconciliation re-runs against the right toVersion.
+        if (requiredLevel == CkSemVerLevel.Major
+            && validationResult.Verdict is not (CkSemVerVerdict.VersionTooLow or CkSemVerVerdict.Downgrade))
         {
             var hasMigrationForDeclaredVersion = HasMigrationForVersion(current, declaredVersion);
             if (!hasMigrationForDeclaredVersion)
@@ -347,6 +363,43 @@ internal class ValidateVersionCommand : CkcCommand
         }
 
         return errors.Select(e => $"{modelName}: {e}").ToList();
+    }
+
+    /// <summary>
+    ///     Verifies (never modifies) that every declared dependency range resolves to a published
+    ///     version. Adds an OCTO-CK103 finding to <paramref name="errors" /> when a range is satisfied
+    ///     by no published version, or OCTO-CK102 when the catalog source was unreachable during the
+    ///     last cache refresh. Pinned to <paramref name="catalogName" /> when set, otherwise all
+    ///     readable catalogs are queried.
+    /// </summary>
+    private async Task CheckDependenciesAsync(CkMetaRootDto meta, string modelName, string? catalogName,
+        List<string> errors)
+    {
+        foreach (var dependencyRange in meta.Dependencies ?? [])
+        {
+            var dependencyResult = catalogName != null
+                ? await _catalogService.IsExistingAsync(catalogName, dependencyRange)
+                : await _catalogService.IsExistingAsync(dependencyRange);
+            if (dependencyResult.Exists)
+            {
+                continue;
+            }
+
+            errors.Add(dependencyResult.SourceUnreachable
+                ? $"OCTO-CK102: Dependency '{dependencyRange.FullName}' of model '{modelName}' could not be checked " +
+                  "because the catalog source was unreachable. Check connectivity and retry with --refresh."
+                : $"OCTO-CK103: Dependency range '{dependencyRange.FullName}' of model '{modelName}' is not satisfied " +
+                  "by any published version. Publish the dependency first or correct the range in ckModel.yaml.");
+        }
+    }
+
+    /// <summary>
+    ///     Renders the readable catalogs as a comma-separated list for error messages.
+    /// </summary>
+    private string DescribeAvailableCatalogs()
+    {
+        var catalogs = _catalogService.GetCatalogList().Select(c => c.Item1).ToList();
+        return catalogs.Count > 0 ? string.Join(", ", catalogs) : "<none>";
     }
 
     private static bool HasMigrationForVersion(CkCompiledModelRoot current, CkVersion declaredVersion)

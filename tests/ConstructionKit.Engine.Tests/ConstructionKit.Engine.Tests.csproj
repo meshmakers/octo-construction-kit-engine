@@ -28,8 +28,8 @@
              to fabricate ITaskItem / IBuildEngine fakes; MsBuildTasks itself does not flow
              these transitively because its csproj bundles them via CopyLocalLockFileAssemblies
              for the NuGet packaging path. -->
-        <PackageReference Include="Microsoft.Build.Framework" Version="18.7.1" />
-        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.7.1" />
+        <PackageReference Include="Microsoft.Build.Framework" Version="18.8.2" />
+        <PackageReference Include="Microsoft.Build.Utilities.Core" Version="18.8.2" />
     </ItemGroup>
 
 

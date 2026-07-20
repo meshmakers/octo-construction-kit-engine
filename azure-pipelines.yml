@@ -114,12 +114,15 @@ stages:
                 **/*Tests.csproj
                 !**/*SystemTests.csproj
               testRunTitle: 'CI'
+          # Multi-arch image (AB#4451): arm64 for Apple-Silicon kind clusters and
+          # edge devices, amd64 for the managed clusters.
           - template: templates/steps/build-and-push-docker.yml@pipelineTemplates
             parameters:
               publicRegistryServiceConnection: $(DockerRegistryPublicConnection)
               privateRegistryName: $(DockerRegistryPrivateUri)
               repository: meshmakers/octo-schema-provider
               dockerfile: src/ConstructionKit.SchemaProvider/Dockerfile
+              platforms: 'linux/arm64,linux/amd64'
           - task: PowerShell@2
             displayName: 'Create api documentation'
             inputs:

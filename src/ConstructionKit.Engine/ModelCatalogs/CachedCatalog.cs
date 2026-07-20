@@ -33,13 +33,21 @@ public abstract class CachedCatalog(
     public string Description { get; } = description;
 
     /// <inheritdoc />
-    public bool CanWrite { get; } = canWrite;
+    /// <remarks>
+    ///     Virtual so that catalogs whose enabled state can change at runtime (e.g.
+    ///     <see cref="LocalFileSystemCatalog" />, toggled via the CLI <c>-lce</c> switch after the
+    ///     singleton has been constructed) can evaluate it live instead of freezing the constructor value.
+    /// </remarks>
+    public virtual bool CanWrite { get; } = canWrite;
 
     /// <inheritdoc />
-    public bool CanRead { get; } = canRead;
+    /// <remarks>
+    ///     Virtual — see <see cref="CanWrite" />.
+    /// </remarks>
+    public virtual bool CanRead { get; } = canRead;
 
     /// <inheritdoc />
-    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null);
+    public abstract Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <inheritdoc />
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
@@ -73,7 +81,10 @@ public abstract class CachedCatalog(
                     return new ModelExistingResult
                     {
                         Exists = true,
-                        ModelId = candidateVersions.OrderBy(v => v).Last()
+                        ModelId = candidateVersions.OrderBy(v => v).Last(),
+                        CatalogName = CatalogName,
+                        CacheUpdatedAt = catalog.UpdatedAt,
+                        SourceUnreachable = catalog.SourceUnreachable
                     };
                 }
 
@@ -84,7 +95,10 @@ public abstract class CachedCatalog(
         return new ModelExistingResult
         {
             Exists = false,
-            ModelId = null
+            ModelId = null,
+            CatalogName = CatalogName,
+            CacheUpdatedAt = catalog.UpdatedAt,
+            SourceUnreachable = catalog.SourceUnreachable
         };
     }
 

@@ -53,6 +53,16 @@ public abstract class PublicGitHubCatalogTestsBase
         Catalog = new PublicGitHubCatalog(CkJsonSerializer, HttpClientFactory, GitHubClientFactory, gitHubOptions);
     }
 
+    /// <summary>
+    ///     The root catalog fetch goes through GetAsync (not GetStringAsync) so the catalog can
+    ///     distinguish a 404 (empty catalog) from network failures (source unreachable, AB#4420).
+    /// </summary>
+    protected void StubRootCatalog(string json)
+    {
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json) });
+    }
+
     protected static CkModelId CreateTestModelId(string name = "TestModel", string version = "1.0.0")
     {
         return new CkModelId(name, version);
@@ -197,8 +207,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     {
         var modelId = CreateTestModelId();
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog1);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -215,8 +224,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     [Fact]
     public async Task RefreshCatalogAsync_UsesHttpClient()
     {
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog3);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -236,8 +244,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     [Fact]
     public void ListAsync_UsesHttpClient()
     {
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog2);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -261,8 +268,7 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0.5]");
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog1);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -292,6 +298,51 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
             Catalog.GetAsync(modelId, operationResult));
 
         Assert.Contains("is invalid", exception.Message);
+    }
+
+    [Fact]
+    public async Task RefreshCatalogAsync_WithForce_BypassesFreshCacheWindow()
+    {
+        StubRootCatalog(Data.RootCatalog);
+
+        // First refresh writes the cache; the second non-forced refresh within the 60s
+        // freshness window must be a no-op, a forced refresh must contact the source again.
+        await Catalog.RefreshCatalogAsync();
+        await Catalog.RefreshCatalogAsync();
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .MustHaveHappened(1, Times.Exactly);
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .MustHaveHappened(2, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_AfterUnreachableRefresh_FlagsSourceUnreachable()
+    {
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .Throws<HttpRequestException>();
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
+
+        Assert.False(result.Exists);
+        Assert.True(result.SourceUnreachable);
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_AfterNotFoundRefresh_ReportsEmptyButReachable()
+    {
+        // A 404 means the source responded and the catalog simply does not exist —
+        // this must NOT be flagged as unreachable (first-publication semantics)
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.NotFound));
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
+
+        Assert.False(result.Exists);
+        Assert.False(result.SourceUnreachable);
     }
 
     [Fact]
@@ -407,8 +458,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var modelId = CreateTestModelId();
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog1);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -425,8 +475,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     [Fact]
     public async Task RefreshCatalogAsync_UsesHttpClient()
     {
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog3);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -445,8 +494,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     [Fact]
     public void ListAsync_UsesHttpClient()
     {
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog2);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -470,8 +518,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0.5]");
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog1);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -601,8 +648,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0.3]");
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog1);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -620,8 +666,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "[1.0,2.0]");
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog2);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
@@ -641,8 +686,7 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         var versionRange = CreateTestVersionRange(range: "1.0.0");
 
-        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/catalog.json"))
-            .Returns(Data.RootCatalog);
+        StubRootCatalog(Data.RootCatalog);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
             .Returns(Data.TestModelModelCatalog2);
         A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))

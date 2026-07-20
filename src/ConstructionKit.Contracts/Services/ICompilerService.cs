@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts.Services;
 
 /// <summary>
@@ -36,4 +38,12 @@ public interface ICompilerService
     /// <param name="operationResult">Operation result</param>
     /// <returns>An object with files created by compiler.</returns>
     Task<CompileResult> CompileAsync(string rootPath, string outputPath, string? createCacheFilePath, OperationResult operationResult);
+
+    /// <summary>
+    ///     Compiles the construction kit model fully in-memory without writing any output files.
+    /// </summary>
+    /// <param name="rootPath">Local root path where the construction kit model exists.</param>
+    /// <param name="operationResult">Operation result</param>
+    /// <returns>The compiled, canonically sorted model root.</returns>
+    Task<CkCompiledModelRoot> CompileInMemoryAsync(string rootPath, OperationResult operationResult);
 }

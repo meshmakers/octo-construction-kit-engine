@@ -383,6 +383,7 @@ internal class CatalogManager : ICatalogManager
         object? sourceIdentifier = null)
     {
         List<ModelExistingResult> results = new();
+        var anySourceUnreachable = false;
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
             if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
@@ -391,6 +392,7 @@ internal class CatalogManager : ICatalogManager
             }
 
             var modelExistingResult = await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
+            anySourceUnreachable |= modelExistingResult.SourceUnreachable;
             if (modelExistingResult.Exists)
             {
                 results.Add(modelExistingResult);
@@ -399,15 +401,16 @@ internal class CatalogManager : ICatalogManager
 
         if (results.Count > 0)
         {
-            // Return the highest version found
+            // Return the highest version found; propagate whether any queried catalog source
+            // was unreachable so callers can flag a potentially stale baseline.
             var highest = results
                 .Where(x => x.ModelId != null)
                 .OrderByDescending(x => x.ModelId)
                 .First();
-            return highest;
+            return highest with { SourceUnreachable = anySourceUnreachable };
         }
 
-        return new ModelExistingResult { Exists = false  };
+        return new ModelExistingResult { Exists = false, SourceUnreachable = anySourceUnreachable };
     }
 
     public async Task<ModelExistingResult> IsExistingAsync(string catalogName, CkModelIdVersionRange ckModelIdVersionRange,
@@ -423,7 +426,8 @@ internal class CatalogManager : ICatalogManager
         return await catalog.IsExistingAsync(ckModelIdVersionRange, sourceIdentifier).ConfigureAwait(false);
     }
 
-    public async Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null)
+    public async Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null,
+        bool forceRefresh = false)
     {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
             catalogName, StringComparison.OrdinalIgnoreCase) == 0);
@@ -432,10 +436,10 @@ internal class CatalogManager : ICatalogManager
             throw ModelCatalogException.ModelCatalogNotFound(catalogName);
         }
 
-        await catalog.RefreshCatalogAsync().ConfigureAwait(false);
+        await catalog.RefreshCatalogAsync(null, forceRefresh).ConfigureAwait(false);
     }
 
-    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null)
+    public async Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
         foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
@@ -444,7 +448,7 @@ internal class CatalogManager : ICatalogManager
                 continue;
             }
 
-            await catalog.RefreshCatalogAsync(sourceIdentifier).ConfigureAwait(false);
+            await catalog.RefreshCatalogAsync(sourceIdentifier, forceRefresh).ConfigureAwait(false);
         }
     }
 }

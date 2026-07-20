@@ -1,0 +1,218 @@
+# Construction Kit SemVer Rules and Version Validation
+
+The version of a Construction Kit model lives in the `modelId` suffix of `ckModel.yaml`
+(e.g. `modelId: Basic-2.0.2`) and is maintained manually by the developer. The
+`ckc ValidateVersion` command enforces that this version is *honest*: it diffs the current model
+against the last published version, classifies every change according to the fixed rule set below,
+and fails when the declared version does not satisfy the derived minimum bump level.
+
+The command **never writes** `ckModel.yaml` — the developer stays in control of the version; the
+tool only checks it. Enforcement happens as a CI gate (PR/main builds).
+
+## The command
+
+```
+ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
+                    [-cn <catalogName>] [-o <report.md>]
+                    [-rf|--refresh] [-cl|--changelog] [-rmm|--requireMigrationForMajor]
+                    [-lce <bool>] [-lcr <path>]
+```
+
+| Argument | Description |
+| -------- | ----------- |
+| `-p, --path` | Root path(s) of Construction Kit model directories. Multiple paths are validated in the given order — pass them in dependency order so cascade violations read comprehensibly. |
+| `-cn, --catalogName` | Pins **baseline retrieval and the FR-9 dependency-existence check** (`OCTO-CK102`/`OCTO-CK103`) to the named catalog. Without it, all readable catalogs are queried and the highest published version wins (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub). **It does not pin the compile-stage dependency *resolution*** — see the note below. |
+| `-o, --output` | Additionally writes the report as Markdown (e.g. for PR comments). |
+| `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
+| `-cl, --changelog` | Writes/updates the `CHANGELOG.md` section of the declared version next to `ckModel.yaml`. Only runs after successful validation; older sections are never rewritten. |
+| `-rmm, --requireMigrationForMajor` | Escalates a missing migration for a required major bump from a warning to an error. |
+| `-lce, -lcr` | Enable/point the local file system catalog for this invocation (same semantics as `Compile`). |
+
+> **`-cn` pins the baseline, not the compile-stage dependency resolution.** Determining the
+> baseline (which version is "the last published one") and the FR-9 dependency-existence check are
+> restricted to the named catalog. Compiling the current model in memory, however, resolves its
+> dependency closure across **all** readable catalogs — this is by design (the compiler is the same
+> one used everywhere), but it means a stale entry in another catalog (typically a leftover local
+> `LocalFileSystemCatalog` model with different content) can still poison transitive resolution and
+> flip the diff of a *dependent* model to a spurious level, even though `-cn` was given. Combine
+> `-cn` with a clean, per-run local catalog to eliminate this.
+>
+> **Recommended for CI and reproducible local runs:** `-cn <catalog> -rf -lcr <empty-dir>` — pin the
+> baseline to one catalog, force a cache refresh, and point the local catalog at a fresh empty
+> directory so no stale local content participates in resolution. The shipped CI step in
+> `octo-construction-kit` does exactly this via a per-run `$(OctoLocalCatalogRootPath)`.
+
+### Validation rule
+
+With *published* = last published version and *minimum* = published + exactly one bump of the
+highest level in the diff:
+
+- Diff empty and declared == published → **valid**.
+- Diff empty and declared > published → **valid** (reported as a note: bump without structural
+  change, e.g. a semantic change — legitimate).
+- Diff non-empty and declared >= minimum → **valid** (higher than required is ok — only the
+  *minimum* level is enforced).
+- Diff non-empty and declared < minimum (in particular: version left untouched) → **error**.
+- Declared < published → **error** (downgrade).
+
+### Error codes
+
+| Code | Meaning | Remediation |
+| ---- | ------- | ----------- |
+| `OCTO-CK100` | Declared version below the required minimum | Raise the version in `ckModel.yaml` to at least the reported minimum |
+| `OCTO-CK101` | Declared version below the published version (downgrade) | Use a version >= the published one |
+| `OCTO-CK102` | Catalog source unreachable — baseline (or dependency check) impossible | Check network/VPN and catalog configuration, retry with `--refresh` |
+| `OCTO-CK103` | A dependency range is satisfied by no published version | Publish the dependency first or correct the range |
+| `OCTO-CK104` | Major bump without a matching migration (only with `--requireMigrationForMajor`) | Add a migration with `toVersion` == declared version |
+
+Exit codes: `0` = valid, non-zero = violation or error (CI-friendly). Concretely, a version
+violation (any `OCTO-CK1xx` finding, an unknown catalog, or a compile failure) exits with the
+process code `-6` (`ModelValidationException`); because process exit codes are unsigned bytes this
+surfaces as `250` in PowerShell's `$LASTEXITCODE` and `250` in a POSIX shell's `$?`. **CI must gate
+on `-ne 0`, never on `-eq 1`** — the command never exits with `1`.
+
+### First publication vs. unreachable catalogs
+
+"No catalog responds" and "catalogs respond, model unknown" are strictly separated:
+
+- Model unknown in all (reachable) catalogs → **first publication** → valid, any version is
+  accepted as the starting point.
+- Catalog source unreachable during the last cache refresh → **error** `OCTO-CK102`. A missing
+  baseline is never silently interpreted as a first publication.
+
+The report also prints the catalog cache age of the baseline; `--refresh` forces a refresh
+(mandatory in CI, where a stale cache would validate against the wrong baseline).
+
+## The fixed rule set (V1)
+
+The highest applicable level in the overall diff determines the minimum bump level. The rule set
+is built-in and not configurable. It is implemented as the central rule table in
+`ConstructionKit.Engine/SemVer/CkSemVerClassifier.cs` — keep this page and that table in sync.
+
+Validation always compares the **compiled, canonically sorted** models
+(`CkCompiledModelRoot`), never raw source YAMLs. Pure formatting/comment changes in the sources
+therefore produce an empty diff and require no bump.
+
+References to elements of the model itself are compared ignoring the model version; references
+into other models are compared by name and major version. A dependency switching to a new major
+therefore surfaces as a breaking reference change, while minor/revision dependency bumps only
+surface in the dependency diff.
+
+### Major (breaking)
+
+| Change | Reasoning |
+| ------ | --------- |
+| Type, attribute, enum, record, or association role **removed** | Consumers reference the element |
+| Attribute assignment removed from a type, record, or association role | Consumers reference the attribute |
+| `valueType` of an attribute changed | Data format breaks |
+| `valueCkEnumId` / `valueCkRecordId` changed | Reference target breaks |
+| Attribute assignment references a different attribute definition (`id` changed) | Value semantics may break (defensive) |
+| Type attribute changed from optional to **required** (`isOptional: true → false`) | Existing instances may become invalid |
+| New **required** attribute **without** `defaultValues` (or referencing an attribute of another model) | Existing instances become invalid (defensive when not inspectable) |
+| `derivedFromCkTypeId` / `derivedFromCkRecordId` changed | Inheritance hierarchy breaks (GraphQL schema, queries) |
+| Multiplicity **tightened** (permissiveness One < ZeroOrOne < N decreases) | Existing associations may become invalid |
+| `inboundName` / `outboundName` of an association role changed | Navigation/GraphQL breaks |
+| Type association removed | Consumers use the navigation |
+| Type association added referencing a role with multiplicity **One** (either direction) | New mandatory association — entity creation without it is rejected |
+| Type association added referencing a role of **another model** | Multiplicity not inspectable (defensive) |
+| `targetCkAttributeIds` of a type association changed | Referential integrity changes (defensive) |
+| Enum value **removed** or `key` of an existing `name` changed | Stored values become unreadable |
+| `useFlags` changed | Value semantics break |
+| `isExtensible: true → false` | Runtime extensions are no longer allowed |
+| `isAbstract: false → true` or `isFinal: false → true` | Instantiation/derivation breaks |
+| Unique index added (`Unique`, `UniqueNotDeleted`) | Existing data may be invalid |
+| Type is no longer a collection root (`isCollectionRoot: true → false`) | Collection semantics break (defensive) |
+| Dependency removed | Consumers may rely on the transitively provided model (defensive) |
+| Dependency switched to a new **major** version | Transitively breaking |
+
+### Minor (additive)
+
+| Change | Reasoning |
+| ------ | --------- |
+| New type, attribute, enum, record, association role | Purely additive |
+| New **optional** attribute on an existing type/record/association role | Additive |
+| New **required** attribute **with** `defaultValues` (same model) | Additive, existing data can be filled |
+| New enum value | Additive (precedent: `isExtensible` semantics) |
+| `isExtensible: false → true` | Relaxation |
+| Attribute changed from required to optional | Relaxation |
+| Multiplicity **relaxed** (permissiveness One < ZeroOrOne < N increases) | Relaxation |
+| `isAbstract: true → false`, `isFinal: true → false` | Relaxation |
+| Non-unique index added, any index removed | Query behavior, no data break |
+| `defaultValues` / `autoCompleteValues` / `autoIncrementReference` changed | Behavior of newly created instances changes |
+| `isRuntimeState` changed | Blueprint re-apply behavior changes |
+| Attribute `metaData` changed | Metadata only, no data break |
+| `enableChangeStreamPreAndPostImages` changed | Change stream behavior, no data break |
+| Type becomes a collection root (`isCollectionRoot: false → true`) | Additive |
+| New type association referencing a non-mandatory role of the same model (no multiplicity One) | Additive |
+| New dependency | Additive |
+| Dependency version changed without a major switch | Compatible |
+
+### Patch
+
+| Change | Reasoning |
+| ------ | --------- |
+| `description` (all element kinds, model meta) | Purely documentational |
+| Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
+
+### Defensive default
+
+A change without an explicit rule is classified as **Major**. Since only a minimum level is
+enforced, an overly strict classification is annoying for the developer but never wrong — an
+overly lax one, however, is dangerous.
+
+**Convention for new schema fields:** every new public property on the element DTOs
+(`CkTypeDto`, `CkAttributeDto`, `CkEnumDto`, `CkRecordDto`, `CkAssociationRoleDto` and their
+nested DTOs) must be registered in `CkModelDiffService.AccountedProperties` together with a diff
+implementation and a classification rule (or a documented, conscious exclusion). A guard test in
+`ConstructionKit.Engine.Tests` fails when a DTO property is not accounted for, and this page must
+be extended with the new rule.
+
+### Renames
+
+A rename is not structurally detectable and appears as remove+add — which correctly requires a
+major bump. The report hints at possible renames when removals and additions of the same element
+kind occur in one diff.
+
+## Migration reconciliation
+
+If the diff requires a major bump, the command checks whether the model defines a migration with
+`toVersion` equal to the declared version. If not, a warning lists the breaking changes — the
+engine's no-migrations bridge allows schema-only majors, so this is not an error by default.
+`--requireMigrationForMajor` escalates it to `OCTO-CK104`.
+
+Migration reconciliation is **skipped while the declared version itself is still wrong** (verdict
+`VersionTooLow` or a downgrade). In that state `OCTO-CK100`/`OCTO-CK101` already require the
+developer to raise the version; reconciling migrations at the same time would name the (too-low)
+*declared* version as the missing migration's `toVersion` while `OCTO-CK100` simultaneously demands a
+higher minimum — a contradictory hint. Once the version is corrected, the next run reconciles
+against the now-correct `toVersion` (the check self-heals). For an already-valid version the
+reconciliation runs normally.
+
+## Changelog generation
+
+With `--changelog`, the command writes/updates a `CHANGELOG.md` next to `ckModel.yaml` from the
+classified diff: one section per version with date, bump level, and every change including its
+classification (`### Breaking` / `### Added` / `### Changed`). Existing sections of older
+versions are never rewritten; repeated runs replace only the section of the currently declared
+version (idempotent). Generation only runs after successful validation. Without the flag, the
+command is fully read-only.
+
+## Known limitations (V1)
+
+- **Parallel branches:** two branches that change the same model and both correctly bump to the
+  same version validate green against the same published baseline. Only after merge+publish of
+  the first does the second one's validation trip (main build as second gate).
+- **Foreign attribute defaults:** whether a *required* attribute referencing an attribute
+  definition of another model carries default values cannot be inspected — such additions are
+  classified Major defensively.
+- **Dependency ranges are classified via their resolved versions.** The compiled baseline model
+  persists only the *resolved* dependency versions, not the declared ranges (and the compiled
+  model schema is closed, so persisting ranges is a catalog-format evolution). A range edit that
+  changes the resolved version is classified (major switch → Major, otherwise → Minor); a range
+  edit that leaves the resolved version unchanged (e.g. lowering the floor, or raising the
+  ceiling while no matching version is published yet) is not visible to the diff and requires no
+  bump. The declared ranges themselves are still validated for satisfiability (`OCTO-CK103`).
+  Persisting declared ranges in the compiled model is a follow-up alongside the catalog
+  `versionInfo` metadata.
+- The rule set is not configurable; catalog metadata (`versionInfo`, `IsBreaking` flags) is a
+  follow-up.

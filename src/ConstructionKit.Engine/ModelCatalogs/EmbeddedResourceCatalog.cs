@@ -37,7 +37,7 @@ public class EmbeddedResourceCatalog : ICatalog
     public bool CanRead => true;
 
     /// <inheritdoc />
-    public Task RefreshCatalogAsync(object? sourceIdentifier = null)
+    public Task RefreshCatalogAsync(object? sourceIdentifier = null, bool forceRefresh = false)
     {
         // Embedded resources are static, nothing to refresh
         return Task.CompletedTask;
@@ -60,7 +60,7 @@ public class EmbeddedResourceCatalog : ICatalog
 
         if (!satisfiedModels.Any())
         {
-            return Task.FromResult(new ModelExistingResult { Exists = false });
+            return Task.FromResult(new ModelExistingResult { Exists = false, CatalogName = CatalogName });
         }
 
         // Return the latest satisfied version
@@ -71,7 +71,8 @@ public class EmbeddedResourceCatalog : ICatalog
         return Task.FromResult(new ModelExistingResult
         {
             Exists = true,
-            ModelId = latestSatisfiedModel.ModelId
+            ModelId = latestSatisfiedModel.ModelId,
+            CatalogName = CatalogName
         });
     }
 

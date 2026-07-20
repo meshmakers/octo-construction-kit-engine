@@ -143,6 +143,18 @@ public interface ICatalogService
     Task<bool> IsExistingAsync(CkModelId ckModelId, object? sourceIdentifier = null);
 
     /// <summary>
+    ///     Returns whether a model within the version range exists in any of the known catalogs.
+    ///     When the model exists in multiple catalogs, the highest satisfying version is returned.
+    /// </summary>
+    /// <param name="ckModelIdVersionRange">The construction kit model id with version range</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
+    /// <returns>The task that returns the existence result including the highest satisfying version</returns>
+    Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange ckModelIdVersionRange,
+        object? sourceIdentifier = null);
+
+    /// <summary>
     /// Restores construction kit models based on a construction kit model configuration file.
     /// </summary>
     /// <param name="modelConfigurationFilePath">Local file path where the model configuration file exists.</param>
@@ -183,8 +195,10 @@ public interface ICatalogService
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
+    /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
+    /// contacts the source</param>
     /// <returns></returns>
-    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null);
+    Task RefreshCatalogCacheAsync(string catalogName, object? sourceIdentifier = null, bool forceRefresh = false);
 
     /// <summary>
     /// Refreshes the catalog cache for all catalogs
@@ -192,6 +206,8 @@ public interface ICatalogService
     /// <param name="sourceIdentifier">An object
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
+    /// <param name="forceRefresh">When true, the refresh bypasses the cache freshness window and always
+    /// contacts the source</param>
     /// <returns></returns>
-    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null);
+    Task RefreshAllCatalogCachesAsync(object? sourceIdentifier = null, bool forceRefresh = false);
 }

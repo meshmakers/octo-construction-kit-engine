@@ -208,12 +208,58 @@ public class CompilerService : ICompilerService
 
         // Ensure that the paths are normalized (We do not want to mix separators because it leads to issues)
         outputPath = MmPath.NormalizePath(outputPath);
-        rootPath = MmPath.NormalizePath(rootPath);
         // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
         if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
         {
             createCacheFilePath = MmPath.NormalizePath(createCacheFilePath);
         }
+
+        var (ckModelGraph, compiledModelRoot) = await CompileCoreAsync(rootPath, operationResult)
+            .ConfigureAwait(false);
+
+        if (!Directory.Exists(outputPath))
+        {
+            Directory.CreateDirectory(outputPath);
+        }
+
+        var compiledModelFile = $"ck-{compiledModelRoot.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
+        var compiledModelFilePath = Path.Combine(outputPath, compiledModelFile);
+#if NETSTANDARD2_0
+        using var streamWriter = new StreamWriter(compiledModelFilePath);
+#else
+        await using var streamWriter = new StreamWriter(compiledModelFilePath);
+#endif
+        await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot).ConfigureAwait(false);
+
+#if NETSTANDARD2_0
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
+#else
+        if (!string.IsNullOrWhiteSpace(createCacheFilePath))
+#endif
+        {
+            var compiledModelCacheFilePath =
+                await CreateCacheFileAsync(ckModelGraph, compiledModelRoot.ModelId, createCacheFilePath)
+                    .ConfigureAwait(false);
+            return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
+        }
+
+        return new CompileResult(compiledModelFilePath);
+    }
+
+    /// <inheritdoc />
+    public async Task<CkCompiledModelRoot> CompileInMemoryAsync(string rootPath, OperationResult operationResult)
+    {
+        var (_, compiledModelRoot) = await CompileCoreAsync(rootPath, operationResult).ConfigureAwait(false);
+        return compiledModelRoot;
+    }
+
+    private async Task<(ICkModelGraph CkModelGraph, CkCompiledModelRoot CompiledModelRoot)> CompileCoreAsync(
+        string rootPath, OperationResult operationResult)
+    {
+        ArgumentValidation.ValidateDirectoryPath(nameof(rootPath), rootPath);
+
+        // Ensure that the paths are normalized (We do not want to mix separators because it leads to issues)
+        rootPath = MmPath.NormalizePath(rootPath);
 
         var originFileResolver = new OriginFileResolver(rootPath);
 
@@ -475,33 +521,8 @@ public class CompilerService : ICompilerService
         {
             throw CompilerException.OperationResultWithErrors(operationResult);
         }
-        if (!Directory.Exists(outputPath))
-        {
-            Directory.CreateDirectory(outputPath);
-        }
 
-        var compiledModelFile = $"ck-{ckMetaDto.ModelId.SemanticVersionedFullName.ToLower()}.yaml";
-        var compiledModelFilePath = Path.Combine(outputPath, compiledModelFile);
-#if NETSTANDARD2_0
-        using var streamWriter = new StreamWriter(compiledModelFilePath);
-#else
-        await using var streamWriter = new StreamWriter(compiledModelFilePath);
-#endif
-        await _ckSerializer.SerializeAsync(streamWriter, compiledModelRoot).ConfigureAwait(false);
-
-#if NETSTANDARD2_0
-        if (!string.IsNullOrWhiteSpace(createCacheFilePath) && createCacheFilePath != null)
-#else
-        if (!string.IsNullOrWhiteSpace(createCacheFilePath))
-#endif
-        {
-            var compiledModelCacheFilePath =
-                await CreateCacheFileAsync(ckModelGraph, compileCandidate.ModelId, createCacheFilePath)
-                    .ConfigureAwait(false);
-            return new CompileResult(compiledModelFilePath, compiledModelCacheFilePath);
-        }
-
-        return new CompileResult(compiledModelFilePath);
+        return (ckModelGraph, compiledModelRoot);
     }
 
     private async Task<CkMetaRootDto> GetCkMetaRootDtoAsync(string rootPath, OriginFileResolver originFileResolver,

@@ -12,6 +12,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Meshmakers.Octo.ConstructionKit.Engine.Services;
 
 // ReSharper disable once CheckNamespace
@@ -68,6 +69,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ICkCacheService, CkCacheService>();
         services.AddTransient<ICkClassMappingService, CkClassMappingService>();
         services.AddTransient<ICatalogService, CatalogService>();
+
+        // SemVer version validation services (pure functions over compiled models)
+        services.AddTransient<ICkModelDiffService, CkModelDiffService>();
+        services.AddTransient<ICkSemVerClassifier, CkSemVerClassifier>();
+        services.AddTransient<ICkChangelogGenerator, CkChangelogGenerator>();
 
         // Add here sources of Ck model repositories
         services.AddTransient<ICatalog, LocalFileSystemCatalog>();

@@ -173,7 +173,17 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
 
     private static bool IsShaConflict(ApiException ex)
     {
+        // Three shapes of "the file is not in the state your request assumed":
+        //  - 409 Conflict
+        //  - 422 "... but expected ..." — update carried a stale sha
+        //  - 422 «"sha" wasn't supplied.» — CREATE hit a file that already exists
+        //    (GitHub treats the create as an update and demands the sha). Seen in
+        //    AB#4506: the second CkCompile publish pass within one build re-created
+        //    catalog files committed seconds earlier by the first pass, because the
+        //    existence read still returned stale data. The CreateFileAsync fallback
+        //    below (re-read → update) recovers exactly this case.
         return ex.Message.Contains("but expected", StringComparison.OrdinalIgnoreCase)
+               || ex.Message.Contains("\"sha\" wasn't supplied", StringComparison.OrdinalIgnoreCase)
                || ex.StatusCode == System.Net.HttpStatusCode.Conflict;
     }
 }

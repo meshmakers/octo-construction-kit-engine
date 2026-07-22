@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Engine.Tests")]
+[assembly: InternalsVisibleTo("ConstructionKit.Engine.SystemTests")]
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.SystemTests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 namespace Meshmakers.Octo.ConstructionKit.Engine;

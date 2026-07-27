@@ -6,6 +6,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.SemVer;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -16,7 +17,9 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Commands.Implementations;
 ///     Validates that the version declared in <c>ckModel.yaml</c> honestly reflects the changes
 ///     made since the last published version of the model. The command never writes to the model
 ///     sources; with <c>--changelog</c> it additionally maintains a <c>CHANGELOG.md</c> next to
-///     <c>ckModel.yaml</c>.
+///     <c>ckModel.yaml</c>. Successfully validated packages are published to the local file system
+///     catalog (run-isolated in CI via <c>-lcr</c>) so later packages of the same invocation can
+///     depend on versions introduced by the same commit.
 /// </summary>
 internal class ValidateVersionCommand : CkcCommand
 {
@@ -148,12 +151,19 @@ internal class ValidateVersionCommand : CkcCommand
         var markdownReport = new StringBuilder("# Construction Kit SemVer Validation Report\n");
         var failures = new List<string>();
 
+        // Models validated earlier in THIS invocation, keyed by model name. Paths are passed in
+        // dependency order, so a later package may depend on a version that is introduced by an
+        // earlier package of the same commit and is therefore not published to any catalog yet
+        // (it gets published DURING the subsequent build). Without this, every same-commit
+        // dependency bump dies with a false OCTO-CK103.
+        var validatedSiblings = new Dictionary<string, CkModelId>(StringComparer.Ordinal);
+
         foreach (var rootPath in rootPaths)
         {
             try
             {
                 var packageErrors = await ValidatePackageAsync(rootPath, catalogName, writeChangelog,
-                    requireMigrationForMajor, markdownReport);
+                    requireMigrationForMajor, markdownReport, validatedSiblings);
                 failures.AddRange(packageErrors);
             }
             catch (Exception ex) when (ex is CompilerException or ModelParseException or CkModelException
@@ -195,7 +205,8 @@ internal class ValidateVersionCommand : CkcCommand
     }
 
     private async Task<List<string>> ValidatePackageAsync(string rootPath, string? catalogName, bool writeChangelog,
-        bool requireMigrationForMajor, StringBuilder markdownReport)
+        bool requireMigrationForMajor, StringBuilder markdownReport,
+        Dictionary<string, CkModelId> validatedSiblings)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
@@ -245,6 +256,8 @@ internal class ValidateVersionCommand : CkcCommand
 
             // First publication: any version is valid — the declared version is the starting point
             notes.Add("First publication — the model exists in no catalog yet; the declared version is the baseline.");
+            await RegisterValidatedSiblingAsync(rootPath, modelName, declaredVersion, null, validatedSiblings,
+                warnings);
             WriteReport(markdownReport, modelName, rootPath, null, declaredVersion, null, [], errors, warnings, notes);
 
             if (writeChangelog)
@@ -268,7 +281,7 @@ internal class ValidateVersionCommand : CkcCommand
         //    unsatisfiable dependency range otherwise aborts the in-memory compile with a raw
         //    ModelValidationException before OCTO-CK103 can be emitted. On failure we skip
         //    compile/diff for this package, write a clean report and continue with the next package.
-        await CheckDependenciesAsync(meta, modelName, catalogName, errors);
+        await CheckDependenciesAsync(meta, modelName, catalogName, errors, validatedSiblings, notes);
         if (errors.Count > 0)
         {
             WriteReport(markdownReport, modelName, rootPath, existingResult, declaredVersion, null, [],
@@ -354,11 +367,18 @@ internal class ValidateVersionCommand : CkcCommand
             }
         }
 
-        // 9. Emit the report
+        // 9. Register the package for sibling dependency resolution of later packages in this run
+        if (errors.Count == 0)
+        {
+            await RegisterValidatedSiblingAsync(rootPath, modelName, declaredVersion, current, validatedSiblings,
+                warnings);
+        }
+
+        // 10. Emit the report
         WriteReport(markdownReport, modelName, rootPath, existingResult, declaredVersion, validationResult,
             classifiedChanges, errors, warnings, notes);
 
-        // 10. Only on success and --changelog: write/replace the section of the declared version
+        // 11. Only on success and --changelog: write/replace the section of the declared version
         if (errors.Count == 0 && writeChangelog)
         {
             var note = validationResult.Verdict == CkSemVerVerdict.ValidBumpWithoutStructuralChange
@@ -372,13 +392,17 @@ internal class ValidateVersionCommand : CkcCommand
 
     /// <summary>
     ///     Verifies (never modifies) that every declared dependency range resolves to a published
-    ///     version. Adds an OCTO-CK103 finding to <paramref name="errors" /> when a range is satisfied
-    ///     by no published version, or OCTO-CK102 when the catalog source was unreachable during the
+    ///     version. A range that no catalog satisfies is additionally checked against the sibling
+    ///     packages validated earlier in this invocation: the paths are passed in dependency order,
+    ///     so a dependency version introduced by the same commit is legitimate even though it is
+    ///     only published during the subsequent build. Adds an OCTO-CK103 finding to
+    ///     <paramref name="errors" /> when a range is satisfied by no published version and no
+    ///     validated sibling, or OCTO-CK102 when the catalog source was unreachable during the
     ///     last cache refresh. Pinned to <paramref name="catalogName" /> when set, otherwise all
     ///     readable catalogs are queried.
     /// </summary>
     private async Task CheckDependenciesAsync(CkMetaRootDto meta, string modelName, string? catalogName,
-        List<string> errors)
+        List<string> errors, Dictionary<string, CkModelId> validatedSiblings, List<string> notes)
     {
         foreach (var dependencyRange in meta.Dependencies ?? [])
         {
@@ -390,11 +414,73 @@ internal class ValidateVersionCommand : CkcCommand
                 continue;
             }
 
+            if (validatedSiblings.TryGetValue(dependencyRange.Name, out var siblingModelId)
+                && dependencyRange.IsSatisfiedBy(siblingModelId))
+            {
+                notes.Add(
+                    $"Dependency '{dependencyRange.FullName}' is not published yet but satisfied by sibling model " +
+                    $"'{siblingModelId.FullName}' validated earlier in this run — it is published during the same build.");
+                continue;
+            }
+
             errors.Add(dependencyResult.SourceUnreachable
                 ? $"OCTO-CK102: Dependency '{dependencyRange.FullName}' of model '{modelName}' could not be checked " +
                   "because the catalog source was unreachable. Check connectivity and retry with --refresh."
                 : $"OCTO-CK103: Dependency range '{dependencyRange.FullName}' of model '{modelName}' is not satisfied " +
                   "by any published version. Publish the dependency first or correct the range in ckModel.yaml.");
+        }
+    }
+
+    /// <summary>
+    ///     Registers a successfully validated package so later packages of the same invocation can
+    ///     resolve it as a dependency: records the declared version for the dependency-existence
+    ///     check and publishes the compiled model to the local file system catalog (run-isolated in
+    ///     CI via -lcr) so the compile stage of dependent packages resolves it. When
+    ///     <paramref name="compiledModel" /> is null (first-publication path, which returns before
+    ///     the regular compile step) the model is compiled in-memory first; a compile failure only
+    ///     produces a warning — the dependent package then reports the actionable finding itself.
+    /// </summary>
+    private async Task RegisterValidatedSiblingAsync(string rootPath, string modelName, CkVersion declaredVersion,
+        CkCompiledModelRoot? compiledModel, Dictionary<string, CkModelId> validatedSiblings, List<string> warnings)
+    {
+        var modelId = new CkModelId(modelName, declaredVersion);
+        validatedSiblings[modelName] = modelId;
+
+        if (!_localCatalogOptions.Value.IsEnabled)
+        {
+            warnings.Add(
+                $"The local catalog is disabled — sibling packages of this run cannot compile against '{modelId.FullName}'. " +
+                "Enable it (-lce true) with an isolated root (-lcr <empty-dir>) when validating dependent packages together.");
+            return;
+        }
+
+        try
+        {
+            if (compiledModel == null)
+            {
+                var compileOperationResult = new OperationResult();
+                compiledModel = await _compilerService.CompileInMemoryAsync(rootPath, compileOperationResult);
+                if (compileOperationResult.HasErrors || compileOperationResult.HasFatalErrors)
+                {
+                    warnings.Add(
+                        $"Model '{modelId.FullName}' could not be compiled for sibling dependency resolution; " +
+                        "dependent packages of this run may fail to compile against it.");
+                    return;
+                }
+            }
+
+            await _catalogService.PublishAsync(LocalFileSystemCatalog.Name, compiledModel,
+                new OriginFileResolver(rootPath), isForced: true);
+            Logger.LogInformation(
+                "Model '{ModelFullName}' registered in the local catalog for sibling dependency resolution",
+                modelId.FullName);
+        }
+        catch (Exception ex) when (ex is CompilerException or ModelParseException or CkModelException
+                                       or ModelCatalogException)
+        {
+            warnings.Add(
+                $"Model '{modelId.FullName}' could not be registered for sibling dependency resolution ({ex.Message}); " +
+                "dependent packages of this run may fail to compile against it.");
         }
     }
 

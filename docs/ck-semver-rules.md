@@ -20,7 +20,7 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 
 | Argument | Description |
 | -------- | ----------- |
-| `-p, --path` | Root path(s) of Construction Kit model directories. Multiple paths are validated in the given order — pass them in dependency order so cascade violations read comprehensibly. |
+| `-p, --path` | Root path(s) of Construction Kit model directories. Multiple paths are validated in the given order — pass them in **dependency order** (dependencies first): a later package may depend on a version a sibling package introduces in the same run (see the sibling-resolution note below). |
 | `-cn, --catalogName` | Pins **baseline retrieval and the FR-9 dependency-existence check** (`OCTO-CK102`/`OCTO-CK103`) to the named catalog. Without it, all readable catalogs are queried and the highest published version wins (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub). **It does not pin the compile-stage dependency *resolution*** — see the note below. |
 | `-o, --output` | Additionally writes the report as Markdown (e.g. for PR comments). |
 | `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
@@ -41,6 +41,17 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 > baseline to one catalog, force a cache refresh, and point the local catalog at a fresh empty
 > directory so no stale local content participates in resolution. The shipped CI step in
 > `octo-construction-kit` does exactly this via a per-run `$(OctoLocalCatalogRootPath)`.
+>
+> **Same-run sibling dependency resolution.** A commit that bumps a dependency model and its
+> consumer together (e.g. `Basic.Energy` 1.1.4 → 1.2.0 plus `EnergyCommunity` 4.0.0 depending on
+> `Basic.Energy-[1.2,2.0)`) declares a range no catalog can satisfy yet — the new dependency
+> version is only published *during* the subsequent build. To keep this from dying with a false
+> `OCTO-CK103`, every package that validates successfully (including first publications) is
+> registered for the rest of the invocation: its declared version satisfies the FR-9
+> dependency-existence check of later packages, and its compiled model is published to the local
+> file system catalog (the run-isolated `-lcr` directory in CI) so the compile stage of later
+> packages resolves it. This is why the `-p` paths must be in dependency order — a consumer
+> validated *before* its same-run dependency still fails with `OCTO-CK103`, honestly.
 
 ### Validation rule
 
@@ -62,7 +73,7 @@ highest level in the diff:
 | `OCTO-CK100` | Declared version below the required minimum | Raise the version in `ckModel.yaml` to at least the reported minimum |
 | `OCTO-CK101` | Declared version below the published version (downgrade) | Use a version >= the published one |
 | `OCTO-CK102` | Catalog source unreachable — baseline (or dependency check) impossible | Check network/VPN and catalog configuration, retry with `--refresh` |
-| `OCTO-CK103` | A dependency range is satisfied by no published version | Publish the dependency first or correct the range |
+| `OCTO-CK103` | A dependency range is satisfied by no published version and no sibling package validated earlier in the same run | Publish the dependency first, correct the range, or pass the dependency's source path before the consumer's (dependency order) |
 | `OCTO-CK104` | Major bump without a matching migration (only with `--requireMigrationForMajor`) | Add a migration with `toVersion` == declared version |
 
 Exit codes: `0` = valid, non-zero = violation or error (CI-friendly). Concretely, a version

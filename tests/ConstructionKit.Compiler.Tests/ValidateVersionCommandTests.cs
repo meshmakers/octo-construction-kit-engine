@@ -115,6 +115,29 @@ public sealed class ValidateVersionCommandTests : IDisposable
         return _serviceProvider.GetRequiredService<ICommandParser>().ParseAndValidateAsync();
     }
 
+    /// <summary>
+    ///     Writes a dependent CK source into its own directory: it declares a dependency range on
+    ///     <c>CmdFixture</c> and one type deriving from a <c>CmdFixture</c> type is not needed —
+    ///     the dependency declaration alone exercises resolution.
+    /// </summary>
+    private string WriteDependentSource(string version, string dependencyRange)
+    {
+        var dependentDir = Path.Combine(_root, "src-dependent");
+        Directory.CreateDirectory(dependentDir);
+        Directory.CreateDirectory(Path.Combine(dependentDir, "attributes"));
+
+        File.WriteAllText(Path.Combine(dependentDir, "ckModel.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-meta.schema.json\"\n" +
+            $"dependencies:\n  - {dependencyRange}\n" +
+            $"modelId: CmdFixtureDependent-{version}\n");
+
+        File.WriteAllText(Path.Combine(dependentDir, "attributes", "label.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+            "attributes:\n  - id: Label\n    valueType: String\n");
+
+        return dependentDir;
+    }
+
     [Fact]
     public async Task UnsatisfiableDependencyRange_FailsWithCk103AndCleanReport()
     {
@@ -234,5 +257,79 @@ public sealed class ValidateVersionCommandTests : IDisposable
         var changelog = await File.ReadAllTextAsync(changelogPath, TestContext.Current.CancellationToken);
         Assert.Contains("## 2.0.0", changelog);
         Assert.Contains("### Breaking", changelog);
+    }
+
+    [Fact]
+    public async Task DependencyOnSiblingVersionBumpedInSameRun_IsSatisfiedWithoutCk103()
+    {
+        // Baselines: CmdFixture-1.0.0 and CmdFixtureDependent-1.0.0 (dep range open at 1.0)
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+        await PublishDependentBaselineAsync(dependentDir);
+
+        // Same-commit bump: CmdFixture 1.0.0 -> 1.1.0 (additive), dependent narrows to [1.1,2.0)
+        // — the range is satisfied by NO published version, only by the sibling working copy.
+        WriteSource("1.1.0");
+        WriteDependentSource("1.1.0", "CmdFixture-[1.1,2.0)");
+
+        await RunAsync("-p", _sourceDir, "-p", dependentDir, "-o", _reportPath);
+
+        // The sibling is registered in the local catalog after its own validation, so both the
+        // dependency-existence check and the dependent's compile resolve CmdFixture-1.1.0 even
+        // though it was never published before this run.
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("OCTO-CK103", report);
+        Assert.DoesNotContain("ERROR", report);
+    }
+
+    [Fact]
+    public async Task DependencyRangeNotSatisfiedBySibling_StillFailsWithCk103()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+        await PublishDependentBaselineAsync(dependentDir);
+
+        // Sibling bumps to 1.1.0 but the dependent demands [2.0,3.0) — the sibling must NOT
+        // satisfy the range, the honest OCTO-CK103 stays.
+        WriteSource("1.1.0");
+        WriteDependentSource("1.1.0", "CmdFixture-[2.0,3.0)");
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "-p", dependentDir, "-o", _reportPath));
+
+        Assert.Contains("OCTO-CK103", exception.Message);
+        Assert.Contains("CmdFixture-[2.0,3.0)", exception.Message);
+    }
+
+    [Fact]
+    public async Task DependencyOnFirstPublicationSibling_IsSatisfiedWithoutCk103()
+    {
+        // CmdFixture has never been published (first publication) and the dependent — also new —
+        // depends on it in the very same run.
+        WriteSource("1.0.0");
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+
+        await RunAsync("-p", _sourceDir, "-p", dependentDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("OCTO-CK103", report);
+        Assert.Contains("First publication", report);
+        // The dependent's sibling registration must have compiled against the brand-new
+        // CmdFixture-1.0.0 the first package registered a moment earlier.
+        Assert.DoesNotContain("could not be compiled for sibling dependency resolution", report);
+        Assert.DoesNotContain("could not be registered for sibling dependency resolution", report);
+    }
+
+    private async Task PublishDependentBaselineAsync(string dependentDir)
+    {
+        var operationResult = new OperationResult();
+        var compiled = await _serviceProvider.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(dependentDir, operationResult);
+        Assert.False(operationResult.HasErrors);
+
+        await _serviceProvider.GetRequiredService<ICatalogService>().PublishAsync(
+            LocalFileSystemCatalog.Name, compiled, new OriginFileResolver(dependentDir), isForced: true);
     }
 }

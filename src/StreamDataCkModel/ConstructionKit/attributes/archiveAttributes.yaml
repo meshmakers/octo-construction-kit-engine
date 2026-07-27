@@ -8,11 +8,12 @@ attributes:
     valueType: RecordArray
     valueCkRecordId: ${this}/CkArchiveColumn
   - id: Archive.Status
-    description: "Lifecycle status of the archive. Defaults to Created."
+    description: "Lifecycle status of the archive. Defaults to Created. Runtime-state (AB#4582): the lifecycle is operator-managed via ActivateArchive, not blueprint configuration. Marked isRuntimeState so a blueprint re-apply (InstallBlueprint -f) preserves the live status instead of resetting an activated archive back to the seeded Disabled/Created value and silently breaking stream-data queries."
     valueType: Enum
     valueCkEnumId: ${this}/CkArchiveStatus
     defaultValues:
       - 0
+    isRuntimeState: true
   - id: Archive.RawRetentionMs
     description: "Retention window for raw data points in milliseconds. When set, the partition pruner may drop source partitions older than (now - RawRetentionMs), but never ahead of the slowest attached rollup's watermark. Null means keep forever."
     valueType: Int

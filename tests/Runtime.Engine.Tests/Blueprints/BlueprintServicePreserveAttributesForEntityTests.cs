@@ -164,6 +164,50 @@ public class BlueprintServicePreserveAttributesForEntityTests
         Assert.Equal(47, seed.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
     }
 
+    [Fact]
+    public void ArchiveStatus_ActivatedArchive_SurvivesForcedBlueprintReApply()
+    {
+        // AB#4582: EnergyCommunity.Base seeds every archive with Archive.Status=2
+        // (Disabled) so a fresh install never requires CrateDB; ActivateArchive later
+        // flips the live archive to 1 (Activated) and provisions the table. A forced
+        // blueprint re-apply (InstallBlueprint -f) upserts the same seed and, without
+        // the runtime-state flag, would rewrite Status back to Disabled — the archive
+        // then reads as not activated and stream-data queries fail with
+        // STREAMDATA_ARCHIVE_NOT_ACTIVATED even though the CrateDB rows are untouched.
+        // With Archive.Status flagged isRuntimeState the live Activated value is
+        // preserved, so the re-apply is a no-op on the lifecycle status.
+        var flagged = new[]
+        {
+            BuildTypeAttr("Status", isRuntimeState: true),
+        };
+        var seed = SeedEntity(("Status", 2));     // seeded Disabled
+        var existing = ExistingEntity(("Status", 1)); // live Activated
+
+        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+
+        Assert.Equal(1, preserved);
+        Assert.Equal(1, seed.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
+    }
+
+    [Fact]
+    public void ArchiveStatus_FreshInstall_KeepsSeededDisabledValue()
+    {
+        // AB#4582: the flag must not change fresh-install behaviour. With no existing
+        // archive entity there is nothing to preserve, so the seeded Disabled (2) value
+        // lands and the post-install ActivateArchive phase can activate it as before.
+        var flagged = new[]
+        {
+            BuildTypeAttr("Status", isRuntimeState: true),
+        };
+        var seed = SeedEntity(("Status", 2));
+        var existing = ExistingEntity(); // fresh tenant, no archive yet
+
+        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+
+        Assert.Equal(0, preserved);
+        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
+    }
+
     private static CkTypeAttributeGraph BuildTypeAttr(string name, bool isRuntimeState)
     {
         var attrId = new CkId<CkAttributeId>($"{TestCkModelId}/{name}");

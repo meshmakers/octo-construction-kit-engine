@@ -231,64 +231,81 @@ Blueprints initialize tenants with pre-configured CK models and runtime data. Se
 Key services:
 - `IBlueprintService` - Applies blueprints to tenants
 
-#### Runtime-State Preservation on Re-Apply
+#### Runtime-State Preservation on Re-Import (Upsert)
 
-`BlueprintService.ApplyBlueprintAsync` is the call host services (e.g. the
-Communication Controller) invoke at tenant startup to roll forward
-service-managed blueprints. When the embedded blueprint version differs
-from the installed version, the seed-data import runs. Without
-intervention, that path hits
-`IImportRtModelCommand.ImportModelAsync(..., ImportStrategy.Upsert)`
-which the MongoDB layer maps to a full `ReplaceOne` — every attribute on
-the existing entity is overwritten by the seed's value, even attributes
-the blueprint author never meant to manage at all (deployment status,
-last-error fields, sync sequence numbers, …). The observable failure
-mode: a "Deployed" adapter flips back to "Undeployed" on the next
-controller restart that picks up a blueprint version bump, because the
-seed encodes `DeploymentState: 0` as the fresh-tenant default.
+Any `ImportStrategy.Upsert` import maps to a full `ReplaceOne` in the
+MongoDB layer — every attribute on the existing entity is overwritten by
+the import model's value, even attributes the author never meant to manage
+(deployment status, last-error fields, sync sequence numbers, stream-data
+`Archive.Status`, …). Two observable failure modes: a "Deployed" adapter
+flips back to "Undeployed" on the next controller restart that picks up a
+blueprint version bump (the seed encodes `DeploymentState: 0` as the
+fresh-tenant default, AB#4582's sibling), and an **activated stream-data
+archive silently reverts to Disabled** on a blueprint re-apply or a plain
+`ImportRt -r` (AB#4582 / AB#4589), breaking SD queries with
+`STREAMDATA_ARCHIVE_NOT_ACTIVATED`.
 
-The fix is per-attribute, opt-in on the CK side:
+The fix is per-attribute, opt-in on the CK side, and lives at the **single
+import choke point** so every Upsert caller gets it automatically:
 
 - **CK schema**: `CkAttribute.isRuntimeState: bool` (defaults to false).
   See `Serialization/Schema/construction-kit-elements-attribute.schema.json`,
   `CkAttributeDto`, and the propagation through `CkAttributeGraph` /
   `CkTypeAttributeGraph`. Existing CK models that don't set the flag
   behave exactly as before.
-- **Blueprint apply path**:
-  `BlueprintService.PreserveRuntimeStateAttributesAsync` runs after
-  `LoadAndTagSeedAsync` and before `ImportModelAsync`. It groups the
-  seed entities by CK type for one batch repo query per type, looks
-  each existing entity up by `RtId`, and for every attribute the CK
-  cache flags `IsRuntimeState=true` it overwrites the **seed value**
-  with the **existing value** before the import runs. The repository
-  call is wrapped — a lookup failure logs a warning and falls through
-  to seed values rather than blocking the apply.
-- **Per-entity vs. per-attribute lock**: preservation is orthogonal to
-  the existing `rtBlueprintLocked` per-entity lock. The lock decides
-  whether the blueprint touches an entity at all; `isRuntimeState`
-  decides — assuming the blueprint is touching the entity — which
+- **Import path (shared)**:
+  `ImportRtModelCommand.PreserveRuntimeStateAttributesAsync` runs at the top
+  of the private `ImportEntityAsync` choke point — through which **all three**
+  public import methods (`ImportModelAsync`, `ImportTextAsync`, `ImportAsync`
+  file/stream) funnel — gated on `importStrategy == Upsert`. It groups the
+  incoming entities by CK type for one batch repo query per type (on the
+  ambient import session/transaction), looks each existing entity up by
+  `RtId`, and for every attribute the CK cache flags `IsRuntimeState=true`
+  it overwrites the **imported value** with the **existing value** before the
+  bulk write. The repository call is wrapped — a lookup failure logs a
+  warning and falls through to imported values rather than blocking the
+  import. `Insert` is untouched (it errors on an existing id, so there is
+  nothing to preserve).
+- **Who benefits**: because it sits in the import command, all Upsert
+  callers are covered with no per-caller code:
+  - blueprint seed apply (`BlueprintService.ApplySeedDataForBlueprintAsync`
+    and the locked/merge import path) — the explicit pre-import preserve call
+    that used to live in `BlueprintService` was removed; it is now automatic.
+  - the plain `ImportRt -r` CLI path (`octo-bot-services` `ImportModelJob` →
+    `ImportAsync`) — the AB#4589 target (voest-app archive re-import).
+  - CK-model migration entity writes (`BlueprintMigrationExecutor`, Upsert).
+    Note: an additive migration that introduces a new runtime-state attribute
+    on a pre-existing entity still lands its value (existing entity has no
+    prior value → nothing to preserve); only a migration that *rewrites an
+    already-present* runtime-state attribute would be preserved-over — rare,
+    and consistent with "an import must never trample runtime state".
+- **Per-entity vs. per-attribute lock**: preservation is orthogonal to the
+  blueprint `rtBlueprintLocked` per-entity lock. The lock (blueprint layer)
+  decides whether the blueprint touches an entity at all; `isRuntimeState`
+  (import layer) decides — assuming the entity is being imported — which
   specific attributes survive the upsert.
-- **What it does not do**: preservation only rewrites the seed
-  in-memory, so the actual import path stays a `ReplaceOne`. Attributes
-  not in the seed are still cleared on the upsert in line with prior
-  behaviour; preservation can only *replace* a seed value for an
-  attribute the seed already declares. Fresh tenants (no existing
-  entity) are silent no-ops.
+- **What it does not do**: preservation only rewrites the incoming model
+  in-memory, so the actual import stays a `ReplaceOne`. Attributes not in the
+  import model are still cleared on the upsert in line with prior behaviour;
+  preservation can only *replace* an imported value for an attribute the model
+  already declares. Fresh tenants / brand-new entities (no existing entity)
+  are silent no-ops.
 
 The testable seam is the pure
-`BlueprintService.PreserveAttributesForEntity` static helper, exposed
+`ImportRtModelCommand.PreserveAttributesForEntity` static helper, exposed
 via `InternalsVisibleTo`. Tests in
-`tests/Runtime.Engine.Tests/Blueprints/BlueprintServicePreserveAttributesForEntityTests.cs`
-cover: flagged+both-sides → preserved; unflagged → seed wins; mixed;
-seed-only (additive CK bump) → seed value lands; existing-only (seed
-omits the attr) → no-op; multi-attribute independence.
+`tests/Runtime.Engine.Tests/Exchange/ImportRtModelCommandPreserveAttributesForEntityTests.cs`
+cover: flagged+both-sides → preserved; unflagged → imported value wins; mixed;
+model-only (additive CK bump) → imported value lands; existing-only (model
+omits the attr) → no-op; multi-attribute independence; and the stream-data
+`Archive.Status` activated-survives-re-import / fresh-import-keeps-Disabled cases.
 
 Author guidance: when adding a CK attribute that carries runtime state
 the host services / operators / users own at runtime (status enums,
-sync counters, error message fields, change timestamps), mark it
-`isRuntimeState: true` so a future version bump can never trample it.
-When in doubt: blueprint authors describe **configuration**; everything
-else is runtime state.
+sync counters, error message fields, change timestamps, archive lifecycle
+status), mark it `isRuntimeState: true` so a future version bump or
+re-import can never trample it. When in doubt: authors describe
+**configuration**; everything else is runtime state.
 
 ### CK Model Migrations
 CK Model Migrations update runtime entities when CK model versions change. See `docs/ck-model-migrations.md` for details.

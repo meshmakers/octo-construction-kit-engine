@@ -7,6 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
+using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
@@ -158,10 +159,27 @@ internal class ImportRtModelCommand(
     private async Task ImportEntityAsync(IOctoSession session, IEnumerable<RtEntityTcDto> modelRtEntities,
         IRuntimeRepository runtimeRepository, ImportStrategy importStrategy)
     {
+        // Materialize once so the runtime-state preserve pass and the import loop below both
+        // operate on the same DTO instances (the preserve pass rewrites seed attribute values
+        // in place) and a lazy/single-pass IEnumerable can't be enumerated twice.
+        var entities = modelRtEntities as IReadOnlyList<RtEntityTcDto> ?? modelRtEntities.ToList();
+
+        // On Upsert the DB layer runs a full ReplaceOne, which would overwrite every attribute
+        // on the existing document — including CK attributes flagged isRuntimeState that
+        // services/operators own at runtime (deployment/communication status, sync counters,
+        // stream-data Archive.Status, …). Preserve those from the existing entity before the
+        // import so no Upsert caller (blueprint apply, plain RT ImportRt, CK-model migration)
+        // can silently trample them. Insert can't overwrite (it errors on an existing id), so
+        // there is nothing to preserve there.
+        if (importStrategy == ImportStrategy.Upsert)
+        {
+            await PreserveRuntimeStateAttributesAsync(session, entities, runtimeRepository).ConfigureAwait(false);
+        }
+
 #if NETSTANDARD2_0
-        Parallel.ForEach(modelRtEntities, modelRtEntity =>
+        Parallel.ForEach(entities, modelRtEntity =>
 #else
-        await Parallel.ForEachAsync(modelRtEntities, async (modelRtEntity, token) =>
+        await Parallel.ForEachAsync(entities, async (modelRtEntity, token) =>
 #endif
         {
             var ckTypeGraph = cacheService.GetRtCkType(runtimeRepository.TenantId, modelRtEntity.CkTypeId);
@@ -391,5 +409,155 @@ internal class ImportRtModelCommand(
         {
             throw ExchangeException.BulkImportError(e);
         }
+    }
+
+    /// <summary>
+    /// For every entity in the import model that already exists in the tenant repo, replaces the
+    /// incoming values for CK-attributes flagged <c>isRuntimeState</c> (see
+    /// <see cref="ConstructionKit.Contracts.DataTransferObjects.CkAttributeDto.IsRuntimeState"/>)
+    /// with the existing runtime value. Runs only for <see cref="ImportStrategy.Upsert"/> (an Insert
+    /// cannot overwrite an existing entity). Fresh tenants and brand-new entities are silent no-ops.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Why this exists: an Upsert import maps to a full <c>ReplaceOne</c> in the MongoDB layer —
+    /// every attribute on the existing document is overwritten by the import's values, even for
+    /// attributes that carry runtime state services/operators own (deployment/communication status,
+    /// last-error fields, sync sequence numbers, stream-data <c>Archive.Status</c>). Without this,
+    /// re-importing a seed/YAML that carries those attributes resets them to whatever default the
+    /// import file holds — e.g. a "Deployed" adapter flipping back to "Undeployed" on a blueprint
+    /// version bump, or an activated stream-data archive silently reverting to Disabled on a
+    /// blueprint re-apply or a plain <c>ImportRt -r</c> (AB#4582 / AB#4589).
+    /// </para>
+    /// <para>
+    /// This lives at the single import choke point so every Upsert caller — blueprint seed apply,
+    /// the plain <c>ImportRt</c> CLI path, and CK-model migration entity writes — gets the guarantee
+    /// automatically. Preservation only rewrites incoming values in place for attributes the model
+    /// already declares AND the existing entity already has a value for; additive attributes (new in
+    /// this CK bump) fall through to the imported value on a pre-existing entity, and entities that
+    /// don't exist yet are untouched.
+    /// </para>
+    /// </remarks>
+    private async Task PreserveRuntimeStateAttributesAsync(IOctoSession session,
+        IReadOnlyList<RtEntityTcDto> modelRtEntities, IRuntimeRepository runtimeRepository)
+    {
+        // Group by CkTypeId so we can batch one repo query per type instead of per entity.
+        // Entities with an empty rtId can't be looked up — they are always treated as new.
+        var entitiesByType = modelRtEntities
+            .Where(e => !e.RtId.Equals(OctoObjectId.Empty))
+            .GroupBy(e => e.CkTypeId)
+            .ToList();
+
+        if (entitiesByType.Count == 0)
+        {
+            return;
+        }
+
+        var totalPreserved = 0;
+
+        foreach (var typeGroup in entitiesByType)
+        {
+            // Look up the CK type to find which attributes are flagged. If the type isn't in
+            // the cache the import would fail downstream anyway — let it surface there with
+            // the existing error path instead of swallowing it here.
+            if (!cacheService.TryGetRtCkType(runtimeRepository.TenantId, typeGroup.Key, out var ckTypeGraph))
+            {
+                continue;
+            }
+
+            // Materialize the flagged-attribute set once per type.
+            var flaggedAttributes = ckTypeGraph!.AllAttributes.Values
+                .Where(a => a.IsRuntimeState)
+                .ToList();
+
+            if (flaggedAttributes.Count == 0)
+            {
+                // Cheap fast path: this type has no runtime-state attrs, nothing to preserve.
+                continue;
+            }
+
+            var modelEntities = typeGroup.ToList();
+            var rtIds = modelEntities.Select(e => e.RtId).ToList();
+
+            IResultSet<RtEntity> existingEntities;
+            try
+            {
+                existingEntities = await runtimeRepository.GetRtEntitiesByIdAsync(
+                    session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // Don't fail the whole import — if we can't look up existing entities the
+                // import will still proceed with the imported values (i.e. the old behaviour).
+                logger.LogWarning(ex,
+                    "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; falling back to imported values",
+                    typeGroup.Key);
+                continue;
+            }
+
+            var existingByRtId = existingEntities.Items.ToDictionary(e => e.RtId);
+
+            foreach (var modelEntity in modelEntities)
+            {
+                if (!existingByRtId.TryGetValue(modelEntity.RtId, out var existing))
+                {
+                    // New entity — let the imported value land as-is.
+                    continue;
+                }
+
+                var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes);
+                if (preservedForEntity > 0)
+                {
+                    totalPreserved += preservedForEntity;
+                    logger.LogDebug(
+                        "Preserved {PreservedCount} runtime-state attribute(s) on existing entity {RtId} (type {CkTypeId}) during RT import",
+                        preservedForEntity, modelEntity.RtId, typeGroup.Key);
+                }
+            }
+        }
+
+        if (totalPreserved > 0)
+        {
+            logger.LogInformation(
+                "RT import preserved {TotalPreserved} runtime-state attribute value(s) for tenant {TenantId}",
+                totalPreserved, runtimeRepository.TenantId);
+        }
+    }
+
+    /// <summary>
+    /// Per-entity preserve loop. For each <paramref name="flaggedAttributes"/> entry that has a
+    /// value on <paramref name="existing"/> AND a value on <paramref name="modelEntity"/>, copies
+    /// the existing value over the imported value in-place on <paramref name="modelEntity"/>. Returns
+    /// the count of attributes preserved. Pure function so it can be unit-tested without mocking
+    /// the repository / cache surface.
+    /// </summary>
+    internal static int PreserveAttributesForEntity(
+        RtEntityTcDto modelEntity,
+        RtEntity existing,
+        IReadOnlyList<CkTypeAttributeGraph> flaggedAttributes)
+    {
+        var preserved = 0;
+        foreach (var flaggedAttr in flaggedAttributes)
+        {
+            var modelAttr = modelEntity.Attributes.FirstOrDefault(a =>
+                a.Id.Equals(flaggedAttr.CkAttributeId));
+            if (modelAttr == null)
+            {
+                // Import model doesn't carry this attribute (e.g. additive CK bump) — nothing to overwrite.
+                continue;
+            }
+
+            if (!existing.Attributes.TryGetValue(flaggedAttr.AttributeName, out var existingValue))
+            {
+                // Existing entity doesn't have a value for this attr (e.g. the attr was just added
+                // in this CK bump on a pre-existing entity); fall through to the imported value so the
+                // new attr lands with its imported default.
+                continue;
+            }
+
+            modelAttr.Value = existingValue;
+            preserved++;
+        }
+        return preserved;
     }
 }

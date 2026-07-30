@@ -3,22 +3,23 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
-using Meshmakers.Octo.Runtime.Engine.Blueprints;
+using Meshmakers.Octo.Runtime.Engine.Exchange;
 
 using Xunit;
 
-namespace Meshmakers.Octo.Runtime.Engine.Tests.Blueprints;
+namespace Meshmakers.Octo.Runtime.Engine.Tests.Exchange;
 
 /// <summary>
-/// Unit tests for <see cref="BlueprintService.PreserveAttributesForEntity"/>. The static
-/// method drives the per-entity preservation loop and is the testable seam of the
-/// broader runtime-state preservation feature — it carries the full decision logic
-/// (which seed attrs to rewrite, which to leave alone) without any repository or cache
-/// dependencies.
+/// Unit tests for <see cref="ImportRtModelCommand.PreserveAttributesForEntity"/>. The static
+/// method drives the per-entity preservation loop and is the testable seam of the broader
+/// runtime-state preservation feature — it carries the full decision logic (which incoming
+/// attrs to rewrite, which to leave alone) without any repository or cache dependencies. It runs
+/// on every Upsert import (blueprint seed apply, plain ImportRt, CK-model migration), so an
+/// activated stream-data archive or a "Deployed" adapter survives a re-import (AB#4582 / AB#4589).
 /// </summary>
-public class BlueprintServicePreserveAttributesForEntityTests
+public class ImportRtModelCommandPreserveAttributesForEntityTests
 {
-    // The CK side carries a versioned model id ("Test-1.0.0"), while the RT side (seed
+    // The CK side carries a versioned model id ("Test-1.0.0"), while the RT side (import
     // entities deserialised from YAML) carries only the bare model name ("Test"). The
     // cross-type CkId.Equals(RtCkId) overload compares `CkId.ModelId.Name` against
     // `RtCkId.ModelId` (a string), so these two views must align name-wise but not
@@ -37,30 +38,30 @@ public class BlueprintServicePreserveAttributesForEntityTests
         {
             BuildTypeAttr("DeploymentState", isRuntimeState: true),
         };
-        var seed = SeedEntity(("DeploymentState", 0));
+        var model = ModelEntity(("DeploymentState", 0));
         var existing = ExistingEntity(("DeploymentState", 2));
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(1, preserved);
-        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
     }
 
     [Fact]
-    public void UnflaggedAttrPresentOnBoth_LeavesSeedValueUntouched()
+    public void UnflaggedAttrPresentOnBoth_LeavesImportedValueUntouched()
     {
-        // Hostname is blueprint-managed (NOT runtime-state) — the seed value must win
+        // Hostname is blueprint-managed (NOT runtime-state) — the imported value must win
         // on re-apply even when the existing entity has a different value. Otherwise
         // blueprint authors couldn't ever update non-runtime fields.
-        // No flagged attrs at all → preservation is a no-op regardless of seed/existing.
+        // No flagged attrs at all → preservation is a no-op regardless of model/existing.
         var flagged = Array.Empty<CkTypeAttributeGraph>();
-        var seed = SeedEntity(("Hostname", "adapter.new"));
+        var model = ModelEntity(("Hostname", "adapter.new"));
         var existing = ExistingEntity(("Hostname", "adapter.old"));
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(0, preserved);
-        Assert.Equal("adapter.new", seed.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
+        Assert.Equal("adapter.new", model.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
     }
 
     [Fact]
@@ -73,61 +74,61 @@ public class BlueprintServicePreserveAttributesForEntityTests
         {
             BuildTypeAttr("DeploymentState", isRuntimeState: true),
         };
-        var seed = SeedEntity(
+        var model = ModelEntity(
             ("DeploymentState", 0),
             ("Hostname", "adapter.new"));
         var existing = ExistingEntity(
             ("DeploymentState", 2),
             ("Hostname", "adapter.old"));
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(1, preserved);
-        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
-        Assert.Equal("adapter.new", seed.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
+        Assert.Equal("adapter.new", model.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
     }
 
     [Fact]
-    public void FlaggedAttrMissingFromExisting_LeavesSeedValueUntouched()
+    public void FlaggedAttrMissingFromExisting_LeavesImportedValueUntouched()
     {
         // The blueprint added a brand-new runtime-state attribute (e.g. a CK bump
         // introducing LastSyncedSequenceNumber). The pre-existing entity has never
-        // carried this attribute, so there is nothing to preserve — the seed default
+        // carried this attribute, so there is nothing to preserve — the imported default
         // is what the entity will have on first read post-import.
         var flagged = new[]
         {
             BuildTypeAttr("LastSyncedSequenceNumber", isRuntimeState: true),
         };
-        var seed = SeedEntity(("LastSyncedSequenceNumber", 0));
+        var model = ModelEntity(("LastSyncedSequenceNumber", 0));
         var existing = ExistingEntity(); // no attributes
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(0, preserved);
-        Assert.Equal(0, seed.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
+        Assert.Equal(0, model.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
     }
 
     [Fact]
-    public void FlaggedAttrMissingFromSeed_NoOp()
+    public void FlaggedAttrMissingFromModel_NoOp()
     {
         // The CK type defines a runtime-state attribute (e.g. LastDeploymentError),
-        // but the blueprint seed deliberately omits it because there's no sensible
-        // default. We should NOT touch the seed in this case — there's nothing to
+        // but the import model deliberately omits it because there's no sensible
+        // default. We should NOT touch the model in this case — there's nothing to
         // rewrite, and the entity keeps whatever value it had before (via the
         // separate value on the CK default of the attribute).
         var flagged = new[]
         {
             BuildTypeAttr("LastDeploymentError", isRuntimeState: true),
         };
-        var seed = SeedEntity(("Hostname", "adapter.new"));
+        var model = ModelEntity(("Hostname", "adapter.new"));
         var existing = ExistingEntity(
             ("LastDeploymentError", "previous failure"),
             ("Hostname", "adapter.old"));
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(0, preserved);
-        Assert.DoesNotContain(seed.Attributes, a => a.Id.ElementId.Name == "LastDeploymentError");
+        Assert.DoesNotContain(model.Attributes, a => a.Id.ElementId.Name == "LastDeploymentError");
     }
 
     [Fact]
@@ -144,7 +145,7 @@ public class BlueprintServicePreserveAttributesForEntityTests
             BuildTypeAttr("ConfigurationState", isRuntimeState: true),
             BuildTypeAttr("LastSyncedSequenceNumber", isRuntimeState: true),
         };
-        var seed = SeedEntity(
+        var model = ModelEntity(
             ("DeploymentState", 0),
             ("CommunicationState", 0),
             ("ConfigurationState", 0),
@@ -155,57 +156,57 @@ public class BlueprintServicePreserveAttributesForEntityTests
             ("ConfigurationState", 2),
             ("LastSyncedSequenceNumber", 47));
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(4, preserved);
-        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
-        Assert.Equal(1, seed.Attributes.Single(a => a.Id.ElementId.Name == "CommunicationState").Value);
-        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "ConfigurationState").Value);
-        Assert.Equal(47, seed.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
+        Assert.Equal(1, model.Attributes.Single(a => a.Id.ElementId.Name == "CommunicationState").Value);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "ConfigurationState").Value);
+        Assert.Equal(47, model.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
     }
 
     [Fact]
-    public void ArchiveStatus_ActivatedArchive_SurvivesForcedBlueprintReApply()
+    public void ArchiveStatus_ActivatedArchive_SurvivesForcedReImport()
     {
-        // AB#4582: EnergyCommunity.Base seeds every archive with Archive.Status=2
+        // AB#4582/AB#4589: EnergyCommunity.Base seeds every archive with Archive.Status=2
         // (Disabled) so a fresh install never requires CrateDB; ActivateArchive later
         // flips the live archive to 1 (Activated) and provisions the table. A forced
-        // blueprint re-apply (InstallBlueprint -f) upserts the same seed and, without
-        // the runtime-state flag, would rewrite Status back to Disabled — the archive
-        // then reads as not activated and stream-data queries fail with
-        // STREAMDATA_ARCHIVE_NOT_ACTIVATED even though the CrateDB rows are untouched.
-        // With Archive.Status flagged isRuntimeState the live Activated value is
-        // preserved, so the re-apply is a no-op on the lifecycle status.
+        // Upsert re-import — blueprint InstallBlueprint -f OR a plain ImportRt -r of the
+        // voest archive YAML — would rewrite Status back to Disabled without the runtime-
+        // state flag; the archive then reads as not activated and stream-data queries fail
+        // with STREAMDATA_ARCHIVE_NOT_ACTIVATED even though the CrateDB rows are untouched.
+        // With Archive.Status flagged isRuntimeState the live Activated value is preserved,
+        // so the re-import is a no-op on the lifecycle status.
         var flagged = new[]
         {
             BuildTypeAttr("Status", isRuntimeState: true),
         };
-        var seed = SeedEntity(("Status", 2));     // seeded Disabled
+        var model = ModelEntity(("Status", 2));     // imported Disabled
         var existing = ExistingEntity(("Status", 1)); // live Activated
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(1, preserved);
-        Assert.Equal(1, seed.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
+        Assert.Equal(1, model.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
     }
 
     [Fact]
-    public void ArchiveStatus_FreshInstall_KeepsSeededDisabledValue()
+    public void ArchiveStatus_FreshImport_KeepsImportedDisabledValue()
     {
-        // AB#4582: the flag must not change fresh-install behaviour. With no existing
-        // archive entity there is nothing to preserve, so the seeded Disabled (2) value
+        // AB#4582/AB#4589: the flag must not change fresh-import behaviour. With no existing
+        // archive entity there is nothing to preserve, so the imported Disabled (2) value
         // lands and the post-install ActivateArchive phase can activate it as before.
         var flagged = new[]
         {
             BuildTypeAttr("Status", isRuntimeState: true),
         };
-        var seed = SeedEntity(("Status", 2));
+        var model = ModelEntity(("Status", 2));
         var existing = ExistingEntity(); // fresh tenant, no archive yet
 
-        var preserved = BlueprintService.PreserveAttributesForEntity(seed, existing, flagged);
+        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
 
         Assert.Equal(0, preserved);
-        Assert.Equal(2, seed.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
     }
 
     private static CkTypeAttributeGraph BuildTypeAttr(string name, bool isRuntimeState)
@@ -226,7 +227,7 @@ public class BlueprintServicePreserveAttributesForEntityTests
         return new CkTypeAttributeGraph(attrId, ckTypeAttrDto, ckAttrGraph);
     }
 
-    private static RtEntityTcDto SeedEntity(params (string Name, object Value)[] attrs)
+    private static RtEntityTcDto ModelEntity(params (string Name, object Value)[] attrs)
     {
         var entity = new RtEntityTcDto
         {

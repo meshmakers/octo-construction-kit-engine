@@ -45,17 +45,10 @@ public sealed record SeriesResolutionRequest(
     string SourcePath)
 {
     /// <summary>
-    /// Optional runtime scope override — the source entity rtIds the series is restricted to (e.g. the
-    /// EnergyMeasurement entities resolved from a selected MeteringPoint, AB#4236). Advisory to the
-    /// resolver; forwarded by the caller to the downsampling query.
+    /// Optional runtime scope override — the source entity rtIds the series is restricted to
+    /// (AB#4236). Advisory to the resolver; forwarded by the caller to the downsampling query.
     /// </summary>
     public IReadOnlyList<OctoObjectId>? RtIds { get; init; }
-
-    /// <summary>
-    /// Optional OBIS-code filter narrowing the series within the archive. Advisory to the resolver;
-    /// forwarded by the caller to the downsampling query's field filter.
-    /// </summary>
-    public string? ObisFilter { get; init; }
 
     /// <summary>
     /// Optional IANA time zone (e.g. <c>Europe/Vienna</c>) the query is resolved in (AB#4190,

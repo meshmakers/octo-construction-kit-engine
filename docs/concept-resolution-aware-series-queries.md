@@ -95,7 +95,14 @@ ideal       = timespan / targetPoints
 baseNative  = timespan / basePeriod                   (null if the base grain is undeclared)
 
 1. fineEnough = eligible rungs with grain <= ideal
-   if fineEnough → the COARSEST fineEnough rung, downsample to targetPoints        (Ok)
+   if fineEnough → the COARSEST fineEnough rung, bucket = a WHOLE MULTIPLE of its grain (Ok)
+       # merge = max(1, round(ideal / grain)); bucket = merge * grain; points = timespan / bucket
+       # A rollup is a windowed archive: the downsampler only folds a stored window into a bin
+       # when the whole window is contained (concept-time-range §7). A bucket that is not an
+       # integer multiple of the grain drops every straddling window — a month over the hourly
+       # rollup at the raw ~1.07 h ideal read ~6% of the true sum (AB#4714). merge == 1 (the
+       # common case) = read the rung at native grain, lossless. points therefore lands NEAR
+       # targetPoints (e.g. 720 not 670), never below the grain.
 2. else if baseNative <= targetPoints → the BASE rung unreduced (raw fits)          (Ok)
        # checked BEFORE ResolutionLimited: raw is finer and delivers more points
        # than any coarser rollup when it already fits (e.g. 1 day of 15-min = 96
@@ -105,10 +112,10 @@ baseNative  = timespan / basePeriod                   (null if the base grain is
        base grain unknown → return base                                            (UnknownBaseGrain)
        else               → return base raw, refuse to reduce                       (NoSuitableRollup, O2-followup)
    # no base rung at all → EmptyLadder
-then = downsample the chosen rung with limit = targetPoints   (AB#4233 path)
+then = downsample the chosen rung with limit = points          (AB#4233 path)
 ```
 
-Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands the exact point count. Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
+Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands a point count near the target. The output bucket is a **whole multiple of the chosen rung's grain**, not the raw pixel ideal — a windowed rollup can only be re-aggregated on complete grain windows, so an off-grain bucket silently undercounts (AB#4714). Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
 
 ### §4.3 Worked example (1 year, targetPoints = 600)
 
@@ -117,7 +124,7 @@ Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `li
 | Rung | grain | nativePoints | Decision |
 |---|---|---|---|
 | raw | 15 min | 35 040 | too fine — 35 k-row scan for no visual gain |
-| rollup | 1 h | 8 760 | **chosen** — ≥ 600; downsample → 600 (scans 8 760/series) |
+| rollup | 1 h | 8 760 | **chosen** — grain ≤ ideal; bucket snaps to 15 h (round(14.6) × 1 h) → 584 points |
 | rollup | 1 d | 365 | too coarse (< 600) — would cap at 365 points |
 
 If only the daily rung existed, the selector would fall back to it and return 365 points (honest under-delivery), and a consumer wanting more would have to fall through to the 1 h/raw rung.

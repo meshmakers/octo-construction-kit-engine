@@ -70,7 +70,8 @@ public class SeriesResolutionServiceTests
 
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(oneHour.RtId, result.ArchiveRtId);
-        Assert.Equal(600, result.Points);
+        // Bucket snaps to a whole multiple of the 1 h grain (AB#4714): 8760 h / round(14.6) = 584.
+        Assert.Equal(584, result.Points);
     }
 
     [Fact]

@@ -82,8 +82,23 @@ internal static class SeriesResolutionPlanner
         if (fineEnough.Count > 0)
         {
             var chosen = fineEnough.OrderByDescending(x => x.Grain).First();
+
+            // The output bucket MUST be an integer multiple of the chosen rung's grain, not the raw
+            // pixel-driven ideal. A rollup is a windowed archive: the downsampling engine only folds a
+            // stored window into a bin when the whole window is contained in it (concept-time-range §7),
+            // so a bin width that is not a multiple of the grain makes every straddling window drop and
+            // the series undercounts badly (measured ~6% of truth for a month over the hourly rollup —
+            // AB#4714). Snap to the nearest grain multiple: merge = round(ideal / grain) grain windows
+            // per bin. merge == 1 (the common case, e.g. a month over the hourly rollup) means "read the
+            // rollup at its native grain" — lossless. The frontend aligns the query window to this same
+            // grid (line-chart-widget), and the server's DownsamplingBinQuantizer independently arrives
+            // at the same whole-window merge, so SQL grid and axis agree.
+            var merge = Math.Max(1L,
+                (long)Math.Round((double)idealBucketMs / chosen.Grain, MidpointRounding.AwayFromZero));
+            var bucketMs = merge * chosen.Grain;
+            var points = (int)Math.Max(1L, spanMs / bucketMs);
             return new SeriesResolutionResult(
-                chosen.Rung.ArchiveRtId, idealBucketMs, targetPoints, requiredAggregation,
+                chosen.Rung.ArchiveRtId, bucketMs, points, requiredAggregation,
                 SeriesResolutionSignal.Ok);
         }
 

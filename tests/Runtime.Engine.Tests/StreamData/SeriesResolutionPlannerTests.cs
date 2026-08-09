@@ -39,7 +39,9 @@ public class SeriesResolutionPlannerTests
     public void WorkedExample_YearTo600Points_PicksCoarsestSufficientRollup_OneHour()
     {
         // 1 year / 600 points → ideal bucket ≈ 14.6 h. Rungs: raw 15 min (base) + 1 h + 1 d SUM rollups.
-        // 1 d (24 h) is too coarse; 1 h is the coarsest rung still ≤ ideal → chosen, downsampled to 600.
+        // 1 d (24 h) is too coarse; 1 h is the coarsest rung still ≤ ideal → chosen. The output bucket is
+        // snapped to an integer multiple of the 1 h grain (a windowed rollup can only be summed on whole
+        // grain windows, AB#4714): merge = round(14.6) = 15 → 15 h buckets, 8760 h / 15 = 584 points.
         var oneHour = Rollup(OneHour, CkRollupFunction.Sum);
         var ladder = new[] { Base(FifteenMin), oneHour, Rollup(OneDay, CkRollupFunction.Sum) };
 
@@ -47,9 +49,28 @@ public class SeriesResolutionPlannerTests
 
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(oneHour.ArchiveRtId, result.ArchiveRtId);
-        Assert.Equal(600, result.Points);
-        Assert.Equal(52_560_000, result.EffectiveBucketMs); // 365 d / 600
+        Assert.Equal(584, result.Points);
+        Assert.Equal(15 * OneHour, result.EffectiveBucketMs); // 15 h — nearest 1 h multiple to the 14.6 h ideal
         Assert.Equal(CkRollupFunction.Sum, result.ReducingFunction);
+    }
+
+    [Fact]
+    public void MonthTo670Points_OverHourlyRollup_ReadsNativeGrain_NotPixelBucket()
+    {
+        // The AB#4714 regression: a 30-day month at ~670 pixels → ideal bucket ≈ 1.07 h. The hourly
+        // rollup is the coarsest rung ≤ ideal. merge = round(1.07) = 1, so the bucket snaps to the 1 h
+        // grain (NOT the 1.07 h pixel width, which is not a grain multiple and dropped ~94% of windows).
+        var from = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2025, 7, 1, 0, 0, 0, DateTimeKind.Utc); // 30 days = 720 h
+        var oneHour = Rollup(OneHour, CkRollupFunction.Sum);
+        var ladder = new[] { Base(FifteenMin), oneHour, Rollup(OneDay, CkRollupFunction.Sum) };
+
+        var result = Plan(ladder, from, to, 670, CkRollupFunction.Sum);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(oneHour.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(OneHour, result.EffectiveBucketMs); // native 1 h grain, grid-aligned → lossless
+        Assert.Equal(720, result.Points);                // 720 h / 1 h, not the requested 670
     }
 
     [Fact]

@@ -345,4 +345,44 @@ public class RollupOrchestratorTests
                 A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
             .MustHaveHappened(2, Times.Exactly); // exactly the 2 closed buckets, no open-bucket upsert
     }
+
+    // ---- Derived-columns self-heal (AB#4772) -----------------------------------------------
+
+    [Fact]
+    public async Task Tick_RollupWithoutPersistedColumns_HealsEvenWhenNotActivated()
+    {
+        // Disabled rollups never reach the aggregation path, but the heal must still run —
+        // the broken Columns attribute breaks the archives GraphQL regardless of status.
+        StubRollups(Rollup(BaseTime, status: CkArchiveStatus.Disabled) with { HasPersistedColumns = false });
+
+        await NewSut(BaseTime).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.TryPersistDerivedColumnsAsync(RollupRt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_RollupWithPersistedColumns_DoesNotCallHeal()
+    {
+        StubActivatedSource();
+        StubRollups(Rollup(BaseTime)); // HasPersistedColumns defaults to true
+
+        await NewSut(BaseTime).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _rollupStore.TryPersistDerivedColumnsAsync(A<OctoObjectId>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_HealFailure_DoesNotStopTheTick()
+    {
+        StubActivatedSource();
+        StubRollups(Rollup(BaseTime) with { HasPersistedColumns = false });
+        A.CallTo(() => _rollupStore.TryPersistDerivedColumnsAsync(RollupRt))
+            .Throws(new InvalidOperationException("boom"));
+
+        // Must not surface the heal failure; the rollup itself still gets processed (no lag due
+        // here, so 0 buckets — the assertion is simply that TickAsync completes).
+        var n = await NewSut(BaseTime).TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, n);
+    }
 }

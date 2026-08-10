@@ -92,6 +92,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await ValidateRollupForActivationAsync(archiveRtId);
         await EnsureCrateProvisionedAsync(snapshot);
         await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
+        await EnsureRollupColumnsPersistedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
@@ -130,6 +131,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await ValidateRollupForActivationAsync(archiveRtId);
         await EnsureCrateProvisionedAsync(snapshot);
         await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
+        await EnsureRollupColumnsPersistedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
     }
 
@@ -416,6 +418,34 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _logger.LogInformation(
             "Rollup {RollupRtId}: initial watermark seeded to {Watermark:O} (bucketSize={BucketSize}, alignment={Alignment})",
             archiveRtId, initialBucketEnd, rollup.BucketSize, rollup.BucketAlignment);
+    }
+
+    /// <summary>
+    /// Self-heal for the inherited mandatory <c>Archive.Columns</c> attribute on rollups
+    /// (AB#4771/AB#4772): entities seeded via ImportRt may lack it entirely, which breaks the
+    /// non-null <c>columns</c> GraphQL field for the whole archives list. The store persists the
+    /// derived aggregate columns when missing; a failure is logged but never blocks activation —
+    /// the read path stays authoritative via re-derivation from the aggregations either way.
+    /// </summary>
+    private async Task EnsureRollupColumnsPersistedAsync(OctoObjectId archiveRtId)
+    {
+        if (_rollupStore is null) return;
+
+        try
+        {
+            if (await _rollupStore.TryPersistDerivedColumnsAsync(archiveRtId))
+            {
+                _logger.LogInformation(
+                    "Rollup {RollupRtId}: persisted derived aggregate columns onto the entity (missing Columns attribute healed).",
+                    archiveRtId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Rollup {RollupRtId}: failed to persist derived aggregate columns; continuing activation.",
+                archiveRtId);
+        }
     }
 
     private async Task EnsureCrateProvisionedAsync(ArchiveSnapshot snapshot)

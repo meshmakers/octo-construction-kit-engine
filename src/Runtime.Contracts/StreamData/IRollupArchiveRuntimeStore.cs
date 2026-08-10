@@ -105,6 +105,18 @@ public interface IRollupArchiveRuntimeStore
     IAsyncEnumerable<RollupArchiveSnapshot> EnumerateAsync();
 
     /// <summary>
+    /// Persists the derived aggregate columns (<see cref="RollupColumnGenerator.Generate"/> over
+    /// the entity's aggregations) onto the inherited <c>Archive.Columns</c> attribute when no
+    /// persisted (non-computed) column is present yet, preserving any computed columns the entity
+    /// already declares. Self-heal for rollups created outside the API path (e.g. ImportRt seeds)
+    /// whose missing mandatory Columns attribute breaks the non-null <c>columns</c> GraphQL field
+    /// (AB#4771/AB#4772). Idempotent; a no-op on healthy entities.
+    /// </summary>
+    /// <returns>True when columns were written; false when nothing needed healing (or the RtId is
+    /// not a live rollup).</returns>
+    Task<bool> TryPersistDerivedColumnsAsync(OctoObjectId rollupRtId);
+
+    /// <summary>
     /// Returns the count of non-soft-deleted rollups that reference
     /// <paramref name="sourceArchiveRtId"/>. Used by the source archive's delete path to enforce
     /// <see cref="RollupSourceInUseException"/> (concept §6).

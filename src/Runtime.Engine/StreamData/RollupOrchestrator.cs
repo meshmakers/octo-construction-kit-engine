@@ -75,6 +75,30 @@ public sealed class RollupOrchestrator : IRollupOrchestrator
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            // AB#4772 self-heal: entities seeded via ImportRt may lack the mandatory inherited
+            // Columns attribute, which breaks the non-null GraphQL field for the whole archives
+            // list. The tick sees every non-deleted rollup regardless of status (deliberately
+            // before the Activated check, so Disabled/Created ones heal too); the store call is
+            // a no-op once healed, and a failure must not stop the tick.
+            if (!snapshot.HasPersistedColumns)
+            {
+                try
+                {
+                    if (await _rollupStore.TryPersistDerivedColumnsAsync(snapshot.RtId))
+                    {
+                        _logger.LogInformation(
+                            "Rollup {RollupRtId}: persisted derived aggregate columns onto the entity (missing Columns attribute healed).",
+                            snapshot.RtId);
+                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    _logger.LogWarning(ex,
+                        "Rollup {RollupRtId}: failed to persist derived aggregate columns; continuing tick.",
+                        snapshot.RtId);
+                }
+            }
+
             if (snapshot.Status != CkArchiveStatus.Activated)
             {
                 continue;

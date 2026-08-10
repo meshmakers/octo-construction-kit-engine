@@ -59,10 +59,11 @@ public sealed record RollupArchiveSnapshot(
     /// True when the entity carries at least one persisted (ingested, non-computed) column on its
     /// inherited <c>Archive.Columns</c> slot — i.e. the dehydrated
     /// <see cref="RollupColumnGenerator"/> cache exists. <c>false</c> flags the defect state
-    /// produced by ImportRt-seeded records, which arrive with <see cref="Aggregations"/> but an
-    /// empty Columns list; computed columns alone don't count. AB#4772 — the repair path
-    /// (<c>TryPersistDerivedColumnsAsync</c> on the Mongo store) is not yet reachable through
-    /// <see cref="IRollupArchiveRuntimeStore"/>; wiring it up is still open work on AB#4772.
+    /// produced by ImportRt-seeded records, which arrive with <see cref="Aggregations"/> but no
+    /// Columns attribute — breaking the non-null <c>columns</c> GraphQL field for the whole
+    /// archives list (AB#4771/AB#4772); computed columns alone don't count. When false, callers
+    /// holding a write path (orchestrator tick, lifecycle activation) heal via
+    /// <see cref="IRollupArchiveRuntimeStore.TryPersistDerivedColumnsAsync"/>.
     /// </summary>
     /// <remarks>
     /// The rollup read path re-derives the columns from <see cref="Aggregations"/> and is therefore

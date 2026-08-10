@@ -367,6 +367,36 @@ public class ArchiveLifecycleServiceTests
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
     }
 
+    // ---- Derived-columns self-heal on activation (AB#4772) ----
+
+    [Fact]
+    public async Task Activate_Rollup_PersistsDerivedColumnsViaStore()
+    {
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt)).Returns(RollupSnapshot(watermark: null));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage();
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => rollupStore.TryPersistDerivedColumnsAsync(Rt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Activate_Rollup_ColumnsHealFailure_DoesNotBlockActivation()
+    {
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt)).Returns(RollupSnapshot(watermark: null));
+        A.CallTo(() => rollupStore.TryPersistDerivedColumnsAsync(Rt))
+            .Throws(new InvalidOperationException("boom"));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage();
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
+    }
+
     // ---- Activation-time rollup validation (rollup-archives concept §10) ----
 
     [Fact]

@@ -55,6 +55,24 @@ public sealed record RollupArchiveSnapshot(
     /// </summary>
     public TimeSpan? CarryLookback { get; init; }
 
+    /// <summary>
+    /// True when the entity carries at least one persisted (ingested, non-computed) column on its
+    /// inherited <c>Archive.Columns</c> slot — i.e. the dehydrated
+    /// <see cref="RollupColumnGenerator"/> cache exists. <c>false</c> flags the defect state
+    /// produced by ImportRt-seeded records, which arrive with <see cref="Aggregations"/> but an
+    /// empty Columns list; computed columns alone don't count. AB#4772 — the repair path
+    /// (<c>TryPersistDerivedColumnsAsync</c> on the Mongo store) is not yet reachable through
+    /// <see cref="IRollupArchiveRuntimeStore"/>; wiring it up is still open work on AB#4772.
+    /// </summary>
+    /// <remarks>
+    /// The rollup read path re-derives the columns from <see cref="Aggregations"/> and is therefore
+    /// unaffected, but consumers that read the source archive's persisted Columns list — above all
+    /// chained-rollup activation, which resolves an aggregation's <c>SourcePath</c> against it —
+    /// see nothing. Defaults to <c>true</c> so callers constructing a snapshot without persistence
+    /// context (tests, in-memory stores) are not treated as defective.
+    /// </remarks>
+    public bool HasPersistedColumns { get; init; } = true;
+
     // ---------- Recompute observability (AB#4184, Phase 5 follow-up) ----------
     // Init-only so the positional ctor used by the orchestrator / lifecycle stays unchanged; these
     // are projected from the engine-maintained recompute-state attributes on the Archive base and

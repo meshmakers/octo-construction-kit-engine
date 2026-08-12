@@ -186,8 +186,22 @@ of another computed column. mXparser binds each referenced name as an `Argument`
 > DateTime→ticks, numeric string) are bound; a formula referencing a non-numeric / absent column
 > yields NaN → `NULL`. Standard columns (`timestamp`, `rtid`, …) are **not** bound today — a
 > timestamp-derived computed column (#4190) would add `timestamp` to the argument set later.
-> Translating user-facing **logical** names → physical names at create time is **Phase 4** (the
-> stored formula already uses physical names by then).
+>
+> **Logical names at create time — implemented (AB#4779).** A formula may be written in the archive's
+> logical column vocabulary — the CK attribute paths the Studio lists, e.g. `Amount.Value` — and is
+> rewritten to the physical form before it is validated or stored, so everything from validation
+> onwards is unchanged and the stored formula is still physical. `ComputedColumnFormulaRewriter`
+> (CrateDB layer, next to `ColumnNameMapper`) scans identifier runs, allows dots inside them, and
+> replaces a run only when it matches a column name in full — case-insensitively, matching the query
+> side's `StreamDataFieldResolver`. A run that matches nothing is left as written, so a physical name
+> keeps working unchanged (no migration) and an unknown name is rejected by the spelling the caller
+> used. Reached through `IStreamDataRepository.NormalizeComputedFormulaAsync`, because the rule is
+> `ColumnNameMapper`'s and that is internal to the storage layer.
+>
+> The translation runs **before** the no-op check in `UpdateComputedColumnFormulaAsync`: the stored
+> formula is physical, so comparing the caller's logical spelling against it would read as a change
+> and re-saving the identical formula would version the column, backfill it and swap the pointer for
+> nothing.
 
 In `CrateDbStreamDataRepository.InsertAsync` / `InsertTimeRangeAsync`, after the producer's
 attributes are flattened into the per-row column dictionary and before the INSERT:
@@ -383,8 +397,12 @@ logical→physical name pointer atomically on completion.
 > that validates *without evaluating* — so a formula that merely divides by zero at probe values is
 > not a false-positive (unlike `Validate`). References resolve against **physical** column names (§5).
 >
-> *Deferred (UX surface, not correctness):* a GraphQL operand-enumeration query for the Studio picker
-> and an optional user-facing logical→physical name translation at create time.
+> The logical→physical translation at create time is **done** (AB#4779, see §5), so a reference may be
+> written as `Amount.Value` or as `amountvalue`.
+>
+> *Still deferred (UX surface, not correctness):* a GraphQL operand-enumeration query for the Studio
+> picker. Names are now accepted, but the panel still does not **show** which ones exist — and after
+> saving it shows the stored physical form, since only that is persisted.
 
 On create / edit of a computed column (reusing the shared validator from §7, which already
 does `checkSyntax()` + NaN test-eval):

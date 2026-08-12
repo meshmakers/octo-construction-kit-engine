@@ -132,6 +132,22 @@ public class FormulaEngineTests
         Assert.Null(result);
     }
 
+    /// <summary>
+    /// Why a computed column's formula must be stored in its physical form (AB#4779). The archive's
+    /// row dictionaries — and therefore the arguments bound here — are keyed by the physical column
+    /// name; an mXparser argument name cannot contain a dot in the first place. So a formula left in
+    /// the logical spelling does not fail loudly, it evaluates to nothing: this is the ingest path, and
+    /// a null lands in the column as SQL NULL without failing the insert.
+    /// </summary>
+    [Fact]
+    public void Evaluate_DottedLogicalName_YieldsNothing_WhileThePhysicalNameComputes()
+    {
+        var args = Args(("amountvalue", 5.0));
+
+        Assert.Equal(7.0, _engine.Evaluate("amountvalue + 2", args, FormulaResultType.Double));
+        Assert.Null(_engine.Evaluate("Amount.Value + 2", args, FormulaResultType.Double));
+    }
+
     // ---- Validate ---------------------------------------------------------
 
     [Fact]

@@ -60,6 +60,28 @@ public interface IStreamDataRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Rewrites a computed-column formula from the archive's <b>logical</b> column vocabulary — the CK
+    /// attribute paths the Studio lists and the query surface uses, e.g. <c>Amount.Value</c> — into the
+    /// <b>physical</b> form the evaluation path binds, e.g. <c>amountvalue</c> (AB#4779).
+    /// <para>
+    /// The lifecycle service calls this before validating and persisting, so the stored formula is
+    /// always physical and every downstream consumer keeps seeing exactly what it saw before. A name
+    /// that is already physical, or that matches no column at all, is left as written — the latter so
+    /// validation can reject it by the spelling the caller actually used.
+    /// </para>
+    /// <para>
+    /// It lives on the storage contract rather than in the lifecycle service because the
+    /// logical→physical rule belongs to the storage layer, the same reason
+    /// <see cref="ValidateComputedColumnsAsync" /> does. No I/O.
+    /// </para>
+    /// </summary>
+    Task<string> NormalizeComputedFormulaAsync(
+        OctoObjectId archiveRtId,
+        IReadOnlyList<CkArchiveColumnSpec> columns,
+        string formula,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Adds the physical CrateDB column for the computed column named <paramref name="columnName"/>
     /// via <c>ALTER TABLE … ADD COLUMN</c> (AB#4189 Phase 7). Idempotent — tolerant of the column
     /// already existing (e.g. a re-add reusing an orphaned column). The column on

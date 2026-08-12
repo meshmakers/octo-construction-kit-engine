@@ -28,6 +28,19 @@ public class ArchiveLifecycleServiceComputedColumnTests
     private readonly IStreamDataRepository _repo = A.Fake<IStreamDataRepository>();
     private readonly IArchiveAuditTrail _audit = A.Fake<IArchiveAuditTrail>();
 
+    public ArchiveLifecycleServiceComputedColumnTests()
+    {
+        // These tests are about the orchestration, not the logical→physical rewrite (AB#4779), and
+        // their formulas are already physical. Model the real contract's identity case: a formula
+        // that names no logical column comes back unchanged. Without this the fake would hand back a
+        // dummy and every assertion downstream would be about the wrong string.
+        A.CallTo(() => _repo.NormalizeComputedFormulaAsync(
+                A<OctoObjectId>._, A<IReadOnlyList<CkArchiveColumnSpec>>._, A<string>._,
+                A<CancellationToken>._))
+            .ReturnsLazily((OctoObjectId _, IReadOnlyList<CkArchiveColumnSpec> _, string f,
+                CancellationToken _) => f);
+    }
+
     private ArchiveLifecycleService NewSut() =>
         new(TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance);
 
@@ -214,5 +227,100 @@ public class ArchiveLifecycleServiceComputedColumnTests
             NewSut().UpdateComputedColumnFormulaAsync(Rt, "doesNotExist", NewFormula));
 
         A.CallTo(() => _store.SetPendingFormulaAsync(A<OctoObjectId>._, A<string>._, A<string>._)).MustNotHaveHappened();
+    }
+
+    // ---------------------------------------------------------- AB#4779: logical column names
+
+    /// <summary>Rewrites the logical spelling a caller may use to the stored physical form.</summary>
+    private void StubRewrite(string logical, string physical) =>
+        A.CallTo(() => _repo.NormalizeComputedFormulaAsync(
+                A<OctoObjectId>._, A<IReadOnlyList<CkArchiveColumnSpec>>._, logical,
+                A<CancellationToken>._))
+            .Returns(physical);
+
+    [Fact]
+    public async Task Add_PersistsTheRewrittenFormula_NotWhatTheCallerTyped()
+    {
+        Stub(CkArchiveStatus.Activated);
+        StubRewrite("Amount.Value / 1000", "amountvalue / 1000");
+
+        await NewSut().AddComputedColumnAsync(Rt, "power", "Amount.Value / 1000",
+            FormulaResultType.Double, indexed: false);
+
+        // Everything downstream — validation, ingest, backfill — only ever sees the physical form.
+        A.CallTo(() => _store.AddComputedColumnAsync(Rt,
+                A<CkArchiveColumnSpec>.That.Matches(c => c.Formula == "amountvalue / 1000")))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Add_ValidatesTheRewrittenFormula()
+    {
+        Stub(CkArchiveStatus.Activated);
+        StubRewrite("Amount.Value", "amountvalue");
+
+        await NewSut().AddComputedColumnAsync(Rt, "power", "Amount.Value",
+            FormulaResultType.Double, indexed: false);
+
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(Rt,
+                A<IReadOnlyList<CkArchiveColumnSpec>>.That.Matches(
+                    cols => cols.Any(c => c.Formula == "amountvalue")),
+                A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task UpdateFormula_SameFormulaInLogicalSpelling_IsANoOp()
+    {
+        // The regression this guards: the stored formula is physical, so comparing the caller's
+        // logical spelling against it looks like a change. Re-saving the identical formula from the
+        // UI would then version the column (powerFactor__v1, __v2 …), backfill it and swap the
+        // pointer — repeatedly, for no change at all.
+        Stub(CkArchiveStatus.Activated, Comp("powerFactor"));
+        StubRewrite("ActivePower / ApparentPower", OldFormula);
+
+        await NewSut().UpdateComputedColumnFormulaAsync(Rt, "powerFactor",
+            "ActivePower / ApparentPower");
+
+        A.CallTo(() => _repo.ValidateComputedColumnsAsync(A<OctoObjectId>._,
+                A<IReadOnlyList<CkArchiveColumnSpec>>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _store.SetPendingFormulaAsync(A<OctoObjectId>._, A<string>._, A<string>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _repo.AddPendingComputedColumnStorageAsync(
+                A<ArchiveSnapshot>._, A<string>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task UpdateFormula_PersistsTheRewrittenFormulaAsPending()
+    {
+        Stub(CkArchiveStatus.Activated, Comp("powerFactor"));
+        StubRewrite("Amount.Value * 2", "amountvalue * 2");
+
+        await NewSut().UpdateComputedColumnFormulaAsync(Rt, "powerFactor", "Amount.Value * 2");
+
+        A.CallTo(() => _store.SetPendingFormulaAsync(Rt, "powerFactor", "amountvalue * 2"))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task UpdateFormula_SwapCommitsTheRewrittenFormula_NotTheCallersSpelling()
+    {
+        // Field report: the panel showed "Amount.Value + 2" after a formula change while the values
+        // still looked right. The swap is what becomes the column's stored Formula, and ingest
+        // evaluates that on every new row — so committing the logical spelling left the backfilled
+        // rows correct (they came from the pending formula) and made every row ingested afterwards
+        // evaluate to NULL. Asserting only on SetPendingFormulaAsync is what let it through.
+        Stub(CkArchiveStatus.Activated, Comp("powerFactor"));
+        StubRewrite("Amount.Value * 2", "amountvalue * 2");
+
+        await NewSut().UpdateComputedColumnFormulaAsync(Rt, "powerFactor", "Amount.Value * 2");
+
+        A.CallTo(() => _store.SwapComputedColumnFormulaAsync(Rt, "powerFactor", "amountvalue * 2", 1))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _store.SwapComputedColumnFormulaAsync(
+                A<OctoObjectId>._, A<string>._, "Amount.Value * 2", A<int>._))
+            .MustNotHaveHappened();
     }
 }

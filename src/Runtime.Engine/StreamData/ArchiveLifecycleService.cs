@@ -226,10 +226,16 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status, "add a computed column to");
         }
 
+        // The caller may write the formula in the archive's logical column vocabulary (Amount.Value),
+        // which is what the Studio lists; the evaluator binds the physical form (amountvalue). Rewrite
+        // first, so everything from validation onwards deals with the physical form only (AB#4779).
+        var physicalFormula = await _repository.NormalizeComputedFormulaAsync(
+            archiveRtId, snapshot.Columns, formula);
+
         var newColumn = new CkArchiveColumnSpec(string.Empty, indexed, Required: false)
         {
             Name = name,
-            Formula = formula,
+            Formula = physicalFormula,
             ResultType = resultType,
             ComputedState = ComputedColumnState.Pending,
             ComputedVersion = 0,
@@ -309,7 +315,14 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
                 $"Computed column '{name}' does not exist on archive {archiveRtId}.");
         }
 
-        if (string.Equals(target.Formula, formula, StringComparison.Ordinal))
+        // Rewrite to the physical form BEFORE the no-op check (AB#4779). The stored formula is
+        // physical, so comparing the caller's logical spelling against it would always look like a
+        // change: re-saving the identical formula from the UI would version the column
+        // (power → power__v1 → __v2 …), backfill it and swap the pointer, all for nothing.
+        var physicalFormula = await _repository.NormalizeComputedFormulaAsync(
+            archiveRtId, snapshot.Columns, formula);
+
+        if (string.Equals(target.Formula, physicalFormula, StringComparison.Ordinal))
         {
             return; // no-op: formula unchanged
         }
@@ -318,7 +331,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // unresolvable reference) before touching anything.
         var prospective = snapshot.Columns
             .Select(c => c.IsComputed && string.Equals(c.Name, name, StringComparison.Ordinal)
-                ? c with { Formula = formula }
+                ? c with { Formula = physicalFormula }
                 : c)
             .ToList();
         await _repository.ValidateComputedColumnsAsync(archiveRtId, prospective);
@@ -330,15 +343,20 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // Order matters: add the pending physical column BEFORE marking PendingFormula, so ingest's
         // dual-write (which starts the moment the marker is persisted) never targets a missing column.
         await _repository.AddPendingComputedColumnStorageAsync(snapshot, name);
-        await _store.SetPendingFormulaAsync(archiveRtId, name, formula);
+        await _store.SetPendingFormulaAsync(archiveRtId, name, physicalFormula);
         var withPending = await LoadAsync(archiveRtId);
 
         try
         {
             await _repository.BackfillComputedColumnAsync(withPending, name);
             // Atomic swap: the version pointer flip is the commit — readers move from the previous
-            // formula's values to the new ones in a single store write.
-            await _store.SwapComputedColumnFormulaAsync(archiveRtId, name, formula, target.ComputedVersion + 1);
+            // formula's values to the new ones in a single store write. The physical form, like the
+            // pending marker above: this is what becomes the column's stored Formula, and the ingest
+            // path evaluates it on every new row. Writing the caller's logical spelling here left the
+            // backfilled rows correct (they came from the pending formula) while every row ingested
+            // afterwards silently evaluated to NULL — a column that looks right and goes blank.
+            await _store.SwapComputedColumnFormulaAsync(
+                archiveRtId, name, physicalFormula, target.ComputedVersion + 1);
             _logger.LogInformation(
                 "Computed column '{Column}' on archive {Archive} re-formulated and backfilled (version {Version}).",
                 name, archiveRtId, target.ComputedVersion + 1);

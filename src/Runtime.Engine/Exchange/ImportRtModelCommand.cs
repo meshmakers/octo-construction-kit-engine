@@ -20,13 +20,19 @@ internal class ImportRtModelCommand(
     ILogger<ImportRtModelCommand> logger,
     ICkCacheService cacheService,
     IRtYamlSerializer rtYamlSerializer,
-    IRtJsonSerializer rtJsonSerializer)
+    IRtJsonSerializer rtJsonSerializer,
+    IRtImportAuditTrail rtImportAuditTrail,
+    RtImportOptions importOptions)
     : IImportRtModelCommand
 {
     private readonly ConcurrentDictionary<OctoObjectId, byte> _entityImportIds = new();
     private readonly ConcurrentQueue<RtAssociation> _importAssociationQueue = new();
 
     private readonly ConcurrentQueue<RtEntity> _importEntityQueue = new();
+
+    private readonly ConcurrentQueue<(OctoObjectId RtId, RtCkId<CkTypeId> CkTypeId, IReadOnlyList<string> MissingCkAttributeIds)>
+        _mandatoryViolations = new();
+
     private readonly IRtSerializer _rtYamlSerializer = rtYamlSerializer;
     private int _associationsCount;
 
@@ -210,6 +216,18 @@ internal class ImportRtModelCommand(
 #endif
             AssignAttributes(runtimeRepository, modelRtEntity, ckTypeGraph, rtEntity, "type", ckTypeGraph.CkTypeId);
 
+            // AB#4772: the bulk import path bypasses the entity rule engine, so an entity missing
+            // a mandatory attribute would be stored in a state its CK type forbids (AB#4771:
+            // seeded rollups without Archive.Columns broke the non-null GraphQL field for the
+            // whole archives list). Collect violations here; they are reported (and, in strict
+            // mode, rejected) before anything is written.
+            var missingMandatory = FindMissingMandatoryAttributes(ckTypeGraph.AllAttributes.Values, rtEntity);
+            if (missingMandatory.Count > 0)
+            {
+                _mandatoryViolations.Enqueue((rtEntity.RtId, modelRtEntity.CkTypeId,
+                    missingMandatory.Select(a => a.CkAttributeId.ToString()).ToList()));
+            }
+
             _importEntityQueue.Enqueue(rtEntity);
 
             if (modelRtEntity.Associations is { Count: > 0 })
@@ -244,7 +262,94 @@ internal class ImportRtModelCommand(
 #endif
         logger.LogInformation("{EntityCount} entities (total imports of {Count}) imported", _importEntityQueue.Count,
             _entityImportIds.Count);
+        await ReportMandatoryViolationsAsync(runtimeRepository.TenantId).ConfigureAwait(false);
         await ImportToDatabase(session, runtimeRepository, importStrategy).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The exact predicate the entity rule engine applies on API inserts (see
+    /// <c>EntityRuleEngine.SetDefaultValuesOnInsert</c>): an attribute is a violation when it is
+    /// not optional, carries no value on the entity, and neither default values nor an
+    /// auto-increment reference exist to ever fill it. Attributes WITH defaults/auto-increment
+    /// are deliberately not flagged — that keeps parity with what an API insert would accept,
+    /// even though the import path applies neither (stage-2 scope decision on AB#4772).
+    /// Exposed as the testable seam of the validation.
+    /// </summary>
+    internal static List<CkTypeAttributeGraph> FindMissingMandatoryAttributes(
+        IEnumerable<CkTypeAttributeGraph> attributeGraphs, RtTypeWithAttributes rtType)
+    {
+        List<CkTypeAttributeGraph>? missing = null;
+        foreach (var attribute in attributeGraphs)
+        {
+            if (attribute.IsOptional)
+            {
+                continue;
+            }
+
+            if (rtType.Attributes.TryGetValue(attribute.AttributeName, out var value) && value != null)
+            {
+                continue;
+            }
+
+            if (attribute.DefaultValues != null || !string.IsNullOrWhiteSpace(attribute.AutoIncrementReference))
+            {
+                continue;
+            }
+
+            (missing ??= []).Add(attribute);
+        }
+
+        return missing ?? [];
+    }
+
+    /// <summary>
+    /// Stage-2 rollout of the AB#4772 hardening: logs every collected mandatory-attribute
+    /// violation as a warning and publishes one audit event per entity (tenant event log via the
+    /// host's <c>IAuditEventSink</c>). When <see cref="RtImportOptions.StrictMandatoryValidation"/>
+    /// is on, throws BEFORE anything is written so the import fails atomically. An audit-trail
+    /// failure never blocks the import in non-strict mode.
+    /// </summary>
+    private async Task ReportMandatoryViolationsAsync(string tenantId)
+    {
+        if (_mandatoryViolations.IsEmpty)
+        {
+            return;
+        }
+
+        var violations = _mandatoryViolations.ToArray();
+        foreach (var (rtId, ckTypeId, missing) in violations)
+        {
+            logger.LogWarning(
+                "Imported entity '{CkTypeId}@{RtId}' is missing mandatory attribute(s) {MissingAttributes} " +
+                "(no default value or auto-increment reference). The stored entity violates its CK type; " +
+                "non-null GraphQL fields on these attributes will fail (AB#4772).",
+                ckTypeId, rtId, string.Join(", ", missing));
+
+            try
+            {
+                await rtImportAuditTrail.RecordMissingMandatoryAttributesAsync(tenantId, ckTypeId, rtId, missing)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e,
+                    "Failed to publish the missing-mandatory-attributes audit event for '{CkTypeId}@{RtId}'",
+                    ckTypeId, rtId);
+            }
+        }
+
+        if (importOptions.StrictMandatoryValidation)
+        {
+            var summary = string.Join("; ", violations
+                .Take(20)
+                .Select(v => $"{v.CkTypeId}@{v.RtId}: {string.Join(", ", v.MissingCkAttributeIds)}"));
+            if (violations.Length > 20)
+            {
+                summary += $"; … {violations.Length - 20} more";
+            }
+
+            throw ExchangeException.MandatoryAttributesMissing(violations.Length, summary);
+        }
     }
 
     private void AssignAttributes<TKey>(IRuntimeRepository runtimeRepository,

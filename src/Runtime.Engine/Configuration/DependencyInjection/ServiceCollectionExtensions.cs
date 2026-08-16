@@ -52,6 +52,10 @@ public static class ServiceCollectionExtensions
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();
         services.AddTransient<IImportRtModelCommand, ImportRtModelCommand>();
+        // AB#4772 stage-2: default options keep strict mandatory validation OFF (warn + audit
+        // only). Hosts opt in by registering a bound instance (e.g. from the Import config
+        // section — Import:StrictMandatoryValidation).
+        services.TryAddSingleton<RtImportOptions>();
 
         // Add converters
         services.AddTransient<IRtEntityToTcDtoConverter, RtEntityToTcDtoConverter>();
@@ -110,6 +114,10 @@ public static class ServiceCollectionExtensions
         // CK model import audit trail (WI #3324). Default forwards every call through
         // IAuditEventSink.
         services.TryAddTransient<ICkModelImportAuditTrail, ForwardingCkModelImportAuditTrail>();
+
+        // RT model import audit trail (AB#4772). Default forwards every call through
+        // IAuditEventSink.
+        services.TryAddTransient<IRtImportAuditTrail, ForwardingRtImportAuditTrail>();
 
         // StreamData archive lifecycle. Concept §3, §11. The lifecycle service itself is
         // constructed per-tenant by the host (e.g. Mongo TenantContext) because it requires a

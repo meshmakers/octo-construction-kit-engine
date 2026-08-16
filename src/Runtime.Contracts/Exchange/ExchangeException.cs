@@ -38,6 +38,15 @@ public class ExchangeException : PersistenceException
         return new ExchangeException($"Attribute '{modelAttributeId}' does not exist at {elementType} '{ckId}'.");
     }
 
+    internal static Exception MandatoryAttributesMissing(int entityCount, string violationSummary)
+    {
+        return new ExchangeException(
+            $"Import rejected (strict mandatory validation): {entityCount} entit" +
+            (entityCount == 1 ? "y is" : "ies are") +
+            " missing mandatory attributes that have no default value or auto-increment reference. " +
+            $"Nothing was written. {violationSummary}");
+    }
+
     internal static Exception CkEnumIdNotDefined(CkTypeAttributeGraph ckTypeAttributeGraph)
     {
         return new ExchangeException($"CkEnumId is not defined for attribute '{ckTypeAttributeGraph.AttributeName}'.");

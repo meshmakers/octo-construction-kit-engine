@@ -64,6 +64,24 @@ public class RtEntityTcDto : RtTypeWithAttributesTcDto
     public string? RtWellKnownName { get; set; }
 
     /// <summary>
+    ///     Gets or sets the engine-computed display name of the entity (from the CK type's
+    ///     displayNameRule; read-only for API consumers).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? RtDisplayName { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the engine-computed display description of the entity (from the CK type's
+    ///     displayDescriptionRule; read-only for API consumers).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? RtDisplayDescription { get; set; }
+
+    /// <summary>
     /// Gets or sets the state of the entity.
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]

@@ -1129,6 +1129,10 @@ public static class RtPathEvaluator
                     if (token.Value.ToPascalCase() == nameof(RtEntity.RtId) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.CkTypeId) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtWellKnownName) ||
+                        // RtDisplayName/RtDisplayDescription are readable but engine-computed —
+                        // deliberately absent from the settable system-field list above.
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtDisplayName) ||
+                        token.Value.ToPascalCase() == nameof(RtEntity.RtDisplayDescription) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtVersion) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtCreationDateTime) ||
                         token.Value.ToPascalCase() == nameof(RtEntity.RtChangedDateTime))

@@ -73,6 +73,19 @@ public class RtEntity : RtTypeWithAttributes
     ///     Returns the well-known name to access well-known entities in a faster way
     /// </summary>
     public string? RtWellKnownName { get; set; }
+
+    /// <summary>
+    ///     Engine-computed display name, evaluated from the CK type's displayNameRule on save.
+    ///     Read-only for API consumers; null when the type has no rule or every referenced
+    ///     attribute is empty (readers fall back to "ckTypeId@rtId").
+    /// </summary>
+    public string? RtDisplayName { get; set; }
+
+    /// <summary>
+    ///     Engine-computed display description, evaluated from the CK type's displayDescriptionRule
+    ///     on save. Read-only for API consumers.
+    /// </summary>
+    public string? RtDisplayDescription { get; set; }
     
     /// <summary>
     ///     Gets or sets the runtime version, which is used to detect changes of the entity

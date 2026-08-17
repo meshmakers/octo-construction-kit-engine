@@ -39,6 +39,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             RtArchivedDateTime = e.RtArchivedDateTime,
             RtState = e.RtState,
             RtWellKnownName = e.RtWellKnownName,
+            RtDisplayName = e.RtDisplayName,
+            RtDisplayDescription = e.RtDisplayDescription,
 #if NETSTANDARD2_0
             Attributes = new Dictionary<string, object?>(e.Attributes
                 .ToDictionary(k => k.Key, v => v.Value))
@@ -96,7 +98,9 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
                     RtChangedDateTime = e.RtChangedDateTime,
                     RtArchivedDateTime = e.RtArchivedDateTime,
                     RtState = e.RtState,
-                    RtWellKnownName = e.RtWellKnownName
+                    RtWellKnownName = e.RtWellKnownName,
+                    RtDisplayName = e.RtDisplayName,
+                    RtDisplayDescription = e.RtDisplayDescription
                 };
                 return entity;
             });
@@ -184,6 +188,8 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
         public DateTime? RtArchivedDateTime { get; set; }
         public RtState? RtState { get; set; }
         public string? RtWellKnownName { get; set; }
+        public string? RtDisplayName { get; set; }
+        public string? RtDisplayDescription { get; set; }
         public Dictionary<string, object?> Attributes { get; set; } = new();
     }
 

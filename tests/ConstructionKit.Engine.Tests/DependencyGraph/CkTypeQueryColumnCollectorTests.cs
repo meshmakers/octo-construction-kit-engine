@@ -52,9 +52,9 @@ public class CkTypeQueryColumnCollectorTests
 
         var result = ckTypeQueryColumnCollector.GetColumns("sample1/Demo1", new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
         Assert.Equal<object>(
-            ["a", "b", "c", "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
+            ["a", "b", "c", "rtId", "ckTypeId", "rtWellKnownName", "rtDisplayName", "rtDisplayDescription", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"],
             result.Select(x => x.Path));
-        Assert.Equal<object>(["A", "B", "C", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
+        Assert.Equal<object>(["A", "B", "C", "RtId", "CkTypeId", "RtWellKnownName", "RtDisplayName", "RtDisplayDescription", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }
 
@@ -72,12 +72,12 @@ public class CkTypeQueryColumnCollectorTests
         Assert.Equal<object>(
         [
             "myAttributeA", "myAttributeB", "myAttributeC", "myRecord.myAttributeA", "myRecord.myAttributeB",
-            "myRecord.myAttributeC", "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"
+            "myRecord.myAttributeC", "rtId", "ckTypeId", "rtWellKnownName", "rtDisplayName", "rtDisplayDescription", "rtVersion", "rtCreationDateTime", "rtChangedDateTime"
         ], result.Select(x => x.Path));
         Assert.Equal<object>(
         [
             "MyAttributeA", "MyAttributeB", "MyAttributeC", "MyRecord", "MyAttributeA", "MyRecord", "MyAttributeB",
-            "MyRecord", "MyAttributeC", "RtId", "CkTypeId", "RtWellKnownName", "RtVersion", "RtCreationDateTime",
+            "MyRecord", "MyAttributeC", "RtId", "CkTypeId", "RtWellKnownName", "RtDisplayName", "RtDisplayDescription", "RtVersion", "RtCreationDateTime",
             "RtChangedDateTime"
         ], result.SelectMany(x => x.AccessPathList.Select(y => y.Value)));
     }
@@ -161,7 +161,7 @@ public class CkTypeQueryColumnCollectorTests
 
         var result = collector.GetColumns("Described/Device", new CkTypeQueryColumnOptions { IgnoreNavigationProperties = true });
 
-        var systemColumns = new[] { "rtId", "ckTypeId", "rtWellKnownName", "rtVersion", "rtCreationDateTime", "rtChangedDateTime" };
+        var systemColumns = new[] { "rtId", "ckTypeId", "rtWellKnownName", "rtDisplayName", "rtDisplayDescription", "rtVersion", "rtCreationDateTime", "rtChangedDateTime" };
         foreach (var sysCol in systemColumns)
         {
             var column = result.Single(x => x.Path == sysCol);

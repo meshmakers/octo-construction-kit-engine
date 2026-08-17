@@ -67,14 +67,19 @@ The declared rules round-trip through the MongoDB model cache
 `DatabaseCkModelRepository` import + read-back) — the standard three-point round-trip
 every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#4589).
 
-## Runtime semantics (later phases, for context)
+## Runtime semantics
 
-- **Phase 2 (AB#4810):** `RtDisplayName` / `RtDisplayDescription` on `RtEntity` + DTO
-  set; a `DisplayNameModifier` (`IPreDocumentModification<RtEntity>`, modeled on
-  `AutoIncrementModifier`) evaluates the effective rule on Insert/Replace; GraphQL
-  exposes the fields read-only. Empty evaluation stores `null`; the read layer always
-  synthesizes `<ckTypeId>@<rtId>` so the API never returns an empty display name
-  (filter/sort operate on the stored value).
+- **Phase 2 (AB#4810, implemented):** `RtDisplayName` / `RtDisplayDescription` on
+  `RtEntity` (+ TcDto/converter, SDK DTOs, serializer/mapper, query columns
+  `rtDisplayName`/`rtDisplayDescription`, readable via `RtPathEvaluator` but deliberately
+  not settable). The `DisplayNameModifier` (`IPreDocumentModification<RtEntity>` in
+  octo-construction-kit-engine-mongodb, modeled on `AutoIncrementModifier`) evaluates the
+  effective rule on Insert/Replace; parse results are memoized by rule text. Empty
+  evaluation stores `null`. GraphQL (octo-asset-repo-services) exposes `rtDisplayName`
+  as non-null with the `<ckTypeId>@<rtId>` fallback synthesized at read time and
+  `rtDisplayDescription` nullable — on the generic entity type, the per-CK-type object +
+  interface types and simple query rows; not present on any mutation input type.
+  Filter/sort operate on the stored value, not the synthesized fallback.
 - **Phase 3 (AB#4811):** recompute on partial updates when a referenced path (prefix
   match, so record sub-updates count) is part of the update.
 - **Phase 4 (AB#4812):** backfill sweep over existing entities when a model import

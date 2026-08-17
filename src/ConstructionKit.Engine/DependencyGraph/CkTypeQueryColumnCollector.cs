@@ -15,6 +15,8 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string AssociationMetaSeparator = "::";
     private const string SystemAttributeRtId = "RtId";
     private const string SystemAttributeRtWellKnownName = "RtWellKnownName";
+    private const string SystemAttributeRtDisplayName = "RtDisplayName";
+    private const string SystemAttributeRtDisplayDescription = "RtDisplayDescription";
     private const string SystemAttributeRtVersion = "RtVersion";
     private const string SystemAttributeRtCreationDateTime = "RtCreationDateTime";
     private const string SystemAttributeRtChangedDateTime = "RtChangedDateTime";
@@ -102,6 +104,12 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtWellKnownName.ToCamelCase(),
             [new(SystemAttributeRtWellKnownName, PathType.Attribute)],
             AttributeValueTypesDto.String));
+        columns.Add(new CkTypeQueryColumn(SystemAttributeRtDisplayName.ToCamelCase(),
+            [new(SystemAttributeRtDisplayName, PathType.Attribute)],
+            AttributeValueTypesDto.String));
+        columns.Add(new CkTypeQueryColumn(SystemAttributeRtDisplayDescription.ToCamelCase(),
+            [new(SystemAttributeRtDisplayDescription, PathType.Attribute)],
+            AttributeValueTypesDto.String));
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtVersion.ToCamelCase(),
             [new(SystemAttributeRtVersion, PathType.Attribute)],
             AttributeValueTypesDto.Int64));
@@ -111,7 +119,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtChangedDateTime.ToCamelCase(),
             [new(SystemAttributeRtChangedDateTime, PathType.Attribute)],
             AttributeValueTypesDto.DateTime));
-        TrackProducedColumns(6);
+        TrackProducedColumns(8);
         return columns;
     }
 

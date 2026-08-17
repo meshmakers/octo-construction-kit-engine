@@ -310,7 +310,9 @@ public class CompilerService : ICompilerService
                                 Indexes = ckTypeDto.Indexes,
                                 IsAbstract = ckTypeDto.IsAbstract,
                                 IsFinal = ckTypeDto.IsFinal,
-                                EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages
+                                EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages,
+                                DisplayNameRule = ckTypeDto.DisplayNameRule,
+                                DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule
                             };
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))

@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.DisplayRules;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 using Microsoft.Extensions.Logging;
@@ -82,6 +83,9 @@ internal class InheritanceResolver : IInheritanceResolver
         _logger.LogDebug("Resolving dependencies based on inheritance");
         BuildInheritedConfiguration(modelGraph, failedTypeIds, originFileResolver, operationResult);
 
+        _logger.LogDebug("Validating display rules");
+        ValidateDisplayRules(modelGraph, failedTypeIds, originFileResolver, operationResult);
+
         _logger.LogDebug("Resolving inheritance completed");
 
         return modelGraph;
@@ -127,6 +131,8 @@ internal class InheritanceResolver : IInheritanceResolver
                 typeGraph.SetDefiningCollectionCkTypeId(typeGraph.CkTypeId);
             }
 
+            ResolveDisplayRules(modelGraph, typeGraph, baseTypes);
+
             foreach (var ckTypeAttribute in typeGraph.DefinedAttributes)
             {
                 if (!modelGraph.Attributes.TryGetValue(ckTypeAttribute.CkAttributeId, out var attributeGraph))
@@ -145,6 +151,118 @@ internal class InheritanceResolver : IInheritanceResolver
         }
 
         return typeGraph;
+    }
+
+    /// <summary>
+    /// Validates the display rules declared on types: syntax (${path} interpolation with ?? coalesce)
+    /// and that every referenced attribute path exists on the type (own attributes including record
+    /// paths, no associations). Runs after attribute flattening so inherited attributes are visible.
+    /// Errors are reported only at the declaring type — derived types inheriting the rule share the
+    /// same attribute set (attribute merge is additive), so a rule valid at the declaring type is
+    /// valid for all inheritors.
+    /// </summary>
+    private static void ValidateDisplayRules(CkModelGraph modelGraph, HashSet<CkId<CkTypeId>> failedTypeIds,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        foreach (var pair in modelGraph.Types)
+        {
+            var ckTypeId = pair.Key;
+            var typeGraph = pair.Value;
+            if (failedTypeIds.Contains(ckTypeId))
+            {
+                continue;
+            }
+
+            if (typeGraph.DisplayNameRuleDeclared)
+            {
+                ValidateDisplayRule(modelGraph, ckTypeId, typeGraph, typeGraph.DisplayNameRule!,
+                    "displayNameRule", originFileResolver, operationResult);
+            }
+
+            if (typeGraph.DisplayDescriptionRuleDeclared)
+            {
+                ValidateDisplayRule(modelGraph, ckTypeId, typeGraph, typeGraph.DisplayDescriptionRule!,
+                    "displayDescriptionRule", originFileResolver, operationResult);
+            }
+        }
+    }
+
+    private static void ValidateDisplayRule(CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId, CkTypeGraph typeGraph,
+        string rule, string ruleProperty, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        var location = originFileResolver.Resolve(ckTypeId);
+
+        var parseResult = DisplayRuleParser.Parse(rule);
+        if (!parseResult.IsValid)
+        {
+            foreach (var error in parseResult.Errors)
+            {
+                operationResult.AddMessage(MessageCodes.DisplayRuleSyntaxInvalid(location, ruleProperty, ckTypeId,
+                    error));
+            }
+
+            return;
+        }
+
+        foreach (var attributePath in parseResult.ReferencedPaths)
+        {
+            if (!IsValidAttributePath(modelGraph, typeGraph, attributePath))
+            {
+                operationResult.AddMessage(MessageCodes.DisplayRuleAttributePathUnknown(location, ruleProperty,
+                    ckTypeId, attributePath));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks an attribute path against a type's flattened attributes; dot-separated segments
+    /// traverse record attributes (arbitrarily nested).
+    /// </summary>
+    private static bool IsValidAttributePath(CkModelGraph modelGraph, CkTypeWithAttributesGraph scope, string path)
+    {
+        var segments = path.Split('.');
+        var current = scope;
+        for (var i = 0; i < segments.Length; i++)
+        {
+            if (!current.AllAttributesByName.TryGetValue(segments[i], out var attribute))
+            {
+                return false;
+            }
+
+            if (i == segments.Length - 1)
+            {
+                return true;
+            }
+
+            if (attribute.ValueCkRecordId == null ||
+                !modelGraph.Records.TryGetValue(attribute.ValueCkRecordId, out var recordGraph))
+            {
+                return false;
+            }
+
+            current = recordGraph;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Fills empty display rules from the base-type chain. The chain is ordered nearest-first, so the
+    /// nearest declared (or already-inherited) rule wins; a rule declared on the type itself is never
+    /// overwritten.
+    /// </summary>
+    private static void ResolveDisplayRules(CkModelGraph modelGraph, CkTypeGraph typeGraph,
+        IEnumerable<CkGraphTypeInheritance> baseTypes)
+    {
+        foreach (var baseType in baseTypes)
+        {
+            if (!modelGraph.Types.TryGetValue(baseType.BaseCkTypeId, out var baseGraph))
+            {
+                continue;
+            }
+
+            typeGraph.InheritDisplayRules(baseGraph.DisplayNameRule, baseGraph.DisplayDescriptionRule);
+        }
     }
 
     /// <summary>
@@ -484,6 +602,8 @@ internal class InheritanceResolver : IInheritanceResolver
                 typeGraph.SetIsCollectionRoot(true);
                 typeGraph.SetDefiningCollectionCkTypeId(typeGraph.CkTypeId);
             }
+
+            ResolveDisplayRules(modelGraph, typeGraph, baseTypes);
 
             foreach (var ckTypeAttribute in typeGraph.DefinedAttributes)
             {

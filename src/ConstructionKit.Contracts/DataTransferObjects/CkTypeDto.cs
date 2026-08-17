@@ -62,4 +62,22 @@ public class CkTypeDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }
+
+    /// <summary>
+    ///     Optional rule defining how the display name (rtDisplayName) of a runtime entity is computed
+    ///     from its attribute values on save, e.g. "${roomNumber} - ${name ?? globalId}".
+    ///     Supports ${attributePath} interpolation (own attributes including record paths, no associations)
+    ///     and the ?? coalesce operator. Inherited along the derivedFromCkTypeId chain; a derived type
+    ///     may override it with its own rule (nearest non-empty rule wins).
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? DisplayNameRule { get; set; }
+
+    /// <summary>
+    ///     Optional rule defining how the display description (rtDisplayDescription) of a runtime entity
+    ///     is computed from its attribute values on save. Same syntax and inheritance semantics as
+    ///     <see cref="DisplayNameRule" />.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? DisplayDescriptionRule { get; set; }
 }

@@ -26,6 +26,14 @@
         "description": {
           "type": "string"
         },
+        "displayNameRule": {
+          "type": "string",
+          "description": "Optional rule computing rtDisplayName from attribute values on save, e.g. '${roomNumber} - ${name ?? globalId}'. Supports ${attributePath} interpolation and the ?? coalesce operator. Inherited by derived types; nearest non-empty rule wins."
+        },
+        "displayDescriptionRule": {
+          "type": "string",
+          "description": "Optional rule computing rtDisplayDescription from attribute values on save. Same syntax and inheritance semantics as displayNameRule."
+        },
         "attributes": {
           "type": "array",
           "items": {
@@ -143,6 +151,14 @@
         },
         "description": {
           "type": "string"
+        },
+        "displayNameRule": {
+          "type": "string",
+          "description": "Optional rule computing rtDisplayName from attribute values on save, e.g. '${roomNumber} - ${name ?? globalId}'. Supports ${attributePath} interpolation and the ?? coalesce operator. Inherited by derived types; nearest non-empty rule wins."
+        },
+        "displayDescriptionRule": {
+          "type": "string",
+          "description": "Optional rule computing rtDisplayDescription from attribute values on save. Same syntax and inheritance semantics as displayNameRule."
         },
         "attributes": {
           "type": "array",

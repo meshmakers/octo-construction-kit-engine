@@ -99,6 +99,8 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                     : (CkSemVerLevel.Major, "type is no longer a collection root"),
             { ElementKind: CkModelElementKind.Type, Property: "enableChangeStreamPreAndPostImages" } =>
                 (CkSemVerLevel.Minor, "change stream behavior changes, no data break"),
+            { ElementKind: CkModelElementKind.Type, Property: "displayNameRule" or "displayDescriptionRule" } =>
+                (CkSemVerLevel.Patch, "computed display values change only, no data/schema break"),
 
             // ── Attribute definitions ───────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Attribute, Property: "valueType" } =>

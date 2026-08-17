@@ -33,6 +33,10 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages;
         DerivedFromCkTypeId = ckTypeDto.DerivedFromCkTypeId;
         Description = ckTypeDto.Description;
+        DisplayNameRule = ckTypeDto.DisplayNameRule;
+        DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule;
+        DisplayNameRuleDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.DisplayNameRule);
+        DisplayDescriptionRuleDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.DisplayDescriptionRule);
         _baseTypes = [];
         _derivedTypes = [];
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
@@ -59,6 +63,8 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="associations"></param>
     /// <param name="description"></param>
     /// <param name="enableChangeStreamPreAndPostImages"></param>
+    /// <param name="displayNameRule"></param>
+    /// <param name="displayDescriptionRule"></param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -68,9 +74,11 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
         IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description,
-        bool enableChangeStreamPreAndPostImages)
+        bool enableChangeStreamPreAndPostImages, string? displayNameRule = null, string? displayDescriptionRule = null)
         : base(definedAttributes, allAttributes)
     {
+        DisplayNameRule = displayNameRule;
+        DisplayDescriptionRule = displayDescriptionRule;
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
@@ -152,6 +160,32 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     ///     An optional description of the type
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    ///     The effective rule computing rtDisplayName on save. Initialized with the rule declared on
+    ///     this type; during inheritance resolution an empty rule is filled from the nearest base type
+    ///     that declares one (see <see cref="InheritDisplayRules" />).
+    /// </summary>
+    public string? DisplayNameRule { get; private set; }
+
+    /// <summary>
+    ///     The effective rule computing rtDisplayDescription on save. Same inheritance semantics as
+    ///     <see cref="DisplayNameRule" />.
+    /// </summary>
+    public string? DisplayDescriptionRule { get; private set; }
+
+    /// <summary>
+    ///     True when <see cref="DisplayNameRule" /> was declared on this type itself (not inherited).
+    ///     Used to report rule validation errors only at the declaring type.
+    /// </summary>
+    [JsonIgnore]
+    public bool DisplayNameRuleDeclared { get; }
+
+    /// <summary>
+    ///     True when <see cref="DisplayDescriptionRule" /> was declared on this type itself (not inherited).
+    /// </summary>
+    [JsonIgnore]
+    public bool DisplayDescriptionRuleDeclared { get; }
     
     /// <summary>
     ///     Returns a string that describes the inheritance chain
@@ -175,6 +209,26 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     internal void SetIsCollectionRoot(bool isCollectionRoot)
     {
         IsCollectionRoot = isCollectionRoot;
+    }
+
+    /// <summary>
+    ///     Fills empty display rules from a base type. Called during inheritance resolution walking
+    ///     from the nearest base type upward, so the nearest declared rule wins. A rule already set
+    ///     (declared on this type or inherited from a nearer base) is never overwritten.
+    /// </summary>
+    /// <param name="baseDisplayNameRule">The base type's effective display name rule</param>
+    /// <param name="baseDisplayDescriptionRule">The base type's effective display description rule</param>
+    internal void InheritDisplayRules(string? baseDisplayNameRule, string? baseDisplayDescriptionRule)
+    {
+        if (string.IsNullOrWhiteSpace(DisplayNameRule) && !string.IsNullOrWhiteSpace(baseDisplayNameRule))
+        {
+            DisplayNameRule = baseDisplayNameRule;
+        }
+
+        if (string.IsNullOrWhiteSpace(DisplayDescriptionRule) && !string.IsNullOrWhiteSpace(baseDisplayDescriptionRule))
+        {
+            DisplayDescriptionRule = baseDisplayDescriptionRule;
+        }
     }
 
     /// <summary>

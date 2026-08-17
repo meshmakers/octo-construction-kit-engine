@@ -183,6 +183,12 @@ internal static class MessageCodes
     internal static OperationMessage CkAttributeIdNotFoundAtRecord(string? location, object ckAttributeId, object ckRecordId) =>
         GetMessage("CkAttributeIdNotFoundAtRecord", location, ckAttributeId, ckRecordId);
 
+    internal static OperationMessage DisplayRuleSyntaxInvalid(string? location, object ruleProperty, object ckTypeId, object errorMessage) =>
+        GetMessage("DisplayRuleSyntaxInvalid", location, ruleProperty, ckTypeId, errorMessage);
+
+    internal static OperationMessage DisplayRuleAttributePathUnknown(string? location, object ruleProperty, object ckTypeId, object attributePath) =>
+        GetMessage("DisplayRuleAttributePathUnknown", location, ruleProperty, ckTypeId, attributePath);
+
     internal static OperationMessage FileContainsNoModel(string? location) =>
         GetMessage("FileContainsNoModel", location);
     internal static OperationMessage NoImportsFound(string? location) =>
@@ -620,6 +626,18 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.FatalError,
                  66, "Multiple versions of construction kit model '{modelName}' were resolved as transitive dependencies: {versions}. Conflicting versions are referenced by: {origins}. This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled).",
                  new [] {"modelName", "versions", "origins"})
+        },
+        {
+            "DisplayRuleSyntaxInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 67, "Display rule '{ruleProperty}' of type '{ckTypeId}' is invalid: {errorMessage}",
+                 new [] {"ruleProperty", "ckTypeId", "errorMessage"})
+        },
+        {
+            "DisplayRuleAttributePathUnknown",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 68, "Display rule '{ruleProperty}' of type '{ckTypeId}' references unknown attribute path '{attributePath}'. Only own attributes (including record paths) can be referenced; associations are not supported.",
+                 new [] {"ruleProperty", "ckTypeId", "attributePath"})
         },
     };
 }

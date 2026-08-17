@@ -551,6 +551,22 @@ public class CkSemVerClassifierTests
         Assert.Equal(CkSemVerLevel.Patch, _classifier.GetRequiredLevel(classified));
     }
 
+    [Fact]
+    public void DisplayRuleChanges_ArePatch()
+    {
+        var baseline = SemVerTestModels.CreateModel();
+        var current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(current).DisplayNameRule = "${serialNumber}";
+        SemVerTestModels.GetMachine(current).DisplayDescriptionRule = "${serialNumber} description";
+
+        var changes = _diffService.Diff(baseline, current);
+        var classified = _classifier.Classify(changes, baseline, current);
+
+        Assert.Equal(2, classified.Count);
+        Assert.All(classified, c => Assert.Equal(CkSemVerLevel.Patch, c.Level));
+        Assert.Equal(CkSemVerLevel.Patch, _classifier.GetRequiredLevel(classified));
+    }
+
     // ── Aggregation and defensive default ───────────────────────────────────────────────
 
     [Fact]

@@ -42,7 +42,8 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkTypeDto.TypeId), nameof(CkTypeDto.DerivedFromCkTypeId), nameof(CkTypeDto.IsFinal),
                 nameof(CkTypeDto.IsAbstract), nameof(CkTypeDto.Indexes), nameof(CkTypeDto.Associations),
-                nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description)
+                nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description),
+                nameof(CkTypeDto.DisplayNameRule), nameof(CkTypeDto.DisplayDescriptionRule)
             ],
             [typeof(CkTypeWithAttributesDto)] = [nameof(CkTypeWithAttributesDto.Attributes)],
             [typeof(CkAttributeDto)] =
@@ -158,6 +159,10 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineType.EnableChangeStreamPreAndPostImages, currentType.EnableChangeStreamPreAndPostImages);
                 AddModified(typeChanges, CkModelElementKind.Type, id, "description",
                     baselineType.Description, currentType.Description);
+                AddModified(typeChanges, CkModelElementKind.Type, id, "displayNameRule",
+                    baselineType.DisplayNameRule, currentType.DisplayNameRule);
+                AddModified(typeChanges, CkModelElementKind.Type, id, "displayDescriptionRule",
+                    baselineType.DisplayDescriptionRule, currentType.DisplayDescriptionRule);
 
                 DiffAttributeAssignments(typeChanges, CkModelElementKind.TypeAttribute, id,
                     baselineType.Attributes, currentType.Attributes, modelName);

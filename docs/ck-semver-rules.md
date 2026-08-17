@@ -163,6 +163,7 @@ surface in the dependency diff.
 | Change | Reasoning |
 | ------ | --------- |
 | `description` (all element kinds, model meta) | Purely documentational |
+| `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
 
 ### Defensive default

@@ -90,6 +90,26 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
   unchanged", empty string = explicit clear sentinel — the Mongo update mapper translates
   it to `$unset`, the local mapper to `null`. Guarded (optimistic-concurrency) updates get
   the same treatment.
-- **Phase 4 (AB#4812):** backfill sweep over existing entities when a model import
-  changes a rule.
+- **Phase 4 (AB#4812, implemented — octo-construction-kit-engine-mongodb):** backfill
+  sweep over existing entities when a model import changes a rule.
+  - *Detection:* `TenantContext.ImportCkModelAsync` captures the declared rules of all
+    available CK types directly from Mongo before the import (mirroring
+    `GetSchemaVersionsDirectAsync` — the import hard-deletes the previous version's
+    CkType documents, so there is no old snapshot afterwards) and diffs them after the
+    import (`DisplayRuleChangeDetector`). Declared-rule diff is sufficient: a change is
+    swept polymorphically from the declaring type, which covers all inheritors.
+  - *Durable tasks:* one record per (tenant, type) in the non-CK system collection
+    `display_rule_sweep` (`IDisplayRuleSweepStore`, modeled on `TenantSetupRetryStore`):
+    lease-protected claim, bounded retries, re-enqueue resets the budget. Enqueue
+    failures never fail the import (logged as error).
+  - *Sweep:* `DisplayRuleSweepHostedService` (opt-in via
+    `AddDisplayRuleSweepBackgroundService`, registered in the asset repository host;
+    options `DisplayRules:Sweep`) drains due tasks. `DisplayRuleSweeper` pages the
+    polymorphic type query sorted by `_id`, evaluates each entity with its own type's
+    effective rules and writes only changed fields as partial updates (empty string =
+    clear sentinel; `RtChangedDateTime` untouched). Idempotent — a retry only redoes the
+    remainder. Types above the collection roots fan out to the collection roots of their
+    subtree.
+  - Evaluation semantics are shared across save/update/sweep via
+    `Runtime.Contracts/DisplayRules/RtDisplayRuleEvaluator`.
 - **Phase 5 (AB#4813):** consumers switch from `rtWellKnownName` to `rtDisplayName`.

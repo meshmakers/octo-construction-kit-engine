@@ -1,5 +1,6 @@
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.DisplayRules;
+using Meshmakers.Octo.Runtime.Contracts.DisplayRules;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
@@ -64,7 +65,7 @@ internal static class DisplayFieldUpdateRecompute
             var source = partialEntity.Attributes.ContainsKey(GetRootAttribute(path))
                 ? partialEntity
                 : storedEntity;
-            return ResolveAttributePath(source, path);
+            return RtDisplayRuleEvaluator.ResolveAttributePath(source, path);
         }
 
         if (nameParseResult != null)
@@ -82,32 +83,5 @@ internal static class DisplayFieldUpdateRecompute
     {
         var separatorIndex = path.IndexOf('.');
         return separatorIndex < 0 ? path : path.Substring(0, separatorIndex);
-    }
-
-    /// <summary>
-    ///     Resolves a rule path against an entity's attributes; dot-separated segments traverse
-    ///     record values.
-    /// </summary>
-    private static object? ResolveAttributePath(RtTypeWithAttributes source, string path)
-    {
-        var current = source;
-        var segments = path.Split('.');
-        for (var i = 0; i < segments.Length; i++)
-        {
-            var value = current.GetAttributeValueOrDefault(segments[i]);
-            if (i == segments.Length - 1)
-            {
-                return value;
-            }
-
-            if (value is not RtTypeWithAttributes nested)
-            {
-                return null;
-            }
-
-            current = nested;
-        }
-
-        return null;
     }
 }

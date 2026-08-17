@@ -112,4 +112,11 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
     subtree.
   - Evaluation semantics are shared across save/update/sweep via
     `Runtime.Contracts/DisplayRules/RtDisplayRuleEvaluator`.
-- **Phase 5 (AB#4813):** consumers switch from `rtWellKnownName` to `rtDisplayName`.
+- **Phase 5 (AB#4813, implemented — octo-frontend-libraries):** the entity pickers
+  (`RuntimeEntitySelectDataSource` / `RuntimeEntityDialogDataSource` in
+  `@meshmakers/octo-services`, used by the MeshBoard entity selectors and widget config
+  dialogs) display `rtDisplayName` (Name column + select input, plus a Description
+  column) and the text search filters on `rtDisplayName` instead of `rtId`.
+  `rtWellKnownName` stays an identifier everywhere (octo-cli archive/auto-increment
+  usages deliberately unchanged); octo-mcp-service and Refinery Studio pick the fields up
+  via the SDK DTOs / released frontend libraries.

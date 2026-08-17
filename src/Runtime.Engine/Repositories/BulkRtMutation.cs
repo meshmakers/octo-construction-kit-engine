@@ -225,6 +225,9 @@ internal class BulkRtMutation(
             }
         }
 
+        await RecomputeDisplayFieldsForUpdatesAsync(session, collection, ckTypeGraph, rtEntities)
+            .ConfigureAwait(false);
+
         // Guarded updates are applied one-by-one with the optimistic-concurrency filter; the
         // write may be a no-op if the guard does not match (stale-write protection — see
         // AttributeNewerThanGuard). Unguarded entities still go through the batch path.
@@ -245,6 +248,53 @@ internal class BulkRtMutation(
         if (unguardedEntities.Count > 0)
         {
             await collection.UpdateOneAsync(session, unguardedEntities).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     Smart recompute of the display fields on partial updates (AB#4811): when an update
+    ///     touches an attribute referenced by the type's effective display rules, the stored
+    ///     entities are re-read once per batch and the rules are re-evaluated against stored +
+    ///     updated attributes (see <see cref="DisplayFieldUpdateRecompute" />). Updates not
+    ///     touching referenced attributes cause no extra read.
+    /// </summary>
+    private static async Task RecomputeDisplayFieldsForUpdatesAsync(IOctoSession session,
+        IDataSourceCollection<OctoObjectId, RtEntity> collection, CkTypeGraph ckTypeGraph,
+        IReadOnlyList<RtEntity> rtEntities)
+    {
+        var nameParseResult = DisplayFieldUpdateRecompute.GetValidParseResult(ckTypeGraph.DisplayNameRule);
+        var descriptionParseResult =
+            DisplayFieldUpdateRecompute.GetValidParseResult(ckTypeGraph.DisplayDescriptionRule);
+        if (nameParseResult == null && descriptionParseResult == null)
+        {
+            return;
+        }
+
+        var referencedRootAttributes =
+            DisplayFieldUpdateRecompute.GetReferencedRootAttributes(nameParseResult, descriptionParseResult);
+        var affectedEntities = rtEntities
+            .Where(e => DisplayFieldUpdateRecompute.TouchesReferencedAttributes(e, referencedRootAttributes))
+            .ToList();
+        if (affectedEntities.Count == 0)
+        {
+            return;
+        }
+
+        var rtIds = affectedEntities.Select(e => e.RtId).ToList();
+        var storedEntities = await collection.FindManyAsync(session, f => rtIds.Contains(f.RtId))
+            .ConfigureAwait(false);
+        var storedEntitiesById = storedEntities.ToDictionary(e => e.RtId);
+
+        foreach (var partialEntity in affectedEntities)
+        {
+            if (!storedEntitiesById.TryGetValue(partialEntity.RtId, out var storedEntity))
+            {
+                // Missing entity surfaces as MatchedCount=0 in the update itself
+                continue;
+            }
+
+            DisplayFieldUpdateRecompute.Recompute(nameParseResult, descriptionParseResult, partialEntity,
+                storedEntity);
         }
     }
 

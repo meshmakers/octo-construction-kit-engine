@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -18,6 +19,23 @@ public static class DisplayRuleParser
         new(@"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$", RegexOptions.Compiled);
 
     private static readonly string[] CoalesceSeparator = ["??"];
+
+    /// <summary>
+    ///     Memoization for <see cref="ParseCached" />, keyed by rule text — identical rules across
+    ///     types and tenants share one parse result. Rules are validated at model compile time, so
+    ///     the population is small and stable.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, DisplayRuleParseResult> ParsedRules = new();
+
+    /// <summary>
+    ///     Parses a display rule with memoization by rule text. Use this on hot paths (entity save)
+    ///     instead of <see cref="Parse" />.
+    /// </summary>
+    /// <param name="rule">The rule text</param>
+    public static DisplayRuleParseResult ParseCached(string rule)
+    {
+        return ParsedRules.GetOrAdd(rule, Parse);
+    }
 
     /// <summary>
     ///     Parses a display rule into literal and placeholder segments. Syntax errors are collected

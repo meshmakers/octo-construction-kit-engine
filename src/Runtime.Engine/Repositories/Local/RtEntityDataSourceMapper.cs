@@ -70,8 +70,20 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
 
         savedDocument.RtChangedDateTime = documentToApply.RtChangedDateTime;
         savedDocument.RtWellKnownName = documentToApply.RtWellKnownName;
-        savedDocument.RtDisplayName = documentToApply.RtDisplayName;
-        savedDocument.RtDisplayDescription = documentToApply.RtDisplayDescription;
+
+        // Display fields are engine-computed (AB#4811): null on the partial document means
+        // "not recomputed, leave unchanged"; an empty string is the explicit clear sentinel.
+        if (documentToApply.RtDisplayName != null)
+        {
+            savedDocument.RtDisplayName =
+                documentToApply.RtDisplayName.Length == 0 ? null : documentToApply.RtDisplayName;
+        }
+
+        if (documentToApply.RtDisplayDescription != null)
+        {
+            savedDocument.RtDisplayDescription =
+                documentToApply.RtDisplayDescription.Length == 0 ? null : documentToApply.RtDisplayDescription;
+        }
 
         // Apply state changes for archiving
         if (documentToApply.RtState.HasValue)

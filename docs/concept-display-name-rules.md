@@ -80,8 +80,16 @@ every new `CkTypeDto` property needs (see the `isRuntimeState` precedent, AB#458
   `rtDisplayDescription` nullable — on the generic entity type, the per-CK-type object +
   interface types and simple query rows; not present on any mutation input type.
   Filter/sort operate on the stored value, not the synthesized fallback.
-- **Phase 3 (AB#4811):** recompute on partial updates when a referenced path (prefix
-  match, so record sub-updates count) is part of the update.
+- **Phase 3 (AB#4811, implemented):** smart recompute on partial updates. When an update
+  carries a root attribute referenced by the type's display rules (records are updated by
+  their root attribute, so record sub-updates count), `BulkRtMutation` re-reads the stored
+  entities once per batch and re-evaluates the rules against stored + updated attributes
+  (pure logic in `DisplayFieldUpdateRecompute`, memoized parses via
+  `DisplayRuleParser.ParseCached`). Updates not touching referenced attributes cause no
+  extra read. Clear semantics on partial update documents: `null` = "not recomputed, leave
+  unchanged", empty string = explicit clear sentinel — the Mongo update mapper translates
+  it to `$unset`, the local mapper to `null`. Guarded (optimistic-concurrency) updates get
+  the same treatment.
 - **Phase 4 (AB#4812):** backfill sweep over existing entities when a model import
   changes a rule.
 - **Phase 5 (AB#4813):** consumers switch from `rtWellKnownName` to `rtDisplayName`.

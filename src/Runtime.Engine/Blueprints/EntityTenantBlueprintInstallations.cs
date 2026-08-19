@@ -112,6 +112,8 @@ public sealed class EntityTenantBlueprintInstallations : ITenantBlueprintInstall
             var existing = await FindByBlueprintNameAsync(repository, session, installation.BlueprintId.Name)
                 .ConfigureAwait(false);
 
+            // Builds a complete replacement row — callers must supply every field, since
+            // anything not set below is gone after the ReplaceOne.
             var entity = await repository
                 .CreateTransientRtEntityByRtCkIdAsync(InstallationCkTypeId)
                 .ConfigureAwait(false);

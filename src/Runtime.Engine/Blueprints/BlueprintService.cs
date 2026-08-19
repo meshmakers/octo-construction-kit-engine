@@ -1332,7 +1332,7 @@ internal class BlueprintService : IBlueprintService
                     .ConfigureAwait(false);
             }
 
-            // 7. Advance the installation record, then record the update in history
+            // 6. Advance the installation record, then record the update in history
             if (result.Success)
             {
                 // One timestamp for both records so the installation row and the history

@@ -142,6 +142,62 @@ internal class BlueprintService : IBlueprintService
         }
     }
 
+    /// <summary>
+    /// Records the live installation row for a blueprint.
+    /// </summary>
+    /// <remarks>
+    /// The persistence layer replaces the row wholesale (see
+    /// <c>EntityTenantBlueprintInstallations.UpsertAsync</c>), so every field that is not
+    /// passed explicitly must be carried over from <paramref name="existing"/> or it is
+    /// silently lost. <see cref="BlueprintInstallation.InstalledAt"/> is the first-install
+    /// timestamp and is never overwritten.
+    /// </remarks>
+    /// <param name="tenantId">The tenant that carries the installation.</param>
+    /// <param name="blueprintId">The blueprint id that is now in effect.</param>
+    /// <param name="existing">
+    /// The current row for the same blueprint name, or <c>null</c> when the blueprint is
+    /// not yet recorded on the tenant.
+    /// </param>
+    /// <param name="isDependency">
+    /// <c>true</c> when the blueprint is only present as a transitive dependency.
+    /// </param>
+    /// <param name="resolvedDependencies">
+    /// The dependency closure to record, or <c>null</c> to keep the list of
+    /// <paramref name="existing"/> — the update path does not re-resolve blueprint
+    /// dependencies.
+    /// </param>
+    /// <param name="timestampUtc">
+    /// Timestamp of the operation; also used as <c>InstalledAt</c> for a fresh row.
+    /// </param>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    private async Task UpsertInstallationAsync(
+        string tenantId,
+        BlueprintId blueprintId,
+        BlueprintInstallation? existing,
+        bool isDependency,
+        IReadOnlyList<BlueprintId>? resolvedDependencies,
+        DateTime timestampUtc,
+        CancellationToken cancellationToken)
+    {
+        var installation = new BlueprintInstallation
+        {
+            BlueprintId = blueprintId,
+            // MapToInstallation falls back to DateTime.MinValue when the attribute is
+            // missing on the stored entity — never persist that back.
+            InstalledAt = existing != null && existing.InstalledAt != default
+                ? existing.InstalledAt
+                : timestampUtc,
+            LastUpdatedAt = timestampUtc,
+            IsDependency = isDependency,
+            SeedDataChecksum = existing?.SeedDataChecksum,
+            ResolvedDependencies = (resolvedDependencies ?? existing?.ResolvedDependencies ?? [])
+                .ToList()
+        };
+
+        await _installations.UpsertAsync(tenantId, installation, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task<BlueprintApplicationResult> ApplyBlueprintAsync(
         string tenantId,
@@ -372,17 +428,14 @@ internal class BlueprintService : IBlueprintService
                 }
 
                 // 4b. Record the installation row.
-                var installation = new BlueprintInstallation
-                {
-                    BlueprintId = blueprint.BlueprintId,
-                    InstalledAt = existing?.InstalledAt ?? DateTime.UtcNow,
-                    LastUpdatedAt = DateTime.UtcNow,
-                    IsDependency = !isRoot,
-                    ResolvedDependencies = isRoot
-                        ? rootDependencyIds.ToList()
-                        : []
-                };
-                await _installations.UpsertAsync(tenantId, installation, cancellationToken)
+                await UpsertInstallationAsync(
+                        tenantId,
+                        blueprint.BlueprintId,
+                        existing,
+                        isDependency: !isRoot,
+                        resolvedDependencies: isRoot ? rootDependencyIds : [],
+                        DateTime.UtcNow,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 if (!isRoot)
@@ -1279,13 +1332,65 @@ internal class BlueprintService : IBlueprintService
                     .ConfigureAwait(false);
             }
 
-            // 7. Record update in history
+            // 7. Advance the installation record, then record the update in history
             if (result.Success)
             {
+                // One timestamp for both records so the installation row and the history
+                // entry stay joinable.
+                var appliedAt = DateTime.UtcNow;
+
+                // The installation row is the live view of what is in effect on the tenant.
+                // Without this upsert ListBlueprintInstallations keeps reporting the
+                // pre-update version, UninstallAsync no longer matches the entities (they
+                // are stamped with the target version, while the row still names the old
+                // one) and the idempotency skip in ApplyBlueprintAsync misses — a stale row
+                // lets an older version be installed over a newer one when the blueprint is
+                // resolved as a transitive dependency.
+                // Looked up by targetVersion.Name, deliberately not via currentInfo: that
+                // keeps this independent of the name-less history lookup above.
+                var existingInstallation = await _installations
+                    .GetByBlueprintNameAsync(tenantId, targetVersion.Name, cancellationToken)
+                    .ConfigureAwait(false);
+
+                try
+                {
+                    await UpsertInstallationAsync(
+                            tenantId,
+                            targetVersion,
+                            existingInstallation,
+                            // A blueprint that came in transitively stays a dependency
+                            // across updates; no row at all means this was an explicitly
+                            // requested root.
+                            isDependency: existingInstallation?.IsDependency ?? false,
+                            // The update path does not re-resolve blueprint dependencies —
+                            // keep whatever the install path recorded.
+                            resolvedDependencies: null,
+                            appliedAt,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Fail loudly: the entities are already on the target version, so a
+                    // silent divergence between record and reality is exactly the failure
+                    // mode this write exists to prevent. No history entry is written, so a
+                    // repeated update repairs both records idempotently.
+                    _logger.LogError(ex,
+                        "Entities of tenant {TenantId} were migrated to {TargetVersion} but the installation record could not be updated",
+                        tenantId, targetVersion);
+
+                    result.Success = false;
+                    result.Errors.Add(
+                        $"Blueprint entities were migrated to '{targetVersion.FullName}', but the installation record could not be updated: {ex.Message}. Re-run the update to repair the record.");
+                    await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId)
+                        .ConfigureAwait(false);
+                    return result;
+                }
+
                 var blueprintInfo = new TenantBlueprintInfo
                 {
                     BlueprintId = targetVersion,
-                    AppliedAt = DateTime.UtcNow,
+                    AppliedAt = appliedAt,
                     ApplicationMode = updateMode == BlueprintUpdateMode.Migration
                         ? BlueprintApplicationMode.Migration
                         : BlueprintApplicationMode.Update,
@@ -1314,7 +1419,7 @@ internal class BlueprintService : IBlueprintService
                         result.EntitiesUpdated,
                         result.EntitiesDeleted,
                         correlationId,
-                        DateTime.UtcNow),
+                        appliedAt),
                     cancellationToken).ConfigureAwait(false);
             }
             else

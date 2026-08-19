@@ -229,6 +229,24 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 └── 4. Append history entry, return result
 ```
 
+```
+ApplyUpdateAsync(tenantId, targetVersion, updateMode, options)
+│
+├── 1. Resolve the current version, preview the update
+│
+├── 2. Conflict gate → abort unless pre-resolved or ContinueOnError
+│       DryRun → return preview counts, write nothing
+│
+├── 3. Install new CK model dependencies, run CK model migrations
+│
+├── 4. Apply the diff (Safe / Merge / Full) or execute the migration script
+│
+├── 5. Upsert the BlueprintInstallation row onto the target version
+│       → failure here fails the update; no history entry is written
+│
+└── 6. Append history entry, publish BlueprintUpdated event, return result
+```
+
 ## Entity Source Tracking
 
 Every seed entity is stamped with three system attributes when applied:
@@ -297,6 +315,30 @@ public async Task UpdateTenantAsync(string tenantId)
 ```
 
 Updates do not create a tenant backup — take an external snapshot (e.g. the platform's tenant dump/backup jobs) beforehand if you need a safety net.
+
+### What a successful update records
+
+A successful update writes **two** records, in this order:
+
+1. The installation row (`ITenantBlueprintInstallations`) — `BlueprintId` moves to the target
+   version and `LastUpdatedAt` is stamped with the apply timestamp. `InstalledAt`,
+   `IsDependency`, `ResolvedDependencies` and `SeedDataChecksum` are carried over from the
+   existing row. If the row is missing (a tenant that only ever got history entries), it is
+   created as a root installation.
+2. The history entry (`ITenantBlueprintHistory`) — append-only, sharing the same timestamp.
+
+The installation row goes first on purpose: it is the live view of what is in effect, the
+history is the audit log, and there is no transaction spanning both stores. If the installation
+upsert fails, the update is reported as failed and **no** history entry is written, so both
+records stay on the previous version and a repeated update repairs them idempotently.
+
+Two consequences worth knowing:
+
+- Updates do not re-resolve blueprint dependencies (only CK model dependencies), so
+  `ResolvedDependencies` is preserved as-is. A target version that declares new blueprint
+  dependencies needs an explicit install to pull them in.
+- Conflicts skipped via `ContinueOnError` do not hold the row back: skipped entities are
+  unlocked and therefore user data, while the row states which blueprint version is in effect.
 
 ## Conflict Resolution
 
@@ -422,7 +464,7 @@ if (!result.Success && result.BlockingDependents.Any())
 | Behaviour              | Default                                                                                       |
 |------------------------|-----------------------------------------------------------------------------------------------|
 | **Refcount check**     | If any other installed blueprint depends on this one, uninstall is blocked.                   |
-| **Owned entity erase** | All entities with `rtBlueprintSource == <this blueprint full id>` are erased permanently.     |
+| **Owned entity erase** | All entities with `rtBlueprintSource == <this blueprint full id>` are erased permanently. The match is version-exact and uses the version named by the installation row, i.e. the version currently in effect. |
 | **Unlocked entities**  | Entities the user released (`rtBlueprintLocked = false`) are kept — they survive the uninstall. |
 | **Cascade**            | `cascade: true` uninstalls dependents first and orphan-cleans dependencies of the target.     |
 
@@ -432,7 +474,7 @@ A tenant can host any number of blueprints concurrently. Two services track this
 
 | Interface                          | Purpose                                                                                       |
 |------------------------------------|-----------------------------------------------------------------------------------------------|
-| `ITenantBlueprintInstallations`    | The current set of installed blueprints (one row per blueprint, with `IsDependency` flag).    |
+| `ITenantBlueprintInstallations`    | The current set of installed blueprints (one row per blueprint, with `IsDependency` flag). The row mutates to the new version on every update. |
 | `ITenantBlueprintHistory`          | Append-only operation log (install, update, rollback, uninstall) with timestamps and counts.  |
 
 ```csharp

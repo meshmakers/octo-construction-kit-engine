@@ -35,6 +35,10 @@ public interface ITenantBlueprintInstallations
     /// Inserts a new installation row or replaces the existing one for the same
     /// blueprint name. Use this after a successful Apply, Update or ReApply.
     /// </summary>
+    /// <remarks>
+    /// Implementations replace the row wholesale. Callers must supply every field,
+    /// including the ones they do not intend to change — anything left unset is lost.
+    /// </remarks>
     Task UpsertAsync(
         string tenantId,
         BlueprintInstallation installation,
@@ -68,7 +72,8 @@ public class BlueprintInstallation
     public required DateTime InstalledAt { get; set; }
 
     /// <summary>
-    /// When the installation was last touched (Apply, ReApply or Update).
+    /// Timestamp of the most recent apply that touched this installation — install,
+    /// re-apply or update. Shares the timestamp of the corresponding history entry.
     /// </summary>
     public required DateTime LastUpdatedAt { get; set; }
 
@@ -80,7 +85,10 @@ public class BlueprintInstallation
 
     /// <summary>
     /// Blueprint ids that were installed alongside this one as transitive
-    /// dependencies. Cleared and re-populated on each Update.
+    /// dependencies. Populated by the apply path from the resolved install order and
+    /// carried over unchanged by the update path, which does not re-resolve blueprint
+    /// dependencies — a target version that declares new ones needs an explicit
+    /// install. Uninstall refcounting reads this list.
     /// </summary>
     public List<BlueprintId> ResolvedDependencies { get; set; } = [];
 

@@ -42,19 +42,40 @@ internal class InMemoryTenantBlueprintHistory : ITenantBlueprintHistory
     }
 
     /// <inheritdoc />
+    public Task<TenantBlueprintInfo?> GetCurrentByBlueprintNameAsync(
+        string tenantId,
+        string blueprintName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(blueprintName))
+        {
+            throw new ArgumentException(
+                "Blueprint name cannot be empty or whitespace", nameof(blueprintName));
+        }
+
+        if (_history.TryGetValue(tenantId, out var history))
+        {
+            return Task.FromResult<TenantBlueprintInfo?>(history
+                .Where(h => h.BlueprintId.Name == blueprintName)
+                .OrderByDescending(h => h.AppliedAt)
+                .FirstOrDefault());
+        }
+
+        return Task.FromResult<TenantBlueprintInfo?>(null);
+    }
+
+    /// <inheritdoc />
     public Task AddEntryAsync(
         string tenantId,
         TenantBlueprintInfo info,
         CancellationToken cancellationToken = default)
     {
+        // Copy-on-write: the readers enumerate the list they fetched from the dictionary,
+        // so mutating that list in place can throw "collection was modified" mid-query.
         _history.AddOrUpdate(
             tenantId,
             _ => [info],
-            (_, existing) =>
-            {
-                existing.Add(info);
-                return existing;
-            });
+            (_, existing) => [..existing, info]);
 
         return Task.CompletedTask;
     }

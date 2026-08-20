@@ -16,13 +16,45 @@ public interface ITenantBlueprintHistory
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets the currently active blueprint for a tenant
+    /// Gets the most recent history entry of the tenant, across <i>all</i> blueprints.
     /// </summary>
+    /// <remarks>
+    /// A tenant can host any number of blueprints concurrently, so "the last entry of the
+    /// tenant" says nothing about a specific blueprint - on a multi-blueprint tenant this
+    /// returns whichever blueprint happened to be applied last. Any caller that means
+    /// "the version of blueprint X currently in effect" has to use
+    /// <see cref="GetCurrentByBlueprintNameAsync" /> instead.
+    /// </remarks>
     /// <param name="tenantId">Tenant identifier</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Current blueprint info, or null if no blueprint was applied</returns>
+    /// <returns>Most recent blueprint info, or null if no blueprint was applied</returns>
     Task<TenantBlueprintInfo?> GetCurrentAsync(
         string tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets the most recent history entry of one specific blueprint on the tenant.
+    /// </summary>
+    /// <remarks>
+    /// This is the lookup the update path needs: it answers "which version of this
+    /// blueprint is in effect", independently of what else was applied to the tenant
+    /// afterwards. Counterpart of
+    /// <see cref="ITenantBlueprintInstallations.GetByBlueprintNameAsync" /> on the
+    /// live-state side.
+    /// </remarks>
+    /// <param name="tenantId">Tenant identifier</param>
+    /// <param name="blueprintName">
+    /// Blueprint name, without the version suffix. Must not be null, empty or whitespace -
+    /// use <see cref="GetCurrentAsync" /> when no specific blueprint is meant.
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>
+    /// Most recent blueprint info of that blueprint, or null when the blueprint was never
+    /// applied to the tenant
+    /// </returns>
+    Task<TenantBlueprintInfo?> GetCurrentByBlueprintNameAsync(
+        string tenantId,
+        string blueprintName,
         CancellationToken cancellationToken = default);
 
     /// <summary>

@@ -278,4 +278,152 @@ public class InMemoryTenantBlueprintHistoryTests
         Assert.Equal("admin@example.com", retrieved.AppliedBy);
         Assert.Equal("Production rollout", retrieved.Notes);
     }
+    [Fact]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldIgnoreOtherBlueprintsAppliedLater()
+    {
+        // Arrange - the tenant carries two blueprints, and the newest entry of the whole
+        // tenant belongs to the *other* one. This is the AB#4832 regression case: the
+        // name-less lookup used to answer with Other-1.0.0 here, so the migration lookup
+        // in the update path never matched and PreviousVersion named a foreign blueprint.
+        var tenantId = "test-tenant-multi-blueprint";
+        var ct = TestContext.Current.CancellationToken;
+
+        var mine = new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("MyBlueprint-2.1.1"),
+            AppliedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        };
+
+        var other = new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("OtherBlueprint-1.0.0"),
+            AppliedAt = new DateTime(2024, 2, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        };
+
+        await _sut.AddEntryAsync(tenantId, mine, ct);
+        await _sut.AddEntryAsync(tenantId, other, ct);
+
+        // Act
+        var current = await _sut.GetCurrentByBlueprintNameAsync(tenantId, "MyBlueprint", ct);
+
+        // Assert
+        Assert.NotNull(current);
+        Assert.Equal("MyBlueprint-2.1.1", current.BlueprintId.FullName);
+    }
+
+    [Fact]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldReturnNewestEntryOfThatBlueprint()
+    {
+        // Arrange
+        var tenantId = "test-tenant-name-newest";
+        var ct = TestContext.Current.CancellationToken;
+
+        var v1 = new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("MyBlueprint-1.0.0"),
+            AppliedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        };
+
+        var v2 = new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("MyBlueprint-2.0.0"),
+            AppliedAt = new DateTime(2024, 3, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Update
+        };
+
+        var otherLater = new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("OtherBlueprint-9.9.9"),
+            AppliedAt = new DateTime(2024, 4, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        };
+
+        await _sut.AddEntryAsync(tenantId, v2, ct);
+        await _sut.AddEntryAsync(tenantId, otherLater, ct);
+        await _sut.AddEntryAsync(tenantId, v1, ct);
+
+        // Act
+        var current = await _sut.GetCurrentByBlueprintNameAsync(tenantId, "MyBlueprint", ct);
+
+        // Assert
+        Assert.NotNull(current);
+        Assert.Equal("MyBlueprint-2.0.0", current.BlueprintId.FullName);
+        Assert.Equal(BlueprintApplicationMode.Update, current.ApplicationMode);
+    }
+
+    [Fact]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldReturnNullWhenBlueprintNotApplied()
+    {
+        // Arrange - tenant has history, but not for the requested blueprint
+        var tenantId = "test-tenant-name-missing";
+        var ct = TestContext.Current.CancellationToken;
+        await _sut.AddEntryAsync(tenantId, CreateBlueprintInfo("OtherBlueprint", "1.0.0"), ct);
+
+        // Act
+        var current = await _sut.GetCurrentByBlueprintNameAsync(tenantId, "MyBlueprint", ct);
+
+        // Assert
+        Assert.Null(current);
+    }
+
+    [Fact]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldReturnNullForUnknownTenant()
+    {
+        // Arrange
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var current = await _sut.GetCurrentByBlueprintNameAsync("unknown-tenant", "MyBlueprint", ct);
+
+        // Assert
+        Assert.Null(current);
+    }
+
+    [Fact]
+    public async Task GetCurrentAsync_ShouldStillReturnLastAppliedBlueprintOfTenant()
+    {
+        // Arrange - the name-less lookup keeps its documented "last applied on the tenant"
+        // semantics; only the callers that mean a specific blueprint were moved off it.
+        var tenantId = "test-tenant-last-applied";
+        var ct = TestContext.Current.CancellationToken;
+
+        await _sut.AddEntryAsync(tenantId, new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("MyBlueprint-2.1.1"),
+            AppliedAt = new DateTime(2024, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        }, ct);
+
+        await _sut.AddEntryAsync(tenantId, new TenantBlueprintInfo
+        {
+            BlueprintId = new BlueprintId("OtherBlueprint-1.0.0"),
+            AppliedAt = new DateTime(2024, 2, 1, 10, 0, 0, DateTimeKind.Utc),
+            ApplicationMode = BlueprintApplicationMode.Initial
+        }, ct);
+
+        // Act
+        var current = await _sut.GetCurrentAsync(tenantId, ct);
+
+        // Assert
+        Assert.NotNull(current);
+        Assert.Equal("OtherBlueprint-1.0.0", current.BlueprintId.FullName);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("	")]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldRejectBlankBlueprintName(string blueprintName)
+    {
+        // Arrange - a blank name is a caller bug, not "no blueprint": it would otherwise run a
+        // query that can never match and report the blueprint as not installed.
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act + Assert
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _sut.GetCurrentByBlueprintNameAsync("some-tenant", blueprintName, ct));
+    }
 }

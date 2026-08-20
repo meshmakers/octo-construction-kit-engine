@@ -622,28 +622,45 @@ internal class BlueprintService : IBlueprintService
     }
 
     /// <inheritdoc />
-    public async Task<BlueprintUpdateInfo?> GetUpdateInfoAsync(
+    public Task<BlueprintUpdateInfo?> GetUpdateInfoAsync(
         string tenantId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Getting update info for tenant {TenantId}", tenantId);
+        return GetUpdateInfoAsync(tenantId, blueprintName: null, cancellationToken);
+    }
 
-        // 1. Get current blueprint for tenant
-        var currentInfo = await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
-            .ConfigureAwait(false);
+    /// <inheritdoc />
+    public async Task<BlueprintUpdateInfo?> GetUpdateInfoAsync(
+        string tenantId,
+        string? blueprintName,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Getting update info for blueprint {BlueprintName} of tenant {TenantId}",
+            blueprintName ?? "(last applied)", tenantId);
+
+        // 1. Get the version of that blueprint currently in effect on the tenant. Without a
+        //    name this falls back to whatever was applied last, which is only meaningful on
+        //    a single-blueprint tenant.
+        var currentInfo = blueprintName is { Length: > 0 }
+            ? await _blueprintHistory
+                .GetCurrentByBlueprintNameAsync(tenantId, blueprintName, cancellationToken)
+                .ConfigureAwait(false)
+            : await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
+                .ConfigureAwait(false);
 
         if (currentInfo == null)
         {
-            _logger.LogDebug("No blueprint applied to tenant {TenantId}", tenantId);
+            _logger.LogDebug("Blueprint {BlueprintName} is not applied to tenant {TenantId}",
+                blueprintName ?? "(any)", tenantId);
             return null;
         }
 
         // 2. Find available versions in catalog
-        var blueprintName = currentInfo.BlueprintId.Name;
+        var resolvedName = currentInfo.BlueprintId.Name;
         var listResult = await _blueprintCatalogManager.ListAsync(0, 1000).ConfigureAwait(false);
 
         var availableVersions = listResult.Items
-            .Where(item => item.BlueprintId.Name == blueprintName &&
+            .Where(item => item.BlueprintId.Name == resolvedName &&
                            item.BlueprintId.Version.CompareTo(currentInfo.BlueprintId.Version) > 0)
             .Select(item => item.BlueprintId)
             .OrderBy(id => id.Version)
@@ -713,14 +730,26 @@ internal class BlueprintService : IBlueprintService
 
         var preview = new BlueprintUpdatePreview();
 
-        // 1. Get current blueprint for tenant
-        var currentInfo = await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
+        // 1. Get the version of *this* blueprint currently in effect. A tenant can host
+        //    several blueprints; the name-less lookup would answer with whichever one was
+        //    applied last and make the migration lookup below miss (AB#4832).
+        var currentInfo = await _blueprintHistory
+            .GetCurrentByBlueprintNameAsync(tenantId, targetVersion.Name, cancellationToken)
             .ConfigureAwait(false);
 
         if (currentInfo == null)
         {
-            preview.Warnings.Add("No blueprint currently applied to tenant - this will be a fresh application");
+            preview.Warnings.Add(
+                $"Blueprint '{targetVersion.Name}' is not currently applied to tenant - this will be a fresh application");
             preview.EntitiesToAdd = 1; // Placeholder - actual count would come from seed data analysis
+
+            if (updateMode == BlueprintUpdateMode.Migration)
+            {
+                // Nothing to migrate from: a migration script is defined per source version.
+                preview.Conflicts.Add(MissingMigrationScriptConflict(
+                    targetVersion, currentVersion: null, targetBlueprintMigrations: null));
+            }
+
             return preview;
         }
 
@@ -769,8 +798,10 @@ internal class BlueprintService : IBlueprintService
 
             if (migrationRef == null)
             {
-                preview.Warnings.Add($"No migration script found from version {currentInfo.BlueprintId.Version}");
-                preview.Warnings.Add("Falling back to Merge mode for preview");
+                // Blocking, not a warning: the caller explicitly asked for Migration mode, and
+                // silently degrading to Merge is what made this failure invisible (AB#4832).
+                preview.Conflicts.Add(MissingMigrationScriptConflict(
+                    targetVersion, currentInfo.BlueprintId, targetBlueprint.Migrations));
             }
             else
             {
@@ -857,6 +888,46 @@ internal class BlueprintService : IBlueprintService
         }
 
         return preview;
+    }
+
+    /// <summary>
+    /// Renders the operator-facing explanation for "Migration mode was requested, but no
+    /// script matches the installed version". Shared by the preview conflict and the
+    /// hard failure in <see cref="ApplyUpdateAsync" /> so both say the same thing.
+    /// </summary>
+    private static string MissingMigrationScriptMessage(
+        BlueprintId targetVersion,
+        BlueprintId? currentVersion,
+        IReadOnlyCollection<BlueprintMigrationReferenceDto>? targetBlueprintMigrations)
+    {
+        var available = targetBlueprintMigrations is { Count: > 0 }
+            ? string.Join(", ", targetBlueprintMigrations.Select(m => m.FromVersion))
+            : "(none)";
+
+        var installed = currentVersion?.Version.ToString() ?? "(not installed)";
+
+        return $"Migration mode requested, but '{targetVersion.FullName}' ships no migration "
+               + $"script for the installed version '{installed}' of blueprint "
+               + $"'{targetVersion.Name}' (available fromVersion values: {available}). Ship a "
+               + "migration script for that version, or update with mode Merge or Full.";
+    }
+
+    private static BlueprintUpdateConflict MissingMigrationScriptConflict(
+        BlueprintId targetVersion,
+        BlueprintId? currentVersion,
+        IReadOnlyCollection<BlueprintMigrationReferenceDto>? targetBlueprintMigrations)
+    {
+        return new BlueprintUpdateConflict
+        {
+            // Deliberately not the empty string: the conflict gate in ApplyUpdateAsync treats a
+            // conflict as pre-resolved once ConflictResolutions[EntityId] is anything but Skip,
+            // so a blank id could be unblocked by a resolution meant for another conflict.
+            EntityId = $"migration:{targetVersion.FullName}",
+            Description = MissingMigrationScriptMessage(
+                targetVersion, currentVersion, targetBlueprintMigrations),
+            ConflictType = ConflictType.MissingMigrationScript,
+            SuggestedResolution = ConflictResolution.Skip
+        };
     }
 
     /// <summary>
@@ -1117,8 +1188,12 @@ internal class BlueprintService : IBlueprintService
 
         try
         {
-            // 1. Get current blueprint info
-            var currentInfo = await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
+            // 1. Get the version of *this* blueprint currently in effect on the tenant. Looked
+            //    up by name: the tenant may carry other blueprints that were applied more
+            //    recently, and the name-less lookup used to hand a foreign blueprint to the
+            //    migration lookup below and to PreviousVersion (AB#4832).
+            var currentInfo = await _blueprintHistory
+                .GetCurrentByBlueprintNameAsync(tenantId, targetVersion.Name, cancellationToken)
                 .ConfigureAwait(false);
 
             // 2. Preview the update first
@@ -1316,9 +1391,24 @@ internal class BlueprintService : IBlueprintService
                     result.Errors.AddRange(migrationResult.Errors);
                     result.Warnings.AddRange(migrationResult.Warnings);
                 }
+                else if (!options.ContinueOnError)
+                {
+                    // Fail loudly. Falling back to Merge silently performed a different update
+                    // than the operator asked for - the deletes and renames the script was meant
+                    // to do simply did not happen, and the command still reported success
+                    // (AB#4832). The preview above already raises a blocking conflict for this;
+                    // this guard covers callers that pre-resolve conflicts or skip the preview.
+                    result.Success = false;
+                    result.Errors.Add(MissingMigrationScriptMessage(
+                        targetVersion, currentInfo?.BlueprintId, targetBlueprint.Migrations));
+                    await NotifyUpdateFailedAsync(tenantId, targetVersion, result.Errors, correlationId)
+                        .ConfigureAwait(false);
+                    return result;
+                }
                 else
                 {
-                    result.Warnings.Add("No migration script found - applying seed data with Merge mode");
+                    result.Warnings.Add(
+                        "No migration script found - applying seed data with Merge mode (ContinueOnError)");
                     await ApplyDiffAsync(tenantId, targetVersion, targetBlueprint,
                         BlueprintUpdateMode.Merge, options, result, cancellationToken)
                         .ConfigureAwait(false);
@@ -1346,8 +1436,7 @@ internal class BlueprintService : IBlueprintService
                 // one) and the idempotency skip in ApplyBlueprintAsync misses — a stale row
                 // lets an older version be installed over a newer one when the blueprint is
                 // resolved as a transitive dependency.
-                // Looked up by targetVersion.Name, deliberately not via currentInfo: that
-                // keeps this independent of the name-less history lookup above.
+                // Looked up by targetVersion.Name, the same key the history lookup above uses.
                 var existingInstallation = await _installations
                     .GetByBlueprintNameAsync(tenantId, targetVersion.Name, cancellationToken)
                     .ConfigureAwait(false);

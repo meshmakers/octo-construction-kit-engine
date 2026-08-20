@@ -64,13 +64,35 @@ public interface IBlueprintService
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Gets update information for a tenant's current blueprint
+    /// Gets update information for the blueprint that was applied to the tenant last.
     /// </summary>
+    /// <remarks>
+    /// On a multi-blueprint tenant "the blueprint applied last" is arbitrary from the
+    /// caller's point of view - prefer the overload taking a blueprint name.
+    /// </remarks>
     /// <param name="tenantId">Tenant identifier</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Information about available updates, or null if no blueprint is applied</returns>
     Task<BlueprintUpdateInfo?> GetUpdateInfoAsync(
         string tenantId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets update information for one specific blueprint on the tenant.
+    /// </summary>
+    /// <param name="tenantId">Tenant identifier</param>
+    /// <param name="blueprintName">
+    /// Blueprint name to describe, without the version suffix. When null or empty the
+    /// blueprint that was applied to the tenant last is used (legacy behaviour).
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>
+    /// Information about available updates, or null when that blueprint is not installed
+    /// on the tenant
+    /// </returns>
+    Task<BlueprintUpdateInfo?> GetUpdateInfoAsync(
+        string tenantId,
+        string? blueprintName,
         CancellationToken cancellationToken = default);
 
     /// <summary>

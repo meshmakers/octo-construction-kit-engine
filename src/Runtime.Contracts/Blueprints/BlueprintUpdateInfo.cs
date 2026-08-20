@@ -128,7 +128,14 @@ public enum ConflictType
     /// <summary>
     /// Required dependency is missing
     /// </summary>
-    MissingDependency
+    MissingDependency,
+
+    /// <summary>
+    /// An update was requested in <see cref="BlueprintUpdateMode.Migration" /> mode, but the
+    /// target blueprint ships no migration script whose <c>fromVersion</c> matches the
+    /// version of that blueprint currently installed on the tenant.
+    /// </summary>
+    MissingMigrationScript
 }
 
 /// <summary>

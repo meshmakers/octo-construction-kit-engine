@@ -232,7 +232,7 @@ ApplyBlueprintAsync(tenantId, blueprintId, force)
 ```
 ApplyUpdateAsync(tenantId, targetVersion, updateMode, options)
 │
-├── 1. Resolve the current version, preview the update
+├── 1. Resolve the current version *of this blueprint* (by name), preview the update
 │
 ├── 2. Conflict gate → abort unless pre-resolved or ContinueOnError
 │       DryRun → return preview counts, write nothing
@@ -287,7 +287,7 @@ Seed data is applied with **upsert** strategy: existing entities (matched by `rt
 | `Safe`      | Add new entities only. Existing entities are left alone, even if locked.                                     |
 | `Merge`     | Add new + upsert locked entities. Unlocked entities raise `UserModified` conflicts (default: skip).          |
 | `Full`      | Like Merge, plus delete entities that exist in the tenant but no longer in the seed. Unlocked → conflict.    |
-| `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. |
+| `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. Fails the update when the target ships no script for the installed version (see below). |
 
 ## Updates
 
@@ -423,6 +423,20 @@ migrations:
     scriptPath: "migrations/from-1.0.0.yaml"
 ```
 
+`fromVersion` is matched against the version of **this blueprint** currently installed on the
+tenant — resolved via `ITenantBlueprintHistory.GetCurrentByBlueprintNameAsync`, so other
+blueprints applied to the tenant later do not interfere.
+
+If no `fromVersion` matches, an update requested in `Migration` mode **fails**: the preview
+raises a blocking `MissingMigrationScript` conflict (entity id `migration:<blueprintId>`) and
+`ApplyUpdateAsync` returns `Success = false` with the installed version and the available
+`fromVersion` values in the error. Earlier versions degraded to `Merge` with only a warning and
+still reported success, so the deletes and renames the script was meant to perform silently did
+not happen (AB#4832). The old behaviour is still reachable for programmatic callers via
+`BlueprintUpdateOptions.ContinueOnError`, which downgrades the failure to a warning and applies
+the seed data in `Merge` mode; the REST/GraphQL/CLI paths do not expose that flag, so there
+`-m Migration` either runs the script or fails.
+
 ### Supported step actions
 
 | Action      | Purpose                                                                                          |
@@ -485,6 +499,20 @@ foreach (var i in installations)
     Console.WriteLine($"{i.BlueprintId} {role}  installed {i.InstalledAt:u}");
 }
 ```
+
+Because a tenant carries several blueprints, "the current blueprint" only ever means something
+per blueprint name:
+
+| Call                                                    | Answers                                                                 |
+|---------------------------------------------------------|-------------------------------------------------------------------------|
+| `ITenantBlueprintHistory.GetCurrentAsync(tenantId)`     | The blueprint applied to the tenant **last**, whichever one that is. Only meaningful on a single-blueprint tenant. |
+| `GetCurrentByBlueprintNameAsync(tenantId, name)`        | The version of **that** blueprint in effect — what the update, preview and migration paths use. |
+| `ITenantBlueprintInstallations.GetByBlueprintNameAsync` | The live installation row of that blueprint (state, not audit log).     |
+
+`IBlueprintService.GetUpdateInfoAsync` has the same split: the two-argument overload describes
+the last-applied blueprint, the overload taking a `blueprintName` describes the one asked for.
+On the API surface both `blueprints.updateInfo` / `blueprints.current` (GraphQL) and
+`GET blueprints/updates` / `GET blueprints/current` (REST) accept an optional `blueprintName`.
 
 ## Backup and Rollback
 

@@ -42,6 +42,28 @@ internal class InMemoryTenantBlueprintHistory : ITenantBlueprintHistory
     }
 
     /// <inheritdoc />
+    public Task<TenantBlueprintInfo?> GetCurrentByBlueprintNameAsync(
+        string tenantId,
+        string blueprintName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(blueprintName))
+        {
+            throw new ArgumentException("Blueprint name cannot be empty", nameof(blueprintName));
+        }
+
+        if (_history.TryGetValue(tenantId, out var history))
+        {
+            return Task.FromResult<TenantBlueprintInfo?>(history
+                .Where(h => h.BlueprintId.Name == blueprintName)
+                .OrderByDescending(h => h.AppliedAt)
+                .FirstOrDefault());
+        }
+
+        return Task.FromResult<TenantBlueprintInfo?>(null);
+    }
+
+    /// <inheritdoc />
     public Task AddEntryAsync(
         string tenantId,
         TenantBlueprintInfo info,

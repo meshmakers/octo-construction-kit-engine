@@ -79,8 +79,35 @@ public sealed class EntityTenantBlueprintHistory : ITenantBlueprintHistory
         string tenantId,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Getting current blueprint for tenant {TenantId}", tenantId);
+        _logger.LogDebug("Getting last applied blueprint for tenant {TenantId}", tenantId);
 
+        return await GetNewestEntryAsync(tenantId, blueprintName: null, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<TenantBlueprintInfo?> GetCurrentByBlueprintNameAsync(
+        string tenantId,
+        string blueprintName,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(blueprintName))
+        {
+            throw new ArgumentException("Blueprint name cannot be empty", nameof(blueprintName));
+        }
+
+        _logger.LogDebug("Getting current version of blueprint {BlueprintName} for tenant {TenantId}",
+            blueprintName, tenantId);
+
+        return await GetNewestEntryAsync(tenantId, blueprintName, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    private async Task<TenantBlueprintInfo?> GetNewestEntryAsync(
+        string tenantId,
+        string? blueprintName,
+        CancellationToken cancellationToken)
+    {
         var repository = await _repositoryProvider
             .GetRepositoryAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
@@ -90,7 +117,15 @@ public sealed class EntityTenantBlueprintHistory : ITenantBlueprintHistory
         }
 
         var session = await repository.GetSessionAsync().ConfigureAwait(false);
+
+        // Filter first, sort second: that is the field order of the compound
+        // (BlueprintName, AppliedAt) index declared on System/BlueprintHistory.
         var options = RtEntityQueryOptions.Create();
+        if (!string.IsNullOrEmpty(blueprintName))
+        {
+            options.Field(AttrBlueprintName, FieldFilterOperator.Equals, blueprintName);
+        }
+
         options.SortOrder(AttrAppliedAt, SortOrders.Descending);
 
         var resultSet = await repository

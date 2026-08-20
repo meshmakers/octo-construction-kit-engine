@@ -412,14 +412,18 @@ public class InMemoryTenantBlueprintHistoryTests
         Assert.Equal("OtherBlueprint-1.0.0", current.BlueprintId.FullName);
     }
 
-    [Fact]
-    public async Task GetCurrentByBlueprintNameAsync_ShouldRejectEmptyBlueprintName()
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("	")]
+    public async Task GetCurrentByBlueprintNameAsync_ShouldRejectBlankBlueprintName(string blueprintName)
     {
-        // Arrange
+        // Arrange - a blank name is a caller bug, not "no blueprint": it would otherwise run a
+        // query that can never match and report the blueprint as not installed.
         var ct = TestContext.Current.CancellationToken;
 
         // Act + Assert
         await Assert.ThrowsAsync<ArgumentException>(
-            () => _sut.GetCurrentByBlueprintNameAsync("some-tenant", string.Empty, ct));
+            () => _sut.GetCurrentByBlueprintNameAsync("some-tenant", blueprintName, ct));
     }
 }

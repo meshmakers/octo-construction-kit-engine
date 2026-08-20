@@ -43,7 +43,10 @@ public interface ITenantBlueprintHistory
     /// live-state side.
     /// </remarks>
     /// <param name="tenantId">Tenant identifier</param>
-    /// <param name="blueprintName">Blueprint name, without the version suffix</param>
+    /// <param name="blueprintName">
+    /// Blueprint name, without the version suffix. Must not be null, empty or whitespace -
+    /// use <see cref="GetCurrentAsync" /> when no specific blueprint is meant.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>
     /// Most recent blueprint info of that blueprint, or null when the blueprint was never

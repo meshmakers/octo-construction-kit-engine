@@ -82,8 +82,9 @@ public interface IBlueprintService
     /// </summary>
     /// <param name="tenantId">Tenant identifier</param>
     /// <param name="blueprintName">
-    /// Blueprint name to describe, without the version suffix. When null or empty the
-    /// blueprint that was applied to the tenant last is used (legacy behaviour).
+    /// Blueprint name to describe, without the version suffix. When null, empty or
+    /// whitespace the blueprint that was applied to the tenant last is used (legacy
+    /// behaviour).
     /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>

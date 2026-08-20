@@ -47,9 +47,10 @@ internal class InMemoryTenantBlueprintHistory : ITenantBlueprintHistory
         string blueprintName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(blueprintName))
+        if (string.IsNullOrWhiteSpace(blueprintName))
         {
-            throw new ArgumentException("Blueprint name cannot be empty", nameof(blueprintName));
+            throw new ArgumentException(
+                "Blueprint name cannot be empty or whitespace", nameof(blueprintName));
         }
 
         if (_history.TryGetValue(tenantId, out var history))
@@ -69,14 +70,12 @@ internal class InMemoryTenantBlueprintHistory : ITenantBlueprintHistory
         TenantBlueprintInfo info,
         CancellationToken cancellationToken = default)
     {
+        // Copy-on-write: the readers enumerate the list they fetched from the dictionary,
+        // so mutating that list in place can throw "collection was modified" mid-query.
         _history.AddOrUpdate(
             tenantId,
             _ => [info],
-            (_, existing) =>
-            {
-                existing.Add(info);
-                return existing;
-            });
+            (_, existing) => [..existing, info]);
 
         return Task.CompletedTask;
     }

@@ -641,9 +641,12 @@ internal class BlueprintService : IBlueprintService
         // 1. Get the version of that blueprint currently in effect on the tenant. Without a
         //    name this falls back to whatever was applied last, which is only meaningful on
         //    a single-blueprint tenant.
-        var currentInfo = blueprintName is { Length: > 0 }
+        var resolveByName = !string.IsNullOrWhiteSpace(blueprintName);
+        var currentInfo = resolveByName
             ? await _blueprintHistory
-                .GetCurrentByBlueprintNameAsync(tenantId, blueprintName, cancellationToken)
+                // The bang is for netstandard2.0, whose IsNullOrWhiteSpace carries no
+                // [NotNullWhen(false)] annotation to narrow the nullable reference.
+                .GetCurrentByBlueprintNameAsync(tenantId, blueprintName!, cancellationToken)
                 .ConfigureAwait(false)
             : await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
                 .ConfigureAwait(false);

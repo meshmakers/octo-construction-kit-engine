@@ -91,9 +91,10 @@ public sealed class EntityTenantBlueprintHistory : ITenantBlueprintHistory
         string blueprintName,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(blueprintName))
+        if (string.IsNullOrWhiteSpace(blueprintName))
         {
-            throw new ArgumentException("Blueprint name cannot be empty", nameof(blueprintName));
+            throw new ArgumentException(
+                "Blueprint name cannot be empty or whitespace", nameof(blueprintName));
         }
 
         _logger.LogDebug("Getting current version of blueprint {BlueprintName} for tenant {TenantId}",

@@ -186,6 +186,17 @@ internal sealed class InMemoryGitHubClientWrapper : IGitHubClientWrapper
         return Task.CompletedTask;
     }
 
+    public Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
+    {
+        var merged = merge(Content(filePath));
+        if (merged != null)
+        {
+            _files[filePath] = (merged, NextSha());
+        }
+
+        return Task.CompletedTask;
+    }
+
     public Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
         _files.Remove(filePath);

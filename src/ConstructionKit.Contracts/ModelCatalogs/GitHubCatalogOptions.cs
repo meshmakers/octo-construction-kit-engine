@@ -76,4 +76,17 @@ public abstract class GitHubCatalogOptions(string cacheFileName) : CatalogOption
     /// When true, this GitHub catalog is enabled for reading and writing models.
     /// </summary>
     public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
+    /// How often a catalog refresh retries reading an index file that is listed in the root
+    /// catalog but answers 404. GitHub Pages briefly serves 404 while a deployment is being
+    /// replaced (AB#4872), so a listed-but-missing index is usually transient. The count is a
+    /// budget shared across one refresh, so a full site swap cannot stall a refresh for minutes.
+    /// </summary>
+    public int RefreshNotFoundRetryCount { get; set; } = 3;
+
+    /// <summary>
+    /// Delay in seconds between the retries of <see cref="RefreshNotFoundRetryCount"/>.
+    /// </summary>
+    public int RefreshNotFoundRetryDelaySeconds { get; set; } = 10;
 }

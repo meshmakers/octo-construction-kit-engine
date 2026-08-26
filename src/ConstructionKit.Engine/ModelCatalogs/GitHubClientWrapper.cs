@@ -99,6 +99,45 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
         }
     }
 
+    public async Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge)
+    {
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
+        {
+            var existing = await GetFileAsync(filePath).ConfigureAwait(false);
+            var content = merge(existing?.Item1);
+            if (content == null)
+            {
+                return;
+            }
+
+            try
+            {
+                // Raw Octokit calls, NOT UpdateFileAsync/CreateFileAsync: their internal SHA-conflict
+                // retry rewrites the SAME content with a fresh SHA, which would silently clobber the
+                // concurrent writer's changes. Here the conflict has to bubble up so the next loop
+                // iteration re-reads and re-merges on top of the winner's content.
+                if (existing.HasValue)
+                {
+                    await _client.Repository.Content.UpdateFile(
+                        gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
+                        new UpdateFileRequest(commitMessage, content, existing.Value.Item2)).ConfigureAwait(false);
+                }
+                else
+                {
+                    await _client.Repository.Content.CreateFile(
+                        gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
+                        new CreateFileRequest(commitMessage, content)).ConfigureAwait(false);
+                }
+
+                return;
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsShaConflict(ex))
+            {
+                await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
+            }
+        }
+    }
+
     public async Task DeleteFileAsync(string filePath, string commitMessage, string sha)
     {
         var currentSha = sha;

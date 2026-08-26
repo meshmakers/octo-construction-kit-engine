@@ -32,6 +32,20 @@ public interface IGitHubClientWrapper
     Task CreateFileAsync(string filePath, string commitMessage, string content);
 
     /// <summary>
+    /// Reads a file, lets the caller merge new content on top of the current state, and writes the
+    /// result — retrying the whole read-merge-write cycle on SHA conflicts, so a concurrent
+    /// writer's changes are re-read and merged instead of being clobbered. Reads go through the
+    /// authenticated GitHub Contents API, which is consistent with the repository (unlike the
+    /// gh-pages mirror, which lags behind while a Pages deployment runs).
+    /// </summary>
+    /// <param name="filePath">File path in the repository.</param>
+    /// <param name="commitMessage">The commit message for the create/update.</param>
+    /// <param name="merge">Maps the current file content (null when the file does not exist) to
+    /// the content to write; returning null skips the write (already up to date).</param>
+    /// <returns>A task representing the asynchronous operation.</returns>
+    Task UpsertFileWithMergeAsync(string filePath, string commitMessage, Func<string?, string?> merge);
+
+    /// <summary>
     /// Deletes a file from the GitHub repository.
     /// </summary>
     /// <param name="filePath">File path in the repository.</param>

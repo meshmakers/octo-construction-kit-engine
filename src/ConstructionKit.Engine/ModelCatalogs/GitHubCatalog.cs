@@ -38,6 +38,17 @@ public abstract class GitHubCatalog : CachedCatalog
     private const string CatalogFileName = "catalog.json";
     private const int MaxCacheFileAgeSeconds = 60;
 
+    private static readonly System.Text.Json.JsonSerializerOptions CatalogJsonReadOptions = new()
+    {
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+    };
+
+    private static readonly System.Text.Json.JsonSerializerOptions CatalogJsonWriteOptions = new()
+    {
+        WriteIndented = true,
+        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+    };
+
     private readonly ICkJsonSerializer _ckJsonSerializer;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IGitHubClientFactory _gitHubClientFactory;
@@ -185,13 +196,25 @@ public abstract class GitHubCatalog : CachedCatalog
             await UpdateRootCatalogAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
 
             cancellationToken?.ThrowIfCancellationRequested();
-
-            // Refresh the in-memory catalog
-            await RefreshCatalogAsync(true).ConfigureAwait(false);
         }
         catch (ApiException e)
         {
             throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
+        }
+
+        try
+        {
+            // Refresh the local read cache. Best effort only: the refresh reads the gh-pages
+            // mirror, which lags the commits just pushed and briefly serves 404 while a Pages
+            // deployment is being replaced. A transient failure here must not fail a publish
+            // that already succeeded (AB#4872: overlapping Pages deploys of two CI builds made
+            // exactly this refresh kill both builds minutes after the models were safely
+            // published). The cache has a 60 s max age, so the next read refreshes again.
+            await RefreshCatalogAsync(true).ConfigureAwait(false);
+        }
+        catch (Exception e) when (e is ModelCatalogException or HttpRequestException or TaskCanceledException)
+        {
+            // Swallow — the publish itself is complete.
         }
     }
 
@@ -295,18 +318,33 @@ public abstract class GitHubCatalog : CachedCatalog
         return null;
     }
 
-    private async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description,
+    // The publish path reads AND writes the catalog index files through the authenticated GitHub
+    // Contents API (inside UpsertFileWithMergeAsync) and never through the gh-pages URL: Pages
+    // deploys lag behind the repository and briefly serve 404 while a deployment is replaced,
+    // which both failed builds ("index files are missing", AB#4872 — originally fixed via
+    // AB#2826/AB#2831) and corrupted merges (a stale Pages read dropping a concurrent build's
+    // freshly published version from the catalog). Quota note before swinging this pendulum
+    // again: these are ~3 extra API reads per published model on top of the ~8 mutation calls a
+    // publish already makes. The 5000/h-per-user REST-quota incident that moved reads to
+    // gh-pages (commit b364570, octo-construction-kit-CI 33317) was caused by the
+    // O(models × majors) refresh walk, which deliberately stays on gh-pages.
+    private static async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description,
         IGitHubClientWrapper gitHubClient)
     {
-        // Create catalog file path for this major version
+        // Catalog file path for this major version
         var catalogPath =
             $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{CatalogFileName}";
 
-        // Try to load existing catalog first
-        var catalogData = await GetModelLibraryVersionsCatalogAsync(modelId.Name, modelId.Version.Major)
+        await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
+                $"Update catalog for {modelId.Name} v{modelId.Version.Major}",
+                existingJson => MergeModelVersionsCatalog(existingJson, modelId, description))
             .ConfigureAwait(false);
-        bool isModified = false;
-        bool isNew = catalogData == null;
+    }
+
+    internal static string? MergeModelVersionsCatalog(string? existingJson, CkModelId modelId, string? description)
+    {
+        var catalogData = DeserializeCatalog<SharedCatalogTypes.ModelLibraryVersionsCatalog>(existingJson);
+        var isModified = false;
 
         catalogData ??= new SharedCatalogTypes.ModelLibraryVersionsCatalog
         {
@@ -345,47 +383,32 @@ public abstract class GitHubCatalog : CachedCatalog
             isModified = true;
         }
 
-        if (isModified)
+        if (!isModified)
         {
-            // Sort versions in descending order (latest first)
-            var sortedVersions = versionDict.Values
-                .OrderByDescending(v => new CkVersion(v.Version))
-                .ToList();
-
-            catalogData.UpdatedAt = DateTime.UtcNow;
-            catalogData.LatestVersion = sortedVersions.FirstOrDefault()?.Version;
-
-            // Serialize catalog to JSON
-            var catalogContent = System.Text.Json.JsonSerializer.Serialize(catalogData,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                });
-
-            // Update or create the catalog file
-            if (isNew)
-            {
-                // Create a new catalog file
-                await gitHubClient.CreateFileAsync(
-                        catalogPath, $"Create catalog for {modelId.Name} v{modelId.Version.Major}", catalogContent)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                var r = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
-                if (!r.HasValue)
-                {
-                    throw ModelCatalogException.CannotReadExistingModelVersionCatalog(modelId, CatalogName,
-                        catalogPath);
-                }
-
-                // Update existing catalog
-                await gitHubClient.UpdateFileAsync(
-                    catalogPath, $"Update catalog for {modelId.Name} v{modelId.Version.Major}", catalogContent,
-                    r.Value.Item2).ConfigureAwait(false);
-            }
+            return null;
         }
+
+        // Sort versions in descending order (latest first)
+        var sortedVersions = versionDict.Values
+            .OrderByDescending(v => new CkVersion(v.Version))
+            .ToList();
+
+        catalogData.UpdatedAt = DateTime.UtcNow;
+        catalogData.LatestVersion = sortedVersions.FirstOrDefault()?.Version;
+
+        return SerializeCatalog(catalogData);
+    }
+
+    private static T? DeserializeCatalog<T>(string? json) where T : class
+    {
+        return string.IsNullOrWhiteSpace(json)
+            ? null
+            : System.Text.Json.JsonSerializer.Deserialize<T>(json!, CatalogJsonReadOptions);
+    }
+
+    private static string SerializeCatalog<T>(T catalog)
+    {
+        return System.Text.Json.JsonSerializer.Serialize(catalog, CatalogJsonWriteOptions);
     }
 
 
@@ -406,7 +429,45 @@ public abstract class GitHubCatalog : CachedCatalog
         }
 
         var cache = await ReadCacheAsync(false).ConfigureAwait(false);
+
+        // gh-pages briefly serves 404 for the whole site while a Pages deployment is being
+        // replaced (AB#4872). An index file that should exist — the root index, or a sub-catalog
+        // the root index lists — answering 404 is therefore usually transient: retry a few times
+        // before treating it as missing. The budget is shared across the whole refresh so a full
+        // site swap cannot stall a refresh for minutes.
+        var notFoundRetryBudget = _gitHubOptions.RefreshNotFoundRetryCount;
+        var notFoundRetryDelay = TimeSpan.FromSeconds(_gitHubOptions.RefreshNotFoundRetryDelaySeconds);
+
+        async Task<T?> ReadWithNotFoundRetryAsync<T>(Func<Task<T?>> read) where T : class
+        {
+            var result = await read().ConfigureAwait(false);
+            while (result == null && notFoundRetryBudget > 0)
+            {
+                notFoundRetryBudget--;
+                if (notFoundRetryDelay > TimeSpan.Zero)
+                {
+                    await Task.Delay(notFoundRetryDelay).ConfigureAwait(false);
+                }
+
+                result = await read().ConfigureAwait(false);
+            }
+
+            return result;
+        }
+
         var (catalog, sourceUnreachable) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
+        while (catalog == null && !sourceUnreachable && notFoundRetryBudget > 0)
+        {
+            // A missing root index is either a genuinely empty catalog or the deploy swap —
+            // retry before caching "empty", so models don't transiently vanish mid-deploy.
+            notFoundRetryBudget--;
+            if (notFoundRetryDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(notFoundRetryDelay).ConfigureAwait(false);
+            }
+
+            (catalog, sourceUnreachable) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
+        }
 
         CacheTypes.CacheCatalog cacheCatalog = new()
         {
@@ -418,8 +479,8 @@ public abstract class GitHubCatalog : CachedCatalog
         {
             foreach (var rootCatalogEntry in catalog.Models)
             {
-                var modelLibraryCatalog =
-                    await GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath).ConfigureAwait(false);
+                var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
+                    GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath)).ConfigureAwait(false);
 
                 if (modelLibraryCatalog == null)
                 {
@@ -435,9 +496,10 @@ public abstract class GitHubCatalog : CachedCatalog
 
                 foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
                 {
-                    var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(
-                        rootCatalogEntry.ModelName,
-                        modelLibraryCatalogEntry.MajorVersion).ConfigureAwait(false);
+                    var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
+                        GetModelLibraryVersionsCatalogAsync(
+                            rootCatalogEntry.ModelName,
+                            modelLibraryCatalogEntry.MajorVersion)).ConfigureAwait(false);
 
                     if (versionsCatalog == null)
                     {
@@ -464,12 +526,6 @@ public abstract class GitHubCatalog : CachedCatalog
         await WriteCacheAsync(cacheCatalog).ConfigureAwait(false);
     }
 
-
-    private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync()
-    {
-        var (catalog, _) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
-        return catalog;
-    }
 
     private async Task<(SharedCatalogTypes.RootCatalog? Catalog, bool SourceUnreachable)>
         GetRootCatalogWithReachabilityAsync()
@@ -580,13 +636,20 @@ public abstract class GitHubCatalog : CachedCatalog
         return null;
     }
 
-    private async Task UpdateRootCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
+    // See the API-vs-gh-pages note on UpdateModelVersionsCatalogAsync.
+    private static async Task UpdateRootCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
     {
         var catalogPath = $"{RootPath}{CatalogFileName}";
 
-        // Get or create catalog
-        var catalogData = await GetRootCatalogAsync().ConfigureAwait(false);
-        var isNew = catalogData == null;
+        await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
+                $"Update model catalog for {modelId.Name}",
+                existingJson => MergeRootCatalog(existingJson, modelId))
+            .ConfigureAwait(false);
+    }
+
+    internal static string? MergeRootCatalog(string? existingJson, CkModelId modelId)
+    {
+        var catalogData = DeserializeCatalog<SharedCatalogTypes.RootCatalog>(existingJson);
 
         catalogData ??= new SharedCatalogTypes.RootCatalog
         {
@@ -595,65 +658,40 @@ public abstract class GitHubCatalog : CachedCatalog
             Models = []
         };
 
-        // Find or create entry for this model
         var existingEntry = catalogData.Models.FirstOrDefault(m => m.ModelName == modelId.Name);
-
-        // Get the model catalog to verify the latest version
-        if (existingEntry == null)
+        if (existingEntry != null)
         {
-            // Add new entry
-            var newEntry = new SharedCatalogTypes.RootCatalogEntry
-            {
-                ModelName = modelId.Name,
-                CatalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}"
-            };
-            catalogData.Models.Add(newEntry);
-
-            // Sort models alphabetically
-            catalogData.Models = catalogData.Models.OrderBy(m => m.ModelName).ToList();
-            catalogData.UpdatedAt = DateTime.UtcNow;
-
-            var catalogContent = System.Text.Json.JsonSerializer.Serialize(catalogData,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                });
-
-            if (isNew)
-            {
-                // Create a new catalog file
-                await gitHubClient.CreateFileAsync(
-                        catalogPath, $"Create model catalog for {modelId.Name}", catalogContent)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                var existingCatalog = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
-                if (!existingCatalog.HasValue)
-                {
-                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName,
-                        catalogPath);
-                }
-
-                // Update existing catalog
-                await gitHubClient.UpdateFileAsync(
-                        catalogPath,
-                        $"Update model catalog for {modelId.Name}", catalogContent,
-                        existingCatalog.Value.Item2)
-                    .ConfigureAwait(false);
-            }
+            return null;
         }
+
+        catalogData.Models.Add(new SharedCatalogTypes.RootCatalogEntry
+        {
+            ModelName = modelId.Name,
+            CatalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}"
+        });
+
+        // Sort models alphabetically
+        catalogData.Models = catalogData.Models.OrderBy(m => m.ModelName).ToList();
+        catalogData.UpdatedAt = DateTime.UtcNow;
+
+        return SerializeCatalog(catalogData);
     }
 
-    private async Task UpdateModelLibraryCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
+    // See the API-vs-gh-pages note on UpdateModelVersionsCatalogAsync.
+    private static async Task UpdateModelLibraryCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
     {
-        // Create catalog file path for the model
+        // Catalog file path for the model
         var catalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}";
 
-        // Try to load existing catalog first
-        var catalogData = await GetModelLibraryCatalogAsync(catalogPath).ConfigureAwait(false);
-        var isNew = catalogData == null;
+        await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
+                $"Update model catalog for {modelId.Name}",
+                existingJson => MergeModelLibraryCatalog(existingJson, modelId))
+            .ConfigureAwait(false);
+    }
+
+    internal static string? MergeModelLibraryCatalog(string? existingJson, CkModelId modelId)
+    {
+        var catalogData = DeserializeCatalog<SharedCatalogTypes.ModelLibraryCatalog>(existingJson);
 
         catalogData ??= new SharedCatalogTypes.ModelLibraryCatalog
         {
@@ -661,51 +699,22 @@ public abstract class GitHubCatalog : CachedCatalog
             MajorVersions = new List<SharedCatalogTypes.ModelLibraryCatalogEntry>()
         };
 
-        // Check or update the entry for the current major version
         var currentMajor = modelId.Version.Major;
         var majorVersionEntry = catalogData.MajorVersions.FirstOrDefault(m => m.MajorVersion == currentMajor);
-
-        if (majorVersionEntry == null)
+        if (majorVersionEntry != null)
         {
-            catalogData.MajorVersions.Add(new SharedCatalogTypes.ModelLibraryCatalogEntry
-            {
-                MajorVersion = currentMajor,
-                CatalogPath =
-                    $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{currentMajor}/{CatalogFileName}"
-            });
-
-            catalogData.UpdatedAt = DateTime.UtcNow;
-
-            var catalogContent = System.Text.Json.JsonSerializer.Serialize(catalogData,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
-                });
-
-            if (isNew)
-            {
-                // Create a new catalog file
-                await gitHubClient.CreateFileAsync(
-                        catalogPath, $"Create model catalog for {modelId.Name}", catalogContent)
-                    .ConfigureAwait(false);
-            }
-            else
-            {
-                var existingCatalog = await gitHubClient.GetFileAsync(catalogPath).ConfigureAwait(false);
-                if (!existingCatalog.HasValue)
-                {
-                    throw ModelCatalogException.CannotReadExistingModelLibraryCatalog(modelId, CatalogName,
-                        catalogPath);
-                }
-
-                // Update existing catalog
-                await gitHubClient.UpdateFileAsync(
-                        catalogPath,
-                        $"Update model catalog for {modelId.Name}", catalogContent,
-                        existingCatalog.Value.Item2)
-                    .ConfigureAwait(false);
-            }
+            return null;
         }
+
+        catalogData.MajorVersions.Add(new SharedCatalogTypes.ModelLibraryCatalogEntry
+        {
+            MajorVersion = currentMajor,
+            CatalogPath =
+                $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{currentMajor}/{CatalogFileName}"
+        });
+
+        catalogData.UpdatedAt = DateTime.UtcNow;
+
+        return SerializeCatalog(catalogData);
     }
 }

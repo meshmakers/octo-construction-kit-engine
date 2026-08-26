@@ -41,7 +41,11 @@ public abstract class PublicGitHubCatalogTestsBase
             GitHubRepositoryOwner = "testowner",
             GitHubRepositoryName = "testrepo",
             GitHubRepositoryBranch = "main",
-            GitHubApiToken = withToken ? "test-token" : null
+            GitHubApiToken = withToken ? "test-token" : null,
+            // Deterministic tests: an unstubbed fake read returns null, which the refresh treats
+            // as 404. No implicit retries here — retry-specific tests raise the count themselves.
+            RefreshNotFoundRetryCount = 0,
+            RefreshNotFoundRetryDelaySeconds = 0
         };
 
         A.CallTo(() => HttpClientFactory.CreateClient(A<Uri>.Ignored))
@@ -346,6 +350,74 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     }
 
     [Fact]
+    public async Task RefreshCatalogAsync_RetriesListedIndexOn404_ThenSucceeds()
+    {
+        // AB#4872: while a gh-pages deployment is being replaced, an index file that the root
+        // catalog lists briefly answers 404. The refresh must retry instead of caching the model
+        // away.
+        CatalogOptions.RefreshNotFoundRetryCount = 2;
+
+        StubRootCatalog(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .ReturnsNextFromSequence(
+                null, // 404 mid pages-deploy
+                Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[1.0.5]"));
+
+        Assert.True(result.Exists);
+        Assert.Equal("TestModel-1.0.5", result.ModelId);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .MustHaveHappenedTwiceExactly();
+    }
+
+    [Fact]
+    public async Task RefreshCatalogAsync_RetriesRootIndexOn404_ThenSucceeds()
+    {
+        // The whole site 404s during the deploy swap — including the root index. A 404 root must
+        // be retried before being cached as "empty catalog".
+        CatalogOptions.RefreshNotFoundRetryCount = 2;
+
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .ReturnsNextFromSequence(
+                new HttpResponseMessage(HttpStatusCode.NotFound),
+                new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(Data.RootCatalog) });
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1Multiple);
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[1.0.5]"));
+
+        Assert.True(result.Exists);
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/catalog.json", A<CancellationToken>._))
+            .MustHaveHappenedTwiceExactly();
+    }
+
+    [Fact]
+    public async Task RefreshCatalogAsync_WithExhaustedRetryBudget_SkipsMissingIndex()
+    {
+        // Persistent 404 on a listed index: after the shared budget is used up the model is
+        // skipped (previous behavior) instead of retrying forever.
+        CatalogOptions.RefreshNotFoundRetryCount = 1;
+
+        StubRootCatalog(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns((string?)null);
+
+        await Catalog.RefreshCatalogAsync(null, forceRefresh: true);
+        var result = await Catalog.IsExistingAsync(CreateTestVersionRange(range: "[0.0,)"));
+
+        Assert.False(result.Exists);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .MustHaveHappenedTwiceExactly();
+    }
+
+    [Fact]
     public async Task GetAsync_WithTimeout_ThrowsException()
     {
         var modelId = CreateTestModelId();
@@ -562,6 +634,55 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         await Catalog.PublishAsync(model, force: true);
 
         A.CallTo(() => GitHubClientWrapper.UpdateFileAsync(A<string>._, A<string>._, A<string>._, A<string>._))
+            .MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task PublishAsync_UpdatesCatalogIndexesViaApiMergeUpsert_NotViaPages()
+    {
+        // AB#4872: the publish path must read/write all three catalog index files through the
+        // authenticated GitHub API (merge upsert) — never through the gh-pages mirror, which
+        // lags behind the repository and 404s while a Pages deployment is replaced.
+        var model = CreateTestCompiledModel();
+
+        A.CallTo(() => CkJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
+            .Returns(Task.CompletedTask);
+
+        await Catalog.PublishAsync(model);
+
+        A.CallTo(() => GitHubClientWrapper.UpsertFileWithMergeAsync(
+                "ck-models/v2/t/TestModel/1/catalog.json", A<string>._, A<Func<string?, string?>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => GitHubClientWrapper.UpsertFileWithMergeAsync(
+                "ck-models/v2/t/TestModel/catalog.json", A<string>._, A<Func<string?, string?>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => GitHubClientWrapper.UpsertFileWithMergeAsync(
+                "ck-models/v2/catalog.json", A<string>._, A<Func<string?, string?>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => HttpClientWrapper.GetStringAsync(A<string>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task PublishAsync_SucceedsWhenPostPublishRefreshFails()
+    {
+        // AB#4872: after the models are safely published, the local-cache refresh reads the
+        // gh-pages mirror, which can fail transiently mid Pages-deploy. That must not fail the
+        // publish (both CI builds 43168/43170 died exactly here, minutes after publishing).
+        var model = CreateTestCompiledModel();
+
+        A.CallTo(() => CkJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
+            .Returns(Task.CompletedTask);
+
+        StubRootCatalog(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Throws<HttpRequestException>();
+
+        await Catalog.PublishAsync(model);
+
+        // The refresh was attempted and its failure swallowed
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
             .MustHaveHappened();
     }
 

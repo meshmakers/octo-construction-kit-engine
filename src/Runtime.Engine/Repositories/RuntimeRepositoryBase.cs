@@ -3,10 +3,13 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
+using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
+using Meshmakers.Octo.Runtime.Engine.Security;
 
 // ReSharper disable MemberCanBePrivate.Global
 
@@ -18,6 +21,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 public abstract class RuntimeRepositoryBase : IRuntimeRepository
 {
     private readonly ICkCacheService _ckCacheService;
+    private readonly IDataPermissionResolver? _dataPermissionResolver;
+    private readonly IAuditEventSink? _auditEventSink;
 
     /// <summary>
     ///     Creates a new instance of <see cref="RuntimeRepositoryBase" />
@@ -26,20 +31,34 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// <param name="ckCacheService">Construction kit cache service</param>
     /// <param name="repositoryDataSource">The corresponding repository data source</param>
     /// <param name="bulkRtMutation"></param>
+    /// <param name="dataPermissionResolver">
+    ///     Optional data-permission resolver (AB#4973); when absent, write-side data permissions are
+    ///     not enforced (backward-compatible)
+    /// </param>
+    /// <param name="auditEventSink">Optional audit sink for AuditOnly permission violations</param>
     protected RuntimeRepositoryBase(string tenantId, ICkCacheService ckCacheService,
         IRepositoryDataSource repositoryDataSource,
-        IBulkRtMutation bulkRtMutation)
+        IBulkRtMutation bulkRtMutation,
+        IDataPermissionResolver? dataPermissionResolver = null,
+        IAuditEventSink? auditEventSink = null)
     {
         BulkRtMutation = bulkRtMutation;
         RepositoryDataSource = repositoryDataSource;
         TenantId = tenantId;
         _ckCacheService = ckCacheService;
+        _dataPermissionResolver = dataPermissionResolver;
+        _auditEventSink = auditEventSink;
     }
 
     /// <summary>
     ///     The bulk mutation implementation
     /// </summary>
     protected IBulkRtMutation BulkRtMutation { get; }
+
+    /// <summary>
+    ///     Optional audit sink for data-permission audit events (AB#4973).
+    /// </summary>
+    protected IAuditEventSink? AuditEventSink => _auditEventSink;
 
     /// <summary>
     ///     Returns the data source of the repository
@@ -356,7 +375,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<RtEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
@@ -375,7 +394,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateDelete(new RtEntityId(resolvedCkTypeId, rtId)) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
@@ -463,6 +482,36 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         return DeleteManyRtEntitiesAsync<TEntity>(session, ckTypeId, fieldFilterCriteria, deleteOptions);
     }
 
+    /// <summary>
+    ///     The single write funnel with data-permission enforcement (AB#4973): system sessions and
+    ///     tenants without policies pass through untouched (dormant guarantee); denied changes reject
+    ///     the whole set atomically with a <see cref="RuntimeRepositoryException" />.
+    /// </summary>
+    private async Task ApplyChangesGuardedAsync(IOctoSession session, ICkCacheService cacheService,
+        IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
+        IReadOnlyList<AssociationUpdateInfo> associationUpdateInfoList,
+        BulkRtMutationOptions options)
+    {
+        var securityContext = session.GetSecurityContext();
+        if (!securityContext.IsSystem && _dataPermissionResolver != null)
+        {
+            var policyTable = await _dataPermissionResolver.GetPolicyTableAsync(this).ConfigureAwait(false);
+            if (policyTable.HasRules)
+            {
+                var guardResult = new OperationResult();
+                await DataPermissionWriteGuard.CheckAsync(this, cacheService, _auditEventSink, session,
+                        securityContext, policyTable, entityUpdateInfoList, associationUpdateInfoList,
+                        guardResult)
+                    .ConfigureAwait(false);
+                RuntimeRepositoryException.ThrowIfOperationResultError(guardResult);
+            }
+        }
+
+        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
+                associationUpdateInfoList, options)
+            .ConfigureAwait(false);
+    }
+
     /// <inheritdoc />
     public async Task ApplyChangesAsync(IOctoSession session,
         IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList,
@@ -471,7 +520,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         OperationResult operationResult)
     {
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entityUpdateInfoList,
+        await ApplyChangesGuardedAsync(session, cacheService, entityUpdateInfoList,
                 associationUpdateInfoList, BulkRtMutationOptions.FromDeleteOptions(deleteOptions))
             .ConfigureAwait(false);
     }
@@ -749,7 +798,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
         rtEntity.CkTypeId = ckTypeId;
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateInsert(rtEntity) };
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
@@ -774,7 +823,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         }
 
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
@@ -832,7 +881,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var rtEntityId = new RtEntityId(ckTypeId, rtId);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateUpdate(rtEntityId, rtEntity) };
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }
@@ -878,7 +927,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         var rtEntityId = new RtEntityId(ckTypeId, rtId);
         var entitiesUpdate = new[] { EntityUpdateInfo<TEntity>.CreateReplace(rtEntityId, rtEntity) };
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        await BulkRtMutation.ApplyChangesAsync(session, RepositoryDataSource, cacheService, entitiesUpdate,
+        await ApplyChangesGuardedAsync(session, cacheService, entitiesUpdate,
                 [], BulkRtMutationOptions.Default)
             .ConfigureAwait(false);
     }

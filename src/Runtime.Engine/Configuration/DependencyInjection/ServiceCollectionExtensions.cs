@@ -51,8 +51,10 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IEntityRuleEngine, EntityRuleEngine>();
         services.AddTransient<IGraphRuleEngine, GraphRuleEngine>();
 
-        // Data-level permissions (AB#4972): per-tenant policy-table resolver, TTL-cached
+        // Data-level permissions (AB#4972/AB#4973): per-tenant policy-table resolver (TTL-cached)
+        // and the caller-specific read-filter factory
         services.TryAddSingleton<IDataPermissionResolver, DataPermissionResolver>();
+        services.TryAddSingleton<IDataSecurityFilterFactory, DataSecurityFilterFactory>();
 
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();

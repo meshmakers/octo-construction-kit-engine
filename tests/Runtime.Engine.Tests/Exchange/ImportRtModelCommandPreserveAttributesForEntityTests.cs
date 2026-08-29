@@ -41,7 +41,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
         var model = ModelEntity(("DeploymentState", 0));
         var existing = ExistingEntity(("DeploymentState", 2));
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(1, preserved);
         Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
@@ -58,7 +58,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
         var model = ModelEntity(("Hostname", "adapter.new"));
         var existing = ExistingEntity(("Hostname", "adapter.old"));
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(0, preserved);
         Assert.Equal("adapter.new", model.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
@@ -81,7 +81,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
             ("DeploymentState", 2),
             ("Hostname", "adapter.old"));
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(1, preserved);
         Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
@@ -102,7 +102,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
         var model = ModelEntity(("LastSyncedSequenceNumber", 0));
         var existing = ExistingEntity(); // no attributes
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(0, preserved);
         Assert.Equal(0, model.Attributes.Single(a => a.Id.ElementId.Name == "LastSyncedSequenceNumber").Value);
@@ -125,7 +125,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
             ("LastDeploymentError", "previous failure"),
             ("Hostname", "adapter.old"));
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(0, preserved);
         Assert.DoesNotContain(model.Attributes, a => a.Id.ElementId.Name == "LastDeploymentError");
@@ -156,7 +156,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
             ("ConfigurationState", 2),
             ("LastSyncedSequenceNumber", 47));
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(4, preserved);
         Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
@@ -184,7 +184,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
         var model = ModelEntity(("Status", 2));     // imported Disabled
         var existing = ExistingEntity(("Status", 1)); // live Activated
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(1, preserved);
         Assert.Equal(1, model.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
@@ -203,7 +203,7 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
         var model = ModelEntity(("Status", 2));
         var existing = ExistingEntity(); // fresh tenant, no archive yet
 
-        var preserved = ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged);
+        var preserved = Preserve(model, existing, flagged);
 
         Assert.Equal(0, preserved);
         Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "Status").Value);
@@ -243,6 +243,107 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
             });
         }
         return entity;
+    }
+
+
+    [Fact]
+    public void FlaggedRecordArrayAttr_HandsTheExistingValueToTheConverter()
+    {
+        // AB#4784: the repository holds RtRecord, the transport container holds RtRecordTcDto.
+        // Copying the existing value across raw made the import throw InvalidCastException in
+        // AssignAttributes, so the whole seed failed on any tenant that already had a value —
+        // in practice every tenant with Helm ValueOverrides on a workload.
+        var flagged = new[]
+        {
+            BuildTypeAttr("Values", isRuntimeState: true),
+        };
+        var existingRecords = new List<RtRecord>
+        {
+            new(new RtCkId<CkRecordId>($"{TestRtModelId}/ValueOverride"),
+                new Dictionary<string, object?> { ["Path"] = "publicUri", ["Value"] = "https://live" }),
+        };
+        var model = ModelEntity(("Values", new List<RtRecordTcDto>()));
+        var existing = ExistingEntity(("Values", existingRecords));
+
+        object? converterSaw = null;
+        var converted = new List<RtRecordTcDto> { new() { CkRecordId = new RtCkId<CkRecordId>($"{TestRtModelId}/ValueOverride") } };
+
+        var preserved = Preserve(model, existing, flagged, value =>
+        {
+            converterSaw = value;
+            return converted;
+        });
+
+        Assert.Equal(1, preserved);
+        Assert.Same(existingRecords, converterSaw);
+        // What lands on the model is the CONVERTED value, never the raw repository shape.
+        var landed = model.Attributes.Single(a => a.Id.ElementId.Name == "Values").Value;
+        Assert.Same(converted, landed);
+        Assert.IsNotType<List<RtRecord>>(landed);
+    }
+
+    [Fact]
+    public void FlaggedScalarAttr_AlsoGoesThroughTheConverter()
+    {
+        // The converter is a pass-through for scalars, but it must still be applied uniformly:
+        // a preserve path that special-cased records would drift the moment another value type
+        // needs conversion.
+        var flagged = new[]
+        {
+            BuildTypeAttr("DeploymentState", isRuntimeState: true),
+        };
+        var model = ModelEntity(("DeploymentState", 0));
+        var existing = ExistingEntity(("DeploymentState", 2));
+
+        var converterCalls = 0;
+
+        var preserved = Preserve(model, existing, flagged, value =>
+        {
+            converterCalls++;
+            return value;
+        });
+
+        Assert.Equal(1, preserved);
+        Assert.Equal(1, converterCalls);
+        Assert.Equal(2, model.Attributes.Single(a => a.Id.ElementId.Name == "DeploymentState").Value);
+    }
+
+    [Fact]
+    public void ExistingOnlyRecordAttr_DoesNotInvokeTheConverter()
+    {
+        // The model doesn't declare the attribute, so there is nothing to overwrite — and no
+        // conversion to pay for. Pins that the converter sits behind the same guard as the
+        // assignment rather than running eagerly per flagged attribute.
+        var flagged = new[]
+        {
+            BuildTypeAttr("Values", isRuntimeState: true),
+        };
+        var model = ModelEntity(("Hostname", "app.example"));
+        var existing = ExistingEntity(("Values", new List<RtRecord>()));
+
+        var converterCalls = 0;
+
+        var preserved = Preserve(model, existing, flagged, value =>
+        {
+            converterCalls++;
+            return value;
+        });
+
+        Assert.Equal(0, preserved);
+        Assert.Equal(0, converterCalls);
+    }
+
+    /// <summary>
+    /// Runs the preserve loop with an identity converter. These tests exercise the decision logic
+    /// — which incoming attributes get rewritten — which is independent of the repository-to-
+    /// transport conversion the production call injects (AB#4784). Tests that care about the
+    /// conversion pass their own <paramref name="convert"/>.
+    /// </summary>
+    private static int Preserve(RtEntityTcDto model, RtEntity existing,
+        IReadOnlyList<CkTypeAttributeGraph> flagged, Func<object?, object?>? convert = null)
+    {
+        return ImportRtModelCommand.PreserveAttributesForEntity(model, existing, flagged,
+            convert ?? (value => value));
     }
 
     private static RtEntity ExistingEntity(params (string Name, object Value)[] attrs)

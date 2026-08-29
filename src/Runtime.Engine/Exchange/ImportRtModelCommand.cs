@@ -610,7 +610,8 @@ internal class ImportRtModelCommand(
                     continue;
                 }
 
-                var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes);
+                var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes,
+                    value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));
                 if (preservedForEntity > 0)
                 {
                     totalPreserved += preservedForEntity;
@@ -630,16 +631,82 @@ internal class ImportRtModelCommand(
     }
 
     /// <summary>
+    /// Converts a value read from the repository into the shape the transport container expects
+    /// (AB#4784).
+    ///
+    /// The two shapes coincide for every scalar attribute type, which is why the raw assignment
+    /// this replaces worked for the overwhelming majority of runtime-state attributes. Records do
+    /// not coincide: the repository holds <see cref="RtRecord" />, the transport container holds
+    /// <see cref="RtRecordTcDto" />, and handing the former to the latter made the import throw an
+    /// <see cref="InvalidCastException" /> further down in <see cref="AssignAttributes{TKey}" /> —
+    /// so the whole seed failed on any tenant that already had a value.
+    ///
+    /// Deliberately NOT reusing <c>RtEntityToTcDtoConverter</c>: that one serves export, where it
+    /// skips runtime-state attributes and may resolve enum keys to names. Both are wrong here.
+    /// Preserving means carrying the existing value over verbatim, including nested runtime-state
+    /// attributes — dropping one would silently lose data on the way through the import.
+    /// </summary>
+    internal static object? ToTransportValue(ICkCacheService cacheService, string tenantId, object? existingValue)
+    {
+        switch (existingValue)
+        {
+            case RtRecord record:
+                return ToRecordTcDto(cacheService, tenantId, record);
+            // Covariance makes any List<RtRecord> an IEnumerable<object?>. A string is
+            // IEnumerable<char>, not IEnumerable<object?>, so it cannot be caught here by accident.
+            case IEnumerable<object?> items:
+                return items.Select(item => ToTransportValue(cacheService, tenantId, item)).ToList();
+            default:
+                return existingValue;
+        }
+    }
+
+    /// <summary>
+    /// Repository record to transport record, recursively. Enum values are carried over as their
+    /// numeric key without translation — <see cref="AssignAttributes{TKey}" /> accepts key or name.
+    /// </summary>
+    internal static RtRecordTcDto ToRecordTcDto(ICkCacheService cacheService, string tenantId, RtRecord record)
+    {
+        var recordGraph = cacheService.GetRtCkRecord(tenantId, record.CkRecordId);
+        var dto = new RtRecordTcDto { CkRecordId = recordGraph.CkRecordId.ToRtCkId() };
+
+        foreach (var attributeGraph in recordGraph.AllAttributesByName.Values)
+        {
+            if (!record.Attributes.TryGetValue(attributeGraph.AttributeName, out var value))
+            {
+                continue;
+            }
+
+            dto.Attributes.Add(new RtAttributeTcDto
+            {
+                Id = attributeGraph.CkAttributeId.ToRtCkId(),
+                Value = ToTransportValue(cacheService, tenantId, value)
+            });
+        }
+
+        return dto;
+    }
+
+    /// <summary>
     /// Per-entity preserve loop. For each <paramref name="flaggedAttributes"/> entry that has a
     /// value on <paramref name="existing"/> AND a value on <paramref name="modelEntity"/>, copies
     /// the existing value over the imported value in-place on <paramref name="modelEntity"/>. Returns
     /// the count of attributes preserved. Pure function so it can be unit-tested without mocking
     /// the repository / cache surface.
     /// </summary>
+    /// <param name="modelEntity">The imported entity whose values are overwritten in place.</param>
+    /// <param name="existing">The entity as it currently stands on the tenant.</param>
+    /// <param name="flaggedAttributes">The attributes of this type flagged <c>isRuntimeState</c>.</param>
+    /// <param name="convertValue">
+    /// Turns a repository-shaped value into its transport shape. Injected rather than called
+    /// directly so this stays a pure function; production passes <see cref="ToTransportValue" />,
+    /// which needs the CK cache and the tenant id.
+    /// </param>
     internal static int PreserveAttributesForEntity(
         RtEntityTcDto modelEntity,
         RtEntity existing,
-        IReadOnlyList<CkTypeAttributeGraph> flaggedAttributes)
+        IReadOnlyList<CkTypeAttributeGraph> flaggedAttributes,
+        Func<object?, object?> convertValue)
     {
         var preserved = 0;
         foreach (var flaggedAttr in flaggedAttributes)
@@ -660,7 +727,7 @@ internal class ImportRtModelCommand(
                 continue;
             }
 
-            modelAttr.Value = existingValue;
+            modelAttr.Value = convertValue(existingValue);
             preserved++;
         }
         return preserved;

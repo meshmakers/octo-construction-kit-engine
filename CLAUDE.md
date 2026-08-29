@@ -291,14 +291,41 @@ import choke point** so every Upsert caller gets it automatically:
   already declares. Fresh tenants / brand-new entities (no existing entity)
   are silent no-ops.
 
+- **Record-typed values need converting, not copying (AB#4784)**: the value
+  read from the repository is in *repository* shape, the import model holds
+  *transport* shape. They coincide for every scalar type, which is why a raw
+  assignment worked for the overwhelming majority of runtime-state attributes —
+  but a `Record` / `RecordArray` value is an `RtRecord` on one side and an
+  `RtRecordTcDto` on the other, and handing the former over made the import throw
+  `InvalidCastException` in `AssignAttributes`. The import is atomic, so the whole
+  seed failed. In practice this hit exactly one attribute,
+  `System.Communication/Values` (the Helm `ValueOverride`s), which blocked adopting
+  any existing tenant into a blueprint that seeds a workload. `ToTransportValue`
+  now converts before assigning.
+
+  It deliberately does **not** reuse `RtEntityToTcDtoConverter`: that one serves
+  export, where it *skips* runtime-state attributes and may resolve enum keys to
+  names. Both are wrong here — preserving means carrying the existing value over
+  verbatim, including nested runtime-state attributes, or the value would be
+  silently truncated on the way through. Enum keys pass through unresolved because
+  `AssignAttributes` accepts key or name.
+
 The testable seam is the pure
 `ImportRtModelCommand.PreserveAttributesForEntity` static helper, exposed
-via `InternalsVisibleTo`. Tests in
+via `InternalsVisibleTo`. It takes the conversion as a `Func<object?, object?>`
+so it stays free of the CK cache; production passes `ToTransportValue`. Tests in
 `tests/Runtime.Engine.Tests/Exchange/ImportRtModelCommandPreserveAttributesForEntityTests.cs`
 cover: flagged+both-sides → preserved; unflagged → imported value wins; mixed;
 model-only (additive CK bump) → imported value lands; existing-only (model
-omits the attr) → no-op; multi-attribute independence; and the stream-data
-`Archive.Status` activated-survives-re-import / fresh-import-keeps-Disabled cases.
+omits the attr) → no-op; multi-attribute independence; the stream-data
+`Archive.Status` activated-survives-re-import / fresh-import-keeps-Disabled cases;
+and (AB#4784) that the preserved value is handed to the converter rather than
+copied raw — including the `RecordArray` case the suite was missing, which is why
+the bug shipped. The conversion itself is covered by
+`ImportRtModelCommandToTransportValueTests` against the real CK cache fixture
+(record → DTO with matching record / attribute ids, per-element array conversion,
+missing record attribute stays omitted rather than nulled, scalar and string
+pass-through).
 
 Author guidance: when adding a CK attribute that carries runtime state
 the host services / operators / users own at runtime (status enums,

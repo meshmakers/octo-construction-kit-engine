@@ -125,6 +125,7 @@ public class RtEntityDataSourceMapper<TDocument> : IDataSourceMapper<OctoObjectI
                 RtChangedDateTime = modelRtEntity.RtChangedDateTime,
                 RtCreationDateTime = modelRtEntity.RtCreationDateTime,
                 RtWellKnownName = modelRtEntity.RtWellKnownName,
+                RtCreatedBy = modelRtEntity.RtCreatedBy,
                 RtDisplayName = modelRtEntity.RtDisplayName,
                 RtDisplayDescription = modelRtEntity.RtDisplayDescription,
                 RtState = modelRtEntity.RtState,

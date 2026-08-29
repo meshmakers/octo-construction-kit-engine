@@ -64,6 +64,15 @@ public class RtEntityTcDto : RtTypeWithAttributesTcDto
     public string? RtWellKnownName { get; set; }
 
     /// <summary>
+    ///     Gets or sets the subject id of the identity that created the entity (engine-stamped;
+    ///     read-only for API consumers, round-tripped verbatim on export/import).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? RtCreatedBy { get; set; }
+
+    /// <summary>
     ///     Gets or sets the engine-computed display name of the entity (from the CK type's
     ///     displayNameRule; read-only for API consumers).
     /// </summary>

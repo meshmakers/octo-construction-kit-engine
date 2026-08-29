@@ -15,6 +15,7 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
     private const string AssociationMetaSeparator = "::";
     private const string SystemAttributeRtId = "RtId";
     private const string SystemAttributeRtWellKnownName = "RtWellKnownName";
+    private const string SystemAttributeRtCreatedBy = "RtCreatedBy";
     private const string SystemAttributeRtDisplayName = "RtDisplayName";
     private const string SystemAttributeRtDisplayDescription = "RtDisplayDescription";
     private const string SystemAttributeRtVersion = "RtVersion";
@@ -103,6 +104,9 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
             AttributeValueTypesDto.String));
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtWellKnownName.ToCamelCase(),
             [new(SystemAttributeRtWellKnownName, PathType.Attribute)],
+            AttributeValueTypesDto.String));
+        columns.Add(new CkTypeQueryColumn(SystemAttributeRtCreatedBy.ToCamelCase(),
+            [new(SystemAttributeRtCreatedBy, PathType.Attribute)],
             AttributeValueTypesDto.String));
         columns.Add(new CkTypeQueryColumn(SystemAttributeRtDisplayName.ToCamelCase(),
             [new(SystemAttributeRtDisplayName, PathType.Attribute)],

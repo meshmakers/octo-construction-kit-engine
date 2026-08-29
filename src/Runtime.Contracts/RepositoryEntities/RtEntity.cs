@@ -75,6 +75,14 @@ public class RtEntity : RtTypeWithAttributes
     public string? RtWellKnownName { get; set; }
 
     /// <summary>
+    ///     Subject id of the identity that created the entity. Stamped by the engine on insert from the
+    ///     session's security context; immutable afterwards (partial updates never touch it, replaces
+    ///     preserve the stored value). Null for entities created by system/internal callers or before
+    ///     the field existed.
+    /// </summary>
+    public string? RtCreatedBy { get; set; }
+
+    /// <summary>
     ///     Engine-computed display name, evaluated from the CK type's displayNameRule on save.
     ///     Read-only for API consumers; null when the type has no rule or every referenced
     ///     attribute is empty (readers fall back to "ckTypeId@rtId").

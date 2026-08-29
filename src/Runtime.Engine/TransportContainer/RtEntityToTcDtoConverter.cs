@@ -27,6 +27,7 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
             RtChangedDateTime = rtEntity.RtChangedDateTime,
             RtCreationDateTime = rtEntity.RtCreationDateTime,
             RtWellKnownName = rtEntity.RtWellKnownName,
+            RtCreatedBy = rtEntity.RtCreatedBy,
             RtDisplayName = rtEntity.RtDisplayName,
             RtDisplayDescription = rtEntity.RtDisplayDescription,
             RtState = rtEntity.RtState,

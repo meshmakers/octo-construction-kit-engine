@@ -202,6 +202,7 @@ internal class ImportRtModelCommand(
             rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime ?? DateTime.UtcNow;
             rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? DateTime.UtcNow;
             rtEntity.RtWellKnownName = modelRtEntity.RtWellKnownName;
+            rtEntity.RtCreatedBy = modelRtEntity.RtCreatedBy;
             rtEntity.RtState = modelRtEntity.RtState;
 
             // Atomic check-and-insert across Parallel.ForEachAsync workers; HashSet is not

@@ -95,6 +95,14 @@ internal class BulkRtMutation(
         rtEntities.ForEach(x => x.RtChangedDateTime = x.RtCreationDateTime);
         rtEntities.ForEach(x => { x.CkTypeId ??= x.GetRtCkTypeId(); });
 
+        // User sessions always stamp the caller (a client-supplied value must never win); system
+        // sessions keep a provided value so import/restore round-trips the original creator.
+        var securityContext = session.GetSecurityContext();
+        if (!securityContext.IsSystem)
+        {
+            rtEntities.ForEach(x => x.RtCreatedBy = securityContext.SubjectId);
+        }
+
         if (!options.DisablePreDocumentModifications)
         {
             foreach (var preDocumentModification in _preDocumentModifications)
@@ -319,6 +327,8 @@ internal class BulkRtMutation(
 
         var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
 
+        await PreserveCreatedByForReplacesAsync(session, collection, rtEntities).ConfigureAwait(false);
+
         // Upload the new linked binary data
         await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntities).ConfigureAwait(false);
 
@@ -331,6 +341,33 @@ internal class BulkRtMutation(
         else
         {
             await collection.ReplaceManyAsync(session, rtEntities).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     A replace rewrites the whole document, so an incoming entity without <see cref="RtEntity.RtCreatedBy" />
+    ///     would erase the stored creator. The stored value always wins; a replace that creates a new document
+    ///     stamps like an insert.
+    /// </summary>
+    private static async Task PreserveCreatedByForReplacesAsync(IOctoSession session,
+        IDataSourceCollection<OctoObjectId, RtEntity> collection, IReadOnlyList<RtEntity> rtEntities)
+    {
+        var rtIds = rtEntities.Select(e => e.RtId).ToList();
+        var storedEntities = await collection.FindManyAsync(session, f => rtIds.Contains(f.RtId))
+            .ConfigureAwait(false);
+        var storedCreatedBy = storedEntities.ToDictionary(e => e.RtId, e => e.RtCreatedBy);
+
+        var securityContext = session.GetSecurityContext();
+        foreach (var rtEntity in rtEntities)
+        {
+            if (storedCreatedBy.TryGetValue(rtEntity.RtId, out var createdBy))
+            {
+                rtEntity.RtCreatedBy = createdBy;
+            }
+            else if (!securityContext.IsSystem)
+            {
+                rtEntity.RtCreatedBy = securityContext.SubjectId;
+            }
         }
     }
 

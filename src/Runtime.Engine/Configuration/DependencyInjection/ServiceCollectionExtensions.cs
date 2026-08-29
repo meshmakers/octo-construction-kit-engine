@@ -2,6 +2,7 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
+using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
@@ -14,6 +15,7 @@ using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
+using Meshmakers.Octo.Runtime.Engine.Security;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Meshmakers.Octo.Runtime.Engine.TransportContainer;
@@ -48,6 +50,9 @@ public static class ServiceCollectionExtensions
         // Add rule engine
         services.AddTransient<IEntityRuleEngine, EntityRuleEngine>();
         services.AddTransient<IGraphRuleEngine, GraphRuleEngine>();
+
+        // Data-level permissions (AB#4972): per-tenant policy-table resolver, TTL-cached
+        services.TryAddSingleton<IDataPermissionResolver, DataPermissionResolver>();
 
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();

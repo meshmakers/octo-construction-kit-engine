@@ -60,7 +60,7 @@ internal static class DataPermissionWriteGuard
 
             if (ownershipCheckIds.Count > 0)
             {
-                await CheckOwnershipAsync(runtimeRepository, session, securityContext, typeGroup.Key,
+                await CheckOwnershipAsync(runtimeRepository, ckCacheService, session, securityContext, typeGroup.Key,
                     ownershipCheckIds, operationResult).ConfigureAwait(false);
             }
         }
@@ -79,9 +79,9 @@ internal static class DataPermissionWriteGuard
 
                     break;
                 case RtDataAccessLevel.OwnedOnly:
-                    await CheckOwnershipAsync(runtimeRepository, session, securityContext, associationGroup.Key,
-                        associationGroup.Select(a => a.Origin.RtId).Distinct().ToList(), operationResult)
-                        .ConfigureAwait(false);
+                    await CheckOwnershipAsync(runtimeRepository, ckCacheService, session, securityContext,
+                        associationGroup.Key, associationGroup.Select(a => a.Origin.RtId).Distinct().ToList(),
+                        operationResult).ConfigureAwait(false);
                     break;
                 case RtDataAccessLevel.Open or RtDataAccessLevel.Allowed when
                     access.AuditWrite is RtDataAccessLevel.Denied or RtDataAccessLevel.OwnedOnly:
@@ -103,14 +103,18 @@ internal static class DataPermissionWriteGuard
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true));
     }
 
-    private static async Task CheckOwnershipAsync(IRuntimeRepository runtimeRepository, IOctoSession session,
-        RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds,
-        OperationResult operationResult)
+    private static async Task CheckOwnershipAsync(IRuntimeRepository runtimeRepository,
+        ICkCacheService ckCacheService, IOctoSession session, RtSecurityContext securityContext,
+        RtCkId<CkTypeId> ckTypeId, IReadOnlyList<OctoObjectId> rtIds, OperationResult operationResult)
     {
+        // AB#4978: a CK-model-declared owner attribute replaces the stamped creator as the owner.
+        var ownerAttributePath = RtDataPermissionCkTypeHelper.GetEffectiveOwnerAttributePath(ckCacheService,
+            runtimeRepository.TenantId, ckTypeId);
+
         foreach (var rtId in rtIds)
         {
             // Deliberately the raw document read (not the query path): the caller's read filter hides
-            // foreign owned-only entities, but the ownership check must see the stored creator.
+            // foreign owned-only entities, but the ownership check must see the stored owner.
             var entity = await runtimeRepository
                 .GetRtEntityByRtIdAsync(session, new RtEntityId(ckTypeId, rtId))
                 .ConfigureAwait(false);
@@ -120,8 +124,12 @@ internal static class DataPermissionWriteGuard
                 continue;
             }
 
-            // Legacy rows without a creator are not writable under an owned-only grant (fail closed).
-            if (entity.RtCreatedBy == null || entity.RtCreatedBy != securityContext.SubjectId)
+            // Rows without an owner value are not writable under an owned-only grant (fail closed).
+            var owner = ownerAttributePath == null
+                ? entity.RtCreatedBy
+                : entity.GetAttributeValueByAccessPath(ckCacheService, runtimeRepository.TenantId,
+                    ownerAttributePath) as string;
+            if (owner == null || owner != securityContext.SubjectId)
             {
                 AddForbidden(operationResult, ckTypeId, entity.RtId, RtDataAction.Write);
             }

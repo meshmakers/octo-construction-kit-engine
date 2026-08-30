@@ -80,4 +80,16 @@ public class CkTypeDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? DisplayDescriptionRule { get; set; }
+
+    /// <summary>
+    ///     Optional attribute path whose value identifies the owner (subject id) of a runtime entity
+    ///     for owned-only data permissions (AB#4978), e.g. "AssigneeId" or "Owner.UserId". When absent,
+    ///     ownership is the server-stamped rtCreatedBy. Inherited along the derivedFromCkTypeId chain;
+    ///     a derived type may override it (nearest declared path wins). Dot-separated segments traverse
+    ///     single-valued Record attributes (RecordArray segments are rejected — ownership would be
+    ///     multi-valued); the terminal segment must be of value type String. Associations are not
+    ///     traversable.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? OwnerAttributePath { get; set; }
 }

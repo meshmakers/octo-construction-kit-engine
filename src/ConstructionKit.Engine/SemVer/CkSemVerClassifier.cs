@@ -101,6 +101,8 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "change stream behavior changes, no data break"),
             { ElementKind: CkModelElementKind.Type, Property: "displayNameRule" or "displayDescriptionRule" } =>
                 (CkSemVerLevel.Patch, "computed display values change only, no data/schema break"),
+            { ElementKind: CkModelElementKind.Type, Property: "ownerAttributePath" } =>
+                (CkSemVerLevel.Minor, "ownership semantics for owned-only data permissions change"),
 
             // ── Attribute definitions ───────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Attribute, Property: "valueType" } =>

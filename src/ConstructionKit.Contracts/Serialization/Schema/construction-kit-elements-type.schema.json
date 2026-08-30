@@ -34,6 +34,10 @@
           "type": "string",
           "description": "Optional rule computing rtDisplayDescription from attribute values on save. Same syntax and inheritance semantics as displayNameRule."
         },
+        "ownerAttributePath": {
+          "type": "string",
+          "description": "Optional attribute path whose value identifies the owner (subject id) of a runtime entity for owned-only data permissions, e.g. 'AssigneeId' or 'Owner.UserId'. When absent, ownership is the server-stamped rtCreatedBy. Inherited by derived types; nearest declared path wins. Dot-separated segments traverse single-valued Record attributes (RecordArray is rejected); the terminal segment must be of value type String."
+        },
         "attributes": {
           "type": "array",
           "items": {
@@ -159,6 +163,10 @@
         "displayDescriptionRule": {
           "type": "string",
           "description": "Optional rule computing rtDisplayDescription from attribute values on save. Same syntax and inheritance semantics as displayNameRule."
+        },
+        "ownerAttributePath": {
+          "type": "string",
+          "description": "Optional attribute path whose value identifies the owner (subject id) of a runtime entity for owned-only data permissions, e.g. 'AssigneeId' or 'Owner.UserId'. When absent, ownership is the server-stamped rtCreatedBy. Inherited by derived types; nearest declared path wins. Dot-separated segments traverse single-valued Record attributes (RecordArray is rejected); the terminal segment must be of value type String."
         },
         "attributes": {
           "type": "array",

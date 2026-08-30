@@ -184,6 +184,70 @@ internal class InheritanceResolver : IInheritanceResolver
                 ValidateDisplayRule(modelGraph, ckTypeId, typeGraph, typeGraph.DisplayDescriptionRule!,
                     "displayDescriptionRule", originFileResolver, operationResult);
             }
+
+            if (typeGraph.OwnerAttributePathDeclared)
+            {
+                ValidateOwnerAttribute(modelGraph, ckTypeId, typeGraph, originFileResolver, operationResult);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Validates the owner attribute path declared on a type (AB#4978): dot-separated segments
+    /// traverse single-valued Record attributes (RecordArray segments would make ownership
+    /// multi-valued and are rejected); the terminal segment must be of value type String — the
+    /// owned-only data-permission predicate compares its value against the caller's subject id.
+    /// Runs after attribute flattening so inherited attributes are visible; like display rules,
+    /// errors are reported only at the declaring type. Associations are not traversable.
+    /// </summary>
+    private static void ValidateOwnerAttribute(CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId,
+        CkTypeGraph typeGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        var location = originFileResolver.Resolve(ckTypeId);
+        var ownerAttributePath = typeGraph.OwnerAttributePath!;
+
+        var segments = ownerAttributePath.Split('.');
+        CkTypeWithAttributesGraph scope = typeGraph;
+        for (var i = 0; i < segments.Length; i++)
+        {
+            if (!scope.AllAttributesByName.TryGetValue(segments[i], out var attribute))
+            {
+                operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
+                    ownerAttributePath,
+                    $"segment '{segments[i]}' does not exist (associations are not supported)"));
+                return;
+            }
+
+            if (i == segments.Length - 1)
+            {
+                if (attribute.ValueType != AttributeValueTypesDto.String)
+                {
+                    operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
+                        ownerAttributePath,
+                        $"the terminal attribute must be of value type String, but is {attribute.ValueType}"));
+                }
+
+                return;
+            }
+
+            if (attribute.ValueType == AttributeValueTypesDto.RecordArray)
+            {
+                operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
+                    ownerAttributePath,
+                    $"segment '{segments[i]}' is a RecordArray — multi-valued ownership is not supported"));
+                return;
+            }
+
+            if (attribute.ValueType != AttributeValueTypesDto.Record || attribute.ValueCkRecordId == null ||
+                !modelGraph.Records.TryGetValue(attribute.ValueCkRecordId, out var recordGraph))
+            {
+                operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
+                    ownerAttributePath,
+                    $"segment '{segments[i]}' is not a Record attribute and cannot be traversed"));
+                return;
+            }
+
+            scope = recordGraph;
         }
     }
 
@@ -262,6 +326,7 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             typeGraph.InheritDisplayRules(baseGraph.DisplayNameRule, baseGraph.DisplayDescriptionRule);
+            typeGraph.InheritOwnerAttribute(baseGraph.OwnerAttributePath);
         }
     }
 

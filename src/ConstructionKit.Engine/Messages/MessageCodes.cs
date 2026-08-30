@@ -189,6 +189,9 @@ internal static class MessageCodes
     internal static OperationMessage DisplayRuleAttributePathUnknown(string? location, object ruleProperty, object ckTypeId, object attributePath) =>
         GetMessage("DisplayRuleAttributePathUnknown", location, ruleProperty, ckTypeId, attributePath);
 
+    internal static OperationMessage OwnerAttributeInvalid(string? location, object ckTypeId, object ownerAttributePath, object reason) =>
+        GetMessage("OwnerAttributeInvalid", location, ckTypeId, ownerAttributePath, reason);
+
     internal static OperationMessage FileContainsNoModel(string? location) =>
         GetMessage("FileContainsNoModel", location);
     internal static OperationMessage NoImportsFound(string? location) =>
@@ -638,6 +641,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  68, "Display rule '{ruleProperty}' of type '{ckTypeId}' references unknown attribute path '{attributePath}'. Only own attributes (including record paths) can be referenced; associations are not supported.",
                  new [] {"ruleProperty", "ckTypeId", "attributePath"})
+        },
+        {
+            "OwnerAttributeInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 69, "Owner attribute '{ownerAttributePath}' of type '{ckTypeId}' is invalid: {reason}",
+                 new [] {"ckTypeId", "ownerAttributePath", "reason"})
         },
     };
 }

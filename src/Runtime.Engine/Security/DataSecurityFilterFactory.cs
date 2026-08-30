@@ -88,8 +88,22 @@ internal class DataSecurityFilterFactory(
             return null;
         }
 
+        // AB#4978: owned-only types whose CK type declares (or inherits) an owner attribute compare
+        // that attribute's value against the subject instead of the stamped rtCreatedBy.
+        Dictionary<string, string>? ownerAttributes = null;
+        foreach (var concrete in ownedOnly)
+        {
+            var ownerAttributePath = RtDataPermissionCkTypeHelper.GetEffectiveOwnerAttributePath(ckCacheService,
+                tenantId, new RtCkId<CkTypeId>(concrete));
+            if (ownerAttributePath != null)
+            {
+                (ownerAttributes ??= new Dictionary<string, string>(StringComparer.Ordinal))[concrete] =
+                    ownerAttributePath;
+            }
+        }
+
         return new RtDataSecurityQueryFilter(enforcedConcrete, allowed, ownedOnly, securityContext.SubjectId,
-            auditDenied);
+            auditDenied, ownerAttributes);
     }
 
     private IReadOnlyCollection<string> ExpandToConcreteTypeIds(string tenantId, string targetCkTypeId)

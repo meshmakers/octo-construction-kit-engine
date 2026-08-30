@@ -18,12 +18,19 @@ namespace Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 ///     Types where only AuditOnly policies would restrict the caller — access stays open, but reads
 ///     should be logged as would-be violations
 /// </param>
+/// <param name="OwnedOnlyOwnerAttributes">
+///     Per owned-only type the CK-model-declared owner attribute path (AB#4978). Types without an
+///     entry use the default ownership predicate (server-stamped rtCreatedBy); types with an entry
+///     compare the value at the String-terminated path (Record segments allowed) against
+///     <paramref name="SubjectId" />.
+/// </param>
 public sealed record RtDataSecurityQueryFilter(
     IReadOnlyCollection<string> ProtectedCkTypeIds,
     IReadOnlyCollection<string> AllowedCkTypeIds,
     IReadOnlyCollection<string> OwnedOnlyCkTypeIds,
     string? SubjectId,
-    IReadOnlyCollection<string> AuditDeniedCkTypeIds)
+    IReadOnlyCollection<string> AuditDeniedCkTypeIds,
+    IReadOnlyDictionary<string, string>? OwnedOnlyOwnerAttributes = null)
 {
     /// <summary>
     ///     True when the filter restricts anything (at least one enforcing policy exists).
@@ -45,7 +52,11 @@ public sealed record RtDataSecurityQueryFilter(
         var owned = string.Join(",", OwnedOnlyCkTypeIds.OrderBy(x => x, StringComparer.Ordinal));
         var prot = string.Join(",", ProtectedCkTypeIds.OrderBy(x => x, StringComparer.Ordinal));
         var subject = OwnedOnlyCkTypeIds.Count > 0 ? SubjectId ?? string.Empty : string.Empty;
-        return $"p:{prot}|a:{allowed}|o:{owned}|s:{subject}";
+        var ownerAttributes = OwnedOnlyOwnerAttributes is { Count: > 0 }
+            ? string.Join(",", OwnedOnlyOwnerAttributes.OrderBy(x => x.Key, StringComparer.Ordinal)
+                .Select(x => $"{x.Key}={x.Value}"))
+            : string.Empty;
+        return $"p:{prot}|a:{allowed}|o:{owned}|s:{subject}|oa:{ownerAttributes}";
     }
 }
 
@@ -100,6 +111,27 @@ public static class RtDataPermissionCkTypeHelper
         }
 
         return names;
+    }
+
+    /// <summary>
+    ///     Returns the effective owner attribute path of a type for owned-only data permissions
+    ///     (AB#4978): the CK-model-declared (or inherited) String-terminated attribute path (Record
+    ///     segments allowed) identifying the owning subject, or null when ownership is the
+    ///     server-stamped rtCreatedBy — including when the type is unknown in the tenant's CK cache
+    ///     (fail to the unspoofable default).
+    /// </summary>
+    /// <param name="ckCacheService">The CK cache</param>
+    /// <param name="tenantId">The tenant id</param>
+    /// <param name="rtCkTypeId">The runtime type id</param>
+    public static string? GetEffectiveOwnerAttributePath(ICkCacheService ckCacheService, string tenantId,
+        RtCkId<CkTypeId> rtCkTypeId)
+    {
+        if (!ckCacheService.TryGetRtCkType(tenantId, rtCkTypeId, out var graph) || graph == null)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(graph.OwnerAttributePath) ? null : graph.OwnerAttributePath;
     }
 
     /// <summary>

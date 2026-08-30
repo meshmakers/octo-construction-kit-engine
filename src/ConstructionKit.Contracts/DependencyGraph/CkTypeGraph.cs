@@ -37,6 +37,8 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule;
         DisplayNameRuleDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.DisplayNameRule);
         DisplayDescriptionRuleDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.DisplayDescriptionRule);
+        OwnerAttributePath = ckTypeDto.OwnerAttributePath;
+        OwnerAttributePathDeclared = !string.IsNullOrWhiteSpace(ckTypeDto.OwnerAttributePath);
         _baseTypes = [];
         _derivedTypes = [];
         BaseTypes = new ReadOnlyCollection<CkGraphTypeInheritance>(_baseTypes);
@@ -65,6 +67,7 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="enableChangeStreamPreAndPostImages"></param>
     /// <param name="displayNameRule"></param>
     /// <param name="displayDescriptionRule"></param>
+    /// <param name="ownerAttributePath"></param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -74,11 +77,13 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyCollection<CkTypeAttributeDto> definedAttributes,
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
         IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description,
-        bool enableChangeStreamPreAndPostImages, string? displayNameRule = null, string? displayDescriptionRule = null)
+        bool enableChangeStreamPreAndPostImages, string? displayNameRule = null, string? displayDescriptionRule = null,
+        string? ownerAttributePath = null)
         : base(definedAttributes, allAttributes)
     {
         DisplayNameRule = displayNameRule;
         DisplayDescriptionRule = displayDescriptionRule;
+        OwnerAttributePath = ownerAttributePath;
         CkTypeId = ckTypeId;
         IsAbstract = isAbstract;
         IsFinal = isFinal;
@@ -186,6 +191,23 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// </summary>
     [JsonIgnore]
     public bool DisplayDescriptionRuleDeclared { get; }
+
+    /// <summary>
+    ///     The effective owner attribute path for owned-only data permissions (AB#4978): the
+    ///     String-terminated attribute path (Record segments allowed) whose value identifies the
+    ///     owning subject. Initialized with the path declared on this type; during inheritance
+    ///     resolution an empty path is filled from the nearest base type that declares one (see
+    ///     <see cref="InheritOwnerAttribute" />). Null means ownership is the server-stamped
+    ///     rtCreatedBy.
+    /// </summary>
+    public string? OwnerAttributePath { get; private set; }
+
+    /// <summary>
+    ///     True when <see cref="OwnerAttributePath" /> was declared on this type itself (not inherited).
+    ///     Used to report validation errors only at the declaring type.
+    /// </summary>
+    [JsonIgnore]
+    public bool OwnerAttributePathDeclared { get; }
     
     /// <summary>
     ///     Returns a string that describes the inheritance chain
@@ -228,6 +250,20 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         if (string.IsNullOrWhiteSpace(DisplayDescriptionRule) && !string.IsNullOrWhiteSpace(baseDisplayDescriptionRule))
         {
             DisplayDescriptionRule = baseDisplayDescriptionRule;
+        }
+    }
+
+    /// <summary>
+    ///     Fills an empty owner attribute from a base type (AB#4978). Same nearest-wins semantics as
+    ///     <see cref="InheritDisplayRules" />: a name already set (declared on this type or inherited
+    ///     from a nearer base) is never overwritten.
+    /// </summary>
+    /// <param name="baseOwnerAttributePath">The base type's effective owner attribute name</param>
+    internal void InheritOwnerAttribute(string? baseOwnerAttributePath)
+    {
+        if (string.IsNullOrWhiteSpace(OwnerAttributePath) && !string.IsNullOrWhiteSpace(baseOwnerAttributePath))
+        {
+            OwnerAttributePath = baseOwnerAttributePath;
         }
     }
 

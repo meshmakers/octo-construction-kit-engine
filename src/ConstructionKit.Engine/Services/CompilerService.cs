@@ -312,7 +312,8 @@ public class CompilerService : ICompilerService
                                 IsFinal = ckTypeDto.IsFinal,
                                 EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages,
                                 DisplayNameRule = ckTypeDto.DisplayNameRule,
-                                DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule
+                                DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule,
+                                OwnerAttributePath = ckTypeDto.OwnerAttributePath
                             };
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))

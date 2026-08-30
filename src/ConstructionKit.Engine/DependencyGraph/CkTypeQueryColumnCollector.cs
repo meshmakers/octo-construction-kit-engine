@@ -162,7 +162,12 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
             if (!ckTypeAssociationDirectionTuples.Any())
             {
-                continue; // All Ck types are abstract for that association
+                // Unreachable in practice: GetAllDerivedTypes(true) always includes the target type
+                // itself (abstract or not), so the tuple list can only be empty when the grouping
+                // itself is empty. Note the emitted ::totalCount/::exists columns may therefore name
+                // an ABSTRACT target (e.g. relatesTo.systemEntity) — the query pipeline resolves such
+                // targets across their concrete collection roots (AB#5000).
+                continue;
             }
 
             // For N:M associations, create totalCount and exists columns per navigation property grouping

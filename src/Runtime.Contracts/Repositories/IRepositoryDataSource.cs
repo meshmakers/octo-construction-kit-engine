@@ -130,6 +130,17 @@ public interface IRepositoryDataSource
     Task<IDownloadStreamHandler> DownloadBinaryAsync(IOctoSession session, OctoObjectId largeBinaryId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    ///     Gets the metadata of a large binary regardless of its binary type (AB#4985) — including the
+    ///     owning entity id stamped at upload time, which the download gate classifies against the
+    ///     caller's data permissions.
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="largeBinaryId">Object id of the large binary</param>
+    /// <param name="cancellationToken">Optional cancellation token</param>
+    /// <returns>Binary info including the owning entity id, or null when the binary does not exist</returns>
+    Task<IBinaryInfo?> GetBinaryInfoAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets a large binary file from the repository based on the object id

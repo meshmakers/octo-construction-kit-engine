@@ -613,6 +613,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
+    public Task<IBinaryInfo?> GetLargeBinaryInfoAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default)
+    {
+        return RepositoryDataSource.GetBinaryInfoAsync(session, largeBinaryId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<IBinaryInfo?> GetTemporaryLargeBinaryAsync(IOctoSession session, OctoObjectId binaryId,
         CancellationToken cancellationToken = default)
     {

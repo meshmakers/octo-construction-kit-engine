@@ -216,6 +216,15 @@ public abstract class RepositoryDataSource : IRepositoryDataSource
     }
 
     /// <inheritdoc />
+    public Task<IBinaryInfo?> GetBinaryInfoAsync(IOctoSession session, OctoObjectId largeBinaryId,
+        CancellationToken cancellationToken = default)
+    {
+        // Despite its historical name, GetFileSystemBinaryAsync is a plain lookup by binary id in
+        // both implementations — it serves any binary type.
+        return BinaryDataSource.GetFileSystemBinaryAsync(session, largeBinaryId, cancellationToken);
+    }
+
+    /// <inheritdoc />
     public Task<IBinaryInfo?> GetTemporaryBinaryAsync(IOctoSession session, OctoObjectId binaryId,
         CancellationToken cancellationToken = default)
     {

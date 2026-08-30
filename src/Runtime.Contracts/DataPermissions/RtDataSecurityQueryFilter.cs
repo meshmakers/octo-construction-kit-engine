@@ -71,7 +71,7 @@ public interface IDataSecurityFilterFactory
 public static class RtDataPermissionCkTypeHelper
 {
     /// <summary>
-    ///     Returns the runtime full names of the type and all its base types (policies targeting a base
+    ///     Returns the canonical names of the type and all its base types (policies targeting a base
     ///     or collection-root type protect derived types). Falls back to the id itself when the type is
     ///     unknown in the tenant's CK cache.
     /// </summary>
@@ -81,7 +81,7 @@ public static class RtDataPermissionCkTypeHelper
     public static IReadOnlyList<string> GetSelfAndBaseFullNames(ICkCacheService ckCacheService, string tenantId,
         RtCkId<CkTypeId> rtCkTypeId)
     {
-        var names = new List<string> { rtCkTypeId.FullName };
+        var names = new List<string> { rtCkTypeId.SemanticVersionedFullName };
         if (!ckCacheService.TryGetRtCkType(tenantId, rtCkTypeId, out var graph) || graph == null)
         {
             return names;
@@ -90,7 +90,7 @@ public static class RtDataPermissionCkTypeHelper
         var baseCkTypeId = graph.DerivedFromCkTypeId;
         while (baseCkTypeId != null)
         {
-            names.Add(baseCkTypeId.ToRtCkId().FullName);
+            names.Add(baseCkTypeId.ToRtCkId().SemanticVersionedFullName);
             if (!ckCacheService.TryGetCkType(tenantId, baseCkTypeId, out var baseGraph) || baseGraph == null)
             {
                 break;
@@ -100,5 +100,26 @@ public static class RtDataPermissionCkTypeHelper
         }
 
         return names;
+    }
+
+    /// <summary>
+    ///     Canonicalizes a CK type id string to the platform's stored/wire form
+    ///     (<see cref="RtCkId{TElementId}.SemanticVersionedFullName" /> — element version elided when 1,
+    ///     e.g. "Basic/Employee" or "Basic/Employee-2"). Every string comparison in the data-permission
+    ///     evaluation uses this one form; parse failures keep the literal so a malformed policy target
+    ///     still fails closed against rows carrying that literal type id.
+    /// </summary>
+    /// <param name="ckTypeId">The CK type id string as entered (policy target)</param>
+    public static string CanonicalCkTypeId(string ckTypeId)
+    {
+        try
+        {
+            var canonical = new RtCkId<CkTypeId>(ckTypeId).SemanticVersionedFullName;
+            return string.IsNullOrEmpty(canonical) ? ckTypeId : canonical;
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            return ckTypeId;
+        }
     }
 }

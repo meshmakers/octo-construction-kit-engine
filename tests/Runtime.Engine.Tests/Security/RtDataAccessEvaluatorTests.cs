@@ -158,4 +158,52 @@ public class RtDataAccessEvaluatorTests
         Assert.Equal(RtDataAccessLevel.Denied,
             RtDataAccessEvaluator.Classify(mixed, [OpenType], RtDataAction.Read, Outsider, true));
     }
+
+    // Canonicalization (E2E regression, AB#4969): policy targets are entered in the wire form
+    // ("Basic/Employee"), while type-graph walks used to produce the element-versioned RtCkId
+    // FullName ("Basic/Employee-1") — the ordinal target match then never fired and every type
+    // classified Open (reads over-filtered via the parse-normalizing Mongo renderer, writes and
+    // audits silently open). The table now canonicalizes targets to SemanticVersionedFullName.
+
+    [Theory]
+    [InlineData("Basic/Employee", "Basic/Employee")]
+    [InlineData("Basic/Employee-1", "Basic/Employee")]
+    [InlineData("Basic/Employee-2", "Basic/Employee-2")]
+    [InlineData("no-slash-garbage", "no-slash-garbage")]
+    public void CanonicalCkTypeId_ElidesVersionOne_KeepsHigherVersions_KeepsLiterals(string input,
+        string expected)
+    {
+        Assert.Equal(expected, RtDataPermissionCkTypeHelper.CanonicalCkTypeId(input));
+    }
+
+    [Fact]
+    public void Table_CanonicalizesVersionedTargets_OnConstruction()
+    {
+        var table = new RtDataPolicyTable(
+        [
+            new RtDataPolicyRule("p", new HashSet<string> { "Basic/Employee-1", "Basic/Device-2" },
+                [RtDataAction.Read], OwnedOnly: false, AuditOnly: false,
+                new HashSet<string> { "AccountingManagement" })
+        ]);
+
+        Assert.Equal(new HashSet<string> { "Basic/Employee", "Basic/Device-2" },
+            new HashSet<string>(table.Rules[0].TargetCkTypeIds));
+        Assert.Contains("Basic/Employee", table.AllTargetCkTypeIds);
+    }
+
+    [Fact]
+    public void VersionOneTarget_MatchesWireFormSelfAndBase_AfterCanonicalization()
+    {
+        var table = new RtDataPolicyTable(
+        [
+            new RtDataPolicyRule("p", new HashSet<string> { "Basic/Employee-1" },
+                [RtDataAction.Read, RtDataAction.Delete], OwnedOnly: false, AuditOnly: false,
+                new HashSet<string> { "AccountingManagement" })
+        ]);
+
+        Assert.Equal(RtDataAccessLevel.Allowed,
+            RtDataAccessEvaluator.Classify(table, ["Basic/Employee"], RtDataAction.Read, Management, false));
+        Assert.Equal(RtDataAccessLevel.Denied,
+            RtDataAccessEvaluator.Classify(table, ["Basic/Employee"], RtDataAction.Delete, Outsider, false));
+    }
 }

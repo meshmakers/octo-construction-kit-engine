@@ -76,10 +76,33 @@ public sealed record RtDataPolicyRule(
 
 /// <summary>
 ///     The resolved data-policy table of a tenant. An empty table means no type is protected.
+///     Rule targets are canonicalized on construction (element version elided when 1, matching the
+///     stored ckTypeId form) so a target entered as "Basic/Employee-1" and the stored "Basic/Employee"
+///     compare equal in every ordinal string comparison downstream.
 /// </summary>
-/// <param name="Rules">All resolved policy rules</param>
-public sealed record RtDataPolicyTable(IReadOnlyList<RtDataPolicyRule> Rules)
+public sealed record RtDataPolicyTable
 {
+    /// <summary>
+    ///     Creates a table from resolved rules, canonicalizing each rule's target CK type ids.
+    /// </summary>
+    /// <param name="rules">All resolved policy rules</param>
+    public RtDataPolicyTable(IReadOnlyList<RtDataPolicyRule> rules)
+    {
+        Rules = rules.Select(r => r with
+        {
+            TargetCkTypeIds = new HashSet<string>(
+                r.TargetCkTypeIds.Select(RtDataPermissionCkTypeHelper.CanonicalCkTypeId),
+                StringComparer.Ordinal)
+        }).ToList();
+        AllTargetCkTypeIds = new HashSet<string>(Rules.SelectMany(r => r.TargetCkTypeIds),
+            StringComparer.Ordinal);
+    }
+
+    /// <summary>
+    ///     All resolved policy rules (targets canonicalized).
+    /// </summary>
+    public IReadOnlyList<RtDataPolicyRule> Rules { get; }
+
     /// <summary>
     ///     The empty table (no policies — everything open).
     /// </summary>
@@ -93,8 +116,7 @@ public sealed record RtDataPolicyTable(IReadOnlyList<RtDataPolicyRule> Rules)
     /// <summary>
     ///     All CK type ids any rule targets (for cheap "is anything protected here" pre-checks).
     /// </summary>
-    public IReadOnlyCollection<string> AllTargetCkTypeIds { get; } =
-        new HashSet<string>(Rules.SelectMany(r => r.TargetCkTypeIds), StringComparer.Ordinal);
+    public IReadOnlyCollection<string> AllTargetCkTypeIds { get; }
 }
 
 /// <summary>

@@ -133,7 +133,7 @@ internal static class DataPermissionWriteGuard
     {
         operationResult.AddMessage(new OperationMessage(MessageLevel.Error, $"{ckTypeId}@{rtId}",
             ForbiddenMessageNumber,
-            $"Access denied: missing data permission '{action}' on '{ckTypeId.FullName}'."));
+            $"Access denied: missing data permission '{action}' on '{ckTypeId.SemanticVersionedFullName}'."));
     }
 
     private static Task PublishAuditAsync(IAuditEventSink? auditEventSink, string tenantId,
@@ -142,7 +142,7 @@ internal static class DataPermissionWriteGuard
         return auditEventSink?.PublishAsync(new AuditEvent(tenantId, AuditEventLevel.Warning,
                    "DataPermissions.WriteViolation",
                    $"Subject '{securityContext.SubjectId}' performed '{action}' on protected type " +
-                   $"'{ckTypeId.FullName}' without a grant (AuditOnly policy — not blocked)."))
+                   $"'{ckTypeId.SemanticVersionedFullName}' without a grant (AuditOnly policy — not blocked)."))
                ?? Task.CompletedTask;
     }
 

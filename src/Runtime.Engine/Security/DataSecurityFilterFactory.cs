@@ -102,7 +102,7 @@ internal class DataSecurityFilterFactory(
             return [targetCkTypeId];
         }
 
-        return new HashSet<string>(graph.GetAllDerivedTypes(true).Select(t => t.ToRtCkId().FullName),
+        return new HashSet<string>(graph.GetAllDerivedTypes(true).Select(t => t.ToRtCkId().SemanticVersionedFullName),
             StringComparer.Ordinal);
     }
 }

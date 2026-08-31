@@ -346,8 +346,9 @@ internal class ValidateVersionCommand : CatalogReadCommand
     /// <summary>
     ///     Compares every file below the local blueprint directory against the published version.
     ///     Returns the relative paths (forward slashes) whose content differs or which are missing
-    ///     from the published version. Line endings are normalized before comparison so a checkout
-    ///     with different autocrlf settings does not report false drift.
+    ///     from the published version. The comparison is byte-based (binary-safe); CRLF sequences
+    ///     are normalized to LF first so a checkout with different autocrlf settings does not
+    ///     report false drift.
     /// </summary>
     private static async Task<List<string>> CompareContentAsync(IBlueprintCatalog catalog,
         BlueprintId publishedId, string rootPath)
@@ -358,14 +359,15 @@ internal class ValidateVersionCommand : CatalogReadCommand
         foreach (var filePath in Directory.GetFiles(fullRootPath, "*", SearchOption.AllDirectories).Order())
         {
             var relativePath = Path.GetRelativePath(fullRootPath, filePath).Replace('\\', '/');
-            var localContent = NormalizeLineEndings(await File.ReadAllTextAsync(filePath));
+            var localContent = NormalizeLineEndings(await File.ReadAllBytesAsync(filePath));
 
-            string? publishedContent;
+            byte[]? publishedContent;
             try
             {
                 await using var publishedStream = await catalog.OpenBlueprintFileAsync(publishedId, relativePath);
-                using var reader = new StreamReader(publishedStream);
-                publishedContent = NormalizeLineEndings(await reader.ReadToEndAsync());
+                using var publishedBuffer = new MemoryStream();
+                await publishedStream.CopyToAsync(publishedBuffer);
+                publishedContent = NormalizeLineEndings(publishedBuffer.ToArray());
             }
             catch (BlueprintFileNotFoundException)
             {
@@ -376,7 +378,7 @@ internal class ValidateVersionCommand : CatalogReadCommand
             {
                 driftingFiles.Add($"{relativePath} (not in published version)");
             }
-            else if (!string.Equals(localContent, publishedContent, StringComparison.Ordinal))
+            else if (!localContent.AsSpan().SequenceEqual(publishedContent))
             {
                 driftingFiles.Add(relativePath);
             }
@@ -385,9 +387,26 @@ internal class ValidateVersionCommand : CatalogReadCommand
         return driftingFiles;
     }
 
-    private static string NormalizeLineEndings(string content)
+    /// <summary>
+    ///     Removes the CR of every CRLF sequence. Operates on raw bytes so non-text files are
+    ///     compared safely; a lone CR is left untouched (it is content, not a line ending shared
+    ///     between checkout styles).
+    /// </summary>
+    private static byte[] NormalizeLineEndings(byte[] content)
     {
-        return content.Replace("\r\n", "\n");
+        var normalized = new byte[content.Length];
+        var length = 0;
+        for (var i = 0; i < content.Length; i++)
+        {
+            if (content[i] == (byte)'\r' && i + 1 < content.Length && content[i + 1] == (byte)'\n')
+            {
+                continue;
+            }
+
+            normalized[length++] = content[i];
+        }
+
+        return normalized[..length];
     }
 
     private void WriteReport(StringBuilder markdownReport, string rootPath, BlueprintId declaredId,

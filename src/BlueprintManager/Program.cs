@@ -124,6 +124,7 @@ internal static class Program
         // tool's closure), crashing startup for every invocation.
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, ValidateCommand>();
+        services.AddTransient<ICommand, ValidateVersionCommand>();
         services.AddTransient<ICommand, PackCommand>();
         services.AddTransient<ICommand, ListCommand>();
         services.AddTransient<ICommand, VersionCommand>();

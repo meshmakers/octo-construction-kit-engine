@@ -176,6 +176,56 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                         continue;
                     }
 
+                    // A dependency version RANGE declares a MINIMUM: the range floor is
+                    // used as the target above. When the tenant already runs a version
+                    // NEWER than the floor, treat the floor as satisfied and KEEP the
+                    // installed version — never attempt a downgrade to the floor. A
+                    // downgrade has no migration path, and the old code then re-recorded
+                    // the floor as the installed version, both producing the misleading
+                    // "No migration path available from {newer} to {floor}" warning and
+                    // silently rolling the recorded version backwards. AB#5042.
+                    var installedCkVersion = new CkVersion(installedVersion);
+                    if (installedCkVersion.CompareTo(targetVersion) > 0)
+                    {
+                        if (targetModelRange.ModelVersionRange.IsSatisfiedBy(installedCkVersion))
+                        {
+                            _logger.LogInformation(
+                                "CK model {CkModelName}: keeping newer installed version {InstalledVersion} " +
+                                "(dependency floor {FloorVersion}) for tenant {TenantId}",
+                                modelName, installedVersion, targetVersionString, tenantId);
+                        }
+                        else
+                        {
+                            // Installed version is above the dependency's declared
+                            // compatibility range. Still never downgrade, but surface the
+                            // incompatibility as a real warning.
+                            var rangeString = targetModelRange.ModelVersionRange.ToString();
+                            _logger.LogWarning(
+                                "CK model {CkModelName}: installed version {InstalledVersion} is newer than the " +
+                                "dependency's declared compatibility range {Range}; keeping it without downgrading " +
+                                "for tenant {TenantId}",
+                                modelName, installedVersion, rangeString, tenantId);
+                            upgradeInfo.ErrorMessage =
+                                $"Installed version {installedVersion} is newer than the declared compatibility " +
+                                $"range {rangeString}; kept without downgrading.";
+                            result.Warnings.Add(upgradeInfo.ErrorMessage);
+                        }
+
+                        upgradeInfo.UpgradeNeeded = false;
+
+                        // The MigrationHistory must reflect the ACTUAL installed version,
+                        // never the (older) floor.
+                        if (!hasHistoryEntry.Contains(modelName))
+                        {
+                            var installedModelId = new CkModelId(modelName, installedVersion);
+                            await RecordInstalledVersionAsync(tenantId, installedModelId, cancellationToken)
+                                .ConfigureAwait(false);
+                        }
+
+                        result.SkippedModels.Add(upgradeInfo);
+                        continue;
+                    }
+
                     // Check if we need to migrate
                     var fromModel = new CkModelId(modelName, installedVersion);
                     var targetModel = new CkModelId(modelName, targetVersionString);

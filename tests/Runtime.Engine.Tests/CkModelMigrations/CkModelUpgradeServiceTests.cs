@@ -185,6 +185,78 @@ public class CkModelUpgradeServiceTests
     }
 
     [Fact]
+    public async Task UpgradeModelsAsync_InstalledNewerThanFloorWithinRange_ShouldKeepAndNotMigrate()
+    {
+        // A dependency range floor is a MINIMUM: a newer in-range installed version must
+        // be kept, never "downgraded" to the floor (which has no migration path and would
+        // otherwise re-record the older floor and emit a misleading warning). AB#5042.
+        var ct = TestContext.Current.CancellationToken;
+        var tenantId = "tenant1";
+        var modelIds = new List<CkModelIdVersionRange>
+        {
+            new("MyModel", "[3.0.0,4.0.0)")
+        };
+
+        SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>
+        {
+            ["MyModel"] = "3.1.1"
+        }, ct);
+
+        // Act
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId, modelIds, null, null, ct);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Single(result.SkippedModels);
+        Assert.Empty(result.UpgradedModels);
+        Assert.Empty(result.FailedModels);
+        Assert.Empty(result.Warnings);
+        Assert.Equal("3.1.1", result.SkippedModels[0].InstalledVersion);
+        Assert.False(result.SkippedModels[0].UpgradeNeeded);
+
+        // A would-be downgrade is never even probed or executed.
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(A<CkModelId>._, A<CkModelId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _migrationService.MigrateAsync(A<string>._, A<CkModelId>._, A<CkModelId>._, A<CkMigrationOptions>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_InstalledNewerThanRange_ShouldKeepAndWarn()
+    {
+        // Installed version above the dependency's declared compatibility range: keep it
+        // (never downgrade) but surface the incompatibility as a warning. AB#5042.
+        var ct = TestContext.Current.CancellationToken;
+        var tenantId = "tenant1";
+        var modelIds = new List<CkModelIdVersionRange>
+        {
+            new("MyModel", "[3.0.0,4.0.0)")
+        };
+
+        SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>
+        {
+            ["MyModel"] = "4.5.0"
+        }, ct);
+
+        // Act
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId, modelIds, null, null, ct);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Single(result.SkippedModels);
+        Assert.Empty(result.UpgradedModels);
+        Assert.Single(result.Warnings);
+        Assert.Equal("4.5.0", result.SkippedModels[0].InstalledVersion);
+        Assert.False(result.SkippedModels[0].UpgradeNeeded);
+        Assert.Contains("newer than", result.SkippedModels[0].ErrorMessage);
+
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(A<CkModelId>._, A<CkModelId>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _migrationService.MigrateAsync(A<string>._, A<CkModelId>._, A<CkModelId>._, A<CkMigrationOptions>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task UpgradeModelsAsync_MigrationFails_ShouldReportFailure()
     {
         // Arrange

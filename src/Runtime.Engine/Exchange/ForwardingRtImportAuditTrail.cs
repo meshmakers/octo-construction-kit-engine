@@ -50,4 +50,37 @@ public sealed class ForwardingRtImportAuditTrail : IRtImportAuditTrail
             }
         });
     }
+
+    /// <inheritdoc />
+    public Task RecordSkippedDanglingEdgesAsync(
+        string? tenantId,
+        int skippedCount,
+        IReadOnlyList<string> sampleEdgeDescriptions)
+    {
+        var sample = string.Join("; ", sampleEdgeDescriptions);
+        var message =
+            $"Skipped {skippedCount} association edge(s) during import because an endpoint entity " +
+            "exists neither in the imported archive nor in this tenant. The import writes " +
+            "associations without an endpoint check, so these would otherwise be stored as dead " +
+            "rows no query can resolve — a link was dropped (e.g. a permission imported without " +
+            "the role that grants it). Import the missing entities, or the referenced entity's " +
+            $"archive, and re-import to restore the link. Skipped: {sample}";
+        if (skippedCount > sampleEdgeDescriptions.Count)
+        {
+            message += $"; and {skippedCount - sampleEdgeDescriptions.Count} more";
+        }
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Warning,
+            "RtImport.SkippedDanglingEdges",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["skippedCount"] = skippedCount,
+                ["sampleEdges"] = sampleEdgeDescriptions,
+            }
+        });
+    }
 }

@@ -503,6 +503,16 @@ internal class ImportRtModelCommand(
 
             if (importAssociations.Any())
             {
+                // The bulk write below has no endpoint check — an edge whose origin or target
+                // resolves nowhere would be stored as a dead row. Drop such dangling edges (and
+                // warn) before writing (AB#5005). A complete archive carries both ends, so
+                // restore/blueprint imports skip nothing here.
+                importAssociations = await FilterDanglingAssociationsAsync(session, runtimeRepository,
+                    importEntities, importAssociations).ConfigureAwait(false);
+            }
+
+            if (importAssociations.Any())
+            {
                 logger.LogInformation("Adding associations...");
                 await runtimeRepository.BulkRtAssociationsAsync(session, importAssociations,
                     new BulkOperationOptions { InsertStrategy = bulkInsertStrategy }).ConfigureAwait(false);
@@ -515,6 +525,126 @@ internal class ImportRtModelCommand(
         {
             throw ExchangeException.BulkImportError(e);
         }
+    }
+
+    /// <summary>
+    /// Drops association edges whose origin or target resolves to no entity — neither one carried
+    /// by this import nor already present in the target tenant (AB#5005). The bulk association
+    /// write has no endpoint check, so a dangling edge would be persisted as a dead row that no
+    /// query can resolve (e.g. a permission imported without the role that grants it). Kept edges
+    /// are returned; skipped ones are counted and surfaced through <see cref="IRtImportAuditTrail"/>
+    /// (tenant event log) plus a warning log. A complete archive carries both ends of every edge,
+    /// so restore/blueprint imports drop nothing.
+    /// </summary>
+    private async Task<List<RtAssociation>> FilterDanglingAssociationsAsync(IOctoSession session,
+        IRuntimeRepository runtimeRepository, List<RtEntity> importEntities,
+        List<RtAssociation> importAssociations)
+    {
+        // Valid endpoints = everything the archive brought in ...
+        var validIds = new HashSet<OctoObjectId>(importEntities.Select(e => e.RtId));
+
+        // ... plus referenced endpoints that already exist in the tenant. Group the
+        // referenced-but-not-imported ids by CK type for one batch existence query per type.
+        var referencedByType = new Dictionary<RtCkId<CkTypeId>, HashSet<OctoObjectId>>();
+        void CollectReference(RtCkId<CkTypeId>? ckTypeId, OctoObjectId rtId)
+        {
+            if (ckTypeId == null || validIds.Contains(rtId))
+            {
+                return;
+            }
+
+            if (!referencedByType.TryGetValue(ckTypeId, out var set))
+            {
+                set = [];
+                referencedByType[ckTypeId] = set;
+            }
+
+            set.Add(rtId);
+        }
+
+        foreach (var association in importAssociations)
+        {
+            CollectReference(association.OriginCkTypeId, association.OriginRtId);
+            CollectReference(association.TargetCkTypeId, association.TargetRtId);
+        }
+
+        foreach (var referenced in referencedByType)
+        {
+            var existing = await runtimeRepository
+                .GetRtEntitiesByIdAsync(session, referenced.Key, referenced.Value.ToList(),
+                    RtEntityQueryOptions.Create())
+                .ConfigureAwait(false);
+            foreach (var entity in existing.Items)
+            {
+                validIds.Add(entity.RtId);
+            }
+        }
+
+        var (kept, skippedCount, samples) = PartitionDanglingAssociations(validIds, importAssociations);
+        if (skippedCount == 0)
+        {
+            return kept;
+        }
+
+        logger.LogWarning(
+            "Skipped {SkippedCount} association edge(s) on import into '{TenantId}' because an endpoint " +
+            "entity exists neither in the archive nor in the tenant. Sample: {Sample}",
+            skippedCount, runtimeRepository.TenantId, string.Join("; ", samples));
+
+        try
+        {
+            await rtImportAuditTrail
+                .RecordSkippedDanglingEdgesAsync(runtimeRepository.TenantId, skippedCount, samples)
+                .ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to publish the skipped-dangling-edges audit event");
+        }
+
+        return kept;
+    }
+
+    /// <summary>
+    /// Pure partition of import associations into kept (both endpoints in
+    /// <paramref name="validEndpointIds"/>) and skipped (dangling), with a bounded human-readable
+    /// sample of the skipped edges. Exposed as the testable seam of the AB#5005 filter.
+    /// </summary>
+    internal static (List<RtAssociation> Kept, int SkippedCount, List<string> SkippedSamples)
+        PartitionDanglingAssociations(ISet<OctoObjectId> validEndpointIds,
+            IReadOnlyList<RtAssociation> importAssociations, int sampleCap = 10)
+    {
+        var kept = new List<RtAssociation>(importAssociations.Count);
+        var samples = new List<string>();
+        var skippedCount = 0;
+
+        foreach (var association in importAssociations)
+        {
+            var originOk = validEndpointIds.Contains(association.OriginRtId);
+            var targetOk = validEndpointIds.Contains(association.TargetRtId);
+            if (originOk && targetOk)
+            {
+                kept.Add(association);
+                continue;
+            }
+
+            skippedCount++;
+            if (samples.Count >= sampleCap)
+            {
+                continue;
+            }
+
+            var missing = !originOk && !targetOk
+                ? "both endpoints"
+                : !originOk
+                    ? $"origin {association.OriginCkTypeId}@{association.OriginRtId}"
+                    : $"target {association.TargetCkTypeId}@{association.TargetRtId}";
+            samples.Add(
+                $"{association.AssociationRoleId} {association.OriginCkTypeId}@{association.OriginRtId} -> " +
+                $"{association.TargetCkTypeId}@{association.TargetRtId} (missing {missing})");
+        }
+
+        return (kept, skippedCount, samples);
     }
 
     /// <summary>

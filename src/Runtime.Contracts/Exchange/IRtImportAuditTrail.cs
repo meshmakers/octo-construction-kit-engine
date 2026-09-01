@@ -28,4 +28,24 @@ public interface IRtImportAuditTrail
         RtCkId<CkTypeId> ckTypeId,
         OctoObjectId rtId,
         IReadOnlyList<string> missingCkAttributeIds);
+
+    /// <summary>
+    /// Records that one or more association edges were skipped on import because an endpoint
+    /// entity exists neither in the imported archive nor in the target tenant (a dangling edge).
+    /// The bulk import path writes associations straight into the association collection without
+    /// an endpoint check, so such an edge would otherwise be stored as a dead row that no query
+    /// can resolve. Skipping keeps the import consistent; the warning tells the operator which
+    /// links were dropped (e.g. a permission imported without the role that grants it).
+    /// </summary>
+    /// <param name="tenantId">Tenant the import targets.</param>
+    /// <param name="skippedCount">Total number of association edges skipped.</param>
+    /// <param name="sampleEdgeDescriptions">
+    /// A bounded sample of the skipped edges (role and both endpoints), for the operator-facing
+    /// message; the caller caps the sample size and passes <paramref name="skippedCount"/> as the
+    /// true total.
+    /// </param>
+    Task RecordSkippedDanglingEdgesAsync(
+        string? tenantId,
+        int skippedCount,
+        IReadOnlyList<string> sampleEdgeDescriptions);
 }

@@ -73,6 +73,7 @@ public class CommandResolutionTests
             "PublishCommand",
             "UnpublishCommand",
             "ValidateCommand",
+            "ValidateVersionCommand",
             "VersionCommand"
         ];
 

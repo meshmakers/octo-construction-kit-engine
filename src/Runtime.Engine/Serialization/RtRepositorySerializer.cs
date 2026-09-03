@@ -41,12 +41,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             RtWellKnownName = e.RtWellKnownName,
             RtDisplayName = e.RtDisplayName,
             RtDisplayDescription = e.RtDisplayDescription,
-#if NETSTANDARD2_0
-            Attributes = new Dictionary<string, object?>(e.Attributes
-                .ToDictionary(k => k.Key, v => v.Value))
-#else
             Attributes = new Dictionary<string, object?>(e.Attributes)
-#endif
         });
 
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, rtEntityJsons, _options).ConfigureAwait(false);
@@ -63,12 +58,7 @@ internal class RtRepositorySerializer : IRtRepositorySerializer
             TargetCkTypeId = e.TargetCkTypeId ?? throw PersistenceException.CkTypeIdNotSet(),
             AssociationRoleId = e.AssociationRoleId ?? throw PersistenceException.AssociationRoleIdNotSet(),
             RtState = e.RtState,
-#if NETSTANDARD2_0
-            Attributes = new Dictionary<string, object?>(e.Attributes
-                .ToDictionary(k => k.Key, v => v.Value))
-#else
             Attributes = new Dictionary<string, object?>(e.Attributes)
-#endif
         });
 
         await JsonSerializer.SerializeAsync(streamWriter.BaseStream, associationJsons, _options).ConfigureAwait(false);

@@ -64,12 +64,7 @@ internal class BlueprintMigrationParser : IBlueprintMigrationParser
             throw new FileNotFoundException($"Migration file not found: {filePath}", filePath);
         }
 
-#if NETSTANDARD2_0
-        using var reader = new StreamReader(filePath);
-        var yaml = await reader.ReadToEndAsync().ConfigureAwait(false);
-#else
         var yaml = await File.ReadAllTextAsync(filePath, cancellationToken).ConfigureAwait(false);
-#endif
 
         return Parse(yaml);
     }
@@ -85,11 +80,7 @@ internal class BlueprintMigrationParser : IBlueprintMigrationParser
 
         using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true,
             bufferSize: 1024, leaveOpen: true);
-#if NETSTANDARD2_0
-        var yaml = await reader.ReadToEndAsync().ConfigureAwait(false);
-#else
         var yaml = await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-#endif
 
         try
         {

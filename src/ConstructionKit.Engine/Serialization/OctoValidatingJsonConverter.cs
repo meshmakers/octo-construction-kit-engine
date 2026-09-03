@@ -43,6 +43,9 @@ internal class OctoValidatingJsonConverter<T> : JsonConverter<T>, IOctoValidatin
         var evaluationResults = _schema.Evaluate(jsonElement, new EvaluationOptions
         {
             OutputFormat = OutputFormat,
+            // JsonSchema.Net 9.3 started emitting error messages on applicator keywords (properties, items,
+            // additionalProperties). The validators report leaf failures only, so keep them excluded.
+            IncludeApplicatorErrors = false,
             RequireFormatValidation = RequireFormatValidation
         });
         if (evaluationResults.IsValid || (IgnoreAdditionalProperties && OnlyAdditionalPropertiesFailures(evaluationResults)))

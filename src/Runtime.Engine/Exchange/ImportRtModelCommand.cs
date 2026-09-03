@@ -110,11 +110,7 @@ internal class ImportRtModelCommand(
         try
         {
             session.StartTransaction();
-#if NETSTANDARD2_0
-            using (var stream = File.OpenRead(filePath))
-#else
             await using (var stream = File.OpenRead(filePath))
-#endif
             {
                 if (contentType.ToLower() == ExchangeMimeTypes.MimeTypeYaml)
                 {
@@ -182,22 +178,12 @@ internal class ImportRtModelCommand(
             await PreserveRuntimeStateAttributesAsync(session, entities, runtimeRepository).ConfigureAwait(false);
         }
 
-#if NETSTANDARD2_0
-        Parallel.ForEach(entities, modelRtEntity =>
-#else
         await Parallel.ForEachAsync(entities, async (modelRtEntity, token) =>
-#endif
         {
             var ckTypeGraph = cacheService.GetRtCkType(runtimeRepository.TenantId, modelRtEntity.CkTypeId);
 
-#if NETSTANDARD2_0
-            var createTask = runtimeRepository.CreateTransientRtEntityByRtCkIdAsync(modelRtEntity.CkTypeId);
-            createTask.Wait();
-            var rtEntity = createTask.Result;
-#else
             var rtEntity = await runtimeRepository.CreateTransientRtEntityByRtCkIdAsync(modelRtEntity.CkTypeId)
                 .ConfigureAwait(false);
-#endif
             rtEntity.RtId = modelRtEntity.RtId;
             rtEntity.RtChangedDateTime = modelRtEntity.RtChangedDateTime ?? DateTime.UtcNow;
             rtEntity.RtCreationDateTime = modelRtEntity.RtCreationDateTime ?? DateTime.UtcNow;
@@ -211,9 +197,7 @@ internal class ImportRtModelCommand(
                 logger.LogError("'{RtEntityRtId}' already imported", rtEntity.RtId);
             }
 
-#if !NETSTANDARD2_0
             token.ThrowIfCancellationRequested();
-#endif
             AssignAttributes(runtimeRepository, modelRtEntity, ckTypeGraph, rtEntity, "type", ckTypeGraph.CkTypeId);
 
             // AB#4772: the bulk import path bypasses the entity rule engine, so an entity missing
@@ -255,11 +239,7 @@ internal class ImportRtModelCommand(
                     Interlocked.Increment(ref _associationsCount);
                 }
             }
-#if NETSTANDARD2_0
-        });
-#else
         }).ConfigureAwait(false);
-#endif
         logger.LogInformation("{EntityCount} entities (total imports of {Count}) imported", _importEntityQueue.Count,
             _entityImportIds.Count);
         await ReportMandatoryViolationsAsync(runtimeRepository.TenantId).ConfigureAwait(false);

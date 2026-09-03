@@ -95,10 +95,7 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         // read-side resolver — which tolerates an unknown id and silently falls back to UTC — the
         // create boundary fails fast: a typo'd zone must not be accepted and then behave as UTC with
         // no signal to the operator. Empty/whitespace collapses to null (⇒ UTC calendar boundaries).
-        // `?.Trim()` (rather than `referenceTimeZone.Trim()`) so the netstandard2.0 target — whose
-        // BCL lacks the [NotNullWhen(false)] annotation on string.IsNullOrWhiteSpace — doesn't warn
-        // CS8602 on a possible null dereference in the else branch.
-        var normalizedTimeZone = string.IsNullOrWhiteSpace(referenceTimeZone) ? null : referenceTimeZone?.Trim();
+        var normalizedTimeZone = string.IsNullOrWhiteSpace(referenceTimeZone) ? null : referenceTimeZone.Trim();
         if (normalizedTimeZone is not null)
         {
             try

@@ -75,7 +75,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
         using var document = System.Text.Json.JsonDocument.Parse(stream);
         var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List, IncludeApplicatorErrors = false });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement, tolerantToUnknownProperties);
     }
 
@@ -102,7 +102,7 @@ internal class CkSchemaValidator : ICkSchemaValidator
         using var document = System.Text.Json.JsonDocument.Parse(jsonString);
         var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List, IncludeApplicatorErrors = false });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults, jsonElement, tolerantToUnknownProperties);
     }
 

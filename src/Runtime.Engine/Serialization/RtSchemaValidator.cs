@@ -31,7 +31,7 @@ internal class RtSchemaValidator : IRtSchemaValidator
         using var document = System.Text.Json.JsonDocument.Parse(stream);
         var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List, IncludeApplicatorErrors = false });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 
@@ -52,7 +52,7 @@ internal class RtSchemaValidator : IRtSchemaValidator
         using var document = System.Text.Json.JsonDocument.Parse(jsonString);
         var jsonElement = document.RootElement;
 
-        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List });
+        var evaluationResults = schema.Evaluate(jsonElement, new EvaluationOptions { OutputFormat = OutputFormat.List, IncludeApplicatorErrors = false });
         return ValidateEvaluationResults(locationReference, operationResult, evaluationResults);
     }
 

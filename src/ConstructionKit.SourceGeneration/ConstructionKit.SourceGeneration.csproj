@@ -23,7 +23,7 @@
         <!-- Compiler-bound: keep Microsoft.CodeAnalysis.* at the Roslyn version shipped with the SDK line consumers build with (5.3.0 = SDK 10.0.2xx); a newer version is silently skipped by older compilers and the generated CK types vanish. Do not merge Dependabot bumps blindly. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" PrivateAssets="all" />
         <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="5.3.0" PrivateAssets="all" />
-        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" PrivateAssets="all" />
+        <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" PrivateAssets="all" />
         <ProjectReference Include="..\ConstructionKit.Engine\ConstructionKit.Engine.csproj" PrivateAssets="all" />
 
         <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />

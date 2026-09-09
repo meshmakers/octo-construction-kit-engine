@@ -272,8 +272,9 @@ GraphQL layer) can evaluate / validate formulas without a direct mXparser depend
   Meshmakers.Octo.Runtime.Engine.Formulas`) holds `OctoExpression` + the `internal` mXparser
   function extensions + the `FormulaEngine` implementation + the `AddFormulaEngine()` DI extension.
   It is a **dedicated net10.0 package** rather than part of `Runtime.Engine` because mXparser ships
-  `netstandard2.1` but **not** `netstandard2.0`, and `Runtime.Engine` must keep its `netstandard2.0`
-  target for the compiler / source-generation tooling.
+  `netstandard2.1` but **not** `netstandard2.0`, and `Runtime.Engine` still multi-targeted
+  `netstandard2.0` at the time. AB#5084 dropped that target (nothing in the generator / MSBuild-task
+  chain references `Runtime.Engine`); the package split is kept as is.
 - `OctoExpression` moved out of the MongoDB assembly; `FieldFilterResolver` / `RtFieldFilterResolver`
   now reference the new package. `ConvertTernaryToIf` lives in `FormulaEngine` only; the adapter node
   and the communication controller's `ExpressionValidationService` are thin callers of `IFormulaEngine`

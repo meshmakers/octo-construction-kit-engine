@@ -15,11 +15,7 @@ namespace Meshmakers.Octo.Runtime.Engine.RuleEngine;
 /// </summary>
 internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
 {
-#if NETSTANDARD2_0
-    public Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
-#else
     public async Task<EntityRuleEngineResult<TEntity>> ValidateAsync<TEntity>(string tenantId,
-#endif
         IReadOnlyList<IEntityUpdateInfo<TEntity>> entityUpdateInfos, IOriginFileResolver originFileResolver,
         OperationResult operationResult) where TEntity : RtEntity
     {
@@ -29,40 +25,21 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         var entitiesToDelete = new ConcurrentBag<RtEntityId>();
         var updateGuards = new ConcurrentDictionary<RtEntityId, AttributeNewerThanGuard>();
 
-#if NETSTANDARD2_0
-        Parallel.ForEach(entityUpdateInfos, (info, _) =>
-#else
         await Parallel.ForEachAsync(entityUpdateInfos, (info, token) =>
-#endif
         {
             if (!ckCache.TryGetRtCkType(tenantId, info.CkTypeId, out var ckTypeGraph))
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdNotFound(originFileResolver.Resolve(tenantId), tenantId,
                     info.CkTypeId));
-#if NETSTANDARD2_0
-                return;
-#else
                 return ValueTask.CompletedTask;
-#endif
             }
-
-#if NETSTANDARD2_0
-            if (ckTypeGraph == null)
-            {
-                return;
-            }
-#endif
 
             if (ckTypeGraph.IsAbstract)
             {
                 operationResult.AddMessage(MessageCodes.CkTypeIdIsAbstract(originFileResolver.Resolve(tenantId),
                     tenantId,
                     info.CkTypeId));
-#if NETSTANDARD2_0
-                return;
-#else
                 return ValueTask.CompletedTask;
-#endif
             }
 
             // check if all attributes are applied that are mandatory. If there is a mandatory attribute missing and no default value is set, throw an exception
@@ -95,16 +72,10 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 }
             }
 
-#if !NETSTANDARD2_0
             token.ThrowIfCancellationRequested();
-#endif
             if (isInError)
             {
-#if NETSTANDARD2_0
-                return;
-#else
                 return ValueTask.CompletedTask;
-#endif
             }
 
             switch (info.ModOption)
@@ -115,11 +86,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtInsert(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.CkTypeId));
-#if NETSTANDARD2_0
-                        return;
-#else
                         return ValueTask.CompletedTask;
-#endif
                     }
 
                     entitiesToCreate.Add(info.RtEntity);
@@ -130,11 +97,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
-#if NETSTANDARD2_0
-                        return;
-#else
                         return ValueTask.CompletedTask;
-#endif
                     }
 
                     if (!entitiesToUpdate.TryAdd(info.GetRtEntityId(), info.RtEntity))
@@ -142,9 +105,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityIdAlreadyExistInUpdateList(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
-#if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
-#endif
                     }
 
                     if (info.UpdateGuard != null)
@@ -159,11 +120,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                         operationResult.AddMessage(MessageCodes.RtEntityNeedsToBeDefinedAtUpdateReplace(
                             originFileResolver.Resolve(tenantId), tenantId,
                             info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
-#if NETSTANDARD2_0
-                        return;
-#else
                         return ValueTask.CompletedTask;
-#endif
                     }
 
                     if (!entitiesToReplace.TryAdd(info.GetRtEntityId(), info.RtEntity))
@@ -172,9 +129,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                             originFileResolver.Resolve(tenantId),
                             tenantId,
                             info.CkTypeId, info.RtId ?? throw PersistenceException.RtIdNotSet()));
-#if !NETSTANDARD2_0
                         return ValueTask.CompletedTask;
-#endif
                     }
 
                     break;
@@ -185,12 +140,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                     throw new InvalidOperationException($"Unknown mod option '{info.ModOption}'");
             }
 
-#if NETSTANDARD2_0
-        });
-#else
             return ValueTask.CompletedTask;
         }).ConfigureAwait(false);
-#endif
 
         var entityValidatorResult =
             new EntityRuleEngineResult<TEntity>(entitiesToCreate.ToList(),
@@ -199,11 +150,7 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 entitiesToDelete.ToList(),
                 updateGuards.ToDictionary(k => k.Key, v => v.Value));
 
-#if NETSTANDARD2_0
-        return Task.FromResult(entityValidatorResult);
-#else
         return entityValidatorResult;
-#endif
     }
 
     private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs,

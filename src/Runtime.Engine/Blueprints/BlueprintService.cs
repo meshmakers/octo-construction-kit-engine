@@ -644,8 +644,8 @@ internal class BlueprintService : IBlueprintService
         var resolveByName = !string.IsNullOrWhiteSpace(blueprintName);
         var currentInfo = resolveByName
             ? await _blueprintHistory
-                // The bang is for netstandard2.0, whose IsNullOrWhiteSpace carries no
-                // [NotNullWhen(false)] annotation to narrow the nullable reference.
+                // The bang is needed because the null-state narrowing of IsNullOrWhiteSpace does not
+                // flow through the resolveByName bool.
                 .GetCurrentByBlueprintNameAsync(tenantId, blueprintName!, cancellationToken)
                 .ConfigureAwait(false)
             : await _blueprintHistory.GetCurrentAsync(tenantId, cancellationToken)
@@ -2179,11 +2179,7 @@ internal class BlueprintService : IBlueprintService
     {
         try
         {
-#if NETSTANDARD2_0
-            using (seedStream)
-#else
             await using (seedStream)
-#endif
             {
                 var root = await _rtYamlSerializer
                     .DeserializeAsync(seedStream, sourceDescription, operationResult)

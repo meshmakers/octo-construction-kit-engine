@@ -26,12 +26,7 @@ public abstract class RtTypeWithAttributes
     /// </summary>
     protected RtTypeWithAttributes(IReadOnlyDictionary<string, object?> attributes)
     {
-#if NETSTANDARD2_0
-        _attributes = new Dictionary<string, object?>(attributes
-            .ToDictionary(k => k.Key, v => v.Value));
-#else
         _attributes = new Dictionary<string, object?>(attributes);
-#endif
     }
 
     /// <summary>

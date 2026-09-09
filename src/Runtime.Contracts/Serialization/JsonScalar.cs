@@ -127,8 +127,8 @@ public static class JsonScalar
     /// Reads <paramref name="node"/> as a <see cref="double"/> — the non-generic counterpart of
     /// <c>TryToNumber&lt;T&gt;</c>. Accepts JSON numbers natively and parses numeric JSON strings
     /// under invariant culture; returns false otherwise. Unlike the generic overload (which needs
-    /// <c>IParsable&lt;T&gt;</c>, net7+), this is available on every target framework — including
-    /// netstandard2.0 — so callers that cannot use the generic still get the shared parity rules.
+    /// <c>IParsable&lt;T&gt;</c>), this one has no generic constraint, so callers that cannot use the
+    /// generic still get the shared parity rules.
     /// </summary>
     public static bool TryToDouble(JsonNode node, out double value)
     {

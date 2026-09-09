@@ -139,11 +139,7 @@ internal static class RollupLadderFunctionResolver
         foreach (var o in parentOrigins)
         {
             // First-seen wins — duplicates would indicate an inconsistent parent.
-            // (No Dictionary.TryAdd on the netstandard2.0 target.)
-            if (!parentByColumn.ContainsKey(o.ColumnName))
-            {
-                parentByColumn.Add(o.ColumnName, o);
-            }
+            parentByColumn.TryAdd(o.ColumnName, o);
         }
 
         var result = new List<Origin>();

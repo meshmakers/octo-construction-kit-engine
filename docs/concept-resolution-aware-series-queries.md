@@ -1,6 +1,6 @@
 # Concept: Resolution-Aware Series Queries (Archive Auto-Selection)
 
-**Status:** Draft / analysis. Core decisions resolved (§6); no implementation yet.
+**Status:** Implemented — `SeriesResolutionService` + GraphQL `streamData.resolveSeriesQuery` + MCP `resolve_series_query` (AB#4290), cascade function matching (AB#4336); the §6 decisions are in effect.
 **Motivating use case:** "For metering point *X*, OBIS code *Y*, give me all energy data of the last year — I need ~600 points to render a chart."
 **Related:**
 - [`concept-simple-downsampling.md`](concept-simple-downsampling.md) (AB#4233) — reduce a query to exactly `limit` buckets sized to the chart. This concept is the layer that decides *which archive* the `limit` is applied to.

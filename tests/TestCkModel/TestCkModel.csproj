@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
-        <TargetFrameworks>net10.0;netstandard2.0</TargetFrameworks>
+        <TargetFramework>net10.0</TargetFramework>
         <AssemblyName>TestCkModel</AssemblyName>
         <RootNamespace>TestCkModel</RootNamespace>
         <Configurations>Debug;Release;DebugL</Configurations>

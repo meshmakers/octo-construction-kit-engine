@@ -2,6 +2,7 @@
 
     <PropertyGroup>
         <IsPackable>false</IsPackable>
+        <OutputType>Exe</OutputType>
         <AssemblyName>Meshmakers.Octo.ConstructionKit.Compiler.Tests</AssemblyName>
         <RootNamespace>Meshmakers.Octo.ConstructionKit.Compiler.Tests</RootNamespace>
         <TargetFramework>net10.0</TargetFramework>
@@ -12,7 +13,7 @@
     <ItemGroup>
         <PackageReference Include="FakeItEasy" Version="9.0.1" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
+        <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
@@ -20,7 +21,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
-        <PackageReference Include="xunit.v3" Version="3.2.2" />
+        <PackageReference Include="xunit.v3.mtp-off" Version="4.0.0" />
     </ItemGroup>
 
     <ItemGroup>

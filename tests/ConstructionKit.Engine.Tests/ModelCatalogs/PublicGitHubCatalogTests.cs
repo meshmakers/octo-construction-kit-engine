@@ -101,7 +101,9 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
     {
         Assert.Equal(20, Catalog.Order);
         Assert.Equal("PublicGitHubCatalog", Catalog.CatalogName);
-        Assert.Equal("Public GitHub catalog", Catalog.Description);
+        // AB#5139: the description carries the repository coordinates so two installations that
+        // share the catalog name can still be told apart in ListCatalogs / studio.
+        Assert.Equal("Public GitHub catalog (testowner/testrepo@main)", Catalog.Description);
         Assert.True(Catalog.CanWrite);
     }
 
@@ -447,7 +449,9 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
     {
         Assert.Equal(20, Catalog.Order);
         Assert.Equal("PublicGitHubCatalog", Catalog.CatalogName);
-        Assert.Equal("Public GitHub catalog", Catalog.Description);
+        // AB#5139: the description carries the repository coordinates so two installations that
+        // share the catalog name can still be told apart in ListCatalogs / studio.
+        Assert.Equal("Public GitHub catalog (testowner/testrepo@main)", Catalog.Description);
         Assert.True(Catalog.CanWrite);
     }
 

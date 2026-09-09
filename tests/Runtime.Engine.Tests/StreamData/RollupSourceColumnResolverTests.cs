@@ -297,6 +297,61 @@ public class RollupSourceColumnResolverTests
         Assert.Equal(RollupSourceColumnResolutionKind.ChildAggregation, onHourly?.Kind);
     }
 
+    // ---- StateDuration: the compared state is part of the identity of the aggregation ---------
+
+    [Fact]
+    public void TryResolve_StateDurationOverAChildComparingTheSameState_Resolves()
+    {
+        var child = new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, null, "true");
+        var (archive, rollup) = Hourly(child);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, null, "true"), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Equal(RollupSourceColumnResolutionKind.ChildAggregation, resolution.Kind);
+        Assert.Same(child, resolution.ChildAggregation);
+    }
+
+    [Fact]
+    public void TryResolve_StateDurationOverAChildComparingAnotherState_ReturnsNull()
+    {
+        // Summing the child's 'false' durations into the parent's 'true' column would silently
+        // produce wrong numbers, so the mismatch must not resolve (the validator then refuses it).
+        var (archive, rollup) = Hourly(
+            new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, null, "false"));
+
+        Assert.Null(RollupSourceColumnResolver.TryResolve(
+            new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, null, "true"), archive, rollup));
+    }
+
+    [Fact]
+    public void TryResolve_StateDurationPicksTheChildWithTheMatchingState()
+    {
+        var onSpec = new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, "lamp_on", "true");
+        var offSpec = new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, "lamp_off", "false");
+        var (archive, rollup) = Hourly(offSpec, onSpec);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            new CkRollupAggregationSpec("Lamp.On", CkRollupFunction.StateDuration, null, "true"), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Same(onSpec, resolution.ChildAggregation);
+    }
+
+    [Fact]
+    public void TryResolve_NonStateDurationFunctionsIgnoreTheComparisonValue()
+    {
+        var child = new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null, "true");
+        var (archive, rollup) = Hourly(child);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null, "false"), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Same(child, resolution.ChildAggregation);
+    }
+
     [Fact]
     public void TryResolve_NullSpecOrSource_Throws()
     {

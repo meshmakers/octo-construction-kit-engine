@@ -137,7 +137,10 @@ public static class RollupSourceColumnResolver
     /// <see cref="RollupSourceColumnResolutionKind.ChildAggregation"/> (rule 2) with the first child
     /// spec of <paramref name="sourceRollup"/> whose <see cref="CkRollupAggregationSpec.Function"/>
     /// equals the parent's and whose <see cref="NormalisePath">normalised</see> source path equals
-    /// the parent's normalised source path; otherwise <c>null</c>. Rule 1 wins when both apply:
+    /// the parent's normalised source path (and, for
+    /// <see cref="CkRollupFunction.StateDuration"/>, whose
+    /// <see cref="CkRollupAggregationSpec.ComparisonValue"/> is the same state literal); otherwise
+    /// <c>null</c>. Rule 1 wins when both apply:
     /// a verbatim declared column is the more specific match and keeps a legacy chained spec
     /// reading exactly the column it names.
     /// </returns>
@@ -188,12 +191,31 @@ public static class RollupSourceColumnResolver
         foreach (var child in childSpecs)
         {
             if (child.Function == spec.Function &&
-                string.Equals(NormalisePath(child.SourcePath), wanted, StringComparison.Ordinal))
+                string.Equals(NormalisePath(child.SourcePath), wanted, StringComparison.Ordinal) &&
+                ComparisonValueMatches(spec, child))
             {
                 return new RollupSourceColumnResolution(RollupSourceColumnResolutionKind.ChildAggregation, child);
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// A <see cref="CkRollupFunction.StateDuration"/> aggregation measures the time a column spent
+    /// in one specific state, so a child that measured a <em>different</em> state is a different
+    /// quantity and must not serve the parent (its column would otherwise be summed into the
+    /// parent's, silently producing wrong durations). Every other function ignores
+    /// <see cref="CkRollupAggregationSpec.ComparisonValue"/>.
+    /// </summary>
+    private static bool ComparisonValueMatches(CkRollupAggregationSpec spec, CkRollupAggregationSpec child)
+    {
+        if (spec.Function != CkRollupFunction.StateDuration)
+        {
+            return true;
+        }
+
+        return string.Equals(
+            spec.ComparisonValue?.Trim(), child.ComparisonValue?.Trim(), StringComparison.Ordinal);
     }
 }

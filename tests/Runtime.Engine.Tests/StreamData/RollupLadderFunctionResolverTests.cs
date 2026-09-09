@@ -169,6 +169,109 @@ public class RollupLadderFunctionResolverTests
             RollupLadderFunctionResolver.StoredFunctionsFor(monthly, BaseRt, Path, Ladder(daily, monthly)));
     }
 
+    // ---- Rule 2 (AB#5157): a rung declaring the LOGICAL path over a rollup parent --------------
+
+    [Fact]
+    public void LogicalCascadeSpec_OverAParentStoringTheSameFunction_Resolves()
+    {
+        // The read-side twin of RollupSourceColumnResolver rule 2: the monthly rung names
+        // 'DimmingLevel' (not 'dimminglevel_sum'), which is what an AB#5157 multi-source rung over
+        // a base archive AND its hourly rollup has to declare.
+        var hourly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Sum, null));
+        var monthly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Sum, null));
+
+        var functions = RollupLadderFunctionResolver.StoredFunctionsFor(
+            monthly, BaseRt, Path, Ladder(hourly, monthly));
+
+        Assert.Equal(new[] { CkRollupFunction.Sum }, functions.ToArray());
+    }
+
+    [Fact]
+    public void LogicalCascadeSpec_WithADifferentFunctionThanTheParent_IsDropped()
+    {
+        var hourly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Sum, null));
+        var monthly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Min, null));
+
+        Assert.Empty(RollupLadderFunctionResolver.StoredFunctionsFor(
+            monthly, BaseRt, Path, Ladder(hourly, monthly)));
+    }
+
+    [Fact]
+    public void LogicalCascadeSpec_AvgPair_ResolvesWhenBothParentSlotsExist()
+    {
+        var hourly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Avg, null));
+        var monthly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Avg, null));
+
+        Assert.Equal(
+            new[] { CkRollupFunction.Avg },
+            RollupLadderFunctionResolver.StoredFunctionsFor(monthly, BaseRt, Path, Ladder(hourly, monthly)).ToArray());
+    }
+
+    [Theory]
+    [InlineData(CkRollupFunction.First)]
+    [InlineData(CkRollupFunction.Last)]
+    public void LogicalCascadeSpec_FirstAndLast_Resolve(CkRollupFunction function)
+    {
+        var hourly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(BaseRt),
+            new CkRollupAggregationSpec(Path, function, null));
+        var monthly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, function, null));
+
+        Assert.Equal(
+            new[] { function },
+            RollupLadderFunctionResolver.StoredFunctionsFor(monthly, BaseRt, Path, Ladder(hourly, monthly)).ToArray());
+    }
+
+    [Fact]
+    public void LogicalCascadeSpec_StateDurationOverAnotherComparedState_IsDropped()
+    {
+        // The parent measured the time spent in 'false'; re-reading it as the 'true' duration would
+        // be a different quantity.
+        var hourly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.StateDuration, null, "false"));
+        var monthly = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.StateDuration, null, "true"));
+
+        Assert.Empty(RollupLadderFunctionResolver.StoredFunctionsFor(
+            monthly, BaseRt, Path, Ladder(hourly, monthly)));
+
+        var sameState = Rollup(
+            OctoObjectId.GenerateNewId(),
+            From(hourly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.StateDuration, null, "false"));
+
+        Assert.Equal(
+            new[] { CkRollupFunction.StateDuration },
+            RollupLadderFunctionResolver.StoredFunctionsFor(
+                sameState, BaseRt, Path, Ladder(hourly, sameState)).ToArray());
+    }
+
     [Fact]
     public void ChainDeeperThanTheDepthCap_YieldsNoFunctions()
     {

@@ -16,10 +16,21 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// One instance per tenant, mirroring <see cref="RollupOrchestrator"/>.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Propagation is one level per recompute: a successful recompute of an archive enqueues pending
 /// ranges onto its <em>direct</em> dependents, and each of those, when it recomputes, propagates to
 /// its own dependents. A multi-level rollup-of-rollup chain therefore converges over successive
 /// ticks — the same eventual-consistency model the forward watermark orchestrator uses.
+/// </para>
+/// <para>
+/// Since AB#5157 a rollup declares several time-disjoint sources
+/// (<see cref="RollupArchiveSnapshot.Sources"/>), so the dependency graph is a multi-parent DAG.
+/// A dirty range coming from one source is clipped to that source's validity span (on both ends)
+/// before it is enqueued on a dependent; a recompute of <c>[from, to)</c> is split into one
+/// segment per source along the spans and the executor runs once per segment — a segment never
+/// mixes two sources; and the backfill start is the earliest in-span stored timestamp over all
+/// sources. See <c>concept-multi-source-rollups.md</c> §6.
+/// </para>
 /// </remarks>
 public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 {
@@ -64,6 +75,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     private readonly int _maxChunkAttempts;
     private readonly TimeSpan _chunkRetryBaseDelay;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
+    private readonly IArchiveCoverageInvalidator? _coverageInvalidator;
 
     /// <summary>Constructs the orchestrator for one tenant.</summary>
     /// <remarks>
@@ -75,6 +87,9 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// that makes a decade-long backfill survive intermittent CrateDB connection drops. Must be ≥ 1.
     /// <c>delay</c> is the (injectable, for tests) backoff sleep; defaults to
     /// <see cref="Task.Delay(TimeSpan, CancellationToken)"/>.</para>
+    /// <para><c>coverageInvalidator</c> (AB#5157) is optional; when supplied, a completed recompute
+    /// job drops the recomputed rollup's memoised coverage so the next coverage query re-measures
+    /// instead of waiting out the cache TTL.</para>
     /// </remarks>
     public RecomputeOrchestrator(
         string tenantId,
@@ -91,7 +106,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         int maxBucketsPerChunk = DefaultMaxBucketsPerChunk,
         int maxChunkAttempts = DefaultMaxChunkAttempts,
         TimeSpan? chunkRetryBaseDelay = null,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+        Func<TimeSpan, CancellationToken, Task>? delay = null,
+        IArchiveCoverageInvalidator? coverageInvalidator = null)
     {
         if (maxBucketsPerChunk <= 0)
         {
@@ -120,6 +136,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         _maxChunkAttempts = maxChunkAttempts;
         _chunkRetryBaseDelay = chunkRetryBaseDelay ?? DefaultChunkRetryBaseDelay;
         _delay = delay ?? Task.Delay;
+        _coverageInvalidator = coverageInvalidator;
     }
 
     /// <summary>
@@ -365,11 +382,35 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             }
         }
 
-        var source = await _archiveStore.GetAsync(rollup.SourceArchiveRtId);
-        if (source is null)
+        // AB#5157: split [from, to) into one segment per source along the validity spans BEFORE
+        // chunking, so every executor call is served by exactly one source. Buckets no span covers
+        // are simply not recomputed (the forward pass writes no row for them either). Every
+        // segment's source must resolve up front — a missing one fails the job before it starts,
+        // exactly as the single-source path did.
+        var segments = PlanSourceSegments(rollup, from, to);
+        var sourcesByRtId = new Dictionary<OctoObjectId, ArchiveSnapshot>();
+        foreach (var segment in segments)
         {
-            return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
-                $"Source archive {rollup.SourceArchiveRtId} not found.", adoptExistingJob);
+            if (sourcesByRtId.ContainsKey(segment.Reference.SourceArchiveRtId))
+            {
+                continue;
+            }
+
+            var source = await _archiveStore.GetAsync(segment.Reference.SourceArchiveRtId);
+            if (source is null)
+            {
+                return await FailImmediatelyAsync(rollupRtId, from, to, rtIdScope, trigger, now,
+                    $"Source archive {segment.Reference.SourceArchiveRtId} not found.", adoptExistingJob);
+            }
+
+            sourcesByRtId[segment.Reference.SourceArchiveRtId] = source;
+        }
+
+        if (segments.Count == 0)
+        {
+            _logger.LogInformation(
+                "Recompute of rollup {RollupRtId} range [{From:O},{To:O}) lies in no source's validity span — nothing to recompute.",
+                rollupRtId, from, to);
         }
 
         var startedAt = now;
@@ -404,10 +445,28 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         {
             // AB#4283: split the (possibly decade-long) range into bucket-aligned chunks so every
             // executor sub-run keeps its CrateDB statements under the per-statement timeout. Each chunk
-            // swap is atomic on its own sub-range; totals accumulate into this one job.
-            var chunks = RecomputePlanner.PlanChunks(
-                from, to, rollup.BucketAlignment, rollup.BucketSize, _maxBucketsPerChunk,
-                BucketBoundary.ResolveZone(rollup.ReferenceTimeZone));
+            // swap is atomic on its own sub-range; totals accumulate into this one job. Chunks are
+            // planned per source segment (AB#5157) and run sequentially in time order, each with its
+            // segment's source snapshot; a segment boundary is always a bucket boundary, so no chunk
+            // straddles two sources.
+            var chunks = new List<(ArchiveSnapshot Source, DateTime Start, DateTime End)>();
+            foreach (var segment in segments)
+            {
+                var segmentSource = sourcesByRtId[segment.Reference.SourceArchiveRtId];
+                foreach (var (chunkStart, chunkEnd) in RecomputePlanner.PlanChunks(
+                             segment.From, segment.To, rollup.BucketAlignment, rollup.BucketSize, _maxBucketsPerChunk,
+                             BucketBoundary.ResolveZone(rollup.ReferenceTimeZone)))
+                {
+                    chunks.Add((segmentSource, chunkStart, chunkEnd));
+                }
+
+                if (rollup.Sources.Count > 1)
+                {
+                    _logger.LogInformation(
+                        "Recompute of rollup {RollupRtId}: segment [{SegmentStart:O},{SegmentEnd:O}) is served by source {SourceRtId}.",
+                        rollupRtId, segment.From, segment.To, segment.Reference.SourceArchiveRtId);
+                }
+            }
 
             if (chunks.Count > 1)
             {
@@ -419,7 +478,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             var totalRows = 0;
             var totalWindows = 0;
             var chunkIndex = 0;
-            foreach (var (chunkStart, chunkEnd) in chunks)
+            foreach (var (source, chunkStart, chunkEnd) in chunks)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -460,7 +519,13 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             await _audit.RecordRecomputeRunAsync(
                 _tenantId, rollupRtId, from, to, totalRows, totalWindows, elapsed);
 
+            // AB#5157: a recompute (above all a backfill) can extend the rollup's stored range far
+            // beyond what the TTL would surface in time; drop the memoised coverage so the next
+            // coverage query re-measures.
+            _coverageInvalidator?.Invalidate(_tenantId, rollupRtId);
+
             // Chain: this rollup's values changed in [from, to) → its direct dependents are stale.
+            // The full range is propagated; each dependent clips it to its own reference span.
             await EnqueueOnDirectDependentsAsync(rollupRtId, from, to, cancellationToken);
 
             return completed;
@@ -488,17 +553,19 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
 
     /// <summary>
     /// Durable, background backfill (AB#4269 / AB#4286): queue a whole-history recompute of a rollup
-    /// without running it inline. Resolves the source archive's earliest stored timestamp, snaps it
-    /// down to the rollup's bucket boundary, pre-creates a <see cref="RecomputeJobState.Pending"/> job
-    /// and enqueues a persisted pending recompute range <c>[sourceMin, now)</c> — then returns the
-    /// Pending job immediately. The heavy recompute runs later on the background <see cref="TickAsync"/>
-    /// (which adopts the Pending job and drives it to Completed under the host application-lifetime
-    /// token), so it is never bound to — and can never be cancelled by — the client HTTP request.
+    /// without running it inline. Resolves the earliest stored timestamp over all source archives —
+    /// each raised to its <c>ValidFrom</c> (AB#5157) — snaps it down to the rollup's bucket boundary,
+    /// pre-creates a <see cref="RecomputeJobState.Pending"/> job and enqueues a persisted pending
+    /// recompute range <c>[sourceMin, now)</c> — then returns the Pending job immediately. The heavy
+    /// recompute runs later on the background <see cref="TickAsync"/> (which adopts the Pending job and
+    /// drives it to Completed under the host application-lifetime token), so it is never bound to —
+    /// and can never be cancelled by — the client HTTP request.
     /// <para>
-    /// An empty source archive is a no-op (returns <c>null</c>). A non-rollup target produces a failed
-    /// job, exactly as <see cref="RecomputeArchiveAsync"/> would. When a recompute job is already active
-    /// for the rollup, the range is folded into it and that active job is returned so the caller polls a
-    /// single job id.
+    /// A source without data, or whose data lies entirely outside its validity span, contributes
+    /// nothing; when no source contributes the backfill is a no-op (returns <c>null</c>). A non-rollup
+    /// target produces a failed job, exactly as <see cref="RecomputeArchiveAsync"/> would. When a
+    /// recompute job is already active for the rollup, the range is folded into it and that active job
+    /// is returned so the caller polls a single job id.
     /// </para>
     /// </summary>
     public async Task<RecomputeJobSnapshot?> EnqueueBackfillFromSourceAsync(
@@ -527,18 +594,50 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 $"Archive is not activated (status {rollup.Status}) — activate it before backfilling.");
         }
 
-        var sourceMin = await _streamData.GetArchiveMinTimestampAsync(rollup.SourceArchiveRtId, cancellationToken);
+        // AB#5157: backfill start = MIN over sources of max(earliest stored timestamp, ValidFrom).
+        // A source without data contributes nothing; so does one whose data starts at or after its
+        // ValidTo (wholly outside its span) — the rollup would never read it.
+        DateTime? sourceMin = null;
+        foreach (var reference in rollup.Sources)
+        {
+            var archiveMin = await _streamData.GetArchiveMinTimestampAsync(reference.SourceArchiveRtId, cancellationToken);
+            if (archiveMin is null)
+            {
+                _logger.LogDebug(
+                    "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds no data — contributes nothing.",
+                    rollupRtId, reference.SourceArchiveRtId);
+                continue;
+            }
+
+            var candidate = reference.ValidFrom is { } validFrom && validFrom > archiveMin.Value
+                ? validFrom
+                : archiveMin.Value;
+
+            if (reference.ValidTo is { } validTo && candidate >= validTo)
+            {
+                _logger.LogDebug(
+                    "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds data only from {ArchiveMin:O}, at or after its ValidTo {ValidTo:O} — contributes nothing.",
+                    rollupRtId, reference.SourceArchiveRtId, archiveMin.Value, validTo);
+                continue;
+            }
+
+            if (sourceMin is null || candidate < sourceMin.Value)
+            {
+                sourceMin = candidate;
+            }
+        }
+
         if (sourceMin is null)
         {
             _logger.LogInformation(
-                "Backfill of rollup {RollupRtId}: source archive {SourceRtId} holds no data — nothing to queue (no-op).",
-                rollupRtId, rollup.SourceArchiveRtId);
+                "Backfill of rollup {RollupRtId}: no source archive holds data inside its validity span — nothing to queue (no-op).",
+                rollupRtId);
             return null;
         }
 
         var now = _clock();
 
-        // Snap the source's earliest timestamp down to the rollup's bucket boundary so the recompute
+        // Snap the earliest in-span timestamp down to the rollup's bucket boundary so the recompute
         // starts on a clean bucket-start; recompute the whole history [from, now).
         var (from, _) = RecomputePlanner.AlignRangeToBuckets(
             sourceMin.Value, sourceMin.Value, rollup.BucketAlignment, rollup.BucketSize,
@@ -576,11 +675,33 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             new[] { new ArchiveRecomputeRange(rollupRtId, from, now, null, now) });
 
         _logger.LogInformation(
-            "Backfill of rollup {RollupRtId} queued as job {JobId} over [{From:O}, {Now:O}) from source {SourceRtId} " +
-            "(earliest source ts {SourceMin:O}); background recompute orchestrator will run it.",
-            rollupRtId, pending.RtId, from, now, rollup.SourceArchiveRtId, sourceMin.Value);
+            "Backfill of rollup {RollupRtId} queued as job {JobId} over [{From:O}, {Now:O}) from {SourceCount} source(s) " +
+            "(earliest in-span source ts {SourceMin:O}); background recompute orchestrator will run it.",
+            rollupRtId, pending.RtId, from, now, rollup.Sources.Count, sourceMin.Value);
 
         return pending;
+    }
+
+    /// <summary>
+    /// Splits the bucket-aligned range <c>[from, to)</c> into one segment per source whose validity
+    /// span intersects it (AB#5157), ordered by start. Spans are pairwise disjoint and lie on the
+    /// rollup's bucket grid, so the segments are disjoint and bucket-aligned too; a sub-range no span
+    /// covers yields no segment.
+    /// </summary>
+    private static List<(RollupSourceReference Reference, DateTime From, DateTime To)> PlanSourceSegments(
+        RollupArchiveSnapshot rollup, DateTime from, DateTime to)
+    {
+        var segments = new List<(RollupSourceReference Reference, DateTime From, DateTime To)>(rollup.Sources.Count);
+        foreach (var reference in rollup.Sources)
+        {
+            if (reference.Clip(from, to) is { } clipped)
+            {
+                segments.Add((reference, clipped.From, clipped.To));
+            }
+        }
+
+        segments.Sort(static (a, b) => a.From.CompareTo(b.From));
+        return segments;
     }
 
     /// <summary>
@@ -676,11 +797,19 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     }
 
     /// <remarks>
+    /// <para>
     /// <paramref name="maxRetroReach"/> is the AB#4196 bounded-retro-reach cap. When non-null, each
     /// dependent's stale range start is floored at <c>dependentWatermark - maxRetroReach</c>, so a
     /// single very-late change can never drag an automatic recompute further back than the cap. Null
     /// (the default, used by chain propagation after a committed recompute) leaves the range unbounded
     /// — a manual / chained recompute is deliberately not capped.
+    /// </para>
+    /// <para>
+    /// AB#5157: a dependent is a direct child when <paramref name="sourceRtId"/> is among its
+    /// sources, and the dirty range is clipped to that reference's validity span on both ends before
+    /// it is bucket-aligned — a change in the writing source outside the window it is authoritative
+    /// for cannot make the dependent stale. An empty clip enqueues nothing.
+    /// </para>
     /// </remarks>
     private async Task EnqueueOnDirectDependentsAsync(
         OctoObjectId sourceRtId, DateTime from, DateTime to, CancellationToken cancellationToken,
@@ -692,13 +821,19 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             // Direct children only; deeper levels are reached when each child recomputes and
             // propagates to its own dependents. Re-deriving the range per dependent honours that
             // dependent's own bucket alignment.
-            if (dependent.SourceArchiveRtId != sourceRtId)
+            if (!dependent.HasSource(sourceRtId))
+            {
+                continue;
+            }
+
+            var reference = dependent.Sources.First(s => s.SourceArchiveRtId == sourceRtId);
+            if (reference.Clip(from, to) is not { } clipped)
             {
                 continue;
             }
 
             var (start, end) = RecomputePlanner.AlignRangeToBuckets(
-                from, to, dependent.BucketAlignment, dependent.BucketSize,
+                clipped.From, clipped.To, dependent.BucketAlignment, dependent.BucketSize,
                 BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
 
             // AB#4336 decision D2: a retroactive source change inside a bucket also changes the
@@ -713,6 +848,14 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 end = BucketBoundary.NextBucketEnd(
                     end, dependent.BucketAlignment, dependent.BucketSize,
                     BucketBoundary.ResolveZone(dependent.ReferenceTimeZone));
+
+                // AB#5157: the successor bucket past the span end is served by ANOTHER source,
+                // whose carry-in comes from that source's own rows — a change in this source cannot
+                // affect it. Keep the extension inside the span.
+                if (reference.ValidTo is { } validTo && end > validTo)
+                {
+                    end = validTo;
+                }
             }
 
             // Clamp to what this dependent has actually aggregated (AB#4288). The retroactive-write

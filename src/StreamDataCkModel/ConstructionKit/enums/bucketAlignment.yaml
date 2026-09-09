@@ -20,3 +20,6 @@ enums:
       - key: 4
         name: CalendarYear
         description: "Bucket boundaries align to UTC calendar years (Jan 1 00:00:00 UTC). BucketSizeMs is informational only."
+      - key: 5
+        name: CalendarQuarter
+        description: "Bucket boundaries align to calendar quarters starting 1 January / 1 April / 1 July / 1 October (00:00:00 UTC, or local wall-clock time when ReferenceTimeZone is set). BucketSizeMs is informational only; quarter lengths vary 90-92 days. AB#5157."

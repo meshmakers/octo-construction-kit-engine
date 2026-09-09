@@ -21,6 +21,10 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// table — pair slots (AVG's sum/count, TWA's integral/duration) accumulate via SUM, COUNT and
 /// StateDuration chain via SUM, MIN/MAX only via themselves. A pair function counts as stored
 /// only when <em>both</em> slots survive the chain — a lone numerator cannot be recombined.
+/// A multi-source rollup (AB#5157) follows the parent that leads to the requested base: when any
+/// of its sources <em>is</em> the base its specs are direct origins; otherwise the walk cascades
+/// through the first source that is a ladder member and yields origins, so a source outside the
+/// family (a legacy time-range archive in a cutover setup) cannot mask a good in-family parent.
 /// </remarks>
 internal static class RollupLadderFunctionResolver
 {
@@ -93,20 +97,35 @@ internal static class RollupLadderFunctionResolver
             return new List<Origin>();
         }
 
-        if (rollup.SourceArchiveRtId == baseRtId)
+        if (rollup.HasSource(baseRtId))
         {
             return BuildDirectOrigins(rollup);
         }
 
-        if (!ladderByRtId.TryGetValue(rollup.SourceArchiveRtId, out var parent))
+        foreach (var source in rollup.Sources)
         {
-            // Source is neither the base nor a known ladder member — broken chain (or a source
-            // outside this resolution family). Conservatively unmatched.
-            return new List<Origin>();
+            if (!ladderByRtId.TryGetValue(source.SourceArchiveRtId, out var parent))
+            {
+                // Neither the base nor a known ladder member — a source outside this resolution
+                // family (or a broken chain). Skip it; a sibling source may still lead to the base.
+                continue;
+            }
+
+            var parentOrigins = BuildOrigins(parent, baseRtId, ladderByRtId, depth + 1);
+            if (parentOrigins.Count == 0)
+            {
+                continue;
+            }
+
+            var origins = BuildCascadeOrigins(rollup, parentOrigins);
+            if (origins.Count > 0)
+            {
+                return origins;
+            }
         }
 
-        var parentOrigins = BuildOrigins(parent, baseRtId, ladderByRtId, depth + 1);
-        return BuildCascadeOrigins(rollup, parentOrigins);
+        // No source reaches the base with a legal chain. Conservatively unmatched.
+        return new List<Origin>();
     }
 
     private static List<Origin> BuildDirectOrigins(RollupArchiveSnapshot rollup)

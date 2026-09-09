@@ -23,6 +23,13 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// stored functions and stays conservatively excluded.
 /// </para>
 /// <para>
+/// When an <see cref="IArchiveCoverageProvider"/> is supplied (AB#5157) every rung — the base
+/// included — is probed exactly once for its measured coverage, which the planner applies as a
+/// filter ahead of the selection rules. Without a provider no rung reports coverage and the filter
+/// is inert, so the pre-AB#5157 behaviour is preserved; hosts that want
+/// <see cref="SeriesResolutionSignal.CoverageLimited"/> routing must pass the tenant's provider.
+/// </para>
+/// <para>
 /// The base archive is identified by <see cref="SeriesResolutionRequest.BaseArchiveRtId"/>;
 /// resolving it from <see cref="SeriesResolutionRequest.TargetCkTypeId"/> alone is a follow-up.
 /// </para>
@@ -31,17 +38,21 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
 {
     private readonly IArchiveRuntimeStore _archiveStore;
     private readonly IRollupDependencyGraph _dependencyGraph;
+    private readonly IArchiveCoverageProvider? _coverageProvider;
 
     /// <summary>
     /// Creates the resolver for one tenant from that tenant's archive store and rollup dependency
-    /// graph.
+    /// graph. <paramref name="coverageProvider"/> is optional (AB#5157): <c>null</c> keeps the
+    /// measured coverage filter inert.
     /// </summary>
     public SeriesResolutionService(
         IArchiveRuntimeStore archiveStore,
-        IRollupDependencyGraph dependencyGraph)
+        IRollupDependencyGraph dependencyGraph,
+        IArchiveCoverageProvider? coverageProvider = null)
     {
         _archiveStore = archiveStore ?? throw new ArgumentNullException(nameof(archiveStore));
         _dependencyGraph = dependencyGraph ?? throw new ArgumentNullException(nameof(dependencyGraph));
+        _coverageProvider = coverageProvider;
     }
 
     /// <inheritdoc />
@@ -95,6 +106,24 @@ public sealed class SeriesResolutionService : ISeriesResolutionService
                 // per the comparison policy — see EffectiveGrainMs.
                 ReferenceTimeZone = rollup.ReferenceTimeZone,
             });
+        }
+
+        // AB#5157: measured coverage, asked exactly once per rung (base included). A rung without
+        // data keeps null/null and never covers; without a provider the planner's filter is inert.
+        if (_coverageProvider is not null)
+        {
+            for (var i = 0; i < ladder.Count; i++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var coverage = await _coverageProvider
+                    .GetCoverageAsync(ladder[i].ArchiveRtId, cancellationToken)
+                    .ConfigureAwait(false);
+                ladder[i] = ladder[i] with
+                {
+                    AvailableFrom = coverage?.AvailableFrom,
+                    AvailableTo = coverage?.AvailableTo,
+                };
+            }
         }
 
         return SeriesResolutionPlanner.Plan(

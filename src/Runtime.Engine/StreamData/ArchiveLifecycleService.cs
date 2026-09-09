@@ -40,6 +40,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly IRecomputeJobStore? _recomputeJobStore;
     private readonly ILogger<ArchiveLifecycleService> _logger;
     private readonly Func<DateTime> _clock;
+    private readonly IArchiveCoverageInvalidator? _coverageInvalidator;
 
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
@@ -48,7 +49,9 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     /// when supplied, <see cref="DeleteAsync"/> rejects deletion of source archives that still
     /// have active rollups attached (rollup-archives concept §6, §10) and rollup archives get
     /// their <see cref="RollupArchiveSnapshot.LastAggregatedBucketEnd"/> initialised on the
-    /// first activation (rollup-archives concept §4).
+    /// first activation (rollup-archives concept §4). <paramref name="coverageInvalidator"/> is
+    /// optional (AB#5157); when supplied, <see cref="DeleteAsync"/> drops the archive's memoised
+    /// coverage so the next coverage query re-measures instead of waiting out the cache TTL.
     /// </summary>
     public ArchiveLifecycleService(
         string tenantId,
@@ -59,7 +62,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         IRollupArchiveRuntimeStore? rollupStore = null,
         IArchiveRecomputeStateStore? recomputeStateStore = null,
         IRecomputeJobStore? recomputeJobStore = null,
-        Func<DateTime>? clock = null)
+        Func<DateTime>? clock = null,
+        IArchiveCoverageInvalidator? coverageInvalidator = null)
     {
         _tenantId = tenantId;
         _store = store;
@@ -70,6 +74,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _recomputeJobStore = recomputeJobStore;
         _logger = logger;
         _clock = clock ?? (() => DateTime.UtcNow);
+        _coverageInvalidator = coverageInvalidator;
     }
 
     /// <inheritdoc />
@@ -141,7 +146,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         var snapshot = await LoadAsync(archiveRtId);
 
         // Rollup-archives concept §6 / §10: reject source-archive delete while non-soft-deleted
-        // rollups still reference it. The guard is skipped silently when no rollup store is
+        // rollups still reference it — in either storage form and whatever validity span the
+        // reference carries (AB#5157). The guard is skipped silently when no rollup store is
         // registered (deployments without rollups configured), so it costs nothing for the
         // rollup-free path.
         if (_rollupStore is not null)
@@ -160,6 +166,10 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         // Crate first (idempotent), entity store last; matches §11.
         await _repository.DeleteArchiveAsync(archiveRtId);
         await _store.ArchiveEntityAsync(archiveRtId);
+
+        // AB#5157: the archive's measured coverage is gone with its table; drop the memo so a
+        // coverage query does not keep reporting the deleted range for the rest of the cache TTL.
+        _coverageInvalidator?.Invalidate(_tenantId, archiveRtId);
 
         // AB#4300: drop any queued recompute work so a re-import that reuses this rtId doesn't inherit
         // a stale Pending job + range (the drain would skip the freshly-imported-and-still-Created
@@ -383,9 +393,13 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
 
     /// <summary>
     /// Runs the rollup-archives concept §10 activation-time validation when the archive is a
-    /// rollup. No-op when no rollup store is wired or when the archive is not a rollup. Throws
-    /// the matching <see cref="StreamDataException"/> subclass on the first violation; the
-    /// caller surfaces the exception via the GraphQL error mapper.
+    /// rollup. No-op when no rollup store is wired or when the archive is not a rollup. Loads
+    /// <em>every</em> declared source (AB#5157) — its archive view and, for a rollup source, its
+    /// rollup view — re-runs every save-time and per-source rule via
+    /// <see cref="RollupValidator.ValidateForActivation"/>, then the transitive cycle check over the
+    /// tenant's rollups. Throws the matching <see cref="StreamDataException"/> subclass on the first
+    /// violation; the caller surfaces the exception via the GraphQL error mapper. Disabling a source
+    /// of an activated rollup stays allowed; only activation is gated here.
     /// </summary>
     private async Task ValidateRollupForActivationAsync(OctoObjectId archiveRtId)
     {
@@ -394,8 +408,23 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         var rollup = await _rollupStore.GetAsync(archiveRtId);
         if (rollup is null) return; // not a rollup, or soft-deleted
 
-        var source = await _store.GetAsync(rollup.SourceArchiveRtId);
-        RollupValidator.ValidateForActivation(rollup, source);
+        var sources = new List<RollupActivationSource>(rollup.Sources.Count);
+        foreach (var reference in rollup.Sources)
+        {
+            var archive = await _store.GetAsync(reference.SourceArchiveRtId);
+            var sourceRollup = archive is null ? null : await _rollupStore.GetAsync(reference.SourceArchiveRtId);
+            sources.Add(new RollupActivationSource(reference, archive, sourceRollup));
+        }
+
+        RollupValidator.ValidateForActivation(rollup, sources);
+
+        var rollupsByRtId = new Dictionary<OctoObjectId, RollupArchiveSnapshot>();
+        await foreach (var existing in _rollupStore.EnumerateAsync())
+        {
+            rollupsByRtId[existing.RtId] = existing;
+        }
+
+        RollupValidator.ValidateNoTransitiveCycle(rollup, rollupsByRtId);
     }
 
     /// <summary>

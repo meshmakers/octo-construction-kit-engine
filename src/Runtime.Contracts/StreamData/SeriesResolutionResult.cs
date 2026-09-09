@@ -1,3 +1,4 @@
+using System;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
 namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -27,11 +28,21 @@ public sealed record SeriesResolutionResult(
 {
     /// <summary>
     /// The actually deliverable point count when it is below the requested target
-    /// (<see cref="SeriesResolutionSignal.ResolutionLimited"/>) or the native raw count on the
+    /// (<see cref="SeriesResolutionSignal.ResolutionLimited"/> and, with the same meaning,
+    /// <see cref="SeriesResolutionSignal.CoverageLimited"/>) or the native raw count on the
     /// refuse path. Null when the target was met.
     /// </summary>
     public int? ActualPoints { get; init; }
 
     /// <summary>Optional human-readable explanation of the chosen route / signal.</summary>
     public string? Diagnostic { get; init; }
+
+    /// <summary>
+    /// Available-from of the finer rung the measured coverage filter excluded (AB#5157) — the
+    /// timestamp from which the resolver could have served the request at that finer resolution.
+    /// Non-null only together with <see cref="SeriesResolutionSignal.CoverageLimited"/>, and null
+    /// even then when the excluded rung reports no coverage at all. Lets a client offer "finer
+    /// data available from …" without a second round-trip.
+    /// </summary>
+    public DateTime? FinerRungAvailableFrom { get; init; }
 }

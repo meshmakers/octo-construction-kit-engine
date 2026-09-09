@@ -84,6 +84,9 @@ The **native grain** of each rung is derivable without new metadata:
 
 ### §4.2 Selection rule
 
+Since AB#5157 a **coverage filter** runs over the rungs *before* the rules below; it is described in
+§4.2a and is inert unless at least one rung reports measured coverage.
+
 Given the bound time range `[from, to)` (`timespan = to − from`) and a `targetPoints` (default ~600):
 
 ```
@@ -116,6 +119,37 @@ then = downsample the chosen rung with limit = points          (AB#4233 path)
 ```
 
 Rationale: the coarsest sufficient rung minimises the CrateDB scan while the `limit`-downsampling on top lands a point count near the target. The output bucket is a **whole multiple of the chosen rung's grain**, not the raw pixel ideal — a windowed rollup can only be re-aggregated on complete grain windows, so an off-grain bucket silently undercounts (AB#4714). Picking a rung *finer* than necessary only inflates the scan for an identical picture — **except** when no rollup is fine enough yet the raw base already fits within the target: then the base (finest, most points) is preferred over a coarser ResolutionLimited rollup. The resolver **never silently produces a wrong or degraded result** — it either reduces correctly, returns raw when it fits, or returns a truthful signal (`no-suitable-rollup` / `resolution-limited: actual/target`) the caller can surface.
+
+### §4.2a Coverage filter and the `CoverageLimited` signal (AB#5157)
+
+A rung can only answer for the range it actually holds data for. `resolveSeriesQuery` therefore
+filters the candidate rungs by their **measured coverage** (see
+[concept-multi-source-rollups.md](concept-multi-source-rollups.md) §7) before applying the selection
+rule above:
+
+```
+covers(rung) = rung.availableFrom is set AND rung.availableFrom <= from   # the requested END is not considered
+candidates   = rungs that cover                                          # the BASE rung takes part like any other
+             | if none cover: the rung(s) with the EARLIEST availableFrom (ties kept)
+             | if NO rung reports coverage at all: the filter is INERT — result unchanged, pre-AB#5157 behaviour
+rules 1-4 then run unchanged over the candidates
+```
+
+When the filter changes the chosen archive, the result carries:
+
+- `Signal = CoverageLimited` — it **takes precedence over `ResolutionLimited`** (and over `Ok`);
+- `ActualPoints` — the delivered point count, same meaning as for `ResolutionLimited`;
+- `Diagnostic` — names the excluded finer rung and its available-from;
+- `FinerRungAvailableFrom` — a first-class result field with that rung's available-from (`null` when
+  the excluded rung reports no coverage).
+
+If the filtered plan lands on a refuse path (`NoSuitableRollup` / `UnknownBaseGrain`) that signal is
+kept and the exclusion is prepended to the diagnostic; if the covering candidates yield an
+`EmptyLadder` the unfiltered result is returned — so a `CoverageLimited` answer always names a
+covering fallback rung.
+
+The full signal set is therefore: `Ok`, `ResolutionLimited`, `NoSuitableRollup`, `UnknownBaseGrain`,
+`EmptyLadder`, `CoverageLimited`.
 
 ### §4.3 Worked example (1 year, targetPoints = 600)
 

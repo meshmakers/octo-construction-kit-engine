@@ -18,6 +18,11 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// DST-correct (a local calendar day across a DST transition is 23 h or 25 h, not a fixed 24 h).
 /// <c>BucketSize</c> is only consulted for <see cref="BucketAlignment.FixedSize"/>; the calendar
 /// variants ignore it entirely (the attribute is kept informational for monitoring / UI).
+/// <see cref="BucketAlignment.CalendarQuarter"/> (AB#5157) follows the CalendarMonth shape exactly:
+/// quarters start on 1 January / April / July / October at local midnight, so the quarter that
+/// contains the spring-forward transition (Q1 in Europe/Vienna) is 90 d minus 1 h and the one that
+/// contains the fall-back transition (Q4) is 92 d plus 1 h in UTC; Q2 and Q3 are exactly 91 d and
+/// 92 d.
 /// </remarks>
 public static class BucketBoundary
 {
@@ -50,7 +55,8 @@ public static class BucketBoundary
     /// Computes the exclusive end of the bucket that starts at <paramref name="bucketStart"/>.
     /// For <see cref="BucketAlignment.FixedSize"/> this is the legacy
     /// <c>bucketStart + bucketSize</c> arithmetic; for calendar variants it's the next calendar
-    /// boundary (next day / Monday / first-of-month / Jan 1), in <paramref name="zone"/> if supplied.
+    /// boundary (next day / Monday / first-of-month / first-of-quarter / Jan 1), in
+    /// <paramref name="zone"/> if supplied.
     /// </summary>
     public static DateTime NextBucketEnd(
         DateTime bucketStart, BucketAlignment alignment, TimeSpan bucketSize, TimeZoneInfo? zone = null)
@@ -68,6 +74,7 @@ public static class BucketBoundary
                 BucketAlignment.CalendarDay => utc.AddDays(1),
                 BucketAlignment.Iso8601Week => utc.AddDays(7),
                 BucketAlignment.CalendarMonth => utc.AddMonths(1),
+                BucketAlignment.CalendarQuarter => utc.AddMonths(3),
                 BucketAlignment.CalendarYear => utc.AddYears(1),
                 _ => throw UnknownAlignment(alignment)
             };
@@ -80,6 +87,7 @@ public static class BucketBoundary
             BucketAlignment.CalendarDay => local.AddDays(1),
             BucketAlignment.Iso8601Week => local.AddDays(7),
             BucketAlignment.CalendarMonth => local.AddMonths(1),
+            BucketAlignment.CalendarQuarter => local.AddMonths(3),
             BucketAlignment.CalendarYear => local.AddYears(1),
             _ => throw UnknownAlignment(alignment)
         };
@@ -123,6 +131,7 @@ public static class BucketBoundary
                 BucketAlignment.CalendarDay => AlignDownToDay(utc),
                 BucketAlignment.Iso8601Week => AlignDownToIso8601Week(utc),
                 BucketAlignment.CalendarMonth => AlignDownToMonth(utc),
+                BucketAlignment.CalendarQuarter => AlignDownToQuarter(utc),
                 BucketAlignment.CalendarYear => AlignDownToYear(utc),
                 _ => throw UnknownAlignment(alignment)
             };
@@ -134,6 +143,7 @@ public static class BucketBoundary
             BucketAlignment.CalendarDay => AlignDownToDay(local),
             BucketAlignment.Iso8601Week => AlignDownToIso8601Week(local),
             BucketAlignment.CalendarMonth => AlignDownToMonth(local),
+            BucketAlignment.CalendarQuarter => AlignDownToQuarter(local),
             BucketAlignment.CalendarYear => AlignDownToYear(local),
             _ => throw UnknownAlignment(alignment)
         };
@@ -159,6 +169,14 @@ public static class BucketBoundary
 
     private static DateTime AlignDownToMonth(DateTime t) =>
         new(t.Year, t.Month, 1, 0, 0, 0, t.Kind);
+
+    /// <summary>
+    /// First day of the calendar quarter containing <paramref name="t"/> — month 1, 4, 7 or 10 —
+    /// preserving <see cref="DateTime.Kind"/> exactly like the month aligner so the zone-aware
+    /// path can hand the result to <see cref="ToUtcFromLocal"/>. AB#5157.
+    /// </summary>
+    private static DateTime AlignDownToQuarter(DateTime t) =>
+        new(t.Year, ((t.Month - 1) / 3) * 3 + 1, 1, 0, 0, 0, t.Kind);
 
     private static DateTime AlignDownToYear(DateTime t) =>
         new(t.Year, 1, 1, 0, 0, 0, t.Kind);

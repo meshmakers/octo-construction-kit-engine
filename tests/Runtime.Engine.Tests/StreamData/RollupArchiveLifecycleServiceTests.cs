@@ -258,6 +258,30 @@ public class RollupArchiveLifecycleServiceTests
         MustNotHaveInserted();
     }
 
+    // A rule that fires during Create has no rollup id to name — the message must say so instead of
+    // printing the all-zero placeholder, which reads as a real archive nobody can find (AB#5157
+    // review). Covers every rollup lifecycle message: they all render the id the same way.
+    [Fact]
+    public async Task Create_ValidationMessage_NamesNoPlaceholderId()
+    {
+        StubSource(SourceRt);
+
+        var cutover = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var ex = await Assert.ThrowsAsync<DuplicateRollupSourceException>(() => NewSut().CreateAsync(
+            null,
+            new[]
+            {
+                new RollupSourceReference(SourceRt, ValidTo: cutover),
+                new RollupSourceReference(SourceRt, ValidFrom: cutover),
+            },
+            TimeSpan.FromDays(1), TimeSpan.FromMinutes(1), VoltageAvg, BucketAlignment.CalendarDay));
+
+        Assert.DoesNotContain(OctoObjectId.Empty.ToString(), ex.Message);
+        Assert.Contains("(not yet created)", ex.Message);
+        // The offending source is still named — that is what the operator can act on.
+        Assert.Contains(SourceRt.ToString(), ex.Message);
+    }
+
     // TC-X-VAL-02: an inverted span is rejected at create.
     [Fact]
     public async Task Create_InvertedSpan_ThrowsAndDoesNotInsert()

@@ -13,7 +13,7 @@ public sealed class RollupSourceMissingException : StreamDataException
     public OctoObjectId SourceArchiveRtId { get; }
 
     public RollupSourceMissingException(OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId)
-        : base($"Rollup archive '{rollupArchiveRtId}' references source archive '{sourceArchiveRtId}', which does not exist.", rollupArchiveRtId)
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} references source archive '{sourceArchiveRtId}', which does not exist.", rollupArchiveRtId)
     {
         SourceArchiveRtId = sourceArchiveRtId;
     }
@@ -30,7 +30,7 @@ public sealed class RollupSourceNotActivatedException : StreamDataException
 
     public RollupSourceNotActivatedException(
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, CkArchiveStatus sourceStatus)
-        : base($"Cannot activate rollup '{rollupArchiveRtId}': source archive '{sourceArchiveRtId}' is in status {sourceStatus}; required: Activated.", rollupArchiveRtId)
+        : base($"Cannot activate rollup {Describe(rollupArchiveRtId)}: source archive '{sourceArchiveRtId}' is in status {sourceStatus}; required: Activated.", rollupArchiveRtId)
     {
         SourceArchiveRtId = sourceArchiveRtId;
         SourceStatus = sourceStatus;
@@ -50,7 +50,7 @@ public sealed class RollupSourcePathInvalidException : StreamDataException
     public string SourcePath { get; }
 
     public RollupSourcePathInvalidException(OctoObjectId rollupArchiveRtId, string sourcePath, string reason)
-        : base($"Rollup '{rollupArchiveRtId}' source path '{sourcePath}' is invalid: {reason}", rollupArchiveRtId)
+        : base($"Rollup {Describe(rollupArchiveRtId)} source path '{sourcePath}' is invalid: {reason}", rollupArchiveRtId)
     {
         SourcePath = sourcePath;
     }
@@ -63,7 +63,7 @@ public sealed class RollupSourcePathInvalidException : StreamDataException
 public sealed class RollupAggregationsRequiredException : StreamDataException
 {
     public RollupAggregationsRequiredException(OctoObjectId rollupArchiveRtId)
-        : base($"Rollup archive '{rollupArchiveRtId}' must define at least one aggregation.", rollupArchiveRtId) { }
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} must define at least one aggregation.", rollupArchiveRtId) { }
 }
 
 /// <summary>
@@ -76,7 +76,7 @@ public sealed class DuplicateRollupAggregationException : StreamDataException
 
     public DuplicateRollupAggregationException(
         OctoObjectId rollupArchiveRtId, string sourcePath, CkRollupFunction function)
-        : base($"Rollup archive '{rollupArchiveRtId}' has duplicate aggregation '{function}' on '{sourcePath}'.", rollupArchiveRtId)
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} has duplicate aggregation '{function}' on '{sourcePath}'.", rollupArchiveRtId)
     {
         SourcePath = sourcePath;
         Function = function;
@@ -93,7 +93,7 @@ public sealed class DuplicateRollupAggregationException : StreamDataException
 public sealed class RollupSchemaImmutableException : StreamDataException
 {
     public RollupSchemaImmutableException(OctoObjectId rollupArchiveRtId, CkArchiveStatus currentStatus)
-        : base($"Rollup archive '{rollupArchiveRtId}' is in status {currentStatus}; Sources, BucketSize, and Aggregations are frozen.", rollupArchiveRtId) { }
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} is in status {currentStatus}; Sources, BucketSize, and Aggregations are frozen.", rollupArchiveRtId) { }
 }
 
 /// <summary>
@@ -106,7 +106,7 @@ public sealed class RollupComparisonValueRequiredException : StreamDataException
     public string SourcePath { get; }
 
     public RollupComparisonValueRequiredException(OctoObjectId rollupArchiveRtId, string sourcePath)
-        : base($"Rollup archive '{rollupArchiveRtId}': the StateDuration aggregation on '{sourcePath}' requires a ComparisonValue.", rollupArchiveRtId)
+        : base($"Rollup archive {Describe(rollupArchiveRtId)}: the StateDuration aggregation on '{sourcePath}' requires a ComparisonValue.", rollupArchiveRtId)
     {
         SourcePath = sourcePath;
     }
@@ -118,7 +118,7 @@ public sealed class RollupComparisonValueRequiredException : StreamDataException
 public sealed class RollupCycleException : StreamDataException
 {
     public RollupCycleException(OctoObjectId rollupArchiveRtId)
-        : base($"Rollup archive '{rollupArchiveRtId}' would form a cycle in the source chain.", rollupArchiveRtId) { }
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} would form a cycle in the source chain.", rollupArchiveRtId) { }
 }
 
 /// <summary>
@@ -152,7 +152,7 @@ public sealed class RollupBucketIntervalException : StreamDataException
 
     public RollupBucketIntervalException(OctoObjectId rollupArchiveRtId, TimeSpan bucketSize, TimeSpan sourceGranularity)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}' bucket interval ({FormatInterval(bucketSize)}) must be greater " +
+            $"Rollup archive {Describe(rollupArchiveRtId)} bucket interval ({FormatInterval(bucketSize)}) must be greater " +
             $"than or equal to and an integer multiple of the source granularity ({FormatInterval(sourceGranularity)}).",
             rollupArchiveRtId)
     {
@@ -167,7 +167,7 @@ public sealed class RollupBucketIntervalException : StreamDataException
     public RollupBucketIntervalException(
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, TimeSpan bucketSize, TimeSpan sourceGranularity)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}' bucket interval ({FormatInterval(bucketSize)}) must be greater " +
+            $"Rollup archive {Describe(rollupArchiveRtId)} bucket interval ({FormatInterval(bucketSize)}) must be greater " +
             $"than or equal to and an integer multiple of the window length ({FormatInterval(sourceGranularity)}) " +
             $"of source archive '{sourceArchiveRtId}'.",
             rollupArchiveRtId)
@@ -186,7 +186,7 @@ public sealed class RollupBucketIntervalException : StreamDataException
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId,
         BucketAlignment rollupAlignment, BucketAlignment sourceAlignment)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': source archive '{sourceArchiveRtId}' is aligned " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: source archive '{sourceArchiveRtId}' is aligned " +
             $"{sourceAlignment}, whose buckets do not nest inside the rollup's {rollupAlignment} buckets.",
             rollupArchiveRtId)
     {
@@ -243,7 +243,7 @@ public sealed class RollupSourceInUseException : StreamDataException
 public sealed class RollupSourcesRequiredException : StreamDataException
 {
     public RollupSourcesRequiredException(OctoObjectId rollupArchiveRtId)
-        : base($"Rollup archive '{rollupArchiveRtId}' must declare at least one source archive.", rollupArchiveRtId) { }
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} must declare at least one source archive.", rollupArchiveRtId) { }
 }
 
 /// <summary>
@@ -261,7 +261,7 @@ public sealed class RollupSourceDeclarationConflictException : StreamDataExcepti
     public RollupSourceDeclarationConflictException(
         OctoObjectId rollupArchiveRtId, OctoObjectId deprecatedSourceArchiveRtId, OctoObjectId firstSourceArchiveRtId)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}' declares the deprecated SourceArchiveRtId '{deprecatedSourceArchiveRtId}' " +
+            $"Rollup archive {Describe(rollupArchiveRtId)} declares the deprecated SourceArchiveRtId '{deprecatedSourceArchiveRtId}' " +
             $"and a conflicting Sources list starting with source archive '{firstSourceArchiveRtId}'. " +
             "Remove SourceArchiveRtId and declare every source in Sources.",
             rollupArchiveRtId)
@@ -280,7 +280,7 @@ public sealed class DuplicateRollupSourceException : StreamDataException
     public OctoObjectId SourceArchiveRtId { get; }
 
     public DuplicateRollupSourceException(OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId)
-        : base($"Rollup archive '{rollupArchiveRtId}' references source archive '{sourceArchiveRtId}' more than once.", rollupArchiveRtId)
+        : base($"Rollup archive {Describe(rollupArchiveRtId)} references source archive '{sourceArchiveRtId}' more than once.", rollupArchiveRtId)
     {
         SourceArchiveRtId = sourceArchiveRtId;
     }
@@ -299,7 +299,7 @@ public sealed class RollupSourceSpanInvertedException : StreamDataException
     public RollupSourceSpanInvertedException(
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, DateTime validFrom, DateTime validTo)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': the validity span of source archive '{sourceArchiveRtId}' is empty — " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: the validity span of source archive '{sourceArchiveRtId}' is empty — " +
             $"ValidFrom {validFrom:o} must be earlier than ValidTo {validTo:o}.",
             rollupArchiveRtId)
     {
@@ -322,7 +322,7 @@ public sealed class RollupSourceSpanOverlapException : StreamDataException
     public RollupSourceSpanOverlapException(
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, OctoObjectId overlappingSourceArchiveRtId)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': the validity span of source archive '{sourceArchiveRtId}' overlaps " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: the validity span of source archive '{sourceArchiveRtId}' overlaps " +
             $"the span of source archive '{overlappingSourceArchiveRtId}'. Source spans must be pairwise disjoint.",
             rollupArchiveRtId)
     {
@@ -350,7 +350,7 @@ public sealed class RollupSourceSpanOpenEndConflictException : StreamDataExcepti
         OctoObjectId conflictingSourceArchiveRtId,
         bool isOpenStart)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': source archive '{sourceArchiveRtId}' and source archive " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: source archive '{sourceArchiveRtId}' and source archive " +
             $"'{conflictingSourceArchiveRtId}' both leave the {(isOpenStart ? "start" : "end")} of their validity span open. " +
             $"At most one source may have an open {(isOpenStart ? "start (no ValidFrom)" : "end (no ValidTo)")}.",
             rollupArchiveRtId)
@@ -381,7 +381,7 @@ public sealed class RollupSourceSpanNotOnBucketBoundaryException : StreamDataExc
         string boundaryName,
         DateTime boundary)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': {boundaryName} {boundary:o} of source archive '{sourceArchiveRtId}' " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: {boundaryName} {boundary:o} of source archive '{sourceArchiveRtId}' " +
             "does not lie on a bucket boundary of the rollup.",
             rollupArchiveRtId)
     {
@@ -408,7 +408,7 @@ public sealed class RollupSourceTargetTypeMismatchException : StreamDataExceptio
         RtCkId<CkTypeId> expectedTargetCkTypeId,
         RtCkId<CkTypeId> actualTargetCkTypeId)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': source archive '{sourceArchiveRtId}' targets CK type " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: source archive '{sourceArchiveRtId}' targets CK type " +
             $"'{actualTargetCkTypeId}', but the rollup targets '{expectedTargetCkTypeId}'. All sources must target the same CK type.",
             rollupArchiveRtId)
     {
@@ -431,7 +431,7 @@ public sealed class RollupSourcePathMissingException : StreamDataException
     public RollupSourcePathMissingException(
         OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId, string sourcePath)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}': aggregation source path '{sourcePath}' does not resolve on " +
+            $"Rollup archive {Describe(rollupArchiveRtId)}: aggregation source path '{sourcePath}' does not resolve on " +
             $"source archive '{sourceArchiveRtId}'. Every aggregation path must resolve on every source.",
             rollupArchiveRtId)
     {
@@ -451,7 +451,7 @@ public sealed class RollupSourceCycleException : StreamDataException
 
     public RollupSourceCycleException(OctoObjectId rollupArchiveRtId, OctoObjectId sourceArchiveRtId)
         : base(
-            $"Rollup archive '{rollupArchiveRtId}' would form a cycle in the source graph through source archive " +
+            $"Rollup archive {Describe(rollupArchiveRtId)} would form a cycle in the source graph through source archive " +
             $"'{sourceArchiveRtId}'.",
             rollupArchiveRtId)
     {

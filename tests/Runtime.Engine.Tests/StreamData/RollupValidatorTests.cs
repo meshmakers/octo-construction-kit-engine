@@ -802,4 +802,121 @@ public class RollupValidatorTests
 
         RollupValidator.ValidateForSave(rollup); // must not throw
     }
+
+    // ---- AB#5157 §3: per-source resolution of logical aggregation specs (RollupSourceColumnResolver) ----
+
+    private static readonly DateTime MixedCutover = Utc(2026, 1, 1);
+
+    /// <summary>
+    /// The AC1 / sbeg shape: a daily fixed-size rollup over a 15-min time-range base archive before
+    /// the cutover and an hourly rollup of that base from the cutover on.
+    /// </summary>
+    private static RollupArchiveSnapshot MixedSourcesRollup(params CkRollupAggregationSpec[] aggregations) =>
+        RollupWithSources(new[]
+        {
+            new RollupSourceReference(SourceRt, ValidTo: MixedCutover),
+            new RollupSourceReference(SecondSourceRt, ValidFrom: MixedCutover),
+        }, aggregations) with { BucketSize = TimeSpan.FromDays(1) };
+
+    private static ArchiveSnapshot TimeRangeBase(params string[] paths) =>
+        Source(SourceRt, CkArchiveStatus.Activated, paths) with { IsTimeRange = true, Period = TimeSpan.FromMinutes(15) };
+
+    /// <summary>
+    /// An hourly rollup source: its archive-level snapshot declares the generated physical columns
+    /// (lower-cased, e.g. <c>amountvalue_sum</c>), its rollup snapshot the logical child specs.
+    /// </summary>
+    private static RollupActivationSource HourlyRollupSource(
+        RollupSourceReference reference, params CkRollupAggregationSpec[] childSpecs)
+    {
+        var rollup = new RollupArchiveSnapshot(
+            SecondSourceRt, TargetType, CkArchiveStatus.Activated, null,
+            new[] { new RollupSourceReference(SourceRt) },
+            TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null, childSpecs, null);
+        var archive = new ArchiveSnapshot(SecondSourceRt, TargetType, CkArchiveStatus.Activated, null,
+            RollupColumnGenerator.Generate(childSpecs))
+        {
+            RollupAggregations = childSpecs,
+            Period = TimeSpan.FromHours(1),
+        };
+
+        return new RollupActivationSource(reference, archive, rollup);
+    }
+
+    // AC1: one logical spec ('Amount.Value', Sum) is accepted on the time-range base (rule 1, verbatim
+    // path) AND on the hourly rollup (rule 2, child spec with the same function) in one rung.
+    [Fact]
+    public void ValidateForActivation_LogicalSpecOverMixedBaseAndRollupSources_DoesNotThrow()
+    {
+        var rollup = MixedSourcesRollup(new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null));
+
+        RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            new RollupActivationSource(rollup.Sources[0], TimeRangeBase("Amount.Value")),
+            HourlyRollupSource(rollup.Sources[1], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null)),
+        });
+    }
+
+    // A parent Avg cannot be recombined from a child that only stores Sum — refused, naming the rollup source.
+    [Fact]
+    public void ValidateForActivation_LogicalSpecFunctionNotStoredByRollupSource_ThrowsNamingThatSource()
+    {
+        var rollup = MixedSourcesRollup(new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Avg, null));
+
+        var ex = Assert.Throws<RollupSourcePathMissingException>(
+            () => RollupValidator.ValidateForActivation(rollup, new[]
+            {
+                new RollupActivationSource(rollup.Sources[0], TimeRangeBase("Amount.Value")),
+                HourlyRollupSource(rollup.Sources[1], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null)),
+            }));
+        Assert.Equal("Amount.Value", ex.SourcePath);
+        Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
+        Assert.Contains(SecondSourceRt.ToString(), ex.Message);
+    }
+
+    // The base archive lacking the path is still refused (rule 1 is the only rule for a base archive).
+    [Fact]
+    public void ValidateForActivation_BaseSourceLackingThePath_ThrowsNamingThatSource()
+    {
+        var rollup = MixedSourcesRollup(new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null));
+
+        var ex = Assert.Throws<RollupSourcePathMissingException>(
+            () => RollupValidator.ValidateForActivation(rollup, new[]
+            {
+                new RollupActivationSource(rollup.Sources[0], TimeRangeBase("Amount.Other")),
+                HourlyRollupSource(rollup.Sources[1], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null)),
+            }));
+        Assert.Equal("Amount.Value", ex.SourcePath);
+        Assert.Equal(SourceRt, ex.SourceArchiveRtId);
+    }
+
+    // The pre-AB#5157 chained style — the parent names the child's PHYSICAL column — keeps working via rule 1.
+    [Fact]
+    public void ValidateForActivation_PhysicalNameChainedSpecOverRollupSource_DoesNotThrow()
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("amountvalue_sum", CkRollupFunction.Sum, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+
+        RollupValidator.ValidateForActivation(rollup, new[]
+        {
+            HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null)),
+        });
+    }
+
+    // Without the source's rollup snapshot only rule 1 applies: a logical spec over a rollup source
+    // is refused because the archive-level snapshot declares physical names only.
+    [Fact]
+    public void ValidateForActivation_LogicalSpecOverRollupSourceWithoutItsRollupSnapshot_Throws()
+    {
+        var rollup = RollupWithSources(
+            new[] { new RollupSourceReference(SecondSourceRt) },
+            new[] { new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null) })
+            with { BucketSize = TimeSpan.FromDays(1) };
+        var hourly = HourlyRollupSource(rollup.Sources[0], new CkRollupAggregationSpec("Amount.Value", CkRollupFunction.Sum, null));
+
+        var ex = Assert.Throws<RollupSourcePathMissingException>(
+            () => RollupValidator.ValidateForActivation(rollup, new[] { hourly with { Rollup = null } }));
+        Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
+    }
 }

@@ -49,7 +49,8 @@ public sealed record RollupActivationSource(
 /// subclass whose message names the offending source archive, in this order: declaration conflict,
 /// no sources, duplicate source, inverted span, second open start / open end, overlapping spans,
 /// boundary off the bucket grid (save-time); then per source: missing, not activated, target type
-/// mismatch, bucket granularity, aggregation path missing (activation-time).
+/// mismatch, bucket granularity, aggregation spec unresolvable on the source (activation-time,
+/// see <see cref="RollupSourceColumnResolver"/>).
 /// </para>
 /// </remarks>
 public static class RollupValidator
@@ -251,10 +252,10 @@ public static class RollupValidator
     /// orchestrator: the save-time invariants from <see cref="ValidateForSave"/> and
     /// <see cref="ValidateSourcesForSave"/>, plus — for <em>every</em> source — that it exists, is
     /// activated, targets the same CK type as the rollup, is no finer than the rollup's bucket
-    /// (AB#4289 as reformulated by AB#5157) and captures every
-    /// <see cref="CkRollupAggregationSpec.SourcePath"/> the rollup references (strict: a path
-    /// missing on any one source is rejected). The transitive cycle rule needs the tenant's rollups
-    /// and is run separately via <see cref="ValidateNoTransitiveCycle"/>.
+    /// (AB#4289 as reformulated by AB#5157) and can serve every aggregation spec of the rollup
+    /// (strict: a spec that <see cref="RollupSourceColumnResolver.TryResolve"/> cannot resolve on
+    /// any one source is rejected). The transitive cycle rule needs the tenant's rollups and is
+    /// run separately via <see cref="ValidateNoTransitiveCycle"/>.
     /// </summary>
     /// <param name="rollup">The rollup snapshot being activated.</param>
     /// <param name="sources">
@@ -303,16 +304,16 @@ public static class RollupValidator
 
             ValidateBucketGranularity(rollup, source, archive);
 
-            // A rollup aggregation references a source column by name: an ingested column by its
-            // Path, or a computed column by its Name (concept §10 / AB#4189). Both map to the same
-            // physical source column the rollup SQL aggregates over (ColumnNameMapper.PathToColumnName),
-            // so a rollup can aggregate a computed column exactly like a normal one. Every path must
-            // resolve on every source (AB#5157 decision 2) — a source that lacks one would silently
-            // produce empty columns for the buckets it serves.
-            var sourcePaths = CapturedPaths(archive);
+            // Every logical aggregation spec must resolve on every source (AB#5157 decision 2) — a
+            // source that cannot serve one would silently produce empty columns for the buckets it
+            // serves. Two-step per source (RollupSourceColumnResolver): a captured column addressed
+            // verbatim (ingested Path / computed Name / a rollup's physical column name), else — for a
+            // rollup source — a child aggregation with the same function and the same normalised
+            // source path, so one logical spec ('Amount.Value', Sum) is accepted over a time-range
+            // base archive and over an hourly rollup of it alike (AC1 mixed sources).
             foreach (var agg in rollup.Aggregations)
             {
-                if (!sourcePaths.Contains(agg.SourcePath))
+                if (RollupSourceColumnResolver.TryResolve(agg, archive, source.Rollup) is null)
                 {
                     throw new RollupSourcePathMissingException(rollup.RtId, sourceRtId, agg.SourcePath);
                 }
@@ -336,27 +337,6 @@ public static class RollupValidator
         DateTimeKind.Local => t.ToUniversalTime(),
         _ => DateTime.SpecifyKind(t, DateTimeKind.Utc),
     };
-
-    private static HashSet<string> CapturedPaths(ArchiveSnapshot archive)
-    {
-        var sourcePaths = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var column in archive.Columns)
-        {
-            if (column.IsComputed)
-            {
-                if (!string.IsNullOrWhiteSpace(column.Name))
-                {
-                    sourcePaths.Add(column.Name);
-                }
-            }
-            else if (!string.IsNullOrWhiteSpace(column.Path))
-            {
-                sourcePaths.Add(column.Path);
-            }
-        }
-
-        return sourcePaths;
-    }
 
     /// <summary>
     /// AB#4289 reformulated for calendar-aligned rollups (AB#5157 decision 1). The source

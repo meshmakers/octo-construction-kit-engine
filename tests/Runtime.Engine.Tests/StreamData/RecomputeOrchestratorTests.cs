@@ -1163,4 +1163,140 @@ public class RecomputeOrchestratorTests
                 A<OctoObjectId?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
+
+    // ---- AB#5157 follow-up E2: single-timestamp (degenerate) dirty windows --------------------
+
+    // The retroactive detector persists a single-timestamp correction as [t, t + 1 tick); Mongo's
+    // millisecond resolution collapses it to [t, t). It must still mark the bucket holding t stale on
+    // a multi-source dependent — the span clip alone would discard the empty window.
+    [Fact]
+    public async Task Propagate_DegenerateWindowInsideTheSpan_EnqueuesExactlyOneBucket()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // The same shape on a single unbounded source — the pre-AB#5157 rollup, where the regression showed.
+    [Fact]
+    public async Task Propagate_DegenerateWindow_SingleUnboundedSource_EnqueuesExactlyOneBucket()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A point exactly on a bucket boundary inside the span marks the bucket STARTING there, not the one before.
+    [Fact]
+    public async Task Propagate_DegenerateWindowOnABucketBoundary_EnqueuesTheBucketStartingThere()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var boundary = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(boundary, boundary) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == boundary
+                    && rs[0].RangeEnd == boundary + TimeSpan.FromHours(1))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A point exactly at ValidTo lies outside the half-open span: nothing becomes stale.
+    [Fact]
+    public async Task Propagate_DegenerateWindowAtValidTo_EnqueuesNothing()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(Cutover, Cutover) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // A point one tick before ValidTo is the last instant inside the span: the final bucket is stale.
+    [Fact]
+    public async Task Propagate_DegenerateWindowOneTickBeforeValidTo_EnqueuesTheLastBucketOfTheSpan()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = Cutover.AddTicks(-1);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == Cutover - TimeSpan.FromHours(1)
+                    && rs[0].RangeEnd == Cutover)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A normal window is not widened: one ending exactly on a bucket boundary still yields exactly
+    // that one bucket (a blanket +1 tick would drag in the next bucket).
+    [Fact]
+    public async Task Propagate_NormalWindowEndingOnABoundary_IsNotWidened()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
 }

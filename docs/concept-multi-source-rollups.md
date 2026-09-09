@@ -164,7 +164,7 @@ through the GraphQL/REST error mapping.
 | 11 | Every source archive is `Activated`. | activation | `RollupSourceNotActivatedException` |
 | 12 | Every source targets the **same** CK type as the rollup. | activation | `RollupSourceTargetTypeMismatchException` |
 | 13 | Bucket granularity per source (see below). | activation | `RollupBucketIntervalException` |
-| 14 | **Every** aggregation `SourcePath` resolves on **every** source (strict). | activation | `RollupSourcePathMissingException` |
+| 14 | **Every** aggregation spec resolves on **every** source (strict) — two-step per source, see below. | activation | `RollupSourcePathMissingException` |
 
 Rules 1–7 need no repository access and are therefore cheap enough to run on every create; rule 8
 needs the tenant's rollups (`ValidateNoTransitiveCycle`) and runs at create and at activation;
@@ -201,13 +201,54 @@ The last row is what makes the sbeg cutover shape legal: a legacy archive whose 
 are declared with a ~92 d `Period` is accepted under a `CalendarQuarter` rollup, while anything
 genuinely coarser is rejected.
 
+### Rule 14 — per-source resolution of the aggregation specs (two-step)
+
+The rollup's aggregation specs are **logical** (source path + function, e.g. `Amount.Value` /
+`Sum`). A base archive (raw / time-range) captures that path verbatim as a column, but a rollup
+source declares its *generated physical* column names (`amountvalue_sum`), so a verbatim
+containment check can never accept one logical spec over a rung that mixes a time-range base
+archive with an hourly rollup of it — exactly the AC1 and sbeg shapes. Each spec is therefore
+resolved **per source** by `RollupSourceColumnResolver.TryResolve` in two steps; a spec neither
+step resolves is rejected with `RollupSourcePathMissingException` naming that source:
+
+| Step | Applies when | Outcome |
+|---|---|---|
+| **Rule 1 — declared column** | the source's captured names contain the spec's `SourcePath` **verbatim** (an ingested column by `Path`, a computed column by `Name`, a rollup source's physical column by its physical name) | `DeclaredColumn`: the function is applied directly to that physical column — the pre-AB#5157 behaviour, unchanged |
+| **Rule 2 — child aggregation** | the source is a rollup and one of its own specs has the **same function** and a source path that **normalises** to the same physical name (`NormalisePath`: dots removed, lower-cased — the `ColumnNameMapper.PathToColumnName` rule) | `ChildAggregation`: the child's target column(s) are the parent's source column(s), read function-preserving (§5) |
+
+Rule 1 wins when both apply: a verbatim declared column is the more specific match and keeps a
+legacy chained spec reading exactly the column it names. A parent function the child does not
+store (parent `Avg` over a child that only stores `Sum`) does not resolve — nothing can be
+recombined from it. Rule 2 needs the source's rollup snapshot (`RollupActivationSource.Rollup`);
+without it only rule 1 applies.
+
 ---
 
 ## §5 Aggregation — one source per bucket
 
 The rollup's aggregation specs stay **logical** (source path + function) and are resolved into each
-source's physical columns by the existing chain resolver. The SQL per bucket is unchanged; only the
-choice of *which* archive it runs against becomes per-bucket.
+source's physical columns per source (§4 rule 14, `RollupSourceColumnResolver`). Which columns the
+per-bucket SQL reads therefore depends on the source serving the bucket:
+
+- **Rule 1 — declared column** (base archives, computed columns, and chained specs that name the
+  child's physical column): the function is applied to that single physical column exactly as
+  before AB#5157. Chained rollups written in the physical-name style (`amountvalue_sum` / `Sum`)
+  are unchanged.
+- **Rule 2 — child aggregation** (a logical spec over a rollup source): the child's target
+  column(s) are read **function-preserving** over the child buckets inside the parent bucket:
+
+  | Parent function | Child column(s) | Read |
+  |---|---|---|
+  | `Sum`, `Count`, `StateDuration` | `{base}` | summed |
+  | `Avg` | `{base}_sum`, `{base}_count` | each summed (pair); the average is recomputed on read as `sum / NULLIF(count, 0)` |
+  | `TimeWeightedAvg` | `{base}_integral`, `{base}_duration` | each summed (pair) |
+  | `Min` / `Max` | `{base}` | minimum / maximum |
+  | `First` / `Last` | `{base}` | the value of the earliest / latest child window (by window order) |
+
+  The parent's function must equal the child's, which is what keeps every row of this table
+  function-preserving. The CrateDB layer implements the SQL from the resolver's outcome.
+
+The choice of *which* archive the SQL runs against becomes per-bucket.
 
 `RollupOrchestrator.ProcessRollupSnapshotAsync` per tick:
 

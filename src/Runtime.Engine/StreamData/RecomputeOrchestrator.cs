@@ -810,11 +810,24 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// it is bucket-aligned — a change in the writing source outside the window it is authoritative
     /// for cannot make the dependent stale. An empty clip enqueues nothing.
     /// </para>
+    /// <para>
+    /// A degenerate window (<paramref name="to"/> &lt;= <paramref name="from"/>) is widened to
+    /// <c>[from, from + 1 tick)</c> before clipping. The retroactive detector persists a
+    /// single-timestamp correction as <c>[t, t + 1 tick)</c>, which Mongo's millisecond resolution
+    /// collapses to <c>[t, t)</c>; before AB#5157 the bucket alignment alone turned that into one
+    /// bucket, whereas the half-open span clip would discard it. Widening keeps the point exactly
+    /// when it lies inside the span — a point at <c>ValidTo</c> stays outside.
+    /// </para>
     /// </remarks>
     private async Task EnqueueOnDirectDependentsAsync(
         OctoObjectId sourceRtId, DateTime from, DateTime to, CancellationToken cancellationToken,
         TimeSpan? maxRetroReach = null)
     {
+        if (to <= from)
+        {
+            to = from.AddTicks(1);
+        }
+
         var dependents = await _dependencyGraph.GetTransitiveDependentsAsync(sourceRtId);
         foreach (var dependent in dependents)
         {

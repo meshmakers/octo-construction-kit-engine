@@ -214,18 +214,9 @@ internal static class RollupLadderFunctionResolver
     }
 
     /// <summary>
-    /// Same dot-stripping lower-casing rule as <c>RollupColumnGenerator.SanitisePath</c> /
+    /// The dot-stripping lower-casing rule of <see cref="RollupColumnGenerator.SanitisePath"/> /
     /// the CrateDb <c>ColumnNameMapper</c> — a cascade spec references the parent's physical
     /// column, which is the sanitised form of whatever path the parent declared.
     /// </summary>
-    private static string SanitisePath(string path)
-    {
-        var sb = new System.Text.StringBuilder(path.Length);
-        foreach (var ch in path)
-        {
-            if (ch != '.') sb.Append(ch);
-        }
-
-        return sb.ToString().ToLowerInvariant();
-    }
+    private static string SanitisePath(string path) => RollupColumnGenerator.SanitisePath(path);
 }

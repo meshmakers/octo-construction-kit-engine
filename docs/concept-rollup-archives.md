@@ -294,7 +294,7 @@ A new query `rollupsFor(archiveRtId): [RollupArchiveInfo]` returns the rollups a
 | Save `CkRollupArchive` (any state) | No duplicate `(SourcePath, Function)` pairs. | `DuplicateRollupAggregationException` |
 | Save `CkRollupArchive` (`Activated`+) | `Sources`, `BucketSize`, `Aggregations` are treated as immutable — **documented, not enforced** (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §8: the generic CK mutation can change any attribute the model allows). | `RollupSchemaImmutableException` is reserved for a future guard and is not thrown today. |
 | Activate | Every source archive in `Activated`. | `RollupSourceNotActivatedException` |
-| Activate | Each `SourcePath` is captured (ingested `Path` or computed `Name`) by **every** source's `Columns`. | `RollupSourcePathMissingException` |
+| Activate | Each aggregation spec resolves on **every** source: a column the source captures **verbatim** (ingested `Path`, computed `Name`, or a rollup source's physical column name), else — on a rollup source — a child aggregation with the **same function** whose source path normalises to the same physical name (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 rule 14 / §5; `RollupSourceColumnResolver`). | `RollupSourcePathMissingException` |
 | Source cycle (rollup-of-self) | Graph check at save. | `RollupCycleException` |
 | Transitive source cycle | Graph walk over all source edges at create and at activation. | `RollupSourceCycleException` |
 | Source archive soft-delete | No active rollup lists this archive among its sources (either storage form, any span). | `RollupSourceInUseException` |

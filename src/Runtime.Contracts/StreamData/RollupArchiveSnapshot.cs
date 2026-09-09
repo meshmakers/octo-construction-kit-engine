@@ -268,10 +268,12 @@ public sealed record RollupSourceReference(
     /// Intersects the half-open range <c>[<paramref name="from"/>, <paramref name="to"/>)</c> with
     /// this reference's span and returns the clipped range, or <c>null</c> when the intersection is
     /// empty. Used by the recompute orchestrator to restrict a dirty range to the span of the
-    /// source that produced it — on both ends.
+    /// source that produced it — on both ends. An empty or inverted input range
+    /// (<paramref name="from"/> &gt;= <paramref name="to"/>) yields <c>null</c> as well: a caller
+    /// holding a single-point change must widen it to a non-empty range first.
     /// </summary>
     /// <param name="from">Inclusive start of the range to clip.</param>
-    /// <param name="to">Exclusive end of the range to clip.</param>
+    /// <param name="to">Exclusive end of the range to clip; must be after <paramref name="from"/> for a non-null result.</param>
     public (DateTime From, DateTime To)? Clip(DateTime from, DateTime to)
     {
         var clippedFrom = ValidFrom is { } validFrom && validFrom > from ? validFrom : from;

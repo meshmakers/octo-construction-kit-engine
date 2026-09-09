@@ -108,11 +108,20 @@ public static class RollupColumnGenerator
     /// Lower-cases the path and strips dots so dotted attribute paths
     /// (<c>sensor.reading.value</c>) collapse to a CrateDB-safe column name
     /// (<c>sensorreadingvalue</c>). Kept here in Runtime.Contracts so the contract-level helper
-    /// and the CrateDB-side <c>ColumnNameMapper</c> stay in sync; the latter is the canonical
-    /// reference for the actual storage layer.
+    /// and the CrateDB-side <c>ColumnNameMapper.PathToColumnName</c> stay in sync; the latter is
+    /// the canonical reference for the actual storage layer. Public because the engine's
+    /// per-source aggregation resolver (AB#5157) and the ladder chain walker compare logical
+    /// source paths through exactly this mapping; an already-sanitised name is returned unchanged.
     /// </summary>
-    private static string SanitisePath(string path)
+    /// <param name="path">A logical attribute path or an already-physical column name.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <c>null</c>.</exception>
+    public static string SanitisePath(string path)
     {
+        if (path is null)
+        {
+            throw new ArgumentNullException(nameof(path));
+        }
+
         var sb = new System.Text.StringBuilder(path.Length);
         foreach (var ch in path)
         {

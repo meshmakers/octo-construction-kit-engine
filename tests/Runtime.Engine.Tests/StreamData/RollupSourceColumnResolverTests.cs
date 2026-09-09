@@ -189,6 +189,49 @@ public class RollupSourceColumnResolverTests
     }
 
     [Fact]
+    public void TryResolve_LogicalSpecOverPhysicallyChainedRollup_ResolvesAsChildAggregation()
+    {
+        // A seeded pre-AB#5157 rollup stores its own child's physical column and pins the stored name
+        // with TargetColumnName ("amountvalue_sum"), so its spec names that physical column, not the
+        // logical path — its normalised path never equals the logical parent's. A new logical rollup
+        // stacked on top must still resolve against it (WI AB#5157 review: the sbeg quarter rung over
+        // the seeded EC monthly rung). The bridge matches on the generated column instead.
+        var chained = Spec("amountvalue_sum", CkRollupFunction.Sum, "amountvalue_sum");
+        var (archive, rollup) = Hourly(chained);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            Spec("Amount.Value", CkRollupFunction.Sum), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Equal(RollupSourceColumnResolutionKind.ChildAggregation, resolution.Kind);
+        Assert.Same(chained, resolution.ChildAggregation);
+        Assert.Equal(new[] { "amountvalue_sum" }, RollupColumnGenerator.TargetColumnNamesFor(resolution.ChildAggregation!));
+    }
+
+    [Fact]
+    public void TryResolve_LogicalSpecOverPhysicallyChainedRollup_WrongFunction_ReturnsNull()
+    {
+        // The generated column matches by name, but the child aggregated with a different function —
+        // the Function guard keeps a Max column from serving a Sum parent even under the same name.
+        var chained = Spec("amountvalue_sum", CkRollupFunction.Max, "amountvalue_sum");
+        var (archive, rollup) = Hourly(chained);
+
+        Assert.Null(RollupSourceColumnResolver.TryResolve(
+            Spec("Amount.Value", CkRollupFunction.Sum), archive, rollup));
+    }
+
+    [Fact]
+    public void TryResolve_LogicalSpecOverPhysicallyChainedRollupProducingAnotherColumn_ReturnsNull()
+    {
+        // The chained child stores a different physical column, so it is not the parent's series.
+        var chained = Spec("other_sum", CkRollupFunction.Sum, "other_sum");
+        var (archive, rollup) = Hourly(chained);
+
+        Assert.Null(RollupSourceColumnResolver.TryResolve(
+            Spec("Amount.Value", CkRollupFunction.Sum), archive, rollup));
+    }
+
+    [Fact]
     public void TryResolve_LogicalSpecOverRollupStoringAnotherFunction_ReturnsNull()
     {
         var (archive, rollup) = Hourly(Spec("Amount.Value", CkRollupFunction.Sum));

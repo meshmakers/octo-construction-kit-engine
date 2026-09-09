@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 
 namespace Meshmakers.Octo.Runtime.Engine.StreamData;
@@ -188,11 +189,36 @@ public static class RollupSourceColumnResolver
         }
 
         var wanted = NormalisePath(spec.SourcePath);
+        // The physical storage column(s) this logical spec generates (e.g. Amount.Value + Sum =>
+        // "amountvalue_sum"). A pre-AB#5157 physically-chained rollup source names its own child's
+        // physical column and pins the stored name with an explicit TargetColumnName, so its child
+        // spec's generated column(s) equal ours even though its SourcePath is that physical name and
+        // not the logical path — its normalised path therefore never equals ours. Matching on the
+        // generated column(s) bridges a logical parent spec onto such a chained child so a new
+        // (logical) rollup can be stacked on a seeded physical ladder (WI AB#5157 review: the sbeg
+        // quarter rung over the seeded EC monthly rung).
+        var parentColumns = RollupColumnGenerator.TargetColumnNamesFor(spec).ToList();
         foreach (var child in childSpecs)
         {
-            if (child.Function == spec.Function &&
-                string.Equals(NormalisePath(child.SourcePath), wanted, StringComparison.Ordinal) &&
-                ComparisonValueMatches(spec, child))
+            if (child.Function != spec.Function || !ComparisonValueMatches(spec, child))
+            {
+                continue;
+            }
+
+            // (a) Logical twin: the child names the same logical path (both address the base
+            // attribute). This is the all-logical cascade written by AB#5157.
+            if (string.Equals(NormalisePath(child.SourcePath), wanted, StringComparison.Ordinal))
+            {
+                return new RollupSourceColumnResolution(RollupSourceColumnResolutionKind.ChildAggregation, child);
+            }
+
+            // (b) Physically-chained child: it stores exactly the physical column(s) this logical
+            // spec maps to. Read them function-preserving, identically to (a). The Function guard
+            // above keeps a name collision (a differently-aggregated column that happens to share the
+            // name via TargetColumnName) from matching.
+            if (parentColumns.Count > 0
+                && parentColumns.SequenceEqual(
+                    RollupColumnGenerator.TargetColumnNamesFor(child), StringComparer.Ordinal))
             {
                 return new RollupSourceColumnResolution(RollupSourceColumnResolutionKind.ChildAggregation, child);
             }

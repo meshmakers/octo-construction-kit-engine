@@ -104,6 +104,29 @@ public class RollupLadderFunctionResolverTests
     }
 
     [Fact]
+    public void LogicalRungOverAPhysicallyChainedLadder_ResolvesTheLogicalFunction()
+    {
+        // Read-side counterpart of the write-side bridge: the seeded pre-AB#5157 EC ladder chains by
+        // PHYSICAL column name (SourcePath = "dimminglevel_sum", pinned with TargetColumnName). The
+        // cascade carries the logical path through every physical hop, so a new LOGICAL rung stacked
+        // on top still resolves its function (WI AB#5157 review: the sbeg quarter rung over the seeded
+        // EC monthly rung, itself over a physically-chained daily rung). Rooted at the raw base.
+        var hourly = Rollup(OctoObjectId.GenerateNewId(), From(BaseRt),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Sum, null));
+        var daily = Rollup(OctoObjectId.GenerateNewId(), From(hourly.RtId),
+            new CkRollupAggregationSpec("dimminglevel_sum", CkRollupFunction.Sum, "dimminglevel_sum"));
+        var monthly = Rollup(OctoObjectId.GenerateNewId(), From(daily.RtId),
+            new CkRollupAggregationSpec("dimminglevel_sum", CkRollupFunction.Sum, "dimminglevel_sum"));
+        var quarterly = Rollup(OctoObjectId.GenerateNewId(), From(monthly.RtId),
+            new CkRollupAggregationSpec(Path, CkRollupFunction.Sum, null));
+
+        var functions = RollupLadderFunctionResolver.StoredFunctionsFor(
+            quarterly, BaseRt, Path, Ladder(hourly, daily, monthly, quarterly));
+
+        Assert.Equal(new[] { CkRollupFunction.Sum }, functions);
+    }
+
+    [Fact]
     public void BrokenInFamilyChain_YieldsNoFunctions()
     {
         // The monthly rung applies MIN to a SUM column — not a legal single-step chain, so nothing

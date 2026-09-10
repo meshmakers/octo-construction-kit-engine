@@ -40,3 +40,6 @@ types:
       - id: ${this}/RecomputeJob.StagingTableName
         name: StagingTableName
         isOptional: true
+      - id: ${this}/RecomputeJob.LastProgressAt
+        name: LastProgressAt
+        isOptional: true

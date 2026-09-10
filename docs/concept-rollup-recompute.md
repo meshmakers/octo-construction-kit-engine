@@ -182,6 +182,40 @@ A job that fails before the flip leaves the staging table orphaned (GC'd by name
 table / generation pointer **untouched** → readers keep seeing the previous values. No partial
 state is ever observable. The failure is recorded in the job history (§7) with its reason.
 
+A range is recomputed in chunks (§4), and each chunk swaps on its own pointer, so a job that dies
+part-way leaves the chunks before it committed and the rest carrying their previous values. The
+**unfinished tail is recorded as a pending range** on the rollup, so a later pass finishes the job
+without an operator noticing and asking. The committed prefix is not repeated — a retry resumes at
+the chunk that failed.
+
+That retry is bounded. Each pending range carries `Attempts`, `NextAttemptAt` and `LastError`
+(`CkArchiveRecomputeRange`, System.StreamData 1.9.0). After a failure the drain re-enqueues the
+tail with the attempt count raised and an exponentially backed-off `NextAttemptAt`
+(1, 2, 4, 8 minutes); a range that is not yet due is left in the work list untouched. Once the
+count reaches `MaxRangeAttempts` (default 5) the obligation is **dropped** with an ERROR naming the
+range and the last error, and the rollup keeps its `LastRecomputeFailureReason`. A permanently
+broken rollup — a source that cannot serve one of the aggregation paths, say — therefore stops
+consuming a recompute run and a generation on every tick; it needs the cause fixed and a fresh
+recompute, which is the honest state for a configuration error.
+
+### Bucket ownership — recompute vs forward aggregation
+
+Exactly one of the two writes a given bucket, and the boundary is the **watermark lag**:
+
+| Bucket | Owner |
+|---|---|
+| `bucketEnd <= now - WatermarkLag` (lag-closed) | the recompute |
+| `bucketEnd > now - WatermarkLag` | the forward aggregation |
+
+The forward pass commits a bucket only once it is lag-closed and keeps re-aggregating the one
+before that at generation 0 (AB#4306, `RollupOrchestrator`), so the lag window is where late source
+rows are still absorbed. A recompute therefore caps its range at
+`BucketBoundary.AlignDown(now - WatermarkLag)` and an all-lag-window range is a `Completed` no-op —
+without that cap its generation pointer would outrank the forward pass's generation-0 write for
+those buckets, freezing them on the value the recompute read and hiding every row that arrived
+inside the lag. Corrections inside the lag window need no obligation of their own: the forward pass
+rewrites those buckets from the source on every tick until they close.
+
 ## §5 Triggers
 
 | Trigger | Surface | Behavior |
@@ -253,6 +287,7 @@ One structured log at each phase boundary — **Compute → Validate → Swap �
 |---|---|
 | `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see CLAUDE.md — runtime-state preservation, so a blueprint re-apply never tramples them). |
 | New record `CkArchiveDirtyWindow` | `WindowStart`, `WindowEnd`, `ChangeKind`, `Source`, `DetectedAt`. |
+| Record `CkArchiveRecomputeRange` | `DependentArchiveRtId`, `RangeStart`, `RangeEnd`, `RtIdScope`, `EnqueuedAt`, plus the retry bookkeeping `Attempts` (default 0), `NextAttemptAt` and `LastError` (System.StreamData 1.9.0 — see *Failure mode*). Ranges stored before 1.9.0 read back as attempt zero and are due immediately. |
 | New record `CkArchiveRecomputeJob` | the §7 job-history fields. |
 | New enums | `CkRecomputeChangeKind { Append, RetroactiveModify }`, `CkRecomputeChangeSource { Manual, Pipeline, Import }`, `CkRecomputeJobState { Pending, Running, Swapping, Completed, Failed, Coalesced }`. |
 

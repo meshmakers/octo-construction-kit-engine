@@ -71,6 +71,17 @@ attributes:
   - id: CkArchiveRecomputeRange.EnqueuedAt
     description: "When this obligation was enqueued (UTC)."
     valueType: DateTime
+  - id: CkArchiveRecomputeRange.Attempts
+    description: "How many times a recompute of this range has already failed (AB#5189). Zero on a freshly enqueued obligation; incremented each time the drain re-enqueues the range after a failure. Once it reaches the orchestrator's MaxRangeAttempts the obligation is dropped instead of retried forever, and LastError explains why."
+    valueType: Int
+    defaultValues:
+      - 0
+  - id: CkArchiveRecomputeRange.NextAttemptAt
+    description: "Earliest UTC time the drain may retry this range (AB#5189). Set to an exponentially backed-off point in time after each failure so a permanently broken rollup stops consuming a recompute run every tick. Null means retry on the next tick."
+    valueType: DateTime
+  - id: CkArchiveRecomputeRange.LastError
+    description: "Error message of the most recent failed attempt at this range (AB#5189). Null while the obligation has never failed. Kept per range so an operator can tell which part of a partially recomputed range is stuck and why."
+    valueType: String
 
   # ---------- RecomputeJob members ------------------------------------------------------------
   - id: RecomputeJob.ArchiveRtId

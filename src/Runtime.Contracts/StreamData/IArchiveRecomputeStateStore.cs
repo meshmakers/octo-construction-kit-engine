@@ -47,6 +47,14 @@ public interface IArchiveRecomputeStateStore
     Task ClearPendingRecomputeRangesAsync(OctoObjectId archiveRtId);
 
     /// <summary>
+    /// Replaces the whole pending recompute-range work list in one write (AB#5189). The drain
+    /// consumes only the ranges that are due and has to leave the backed-off ones in place; doing
+    /// that as clear-then-enqueue would drop every held-back obligation if the process died in
+    /// between — which is the very failure mode the attempt tracking exists to survive.
+    /// </summary>
+    Task ReplacePendingRecomputeRangesAsync(OctoObjectId archiveRtId, IReadOnlyList<ArchiveRecomputeRange> ranges);
+
+    /// <summary>
     /// Sets <c>RecomputeInProgress = true</c> and stamps <c>LastRecomputeStartedAt</c>. Called when a
     /// recompute job for the archive starts.
     /// </summary>

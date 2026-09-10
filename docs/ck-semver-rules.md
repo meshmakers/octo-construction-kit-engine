@@ -150,7 +150,9 @@ surface in the dependency diff.
 | `isAbstract: true → false`, `isFinal: true → false` | Relaxation |
 | Non-unique index added, any index removed | Query behavior, no data break |
 | `defaultValues` / `autoCompleteValues` / `autoIncrementReference` changed | Behavior of newly created instances changes |
-| `isRuntimeState` changed | Blueprint re-apply behavior changes |
+| `isRuntimeState` changed (deprecated alias) | Blueprint re-apply behavior changes |
+| Attribute `ownership` changed (resolved value) | Blueprint re-apply and export behavior change |
+| Attribute-assignment `ownership` override set, cleared or changed | Re-apply and export behavior change for that assignment |
 | Attribute `metaData` changed | Metadata only, no data break |
 | `enableChangeStreamPreAndPostImages` changed | Change stream behavior, no data break |
 | Type becomes a collection root (`isCollectionRoot: false → true`) | Additive |
@@ -165,6 +167,7 @@ surface in the dependency diff.
 | `description` (all element kinds, model meta) | Purely documentational |
 | `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
+| `isRuntimeState: true` rewritten as `ownership: RuntimeState` (or `false` as `SeedOwned`) | Same resolved ownership → empty diff → **no bump required**. Both markers are compared on their resolved value, so migrating a declaration to the enum costs nothing; only a genuine change of owner does. |
 
 ### Defensive default
 

@@ -217,11 +217,14 @@
 
     <!--
         Phase 2 of the platform-services initiative — opt-in lint that fails the build when a CK
-        attribute YAML declaration omits the `isRuntimeState` marker. Each CK model project
-        opts in by setting <OctoEnforceRuntimeStateMarkers>true</OctoEnforceRuntimeStateMarkers>;
-        the default is false so existing models that pre-date the marker stay green until
-        their owners sweep them. Concept doc:
-        octo-platform-services/docs/concepts/phase-2-ck-blueprint-seed-management.md §4.3.
+        attribute YAML declaration takes no position on ownership: it must declare either
+        `ownership: SeedOwned|TenantOwned|RuntimeState|Secret` (AB#5187) or the deprecated
+        `isRuntimeState: true|false` alias, and never both. Each CK model project opts in by
+        setting <OctoEnforceRuntimeStateMarkers>true</OctoEnforceRuntimeStateMarkers>; the default
+        is false so existing models that pre-date the marker stay green until their owners sweep
+        them. The property name is kept as-is so projects that already opted in are unaffected.
+        Concept docs: octo-platform-services/docs/concepts/phase-2-ck-blueprint-seed-management.md
+        §4.3, and "Attribute Ownership" in this repo's CLAUDE.md.
     -->
     <PropertyGroup>
         <OctoEnforceRuntimeStateMarkers Condition="'$(OctoEnforceRuntimeStateMarkers)' == ''">false</OctoEnforceRuntimeStateMarkers>
@@ -232,7 +235,7 @@
             BeforeTargets="CoreCompile"
             Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoEnforceRuntimeStateMarkers)' == 'true'">
 
-        <Message Importance="High" Text="Linting isRuntimeState markers (target framework $(TargetFramework))" />
+        <Message Importance="High" Text="Linting CK attribute ownership markers (target framework $(TargetFramework))" />
 
         <CkLintRuntimeStateMarkers ConstructionKitFolders="@(ConstructionKitFolder)" />
     </Target>

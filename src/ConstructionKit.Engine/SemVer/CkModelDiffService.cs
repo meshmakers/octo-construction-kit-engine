@@ -51,6 +51,7 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkAttributeDto.AttributeId), nameof(CkAttributeDto.ValueType), nameof(CkAttributeDto.ValueCkRecordId),
                 nameof(CkAttributeDto.ValueCkEnumId), nameof(CkAttributeDto.DefaultValues), nameof(CkAttributeDto.IsRuntimeState),
+                nameof(CkAttributeDto.Ownership),
                 nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData)
             ],
             [typeof(CkEnumDto)] =
@@ -78,7 +79,7 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkTypeAttributeDto.CkAttributeId), nameof(CkTypeAttributeDto.AttributeName),
                 nameof(CkTypeAttributeDto.AutoCompleteValues), nameof(CkTypeAttributeDto.AutoIncrementReference),
-                nameof(CkTypeAttributeDto.IsOptional)
+                nameof(CkTypeAttributeDto.IsOptional), nameof(CkTypeAttributeDto.Ownership)
             ],
             [typeof(CkTypeAssociationDto)] =
             [
@@ -190,8 +191,15 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatReference(currentAttribute.ValueCkEnumId, modelName));
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "defaultValues",
                     FormatValueList(baselineAttribute.DefaultValues), FormatValueList(currentAttribute.DefaultValues));
+                // AB#5187: both markers are compared on their RESOLVED value, so migrating a
+                // declaration from `isRuntimeState: true` to `ownership: RuntimeState` is not a
+                // change — same meaning, no version bump owed. `isRuntimeState` resolves through
+                // the DTO's mirror (it returns the ownership-derived value once ownership is
+                // declared), so the two comparisons agree by construction.
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "isRuntimeState",
                     baselineAttribute.IsRuntimeState, currentAttribute.IsRuntimeState);
+                AddModified(attributeChanges, CkModelElementKind.Attribute, id, "ownership",
+                    ResolveOwnership(baselineAttribute).ToString(), ResolveOwnership(currentAttribute).ToString());
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "metaData",
                     FormatMetaData(baselineAttribute.MetaData), FormatMetaData(currentAttribute.MetaData));
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "description",
@@ -281,6 +289,12 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatValueList(baselineAssignment.AutoCompleteValues), FormatValueList(currentAssignment.AutoCompleteValues));
                 AddModified(assignmentChanges, elementKind, id, "autoIncrementReference",
                     baselineAssignment.AutoIncrementReference, currentAssignment.AutoIncrementReference);
+                // AB#5187: the per-assignment ownership override is compared RAW (null = inherit
+                // from the attribute definition). Adding or removing an override changes who wins
+                // on this assignment only, which is why it is diffed here and not folded into the
+                // definition's ownership change.
+                AddModified(assignmentChanges, elementKind, id, "ownership",
+                    baselineAssignment.Ownership?.ToString(), currentAssignment.Ownership?.ToString());
             },
             added => FormatReference(added.CkAttributeId, modelName),
             removed => FormatReference(removed.CkAttributeId, modelName));
@@ -386,6 +400,18 @@ public class CkModelDiffService : ICkModelDiffService
         string property, bool oldValue, bool newValue)
     {
         AddModified(changes, elementKind, elementId, property, FormatBool(oldValue), FormatBool(newValue));
+    }
+
+    /// <summary>
+    ///     Effective ownership of an attribute DEFINITION for diff purposes (AB#5187): the
+    ///     declared <c>ownership</c>, or the deprecated <c>isRuntimeState</c> alias mapped onto it.
+    ///     Comparing the resolved value means a baseline compiled before ownership existed and a
+    ///     current model that only renamed its marker produce no change — the migration from the
+    ///     boolean to the enum costs no version bump, only a genuine semantic change does.
+    /// </summary>
+    private static AttributeOwnershipDto ResolveOwnership(CkAttributeDto attribute)
+    {
+        return AttributeOwnership.Resolve(attribute.Ownership, attribute.IsRuntimeState);
     }
 
     /// <summary>

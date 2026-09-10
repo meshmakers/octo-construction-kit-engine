@@ -13,6 +13,8 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 [DebuggerDisplay("{" + nameof(AttributeId) + "}")]
 public class CkAttributeDto
 {
+    private bool _isRuntimeState;
+
     /// <summary>
     ///     The id of the attribute
     /// </summary>
@@ -49,14 +51,49 @@ public class CkAttributeDto
     public ICollection<object>? DefaultValues { get; set; }
 
     /// <summary>
-    ///     When true, blueprint re-apply preserves the existing runtime value of this attribute
-    ///     instead of overwriting it with the seed value. Use for attributes that carry runtime
-    ///     state (e.g. deployment status, communication status, last-error fields, sync sequence
-    ///     numbers) that services / operators own at runtime and that the blueprint must not reset
-    ///     on a version bump. Defaults to <c>false</c> (the attribute is seed-managed).
+    ///     Declares who owns this attribute's value and whether the value is portable — see
+    ///     <see cref="AttributeOwnershipDto" /> for the four values and the author decision matrix.
+    ///     This is the DEFAULT for every assignment of this attribute; a type-attribute or
+    ///     record-attribute assignment may override it via <see cref="CkTypeAttributeDto.Ownership" />.
+    ///     <c>null</c> (omitted) means "not declared": the deprecated <see cref="IsRuntimeState" />
+    ///     alias is used instead, which is what every model authored before AB#5187 does.
     /// </summary>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
-    public bool IsRuntimeState { get; set; }
+    public AttributeOwnershipDto? Ownership { get; set; }
+
+    /// <summary>
+    ///     DEPRECATED alias for <see cref="Ownership" />, kept so every model authored before
+    ///     AB#5187 compiles and behaves exactly as before. Declaring <c>isRuntimeState: true</c>
+    ///     resolves to <see cref="AttributeOwnershipDto.RuntimeState" />, declaring <c>false</c> or
+    ///     omitting it resolves to <see cref="AttributeOwnershipDto.SeedOwned" />.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Once <see cref="Ownership" /> is declared this property stops being an input and
+    ///         becomes a computed MIRROR of it, meaning "preserved on Upsert"
+    ///         (<see cref="AttributeOwnership.IsPreservedOnUpsert" />) — true for
+    ///         <see cref="AttributeOwnershipDto.TenantOwned" />,
+    ///         <see cref="AttributeOwnershipDto.RuntimeState" /> and
+    ///         <see cref="AttributeOwnershipDto.Secret" />. The mirror is what makes version skew
+    ///         safe: it is serialised into the compiled model and persisted by the CK-model
+    ///         repository, so an engine that does not yet know <c>ownership</c> reads a
+    ///         tenant-owned or secret attribute as <c>isRuntimeState: true</c> and degrades to
+    ///         today's behaviour (preserve + exclude from export) instead of regressing to
+    ///         "seed wins", which would reset credentials.
+    ///     </para>
+    ///     <para>
+    ///         Declaring both <c>ownership</c> and <c>isRuntimeState</c> on the same attribute is
+    ///         an authoring error the <c>CkLintRuntimeStateMarkers</c> MSBuild task rejects
+    ///         (OCTO-CK003). The engine resolves it deterministically anyway: <c>ownership</c> wins.
+    ///     </para>
+    /// </remarks>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public bool IsRuntimeState
+    {
+        get => Ownership.HasValue ? Ownership.Value.IsPreservedOnUpsert() : _isRuntimeState;
+        set => _isRuntimeState = value;
+    }
 
     /// <summary>
     ///     An optional description of the attribute

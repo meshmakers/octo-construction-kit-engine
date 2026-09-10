@@ -248,11 +248,13 @@ archive silently reverts to Disabled** on a blueprint re-apply or a plain
 The fix is per-attribute, opt-in on the CK side, and lives at the **single
 import choke point** so every Upsert caller gets it automatically:
 
-- **CK schema**: `CkAttribute.isRuntimeState: bool` (defaults to false).
-  See `Serialization/Schema/construction-kit-elements-attribute.schema.json`,
-  `CkAttributeDto`, and the propagation through `CkAttributeGraph` /
-  `CkTypeAttributeGraph`. Existing CK models that don't set the flag
-  behave exactly as before.
+- **CK schema**: `CkAttribute.ownership: SeedOwned | TenantOwned |
+  RuntimeState | Secret` (AB#5187), with `isRuntimeState: bool` kept as a
+  deprecated alias. See `Serialization/Schema/construction-kit-elements-attribute.schema.json`,
+  `AttributeOwnershipDto`, `CkAttributeDto`, and the propagation through
+  `CkAttributeGraph` / `CkTypeAttributeGraph`. Existing CK models that set
+  neither, or only the boolean, behave exactly as before — see
+  "Attribute Ownership" below.
 - **Import path (shared)**:
   `ImportRtModelCommand.PreserveRuntimeStateAttributesAsync` runs at the top
   of the private `ImportEntityAsync` choke point — through which **all three**
@@ -260,7 +262,8 @@ import choke point** so every Upsert caller gets it automatically:
   file/stream) funnel — gated on `importStrategy == Upsert`. It groups the
   incoming entities by CK type for one batch repo query per type (on the
   ambient import session/transaction), looks each existing entity up by
-  `RtId`, and for every attribute the CK cache flags `IsRuntimeState=true`
+  `RtId`, and for every attribute the CK cache says the tenant owns
+  (`SelectPreservedAttributes` → effective ownership ≠ `SeedOwned`)
   it overwrites the **imported value** with the **existing value** before the
   bulk write. The repository call is wrapped — a lookup failure logs a
   warning and falls through to imported values rather than blocking the
@@ -327,12 +330,91 @@ the bug shipped. The conversion itself is covered by
 missing record attribute stays omitted rather than nulled, scalar and string
 pass-through).
 
-Author guidance: when adding a CK attribute that carries runtime state
-the host services / operators / users own at runtime (status enums,
-sync counters, error message fields, change timestamps, archive lifecycle
-status), mark it `isRuntimeState: true` so a future version bump or
-re-import can never trample it. When in doubt: authors describe
-**configuration**; everything else is runtime state.
+#### Attribute Ownership (AB#5187)
+
+`isRuntimeState` answered two independent questions with one bit — *who owns
+the value on Upsert?* (preservation, `ImportRtModelCommand`) and *is the value
+part of the entity's portable definition?* (exclusion from `ExportRt`,
+`RtEntityToTcDtoConverter`). They agree for a rotating refresh token and for a
+product endpoint, and they collide for tenant master data — a tariff, an IBAN,
+a market-partner id, a logo — which must be preserved AND exported. The boolean
+forced authors to pick one loss, and two teams picked opposite ones in the same
+sprint.
+
+`ownership` replaces it with four one-word answers:
+
+| `ownership` | Blueprint re-apply / Upsert | `ExportRt` | Typical |
+| ----------- | --------------------------- | ---------- | ------- |
+| `SeedOwned` (default, `== isRuntimeState: false`) | seed value wins | exported | product endpoints, report template names, statutory defaults, well-known-name wiring, taxonomy |
+| `TenantOwned` (new) | existing tenant value wins | **exported** | tariffs, IBAN + account holder, market-partner ids, tenant mailbox/host/port, branding, app title, logos, colours |
+| `RuntimeState` (`== isRuntimeState: true`) | existing value wins | excluded | deployment/communication status, last-error pairs, sync cursors, execution history, debug toggles, operator-written chart version/hostname |
+| `Secret` (new) | existing value wins | excluded | client secrets, API keys, bot tokens, passwords, private keys, refresh tokens |
+
+`Secret` behaves like `RuntimeState` today. It earns its place because it is the
+honest name (an API key is not "runtime state"), because a later export opt-in
+must be able to re-include `RuntimeState` while never including a secret, and
+because a later redaction / vault feature needs something a bool cannot carry.
+
+**No flag day.** `AttributeOwnership.Resolve` maps `ownership` when declared,
+otherwise the alias (`true → RuntimeState`, `false`/absent → `SeedOwned`), so
+every declaration that exists resolves with zero behaviour change. Declaring
+both is an authoring error (`OCTO-CK003`, the lint); the engine still resolves
+it deterministically with `ownership` winning. Once `ownership` is declared,
+`CkAttributeDto.IsRuntimeState` becomes a computed **mirror** of
+`IsPreservedOnUpsert()` — true for `TenantOwned`, `RuntimeState` and `Secret` —
+which is serialised into the compiled model and persisted by the CK-model
+repository, so an engine that does not know `ownership` yet degrades to
+preserve-and-exclude (today's behaviour) instead of regressing to "seed wins"
+and resetting credentials.
+
+**Per-assignment override.** Ownership sits on the attribute DEFINITION and is
+copied into every assignment, but one definition is shared by many types — a
+single `ClientId` is assigned by `FinApiConfiguration`,
+`MicrosoftGraphConfiguration` and `ServiceAccountConfiguration`. A type-attribute
+or record-attribute assignment may therefore override it
+(`CkTypeAttributeDto.Ownership`, nullable, `null` = inherit — so existing models
+are untouched). The definition carries the common case; the outlier states its
+own answer next to the type it belongs to.
+
+**Two granularities, on purpose.** Preservation inspects only top-level type
+attributes (`AllAttributes`, inherited included) and preserves a record-valued
+attribute as one unit, verbatim including nested members. Export recurses into
+records and evaluates each member individually. Both are right for what they do,
+but the consequence is an authoring trap: a `TenantOwned` record whose members
+were left `RuntimeState` exports with those members silently stripped. Give
+record members the same ownership as the record-valued attribute that contains
+them.
+
+**Marked is not frozen.** A CK migration `Update` action (with a target
+selector, a condition and `onConflict`) is the sanctioned, versioned, auditable
+way to correct a tenant-owned value across tenants. The choice is "the seed can
+change it silently" vs "changing it costs a migration", not "changeable" vs
+"frozen".
+
+Author guidance — answer the first question that applies and stop:
+
+1. Is it a credential, token, key or password — anything you would not paste
+   into a ticket? → `Secret`
+2. Is it written by a service, operator, pipeline or job rather than typed by a
+   human (status, timestamps, counters, error history, cursors, rotated tokens,
+   deployed hostname/chart version, debug toggles)? → `RuntimeState`
+3. Would a tenant admin set this in the product and be right to be angry if a
+   product update overwrote it? → `TenantOwned`
+4. Otherwise it ships with the product and a new version must be able to correct
+   it. → `SeedOwned`
+
+Tie-breakers: if you cannot name how a correction would reach every tenant,
+choose `SeedOwned` — that is the reversible mistake. Credential tuples travel
+together (host, client id, secret, username, sandbox flag): one member left
+`SeedOwned` produces half a credential, which fails like no credential but looks
+configured in the Studio. Before marking a shared definition, check who else
+uses the attribute id and use the per-assignment override rather than making the
+strictest consumer win by accident.
+
+The `CkLintRuntimeStateMarkers` MSBuild task (opt-in per project via
+`OctoEnforceRuntimeStateMarkers`) accepts either marker and rejects an attribute
+that declares neither (`OCTO-CK001`), both (`OCTO-CK003`), or an unknown
+ownership value (`OCTO-CK004`).
 
 ### CK Model Migrations
 CK Model Migrations update runtime entities when CK model versions change. See `docs/ck-model-migrations.md` for details.

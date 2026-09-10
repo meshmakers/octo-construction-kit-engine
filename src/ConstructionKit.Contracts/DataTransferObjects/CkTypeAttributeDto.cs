@@ -48,4 +48,25 @@ public class CkTypeAttributeDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsOptional { get; set; }
+
+    /// <summary>
+    ///     Optional per-assignment override of the attribute definition's
+    ///     <see cref="CkAttributeDto.Ownership" />. <c>null</c> (omitted) means "inherit from the
+    ///     definition" — which is what every assignment authored before AB#5187 declares, so
+    ///     existing models are untouched.
+    /// </summary>
+    /// <remarks>
+    ///     The override exists because ownership sits on the attribute DEFINITION and one
+    ///     definition is shared by many types: a single <c>ClientId</c> is assigned by
+    ///     <c>FinApiConfiguration</c>, <c>MicrosoftGraphConfiguration</c> and
+    ///     <c>ServiceAccountConfiguration</c>. Marking the definition
+    ///     <see cref="AttributeOwnershipDto.Secret" /> would also freeze the service account's
+    ///     client id against a blueprint rename. With the override the definition carries the
+    ///     common case and the outlier states its own answer, on the assignment, next to the type
+    ///     it belongs to (AB#5187, product decision 3). Applies to type attributes, record
+    ///     attributes and association-role attributes alike — they all use this DTO.
+    /// </remarks>
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public AttributeOwnershipDto? Ownership { get; set; }
 }

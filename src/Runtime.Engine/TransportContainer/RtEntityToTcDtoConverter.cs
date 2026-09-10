@@ -45,12 +45,26 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
     {
         foreach (var ckTypeAttributeGraph in ckTypeWithAttributesGraph.AllAttributesByName.Values)
         {
-            // Bug #1458: runtime-state attributes (e.g. communication state timestamps,
+            // Bug #1458 / AB#5187: RuntimeState attributes (communication state timestamps,
             // deployment/configuration status, sync counters, last-error fields) are volatile,
-            // per-tenant live state owned by services/operators at runtime. They must not be
-            // carried in an exported runtime model, otherwise a re-import would overwrite live
-            // state with stale exported values. Skip them on export.
-            if (ckTypeAttributeGraph.IsRuntimeState)
+            // per-tenant live state owned by services/operators at runtime, and Secret attributes
+            // are credentials. Neither is part of the entity's portable definition — carrying them
+            // would let a re-import overwrite live state with stale exported values. Skip both.
+            //
+            // TenantOwned is deliberately NOT skipped: the tenant owns the value (so an Upsert
+            // preserves it) but a tariff, an IBAN, a market-partner id or a logo IS part of the
+            // portable model, and dropping it silently breaks tenant clone/migration and
+            // "export as template". Separating those two questions is the whole point of the
+            // ownership model — the old isRuntimeState boolean could not express it.
+            //
+            // Granularity, stated deliberately rather than inherited: this loop is re-entered by
+            // ConvertToRtRecordDto, so record MEMBERS are evaluated individually against their own
+            // effective ownership — unlike upsert preservation, which only ever inspects top-level
+            // type attributes and preserves a record-valued attribute as one unit. A record-valued
+            // attribute that is itself excluded never gets here, so members only matter inside an
+            // exported record; authors must give the members the same ownership as the record-valued
+            // attribute that contains them, or a TenantOwned record exports with its members stripped.
+            if (ckTypeAttributeGraph.Ownership.IsExcludedFromExport())
             {
                 continue;
             }

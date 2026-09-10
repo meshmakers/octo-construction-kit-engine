@@ -113,6 +113,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "behavior of newly created instances changes"),
             { ElementKind: CkModelElementKind.Attribute, Property: "isRuntimeState" } =>
                 (CkSemVerLevel.Minor, "blueprint re-apply behavior changes"),
+            // AB#5187: ownership changes who wins on re-apply and whether the value is carried in
+            // an ExportRt. Neither is a data-shape change, so it stays Minor — the same level the
+            // boolean it replaces has always had. It still needs a bump: ImportCkModelAsync
+            // short-circuits a same-version re-import, so a marker changed in place would reach no
+            // existing tenant.
+            { ElementKind: CkModelElementKind.Attribute, Property: "ownership" } =>
+                (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change"),
             { ElementKind: CkModelElementKind.Attribute, Property: "metaData" } =>
                 (CkSemVerLevel.Minor, "attribute metadata changes, no data break"),
 
@@ -229,6 +236,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
             case CkModelChangeKind.Modified when change.Property is "autoCompleteValues" or "autoIncrementReference":
                 return (CkSemVerLevel.Minor, "behavior of newly created instances changes");
+
+            // AB#5187: the per-assignment ownership override. Setting, clearing or changing it
+            // moves this one assignment between "seed wins" and "tenant wins" and in/out of
+            // ExportRt — same class of change as the definition-level property, so the same level.
+            case CkModelChangeKind.Modified when change.Property == "ownership":
+                return (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change for this assignment");
 
             default:
                 return (CkSemVerLevel.Major, "no classification rule for this attribute assignment change — defensively classified as major");

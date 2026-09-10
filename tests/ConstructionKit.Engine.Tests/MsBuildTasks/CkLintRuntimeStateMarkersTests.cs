@@ -146,6 +146,88 @@ public sealed class CkLintRuntimeStateMarkersTests : IDisposable
         Assert.Empty(_errors);
     }
 
+    // ----- AB#5187: the ownership marker -----
+
+    [Theory]
+    [InlineData("SeedOwned")]
+    [InlineData("TenantOwned")]
+    [InlineData("RuntimeState")]
+    [InlineData("Secret")]
+    public void Execute_OwnershipMarker_SatisfiesTheLint(string ownership)
+    {
+        var ckFolder = CreateCkFolder("ConstructionKit");
+        WriteAttributesRaw(ckFolder, "core.yaml",
+            ("Marked", $"  ownership: {ownership}"));
+
+        var task = MakeTask(ckFolder);
+
+        Assert.True(task.Execute());
+        Assert.Empty(_errors);
+    }
+
+    [Fact]
+    public void Execute_LegacyMarkerStillSatisfiesTheLint_AlongsideOwnership()
+    {
+        // A project mid-migration has both styles in the same folder; neither may fail.
+        var ckFolder = CreateCkFolder("ConstructionKit");
+        WriteAttributesRaw(ckFolder, "mixed.yaml",
+            ("Legacy", "  isRuntimeState: true"),
+            ("LegacyFalse", "  isRuntimeState: false"),
+            ("Modern", "  ownership: Secret"));
+
+        var task = MakeTask(ckFolder);
+
+        Assert.True(task.Execute());
+        Assert.Empty(_errors);
+    }
+
+    [Fact]
+    public void Execute_NeitherMarker_ReportsOCTOCK001MentioningOwnership()
+    {
+        var ckFolder = CreateCkFolder("ConstructionKit");
+        WriteAttributesRaw(ckFolder, "core.yaml", ("Lonely", null));
+
+        var task = MakeTask(ckFolder);
+
+        Assert.False(task.Execute());
+        var error = Assert.Single(_errors);
+        Assert.Equal("OCTO-CK001", error.Code);
+        Assert.Contains("Lonely", error.Message ?? string.Empty);
+        Assert.Contains("ownership", error.Message ?? string.Empty);
+    }
+
+    [Fact]
+    public void Execute_BothMarkersOnOneAttribute_ReportsOCTOCK003()
+    {
+        // The engine resolves this deterministically (ownership wins), but a stale alias that
+        // contradicts the enum is exactly how a credential ends up unprotected — so it is rejected.
+        var ckFolder = CreateCkFolder("ConstructionKit");
+        WriteAttributesRaw(ckFolder, "core.yaml",
+            ("Conflicted", "  ownership: Secret\n  isRuntimeState: false"));
+
+        var task = MakeTask(ckFolder);
+
+        Assert.False(task.Execute());
+        var error = Assert.Single(_errors);
+        Assert.Equal("OCTO-CK003", error.Code);
+        Assert.Contains("Conflicted", error.Message ?? string.Empty);
+    }
+
+    [Fact]
+    public void Execute_UnknownOwnershipValue_ReportsOCTOCK004WithTheValidValues()
+    {
+        var ckFolder = CreateCkFolder("ConstructionKit");
+        WriteAttributesRaw(ckFolder, "core.yaml", ("Typo", "  ownership: TenantOwn"));
+
+        var task = MakeTask(ckFolder);
+
+        Assert.False(task.Execute());
+        var error = Assert.Single(_errors);
+        Assert.Equal("OCTO-CK004", error.Code);
+        Assert.Contains("TenantOwn", error.Message ?? string.Empty);
+        Assert.Contains("TenantOwned", error.Message ?? string.Empty);
+    }
+
     // ----- helpers -----
 
     private string CreateCkFolder(string name)
@@ -171,6 +253,30 @@ public sealed class CkLintRuntimeStateMarkersTests : IDisposable
             if (isRuntimeState.HasValue)
             {
                 writer.WriteLine($"  isRuntimeState: {(isRuntimeState.Value ? "true" : "false")}");
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Writes attribute entries with an arbitrary extra YAML line (or none), so a test can
+    ///     express marker combinations the typed helper above cannot — both markers at once, an
+    ///     invalid enum value, or no marker at all.
+    /// </summary>
+    private static void WriteAttributesRaw(string ckFolder, string fileName,
+        params (string id, string? extraLines)[] entries)
+    {
+        var attributesDir = Path.Combine(ckFolder, "attributes");
+        Directory.CreateDirectory(attributesDir);
+
+        using var writer = File.CreateText(Path.Combine(attributesDir, fileName));
+        writer.WriteLine("attributes:");
+        foreach (var (id, extraLines) in entries)
+        {
+            writer.WriteLine($"- id: {id}");
+            writer.WriteLine("  valueType: String");
+            if (extraLines != null)
+            {
+                writer.WriteLine(extraLines);
             }
         }
     }

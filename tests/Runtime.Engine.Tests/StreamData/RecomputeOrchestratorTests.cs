@@ -1605,6 +1605,33 @@ public class RecomputeOrchestratorTests
     }
 
     [Fact]
+    public async Task Tick_JobThatSlippedInBetweenCheckAndRun_LeavesTheObligationsUntouched()
+    {
+        StubRollupAndSource();
+        var obligation = new ArchiveRecomputeRange(RollupRt, From, To, null, Now, 2, Now.AddMinutes(-1), "earlier");
+        StubPending(obligation);
+        // Nothing active when the drain looks, a manual job by the time the run checks again.
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).ReturnsNextFromSequence(
+            (RecomputeJobSnapshot?)null,
+            new RecomputeJobSnapshot(JobRt, RollupRt, RecomputeJobState.Running, RecomputeTrigger.Manual, From, To, null,
+                null, null, Now, null, null, null, null, Now));
+
+        var runs = await NewSut().TickAsync(CancellationToken.None);
+
+        // Nothing ran, nothing counted, and the obligation is neither removed nor duplicated at
+        // attempt zero — it keeps its history and runs once the manual job is done.
+        Assert.Equal(0, runs);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(
+                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Tick_LiveRunningJob_IsLeftAlone_AndTheQueuedWorkStaysUntouched()
     {
         StubRollupAndSource();

@@ -302,7 +302,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                     // e.g. Manual for a backfill); any further intervals run as fresh Periodic jobs.
                     var trigger = adoptJob?.Trigger ?? RecomputeTrigger.Periodic;
                     var outcome = await RecomputeArchiveInternalAsync(
-                        rollup.RtId, start, end, scope, trigger, cancellationToken, adoptJob);
+                        rollup.RtId, start, end, scope, trigger, cancellationToken, adoptJob,
+                        enqueueOnCoalesce: false);
                     adoptJob = null;
 
                     if (outcome.Interrupted)
@@ -313,7 +314,16 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                         cancellationToken.ThrowIfCancellationRequested();
                     }
 
-                    if (outcome.Job.State != RecomputeJobState.Failed)
+                    if (outcome.Job.State == RecomputeJobState.Coalesced)
+                    {
+                        // A job became active between this tick's own active-job check and the run — a
+                        // manual recompute, or another process's drain. Nothing ran: the obligations
+                        // stay exactly as they are, attempt history included, and are picked up once
+                        // that job is done.
+                        continue;
+                    }
+
+                    if (outcome.Job.State == RecomputeJobState.Completed)
                     {
                         recomputeCount++;
                     }
@@ -425,7 +435,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         {
             State = RecomputeJobState.Failed,
             FinishedAt = now,
-            DurationMs = job.StartedAt is { } startedAt ? (int)(now - startedAt).TotalMilliseconds : 0,
+            // A job stuck for weeks overflows an int millisecond count; clamp instead of persisting garbage.
+            DurationMs = job.StartedAt is { } startedAt
+                ? (int)Math.Clamp((now - startedAt).TotalMilliseconds, 0, int.MaxValue)
+                : 0,
             ErrorReason = reason,
         });
         await _stateStore.MarkRecomputeFailedAsync(rollupRtId, now, reason);
@@ -626,7 +639,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         OctoObjectId? rtIdScope,
         RecomputeTrigger trigger,
         CancellationToken cancellationToken,
-        RecomputeJobSnapshot? adoptExistingJob)
+        RecomputeJobSnapshot? adoptExistingJob,
+        bool enqueueOnCoalesce = true)
     {
         var now = _clock();
 
@@ -708,15 +722,22 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             var active = await _jobStore.GetActiveForArchiveAsync(rollupRtId);
             if (active is not null)
             {
-                await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
-                    new[] { new ArchiveRecomputeRange(rollupRtId, from, to, rtIdScope, now) });
+                // A manual trigger parks its range as a fresh obligation. The drain does not
+                // (enqueueOnCoalesce false): its obligations are already in the work list and stay
+                // there untouched, so a job that slipped in between its active-job check and this run
+                // neither duplicates them nor resets their attempt history.
+                if (enqueueOnCoalesce)
+                {
+                    await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
+                        new[] { new ArchiveRecomputeRange(rollupRtId, from, to, rtIdScope, now) });
+                }
 
                 _logger.LogInformation(
                     "Recompute of {RollupRtId} range [{From:O},{To:O}) coalesced into active job {ActiveJob}",
                     rollupRtId, from, to, active.RtId);
 
-                // No outstanding work for the caller: the range was just enqueued above, so the
-                // active job's own drain owns it now.
+                // No outstanding work for the caller: the range is either enqueued above or already
+                // in the work list, so the active job's own drain owns it now.
                 var coalesced = await PersistNewJobAsync(new RecomputeJobSnapshot(
                     OctoObjectId.Empty, rollupRtId, RecomputeJobState.Coalesced, trigger,
                     from, to, rtIdScope, null, null, now, now, 0, null, null));

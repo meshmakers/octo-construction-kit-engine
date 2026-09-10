@@ -74,7 +74,7 @@ public static class RollupColumnGenerator
 
         var baseName = !string.IsNullOrWhiteSpace(spec.TargetColumnName)
             ? spec.TargetColumnName!.ToLowerInvariant()
-            : $"{SanitisePath(spec.SourcePath)}_{FunctionToken(spec.Function)}";
+            : DefaultBaseNameFor(spec);
 
         return spec.Function switch
         {
@@ -89,6 +89,31 @@ public static class RollupColumnGenerator
             CkRollupFunction.Last => new[] { baseName },
             _ => throw new ArgumentOutOfRangeException(nameof(spec), spec.Function, "Unknown rollup function.")
         };
+    }
+
+    /// <summary>
+    /// The column name this spec would generate if it did not pin one with
+    /// <see cref="CkRollupAggregationSpec.TargetColumnName"/> — <c>{sanitised source path}_{function
+    /// token}</c>, the base that <see cref="TargetColumnNamesFor"/> derives its one or two names
+    /// from.
+    /// </summary>
+    /// <remarks>
+    /// This is the read-side identity of the aggregated quantity: it is determined by what the spec
+    /// aggregates (path and function) and not by where it happens to store the result, so two specs
+    /// with the same default base name aggregate the same thing. A pinned
+    /// <see cref="CkRollupAggregationSpec.TargetColumnName"/> is a storage decision and is
+    /// deliberately ignored here — the per-source resolver (AB#5157) uses this to recognise a
+    /// physically-chained child rollup, and matching on the stored name instead would accept a child
+    /// that aggregates a different attribute under a coincidental column name.
+    /// </remarks>
+    public static string DefaultBaseNameFor(CkRollupAggregationSpec spec)
+    {
+        if (string.IsNullOrEmpty(spec.SourcePath))
+        {
+            throw new ArgumentException("SourcePath must not be empty.", nameof(spec));
+        }
+
+        return $"{SanitisePath(spec.SourcePath)}_{FunctionToken(spec.Function)}";
     }
 
     /// <summary>

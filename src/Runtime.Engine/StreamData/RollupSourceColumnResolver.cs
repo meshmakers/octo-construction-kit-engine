@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 
 namespace Meshmakers.Octo.Runtime.Engine.StreamData;
@@ -140,7 +139,10 @@ public static class RollupSourceColumnResolver
     /// equals the parent's and whose <see cref="NormalisePath">normalised</see> source path equals
     /// the parent's normalised source path (and, for
     /// <see cref="CkRollupFunction.StateDuration"/>, whose
-    /// <see cref="CkRollupAggregationSpec.ComparisonValue"/> is the same state literal); otherwise
+    /// <see cref="CkRollupAggregationSpec.ComparisonValue"/> is the same state literal) — or whose
+    /// normalised source path equals the physical column this spec denotes
+    /// (<see cref="RollupColumnGenerator.DefaultBaseNameFor"/>), which is how a logical spec reaches
+    /// a physically-chained child; otherwise
     /// <c>null</c>. Rule 1 wins when both apply:
     /// a verbatim declared column is the more specific match and keeps a legacy chained spec
     /// reading exactly the column it names.
@@ -189,15 +191,15 @@ public static class RollupSourceColumnResolver
         }
 
         var wanted = NormalisePath(spec.SourcePath);
-        // The physical storage column(s) this logical spec generates (e.g. Amount.Value + Sum =>
+        // The physical column name this logical spec denotes (e.g. Amount.Value + Sum =>
         // "amountvalue_sum"). A pre-AB#5157 physically-chained rollup source names its own child's
-        // physical column and pins the stored name with an explicit TargetColumnName, so its child
-        // spec's generated column(s) equal ours even though its SourcePath is that physical name and
-        // not the logical path — its normalised path therefore never equals ours. Matching on the
-        // generated column(s) bridges a logical parent spec onto such a chained child so a new
-        // (logical) rollup can be stacked on a seeded physical ladder (WI AB#5157 review: the sbeg
-        // quarter rung over the seeded EC monthly rung).
-        var parentColumns = RollupColumnGenerator.TargetColumnNamesFor(spec).ToList();
+        // physical column as its source path and pins the stored name with an explicit
+        // TargetColumnName, so its normalised path never equals ours — it is one naming level
+        // further down. Matching our generated name against the child's *source path* bridges a
+        // logical parent spec onto such a chained child so a new (logical) rollup can be stacked on
+        // a seeded physical ladder (WI AB#5157 review: the sbeg quarter rung over the seeded EC
+        // monthly rung).
+        var wantedPhysical = RollupColumnGenerator.DefaultBaseNameFor(spec);
         foreach (var child in childSpecs)
         {
             if (child.Function != spec.Function || !ComparisonValueMatches(spec, child))
@@ -212,13 +214,18 @@ public static class RollupSourceColumnResolver
                 return new RollupSourceColumnResolution(RollupSourceColumnResolutionKind.ChildAggregation, child);
             }
 
-            // (b) Physically-chained child: it stores exactly the physical column(s) this logical
-            // spec maps to. Read them function-preserving, identically to (a). The Function guard
-            // above keeps a name collision (a differently-aggregated column that happens to share the
-            // name via TargetColumnName) from matching.
-            if (parentColumns.Count > 0
-                && parentColumns.SequenceEqual(
-                    RollupColumnGenerator.TargetColumnNamesFor(child), StringComparer.Ordinal))
+            // (b) Physically-chained child: it aggregates the very column this logical spec denotes.
+            // Read it function-preserving, identically to (a).
+            //
+            // Both sides of this comparison are read-side identities — what the spec aggregates, not
+            // where it stores the result. Comparing the two specs' *target* columns instead would
+            // make an explicitly pinned TargetColumnName decide the match, and a pinned name says
+            // nothing about the underlying attribute: a parent SUM(Reactive) that happens to store
+            // into "energy_sum" would then bind to a child SUM(Energy) storing the same name and
+            // silently serve Energy sums for the spans that source covers, while the spans served by
+            // a source that really has Reactive stay correct — one column with two meanings and no
+            // error anywhere (AB#5157 validation finding 1).
+            if (string.Equals(NormalisePath(child.SourcePath), wantedPhysical, StringComparison.Ordinal))
             {
                 return new RollupSourceColumnResolution(RollupSourceColumnResolutionKind.ChildAggregation, child);
             }

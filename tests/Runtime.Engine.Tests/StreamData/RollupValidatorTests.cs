@@ -873,6 +873,30 @@ public class RollupValidatorTests
         Assert.Contains(SecondSourceRt.ToString(), ex.Message);
     }
 
+    // AC2, the cutover shape that actually shipped wrong (AB#5157 validation finding 1, tenant
+    // ab5157live/invalid-path-missing): the legacy base has Reactive, the native rollup after the
+    // cutover only ever aggregated Energy — and both the parent and that child pin the stored name
+    // "energy_sum". Resolving on the stored name let the rollup activate and backfill, so the buckets
+    // before the cutover carried Reactive sums and the ones after carried Energy sums, in one column,
+    // with no warning anywhere. It has to be refused, naming the source that cannot serve the path.
+    [Fact]
+    public void ValidateForActivation_RollupSourceAggregatingAnotherAttributeUnderTheSameColumnName_ThrowsNamingThatSource()
+    {
+        var rollup = MixedSourcesRollup(
+            new CkRollupAggregationSpec("Reactive", CkRollupFunction.Sum, "energy_sum"));
+
+        var ex = Assert.Throws<RollupSourcePathMissingException>(
+            () => RollupValidator.ValidateForActivation(rollup, new[]
+            {
+                new RollupActivationSource(rollup.Sources[0], TimeRangeBase("Reactive")),
+                HourlyRollupSource(rollup.Sources[1],
+                    new CkRollupAggregationSpec("Energy", CkRollupFunction.Sum, "energy_sum")),
+            }));
+        Assert.Equal("Reactive", ex.SourcePath);
+        Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
+        Assert.Contains(SecondSourceRt.ToString(), ex.Message);
+    }
+
     // The base archive lacking the path is still refused (rule 1 is the only rule for a base archive).
     [Fact]
     public void ValidateForActivation_BaseSourceLackingThePath_ThrowsNamingThatSource()

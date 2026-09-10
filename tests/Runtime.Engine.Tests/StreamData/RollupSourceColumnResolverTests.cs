@@ -232,6 +232,57 @@ public class RollupSourceColumnResolverTests
     }
 
     [Fact]
+    public void TryResolve_ChainedChildAggregatingAnotherAttributeUnderTheSameColumnName_ReturnsNull()
+    {
+        // AB#5157 validation finding 1, reproduced from tenant ab5157live/invalid-path-missing. Both
+        // specs pin the stored name "energy_sum", so their target columns are identical — but the
+        // parent aggregates Reactive and the child aggregates Energy. A pinned TargetColumnName is a
+        // storage decision and says nothing about the attribute behind it, so this must not resolve:
+        // the source cannot serve Reactive, and letting it through fills the spans that source covers
+        // with Energy sums while the other source's spans stay correct — one column, two meanings,
+        // no error.
+        var chained = Spec("Energy", CkRollupFunction.Sum, "energy_sum");
+        var (archive, rollup) = Hourly(chained);
+
+        Assert.Null(RollupSourceColumnResolver.TryResolve(
+            Spec("Reactive", CkRollupFunction.Sum, "energy_sum"), archive, rollup));
+    }
+
+    [Fact]
+    public void TryResolve_LogicalSpecPinningItsOwnColumnName_StillReachesThePhysicallyChainedChild()
+    {
+        // The mirror image: what the parent calls its own output column is irrelevant to which child
+        // series serves it. Both specs aggregate Amount.Value summed, so the chained child resolves
+        // even though the parent stores under a name of its own.
+        var chained = Spec("amountvalue_sum", CkRollupFunction.Sum, "amountvalue_sum");
+        var (archive, rollup) = Hourly(chained);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            Spec("Amount.Value", CkRollupFunction.Sum, "quarterly_energy"), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Equal(RollupSourceColumnResolutionKind.ChildAggregation, resolution.Kind);
+        Assert.Same(chained, resolution.ChildAggregation);
+    }
+
+    [Fact]
+    public void TryResolve_LogicalAvgSpecOverAPhysicallyChainedAvgRollup_ResolvesAsChildAggregation()
+    {
+        // The bridge is expressed on the single base name, so the two-column functions ride along:
+        // an Avg parent reaches a chained Avg child that names that base name as its source path.
+        var chained = Spec("amountvalue_avg", CkRollupFunction.Avg, "amountvalue_avg");
+        var (archive, rollup) = Hourly(chained);
+
+        var resolution = RollupSourceColumnResolver.TryResolve(
+            Spec("Amount.Value", CkRollupFunction.Avg), archive, rollup);
+
+        Assert.NotNull(resolution);
+        Assert.Same(chained, resolution.ChildAggregation);
+        Assert.Equal(new[] { "amountvalue_avg_sum", "amountvalue_avg_count" },
+            RollupColumnGenerator.TargetColumnNamesFor(resolution.ChildAggregation!));
+    }
+
+    [Fact]
     public void TryResolve_LogicalSpecOverRollupStoringAnotherFunction_ReturnsNull()
     {
         var (archive, rollup) = Hourly(Spec("Amount.Value", CkRollupFunction.Sum));

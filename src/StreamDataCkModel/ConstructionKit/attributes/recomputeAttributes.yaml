@@ -72,12 +72,12 @@ attributes:
     description: "When this obligation was enqueued (UTC)."
     valueType: DateTime
   - id: CkArchiveRecomputeRange.Attempts
-    description: "How many times a recompute of this range has already failed (AB#5189). Zero on a freshly enqueued obligation; incremented each time the drain re-enqueues the range after a failure. Once it reaches the orchestrator's MaxRangeAttempts the obligation is dropped instead of retried forever, and LastError explains why."
+    description: "How many times a recompute of this range has already failed (AB#5189). Zero on a freshly enqueued obligation; incremented each time the drain re-enqueues the range after a failure. Once it reaches the orchestrator's MaxRangeAttempts the obligation is parked (NextAttemptAt far in the future) instead of retried forever, and LastError explains why."
     valueType: Int
     defaultValues:
       - 0
   - id: CkArchiveRecomputeRange.NextAttemptAt
-    description: "Earliest UTC time the drain may retry this range (AB#5189). Set to an exponentially backed-off point in time after each failure so a permanently broken rollup stops consuming a recompute run every tick. Null means retry on the next tick."
+    description: "Earliest UTC time the drain may retry this range (AB#5189). Set to an exponentially backed-off point in time after each failure so a permanently broken rollup stops consuming a recompute run every tick; set to the year 9999 once the attempt cap is reached, which parks the obligation until a recompute covering it succeeds. Null means retry on the next tick."
     valueType: DateTime
   - id: CkArchiveRecomputeRange.LastError
     description: "Error message of the most recent failed attempt at this range (AB#5189). Null while the obligation has never failed. Kept per range so an operator can tell which part of a partially recomputed range is stuck and why."
@@ -125,3 +125,6 @@ attributes:
   - id: RecomputeJob.StagingTableName
     description: "Name of the per-job CrateDB staging table used for the compute, for post-mortem inspection. Null once swept."
     valueType: String
+  - id: RecomputeJob.LastProgressAt
+    description: "Heartbeat of a non-terminal job (AB#5189, UTC): stamped when the job is created or starts computing and after every committed chunk. A Pending or Running job whose heartbeat is older than the orchestrator's stale-job timeout belongs to a process that died; the drain fails it and continues with the work still queued on the archive. Null on jobs written before the field existed."
+    valueType: DateTime

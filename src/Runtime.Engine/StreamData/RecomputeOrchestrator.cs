@@ -61,25 +61,38 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     public static readonly TimeSpan DefaultChunkRetryBaseDelay = TimeSpan.FromSeconds(2);
 
     /// <summary>
-    /// Default number of times the drain re-enqueues a failing recompute range before giving up on it
-    /// (AB#5189). The per-chunk retry (<see cref="DefaultMaxChunkAttempts"/>) covers a dropped
-    /// connection inside one run; this one covers a range that fails run after run. Without it a
-    /// permanently broken rollup — a source that cannot serve an aggregation path, say — consumes a
-    /// recompute run and a generation on every single tick, forever. Five attempts spread over the
-    /// backoff below give a genuinely transient outage well over an hour to clear.
+    /// Number of times a recompute range may fail before the drain parks it (AB#5189). The per-chunk
+    /// retry (<see cref="DefaultMaxChunkAttempts"/>) covers a dropped connection inside one run; this
+    /// one covers a range that fails run after run. Without it a permanently broken rollup — a source
+    /// that cannot serve an aggregation path, say — consumes a recompute run and a generation on every
+    /// single tick, forever. A parked range stays on the entity, visibly, and is released by the next
+    /// recompute that covers it and succeeds. A constant of the orchestrator, overridable only through
+    /// the constructor (tests); there is no operator setting.
     /// </summary>
     public const int DefaultMaxRangeAttempts = 5;
 
     /// <summary>
     /// Default base delay for the per-range retry backoff (AB#5189). Exponential: after the
-    /// <c>n</c>-th failure the range is held back for <c>base * 2^(n-1)</c>, so the five attempts run
-    /// at roughly +1, +2, +4 and +8 tick-minutes rather than hammering the storage layer once a
-    /// minute. Capped at <see cref="MaxRangeRetryDelay"/>.
+    /// <c>n</c>-th failure the range is held back for <c>base * 2^(n-1)</c>, so with five attempts the
+    /// retries run at +5, +10, +20 and +40 minutes — 75 minutes from the first failure to the last
+    /// attempt, enough for a CrateDB re-election or a node restart to clear. Capped at
+    /// <see cref="MaxRangeRetryDelay"/>.
     /// </summary>
-    public static readonly TimeSpan DefaultRangeRetryBaseDelay = TimeSpan.FromMinutes(1);
+    public static readonly TimeSpan DefaultRangeRetryBaseDelay = TimeSpan.FromMinutes(5);
 
     /// <summary>Upper bound for the per-range backoff, so a large attempt count cannot overflow.</summary>
     public static readonly TimeSpan MaxRangeRetryDelay = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// How long a non-terminal job may go without a heartbeat before the drain treats its process as
+    /// dead (AB#5189). The heartbeat (<see cref="RecomputeJobSnapshot.LastProgressAt"/>) is stamped
+    /// per committed chunk, and a chunk is bounded — at most <see cref="DefaultMaxBucketsPerChunk"/>
+    /// per-bucket statements, each under the CrateDB statement timeout — so an hour without progress
+    /// is far beyond what a live run can legitimately take even on a slow cluster, while being a
+    /// bounded wait compared with the previous behaviour: a job stuck at Running forever, every later
+    /// trigger coalescing into it, the rollup frozen until someone edited the database.
+    /// </summary>
+    public static readonly TimeSpan DefaultStaleJobTimeout = TimeSpan.FromMinutes(60);
 
     private readonly string _tenantId;
     private readonly IArchiveRuntimeStore _archiveStore;
@@ -99,6 +112,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     private readonly IArchiveCoverageInvalidator? _coverageInvalidator;
     private readonly int _maxRangeAttempts;
     private readonly TimeSpan _rangeRetryBaseDelay;
+    private readonly TimeSpan _staleJobTimeout;
 
     /// <summary>Constructs the orchestrator for one tenant.</summary>
     /// <remarks>
@@ -114,8 +128,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// job drops the recomputed rollup's memoised coverage so the next coverage query re-measures
     /// instead of waiting out the cache TTL.</para>
     /// <para><c>maxRangeAttempts</c> / <c>rangeRetryBaseDelay</c> (AB#5189) bound how often the drain
-    /// re-enqueues a range that keeps failing, and how long it is held back between attempts. Must be
-    /// ≥ 1.</para>
+    /// retries a range that keeps failing before parking it, and how long it is held back between
+    /// attempts. Must be ≥ 1. <c>staleJobTimeout</c> is how long a non-terminal job may go without a
+    /// heartbeat before the drain fails it as belonging to a dead process; defaults to
+    /// <see cref="DefaultStaleJobTimeout"/>. Must be positive.</para>
     /// </remarks>
     public RecomputeOrchestrator(
         string tenantId,
@@ -135,7 +151,8 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         Func<TimeSpan, CancellationToken, Task>? delay = null,
         IArchiveCoverageInvalidator? coverageInvalidator = null,
         int maxRangeAttempts = DefaultMaxRangeAttempts,
-        TimeSpan? rangeRetryBaseDelay = null)
+        TimeSpan? rangeRetryBaseDelay = null,
+        TimeSpan? staleJobTimeout = null)
     {
         if (maxBucketsPerChunk <= 0)
         {
@@ -153,6 +170,12 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         {
             throw new ArgumentOutOfRangeException(
                 nameof(maxRangeAttempts), maxRangeAttempts, "Range attempts must be positive.");
+        }
+
+        if (staleJobTimeout is { } stale && stale <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(staleJobTimeout), staleJobTimeout, "Stale-job timeout must be positive.");
         }
 
         _tenantId = tenantId;
@@ -173,13 +196,30 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         _coverageInvalidator = coverageInvalidator;
         _maxRangeAttempts = maxRangeAttempts;
         _rangeRetryBaseDelay = rangeRetryBaseDelay ?? DefaultRangeRetryBaseDelay;
+        _staleJobTimeout = staleJobTimeout ?? DefaultStaleJobTimeout;
     }
 
     /// <summary>
     /// One periodic tick: fan out every source's dirty windows onto its dependents (Information A →
     /// B), then drain each activated rollup's pending recompute ranges (coalesced into disjoint
-    /// intervals). Returns the number of recompute runs executed.
+    /// intervals, per scope). Returns the number of recompute runs executed.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Obligations stay in the work list until the run over them has committed (AB#5189).</b>
+    /// The drain reads the due ranges, runs them, and only then removes exactly those records — in
+    /// the same write that adds a failure's remainder. A process that dies mid-run therefore leaves
+    /// its work where it was; the next drain (after the dead job is recognised, see
+    /// <see cref="IsStale"/>) simply runs it again, idempotently under the generation pointer.
+    /// </para>
+    /// <para>
+    /// <b>Interruption is not failure.</b> A run cut short by cancellation (shutdown) hands its
+    /// remainder back without counting an attempt or imposing a backoff, and the tick stops; every
+    /// obligation it had not reached is untouched. A hard process death counts as an attempt for the
+    /// obligations the dead job was working on — otherwise a range that crashes the process would
+    /// be retried every timeout forever.
+    /// </para>
+    /// </remarks>
     public async Task<int> TickAsync(CancellationToken cancellationToken)
     {
         await foreach (var archive in _archiveStore.EnumerateAsync().WithCancellation(cancellationToken))
@@ -202,91 +242,258 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 continue;
             }
 
+            var tickNow = _clock();
             var pending = await _stateStore.GetPendingRecomputeRangesAsync(rollup.RtId);
+
+            // AB#5189: a job whose process died stays non-terminal forever and, because every later
+            // trigger coalesces into the active job, freezes the rollup. Recognise it by its silent
+            // heartbeat, fail it, and carry on with the work that is still queued.
+            var active = await _jobStore.GetActiveForArchiveAsync(rollup.RtId);
+            if (active is not null && IsStale(active, tickNow, pending.Count))
+            {
+                pending = await RecoverStaleJobAsync(rollup.RtId, active, pending, tickNow);
+                active = null;
+            }
+
+            if (active is { State: RecomputeJobState.Running or RecomputeJobState.Swapping })
+            {
+                // Alive and progressing — a manual run, or a drain in another process. Its own
+                // completion settles this rollup's work list; touching it now would race that.
+                continue;
+            }
+
             if (pending.Count == 0)
             {
                 continue;
             }
 
-            // AB#5189: a range that has already failed is held back until its backoff has elapsed.
-            // Only the due ones are consumed this tick; the rest stay in the work list untouched.
-            var tickNow = _clock();
+            // A range that has already failed is held back until its backoff has elapsed; a parked
+            // one is never due. Only the due ones run this tick; the rest stay in the list untouched.
             var due = pending.Where(r => r.IsDueAt(tickNow)).ToList();
             if (due.Count == 0)
             {
                 continue;
             }
 
-            var heldBack = pending.Where(r => !r.IsDueAt(tickNow)).ToList();
-
             // AB#4286: a durable background backfill / manual recompute pre-creates a Pending job for
             // pollability (the client that queued the work is handed that job id). Adopt it here so the
             // client polls one job id from Pending → Completed, instead of the pre-created Pending job
             // lingering while a throwaway Periodic job actually runs the range.
-            var active = await _jobStore.GetActiveForArchiveAsync(rollup.RtId);
             var adoptJob = active is { State: RecomputeJobState.Pending } ? active : null;
 
-            var merged = RecomputePlanner.MergeIntervals(due.Select(r => (r.RangeStart, r.RangeEnd)));
-
-            // Consume the due work in a single write that keeps the backed-off ranges (AB#5189).
-            // Clear-then-enqueue would lose every held-back obligation if the process died in
-            // between — the exact class of silent work loss this item is about.
-            await _stateStore.ReplacePendingRecomputeRangesAsync(rollup.RtId, heldBack);
-
-            foreach (var (start, end) in merged)
+            // AB#5189: obligations are merged and run PER SCOPE. A scoped obligation (one entity) must
+            // not be widened into a full-range recompute of every entity — the cost escalation for a
+            // large tenant is enormous — nor may an unscoped one be narrowed to a single entity. The
+            // unscoped group goes first so the adopted job, which a backfill always creates unscoped,
+            // takes an unscoped interval.
+            foreach (var group in due.GroupBy(r => r.RtIdScope).OrderBy(g => g.Key is null ? 0 : 1))
             {
-                // The first merged interval adopts the pre-created Pending job (keeping its trigger,
-                // e.g. Manual for a backfill); any further disjoint intervals run as fresh Periodic
-                // jobs. Only one pre-created job exists per rollup.
-                var trigger = adoptJob?.Trigger ?? RecomputeTrigger.Periodic;
-                var outcome = await RecomputeArchiveInternalAsync(
-                    rollup.RtId, start, end, rtIdScope: null, trigger, cancellationToken, adoptJob);
-                adoptJob = null;
+                var scope = group.Key;
+                var obligations = group.ToList();
+                var merged = RecomputePlanner.MergeIntervals(obligations.Select(r => (r.RangeStart, r.RangeEnd)));
 
-                if (outcome.Job.State != RecomputeJobState.Failed)
+                foreach (var (start, end) in merged)
                 {
-                    recomputeCount++;
-                }
+                    // The obligations this interval was merged from: exactly the records to settle once
+                    // the run is over. MergeIntervals keeps only the bounds, so recover them here.
+                    var fed = obligations.Where(r => r.Overlaps(start, end)).ToList();
 
-                // AB#5189: re-enqueue only what did NOT run, and carry the attempt count of the
-                // obligations this interval was merged from. The committed prefix is not repeated —
-                // before this, a permanently failing range re-ran every committed chunk on every
-                // tick, burning a generation each time.
-                if (outcome.UnfinishedFrom is not { } unfinishedFrom)
-                {
-                    continue;
-                }
+                    // The first merged interval adopts the pre-created Pending job (keeping its trigger,
+                    // e.g. Manual for a backfill); any further intervals run as fresh Periodic jobs.
+                    var trigger = adoptJob?.Trigger ?? RecomputeTrigger.Periodic;
+                    var outcome = await RecomputeArchiveInternalAsync(
+                        rollup.RtId, start, end, scope, trigger, cancellationToken, adoptJob);
+                    adoptJob = null;
 
-                var attempts = MaxAttemptsCovering(due, start, end) + 1;
-                var reason = outcome.Job.ErrorReason;
-
-                if (attempts >= _maxRangeAttempts)
-                {
-                    _logger.LogError(
-                        "Recompute of rollup {RollupRtId}: range [{Start:O},{End:O}) failed {Attempts} times " +
-                        "and is given up on — [{UnfinishedFrom:O},{End:O}) stays un-recomputed until the " +
-                        "cause is fixed and a recompute is triggered again. Last error: {Reason}",
-                        rollup.RtId, start, end, attempts, unfinishedFrom, end, reason);
-                    continue;
-                }
-
-                var backoff = RangeRetryDelay(attempts);
-                _logger.LogWarning(
-                    "Recompute of rollup {RollupRtId}: [{UnfinishedFrom:O},{End:O}) still outstanding after " +
-                    "attempt {Attempts}/{MaxAttempts}; retrying after {Backoff}. Last error: {Reason}",
-                    rollup.RtId, unfinishedFrom, end, attempts, _maxRangeAttempts, backoff, reason);
-
-                await _stateStore.EnqueueRecomputeRangesAsync(rollup.RtId,
-                    new[]
+                    if (outcome.Interrupted)
                     {
-                        new ArchiveRecomputeRange(
-                            rollup.RtId, unfinishedFrom, end, null, tickNow,
-                            attempts, tickNow + backoff, reason),
-                    });
+                        await SettleInterruptedRunAsync(rollup.RtId, fed, outcome, scope);
+                        // Stop the tick: the token is cancelled, and every obligation not reached yet
+                        // is still in the list exactly as it was.
+                        cancellationToken.ThrowIfCancellationRequested();
+                    }
+
+                    if (outcome.Job.State != RecomputeJobState.Failed)
+                    {
+                        recomputeCount++;
+                    }
+
+                    if (outcome.UnfinishedFrom is not { } unfinishedFrom)
+                    {
+                        // Nothing outstanding — committed, coalesced into a job that started meanwhile,
+                        // or a target that is gone. Either way these obligations are settled.
+                        await _stateStore.UpdatePendingRecomputeRangesAsync(
+                            rollup.RtId, fed, Array.Empty<ArchiveRecomputeRange>());
+                        continue;
+                    }
+
+                    // Only what did NOT run goes back, carrying the highest attempt count and the
+                    // earliest enqueue time of the obligations it came from. The committed prefix is
+                    // not repeated — before this, a permanently failing range re-ran every committed
+                    // chunk on every tick, burning a generation each time. Taking the maximum means a
+                    // fresh obligation merged into one close to the cap cannot restart the retry loop.
+                    var attempts = fed.Max(r => r.Attempts) + 1;
+                    var enqueuedAt = fed.Min(r => r.EnqueuedAt);
+                    var reason = outcome.Job.ErrorReason;
+                    ArchiveRecomputeRange remainder;
+
+                    if (attempts >= _maxRangeAttempts)
+                    {
+                        _logger.LogError(
+                            "Recompute of rollup {RollupRtId}: range [{Start:O},{End:O}) failed {Attempts} times " +
+                            "and is parked — [{UnfinishedFrom:O},{End:O}) stays un-recomputed and visible on the " +
+                            "archive until the cause is fixed and a recompute covering it succeeds. Last error: {Reason}",
+                            rollup.RtId, start, end, attempts, unfinishedFrom, outcome.UnfinishedTo, reason);
+                        remainder = new ArchiveRecomputeRange(
+                            rollup.RtId, unfinishedFrom, outcome.UnfinishedTo, scope, enqueuedAt,
+                            attempts, ArchiveRecomputeRange.ParkedUntil, reason);
+                    }
+                    else
+                    {
+                        var backoff = RangeRetryDelay(attempts);
+                        _logger.LogWarning(
+                            "Recompute of rollup {RollupRtId}: [{UnfinishedFrom:O},{End:O}) still outstanding after " +
+                            "attempt {Attempts}/{MaxAttempts}; retrying after {Backoff}. Last error: {Reason}",
+                            rollup.RtId, unfinishedFrom, outcome.UnfinishedTo, attempts, _maxRangeAttempts, backoff, reason);
+                        remainder = new ArchiveRecomputeRange(
+                            rollup.RtId, unfinishedFrom, outcome.UnfinishedTo, scope, enqueuedAt,
+                            attempts, tickNow + backoff, reason);
+                    }
+
+                    await _stateStore.UpdatePendingRecomputeRangesAsync(rollup.RtId, fed, new[] { remainder });
+                }
             }
         }
 
         return recomputeCount;
+    }
+
+    /// <summary>
+    /// Whether a non-terminal job belongs to a process that is no longer running it (AB#5189). A
+    /// Running job is stale once its heartbeat is older than the stale-job timeout. A Pending job is
+    /// legitimate only while the work it was created for is queued — the drain adopts it as soon as
+    /// that work is due — so one with no queued work at all is an orphan (the process died between
+    /// creating it and enqueuing its range) once it is older than the timeout; a job without any
+    /// heartbeat predates the field and is judged stale on the spot.
+    /// </summary>
+    private bool IsStale(RecomputeJobSnapshot job, DateTime now, int pendingCount)
+    {
+        switch (job.State)
+        {
+            case RecomputeJobState.Running:
+            case RecomputeJobState.Swapping:
+            {
+                var heartbeat = job.LastProgressAt ?? job.StartedAt;
+                return heartbeat is null || now - heartbeat.Value > _staleJobTimeout;
+            }
+            case RecomputeJobState.Pending:
+            {
+                if (pendingCount > 0)
+                {
+                    return false;
+                }
+
+                var created = job.LastProgressAt;
+                return created is null || now - created.Value > _staleJobTimeout;
+            }
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// Fails a job whose process died (AB#5189) so the rollup is no longer blocked by it, clears the
+    /// in-progress flag that job left set, and — for a job that was actually running — counts the
+    /// death as a failed attempt on the obligations it was working on, with the usual backoff, so a
+    /// range that crashes its process is throttled and eventually parked like any other failing
+    /// range. Returns the work list as it is after the update.
+    /// </summary>
+    private async Task<IReadOnlyList<ArchiveRecomputeRange>> RecoverStaleJobAsync(
+        OctoObjectId rollupRtId,
+        RecomputeJobSnapshot job,
+        IReadOnlyList<ArchiveRecomputeRange> pending,
+        DateTime now)
+    {
+        var heartbeat = job.LastProgressAt ?? job.StartedAt;
+        var reason = job.State == RecomputeJobState.Pending
+            ? $"Orphaned: created at {heartbeat:O} but no recompute work is queued for it (the process " +
+              "died before the work was enqueued); failed so later triggers no longer coalesce into it."
+            : $"Presumed dead: no progress since {heartbeat:O}, longer than the stale-job timeout " +
+              $"({_staleJobTimeout}). The work that was still queued is picked up by the next drain.";
+
+        await _jobStore.UpdateAsync(job with
+        {
+            State = RecomputeJobState.Failed,
+            FinishedAt = now,
+            DurationMs = job.StartedAt is { } startedAt ? (int)(now - startedAt).TotalMilliseconds : 0,
+            ErrorReason = reason,
+        });
+        await _stateStore.MarkRecomputeFailedAsync(rollupRtId, now, reason);
+        await _audit.RecordRecomputeFailureAsync(_tenantId, rollupRtId, job.RangeStart, job.RangeEnd, reason);
+        _logger.LogError(
+            "Recompute job {JobRtId} of rollup {RollupRtId} ({State}, [{Start:O},{End:O})) recovered: {Reason}",
+            job.RtId, rollupRtId, job.State, job.RangeStart, job.RangeEnd, reason);
+
+        if (job.State == RecomputeJobState.Pending)
+        {
+            return pending;
+        }
+
+        var affected = pending
+            .Where(r => !r.IsParked && r.RtIdScope == job.RtIdScope && r.Overlaps(job.RangeStart, job.RangeEnd))
+            .ToList();
+        if (affected.Count == 0)
+        {
+            return pending;
+        }
+
+        var bumped = affected.Select(r =>
+        {
+            var attempts = r.Attempts + 1;
+            return r with
+            {
+                Attempts = attempts,
+                NextAttemptAt = attempts >= _maxRangeAttempts
+                    ? ArchiveRecomputeRange.ParkedUntil
+                    : now + RangeRetryDelay(attempts),
+                LastError = reason,
+            };
+        }).ToList();
+
+        await _stateStore.UpdatePendingRecomputeRangesAsync(rollupRtId, affected, bumped);
+        return pending.Except(affected).Concat(bumped).ToList();
+    }
+
+    /// <summary>
+    /// Settles the obligations of a run that was cut short by cancellation (AB#5189): the remainder
+    /// goes back at the SAME attempt count, due immediately, so a redeploy costs neither an attempt
+    /// nor a backoff; the committed prefix is not repeated. A run that had already committed
+    /// everything before the cancellation was noticed has nothing outstanding and is settled like a
+    /// success.
+    /// </summary>
+    private async Task SettleInterruptedRunAsync(
+        OctoObjectId rollupRtId,
+        IReadOnlyList<ArchiveRecomputeRange> fed,
+        RecomputeRunOutcome outcome,
+        OctoObjectId? scope)
+    {
+        if (outcome.UnfinishedFrom is not { } unfinishedFrom)
+        {
+            await _stateStore.UpdatePendingRecomputeRangesAsync(rollupRtId, fed, Array.Empty<ArchiveRecomputeRange>());
+            return;
+        }
+
+        var mostTried = fed.OrderByDescending(r => r.Attempts).First();
+        var remainder = new ArchiveRecomputeRange(
+            rollupRtId, unfinishedFrom, outcome.UnfinishedTo, scope, fed.Min(r => r.EnqueuedAt),
+            mostTried.Attempts, null, mostTried.LastError);
+
+        _logger.LogInformation(
+            "Recompute of rollup {RollupRtId}: run interrupted; [{UnfinishedFrom:O},{End:O}) stays queued at " +
+            "attempt {Attempts} and resumes on the next tick.",
+            rollupRtId, unfinishedFrom, outcome.UnfinishedTo, mostTried.Attempts);
+
+        await _stateStore.UpdatePendingRecomputeRangesAsync(rollupRtId, fed, new[] { remainder });
     }
 
     /// <summary>
@@ -372,9 +579,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         var outcome = await RecomputeArchiveInternalAsync(
             rollupRtId, from, to, rtIdScope, trigger, cancellationToken, adoptExistingJob: null);
 
-        // AB#5189: a manually triggered recompute that died part-way records what it did not finish,
-        // so the next drain picks the remainder up. Attempt zero — this is the obligation's first
-        // life; the drain counts the retries from here and eventually gives up (MaxRangeAttempts).
+        // AB#5189: a manually triggered recompute that died part-way — a failure or a cancelled
+        // request — records what it did not finish, so the next drain picks the remainder up, with
+        // the scope it was asked for. Attempt zero — this is the obligation's first life; the drain
+        // counts the retries from here and eventually parks it (MaxRangeAttempts).
         if (outcome.UnfinishedFrom is { } unfinishedFrom)
         {
             await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
@@ -393,11 +601,14 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     /// requested range that never committed. <see cref="UnfinishedFrom"/> is <c>null</c> when
     /// nothing is outstanding — a completed run, a coalesced one (the range was folded into the
     /// active job), or a failure the caller must not retry (the rollup is gone or not activated).
+    /// <see cref="Interrupted"/> marks a run cut short by the caller's cancellation token rather
+    /// than by an error: the remainder is outstanding, but it is not the range's fault.
     /// </summary>
     private readonly record struct RecomputeRunOutcome(
         RecomputeJobSnapshot Job,
         DateTime? UnfinishedFrom,
-        DateTime UnfinishedTo);
+        DateTime UnfinishedTo,
+        bool Interrupted = false);
 
     /// <summary>
     /// Core recompute worker shared by the public <see cref="RecomputeArchiveAsync"/> entry point and
@@ -464,9 +675,11 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // capping at the bucket containing `now` left every bucket inside the lag window owned by
         // both. The recompute won the read path permanently, and the late source rows the lag exists
         // to absorb — which arrive after the recompute has read the source and before the bucket
-        // lag-closes — never reached the series. Mirroring the forward condition exactly makes the
-        // ownership rule self-evident: buckets that are lag-closed belong to the recompute,
-        // everything after belongs to the forward pass.
+        // lag-closes — never reached the series. Mirroring the forward condition exactly gives the
+        // guarantee its precise form: the recompute never touches a bucket the forward pass will
+        // write AGAIN. A lag-closed bucket is written by the forward pass exactly once, when it
+        // closes it, and by a recompute any time after that — both values are final, so either order
+        // is correct; the buckets inside the lag window are the forward pass's alone.
         var forwardFrontier = now - rollup.WatermarkLag;
         var openBucketStart = BucketBoundary.AlignDown(
             forwardFrontier, rollup.BucketAlignment, rollup.BucketSize, zone);
@@ -568,6 +781,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 StartedAt = startedAt,
                 FinishedAt = null,
                 ErrorReason = null,
+                LastProgressAt = startedAt,
             };
             await _jobStore.UpdateAsync(job);
         }
@@ -575,7 +789,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         {
             job = await PersistNewJobAsync(new RecomputeJobSnapshot(
                 OctoObjectId.Empty, rollupRtId, RecomputeJobState.Running, trigger,
-                from, to, rtIdScope, null, null, startedAt, null, null, null, null));
+                from, to, rtIdScope, null, null, startedAt, null, null, null, null, startedAt));
         }
 
         await _stateStore.MarkRecomputeStartedAsync(rollupRtId, startedAt);
@@ -632,8 +846,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                 chunkIndex++;
 
                 // Persist running totals after each chunk so a long backfill is observable while it
-                // runs. State stays Running; the terminal Completed write happens once below.
-                job = job with { RowsProcessed = totalRows, WindowsProcessed = totalWindows };
+                // runs, and stamp the heartbeat (AB#5189) so a drain — in this process or another —
+                // can tell this job is alive. State stays Running; the terminal Completed write
+                // happens once below.
+                job = job with { RowsProcessed = totalRows, WindowsProcessed = totalWindows, LastProgressAt = _clock() };
                 await _jobStore.UpdateAsync(job);
 
                 if (chunks.Count > 1)
@@ -662,6 +878,12 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             await _audit.RecordRecomputeRunAsync(
                 _tenantId, rollupRtId, from, to, totalRows, totalWindows, elapsed);
 
+            // AB#5189: a parked obligation (attempts exhausted) inside the range just committed is
+            // satisfied by this run — the operator fixed the cause and recomputed, or a later
+            // obligation over the same range went through. Release it; otherwise it would sit on the
+            // entity forever, reporting a failure that has been repaired.
+            await ReleaseParkedObligationsAsync(rollupRtId, from, to, rtIdScope);
+
             // AB#5157: a recompute (above all a backfill) can extend the rollup's stored range far
             // beyond what the TTL would surface in time; drop the memoised coverage so the next
             // coverage query re-measures.
@@ -675,22 +897,41 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         }
         catch (Exception ex)
         {
+            // AB#5189: a run cut short by OUR token (shutdown, or the caller's request cancelled) is
+            // an interruption, not a failure of the range — nothing about the data or the rollup is
+            // wrong, the process just has to stop. Any other exception, including a cancellation the
+            // storage layer raised on its own (a timeout), is a real failure.
+            var interrupted = ex is OperationCanceledException && cancellationToken.IsCancellationRequested;
             var finishedAt = _clock();
+            var reason = interrupted
+                ? $"Interrupted before the range completed (shutdown or caller cancellation); " +
+                  $"[{unfinishedFrom:O},{to:O}) stays queued and resumes on the next drain."
+                : ex.Message;
             var failed = job with
             {
                 State = RecomputeJobState.Failed,
                 FinishedAt = finishedAt,
                 DurationMs = (int)(finishedAt - startedAt).TotalMilliseconds,
-                ErrorReason = ex.Message,
+                ErrorReason = reason,
             };
             await _jobStore.UpdateAsync(failed);
-            await _stateStore.MarkRecomputeFailedAsync(rollupRtId, finishedAt, ex.Message);
-            await _audit.RecordRecomputeFailureAsync(_tenantId, rollupRtId, from, to, ex.Message);
+            await _stateStore.MarkRecomputeFailedAsync(rollupRtId, finishedAt, reason);
+            await _audit.RecordRecomputeFailureAsync(_tenantId, rollupRtId, from, to, reason);
 
-            _logger.LogError(ex,
-                "Recompute of rollup {RollupRtId} range [{From:O},{To:O}) failed; " +
-                "[{UnfinishedFrom:O},{To:O}) is still outstanding",
-                rollupRtId, from, to, unfinishedFrom, to);
+            if (interrupted)
+            {
+                _logger.LogInformation(
+                    "Recompute of rollup {RollupRtId} range [{From:O},{To:O}) interrupted; " +
+                    "[{UnfinishedFrom:O},{To:O}) is still outstanding",
+                    rollupRtId, from, to, unfinishedFrom, to);
+            }
+            else
+            {
+                _logger.LogError(ex,
+                    "Recompute of rollup {RollupRtId} range [{From:O},{To:O}) failed; " +
+                    "[{UnfinishedFrom:O},{To:O}) is still outstanding",
+                    rollupRtId, from, to, unfinishedFrom, to);
+            }
 
             // AB#5189: the chunks before the failure stay committed, but the rest of the range must
             // not evaporate. The caller records it as outstanding — the manual entry point at attempt
@@ -698,7 +939,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
             // remainder is retried. Chunking (AB#4283) is what turned AB#4184's per-job "a failed run
             // leaves previous values intact" into a per-chunk guarantee; handing the remainder back
             // restores the per-job one.
-            return new RecomputeRunOutcome(failed, unfinishedFrom < to ? unfinishedFrom : null, to);
+            return new RecomputeRunOutcome(failed, unfinishedFrom < to ? unfinishedFrom : null, to, interrupted);
         }
     }
 
@@ -837,9 +1078,12 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
         // Pre-create the Pending job first (persisted → survives an asset-repo restart), then enqueue
         // the persisted pending range. Ordering matters: if a tick fires between the two writes it sees
         // the Pending job but no range yet and simply skips — no orphaned throwaway job is created.
+        // The heartbeat on a Pending job is its creation time (AB#5189): a Pending job that never
+        // gets its range — the process died between these two writes — is recognised as an orphan by
+        // the drain once it is older than the stale-job timeout and has no queued work.
         var pending = await PersistNewJobAsync(new RecomputeJobSnapshot(
             OctoObjectId.Empty, rollupRtId, RecomputeJobState.Pending, RecomputeTrigger.Manual,
-            from, now, null, null, null, null, null, null, null, null));
+            from, now, null, null, null, null, null, null, null, null, now));
 
         await _stateStore.EnqueueRecomputeRangesAsync(rollupRtId,
             new[] { new ArchiveRecomputeRange(rollupRtId, from, now, null, now) });
@@ -853,31 +1097,35 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
     }
 
     /// <summary>
-    /// Highest attempt count among the pending obligations that overlap <c>[start, end)</c>
-    /// (AB#5189). <see cref="RecomputePlanner.MergeIntervals"/> collapses several obligations into
-    /// one interval and drops everything but the bounds, so the attempt count has to be recovered
-    /// from the ranges that fed it. Taking the maximum means merging a fresh obligation into a range
-    /// that is already close to the cap cannot reset the counter and restart the retry loop.
+    /// Removes every parked obligation (AB#5189) that the committed range <c>[from, to)</c> fully
+    /// contains. An unscoped recompute covers every entity and releases parked obligations of any
+    /// scope; a scoped one releases only those of the same scope. A parked obligation reaching
+    /// beyond the committed range is still outstanding for the part outside it and is kept.
     /// </summary>
-    private static int MaxAttemptsCovering(
-        IReadOnlyList<ArchiveRecomputeRange> ranges, DateTime start, DateTime end)
+    private async Task ReleaseParkedObligationsAsync(
+        OctoObjectId rollupRtId, DateTime from, DateTime to, OctoObjectId? rtIdScope)
     {
-        var attempts = 0;
-        foreach (var range in ranges)
+        var pending = await _stateStore.GetPendingRecomputeRangesAsync(rollupRtId);
+        var released = pending
+            .Where(r => r.IsParked
+                        && r.IsContainedIn(from, to)
+                        && (rtIdScope is null || r.RtIdScope == rtIdScope))
+            .ToList();
+        if (released.Count == 0)
         {
-            if (range.RangeStart < end && start < range.RangeEnd && range.Attempts > attempts)
-            {
-                attempts = range.Attempts;
-            }
+            return;
         }
 
-        return attempts;
+        _logger.LogInformation(
+            "Recompute of rollup {RollupRtId} range [{From:O},{To:O}) released {Count} parked obligation(s) it covers.",
+            rollupRtId, from, to, released.Count);
+        await _stateStore.UpdatePendingRecomputeRangesAsync(rollupRtId, released, Array.Empty<ArchiveRecomputeRange>());
     }
 
     /// <summary>
     /// Exponential per-range backoff (AB#5189): the <c>n</c>-th failure waits
     /// <c>base * 2^(n-1)</c>, capped at <see cref="MaxRangeRetryDelay"/> so a large attempt count
-    /// can neither overflow nor park an obligation for days.
+    /// can neither overflow nor hold an obligation back for days.
     /// </summary>
     private TimeSpan RangeRetryDelay(int attempts)
     {

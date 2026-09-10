@@ -25,6 +25,12 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// <param name="DurationMs">Wall-clock duration in ms; <c>null</c> while running.</param>
 /// <param name="ErrorReason">Failure reason when <see cref="State"/> is Failed; <c>null</c> otherwise.</param>
 /// <param name="StagingTableName">Per-job staging table name, for post-mortem; <c>null</c> once swept.</param>
+/// <param name="LastProgressAt">
+/// Heartbeat (AB#5189): stamped when the job is created or starts computing and again after every
+/// committed chunk. A non-terminal job whose heartbeat is older than the orchestrator's stale-job
+/// timeout belongs to a process that died; the drain fails it and carries on with its queued work.
+/// <c>null</c> on jobs written before the field existed.
+/// </param>
 public sealed record RecomputeJobSnapshot(
     OctoObjectId RtId,
     OctoObjectId ArchiveRtId,
@@ -39,4 +45,5 @@ public sealed record RecomputeJobSnapshot(
     DateTime? FinishedAt,
     int? DurationMs,
     string? ErrorReason,
-    string? StagingTableName);
+    string? StagingTableName,
+    DateTime? LastProgressAt = null);

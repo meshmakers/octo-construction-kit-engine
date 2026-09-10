@@ -47,12 +47,27 @@ public interface IArchiveRecomputeStateStore
     Task ClearPendingRecomputeRangesAsync(OctoObjectId archiveRtId);
 
     /// <summary>
-    /// Replaces the whole pending recompute-range work list in one write (AB#5189). The drain
-    /// consumes only the ranges that are due and has to leave the backed-off ones in place; doing
-    /// that as clear-then-enqueue would drop every held-back obligation if the process died in
-    /// between — which is the very failure mode the attempt tracking exists to survive.
+    /// Applies one delta to the pending recompute-range work list in a single write (AB#5189):
+    /// every stored obligation equal to one of <paramref name="remove"/> is taken out, then
+    /// <paramref name="add"/> is appended. Either list may be empty.
     /// </summary>
-    Task ReplacePendingRecomputeRangesAsync(OctoObjectId archiveRtId, IReadOnlyList<ArchiveRecomputeRange> ranges);
+    /// <remarks>
+    /// <para>
+    /// The drain leaves the obligations it is working on <em>in</em> the list while the run is in
+    /// progress and only removes them here, once the run has committed — so a process that dies
+    /// mid-run leaves its work exactly where it was, and the next drain picks it up. Removing and
+    /// re-adding in one write keeps a failure's remainder from ever being absent from the list.
+    /// </para>
+    /// <para>
+    /// Removal is by value (record equality): the caller hands back the very records it read. An
+    /// obligation appended concurrently — a manual trigger coalesced into the running job — has a
+    /// later <see cref="ArchiveRecomputeRange.EnqueuedAt"/>, is not equal, and survives.
+    /// </para>
+    /// </remarks>
+    Task UpdatePendingRecomputeRangesAsync(
+        OctoObjectId archiveRtId,
+        IReadOnlyList<ArchiveRecomputeRange> remove,
+        IReadOnlyList<ArchiveRecomputeRange> add);
 
     /// <summary>
     /// Sets <c>RecomputeInProgress = true</c> and stamps <c>LastRecomputeStartedAt</c>. Called when a

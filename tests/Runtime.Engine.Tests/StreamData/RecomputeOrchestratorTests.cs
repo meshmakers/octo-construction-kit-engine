@@ -723,11 +723,14 @@ public class RecomputeOrchestratorTests
         Assert.Equal(1, count);
         A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, From, To, null, A<CancellationToken>._))
             .MustHaveHappenedOnceExactly();
-        // AB#5189: the due ranges are consumed by a single Replace that keeps the backed-off ones,
-        // not by a blanket Clear — here nothing is held back, so the replacement list is empty.
-        A.CallTo(() => _stateStore.ReplacePendingRecomputeRangesAsync(
-                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 0)))
+        // AB#5189: the obligation stays in the work list while the run is in progress and is removed
+        // — by value — once the run has committed, never by a blanket Clear.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == From && rs[0].RangeEnd == To),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 0)))
             .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearPendingRecomputeRangesAsync(RollupRt)).MustNotHaveHappened();
     }
 
     [Fact]
@@ -1018,6 +1021,31 @@ public class RecomputeOrchestratorTests
                 A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
                 A<OctoObjectId?>._, A<CancellationToken>._))
             .MustHaveHappened(2, Times.Exactly);
+    }
+
+    // AB#5189 (WI AC 4, "multi-piece"): the second source segment fails after the first has
+    // committed. The remainder recorded is exactly the failed segment — from the cutover on.
+    [Fact]
+    public async Task Recompute_SecondSourceSegmentFails_RecordsTheRemainderFromTheCutover()
+    {
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, CutoverSources()));
+        StubBothSources();
+        var from = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 13, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("the native source cannot serve the aggregation path"));
+
+        var job = await NewSut().RecomputeArchiveAsync(
+            RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.Equal(42, job.RowsProcessed);   // the legacy segment committed before the failure
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == Cutover && rs[0].RangeEnd == to && rs[0].Attempts == 0)))
+            .MustHaveHappenedOnceExactly();
     }
 
     [Fact]
@@ -1390,7 +1418,8 @@ public class RecomputeOrchestratorTests
         var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
         var end = new DateTime(2026, 5, 11, 5, 0, 0, DateTimeKind.Utc);
         var failedChunkStart = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
-        StubPending(new ArchiveRecomputeRange(RollupRt, start, end, null, Now));
+        var obligation = new ArchiveRecomputeRange(RollupRt, start, end, null, Now.AddHours(-3));
+        StubPending(obligation);
 
         A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 failedChunkStart, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
@@ -1398,28 +1427,316 @@ public class RecomputeOrchestratorTests
 
         await NewSut(maxBucketsPerChunk: 2).TickAsync(CancellationToken.None);
 
-        // Only the tail is re-enqueued — the committed prefix is not repeated on the next tick, which
-        // is what made a permanently failing rollup re-commit the same buckets every minute.
-        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt,
+        // Only the tail goes back — the committed prefix is not repeated on the next tick, which is
+        // what made a permanently failing rollup re-commit the same buckets every minute. The
+        // obligation it replaces is removed in the SAME write, and the remainder keeps the original
+        // enqueue time so "open since when" survives the retry.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == obligation),
                 A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
                     rs.Count == 1
                     && rs[0].RangeStart == failedChunkStart
                     && rs[0].RangeEnd == end
                     && rs[0].Attempts == 1
                     && rs[0].NextAttemptAt == Now + RecomputeOrchestrator.DefaultRangeRetryBaseDelay
-                    && rs[0].LastError == "boom")))
+                    && rs[0].LastError == "boom"
+                    && rs[0].EnqueuedAt == obligation.EnqueuedAt)))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_FailedInterval_HandsBackTheRemainderUpToTheLagFrontier_NotTheRequestedEnd()
+    {
+        StubRollupAndSource();
+        // The obligation reaches into the lag window: Now is 14:00 with a 5-minute lag, so the
+        // recompute caps its range at 13:00 and the forward pass owns [13:00, 14:00).
+        var start = new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc);
+        var requestedEnd = new DateTime(2026, 5, 11, 14, 0, 0, DateTimeKind.Utc);
+        var cappedEnd = new DateTime(2026, 5, 11, 13, 0, 0, DateTimeKind.Utc);
+        StubPending(new ArchiveRecomputeRange(RollupRt, start, requestedEnd, null, Now));
+
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("boom"));
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        // The buckets inside the lag window are the forward pass's; carrying them in the remainder
+        // would only make the next attempt cap them again.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>._,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == start && rs[0].RangeEnd == cappedEnd)))
             .MustHaveHappenedOnceExactly();
     }
 
     [Fact]
-    public async Task Tick_RangeAtTheAttemptCap_IsGivenUpOnInsteadOfRetriedForever()
+    public async Task Tick_MergedObligations_CarryTheHighestAttemptCountAndTheEarliestEnqueueTime()
+    {
+        StubRollupAndSource();
+        // Two adjacent obligations merge into one interval; one is fresh, the other has failed
+        // three times already. A failure of the merged run must not reset the counter to 1.
+        var fresh = new ArchiveRecomputeRange(RollupRt,
+            new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc), null, Now.AddMinutes(-1));
+        var tried = new ArchiveRecomputeRange(RollupRt,
+            new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc), null, Now.AddHours(-2), 3, Now.AddMinutes(-1), "older");
+        StubPending(fresh, tried);
+
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("boom"));
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 2 && rs.Contains(fresh) && rs.Contains(tried)),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == fresh.RangeStart
+                    && rs[0].RangeEnd == tried.RangeEnd
+                    && rs[0].Attempts == 4
+                    && rs[0].EnqueuedAt == tried.EnqueuedAt)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_ScopedObligation_RunsWithItsScope_AndIsNotMergedWithAnUnscopedOne()
+    {
+        StubRollupAndSource();
+        var entity = OctoObjectId.GenerateNewId();
+        var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
+        var unscoped = new ArchiveRecomputeRange(RollupRt, start, end, null, Now);
+        var scoped = new ArchiveRecomputeRange(RollupRt, start, end, entity, Now);
+        StubPending(unscoped, scoped);
+
+        var runs = await NewSut().TickAsync(CancellationToken.None);
+
+        // Same range, two obligations, two runs: one over every entity, one over the single entity.
+        // Widening the scoped one into the unscoped run would recompute every entity for a
+        // single-entity request; narrowing the unscoped one would silently skip the others.
+        Assert.Equal(2, runs);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                start, end, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                start, end, entity, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_ScopedObligationThatFails_KeepsItsScopeOnTheRemainder()
+    {
+        StubRollupAndSource();
+        var entity = OctoObjectId.GenerateNewId();
+        var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc);
+        var failedChunkStart = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
+        StubPending(new ArchiveRecomputeRange(RollupRt, start, end, entity, Now));
+
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                failedChunkStart, A<DateTime>._, entity, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("boom"));
+
+        await NewSut(maxBucketsPerChunk: 2).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>._,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == failedChunkStart && rs[0].RtIdScope == entity)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_InterruptedRun_HandsTheRemainderBackWithoutCountingAnAttempt_AndStopsTheTick()
+    {
+        StubRollupAndSource();
+        var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 11, 5, 0, 0, DateTimeKind.Utc);
+        var interruptedChunkStart = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
+        var running = new ArchiveRecomputeRange(RollupRt, start, end, null, Now.AddHours(-1), 2, Now.AddMinutes(-1), "earlier");
+        var notReached = new ArchiveRecomputeRange(RollupRt,
+            new DateTime(2026, 5, 11, 8, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 5, 11, 9, 0, 0, DateTimeKind.Utc), null, Now);
+        StubPending(running, notReached);
+
+        // Shutdown arrives while the second chunk is running.
+        using var cts = new CancellationTokenSource();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                interruptedChunkStart, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .ReturnsLazily(_ =>
+            {
+                cts.Cancel();
+                throw new OperationCanceledException(cts.Token);
+            });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => NewSut(maxBucketsPerChunk: 2).TickAsync(cts.Token));
+
+        // The remainder goes back at the SAME attempt count and is due immediately — a redeploy is
+        // not the range's fault and must cost neither an attempt nor a backoff.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == running),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == interruptedChunkStart
+                    && rs[0].RangeEnd == end
+                    && rs[0].Attempts == 2
+                    && rs[0].NextAttemptAt == null
+                    && rs[0].EnqueuedAt == running.EnqueuedAt)))
+            .MustHaveHappenedOnceExactly();
+        // The obligation the tick never reached is untouched — not run, not rewritten.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                notReached.RangeStart, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Contains(notReached)),
+                A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        // The job records the interruption as such, not as a failure of the range.
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.State == RecomputeJobState.Failed && j.ErrorReason!.StartsWith("Interrupted"))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_LiveRunningJob_IsLeftAlone_AndTheQueuedWorkStaysUntouched()
+    {
+        StubRollupAndSource();
+        StubPending(new ArchiveRecomputeRange(RollupRt, From, To, null, Now));
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Running, RecomputeTrigger.Manual, From, To, null, 10, 1,
+            Now.AddMinutes(-30), null, null, null, null, Now.AddMinutes(-1)));
+
+        var runs = await NewSut().TickAsync(CancellationToken.None);
+
+        // A manual run (or another process's drain) owns this rollup right now; its completion is
+        // what settles the work list.
+        Assert.Equal(0, runs);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(
+                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_StaleRunningJob_IsFailed_AndTheDeathCountsAsAnAttemptOnItsObligations()
+    {
+        StubRollupAndSource();
+        var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc);
+        var obligation = new ArchiveRecomputeRange(RollupRt, start, end, null, Now.AddHours(-3));
+        var unrelated = new ArchiveRecomputeRange(RollupRt,
+            new DateTime(2026, 5, 11, 8, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 5, 11, 9, 0, 0, DateTimeKind.Utc), null, Now);
+        StubPending(obligation, unrelated);
+        // The process running this job died two hours ago; nobody has advanced it since.
+        var dead = new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Running, RecomputeTrigger.Periodic, start, end, null, 10, 1,
+            Now.AddHours(-2), null, null, null, null, Now.AddHours(-2));
+        // The store hands the dead job out once; after the drain has failed it, nothing is active.
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt))
+            .ReturnsNextFromSequence(dead, (RecomputeJobSnapshot?)null);
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.RtId == JobRt && j.State == RecomputeJobState.Failed && j.FinishedAt == Now
+                && j.ErrorReason!.StartsWith("Presumed dead"))))
+            .MustHaveHappenedOnceExactly();
+        // The in-progress flag the dead job left behind is cleared.
+        A.CallTo(() => _stateStore.MarkRecomputeFailedAsync(RollupRt, Now, A<string>.That.StartsWith("Presumed dead")))
+            .MustHaveHappenedOnceExactly();
+        // The obligation the job was working on counts the death as an attempt and is backed off;
+        // the unrelated one is not touched.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == obligation),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == start && rs[0].RangeEnd == end
+                    && rs[0].Attempts == 1
+                    && rs[0].NextAttemptAt == Now + RecomputeOrchestrator.DefaultRangeRetryBaseDelay
+                    && rs[0].LastError!.StartsWith("Presumed dead"))))
+            .MustHaveHappenedOnceExactly();
+        // The tick then carries on with the work that IS due — the rollup is no longer frozen.
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                unrelated.RangeStart, unrelated.RangeEnd, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                start, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_RunningJobWithoutHeartbeat_IsJudgedByItsStartTime()
+    {
+        StubRollupAndSource();
+        StubPending(new ArchiveRecomputeRange(RollupRt, From, To, null, Now));
+        // A job written before the heartbeat existed: LastProgressAt null, started two hours ago.
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Running, RecomputeTrigger.Periodic, From, To, null, null, null,
+            Now.AddHours(-2), null, null, null, null));
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.RtId == JobRt && j.State == RecomputeJobState.Failed)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_OrphanedPendingJobWithoutQueuedWork_IsFailedOnceOlderThanTheTimeout()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _rollupStore.EnumerateAsync()).Returns(ToAsyncEnum(Rollup(RollupRt, SourceRt)));
+        A.CallTo(() => _archiveStore.EnumerateAsync()).Returns(ToAsyncEnum(Array.Empty<ArchiveSnapshot>()));
+        // Pre-created by a backfill whose process died before it could enqueue the range.
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Pending, RecomputeTrigger.Manual, From, To, null, null, null,
+            null, null, null, null, null, Now.AddHours(-2)));
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        // Left alone, every later manual trigger would coalesce into this job and never run.
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.RtId == JobRt && j.State == RecomputeJobState.Failed && j.ErrorReason!.StartsWith("Orphaned"))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_FreshPendingJobWithoutQueuedWorkYet_IsLeftAlone()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _rollupStore.EnumerateAsync()).Returns(ToAsyncEnum(Rollup(RollupRt, SourceRt)));
+        A.CallTo(() => _archiveStore.EnumerateAsync()).Returns(ToAsyncEnum(Array.Empty<ArchiveSnapshot>()));
+        // The backfill has just created the job and is about to enqueue its range.
+        A.CallTo(() => _jobStore.GetActiveForArchiveAsync(RollupRt)).Returns(new RecomputeJobSnapshot(
+            JobRt, RollupRt, RecomputeJobState.Pending, RecomputeTrigger.Manual, From, To, null, null, null,
+            null, null, null, null, null, Now.AddSeconds(-1)));
+
+        await NewSut().TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_RangeAtTheAttemptCap_IsParkedInsteadOfRetriedForever_AndStaysVisible()
     {
         StubRollupAndSource();
         var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
         var end = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
         // One short of the cap: this run's failure takes it to the cap.
-        StubPending(new ArchiveRecomputeRange(
-            RollupRt, start, end, null, Now, RecomputeOrchestrator.DefaultMaxRangeAttempts - 1));
+        var obligation = new ArchiveRecomputeRange(
+            RollupRt, start, end, null, Now, RecomputeOrchestrator.DefaultMaxRangeAttempts - 1);
+        StubPending(obligation);
 
         A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
@@ -1427,8 +1744,32 @@ public class RecomputeOrchestratorTests
 
         await NewSut().TickAsync(CancellationToken.None);
 
-        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
-                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+        // Dropping the obligation would leave the entity claiming nothing is outstanding while the
+        // range is stuck; parking keeps it on the entity, never due, until a covering recompute
+        // succeeds (see Recompute_Success_ReleasesTheParkedObligationsItCovers).
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == obligation),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].IsParked
+                    && !rs[0].IsDueAt(Now.AddYears(100))
+                    && rs[0].Attempts == RecomputeOrchestrator.DefaultMaxRangeAttempts
+                    && rs[0].LastError == "permanently broken")))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Tick_ParkedRange_IsNeverRun()
+    {
+        StubRollupAndSource();
+        StubPending(new ArchiveRecomputeRange(RollupRt, From, To, null, Now,
+            RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck"));
+
+        var runs = await NewSut().TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, runs);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
     }
 
@@ -1447,15 +1788,15 @@ public class RecomputeOrchestratorTests
         A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
                 A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
             .MustNotHaveHappened();
-        // Crucially the obligation must still be there — neither cleared nor replaced away.
+        // Crucially the obligation must still be there — neither cleared nor rewritten.
         A.CallTo(() => _stateStore.ClearPendingRecomputeRangesAsync(RollupRt)).MustNotHaveHappened();
-        A.CallTo(() => _stateStore.ReplacePendingRecomputeRangesAsync(
-                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(
+                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
             .MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task Tick_DueRangeConsumed_KeepsTheBackedOffOnesInOneWrite()
+    public async Task Tick_DueRangeSettled_LeavesTheBackedOffOneUntouched()
     {
         StubRollupAndSource();
         var dueRange = new ArchiveRecomputeRange(
@@ -1468,11 +1809,129 @@ public class RecomputeOrchestratorTests
 
         await NewSut().TickAsync(CancellationToken.None);
 
-        A.CallTo(() => _stateStore.ReplacePendingRecomputeRangesAsync(RollupRt,
-                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
-                    rs.Count == 1 && rs[0].RangeStart == backedOff.RangeStart && rs[0].Attempts == 2)))
+        // Only the obligation that ran is removed; the backed-off one is never part of a write.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == dueRange),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 0)))
             .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Contains(backedOff)),
+                A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
         A.CallTo(() => _stateStore.ClearPendingRecomputeRangesAsync(RollupRt)).MustNotHaveHappened();
+    }
+
+    // ---- AB#5189: parked obligations are released by a covering success --------------------------
+
+    [Fact]
+    public async Task Recompute_Success_ReleasesTheParkedObligationsItCovers()
+    {
+        StubRollupAndSource();
+        var from = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc);
+        var parkedInside = new ArchiveRecomputeRange(RollupRt, from, from.AddHours(1), null, Now.AddDays(-1),
+            RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck");
+        var parkedBeyond = new ArchiveRecomputeRange(RollupRt, from.AddHours(1), to.AddHours(1), null, Now.AddDays(-1),
+            RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck");
+        var backedOffInside = new ArchiveRecomputeRange(RollupRt, from, to, null, Now, 2, Now.AddMinutes(5), "later");
+        A.CallTo(() => _stateStore.GetPendingRecomputeRangesAsync(RollupRt))
+            .Returns((IReadOnlyList<ArchiveRecomputeRange>)new[] { parkedInside, parkedBeyond, backedOffInside });
+
+        var job = await NewSut().RecomputeArchiveAsync(RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Completed, job.State);
+        // The operator fixed the cause and recomputed: the parked obligation inside the range is
+        // repaired and goes. The one reaching beyond the range is still outstanding for its tail, and
+        // a backed-off (not parked) one is the drain's business.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == parkedInside),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 0)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_ScopedSuccess_ReleasesOnlyParkedObligationsOfThatScope()
+    {
+        StubRollupAndSource();
+        var entity = OctoObjectId.GenerateNewId();
+        var from = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc);
+        var parkedForEntity = new ArchiveRecomputeRange(RollupRt, from, to, entity, Now.AddDays(-1),
+            RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck");
+        var parkedForAll = new ArchiveRecomputeRange(RollupRt, from, to, null, Now.AddDays(-1),
+            RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck");
+        A.CallTo(() => _stateStore.GetPendingRecomputeRangesAsync(RollupRt))
+            .Returns((IReadOnlyList<ArchiveRecomputeRange>)new[] { parkedForEntity, parkedForAll });
+
+        await NewSut().RecomputeArchiveAsync(RollupRt, from, to, entity, RecomputeTrigger.Manual, CancellationToken.None);
+
+        // A single-entity recompute repairs nothing for the other entities.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 1 && rs[0] == parkedForEntity),
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs => rs.Count == 0)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_Failure_ReleasesNothing()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _stateStore.GetPendingRecomputeRangesAsync(RollupRt))
+            .Returns((IReadOnlyList<ArchiveRecomputeRange>)new[]
+            {
+                new ArchiveRecomputeRange(RollupRt, From, To, null, Now.AddDays(-1),
+                    RecomputeOrchestrator.DefaultMaxRangeAttempts, ArchiveRecomputeRange.ParkedUntil, "stuck"),
+            });
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("still broken"));
+
+        await NewSut().RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(
+                RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    // ---- AB#5189: interruption and heartbeat on the manual path ------------------------------------
+
+    [Fact]
+    public async Task Recompute_Cancelled_MarksTheJobInterrupted_AndQueuesTheWholeRangeAtAttemptZero()
+    {
+        StubRollupAndSource();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var job = await NewSut().RecomputeArchiveAsync(RollupRt, From, To, null, RecomputeTrigger.Manual, cts.Token);
+
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        Assert.StartsWith("Interrupted", job.ErrorReason);
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1 && rs[0].RangeStart == From && rs[0].RangeEnd == To && rs[0].Attempts == 0)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_StampsTheHeartbeat_WhenTheJobStartsAndAfterEveryCommittedChunk()
+    {
+        StubRollupAndSource();
+        var from = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 6, 0, 0, DateTimeKind.Utc);
+
+        await NewSut(maxBucketsPerChunk: 2).RecomputeArchiveAsync(RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        // Three chunks → the Running job is created with a heartbeat and re-stamped three times before
+        // the terminal write; this is what the drain's stale-job detection reads.
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.State == RecomputeJobState.Running && j.LastProgressAt == Now)))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _jobStore.UpdateAsync(A<RecomputeJobSnapshot>.That.Matches(j =>
+                j.State == RecomputeJobState.Running && j.LastProgressAt == Now && j.RowsProcessed != null)))
+            .MustHaveHappened(3, Times.Exactly);
     }
 
     // ---- AB#5189: backfill must skip a source that cannot serve a single bucket ----------------

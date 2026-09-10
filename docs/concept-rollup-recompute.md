@@ -198,6 +198,11 @@ broken rollup — a source that cannot serve one of the aggregation paths, say �
 consuming a recompute run and a generation on every tick; it needs the cause fixed and a fresh
 recompute, which is the honest state for a configuration error.
 
+The pointer is keyed on the exact range, so a recompute over a *different* range adds an entry
+rather than replacing the previous one. After the flip and the sweep, an entry the new range fully
+contains names a generation whose rows are gone, so the flip deletes those contained entries.
+Entries reaching beyond the flipped range are kept — they still govern the part outside it.
+
 ### Bucket ownership — recompute vs forward aggregation
 
 Exactly one of the two writes a given bucket, and the boundary is the **watermark lag**:

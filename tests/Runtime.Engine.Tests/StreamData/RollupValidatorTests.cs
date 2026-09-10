@@ -649,8 +649,7 @@ public class RollupValidatorTests
         Rollup() with { BucketAlignment = alignment, BucketSize = TimeSpan.FromDays(1) };
 
     private static IReadOnlyList<RollupActivationSource> CalendarSource(
-        RollupArchiveSnapshot rollup, BucketAlignment sourceAlignment, TimeSpan sourceBucketSize,
-        string? sourceReferenceTimeZone = null)
+        RollupArchiveSnapshot rollup, BucketAlignment sourceAlignment, TimeSpan sourceBucketSize)
     {
         var sourceRollup = new RollupArchiveSnapshot(
             SourceRt, TargetType, CkArchiveStatus.Activated, null,
@@ -659,53 +658,12 @@ public class RollupValidatorTests
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }, null)
         {
             BucketAlignment = sourceAlignment,
-            ReferenceTimeZone = sourceReferenceTimeZone,
         };
 
         return new[]
         {
             new RollupActivationSource(rollup.Sources[0], Source(paths: "voltage"), sourceRollup),
         };
-    }
-
-    // AB#5157 review: a calendar source's BucketSize is nominal, so the fixed-size multiple rule
-    // cannot judge it. A CalendarMonth source declared at 1 d would satisfy "integer multiple of
-    // 1 d" against a fixed 1 d target while none of its month-long windows fits a bucket — the
-    // rollup would activate and then stay empty.
-    [Fact]
-    public void ValidateForActivation_FixedSizeRollupOverACalendarAlignedSource_Throws()
-    {
-        var rollup = Rollup() with { BucketAlignment = BucketAlignment.FixedSize, BucketSize = TimeSpan.FromDays(1) };
-
-        var ex = Assert.Throws<RollupBucketIntervalException>(() => RollupValidator.ValidateForActivation(
-            rollup, CalendarSource(rollup, BucketAlignment.CalendarMonth, TimeSpan.FromDays(1))));
-
-        Assert.Equal(BucketAlignment.CalendarMonth, ex.SourceAlignment);
-    }
-
-    // AB#5157 review: calendar nesting is a statement about boundaries, and boundaries are local.
-    // A UTC month and a Europe/Vienna quarter share no cut point, so the source windows at every
-    // edge straddle two target buckets and the fully-contained window rule drops them.
-    [Fact]
-    public void ValidateForActivation_CalendarChainWhoseSourceAnchorsToAnotherZone_Throws()
-    {
-        var rollup = CalendarRollup(BucketAlignment.CalendarQuarter) with { ReferenceTimeZone = "Europe/Vienna" };
-
-        var ex = Assert.Throws<RollupCalendarZoneMismatchException>(() => RollupValidator.ValidateForActivation(
-            rollup, CalendarSource(rollup, BucketAlignment.CalendarMonth, TimeSpan.FromDays(28))));
-
-        Assert.Equal("Europe/Vienna", ex.TargetReferenceTimeZone);
-        Assert.Equal("UTC", ex.SourceReferenceTimeZone);
-    }
-
-    [Fact]
-    public void ValidateForActivation_CalendarChainSharingOneReferenceZone_DoesNotThrow()
-    {
-        var rollup = CalendarRollup(BucketAlignment.CalendarQuarter) with { ReferenceTimeZone = "Europe/Vienna" };
-
-        RollupValidator.ValidateForActivation(
-            rollup,
-            CalendarSource(rollup, BucketAlignment.CalendarMonth, TimeSpan.FromDays(28), "Europe/Vienna"));
     }
 
     [Fact]

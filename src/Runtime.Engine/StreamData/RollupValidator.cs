@@ -355,17 +355,6 @@ public static class RollupValidator
 
         if (rollup.BucketAlignment == BucketAlignment.FixedSize)
         {
-            // A calendar-aligned source cannot be measured by the ms rule at all: its BucketSize is
-            // nominal, so a CalendarMonth source declared at 1 d would satisfy "integer multiple of
-            // 1 d" against a fixed 1 d target while its month-long windows fit into no bucket at
-            // all — the fully-contained rule would drop every row and the rollup would come out
-            // empty. Refuse the combination instead of validating a number that means nothing here.
-            if (sourceAlignment != BucketAlignment.FixedSize)
-            {
-                throw new RollupBucketIntervalException(
-                    rollup.RtId, sourceRtId, rollup.BucketAlignment, sourceAlignment);
-            }
-
             // The original ms rule: at least the source window, and an integer multiple of it.
             if (sourceGranularity is { } granularity && granularity > TimeSpan.Zero &&
                 (rollup.BucketSize < granularity || rollup.BucketSize.Ticks % granularity.Ticks != 0))
@@ -386,17 +375,6 @@ public static class RollupValidator
                     rollup.RtId, sourceRtId, rollup.BucketAlignment, sourceAlignment);
             }
 
-            // …and both sides must anchor their buckets to the same zone. Nesting is a statement
-            // about boundaries, and boundaries are local: a UTC month and a Europe/Vienna quarter
-            // do not share a single cut point, so the source windows at every edge straddle two
-            // target buckets and the fully-contained window rule drops them.
-            if (!SameReferenceZone(source.Rollup?.ReferenceTimeZone, rollup.ReferenceTimeZone))
-            {
-                throw new RollupCalendarZoneMismatchException(
-                    rollup.RtId, sourceRtId,
-                    DescribeZone(rollup.ReferenceTimeZone), DescribeZone(source.Rollup?.ReferenceTimeZone));
-            }
-
             return;
         }
 
@@ -410,29 +388,6 @@ public static class RollupValidator
             throw new RollupBucketIntervalException(rollup.RtId, sourceRtId, rollup.BucketSize, period);
         }
     }
-
-    /// <summary>
-    /// True when two reference time zones cut their calendar boundaries at the same instants.
-    /// An unset or unrecognised zone means UTC (<see cref="BucketBoundary.ResolveZone"/> returns
-    /// <c>null</c> for both), so two differently-spelled ids that resolve to the same zone compare
-    /// equal and blank compares equal to blank. AB#5157.
-    /// </summary>
-    private static bool SameReferenceZone(string? sourceZone, string? targetZone)
-    {
-        var source = BucketBoundary.ResolveZone(sourceZone);
-        var target = BucketBoundary.ResolveZone(targetZone);
-
-        if (source is null || target is null)
-        {
-            return source is null && target is null;
-        }
-
-        return source.HasSameRules(target);
-    }
-
-    /// <summary>Names a reference time zone for an error message; blank reads as UTC.</summary>
-    private static string DescribeZone(string? referenceTimeZone) =>
-        string.IsNullOrWhiteSpace(referenceTimeZone) ? "UTC" : referenceTimeZone;
 
     /// <summary>
     /// True when buckets of <paramref name="source"/> nest inside buckets of

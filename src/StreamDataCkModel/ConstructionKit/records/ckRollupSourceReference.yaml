@@ -1,0 +1,13 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+records:
+  - recordId: CkRollupSourceReference
+    description: "One source archive of a RollupArchive together with its optional validity span (AB#5157). A rollup may declare several time-disjoint sources so that history imported at a coarser granularity and data ingested natively at a finer granularity end up in one continuous rollup ladder. ValidFrom is inclusive, ValidTo is exclusive; a reference without bounds is unbounded. Spans must be pairwise disjoint and every boundary must lie on a bucket boundary of the rollup, so every bucket lies entirely within one source's span or within none."
+    attributes:
+      - id: ${this}/CkRollupSourceReference.SourceArchiveRtId
+        name: SourceArchiveRtId
+      - id: ${this}/CkRollupSourceReference.ValidFrom
+        name: ValidFrom
+        isOptional: true
+      - id: ${this}/CkRollupSourceReference.ValidTo
+        name: ValidTo
+        isOptional: true

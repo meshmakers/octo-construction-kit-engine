@@ -2,8 +2,12 @@
 attributes:
   # ---------- RollupArchive -----------------------------------------------------------------
   - id: RollupArchive.SourceArchiveRtId
-    description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated."
+    description: "Runtime id of the source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Immutable after the rollup is activated. DEPRECATED since 1.8.0: declare sources via Sources; a set value is normalised into one unbounded source when Sources is empty; the platform never writes it."
     valueType: String
+  - id: RollupArchive.Sources
+    description: "Source archives this rollup aggregates from, each with an optional validity span (AB#5157). The default way to declare sources since 1.8.0 and the successor of the deprecated SourceArchiveRtId. A non-empty list wins over SourceArchiveRtId; spans must be pairwise disjoint (abutting spans are disjoint, intervals are half-open), at most one entry may have an open start and at most one an open end, and every boundary must lie on a bucket boundary of the rollup in its reference time zone. All sources must target the same CK type. Immutable after the rollup is activated."
+    valueType: RecordArray
+    valueCkRecordId: ${this}/CkRollupSourceReference
   - id: RollupArchive.BucketSizeMs
     description: "Width of the aggregation bucket in milliseconds. Each output row covers the half-open interval [bucketEnd - BucketSizeMs, bucketEnd). Must be positive and a multiple of the source rollup's bucket size when chaining. Immutable after activation. Int64 (AB#4281): calendar-month (2,419,200,000) and calendar-year (31,536,000,000) bucket widths exceed Int32.MaxValue (≈24.85 days), so the value type is 64-bit."
     valueType: Int64
@@ -49,3 +53,14 @@ attributes:
   - id: CkRollupAggregation.ComparisonValue
     description: "State literal a StateDuration aggregation matches the source column against — a number ('2', '100'), a boolean ('true'/'false'), or a string state name. Required when Function is StateDuration; ignored for every other function. AB#4336."
     valueType: String
+
+  # ---------- CkRollupSourceReference (AB#5157) ---------------------------------------------
+  - id: CkRollupSourceReference.SourceArchiveRtId
+    description: "Runtime id of one source Archive this rollup aggregates from. May reference another RollupArchive to form a chain (e.g. raw → 1 min → 1 h). Each source archive may appear at most once in a rollup's Sources list. AB#5157."
+    valueType: String
+  - id: CkRollupSourceReference.ValidFrom
+    description: "Inclusive start of the span in which this source is authoritative. Null means an open start — the source covers every bucket before its ValidTo. Must lie on a bucket boundary of the rollup in its reference time zone, and must be earlier than ValidTo when both are set. AB#5157."
+    valueType: DateTime
+  - id: CkRollupSourceReference.ValidTo
+    description: "Exclusive end of the span in which this source is authoritative. Null means an open end — the source covers every bucket from its ValidFrom onwards. Must lie on a bucket boundary of the rollup in its reference time zone. A bucket no span covers stays empty and the watermark advances. AB#5157."
+    valueType: DateTime

@@ -86,11 +86,17 @@ calls two different informations: *what kind* of change, and *through which path
 A **dirty-dependents ledger**, derived by **propagating** a dirty window through the
 reverse-dependency DAG. Per stale dependent it records the window range to recompute.
 
-- Reverse lookup uses the existing rollup→source link (`RollupArchiveSnapshot.SourceArchiveRtId`,
-  `IRollupArchiveRuntimeStore` enumeration / `CountActiveRollupsForSourceAsync`).
+- Reverse lookup uses the rollup→source links (`RollupArchiveSnapshot.Sources` /
+  `HasSource`, `IRollupArchiveRuntimeStore` enumeration / `CountActiveRollupsForSourceAsync`).
+  Since AB#5157 a rollup may declare **several** time-disjoint sources, so the reverse adjacency
+  carries one edge per `(source, rollup)` pair and the dirty range is clipped to the writing
+  source's validity span on **both** ends — see
+  [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §6.
 - A **new `RollupDependencyGraph` walker** (`Runtime.Engine/StreamData/`) computes the
   **transitive closure**: source → its rollups → their rollups (rollup-of-rollup), with cycle
-  protection (the model already forbids cycles via `RollupCycleException`).
+  protection (the model already forbids cycles via `RollupCycleException` /
+  `RollupSourceCycleException`). The graph is a DAG, not a tree: a multi-source rollup is a direct
+  dependent of each of its sources and its BFS visited-set lists it exactly once per family.
 - The stale range per dependent is snapped to that dependent's bucket boundaries via the existing
   `BucketBoundary` helper.
 

@@ -16,11 +16,16 @@ A rollup archive is a first-class archive: same lifecycle states, same query sur
 
 ### Non-Goals (MVP)
 
-- Aggregating from multiple source archives into one rollup (N:M).
 - Cold-storage / S3 export. Designed for later; not implemented.
 - User-defined aggregation functions beyond the canonical five.
 - Automatic schema propagation from source to rollup on source change.
 - Sub-bucket arithmetic on query (e.g. "give me 15 min from a 1 min rollup"). Re-aggregation across buckets is allowed but is a query-time concern, not part of this concept.
+
+> **Since `System.StreamData` 1.8.0 (AB#5157)** a rollup aggregates from a **list** of time-disjoint
+> source archives, each with an optional validity span, instead of a single source archive. Every
+> statement in this document that speaks of "the source archive" applies per source; the multi-source
+> rules, the normalisation of the deprecated `SourceArchiveRtId` scalar and the archive-coverage
+> surface live in [concept-multi-source-rollups.md](concept-multi-source-rollups.md).
 
 ## §2 Relation to the Existing Archive Concept
 
@@ -54,7 +59,8 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
     orchestrator; direct InsertAsync calls are rejected.
   isFinal: true
   attributes:
-    - ${this}/CkRollupArchive.SourceArchiveRtId
+    - ${this}/CkRollupArchive.Sources
+    - ${this}/CkRollupArchive.SourceArchiveRtId  # deprecated since 1.8.0
     - ${this}/CkRollupArchive.BucketSize
     - ${this}/CkRollupArchive.WatermarkLag
     - ${this}/CkRollupArchive.LastAggregatedBucketEnd
@@ -66,7 +72,8 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
 
 | Attribute | Type | Notes |
 |---|---|---|
-| `SourceArchiveRtId` | `OctoObjectId` | Reference to the parent `CkArchive` (raw or itself a rollup). Immutable after `Activated`. |
+| `Sources` | `RecordArray<CkRollupSourceReference>` | The source archives this rollup aggregates from (raw, time-range or themselves rollups), each with an optional half-open validity span `[ValidFrom, ValidTo)`. At least one entry required. Immutable after `Activated` (documented, not enforced). See [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §2. |
+| `SourceArchiveRtId` | `OctoObjectId?` | **Deprecated since 1.8.0**, optional. A set value is normalised into one unbounded `Sources` entry on read; the platform never writes it. |
 | `BucketSize` | `Duration` | Bucket width, e.g. `PT1M`, `PT1H`, `P1D`. Must be a positive interval supported by CrateDB's `date_trunc` or `date_bin`. Immutable after `Activated`. |
 | `WatermarkLag` | `Duration` | How far behind real-time the orchestrator stays to absorb late inserts. Default `PT5M`. Mutable. |
 | `LastAggregatedBucketEnd` | `DateTime?` | The end timestamp (exclusive) of the most recently committed bucket. `null` before the first run. Maintained by the orchestrator. |
@@ -281,14 +288,16 @@ A new query `rollupsFor(archiveRtId): [RollupArchiveInfo]` returns the rollups a
 
 | Trigger | Rule | On violation |
 |---|---|---|
-| Save `CkRollupArchive` (any state) | `SourceArchiveRtId` references an existing, non-soft-deleted `CkArchive`. | `RollupSourceMissingException` |
+| Activate | Every `Sources` entry references an existing, non-soft-deleted `CkArchive`. | `RollupSourceMissingException` |
+| Save `CkRollupArchive` (any state) | At least one source; no duplicate source; spans non-empty, pairwise disjoint, at most one open start / open end, every boundary on the rollup's bucket grid; no source-graph cycle. | see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 |
 | Save `CkRollupArchive` (any state) | `Aggregations.Count >= 1`. | `RollupAggregationsRequiredException` |
 | Save `CkRollupArchive` (any state) | No duplicate `(SourcePath, Function)` pairs. | `DuplicateRollupAggregationException` |
-| Save `CkRollupArchive` (`Activated`+) | `SourceArchiveRtId`, `BucketSize`, `Aggregations` unchanged. | `RollupSchemaImmutableException` |
-| Activate | Source archive in `Activated`. | `RollupSourceNotActivatedException` |
-| Activate | Each `SourcePath` exists in source `Columns` and has compatible primitive type. | `RollupSourcePathInvalidException` |
-| `SourceArchiveRtId` cycle (rollup-of-self) | Graph check at save. | `RollupCycleException` |
-| Source archive soft-delete | No active rollups reference this source. | `RollupSourceInUseException` |
+| Save `CkRollupArchive` (`Activated`+) | `Sources`, `BucketSize`, `Aggregations` are treated as immutable — **documented, not enforced** (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §8: the generic CK mutation can change any attribute the model allows). | `RollupSchemaImmutableException` is reserved for a future guard and is not thrown today. |
+| Activate | Every source archive in `Activated`. | `RollupSourceNotActivatedException` |
+| Activate | Each aggregation spec resolves on **every** source: a column the source captures **verbatim** (ingested `Path`, computed `Name`, or a rollup source's physical column name), else — on a rollup source — a child aggregation with the **same function** whose source path normalises to the same physical name (see [concept-multi-source-rollups.md](concept-multi-source-rollups.md) §4 rule 14 / §5; `RollupSourceColumnResolver`). | `RollupSourcePathMissingException` |
+| Source cycle (rollup-of-self) | Graph check at save. | `RollupCycleException` |
+| Transitive source cycle | Graph walk over all source edges at create and at activation. | `RollupSourceCycleException` |
+| Source archive soft-delete | No active rollup lists this archive among its sources (either storage form, any span). | `RollupSourceInUseException` |
 
 All exceptions extend `StreamDataException` (concept §12) and surface as stable GraphQL error codes.
 
@@ -323,8 +332,12 @@ Status transitions (`Activated`/`Disabled`/`Failed`) already flow through `Recor
 
 ## §13 Open Items (post-MVP)
 
+> Aggregating from several source archives into one rollup is **implemented** since
+> `System.StreamData` 1.8.0 (AB#5157) for *time-disjoint* sources — see
+> [concept-multi-source-rollups.md](concept-multi-source-rollups.md). Overlapping (additive) sources
+> and a per-aggregation source remain out of scope.
+
 - **Cold storage**: `COPY (SELECT ... WHERE timestamp < threshold) TO 's3://...'` before partition drop. Restore is admin-driven, no auto-rehydrate.
-- **N:M aggregations**: aggregate from multiple source archives into one rollup. Likely needs a richer `Aggregations` model (`source` per aggregation, not per rollup).
 - **DataFlow-based custom rollups**: expose `LoadAggregatedFromArchive@1` for users who want non-canonical aggregations (percentiles, stddev, downsampling with gap-fill). Out of MVP because it duplicates the orchestrator semantics with weaker correctness guarantees.
 - **Sub-bucket query rewrite**: when a query asks for 15 min and only a 1 min rollup exists, automatically re-aggregate on read.
 - **Source schema evolution**: requires explicit rollup re-validation flow and a "rebuild rollup" mutation.

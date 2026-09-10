@@ -15,6 +15,7 @@ public class SeriesResolutionServiceTests
     private static readonly RtCkId<CkTypeId> TargetType = new("Test", new CkTypeId("EnergyMeasurement"));
     private static readonly DateTime YearFrom = new(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime YearTo = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime MidYear = new(2025, 7, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime DayFrom = new(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateTime DayTo = new(2025, 6, 2, 0, 0, 0, DateTimeKind.Utc);
 
@@ -33,7 +34,7 @@ public class SeriesResolutionServiceTests
 
     private static RollupArchiveSnapshot Rollup(
         OctoObjectId sourceRtId, TimeSpan bucketSize, CkRollupFunction fn, string path = Path) =>
-        new(OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, sourceRtId,
+        new(OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(sourceRtId) },
             bucketSize, TimeSpan.FromMinutes(5), null,
             new[] { new CkRollupAggregationSpec(path, fn, null) }, null);
 
@@ -50,7 +51,7 @@ public class SeriesResolutionServiceTests
     private static RollupArchiveSnapshot CalendarRollup(
         OctoObjectId sourceRtId, BucketAlignment alignment, string? tz,
         CkRollupFunction fn = CkRollupFunction.Sum, string path = Path) =>
-        new(OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, sourceRtId,
+        new(OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(sourceRtId) },
             TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
             new[] { new CkRollupAggregationSpec(path, fn, null) }, null)
         {
@@ -83,7 +84,7 @@ public class SeriesResolutionServiceTests
         var baseArchive = Base(TimeSpan.FromMinutes(15));
         StubBase(baseArchive);
         var avgMax = new RollupArchiveSnapshot(
-            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(baseArchive.RtId) },
             TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
             new[]
             {
@@ -250,11 +251,11 @@ public class SeriesResolutionServiceTests
         var baseArchive = Base(TimeSpan.FromMinutes(15));
         StubBase(baseArchive);
         var hourly = new RollupArchiveSnapshot(
-            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(baseArchive.RtId) },
             TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
             new[] { new CkRollupAggregationSpec("DimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
         var daily = new RollupArchiveSnapshot(
-            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, hourly.RtId,
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(hourly.RtId) },
             TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
             new[]
             {
@@ -279,11 +280,11 @@ public class SeriesResolutionServiceTests
         var baseArchive = Base(TimeSpan.FromMinutes(15));
         StubBase(baseArchive);
         var hourly = new RollupArchiveSnapshot(
-            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, baseArchive.RtId,
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(baseArchive.RtId) },
             TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), null,
             new[] { new CkRollupAggregationSpec("DimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
         var brokenDaily = new RollupArchiveSnapshot(
-            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, hourly.RtId,
+            OctoObjectId.GenerateNewId(), TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(hourly.RtId) },
             TimeSpan.FromDays(1), TimeSpan.FromMinutes(5), null,
             new[]
             {
@@ -297,6 +298,145 @@ public class SeriesResolutionServiceTests
 
         // Ideal bucket for 365 d / 300 points is ~1.2 d: the broken daily rung would have been the
         // coarsest sufficient rung — with it excluded, the hourly TWA rung is chosen instead.
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(hourly.RtId, result.ArchiveRtId);
+    }
+    // ---- AB#5157: measured coverage (optional provider) --------------------------------------
+
+    private readonly IArchiveCoverageProvider _coverageProvider = A.Fake<IArchiveCoverageProvider>();
+
+    private SeriesResolutionService NewSutWithCoverage() =>
+        new(_archiveStore, _dependencyGraph, _coverageProvider);
+
+    private void StubCoverage(OctoObjectId rtId, DateTime? availableFrom, DateTime? availableTo = null) =>
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(rtId, A<System.Threading.CancellationToken>._))
+            .Returns(availableFrom is { } from ? new ArchiveCoverage(from, availableTo ?? YearTo) : null);
+
+    /// Base (15 min) + an hourly and a daily SUM rollup directly over it, all stubbed on the stores.
+    private (ArchiveSnapshot BaseArchive, RollupArchiveSnapshot Hourly, RollupArchiveSnapshot Daily) CoverageLadder()
+    {
+        var baseArchive = Base(TimeSpan.FromMinutes(15));
+        StubBase(baseArchive);
+        var hourly = Rollup(baseArchive.RtId, TimeSpan.FromHours(1), CkRollupFunction.Sum);
+        var daily = Rollup(baseArchive.RtId, TimeSpan.FromDays(1), CkRollupFunction.Sum);
+        StubRollups(baseArchive.RtId, hourly, daily);
+        return (baseArchive, hourly, daily);
+    }
+
+    [Fact]
+    public async Task WithoutACoverageProvider_TheFilterIsInertAndTheHourlyRungIsChosen()
+    {
+        var (baseArchive, hourly, _) = CoverageLadder();
+
+        var result = await NewSut().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(hourly.RtId, result.ArchiveRtId);
+        Assert.Null(result.FinerRungAvailableFrom);
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(A<OctoObjectId>._, A<System.Threading.CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    // TC-RES-05: the hourly rung holds no data for the requested start; the covering daily rung
+    // answers instead and the result says so.
+    [Fact]
+    public async Task FinestRungStartsAfterTheRequestedStart_FallsBackToTheCoveringRung_WithCoverageLimited()
+    {
+        var (baseArchive, hourly, daily) = CoverageLadder();
+        StubCoverage(baseArchive.RtId, YearFrom);
+        StubCoverage(hourly.RtId, MidYear);
+        StubCoverage(daily.RtId, YearFrom);
+
+        var result = await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.CoverageLimited, result.Signal);
+        Assert.Equal(daily.RtId, result.ArchiveRtId);
+    }
+
+    // TC-RES-08: ActualPoints carries what the selected rung really yields.
+    [Fact]
+    public async Task CoverageLimitedResult_CarriesActualPoints()
+    {
+        var (baseArchive, hourly, daily) = CoverageLadder();
+        StubCoverage(baseArchive.RtId, YearFrom);
+        StubCoverage(hourly.RtId, MidYear);
+        StubCoverage(daily.RtId, YearFrom);
+
+        var result = await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        Assert.Equal(365, result.Points);       // 365 daily buckets in the year
+        Assert.Equal(365, result.ActualPoints);
+    }
+
+    // TC-RES-09: the diagnostic names the excluded finer rung and its available-from, and the same
+    // instant is exposed as the first-class FinerRungAvailableFrom field.
+    [Fact]
+    public async Task CoverageLimitedResult_DiagnosticNamesTheExcludedRungAndItsAvailableFrom()
+    {
+        var (baseArchive, hourly, daily) = CoverageLadder();
+        StubCoverage(baseArchive.RtId, YearFrom);
+        StubCoverage(hourly.RtId, MidYear);
+        StubCoverage(daily.RtId, YearFrom);
+
+        var result = await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        Assert.NotNull(result.Diagnostic);
+        Assert.Contains(hourly.RtId.ToString(), result.Diagnostic!);
+        Assert.Contains(MidYear.ToString("O"), result.Diagnostic!);
+        Assert.Equal(MidYear, result.FinerRungAvailableFrom);
+    }
+
+    // TC-X-RES-01: a requested start exactly at the finest rung's available-from selects that rung
+    // and raises no signal — the boundary is inclusive on filter and signal alike.
+    [Fact]
+    public async Task RequestedStartEqualToTheFinestRungsAvailableFrom_SelectsItWithoutASignal()
+    {
+        var (baseArchive, hourly, daily) = CoverageLadder();
+        StubCoverage(baseArchive.RtId, YearFrom - TimeSpan.FromDays(1));
+        StubCoverage(hourly.RtId, YearFrom);
+        StubCoverage(daily.RtId, YearFrom - TimeSpan.FromDays(1));
+
+        var result = await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
+        Assert.Equal(hourly.RtId, result.ArchiveRtId);
+        Assert.Null(result.FinerRungAvailableFrom);
+    }
+
+    [Fact]
+    public async Task CoverageProvider_IsAskedExactlyOncePerRungIncludingTheBase()
+    {
+        var (baseArchive, hourly, daily) = CoverageLadder();
+        StubCoverage(baseArchive.RtId, YearFrom);
+        StubCoverage(hourly.RtId, YearFrom);
+        StubCoverage(daily.RtId, YearFrom);
+
+        await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(baseArchive.RtId, A<System.Threading.CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(hourly.RtId, A<System.Threading.CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(daily.RtId, A<System.Threading.CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task ProviderReportsNoCoverageAnywhere_KeepsTheFilterInert()
+    {
+        var (baseArchive, hourly, _) = CoverageLadder();
+        A.CallTo(() => _coverageProvider.GetCoverageAsync(A<OctoObjectId>._, A<System.Threading.CancellationToken>._))
+            .Returns((ArchiveCoverage?)null);
+
+        var result = await NewSutWithCoverage().ResolveAsync(
+            Request(baseArchive.RtId, YearFrom, YearTo, 600), TestContext.Current.CancellationToken);
+
         Assert.Equal(SeriesResolutionSignal.Ok, result.Signal);
         Assert.Equal(hourly.RtId, result.ArchiveRtId);
     }

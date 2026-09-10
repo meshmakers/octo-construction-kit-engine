@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -45,4 +46,22 @@ public sealed record ResolutionRung(
     /// (AB#4290 Phase 4 / decision O6.)
     /// </summary>
     public string? ReferenceTimeZone { get; init; }
+
+    /// <summary>
+    /// Measured earliest timestamp this rung actually holds data for (AB#5157) —
+    /// <c>ArchiveCoverage.AvailableFrom</c> as probed from the storage layer. <c>null</c> when the
+    /// rung has no data (no table, no rows) or coverage was not probed at all. The planner reads
+    /// this field to drop rungs that cannot serve the requested start; when no rung in the family
+    /// reports coverage the filter is inert and the pre-AB#5157 plan is returned unchanged.
+    /// </summary>
+    public DateTime? AvailableFrom { get; init; }
+
+    /// <summary>
+    /// Measured latest timestamp this rung holds data for (AB#5157) —
+    /// <c>ArchiveCoverage.AvailableTo</c>. <c>null</c> under the same conditions as
+    /// <see cref="AvailableFrom"/>. Carried for diagnostics and client display only; the planner
+    /// deliberately does not consider the requested end, so a rung whose coverage ends before it
+    /// stays eligible.
+    /// </summary>
+    public DateTime? AvailableTo { get; init; }
 }

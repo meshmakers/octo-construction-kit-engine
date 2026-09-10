@@ -74,7 +74,7 @@ public static class RollupColumnGenerator
 
         var baseName = !string.IsNullOrWhiteSpace(spec.TargetColumnName)
             ? spec.TargetColumnName!.ToLowerInvariant()
-            : $"{SanitisePath(spec.SourcePath)}_{FunctionToken(spec.Function)}";
+            : DefaultBaseNameFor(spec);
 
         return spec.Function switch
         {
@@ -89,6 +89,31 @@ public static class RollupColumnGenerator
             CkRollupFunction.Last => new[] { baseName },
             _ => throw new ArgumentOutOfRangeException(nameof(spec), spec.Function, "Unknown rollup function.")
         };
+    }
+
+    /// <summary>
+    /// The column name this spec would generate if it did not pin one with
+    /// <see cref="CkRollupAggregationSpec.TargetColumnName"/> — <c>{sanitised source path}_{function
+    /// token}</c>, the base that <see cref="TargetColumnNamesFor"/> derives its one or two names
+    /// from.
+    /// </summary>
+    /// <remarks>
+    /// This is the read-side identity of the aggregated quantity: it is determined by what the spec
+    /// aggregates (path and function) and not by where it happens to store the result, so two specs
+    /// with the same default base name aggregate the same thing. A pinned
+    /// <see cref="CkRollupAggregationSpec.TargetColumnName"/> is a storage decision and is
+    /// deliberately ignored here — the per-source resolver (AB#5157) uses this to recognise a
+    /// physically-chained child rollup, and matching on the stored name instead would accept a child
+    /// that aggregates a different attribute under a coincidental column name.
+    /// </remarks>
+    public static string DefaultBaseNameFor(CkRollupAggregationSpec spec)
+    {
+        if (string.IsNullOrEmpty(spec.SourcePath))
+        {
+            throw new ArgumentException("SourcePath must not be empty.", nameof(spec));
+        }
+
+        return $"{SanitisePath(spec.SourcePath)}_{FunctionToken(spec.Function)}";
     }
 
     /// <summary>
@@ -108,11 +133,20 @@ public static class RollupColumnGenerator
     /// Lower-cases the path and strips dots so dotted attribute paths
     /// (<c>sensor.reading.value</c>) collapse to a CrateDB-safe column name
     /// (<c>sensorreadingvalue</c>). Kept here in Runtime.Contracts so the contract-level helper
-    /// and the CrateDB-side <c>ColumnNameMapper</c> stay in sync; the latter is the canonical
-    /// reference for the actual storage layer.
+    /// and the CrateDB-side <c>ColumnNameMapper.PathToColumnName</c> stay in sync; the latter is
+    /// the canonical reference for the actual storage layer. Public because the engine's
+    /// per-source aggregation resolver (AB#5157) and the ladder chain walker compare logical
+    /// source paths through exactly this mapping; an already-sanitised name is returned unchanged.
     /// </summary>
-    private static string SanitisePath(string path)
+    /// <param name="path">A logical attribute path or an already-physical column name.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="path"/> is <c>null</c>.</exception>
+    public static string SanitisePath(string path)
     {
+        if (path is null)
+        {
+            throw new ArgumentNullException(nameof(path));
+        }
+
         var sb = new System.Text.StringBuilder(path.Length);
         foreach (var ch in path)
         {

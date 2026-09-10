@@ -74,8 +74,10 @@ insert path:
   shouldn't double as the default raw flavor.
 - **`CkTimeRangeArchive`** stores `(window_start, window_end)` rows written by
   external callers (no orchestration, no source archive).
-- **`CkRollupArchive`** keeps its existing rollup attributes (`SourceArchiveRtId`,
-  `BucketSize`, `WatermarkLag`, watermark fields) but its **storage shape unifies
+- **`CkRollupArchive`** keeps its existing rollup attributes (`Sources`, which supersedes the
+  `SourceArchiveRtId` scalar deprecated since `System.StreamData` 1.8.0 — see
+  [concept-multi-source-rollups.md](concept-multi-source-rollups.md) — `BucketSize`,
+  `WatermarkLag`, watermark fields) but its **storage shape unifies
   with `CkTimeRangeArchive`** on the `(window_start, window_end)` schema (§6).
 
 ### Migration: `CkArchive` → `CkRawArchive`
@@ -122,8 +124,9 @@ subtype-specific behaviour is in dedicated stores (`ICkRawArchiveRuntimeStore`,
         recommendations.
 ```
 
-No `SourceArchiveRtId` — the archive is not derived. No `BucketSize` / `WatermarkLag`
-/ `LastAggregatedBucketEnd` / `FrozenUntil` — there is no orchestrator on this path.
+No `Sources` (and no deprecated `SourceArchiveRtId`) — the archive is not derived. No
+`BucketSize` / `WatermarkLag` / `LastAggregatedBucketEnd` / `FrozenUntil` — there is no
+orchestrator on this path.
 
 ### `System/TimeRange` (new, mirrors `Basic/TimeRange`)
 
@@ -383,8 +386,14 @@ work.
 ## §7 Chained Rollups over Time-Range Sources
 
 A `CkRollupArchive` can have either a `CkRawArchive` **or** another time-range archive
-(`CkTimeRangeArchive` or `CkRollupArchive`) as its `SourceArchiveRtId`. The
-orchestrator's aggregation SQL adapts to the source shape.
+(`CkTimeRangeArchive` or `CkRollupArchive`) as a source. The orchestrator's aggregation SQL adapts
+to the source shape.
+
+Since `System.StreamData` 1.8.0 (AB#5157) a rollup declares a **list** of time-disjoint sources
+(`Sources`) with optional half-open validity spans instead of a single `SourceArchiveRtId`; the
+source is chosen **per bucket** and the SQL below is unchanged for the bucket it serves. A legacy
+time-range archive of quarterly totals and a native ladder can therefore feed one continuous rollup
+— see [concept-multi-source-rollups.md](concept-multi-source-rollups.md).
 
 ### Time Predicate
 

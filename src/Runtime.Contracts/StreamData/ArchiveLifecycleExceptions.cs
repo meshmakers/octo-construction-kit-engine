@@ -17,6 +17,16 @@ public class StreamDataException : Exception
     {
         ArchiveRtId = archiveRtId;
     }
+
+    /// <summary>
+    /// Renders an archive id for a message. A rule that fires while the archive is still being
+    /// created has no id to name yet and passes <see cref="OctoObjectId.Empty"/>; the zero id then
+    /// read as a real archive and sent operators looking for '000000000000000000000000'
+    /// (AB#5157 review), so an unassigned id renders as a plain phrase instead. A real id keeps its
+    /// quoted form unchanged.
+    /// </summary>
+    protected static string Describe(OctoObjectId archiveRtId)
+        => archiveRtId == OctoObjectId.Empty ? "(not yet created)" : $"'{archiveRtId}'";
 }
 
 /// <summary>

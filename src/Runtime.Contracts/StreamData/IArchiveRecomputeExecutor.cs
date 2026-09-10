@@ -22,6 +22,12 @@ public interface IArchiveRecomputeExecutor
     /// if the compute or swap fails — leaving the previous committed state intact — so the
     /// orchestrator can mark the job <see cref="RecomputeJobState.Failed"/>.
     /// </summary>
+    /// <remarks>
+    /// Single-source per call, unchanged by AB#5157: <paramref name="source"/> is authoritative for
+    /// the whole range passed in. For a multi-source rollup the orchestrator splits the requested
+    /// range into per-source segments along the sources' validity spans first and calls in once per
+    /// segment, accumulating the job totals — so a segment never mixes two sources.
+    /// </remarks>
     Task<RecomputeExecutionResult> ExecuteAsync(
         ArchiveSnapshot source,
         RollupArchiveSnapshot rollup,

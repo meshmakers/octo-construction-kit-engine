@@ -64,7 +64,13 @@ public class RecomputeOrchestratorTests
     private static RollupArchiveSnapshot Rollup(
         OctoObjectId rtId, OctoObjectId sourceRtId, CkArchiveStatus status = CkArchiveStatus.Activated,
         DateTime? lastAggregatedBucketEnd = null) =>
-        new(rtId, TargetType, status, null, sourceRtId,
+        Rollup(rtId, new[] { new RollupSourceReference(sourceRtId) }, status, lastAggregatedBucketEnd);
+
+    private static RollupArchiveSnapshot Rollup(
+        OctoObjectId rtId, IReadOnlyList<RollupSourceReference> sources,
+        CkArchiveStatus status = CkArchiveStatus.Activated,
+        DateTime? lastAggregatedBucketEnd = null) =>
+        new(rtId, TargetType, status, null, sources,
             TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), lastAggregatedBucketEnd,
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }, null);
 
@@ -724,7 +730,11 @@ public class RecomputeOrchestratorTests
 
     private static RollupArchiveSnapshot TwaRollup(
         OctoObjectId rtId, OctoObjectId sourceRtId, DateTime? lastAggregatedBucketEnd) =>
-        new(rtId, TargetType, CkArchiveStatus.Activated, null, sourceRtId,
+        TwaRollup(rtId, new[] { new RollupSourceReference(sourceRtId) }, lastAggregatedBucketEnd);
+
+    private static RollupArchiveSnapshot TwaRollup(
+        OctoObjectId rtId, IReadOnlyList<RollupSourceReference> sources, DateTime? lastAggregatedBucketEnd) =>
+        new(rtId, TargetType, CkArchiveStatus.Activated, null, sources,
             TimeSpan.FromHours(1), TimeSpan.FromMinutes(5), lastAggregatedBucketEnd,
             new[] { new CkRollupAggregationSpec("dimmingLevel", CkRollupFunction.TimeWeightedAvg, null) }, null);
 
@@ -778,6 +788,514 @@ public class RecomputeOrchestratorTests
                 child.RtId,
                 A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
                     rs.Count == 1
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+    // ---- AB#5157: multi-source recompute ------------------------------------------------------
+
+    private static readonly OctoObjectId NativeRt = OctoObjectId.GenerateNewId();
+
+    /// The legacy/native cutover; on the hourly bucket grid of every rollup built here.
+    private static readonly DateTime Cutover = new(2026, 5, 11, 12, 0, 0, DateTimeKind.Utc);
+
+    private readonly IArchiveCoverageInvalidator _coverageInvalidator = A.Fake<IArchiveCoverageInvalidator>();
+
+    private RecomputeOrchestrator NewSutWithInvalidator() =>
+        new(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore, _executor, _streamData, _audit,
+            NullLogger<RecomputeOrchestrator>.Instance, () => Now,
+            RecomputeOrchestrator.DefaultMaxBucketsPerChunk,
+            RecomputeOrchestrator.DefaultMaxChunkAttempts,
+            chunkRetryBaseDelay: TimeSpan.Zero,
+            delay: (_, _) => Task.CompletedTask,
+            coverageInvalidator: _coverageInvalidator);
+
+    private static ArchiveSnapshot NativeSource() =>
+        new(NativeRt, new RtCkId<CkTypeId>("Test", new CkTypeId("TempSensor")),
+            CkArchiveStatus.Activated, null, Array.Empty<CkArchiveColumnSpec>());
+
+    private static RollupSourceReference[] CutoverSources() => new[]
+    {
+        new RollupSourceReference(SourceRt, ValidTo: Cutover),
+        new RollupSourceReference(NativeRt, ValidFrom: Cutover),
+    };
+
+    private void StubBothSources()
+    {
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).Returns(Source());
+        A.CallTo(() => _archiveStore.GetAsync(NativeRt)).Returns(NativeSource());
+    }
+
+    private static ArchiveDirtyWindow RetroWindow(DateTime start, DateTime end) =>
+        new(start, end, RecomputeChangeKind.RetroactiveModify, RecomputeChangeSource.Pipeline, Now);
+
+    // A rollup that lists the changed archive as ONE of several sources is a direct child of it.
+    [Fact]
+    public async Task Propagate_DependentListingTheSourceAmongTwo_IsADirectChild()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // TC-REC-05: a retroactive write into the legacy source shortly before the cutover produces a
+    // dirty window reaching past it; the enqueued range stops at the span end because the buckets
+    // from the cutover on are served by the other source.
+    [Fact]
+    public async Task Propagate_RetroactiveLegacyWrite_ClipsTheEnqueuedRangeAtTheCutover()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(Cutover - TimeSpan.FromMinutes(30), Cutover + TimeSpan.FromMinutes(30)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        // Unclipped the aligned window would have been [11:00, 13:00).
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == Cutover - TimeSpan.FromHours(1)
+                    && rs[0].RangeEnd == Cutover)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // TC-REC-06: a write into a source outside its own validity span makes nothing stale.
+    [Fact]
+    public async Task Propagate_WriteOutsideTheSourcesSpan_EnqueuesNothing()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(Cutover + TimeSpan.FromMinutes(30), Cutover + TimeSpan.FromMinutes(90)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // The AB#4336 TWA carry extension must not reach into the successor bucket when that bucket is
+    // served by another source — its carry-in comes from that source's own rows.
+    [Fact]
+    public async Task Propagate_TwaDependent_CarryExtensionStopsAtTheSpanEnd()
+    {
+        var spanEnd = new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc);
+        var child = TwaRollup(
+            OctoObjectId.GenerateNewId(),
+            new[]
+            {
+                new RollupSourceReference(SourceRt, ValidTo: spanEnd),
+                new RollupSourceReference(NativeRt, ValidFrom: spanEnd),
+            },
+            lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        // Without the span cap the TWA extension would have reached 12:00.
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == spanEnd)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // TC-X-REC-02: a rung reachable from the changed archive both directly and through another
+    // rollup is enqueued exactly once.
+    [Fact]
+    public async Task Propagate_DependentReachableThroughTwoPaths_IsEnqueuedOnce()
+    {
+        var intermediate = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        var diamond = Rollup(
+            OctoObjectId.GenerateNewId(),
+            new[]
+            {
+                new RollupSourceReference(SourceRt, ValidTo: Cutover),
+                new RollupSourceReference(intermediate.RtId, ValidFrom: Cutover),
+            },
+            lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { intermediate, diamond });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 5, 11, 10, 45, 0, DateTimeKind.Utc)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                diamond.RtId, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                intermediate.RtId, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // The recompute is split along the validity spans: one executor call per source segment, with
+    // that segment's source snapshot; the job totals accumulate over the segments.
+    [Fact]
+    public async Task Recompute_RangeSpanningTheCutover_RunsOneExecutorCallPerSourceSegment_AndSumsTotals()
+    {
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, CutoverSources()));
+        StubBothSources();
+        var from = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 5, 11, 13, 0, 0, DateTimeKind.Utc);
+
+        var job = await NewSut().RecomputeArchiveAsync(
+            RollupRt, from, to, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Completed, job.State);
+        Assert.Equal(84, job.RowsProcessed);    // two segments × (42, 3)
+        Assert.Equal(6, job.WindowsProcessed);
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt), A<RollupArchiveSnapshot>._,
+                from, Cutover, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                Cutover, to, null, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustHaveHappened(2, Times.Exactly);
+    }
+
+    [Fact]
+    public async Task Recompute_RangeCoveredByNoSpan_CompletesWithoutRunningTheExecutor()
+    {
+        // A deliberate gap: the legacy source ends at 09:00, the native one starts at 13:00.
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, new[]
+        {
+            new RollupSourceReference(SourceRt, ValidTo: new DateTime(2026, 5, 11, 9, 0, 0, DateTimeKind.Utc)),
+            new RollupSourceReference(NativeRt, ValidFrom: new DateTime(2026, 5, 11, 13, 0, 0, DateTimeKind.Utc)),
+        }));
+        StubBothSources();
+
+        var job = await NewSut().RecomputeArchiveAsync(
+            RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        Assert.Equal(RecomputeJobState.Completed, job.State);
+        Assert.Equal(0, job.RowsProcessed);
+        Assert.Equal(0, job.WindowsProcessed);
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Recompute_Completed_InvalidatesTheMemoisedCoverageOfTheRollup()
+    {
+        StubRollupAndSource();
+
+        await NewSutWithInvalidator().RecomputeArchiveAsync(
+            RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        A.CallTo(() => _coverageInvalidator.Invalidate(TenantId, RollupRt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_Failed_DoesNotInvalidateTheMemoisedCoverage()
+    {
+        StubRollupAndSource();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .Throws(new InvalidOperationException("column does not exist"));
+
+        await NewSutWithInvalidator().RecomputeArchiveAsync(
+            RollupRt, From, To, null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        A.CallTo(() => _coverageInvalidator.Invalidate(A<string>._, A<OctoObjectId?>._)).MustNotHaveHappened();
+    }
+
+    // TC-AGG-09: the backfill start is the minimum over all sources, not the newest source's start.
+    [Fact]
+    public async Task Backfill_StartIsTheMinimumOverAllSources()
+    {
+        var nativeFrom = new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, new[]
+        {
+            new RollupSourceReference(SourceRt),
+            new RollupSourceReference(NativeRt, ValidFrom: nativeFrom),
+        }));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._))
+            .Returns(new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(NativeRt, A<CancellationToken>._))
+            .Returns(nativeFrom);
+
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.NotNull(job);
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(
+                j => j.RangeStart == new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc) && j.RangeEnd == Now)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // TC-AGG-10: a source's earliest stored timestamp is raised to its ValidFrom before the minimum
+    // is taken — data it holds outside its span is never read by the rollup.
+    [Fact]
+    public async Task Backfill_SourceEarliestTimestampIsRaisedToItsValidFrom()
+    {
+        var nativeFrom = new DateTime(2025, 10, 1, 0, 0, 0, DateTimeKind.Utc);
+        var legacyMin = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, new[]
+        {
+            new RollupSourceReference(SourceRt),
+            new RollupSourceReference(NativeRt, ValidFrom: nativeFrom),
+        }));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._)).Returns(legacyMin);
+        // The native archive holds older rows than its span allows; they must not lower the start.
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(NativeRt, A<CancellationToken>._))
+            .Returns(new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(j => j.RangeStart == legacyMin)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // TC-AGG-11 / TC-X-AGG-02: an empty source is skipped without error.
+    [Fact]
+    public async Task Backfill_SourceHoldingNoData_ContributesNothingAndDoesNotBlockTheBackfill()
+    {
+        var legacyMin = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, CutoverSources()));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._)).Returns(legacyMin);
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(NativeRt, A<CancellationToken>._))
+            .Returns((DateTime?)null);
+
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.NotNull(job);
+        Assert.Equal(RecomputeJobState.Pending, job!.State);
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(j => j.RangeStart == legacyMin)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Backfill_SourceWhoseDataLiesEntirelyAfterItsValidTo_ContributesNothing()
+    {
+        var legacyMin = new DateTime(2025, 6, 1, 0, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, new[]
+        {
+            new RollupSourceReference(SourceRt),
+            new RollupSourceReference(NativeRt, ValidTo: new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc)),
+        }));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(SourceRt, A<CancellationToken>._)).Returns(legacyMin);
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(NativeRt, A<CancellationToken>._))
+            .Returns(new DateTime(2025, 4, 1, 0, 0, 0, DateTimeKind.Utc));
+
+        await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>.That.Matches(j => j.RangeStart == legacyMin)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Backfill_NoSourceHoldsInSpanData_IsANoOp()
+    {
+        A.CallTo(() => _rollupStore.GetAsync(RollupRt)).Returns(Rollup(RollupRt, CutoverSources()));
+        A.CallTo(() => _streamData.GetArchiveMinTimestampAsync(A<OctoObjectId>._, A<CancellationToken>._))
+            .Returns((DateTime?)null);
+
+        var job = await NewSut().EnqueueBackfillFromSourceAsync(RollupRt, CancellationToken.None);
+
+        Assert.Null(job);
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    // TC-AGG-08: history is only produced on an explicit backfill — a freshly activated
+    // multi-source rollup queues nothing by itself.
+    [Fact]
+    public async Task Tick_ActivatedMultiSourceRollupWithoutPendingWork_QueuesNoBackfill()
+    {
+        StubBothSources();
+        A.CallTo(() => _archiveStore.EnumerateAsync()).Returns(ToAsync(Array.Empty<ArchiveSnapshot>()));
+        A.CallTo(() => _rollupStore.EnumerateAsync()).Returns(ToAsync(new[] { Rollup(RollupRt, CutoverSources()) }));
+
+        var count = await NewSut().TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, count);
+        A.CallTo(() => _jobStore.CreateAsync(A<RecomputeJobSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _executor.ExecuteAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._, A<DateTime>._, A<DateTime>._,
+                A<OctoObjectId?>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    // ---- AB#5157 follow-up E2: single-timestamp (degenerate) dirty windows --------------------
+
+    // The retroactive detector persists a single-timestamp correction as [t, t + 1 tick); Mongo's
+    // millisecond resolution collapses it to [t, t). It must still mark the bucket holding t stale on
+    // a multi-source dependent — the span clip alone would discard the empty window.
+    [Fact]
+    public async Task Propagate_DegenerateWindowInsideTheSpan_EnqueuesExactlyOneBucket()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // The same shape on a single unbounded source — the pre-AB#5157 rollup, where the regression showed.
+    [Fact]
+    public async Task Propagate_DegenerateWindow_SingleUnboundedSource_EnqueuesExactlyOneBucket()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), SourceRt, lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
+                    && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A point exactly on a bucket boundary inside the span marks the bucket STARTING there, not the one before.
+    [Fact]
+    public async Task Propagate_DegenerateWindowOnABucketBoundary_EnqueuesTheBucketStartingThere()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var boundary = new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(boundary, boundary) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == boundary
+                    && rs[0].RangeEnd == boundary + TimeSpan.FromHours(1))))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A point exactly at ValidTo lies outside the half-open span: nothing becomes stale.
+    [Fact]
+    public async Task Propagate_DegenerateWindowAtValidTo_EnqueuesNothing()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(Cutover, Cutover) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(A<OctoObjectId>._, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _stateStore.ClearDirtyWindowsAsync(SourceRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // A point one tick before ValidTo is the last instant inside the span: the final bucket is stale.
+    [Fact]
+    public async Task Propagate_DegenerateWindowOneTickBeforeValidTo_EnqueuesTheLastBucketOfTheSpan()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        var point = Cutover.AddTicks(-1);
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[] { RetroWindow(point, point) });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == Cutover - TimeSpan.FromHours(1)
+                    && rs[0].RangeEnd == Cutover)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // A normal window is not widened: one ending exactly on a bucket boundary still yields exactly
+    // that one bucket (a blanket +1 tick would drag in the next bucket).
+    [Fact]
+    public async Task Propagate_NormalWindowEndingOnABoundary_IsNotWidened()
+    {
+        var child = Rollup(OctoObjectId.GenerateNewId(), CutoverSources(), lastAggregatedBucketEnd: Now);
+        A.CallTo(() => _graph.GetTransitiveDependentsAsync(SourceRt))
+            .Returns((IReadOnlyList<RollupArchiveSnapshot>)new[] { child });
+        A.CallTo(() => _stateStore.GetDirtyWindowsAsync(SourceRt))
+            .Returns((IReadOnlyList<ArchiveDirtyWindow>)new[]
+            {
+                RetroWindow(new DateTime(2026, 5, 11, 10, 15, 0, DateTimeKind.Utc),
+                    new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc)),
+            });
+
+        await NewSut().PropagateDirtyWindowsAsync(SourceRt, CancellationToken.None);
+
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(
+                child.RtId,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].RangeStart == new DateTime(2026, 5, 11, 10, 0, 0, DateTimeKind.Utc)
                     && rs[0].RangeEnd == new DateTime(2026, 5, 11, 11, 0, 0, DateTimeKind.Utc))))
             .MustHaveHappenedOnceExactly();
     }

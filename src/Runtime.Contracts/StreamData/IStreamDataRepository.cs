@@ -209,6 +209,13 @@ public interface IStreamDataRepository
     /// implementation must collapse duplicates via the data store's upsert primitive
     /// (CrateDB: <c>ON CONFLICT (timestamp, rtId) DO UPDATE</c>) so the orchestrator can
     /// always retry safely. Returns the number of upserted target rows.
+    /// <para>
+    /// Single-source per call, unchanged by AB#5157: a multi-source rollup aggregates one bucket
+    /// from exactly one source, and the orchestrator picks that source per bucket via
+    /// <see cref="RollupArchiveSnapshot.SourceForBucket"/> before calling in. A bucket no source
+    /// span covers is never passed here at all — the orchestrator writes no row and advances the
+    /// watermark instead.
+    /// </para>
     /// </remarks>
     Task<int> AggregateBucketAsync(
         ArchiveSnapshot sourceArchive,
@@ -240,6 +247,22 @@ public interface IStreamDataRepository
     /// table yet (e.g. <c>Created</c>) or the table is empty.
     /// </summary>
     Task<DateTime?> GetArchiveMinTimestampAsync(
+        OctoObjectId archiveRtId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Measures the archive's stored time range (AB#5157): <c>MIN(window_start)</c> /
+    /// <c>MAX(window_end)</c> for windowed (rollup / time-range) archives and
+    /// <c>MIN(timestamp)</c> / <c>MAX(timestamp)</c> for raw archives. Returns <c>null</c> when the
+    /// archive holds no data — no backing table yet (e.g. <c>Created</c>), an unknown relation, or
+    /// an empty table — never a sentinel range. Every other storage failure propagates.
+    /// </summary>
+    /// <remarks>
+    /// Coverage is archive-wide (not per entity rtId) and a single from/to pair; gaps inside the
+    /// range are not represented. Callers normally go through <see cref="IArchiveCoverageProvider"/>
+    /// so the answer is memoised per tenant instead of probed on every request.
+    /// </remarks>
+    Task<ArchiveCoverage?> GetArchiveCoverageAsync(
         OctoObjectId archiveRtId,
         CancellationToken cancellationToken = default);
 

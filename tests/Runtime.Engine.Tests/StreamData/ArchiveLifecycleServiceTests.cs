@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using FakeItEasy;
 using Meshmakers.Octo.ConstructionKit.Contracts;
@@ -283,15 +284,18 @@ public class ArchiveLifecycleServiceTests
             rollupStore, clock: () => FixedNow);
 
     private static readonly OctoObjectId SourceRt = OctoObjectId.GenerateNewId();
+    private static readonly OctoObjectId SecondSourceRt = OctoObjectId.GenerateNewId();
+    private static readonly DateTime Cutover = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static RollupArchiveSnapshot RollupSnapshot(
         DateTime? watermark,
         TimeSpan? bucketSize = null,
-        CkArchiveStatus status = CkArchiveStatus.Created)
+        CkArchiveStatus status = CkArchiveStatus.Created,
+        RollupSourceReference[]? sources = null)
     {
         return new RollupArchiveSnapshot(
             Rt, TargetType, status, null,
-            SourceRt,
+            sources ?? new[] { new RollupSourceReference(SourceRt) },
             bucketSize ?? TimeSpan.FromMinutes(1),
             TimeSpan.FromMinutes(5),
             watermark,
@@ -299,12 +303,27 @@ public class ArchiveLifecycleServiceTests
             FrozenUntil: null);
     }
 
-    private void StubSourceActivatedWithVoltage()
+    /// <summary>The AB#5157 cutover shape: a legacy source before, and the native source from, the cutover.</summary>
+    private static RollupSourceReference[] CutoverSources() =>
+        new[]
+        {
+            new RollupSourceReference(SourceRt, ValidTo: Cutover),
+            new RollupSourceReference(SecondSourceRt, ValidFrom: Cutover),
+        };
+
+    private void StubSourceActivatedWithVoltage() => StubSourceActivatedWithVoltage(SourceRt);
+
+    private void StubSourceActivatedWithVoltage(OctoObjectId sourceRtId)
     {
-        A.CallTo(() => _store.GetAsync(SourceRt))
+        A.CallTo(() => _store.GetAsync(sourceRtId))
             .Returns(new ArchiveSnapshot(
-                SourceRt, TargetType, CkArchiveStatus.Activated, null,
+                sourceRtId, TargetType, CkArchiveStatus.Activated, null,
                 new[] { new CkArchiveColumnSpec("voltage", Indexed: true, Required: false) }));
+    }
+
+    private static async IAsyncEnumerable<T> ToAsync<T>(T[] items)
+    {
+        foreach (var item in items) { yield return item; await Task.Yield(); }
     }
 
     [Fact]
@@ -446,8 +465,125 @@ public class ArchiveLifecycleServiceTests
                 SourceRt, TargetType, CkArchiveStatus.Activated, null,
                 new[] { new CkArchiveColumnSpec("current", true, false) }));
 
-        var ex = await Assert.ThrowsAsync<RollupSourcePathInvalidException>(
+        var ex = await Assert.ThrowsAsync<RollupSourcePathMissingException>(
             () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
         Assert.Equal("voltage", ex.SourcePath);
+        Assert.Equal(SourceRt, ex.SourceArchiveRtId);
+    }
+
+    // ---- AB#5157: activation validates EVERY declared source ----
+
+    [Fact]
+    public async Task Activate_MultiSourceRollup_LoadsAndValidatesBothSources()
+    {
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromDays(1), sources: CutoverSources()));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage(SourceRt);
+        StubSourceActivatedWithVoltage(SecondSourceRt);
+
+        await NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt);
+
+        A.CallTo(() => _store.GetAsync(SourceRt)).MustHaveHappened();
+        A.CallTo(() => _store.GetAsync(SecondSourceRt)).MustHaveHappened();
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
+    }
+
+    // TC-VAL-14: the second source is not activated.
+    [Fact]
+    public async Task Activate_MultiSourceRollup_SecondSourceNotActivated_Throws()
+    {
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromDays(1), sources: CutoverSources()));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage(SourceRt);
+        A.CallTo(() => _store.GetAsync(SecondSourceRt))
+            .Returns(new ArchiveSnapshot(
+                SecondSourceRt, TargetType, CkArchiveStatus.Created, null,
+                new[] { new CkArchiveColumnSpec("voltage", true, false) }));
+
+        var ex = await Assert.ThrowsAsync<RollupSourceNotActivatedException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+
+        Assert.Equal(CkArchiveStatus.Created, ex.SourceStatus);
+        Assert.Contains(SecondSourceRt.ToString(), ex.Message);
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
+
+    // TC-VAL-11: the second source targets another CK type.
+    [Fact]
+    public async Task Activate_MultiSourceRollup_SecondSourceOtherTargetType_Throws()
+    {
+        var otherType = new RtCkId<CkTypeId>("Test", new CkTypeId("OtherType"));
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        A.CallTo(() => rollupStore.GetAsync(Rt))
+            .Returns(RollupSnapshot(watermark: null, bucketSize: TimeSpan.FromDays(1), sources: CutoverSources()));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage(SourceRt);
+        A.CallTo(() => _store.GetAsync(SecondSourceRt))
+            .Returns(new ArchiveSnapshot(
+                SecondSourceRt, otherType, CkArchiveStatus.Activated, null,
+                new[] { new CkArchiveColumnSpec("voltage", true, false) }));
+
+        var ex = await Assert.ThrowsAsync<RollupSourceTargetTypeMismatchException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+
+        Assert.Equal(SecondSourceRt, ex.SourceArchiveRtId);
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<ArchiveSnapshot>._)).MustNotHaveHappened();
+    }
+
+    // TC-VAL-18: a transitive cycle in the stored rollup graph blocks activation.
+    [Fact]
+    public async Task Activate_Rollup_TransitiveCycle_Throws()
+    {
+        var sourceRollupRt = SourceRt;
+        var rollupStore = A.Fake<IRollupArchiveRuntimeStore>();
+        var rollup = RollupSnapshot(watermark: null);
+        // The source is itself a rollup that reads this rollup back — a two-step cycle.
+        var sourceRollup = new RollupArchiveSnapshot(
+            sourceRollupRt, TargetType, CkArchiveStatus.Activated, null,
+            new[] { new RollupSourceReference(Rt) },
+            TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5), null,
+            new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) }, null);
+        A.CallTo(() => rollupStore.GetAsync(Rt)).Returns(rollup);
+        A.CallTo(() => rollupStore.GetAsync(sourceRollupRt)).Returns(sourceRollup);
+        A.CallTo(() => rollupStore.EnumerateAsync()).Returns(ToAsync(new[] { rollup, sourceRollup }));
+        Stub(CkArchiveStatus.Created);
+        StubSourceActivatedWithVoltage(sourceRollupRt);
+
+        var ex = await Assert.ThrowsAsync<RollupSourceCycleException>(
+            () => NewSutWithRollupAndClock(rollupStore).ActivateAsync(Rt));
+
+        Assert.Equal(sourceRollupRt, ex.SourceArchiveRtId);
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
+
+    // ---- AB#5157: coverage cache invalidation on delete ----
+
+    [Fact]
+    public async Task Delete_InvalidatesTheArchivesCoverageMemo()
+    {
+        var invalidator = A.Fake<IArchiveCoverageInvalidator>();
+        Stub(CkArchiveStatus.Activated);
+
+        var sut = new ArchiveLifecycleService(
+            TenantId, _store, _repo, _audit, NullLogger<ArchiveLifecycleService>.Instance,
+            coverageInvalidator: invalidator);
+        await sut.DeleteAsync(Rt);
+
+        A.CallTo(() => invalidator.Invalidate(TenantId, Rt)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Delete_WithoutCoverageInvalidator_StillDeletes()
+    {
+        Stub(CkArchiveStatus.Activated);
+
+        await NewSut().DeleteAsync(Rt);
+
+        A.CallTo(() => _repo.DeleteArchiveAsync(Rt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _store.ArchiveEntityAsync(Rt)).MustHaveHappenedOnceExactly();
     }
 }

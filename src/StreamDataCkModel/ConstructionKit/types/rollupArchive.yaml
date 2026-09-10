@@ -8,6 +8,10 @@ types:
     attributes:
       - id: ${this}/RollupArchive.SourceArchiveRtId
         name: SourceArchiveRtId
+        isOptional: true
+      - id: ${this}/RollupArchive.Sources
+        name: Sources
+        isOptional: true
       - id: ${this}/RollupArchive.BucketSizeMs
         name: BucketSizeMs
       - id: ${this}/RollupArchive.WatermarkLagMs

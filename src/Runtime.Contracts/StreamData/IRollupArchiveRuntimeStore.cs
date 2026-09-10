@@ -37,8 +37,13 @@ public interface IRollupArchiveRuntimeStore
     /// of rollup-specific knowledge. Concept §4, §9.
     /// </summary>
     /// <param name="rtWellKnownName">Optional human-readable name. Null falls back to the rtId.</param>
-    /// <param name="targetCkTypeId">CK type the rollup rows live on — inherited from the source archive.</param>
-    /// <param name="sourceArchiveRtId">RtId of the source CkArchive (or CkRollupArchive for chained rollups).</param>
+    /// <param name="targetCkTypeId">CK type the rollup rows live on — inherited from the source archives.</param>
+    /// <param name="sources">
+    /// The source archives (CkArchive, or CkRollupArchive for chained rollups) this rollup
+    /// aggregates from, each with an optional validity span (AB#5157). Implementations persist
+    /// this list on the <c>Sources</c> attribute <em>only</em>; the deprecated
+    /// <c>SourceArchiveRtId</c> scalar is never written, not even for a single unbounded source.
+    /// </param>
     /// <param name="bucketSize">Bucket width.</param>
     /// <param name="watermarkLag">How long the orchestrator waits after bucket-end before aggregating.</param>
     /// <param name="aggregations">User-defined aggregation specs.</param>
@@ -66,7 +71,7 @@ public interface IRollupArchiveRuntimeStore
     Task<OctoObjectId> InsertAsync(
         string? rtWellKnownName,
         RtCkId<CkTypeId> targetCkTypeId,
-        OctoObjectId sourceArchiveRtId,
+        IReadOnlyList<RollupSourceReference> sources,
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
@@ -117,9 +122,10 @@ public interface IRollupArchiveRuntimeStore
     Task<bool> TryPersistDerivedColumnsAsync(OctoObjectId rollupRtId);
 
     /// <summary>
-    /// Returns the count of non-soft-deleted rollups that reference
-    /// <paramref name="sourceArchiveRtId"/>. Used by the source archive's delete path to enforce
-    /// <see cref="RollupSourceInUseException"/> (concept §6).
+    /// Returns the count of non-soft-deleted rollups that list
+    /// <paramref name="sourceArchiveRtId"/> among their sources — in either storage form, and
+    /// regardless of the validity span the reference carries (AB#5157). Used by the source
+    /// archive's delete path to enforce <see cref="RollupSourceInUseException"/> (concept §6).
     /// </summary>
     Task<int> CountActiveRollupsForSourceAsync(OctoObjectId sourceArchiveRtId);
 }

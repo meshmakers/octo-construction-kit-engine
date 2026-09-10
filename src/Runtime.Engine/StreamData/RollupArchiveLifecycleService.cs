@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
@@ -32,9 +33,10 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
 
     /// <summary>
     /// Constructs the rollup lifecycle service. <paramref name="rollupStore"/> and
-    /// <paramref name="archiveStore"/> must be tenant-scoped (the source archive lookup in
-    /// <see cref="CreateAsync"/> uses the same Mongo polymorphism that handles both raw archives
-    /// and chained rollups via the shared CkArchive base). The audit trail can be either
+    /// <paramref name="archiveStore"/> must be tenant-scoped (the source archive lookups in
+    /// <see cref="CreateAsync"/> use the same Mongo polymorphism that handles both raw archives
+    /// and chained rollups via the shared CkArchive base; the rollup store is also enumerated for
+    /// the transitive cycle check). The audit trail can be either
     /// tenant-scoped or shared (the tenant id is passed explicitly into every audit call).
     /// <paramref name="streamData"/> is the tenant's stream-data repository (CrateDB); optional
     /// (null when stream data is not enabled), used only by <see cref="RewindWatermarkAsync"/> to
@@ -57,9 +59,18 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    /// Validation runs on a prospective snapshot before anything is written (AB#5157): the
+    /// aggregation rules (<see cref="RollupValidator.ValidateForSave"/>), the source-span rules
+    /// (<see cref="RollupValidator.ValidateSourcesForSave"/>) and the transitive cycle check over
+    /// the tenant's rollups (<see cref="RollupValidator.ValidateNoTransitiveCycle"/>). Because the
+    /// entity does not exist yet, a <see cref="StreamDataException"/> raised here carries
+    /// <see cref="OctoObjectId.Empty"/> as its archive id; the offending source is named in the
+    /// message.
+    /// </remarks>
     public async Task<OctoObjectId> CreateAsync(
         string? rtWellKnownName,
-        OctoObjectId sourceArchiveRtId,
+        IReadOnlyList<RollupSourceReference> sources,
         TimeSpan bucketSize,
         TimeSpan watermarkLag,
         IReadOnlyList<CkRollupAggregationSpec> aggregations,
@@ -70,6 +81,12 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
         if (carryLookback is { } cl && cl <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(carryLookback), "CarryLookback must be positive when set.");
+        }
+
+        if (sources is null) throw new ArgumentNullException(nameof(sources));
+        if (sources.Count == 0)
+        {
+            throw new ArgumentException("At least one source archive is required.", nameof(sources));
         }
 
         if (aggregations is null) throw new ArgumentNullException(nameof(aggregations));
@@ -110,20 +127,67 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             }
         }
 
-        // Source archive lookup goes through the shared CkArchive store: thanks to Mongo
-        // polymorphism the result is the same regardless of whether the source is a raw archive
-        // or another rollup (chained rollups, concept §10). The snapshot carries the inherited
-        // TargetCkTypeId that the new rollup must mirror.
-        var source = await _archiveStore.GetAsync(sourceArchiveRtId)
-            ?? throw new ArchiveNotFoundException(sourceArchiveRtId);
+        // Source archive lookups go through the shared CkArchive store: thanks to Mongo
+        // polymorphism the result is the same regardless of whether a source is a raw archive,
+        // a time-range archive or another rollup (chained rollups, concept §10). The first source
+        // donates the inherited TargetCkTypeId; every other source must target the same type
+        // (AB#5157 — the rollup's rows describe one entity population).
+        RtCkId<CkTypeId>? targetCkTypeId = null;
+        foreach (var source in sources)
+        {
+            var sourceArchive = await _archiveStore.GetAsync(source.SourceArchiveRtId)
+                ?? throw new ArchiveNotFoundException(source.SourceArchiveRtId);
+
+            if (targetCkTypeId is null)
+            {
+                targetCkTypeId = sourceArchive.TargetCkTypeId;
+            }
+            else if (sourceArchive.TargetCkTypeId != targetCkTypeId)
+            {
+                throw new RollupSourceTargetTypeMismatchException(
+                    OctoObjectId.Empty, source.SourceArchiveRtId, targetCkTypeId, sourceArchive.TargetCkTypeId);
+            }
+        }
+
+        // Fail fast on the declaration itself (AB#5157): the aggregation rules, the source-span
+        // rules and the transitive cycle check run on a prospective snapshot BEFORE the insert, so
+        // an invalid rollup never reaches the store. The rtId is not known yet — OctoObjectId.Empty
+        // stands in and the messages name the offending source.
+        var prospective = new RollupArchiveSnapshot(
+            OctoObjectId.Empty,
+            targetCkTypeId!,
+            CkArchiveStatus.Created,
+            rtWellKnownName,
+            sources,
+            bucketSize,
+            watermarkLag,
+            LastAggregatedBucketEnd: null,
+            aggregations,
+            FrozenUntil: null)
+        {
+            BucketAlignment = bucketAlignment,
+            ReferenceTimeZone = normalizedTimeZone,
+            CarryLookback = carryLookback,
+        };
+
+        RollupValidator.ValidateForSave(prospective);
+        RollupValidator.ValidateSourcesForSave(prospective);
+
+        var rollupsByRtId = new Dictionary<OctoObjectId, RollupArchiveSnapshot>();
+        await foreach (var existing in _rollupStore.EnumerateAsync())
+        {
+            rollupsByRtId[existing.RtId] = existing;
+        }
+
+        RollupValidator.ValidateNoTransitiveCycle(prospective, rollupsByRtId);
 
         // Pure-function derivation lives in Runtime.Contracts; ports (e.g. studio) mirror this rule.
         var columns = RollupColumnGenerator.Generate(aggregations);
 
         var rtId = await _rollupStore.InsertAsync(
             rtWellKnownName,
-            source.TargetCkTypeId,
-            sourceArchiveRtId,
+            targetCkTypeId!,
+            sources,
             bucketSize,
             watermarkLag,
             aggregations,
@@ -133,11 +197,18 @@ public sealed class RollupArchiveLifecycleService : IRollupArchiveLifecycleServi
             carryLookback);
 
         _logger.LogInformation(
-            "Rollup {RollupRtId} created from source {SourceRtId} with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment}, referenceTimeZone={ReferenceTimeZone} (tenant {TenantId})",
-            rtId, sourceArchiveRtId, aggregations.Count, columns.Count, bucketAlignment, normalizedTimeZone ?? "UTC", _tenantId);
+            "Rollup {RollupRtId} created from {SourceCount} source(s) [{SourceRtIds}] with {AggregationCount} aggregations / {ColumnCount} derived columns, alignment={Alignment}, referenceTimeZone={ReferenceTimeZone} (tenant {TenantId})",
+            rtId, sources.Count, string.Join(", ", sources.Select(DescribeSource)), aggregations.Count, columns.Count,
+            bucketAlignment, normalizedTimeZone ?? "UTC", _tenantId);
 
         return rtId;
     }
+
+    /// <summary>Renders one source reference with its span for the create log line.</summary>
+    private static string DescribeSource(RollupSourceReference source) =>
+        source.IsUnbounded
+            ? source.SourceArchiveRtId.ToString()
+            : $"{source.SourceArchiveRtId} [{source.ValidFrom?.ToString("o") ?? "open"}, {source.ValidTo?.ToString("o") ?? "open"})";
 
     /// <inheritdoc />
     public async Task FreezeAsync(OctoObjectId rollupRtId, DateTime until)

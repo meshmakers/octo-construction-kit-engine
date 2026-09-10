@@ -21,6 +21,14 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// table — pair slots (AVG's sum/count, TWA's integral/duration) accumulate via SUM, COUNT and
 /// StateDuration chain via SUM, MIN/MAX only via themselves. A pair function counts as stored
 /// only when <em>both</em> slots survive the chain — a lone numerator cannot be recombined.
+/// A multi-source rollup (AB#5157) follows the parent that leads to the requested base: when any
+/// of its sources <em>is</em> the base its specs are direct origins; otherwise the walk cascades
+/// through the first source that is a ladder member and yields origins, so a source outside the
+/// family (a legacy time-range archive in a cutover setup) cannot mask a good in-family parent.
+/// A cascade spec may address the parent either by its physical target column (the pre-AB#5157
+/// chained style, which wins) or by the <em>logical</em> path — the read-side twin of
+/// <see cref="RollupSourceColumnResolver"/>'s rule 2, which is what a mixed base + rollup rung
+/// declares.
 /// </remarks>
 internal static class RollupLadderFunctionResolver
 {
@@ -37,7 +45,8 @@ internal static class RollupLadderFunctionResolver
         string LogicalPath,
         CkRollupFunction Function,
         string ColumnName,
-        PairRole? Role);
+        PairRole? Role,
+        string? ComparisonValue = null);
 
     /// <summary>
     /// Returns every aggregation function <paramref name="rollup"/> stores for the logical
@@ -93,20 +102,35 @@ internal static class RollupLadderFunctionResolver
             return new List<Origin>();
         }
 
-        if (rollup.SourceArchiveRtId == baseRtId)
+        if (rollup.HasSource(baseRtId))
         {
             return BuildDirectOrigins(rollup);
         }
 
-        if (!ladderByRtId.TryGetValue(rollup.SourceArchiveRtId, out var parent))
+        foreach (var source in rollup.Sources)
         {
-            // Source is neither the base nor a known ladder member — broken chain (or a source
-            // outside this resolution family). Conservatively unmatched.
-            return new List<Origin>();
+            if (!ladderByRtId.TryGetValue(source.SourceArchiveRtId, out var parent))
+            {
+                // Neither the base nor a known ladder member — a source outside this resolution
+                // family (or a broken chain). Skip it; a sibling source may still lead to the base.
+                continue;
+            }
+
+            var parentOrigins = BuildOrigins(parent, baseRtId, ladderByRtId, depth + 1);
+            if (parentOrigins.Count == 0)
+            {
+                continue;
+            }
+
+            var origins = BuildCascadeOrigins(rollup, parentOrigins);
+            if (origins.Count > 0)
+            {
+                return origins;
+            }
         }
 
-        var parentOrigins = BuildOrigins(parent, baseRtId, ladderByRtId, depth + 1);
-        return BuildCascadeOrigins(rollup, parentOrigins);
+        // No source reaches the base with a legal chain. Conservatively unmatched.
+        return new List<Origin>();
     }
 
     private static List<Origin> BuildDirectOrigins(RollupArchiveSnapshot rollup)
@@ -124,7 +148,7 @@ internal static class RollupLadderFunctionResolver
             {
                 foreach (var name in names)
                 {
-                    result.Add(new Origin(spec.SourcePath, spec.Function, name, null));
+                    result.Add(new Origin(spec.SourcePath, spec.Function, name, null, spec.ComparisonValue));
                 }
             }
         }
@@ -145,26 +169,82 @@ internal static class RollupLadderFunctionResolver
         var result = new List<Origin>();
         foreach (var spec in rollup.Aggregations)
         {
-            // The cascade spec's SourcePath is a physical column on the parent (sanitised form).
-            if (!parentByColumn.TryGetValue(SanitisePath(spec.SourcePath), out var parent)
-                && !parentByColumn.TryGetValue(spec.SourcePath, out parent))
+            // Rule 1 (pre-AB#5157 chained style): the spec's SourcePath is a physical column on the
+            // parent (sanitised form). It wins, exactly as in RollupSourceColumnResolver.
+            if (parentByColumn.TryGetValue(SanitisePath(spec.SourcePath), out var parent)
+                || parentByColumn.TryGetValue(spec.SourcePath, out parent))
             {
+                var chained = ChainFunction(parent, spec.Function);
+                if (chained is not { } origin)
+                {
+                    continue;
+                }
+
+                foreach (var name in RollupColumnGenerator.TargetColumnNamesFor(spec))
+                {
+                    result.Add(new Origin(
+                        parent.LogicalPath, origin.Function, name, origin.Role, parent.ComparisonValue));
+                }
+
                 continue;
             }
 
-            var chained = ChainFunction(parent, spec.Function);
-            if (chained is not { } origin)
-            {
-                continue;
-            }
-
-            foreach (var name in RollupColumnGenerator.TargetColumnNamesFor(spec))
-            {
-                result.Add(new Origin(parent.LogicalPath, origin.Function, name, origin.Role));
-            }
+            // Rule 2 (AB#5157): the spec names the LOGICAL path and the parent stores the same
+            // logical aggregation — the read-side twin of RollupSourceColumnResolver's rule 2.
+            AddLogicalCascadeOrigins(spec, parentOrigins, result);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Rule-2 cascade: a spec whose <see cref="CkRollupAggregationSpec.SourcePath"/> is the logical
+    /// path (not a physical parent column) resolves against a parent origin with the same function
+    /// and the same normalised path. Pair functions (Avg / TWA) need both role origins on the
+    /// parent; the spec's own target columns become the origins, paired in the generator's order.
+    /// </summary>
+    private static void AddLogicalCascadeOrigins(
+        CkRollupAggregationSpec spec, List<Origin> parentOrigins, List<Origin> result)
+    {
+        var wanted = SanitisePath(spec.SourcePath);
+        var matches = parentOrigins
+            .Where(o => o.Function == spec.Function
+                        && string.Equals(SanitisePath(o.LogicalPath), wanted, StringComparison.Ordinal))
+            .ToList();
+        if (matches.Count == 0)
+        {
+            return;
+        }
+
+        var logicalPath = matches[0].LogicalPath;
+        var names = RollupColumnGenerator.TargetColumnNamesFor(spec).ToList();
+        var isPair = spec.Function is CkRollupFunction.Avg or CkRollupFunction.TimeWeightedAvg;
+        if (isPair)
+        {
+            if (names.Count != 2
+                || !matches.Any(o => o.Role == PairRole.Numerator)
+                || !matches.Any(o => o.Role == PairRole.Denominator))
+            {
+                return;
+            }
+
+            result.Add(new Origin(logicalPath, spec.Function, names[0], PairRole.Numerator));
+            result.Add(new Origin(logicalPath, spec.Function, names[1], PairRole.Denominator));
+            return;
+        }
+
+        // StateDuration measures a specific state: a parent that counted a different literal is a
+        // different quantity and must not be re-read as this one.
+        if (spec.Function == CkRollupFunction.StateDuration
+            && !matches.Any(o => string.Equals(o.ComparisonValue?.Trim(), spec.ComparisonValue?.Trim(), StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        foreach (var name in names)
+        {
+            result.Add(new Origin(logicalPath, spec.Function, name, null, spec.ComparisonValue));
+        }
     }
 
     /// <summary>
@@ -195,18 +275,9 @@ internal static class RollupLadderFunctionResolver
     }
 
     /// <summary>
-    /// Same dot-stripping lower-casing rule as <c>RollupColumnGenerator.SanitisePath</c> /
+    /// The dot-stripping lower-casing rule of <see cref="RollupColumnGenerator.SanitisePath"/> /
     /// the CrateDb <c>ColumnNameMapper</c> — a cascade spec references the parent's physical
     /// column, which is the sanitised form of whatever path the parent declared.
     /// </summary>
-    private static string SanitisePath(string path)
-    {
-        var sb = new System.Text.StringBuilder(path.Length);
-        foreach (var ch in path)
-        {
-            if (ch != '.') sb.Append(ch);
-        }
-
-        return sb.ToString().ToLowerInvariant();
-    }
+    private static string SanitisePath(string path) => RollupColumnGenerator.SanitisePath(path);
 }

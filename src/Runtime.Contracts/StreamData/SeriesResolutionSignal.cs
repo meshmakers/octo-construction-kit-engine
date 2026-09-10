@@ -42,4 +42,15 @@ public enum SeriesResolutionSignal
 
     /// <summary>No archive at all was resolvable for the request (empty family / unknown base).</summary>
     EmptyLadder = 4,
+
+    /// <summary>
+    /// The measured coverage filter changed the routing decision (AB#5157): the rung the resolver
+    /// would otherwise have picked does not hold data for the requested start, so a coarser rung
+    /// that does was chosen instead. Takes precedence over <see cref="ResolutionLimited"/>.
+    /// <c>ActualPoints</c> carries the delivered count with the same meaning as for
+    /// <see cref="ResolutionLimited"/>, the diagnostic names the excluded finer rung, and
+    /// <c>SeriesResolutionResult.FinerRungAvailableFrom</c> carries that rung's available-from so
+    /// a client can offer "finer data from …".
+    /// </summary>
+    CoverageLimited = 5,
 }

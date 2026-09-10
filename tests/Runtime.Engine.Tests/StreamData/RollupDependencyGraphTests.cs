@@ -18,13 +18,16 @@ public class RollupDependencyGraphTests
 
     private RollupDependencyGraph NewSut() => new(_rollupStore);
 
-    private static RollupArchiveSnapshot Rollup(OctoObjectId rtId, OctoObjectId sourceRtId) =>
+    private static RollupArchiveSnapshot Rollup(OctoObjectId rtId, params OctoObjectId[] sourceRtIds) =>
+        Rollup(rtId, Array.ConvertAll(sourceRtIds, id => new RollupSourceReference(id)));
+
+    private static RollupArchiveSnapshot Rollup(OctoObjectId rtId, params RollupSourceReference[] sources) =>
         new(
             rtId,
             TargetType,
             CkArchiveStatus.Activated,
             null,
-            sourceRtId,
+            sources,
             TimeSpan.FromMinutes(1),
             TimeSpan.FromMinutes(5),
             null,
@@ -87,9 +90,8 @@ public class RollupDependencyGraphTests
         var raw = OctoObjectId.GenerateNewId();
         var a = Rollup(OctoObjectId.GenerateNewId(), raw);
         var b = Rollup(OctoObjectId.GenerateNewId(), raw);
-        var c = Rollup(OctoObjectId.GenerateNewId(), a.RtId);
-        var cViaB = c with { SourceArchiveRtId = b.RtId };
-        StubRollups(a, b, c, cViaB);
+        var c = Rollup(OctoObjectId.GenerateNewId(), a.RtId, b.RtId);
+        StubRollups(a, b, c);
 
         var result = await NewSut().GetTransitiveDependentsAsync(raw);
 
@@ -105,13 +107,88 @@ public class RollupDependencyGraphTests
         var raw = OctoObjectId.GenerateNewId();
         var r1Id = OctoObjectId.GenerateNewId();
         var r2Id = OctoObjectId.GenerateNewId();
-        var r1 = Rollup(r1Id, raw);
+        var r1 = Rollup(r1Id, raw, r2Id); // r1 also claims r2 as source
         var r2 = Rollup(r2Id, r1Id);
-        var r1Cycle = r1 with { SourceArchiveRtId = r2Id }; // r1 also claims r2 as source
-        StubRollups(r1, r2, r1Cycle);
+        StubRollups(r1, r2);
 
         var result = await NewSut().GetTransitiveDependentsAsync(raw);
 
         Assert.Equal(new[] { r1Id, r2Id }.OrderBy(x => x), result.Select(r => r.RtId).Distinct().OrderBy(x => x));
+    }
+
+    // ---- AB#5157: multi-source reverse adjacency --------------------------------------------
+
+    // TC-REC-01: a rollup that aggregates two raw archives is reachable from each of them.
+    [Fact]
+    public async Task MultiSourceRollup_IsReachableFromEverySource()
+    {
+        var rawA = OctoObjectId.GenerateNewId();
+        var rawB = OctoObjectId.GenerateNewId();
+        var cutover = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var rollup = Rollup(
+            OctoObjectId.GenerateNewId(),
+            new RollupSourceReference(rawA, ValidTo: cutover),
+            new RollupSourceReference(rawB, ValidFrom: cutover));
+        StubRollups(rollup);
+
+        var fromA = await NewSut().GetTransitiveDependentsAsync(rawA);
+        var fromB = await NewSut().GetTransitiveDependentsAsync(rawB);
+
+        Assert.Equal(new[] { rollup.RtId }, fromA.Select(r => r.RtId));
+        Assert.Equal(new[] { rollup.RtId }, fromB.Select(r => r.RtId));
+    }
+
+    // TC-REC-02: the two-source diamond collapses into one rollup — one traversal, one entry.
+    [Fact]
+    public async Task DiamondAsOneTwoSourceRollup_YieldsExactlyOneEntry()
+    {
+        var raw = OctoObjectId.GenerateNewId();
+        var a = Rollup(OctoObjectId.GenerateNewId(), raw);
+        var b = Rollup(OctoObjectId.GenerateNewId(), raw);
+        var merged = Rollup(OctoObjectId.GenerateNewId(), a.RtId, b.RtId);
+        StubRollups(a, b, merged);
+
+        var result = await NewSut().GetTransitiveDependentsAsync(raw);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(1, result.Count(r => r.RtId == merged.RtId));
+    }
+
+    [Fact]
+    public async Task SameSourceListedTwice_YieldsTheRollupOnce()
+    {
+        // Two disjoint spans over the same archive produce one edge, not two.
+        var raw = OctoObjectId.GenerateNewId();
+        var t1 = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var t2 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var rollup = Rollup(
+            OctoObjectId.GenerateNewId(),
+            new RollupSourceReference(raw, ValidTo: t1),
+            new RollupSourceReference(raw, ValidFrom: t2));
+        StubRollups(rollup);
+
+        var result = await NewSut().GetTransitiveDependentsAsync(raw);
+
+        Assert.Equal(new[] { rollup.RtId }, result.Select(r => r.RtId));
+    }
+
+    // TC-COV-12: the whole family below a base archive is enumerated, multi-source rungs included.
+    [Fact]
+    public async Task TransitiveFamilyFromBaseArchive_IsComplete()
+    {
+        var legacy = OctoObjectId.GenerateNewId();
+        var native = OctoObjectId.GenerateNewId();
+        var cutover = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var daily = Rollup(
+            OctoObjectId.GenerateNewId(),
+            new RollupSourceReference(legacy, ValidTo: cutover),
+            new RollupSourceReference(native, ValidFrom: cutover));
+        var monthly = Rollup(OctoObjectId.GenerateNewId(), daily.RtId);
+        var yearly = Rollup(OctoObjectId.GenerateNewId(), monthly.RtId);
+        StubRollups(daily, monthly, yearly);
+
+        var result = await NewSut().GetTransitiveDependentsAsync(native);
+
+        Assert.Equal(new[] { daily.RtId, monthly.RtId, yearly.RtId }, result.Select(r => r.RtId));
     }
 }

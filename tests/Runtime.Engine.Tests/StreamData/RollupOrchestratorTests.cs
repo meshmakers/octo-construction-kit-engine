@@ -33,13 +33,14 @@ public class RollupOrchestratorTests
         TimeSpan? bucketSize = null,
         TimeSpan? watermarkLag = null,
         DateTime? frozenUntil = null,
-        CkArchiveStatus status = CkArchiveStatus.Activated) =>
+        CkArchiveStatus status = CkArchiveStatus.Activated,
+        RollupSourceReference[]? sources = null) =>
         new(
             RollupRt,
             TargetType,
             status,
             null,
-            SourceRt,
+            sources ?? new[] { new RollupSourceReference(SourceRt) },
             bucketSize ?? TimeSpan.FromMinutes(1),
             watermarkLag ?? TimeSpan.FromMinutes(5),
             watermark,
@@ -237,7 +238,7 @@ public class RollupOrchestratorTests
         var otherRt = OctoObjectId.GenerateNewId();
         var first = Rollup(BaseTime);
         var second = new RollupArchiveSnapshot(
-            otherRt, TargetType, CkArchiveStatus.Activated, null, SourceRt,
+            otherRt, TargetType, CkArchiveStatus.Activated, null, new[] { new RollupSourceReference(SourceRt) },
             TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5),
             BaseTime, // watermark
             new[] { new CkRollupAggregationSpec("voltage", CkRollupFunction.Avg, null) },
@@ -384,5 +385,211 @@ public class RollupOrchestratorTests
         var n = await NewSut(BaseTime).TickAsync(CancellationToken.None);
 
         Assert.Equal(0, n);
+    }
+    // ---- AB#5157: per-bucket source selection -----------------------------------------------
+
+    private static readonly OctoObjectId NativeRt = OctoObjectId.GenerateNewId();
+
+    /// The cutover instant of the legacy/native pair; BaseTime is on the hourly bucket grid.
+    private static readonly DateTime Cutover = BaseTime;
+
+    private static RollupSourceReference[] CutoverSources() => new[]
+    {
+        new RollupSourceReference(SourceRt, ValidTo: Cutover),
+        new RollupSourceReference(NativeRt, ValidFrom: Cutover),
+    };
+
+    private void StubNativeSource(CkArchiveStatus status = CkArchiveStatus.Activated) =>
+        A.CallTo(() => _archiveStore.GetAsync(NativeRt))
+            .Returns(new ArchiveSnapshot(NativeRt, SourceType, status, null, Array.Empty<CkArchiveColumnSpec>()));
+
+    // TC-MODEL-04: ValidFrom is inclusive and ValidTo exclusive, so the bucket that STARTS at the
+    // cutover is served by the native source and the one that ENDS there by the legacy source.
+    [Fact]
+    public async Task Tick_TwoSourcesAcrossTheCutover_UsesLegacyBeforeAndNativeFromTheCutoverBucket()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        var watermark = Cutover - TimeSpan.FromHours(2);                 // 12:00
+        var now = Cutover + TimeSpan.FromHours(2) + TimeSpan.FromMinutes(10); // 16:10, lag 5 min ⇒ cutoff 16:05
+        StubRollups(Rollup(watermark, bucketSize, sources: CutoverSources()));
+        StubActivatedSource();
+        StubNativeSource();
+
+        var committed = await NewSut(now).TickAsync(CancellationToken.None);
+
+        Assert.Equal(4, committed);
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt), A<RollupArchiveSnapshot>._,
+                Cutover - TimeSpan.FromHours(2), Cutover - TimeSpan.FromHours(1), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt), A<RollupArchiveSnapshot>._,
+                Cutover - TimeSpan.FromHours(1), Cutover, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        // The cutover bucket itself belongs to the native source (half-open span).
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                Cutover, Cutover + TimeSpan.FromHours(1), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                Cutover + TimeSpan.FromHours(1), Cutover + TimeSpan.FromHours(2), A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        // No bucket from the cutover onwards may be aggregated from the legacy source.
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt), A<RollupArchiveSnapshot>._,
+                A<DateTime>.That.Matches(d => d >= Cutover), A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_TwoSources_LoadsEachSourceSnapshotOncePerTick()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        var watermark = Cutover - TimeSpan.FromHours(2);
+        var now = Cutover + TimeSpan.FromHours(2) + TimeSpan.FromMinutes(10);
+        StubRollups(Rollup(watermark, bucketSize, sources: CutoverSources()));
+        StubActivatedSource();
+        StubNativeSource();
+
+        await NewSut(now).TickAsync(CancellationToken.None);
+
+        // Four buckets, two sources — but one store lookup per distinct source for the whole tick.
+        A.CallTo(() => _archiveStore.GetAsync(SourceRt)).MustHaveHappenedOnceExactly();
+        A.CallTo(() => _archiveStore.GetAsync(NativeRt)).MustHaveHappenedOnceExactly();
+    }
+
+    // TC-AGG-03: a bucket no span covers writes no row, but the watermark moves on so the rollup
+    // does not stall on a deliberately uncovered range.
+    [Fact]
+    public async Task Tick_BucketCoveredByNoSpan_AdvancesTheWatermarkWithoutAggregating()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        var gapStart = Cutover;                             // 14:00 — legacy ends here
+        var gapEnd = Cutover + TimeSpan.FromHours(2);       // 16:00 — native starts here
+        var watermark = Cutover - TimeSpan.FromHours(1);    // 13:00
+        var now = Cutover + TimeSpan.FromHours(3) + TimeSpan.FromMinutes(10); // 17:10 ⇒ cutoff 17:05
+        StubRollups(Rollup(watermark, bucketSize, sources: new[]
+        {
+            new RollupSourceReference(SourceRt, ValidTo: gapStart),
+            new RollupSourceReference(NativeRt, ValidFrom: gapEnd),
+        }));
+        StubActivatedSource();
+        StubNativeSource();
+
+        var committed = await NewSut(now).TickAsync(CancellationToken.None);
+
+        // Only the legacy bucket [13,14) and the native bucket [16,17) are committed; the two gap
+        // buckets are not counted.
+        Assert.Equal(2, committed);
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>.That.Matches(d => d >= gapStart && d < gapEnd), A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        // …yet the watermark walked across the gap.
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, gapStart + TimeSpan.FromHours(1), false))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, gapEnd, false))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    // The bucket's source is not activated (a disabled source stays allowed): the tick stops there
+    // with the watermark unchanged instead of skipping past data the source will deliver later.
+    [Fact]
+    public async Task Tick_SourceOfALaterBucketNotActivated_StopsTickWithThatWatermarkUnchanged()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        var watermark = Cutover - TimeSpan.FromHours(2);                       // 12:00
+        var now = Cutover + TimeSpan.FromHours(3) + TimeSpan.FromMinutes(10);  // 17:10
+        StubRollups(Rollup(watermark, bucketSize, sources: CutoverSources()));
+        StubActivatedSource();
+        StubNativeSource(CkArchiveStatus.Disabled);
+
+        var committed = await NewSut(now).TickAsync(CancellationToken.None);
+
+        // The two legacy buckets stay committed; the cutover bucket stalls.
+        Assert.Equal(2, committed);
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, Cutover, false))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _rollupStore.AdvanceWatermarkAsync(RollupRt, Cutover + TimeSpan.FromHours(1), false))
+            .MustNotHaveHappened();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    // TC-AGG-12: the open bucket resolves its source per bucket exactly like a closed one.
+    [Fact]
+    public async Task Tick_RefreshOpenBucket_UsesTheSourceCoveringTheOpenBucket()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        // Watermark exactly at the cutover ⇒ the open bucket [14:00, 15:00) lies in the native span.
+        StubRollups(Rollup(Cutover, bucketSize, sources: CutoverSources()));
+        StubActivatedSource();
+        StubNativeSource();
+
+        var committed = await NewSutWithRefresh(Cutover + TimeSpan.FromMinutes(30)).TickAsync(CancellationToken.None);
+
+        Assert.Equal(0, committed);
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == NativeRt), A<RollupArchiveSnapshot>._,
+                Cutover, Cutover + bucketSize, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>.That.Matches(s => s.RtId == SourceRt), A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Tick_RefreshOpenBucket_OpenBucketCoveredByNoSpan_IsSkipped()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        // The only source ends at the cutover, so the open bucket [14:00, 15:00) is uncovered.
+        StubRollups(Rollup(Cutover, bucketSize, sources: new[]
+        {
+            new RollupSourceReference(SourceRt, ValidTo: Cutover),
+        }));
+        StubActivatedSource();
+
+        await NewSutWithRefresh(Cutover + TimeSpan.FromMinutes(30)).TickAsync(CancellationToken.None);
+
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+    }
+
+    // TC-X-AGG-03: the initial watermark of a freshly activated rollup is one documented value
+    // derived from the clock alone — a second source does not move it, and no historic bucket is
+    // produced before an explicit backfill.
+    [Fact]
+    public async Task Tick_NewlyActivatedTwoSourceRollup_StartsAtTheSameClockDerivedInitialWatermark()
+    {
+        var bucketSize = TimeSpan.FromHours(1);
+        var activationTime = Cutover + TimeSpan.FromMinutes(30);
+        // The seed takes the clock and the rollup's own bucket geometry — the very arguments a
+        // single-source rollup passes — and never looks at a source archive.
+        var initialWatermark = BucketBoundary.InitialWatermark(
+            activationTime, BucketAlignment.FixedSize, bucketSize);
+        Assert.Equal(Cutover - TimeSpan.FromHours(1), initialWatermark);
+
+        var now = activationTime + TimeSpan.FromHours(1) + TimeSpan.FromMinutes(10);
+        StubRollups(Rollup(initialWatermark, bucketSize, sources: CutoverSources()));
+        StubActivatedSource();
+        StubNativeSource();
+
+        await NewSut(now).TickAsync(CancellationToken.None);
+
+        // Aggregation starts AT the initial watermark; nothing older is produced.
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>.That.Matches(d => d < initialWatermark), A<DateTime>._, A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _repo.AggregateBucketAsync(
+                A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                initialWatermark, initialWatermark + bucketSize, A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
     }
 }

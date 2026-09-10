@@ -144,4 +144,32 @@ public class RollupColumnGeneratorTests
         Assert.Single(columns);
         Assert.Equal("ison_stateduration", columns[0].Path);
     }
+    [Fact]
+    public void DefaultBaseNameFor_IgnoresAPinnedTargetColumnName()
+    {
+        // The default base name is the read-side identity of the aggregated quantity — what the spec
+        // aggregates, not where it stores the result. The per-source resolver (AB#5157) relies on
+        // that: two specs pinning the same stored name are NOT the same series.
+        var pinned = new CkRollupAggregationSpec("Reactive", CkRollupFunction.Sum, "energy_sum");
+        var plain = new CkRollupAggregationSpec("Reactive", CkRollupFunction.Sum, null);
+
+        Assert.Equal("reactive_sum", RollupColumnGenerator.DefaultBaseNameFor(pinned));
+        Assert.Equal(RollupColumnGenerator.DefaultBaseNameFor(plain),
+            RollupColumnGenerator.DefaultBaseNameFor(pinned));
+        Assert.Equal(new[] { "energy_sum" }, RollupColumnGenerator.TargetColumnNamesFor(pinned));
+    }
+
+    [Theory]
+    [InlineData("Amount.Value", CkRollupFunction.Sum, "amountvalue_sum")]
+    [InlineData("Amount.Value", CkRollupFunction.Avg, "amountvalue_avg")]
+    [InlineData("DimmingLevel", CkRollupFunction.TimeWeightedAvg, "dimminglevel_twavg")]
+    public void DefaultBaseNameFor_IsTheBaseTargetColumnNamesForDerivesFrom(
+        string path, CkRollupFunction function, string expected)
+    {
+        var spec = new CkRollupAggregationSpec(path, function, null);
+
+        Assert.Equal(expected, RollupColumnGenerator.DefaultBaseNameFor(spec));
+        Assert.All(RollupColumnGenerator.TargetColumnNamesFor(spec), n => Assert.StartsWith(expected, n));
+    }
+
 }

@@ -10,6 +10,13 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// hanging off it, and each rollup may itself be the source of further rollups (rollup-of-rollup),
 /// so a retroactive change on a base archive must propagate down a multi-level chain.
 /// </summary>
+/// <remarks>
+/// Since AB#5157 the graph is a multi-parent DAG, not a tree: a rollup declares a list of sources
+/// (<see cref="RollupArchiveSnapshot.Sources"/>) and is a direct dependent of <em>each</em> of
+/// them, so the same rollup is reachable from several base archives and, in a diamond, along
+/// several paths from one base. Traversal therefore dedups by rollup rtId — every dependent is
+/// returned exactly once per query no matter how many edges lead to it.
+/// </remarks>
 public interface IRollupDependencyGraph
 {
     /// <summary>

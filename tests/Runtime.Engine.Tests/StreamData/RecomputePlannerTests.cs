@@ -22,7 +22,7 @@ public class RecomputePlannerTests
             TargetType,
             CkArchiveStatus.Activated,
             null,
-            OctoObjectId.GenerateNewId(),
+            new[] { new RollupSourceReference(OctoObjectId.GenerateNewId()) },
             bucketSize,
             TimeSpan.FromMinutes(5),
             null,
@@ -271,5 +271,42 @@ public class RecomputePlannerTests
         }
         Assert.All(chunks, c => Assert.InRange((int)((c.End - c.Start).Ticks / bucket.Ticks), 1, 2000));
         Assert.Equal(expectedBuckets, chunks.Sum(c => (int)((c.End - c.Start).Ticks / bucket.Ticks)));
+    }
+    // ---- AB#5157: chunking a range that is split per source segment ---------------------------
+
+    // The recompute orchestrator plans chunks per source segment, so a chunk can never straddle a
+    // cutover even when the chunk cap would allow more buckets.
+    [Fact]
+    public void PlanChunks_SegmentEndingOnACutover_KeepsEveryChunkInsideTheSegment()
+    {
+        var cutover = Utc(2026, 5, 11, 12);
+
+        var chunks = RecomputePlanner.PlanChunks(
+            Utc(2026, 5, 11, 10), cutover, BucketAlignment.FixedSize, TimeSpan.FromHours(1), 10);
+
+        Assert.All(chunks, c => Assert.True(c.End <= cutover));
+        Assert.Equal(cutover, chunks[^1].End);
+    }
+
+    [Fact]
+    public void PlanChunks_TwoAdjacentSegments_TileTheWholeRangeWithTheCutoverAsAChunkBoundary()
+    {
+        var cutover = Utc(2026, 5, 11, 12);
+        var bucket = TimeSpan.FromHours(1);
+
+        var legacy = RecomputePlanner.PlanChunks(Utc(2026, 5, 11, 10), cutover, BucketAlignment.FixedSize, bucket, 2);
+        var native = RecomputePlanner.PlanChunks(cutover, Utc(2026, 5, 11, 15), BucketAlignment.FixedSize, bucket, 2);
+
+        var all = legacy.Concat(native).ToList();
+        // Contiguous, no overlap, and the cutover separates the two segments' chunks.
+        Assert.Equal(Utc(2026, 5, 11, 10), all[0].Start);
+        Assert.Equal(Utc(2026, 5, 11, 15), all[^1].End);
+        for (var i = 1; i < all.Count; i++)
+        {
+            Assert.Equal(all[i - 1].End, all[i].Start);
+        }
+
+        Assert.Contains(all, c => c.End == cutover);
+        Assert.Contains(all, c => c.Start == cutover);
     }
 }

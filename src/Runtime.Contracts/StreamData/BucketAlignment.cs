@@ -45,4 +45,12 @@ public enum BucketAlignment
     /// (rtId, year). <c>BucketSizeMs</c> is informational only.
     /// </summary>
     CalendarYear = 4,
+
+    /// <summary>
+    /// Bucket boundaries snap to calendar quarters — 1 January, 1 April, 1 July and 1 October,
+    /// 00:00:00 in the rollup's reference time zone (UTC when none is set). One row per
+    /// (rtId, quarter); quarter lengths vary 90-92 days, so <c>BucketSizeMs</c> is informational
+    /// only. AB#5157.
+    /// </summary>
+    CalendarQuarter = 5,
 }

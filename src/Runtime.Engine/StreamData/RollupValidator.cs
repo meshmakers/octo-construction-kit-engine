@@ -355,6 +355,17 @@ public static class RollupValidator
 
         if (rollup.BucketAlignment == BucketAlignment.FixedSize)
         {
+            // A calendar-aligned source cannot be measured by the ms rule at all: its BucketSize is
+            // nominal, so a CalendarMonth source declared at 1 d would satisfy "integer multiple of
+            // 1 d" against a fixed 1 d target while its month-long windows fit into no bucket at
+            // all — the fully-contained rule would drop every row and the rollup would come out
+            // empty. Refuse the combination instead of validating a number that means nothing here.
+            if (sourceAlignment != BucketAlignment.FixedSize)
+            {
+                throw new RollupBucketIntervalException(
+                    rollup.RtId, sourceRtId, rollup.BucketAlignment, sourceAlignment);
+            }
+
             // The original ms rule: at least the source window, and an integer multiple of it.
             if (sourceGranularity is { } granularity && granularity > TimeSpan.Zero &&
                 (rollup.BucketSize < granularity || rollup.BucketSize.Ticks % granularity.Ticks != 0))

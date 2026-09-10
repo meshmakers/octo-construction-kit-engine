@@ -126,6 +126,15 @@ internal static class SeriesResolutionPlanner
             };
         }
 
+        // The excluded rung is only worth naming as "finer data starts here" when it actually is
+        // finer than the one being delivered. It need not be: the planner prefers whichever rung
+        // fits the requested point count best, so a COARSER rung can be the excluded one — and a
+        // freshly created coarse rung is precisely the case whose coverage starts latest. Reporting
+        // its start as a finer resolution would tell the caller the opposite of the truth.
+        var chosen = ladder.FirstOrDefault(r => r.ArchiveRtId == filtered.ArchiveRtId);
+        var excludedIsFiner = excluded is not null &&
+            IsFinerThan(effectiveGrainMs(excluded, from, to), chosen is null ? null : effectiveGrainMs(chosen, from, to));
+
         return new SeriesResolutionResult(
             filtered.ArchiveRtId, filtered.EffectiveBucketMs, filtered.Points, filtered.ReducingFunction,
             SeriesResolutionSignal.CoverageLimited)
@@ -134,9 +143,20 @@ internal static class SeriesResolutionPlanner
             Diagnostic = filtered.Diagnostic is null
                 ? $"{exclusion}; delivering {filtered.Points} points from {filtered.ArchiveRtId} instead."
                 : $"{exclusion}; delivering {filtered.Points} points from {filtered.ArchiveRtId} instead. {filtered.Diagnostic}",
-            FinerRungAvailableFrom = excluded?.AvailableFrom,
+            FinerRungAvailableFrom = excludedIsFiner ? excluded!.AvailableFrom : null,
         };
     }
+
+    /// <summary>
+    /// True when <paramref name="candidateGrain"/> is a finer resolution than
+    /// <paramref name="chosenGrain"/>. A <c>null</c> grain means "finest, unknown resolution" (a raw
+    /// archive, or a time-range archive without an advisory period), so it beats every known grain
+    /// and ties with another unknown one. AB#5157 review.
+    /// </summary>
+    private static bool IsFinerThan(long? candidateGrain, long? chosenGrain) =>
+        candidateGrain is null
+            ? chosenGrain is not null
+            : chosenGrain is { } chosen && candidateGrain.Value < chosen;
 
     /// <summary>
     /// The coverage filter (AB#5157): <c>null</c> when no rung reports coverage (inert); otherwise

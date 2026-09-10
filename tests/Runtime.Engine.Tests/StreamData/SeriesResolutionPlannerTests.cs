@@ -350,6 +350,27 @@ public class SeriesResolutionPlannerTests
         // (the unfiltered choice) starts too late to be a candidate.
         Assert.Equal(sixHours.ArchiveRtId, result.ArchiveRtId);
         Assert.Equal(SeriesResolutionSignal.CoverageLimited, result.Signal);
+
+        // AB#5157 review: the excluded rung is COARSER than the one delivered, so there is no
+        // finer resolution waiting at its available-from date. Naming it would tell the caller the
+        // opposite of the truth — the six-hour series they are getting is the finer one.
+        Assert.Null(result.FinerRungAvailableFrom);
+    }
+
+    // AB#5157 review, the mirror case: the excluded rung really is finer, so its start date is
+    // exactly what the caller needs to know.
+    [Fact]
+    public void CoverageFilter_ExcludedRungFinerThanTheDeliveredOne_ReportsItsAvailableFrom()
+    {
+        var baseRung = From(Base(FifteenMin), YearFrom);
+        var hourly = From(Rollup(OneHour, CkRollupFunction.Sum), MidYear);
+        var daily = From(Rollup(OneDay, CkRollupFunction.Sum), YearFrom);
+
+        var result = Plan(new[] { baseRung, hourly, daily }, YearFrom, YearTo, 600, CkRollupFunction.Sum);
+
+        Assert.Equal(daily.ArchiveRtId, result.ArchiveRtId);
+        Assert.Equal(SeriesResolutionSignal.CoverageLimited, result.Signal);
+        Assert.Equal(MidYear, result.FinerRungAvailableFrom);
     }
 
     // TC-RES-06: when the filter changes nothing the pre-AB#5157 answer stands.

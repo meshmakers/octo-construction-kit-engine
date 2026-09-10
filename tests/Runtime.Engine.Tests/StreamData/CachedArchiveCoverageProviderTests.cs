@@ -53,6 +53,54 @@ public class CachedArchiveCoverageProviderTests
             .MustHaveHappenedOnceExactly();
     }
 
+    // AB#5157 review: an invalidation landing while a measurement is in flight has to win. The
+    // caller of that measurement still gets its answer, but writing it back would undo the very
+    // lifecycle event that invalidated the entry and serve a pre-change value until the TTL runs
+    // out.
+    [Fact]
+    public async Task InvalidationDuringAnInFlightFetch_IsNotUndoneByTheStaleResult()
+    {
+        var cache = NewCache();
+        var fetches = 0;
+
+        var duringDelete = await cache.GetOrFetchAsync(TenantA, ArchiveRt, _ =>
+        {
+            fetches++;
+            // The delete / clear / completed recompute lands mid-measurement.
+            cache.Invalidate(TenantA, ArchiveRt);
+            return Task.FromResult<ArchiveCoverage?>(Coverage(1));
+        }, TestContext.Current.CancellationToken);
+
+        var afterwards = await cache.GetOrFetchAsync(TenantA, ArchiveRt, _ =>
+        {
+            fetches++;
+            return Task.FromResult<ArchiveCoverage?>(Coverage(2));
+        }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(Coverage(1), duringDelete);
+        Assert.Equal(Coverage(2), afterwards);
+        Assert.Equal(2, fetches);
+    }
+
+    // The same guard must not cost a cache entry when nothing was invalidated.
+    [Fact]
+    public async Task FetchWithoutAnInterveningInvalidation_IsStillMemoised()
+    {
+        var cache = NewCache();
+        var fetches = 0;
+
+        Task<ArchiveCoverage?> Fetch(CancellationToken _)
+        {
+            fetches++;
+            return Task.FromResult<ArchiveCoverage?>(Coverage(1));
+        }
+
+        await cache.GetOrFetchAsync(TenantA, ArchiveRt, Fetch, TestContext.Current.CancellationToken);
+        await cache.GetOrFetchAsync(TenantA, ArchiveRt, Fetch, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, fetches);
+    }
+
     // TC-COV-09: once the caching interval has elapsed the coverage is measured again.
     [Fact]
     public async Task CallAfterTheTtlHasElapsed_RefetchesFromTheRepository()

@@ -24,8 +24,10 @@ namespace Meshmakers.Octo.Runtime.Engine.StreamData;
 /// <para>
 /// Freshness is TTL-only except for the events routed through
 /// <see cref="IArchiveCoverageInvalidator"/> (archive delete/clear, tenant-level drop, recompute
-/// completion); ordinary ingest is absorbed by the TTL. Invalidation is process-local. See
-/// <c>concept-multi-source-rollups.md</c> §7.
+/// completion); ordinary ingest is absorbed by the TTL. Invalidation is process-local, and it
+/// wins over a fetch it interrupts: a measurement that started before the invalidation is handed
+/// to its caller but not memoised, so the invalidated entry stays gone instead of being
+/// reinstated with a pre-change answer. See <c>concept-multi-source-rollups.md</c> §7.
 /// </para>
 /// </remarks>
 public sealed class ArchiveCoverageCache : IArchiveCoverageInvalidator
@@ -39,6 +41,13 @@ public sealed class ArchiveCoverageCache : IArchiveCoverageInvalidator
     private readonly ConcurrentDictionary<(string TenantId, OctoObjectId ArchiveRtId), CacheEntry> _entries = new();
     private readonly TimeSpan _cacheTtl;
     private readonly Func<DateTime> _clock;
+
+    /// <summary>
+    /// Bumped by every <see cref="Invalidate"/>. A fetch records it before starting and publishes
+    /// its result only if it is still unchanged, so an answer measured before a lifecycle change
+    /// can never be written back over that change.
+    /// </summary>
+    private long _generation;
 
     /// <summary>
     /// Creates the cache with the given time-to-live. A zero TTL disables memoisation (every
@@ -94,11 +103,22 @@ public sealed class ArchiveCoverageCache : IArchiveCoverageInvalidator
         }
 
         // Not cached on failure: the exception propagates and the next request measures again.
+        var generationAtStart = Interlocked.Read(ref _generation);
         var coverage = await fetch(cancellationToken).ConfigureAwait(false);
 
-        // Stamp the entry with the time the measurement was requested, not completed — the value
-        // cannot be fresher than the moment it was asked for, so it expires conservatively.
-        _entries[key] = new CacheEntry(coverage, now);
+        // Publish only when nothing was invalidated while the fetch was in flight. Otherwise a
+        // delete, clear or completed recompute that landed mid-fetch would be undone by a
+        // measurement taken before it, and the stale answer would be served until the TTL runs
+        // out — defeating the very invalidation that was requested. The caller still gets this
+        // result; it is simply not memoised.
+        if (Interlocked.Read(ref _generation) == generationAtStart)
+        {
+            // Stamp the entry with the time the measurement was requested, not completed — the
+            // value cannot be fresher than the moment it was asked for, so it expires
+            // conservatively.
+            _entries[key] = new CacheEntry(coverage, now);
+        }
+
         return coverage;
     }
 
@@ -109,6 +129,10 @@ public sealed class ArchiveCoverageCache : IArchiveCoverageInvalidator
         {
             throw new ArgumentNullException(nameof(tenantId));
         }
+
+        // Bump before removing, never after: a fetch that publishes in the window between the two
+        // would otherwise still see the old generation and reinstate what is being invalidated.
+        Interlocked.Increment(ref _generation);
 
         if (archiveRtId is { } rtId)
         {

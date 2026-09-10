@@ -419,6 +419,39 @@ public sealed class RollupSourceTargetTypeMismatchException : StreamDataExceptio
 }
 
 /// <summary>
+/// A calendar-aligned rollup declares a different reference time zone than its calendar-aligned
+/// source. Calendar buckets nest only when both sides anchor them to the same zone: a
+/// <c>CalendarMonth</c> source in UTC has month boundaries at UTC midnight, while a
+/// <c>CalendarQuarter</c> target in <c>Europe/Vienna</c> cuts its quarters at local midnight, so
+/// the source windows at each edge straddle two target buckets. The aggregation's
+/// fully-contained window rule then drops them and the boundary months silently lose data.
+/// AB#5157.
+/// </summary>
+public sealed class RollupCalendarZoneMismatchException : StreamDataException
+{
+    public OctoObjectId SourceArchiveRtId { get; }
+    public string TargetReferenceTimeZone { get; }
+    public string SourceReferenceTimeZone { get; }
+
+    public RollupCalendarZoneMismatchException(
+        OctoObjectId rollupArchiveRtId,
+        OctoObjectId sourceArchiveRtId,
+        string targetReferenceTimeZone,
+        string sourceReferenceTimeZone)
+        : base(
+            $"Rollup archive {Describe(rollupArchiveRtId)} aligns its calendar buckets to " +
+            $"'{targetReferenceTimeZone}', but its calendar-aligned source archive '{sourceArchiveRtId}' aligns to " +
+            $"'{sourceReferenceTimeZone}'. Calendar buckets only nest when both sides use the same reference time " +
+            "zone — otherwise the source windows at every boundary straddle two target buckets and are dropped.",
+            rollupArchiveRtId)
+    {
+        SourceArchiveRtId = sourceArchiveRtId;
+        TargetReferenceTimeZone = targetReferenceTimeZone;
+        SourceReferenceTimeZone = sourceReferenceTimeZone;
+    }
+}
+
+/// <summary>
 /// An aggregation's <c>SourcePath</c> does not resolve against one of the rollup's source
 /// archives. Every path must resolve on <em>every</em> source (strict), otherwise the rollup would
 /// silently produce empty columns for the buckets that source serves. AB#5157.

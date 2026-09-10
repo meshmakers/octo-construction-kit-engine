@@ -125,7 +125,15 @@ RecomputeJob(
   trigger is recorded as `Coalesced` for traceability. No queue, no reject.
 - **Idempotency.** The same input range produces the same staging rows; a crash mid-job is
   recovered from the job state persisted in the Mongo ledger — re-running re-derives identical
-  staging output before any swap.
+  staging output before any swap. Concretely (AB#5189): the obligations a run is working on stay
+  in the rollup's work list until the run has committed, and every job carries a heartbeat
+  (`LastProgressAt`, stamped per committed chunk). A job whose heartbeat has been silent longer
+  than the stale-job timeout (60 minutes) belongs to a dead process; the drain fails it, clears the
+  in-progress flag it left behind, counts the death as a failed attempt on the obligations it was
+  working on, and continues with the work still queued. A Pending job with no queued work at all
+  is an orphan of the same kind and is failed once it is older than the timeout. Without this a
+  dead job stayed non-terminal forever, every later trigger coalesced into it, and the rollup was
+  frozen until someone edited the database.
 
 ## §4 Atomic swap — CrateDB reality
 
@@ -186,40 +194,62 @@ A range is recomputed in chunks (§4), and each chunk swaps on its own pointer, 
 part-way leaves the chunks before it committed and the rest carrying their previous values. The
 **unfinished tail is recorded as a pending range** on the rollup, so a later pass finishes the job
 without an operator noticing and asking. The committed prefix is not repeated — a retry resumes at
-the chunk that failed.
+the chunk that failed. The obligations a run is working on stay in the work list *while* it runs
+and are removed — by value, in the same write that adds the remainder — only once it is over, so a
+process that dies mid-run leaves its work exactly where it was (see §3, *Idempotency*).
 
 That retry is bounded. Each pending range carries `Attempts`, `NextAttemptAt` and `LastError`
-(`CkArchiveRecomputeRange`, System.StreamData 1.9.0). After a failure the drain re-enqueues the
-tail with the attempt count raised and an exponentially backed-off `NextAttemptAt`
-(1, 2, 4, 8 minutes); a range that is not yet due is left in the work list untouched. Once the
-count reaches `MaxRangeAttempts` (default 5) the obligation is **dropped** with an ERROR naming the
-range and the last error, and the rollup keeps its `LastRecomputeFailureReason`. A permanently
-broken rollup — a source that cannot serve one of the aggregation paths, say — therefore stops
-consuming a recompute run and a generation on every tick; it needs the cause fixed and a fresh
-recompute, which is the honest state for a configuration error.
+(`CkArchiveRecomputeRange`, System.StreamData 1.9.0). After a failure the drain puts the tail back
+with the attempt count raised and an exponentially backed-off `NextAttemptAt` (5, 10, 20, 40
+minutes — 75 minutes from the first failure to the last attempt); a range that is not yet due is
+left in the work list untouched. Once the count reaches the attempt cap (five, a constant of the
+orchestrator with no operator setting) the obligation is **parked**: it stays on the entity with
+`NextAttemptAt` in the year 9999, is never due again, and is released only by a recompute that
+covers it and succeeds — the operator fixes the cause and recomputes the range, or a later
+obligation over it goes through. An ERROR names the range and the last error, and the rollup keeps
+its `LastRecomputeFailureReason`. A permanently broken rollup — a source that cannot serve one of
+the aggregation paths, say — therefore stops consuming a recompute run and a generation on every
+tick, and the entity keeps saying what is outstanding instead of claiming nothing is.
+
+Three refinements of that rule. **Interruption is not failure**: a run cut short by cancellation
+(a redeploy) hands its remainder back at the same attempt count, due immediately, and the tick
+stops; obligations it had not reached are untouched. **Merged obligations carry their history**:
+when several ranges merge into one interval, the remainder takes the highest attempt count and the
+earliest enqueue time among them, so a fresh obligation cannot restart the retry loop of one that
+is nearly parked. **A manual trigger is a fresh obligation**: it enters at attempt zero with its own
+budget — the operator explicitly asked — and its success releases whatever parked range it covers.
+
+Obligations are merged and run **per scope**: a single-entity recompute (`rtIdScope`) that fails
+resumes as a single-entity recompute, never widened into a full-range run of every entity, and an
+unscoped one is never narrowed.
 
 The pointer is keyed on the exact range, so a recompute over a *different* range adds an entry
 rather than replacing the previous one. After the flip and the sweep, an entry the new range fully
 contains names a generation whose rows are gone, so the flip deletes those contained entries.
-Entries reaching beyond the flipped range are kept — they still govern the part outside it.
+Entries reaching beyond the flipped range are kept — they still govern the part outside it. The
+deletion follows the sweep's scope: an unscoped flip swept every entity's rows and drops contained
+entries of any scope; a scoped flip drops only contained entries of its own scope, because an
+unscoped entry inside its range still governs every other entity.
 
 ### Bucket ownership — recompute vs forward aggregation
 
-Exactly one of the two writes a given bucket, and the boundary is the **watermark lag**:
+The recompute never touches a bucket the forward aggregation will write **again**, and the
+boundary is the **watermark lag**:
 
-| Bucket | Owner |
-|---|---|
-| `bucketEnd <= now - WatermarkLag` (lag-closed) | the recompute |
-| `bucketEnd > now - WatermarkLag` | the forward aggregation |
+| Bucket | Forward aggregation | Recompute |
+|---|---|---|
+| `bucketEnd <= now - WatermarkLag` (lag-closed) | writes it **exactly once**, when it closes it | may write it any time after that |
+| `bucketEnd > now - WatermarkLag` (inside the lag window) | re-writes it on every tick (open-bucket refresh, AB#4306) | never |
 
-The forward pass commits a bucket only once it is lag-closed and keeps re-aggregating the one
-before that at generation 0 (AB#4306, `RollupOrchestrator`), so the lag window is where late source
-rows are still absorbed. A recompute therefore caps its range at
-`BucketBoundary.AlignDown(now - WatermarkLag)` and an all-lag-window range is a `Completed` no-op —
-without that cap its generation pointer would outrank the forward pass's generation-0 write for
-those buckets, freezing them on the value the recompute read and hiding every row that arrived
-inside the lag. Corrections inside the lag window need no obligation of their own: the forward pass
-rewrites those buckets from the source on every tick until they close.
+Both writes of a lag-closed bucket are final — the forward pass closes it from the complete source
+data, a recompute reads the same complete data — so with a backlog watermark the two may write the
+same lag-closed bucket on the same tick in either order without harm. The lag window is where late
+source rows are still being absorbed, and only the forward pass writes there: a recompute caps its
+range at `BucketBoundary.AlignDown(now - WatermarkLag)` and an all-lag-window range is a
+`Completed` no-op. Without that cap its generation pointer would outrank the forward pass's
+generation-0 refresh for those buckets, freezing them on the value the recompute read and hiding
+every row that arrived inside the lag. Corrections inside the lag window need no obligation of
+their own: the forward pass rewrites those buckets from the source on every tick until they close.
 
 ## §5 Triggers
 
@@ -265,9 +295,11 @@ state, so pre-1.6.0 rollups and rollups that have never been recomputed render c
 
 A `CkArchiveRecomputeJob` record per run — **not** just a boolean flag — with
 `state, trigger, range, rtIdScope, rowsProcessed, windowsProcessed, startedAt, finishedAt,
-durationMs, errorReason, stagingTableName`. Queryable via a new GraphQL
-`recomputeJobsFor(archiveRtId)`. This is what an operator reads to debug "why did last night's
-recompute fail?".
+durationMs, errorReason, stagingTableName`, plus the heartbeat `lastProgressAt` (AB#5189) the
+drain's stale-job detection reads (§3). Queryable via a new GraphQL `recomputeJobsFor(archiveRtId)`.
+This is what an operator reads to debug "why did last night's recompute fail?" — a job failed by
+the stale-job recovery says so in its `errorReason` ("Presumed dead …" / "Orphaned …"), as does one
+that was merely interrupted by a shutdown ("Interrupted …").
 
 ### Audit trail
 
@@ -293,7 +325,7 @@ One structured log at each phase boundary — **Compute → Validate → Swap �
 | `CkArchive` / `CkRollupArchive` attributes | `DirtyWindows` (RecordArray — Information A), `PendingRecomputeRanges` (RecordArray — Information B), and the §7 observability fields. All marked `isRuntimeState: true` (see CLAUDE.md — runtime-state preservation, so a blueprint re-apply never tramples them). |
 | New record `CkArchiveDirtyWindow` | `WindowStart`, `WindowEnd`, `ChangeKind`, `Source`, `DetectedAt`. |
 | Record `CkArchiveRecomputeRange` | `DependentArchiveRtId`, `RangeStart`, `RangeEnd`, `RtIdScope`, `EnqueuedAt`, plus the retry bookkeeping `Attempts` (default 0), `NextAttemptAt` and `LastError` (System.StreamData 1.9.0 — see *Failure mode*). Ranges stored before 1.9.0 read back as attempt zero and are due immediately. |
-| New record `CkArchiveRecomputeJob` | the §7 job-history fields. |
+| New record `CkArchiveRecomputeJob` | the §7 job-history fields, plus the heartbeat `LastProgressAt` (1.9.0). Jobs stored before 1.9.0 carry none and are judged by `StartedAt`. |
 | New enums | `CkRecomputeChangeKind { Append, RetroactiveModify }`, `CkRecomputeChangeSource { Manual, Pipeline, Import }`, `CkRecomputeJobState { Pending, Running, Swapping, Completed, Failed, Coalesced }`. |
 
 The bump is additive; existing archives migrate via the no-migrations bridge (CLAUDE.md).

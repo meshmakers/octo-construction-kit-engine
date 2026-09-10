@@ -1447,6 +1447,56 @@ public class RecomputeOrchestratorTests
     }
 
     [Fact]
+    public async Task Tick_FailedInterval_CountsTheBackoffFromTheFailure_NotFromTheStartOfTheTick()
+    {
+        StubRollupAndSource();
+        var start = new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc);
+        var end = new DateTime(2026, 5, 11, 2, 0, 0, DateTimeKind.Utc);
+        StubPending(new ArchiveRecomputeRange(RollupRt, start, end, null, Now));
+        // The run itself takes twenty minutes — longer than the first backoff — before it fails.
+        var clock = Now;
+        A.CallTo(() => _executor.ExecuteAsync(A<ArchiveSnapshot>._, A<RollupArchiveSnapshot>._,
+                A<DateTime>._, A<DateTime>._, A<OctoObjectId?>._, A<CancellationToken>._))
+            .ReturnsLazily(_ =>
+            {
+                clock = Now.AddMinutes(20);
+                throw new InvalidOperationException("slow failure");
+            });
+        var sut = new RecomputeOrchestrator(TenantId, _archiveStore, _rollupStore, _graph, _stateStore, _jobStore,
+            _executor, _streamData, _audit, NullLogger<RecomputeOrchestrator>.Instance, () => clock);
+
+        await sut.TickAsync(CancellationToken.None);
+
+        // Measured from the start of the tick the remainder would already be due; it must be held
+        // back for the full backoff after the failure.
+        A.CallTo(() => _stateStore.UpdatePendingRecomputeRangesAsync(RollupRt,
+                A<IReadOnlyList<ArchiveRecomputeRange>>._,
+                A<IReadOnlyList<ArchiveRecomputeRange>>.That.Matches(rs =>
+                    rs.Count == 1
+                    && rs[0].NextAttemptAt == Now.AddMinutes(20) + RecomputeOrchestrator.DefaultRangeRetryBaseDelay)))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Recompute_FailureAfterTheLastChunkCommitted_LeavesNothingOutstanding()
+    {
+        StubRollupAndSource();
+        // Every chunk commits; the bookkeeping after the loop is what throws.
+        A.CallTo(() => _stateStore.MarkRecomputeSucceededAsync(RollupRt, A<DateTime>._))
+            .Throws(new InvalidOperationException("mongo hiccup"));
+
+        var job = await NewSut(maxBucketsPerChunk: 2).RecomputeArchiveAsync(
+            RollupRt, new DateTime(2026, 5, 11, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2026, 5, 11, 4, 0, 0, DateTimeKind.Utc), null, RecomputeTrigger.Manual, CancellationToken.None);
+
+        // The job records the failure, but the data is complete: no remainder is queued, so the
+        // drain does not recompute the last chunk (and burn a generation) for nothing.
+        Assert.Equal(RecomputeJobState.Failed, job.State);
+        A.CallTo(() => _stateStore.EnqueueRecomputeRangesAsync(RollupRt, A<IReadOnlyList<ArchiveRecomputeRange>>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Tick_FailedInterval_HandsBackTheRemainderUpToTheLagFrontier_NotTheRequestedEnd()
     {
         StubRollupAndSource();

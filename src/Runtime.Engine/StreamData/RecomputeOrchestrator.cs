@@ -345,6 +345,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                     var attempts = fed.Max(r => r.Attempts) + 1;
                     var enqueuedAt = fed.Min(r => r.EnqueuedAt);
                     var reason = outcome.Job.ErrorReason;
+                    // The backoff counts from the failure, not from the start of the tick: a run can
+                    // take longer than the delay, and measured from tick start the remainder would
+                    // already be due on the next tick.
+                    var failedAt = _clock();
                     ArchiveRecomputeRange remainder;
 
                     if (attempts >= _maxRangeAttempts)
@@ -367,7 +371,7 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                             rollup.RtId, unfinishedFrom, outcome.UnfinishedTo, attempts, _maxRangeAttempts, backoff, reason);
                         remainder = new ArchiveRecomputeRange(
                             rollup.RtId, unfinishedFrom, outcome.UnfinishedTo, scope, enqueuedAt,
-                            attempts, tickNow + backoff, reason);
+                            attempts, failedAt + backoff, reason);
                     }
 
                     await _stateStore.UpdatePendingRecomputeRangesAsync(rollup.RtId, fed, new[] { remainder });
@@ -882,6 +886,10 @@ public sealed class RecomputeOrchestrator : IRecomputeOrchestrator
                         chunkResult.RowsProcessed, chunkResult.WindowsProcessed, totalRows, totalWindows);
                 }
             }
+
+            // Every chunk has committed: nothing of the range is outstanding any more, whatever the
+            // bookkeeping below may still throw.
+            unfinishedFrom = to;
 
             var finishedAt = _clock();
             var elapsed = finishedAt - startedAt;

@@ -39,7 +39,15 @@
     },
     "seedDataPath": {
       "type": "string",
-      "description": "Path to the seed data file relative to the blueprint root directory"
+      "description": "Path to the seed data file relative to the blueprint root directory. Single-file form; use seedDataPaths to split a large seed across several files."
+    },
+    "seedDataPaths": {
+      "type": "array",
+      "description": "Paths to the seed data files relative to the blueprint root directory. Lets a large seed be split across several files and folders (e.g. one pipeline plus its data flow per file). All listed files are loaded and merged into a single runtime model before the import runs, so associations may reference entities declared in any other listed file; the order of the list does not affect the result. When seedDataPath is also set it is loaded first and this list follows; duplicate paths are collapsed. Duplicate rtIds across files are rejected.",
+      "items": {
+        "type": "string",
+        "description": "Path to one seed data file, relative to the blueprint root directory"
+      }
     },
     "requires": {
       "type": "object",

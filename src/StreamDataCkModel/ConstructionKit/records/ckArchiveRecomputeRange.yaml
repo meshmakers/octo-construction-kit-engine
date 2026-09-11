@@ -13,3 +13,11 @@ records:
         name: RtIdScope
       - id: ${this}/CkArchiveRecomputeRange.EnqueuedAt
         name: EnqueuedAt
+      - id: ${this}/CkArchiveRecomputeRange.Attempts
+        name: Attempts
+      - id: ${this}/CkArchiveRecomputeRange.NextAttemptAt
+        name: NextAttemptAt
+        isOptional: true
+      - id: ${this}/CkArchiveRecomputeRange.LastError
+        name: LastError
+        isOptional: true

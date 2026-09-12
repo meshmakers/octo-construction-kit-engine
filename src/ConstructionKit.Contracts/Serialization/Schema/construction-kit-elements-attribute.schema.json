@@ -28,6 +28,16 @@
         },
         "isOptional": {
           "type": "boolean"
+        },
+        "ownership": {
+          "type": "string",
+          "enum": [
+            "SeedOwned",
+            "TenantOwned",
+            "RuntimeState",
+            "Secret"
+          ],
+          "description": "Optional per-assignment override of the attribute definition's 'ownership' (AB#5187). Omit to inherit from the definition. Use it when one shared attribute definition needs a different owner on this type or record - e.g. a shared 'ClientId' that is Secret on FinApiConfiguration but SeedOwned on ServiceAccountConfiguration."
         }
       },
       "additionalProperties": false,
@@ -93,9 +103,19 @@
             ]
           }
         },
+        "ownership": {
+          "type": "string",
+          "enum": [
+            "SeedOwned",
+            "TenantOwned",
+            "RuntimeState",
+            "Secret"
+          ],
+          "description": "Declares who owns this attribute's value and whether the value is portable (AB#5187). SeedOwned (default): the seed author owns it - a blueprint re-apply overwrites the tenant value, and the value is exported. TenantOwned: the tenant owns it - a re-apply keeps the existing value, and the value is still exported (defaultValues may seed a fresh tenant). RuntimeState: a service/operator/pipeline owns it - preserved on re-apply and excluded from ExportRt. Secret: a credential - preserved on re-apply and excluded from ExportRt. Omit to fall back to the deprecated 'isRuntimeState' alias (true -> RuntimeState, false/absent -> SeedOwned). Declaring both is an authoring error (OCTO-CK003)."
+        },
         "isRuntimeState": {
           "type": "boolean",
-          "description": "When true, blueprint re-apply preserves the existing runtime value of this attribute instead of overwriting it with the seed value. Use for attributes that carry runtime state (deployment status, communication status, last-error fields, sync sequence numbers) that the operator/services own at runtime and that the blueprint must not reset on version bumps. Defaults to false (seed-managed)."
+          "description": "DEPRECATED alias for 'ownership' (AB#5187), kept so models authored before it keep working unchanged: true maps to RuntimeState, false or absent maps to SeedOwned. In a COMPILED model this field is also emitted as a mirror of 'ownership' meaning 'preserved on Upsert' (true for TenantOwned, RuntimeState and Secret), so an engine that does not know 'ownership' yet degrades to preserve-and-exclude instead of resetting credentials. Do not declare it together with 'ownership' (OCTO-CK003)."
         },
         "description": {
           "type": "string"

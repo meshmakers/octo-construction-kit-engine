@@ -25,6 +25,19 @@ MyBlueprint/
     └── from-1.0.0.yaml
 ```
 
+A seed that has grown past what one file can carry may be split across several files and
+folders — see [Splitting the seed across several files](#splitting-the-seed-across-several-files):
+
+```
+MyBlueprint/
+├── blueprint.yaml        # seedDataPaths: [...]
+└── seed-data/
+    ├── configurations/base.yaml
+    ├── data-flows/camt053.yaml
+    ├── identity/roles.yaml
+    └── master-data/accounts.yaml
+```
+
 The folder name carries only the blueprint **Name**; the version lives exclusively
 in the manifest's `blueprintId`. Bumping the version is a manifest-only edit — no
 folder rename required.
@@ -49,6 +62,13 @@ blueprintDependencies:
 # Optional path to seed data (relative to blueprint root)
 seedDataPath: seed-data/entities.yaml
 
+# ... or, for a seed split across several files (mutually exclusive in practice; both are
+# loaded if both are given)
+seedDataPaths:
+  - seed-data/configurations/base.yaml
+  - seed-data/data-flows/camt053.yaml
+  - seed-data/identity/roles.yaml
+
 # Optional preconditions — see "Blueprint Variables" below
 requires:
   octo.environment: [staging, production]
@@ -70,6 +90,7 @@ migrations:
 | `ckModelDependencies`   | string[] | CK models with version ranges (auto-imported on apply)                     |
 | `blueprintDependencies` | string[] | Other blueprints with version ranges (resolved transitively)               |
 | `seedDataPath`          | string   | Optional path to seed-data file (runtime-model format)                     |
+| `seedDataPaths`         | string[] | Optional list of seed-data files, merged into one model before import      |
 | `requires`              | object   | Optional preconditions evaluated against the tenant variable context       |
 | `migrations`            | array    | Optional list of migration scripts keyed by source version                 |
 
@@ -279,6 +300,48 @@ entities:
 ```
 
 Seed data is applied with **upsert** strategy: existing entities (matched by `rtId`) are updated; new ones are inserted.
+
+### Splitting the seed across several files
+
+One `entities.yaml` becomes unreadable long before a rich blueprint is finished — data flows,
+pipelines, configurations, identity roles and master data all end up interleaved in a file where
+no diff is reviewable and no feature has an owner. `seedDataPaths` replaces the single
+`seedDataPath` with a list, so the seed can be organised by feature:
+
+```yaml
+seedDataPaths:
+  - seed-data/configurations/base.yaml
+  - seed-data/identity/roles.yaml
+  - seed-data/data-flows/camt053.yaml       # one pipeline + its data flow per file
+  - seed-data/data-flows/weclapp-sync.yaml
+  - seed-data/master-data/accounts.yaml
+```
+
+Each file is a complete runtime-model document with its own `$schema` and `dependencies`; the
+engine loads all of them, unions their `dependencies`, concatenates their `entities` and imports
+the result as **one** model. What follows from that:
+
+- **Order does not matter.** The merged import writes every entity before any association, so an
+  association in the first file may reference an entity declared in the last one. The list order
+  only fixes which file is named first when a duplicate `rtId` is reported.
+- **Duplicate entities across files are rejected.** Identity here is the CK type *plus* the
+  `rtId`, not the `rtId` alone — entities live in a collection per CK type and associations carry
+  the target type next to the target id, so the same id under two types is legal (and occurs in
+  shipped blueprints). `octo-bpm validate` warns about that reuse because it makes association
+  targets easy to get wrong. A duplicate inside a single file keeps its previous behaviour
+  (reported by the importer).
+- **A missing file is an error**, not a warning, as soon as more than one file is declared:
+  importing the rest would leave the tenant partially seeded and still report success. The
+  single-file form keeps its historic warning.
+- **`octo-bpm validate` warns about YAML files under `seed-data/` that no path references** —
+  forgetting to add a newly created file to the list is the one failure mode this form
+  introduces, and it would otherwise pass as a silently smaller install.
+- **Backwards compatible.** `seedDataPath` keeps working unchanged. If a manifest sets both, the
+  single path is loaded first and the list follows (and `octo-bpm validate` warns).
+
+There is no directory or glob form: blueprints are served to the runtime over GitHub Pages, which
+offers no directory listing, so the set of files has to be written down in the manifest that is
+fetched anyway.
 
 ## Update Modes
 

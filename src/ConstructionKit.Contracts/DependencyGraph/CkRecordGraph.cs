@@ -159,7 +159,10 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
             list.Add(CkRecordId);
         }
 
-        list.AddRange(_derivedRecords.Select(x => x.BaseCkRecordId));
+        // AB#5192: this walked _derivedRecords, whose BaseCkRecordId is THIS record — so the method
+        // returned its own id once per derived record, and an empty list for a record that has base
+        // records but no derived ones, which is the case it exists for. Mirrors CkTypeGraph.GetBaseTypes.
+        list.AddRange(_baseRecords.Select(x => x.BaseCkRecordId));
 
         return list;
     }

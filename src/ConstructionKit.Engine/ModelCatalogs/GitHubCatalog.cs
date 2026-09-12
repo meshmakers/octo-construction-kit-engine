@@ -15,7 +15,8 @@ public class PublicGitHubCatalog(
     IHttpClientFactory httpClientFactory,
     IGitHubClientFactory gitHubClientFactory,
     IOptions<PublicGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
-    gitHubClientFactory, gitHubOptions.Value, 20, "PublicGitHubCatalog", "Public GitHub catalog");
+    gitHubClientFactory, gitHubOptions.Value, 20, "PublicGitHubCatalog",
+    GitHubCatalogDescription.ForRepository("Public GitHub catalog", gitHubOptions.Value));
 
 /// <summary>
 /// Private catalog on GitHub for construction kit models.
@@ -27,7 +28,51 @@ public class PrivateGitHubCatalog(
     IGitHubClientFactory gitHubClientFactory,
     IOptions<PrivateGitHubCatalogOptions> gitHubOptions) : GitHubCatalog(ckJsonSerializer, httpClientFactory,
     gitHubClientFactory, gitHubOptions.Value, 15, "PrivateGitHubCatalog",
-    "Private GitHub catalog for development and testing");
+    GitHubCatalogDescription.ForRepository("Private GitHub catalog for development and testing",
+        gitHubOptions.Value));
+
+/// <summary>
+/// Appends the repository coordinates to a catalog's human-readable description.
+/// </summary>
+/// <remarks>
+/// AB#5139 makes the private catalog slots lane-scoped: the same catalog name
+/// (<c>PrivateGitHubCatalog</c> / <c>PrivateGitHubBlueprintCatalog</c>) is bound to a different
+/// GitHub repository per installation — main test-2 keeps <c>construction-kit-libraries-build</c> /
+/// <c>blueprint-libraries-build</c>, the 0.2-dev instance points at <c>meshmakers/octo-catalog-dev</c>.
+/// The catalog name is the identity everything else keys on and must not change, so without the
+/// coordinates in the description two installations are indistinguishable in <c>octo-cli
+/// ListCatalogs</c>, in the GraphQL <c>catalogs</c> field and in Refinery Studio — and "why is my
+/// model not in the private catalog?" cannot be answered from the UI at all. The prose prefix is
+/// kept verbatim so anything grepping logs or docs for it still matches.
+/// </remarks>
+internal static class GitHubCatalogDescription
+{
+    /// <summary>
+    /// Renders <c>"{description} (owner/repo@branch)"</c>, degrading gracefully when the options
+    /// carry no repository: an unset owner or branch is simply left out rather than producing a
+    /// dangling separator, and without a repository name the plain description is returned so no
+    /// empty parentheses ever reach the UI.
+    /// </summary>
+    public static string ForRepository(string description, IGitHubOptions gitHubOptions)
+    {
+        var repositoryName = gitHubOptions.GitHubRepositoryName;
+        if (string.IsNullOrWhiteSpace(repositoryName))
+        {
+            return description;
+        }
+
+        var owner = gitHubOptions.GitHubRepositoryOwner;
+        var branch = gitHubOptions.GitHubRepositoryBranch;
+
+        var repository = string.IsNullOrWhiteSpace(owner) ? repositoryName : owner + "/" + repositoryName;
+        if (!string.IsNullOrWhiteSpace(branch))
+        {
+            repository += "@" + branch;
+        }
+
+        return description + " (" + repository + ")";
+    }
+}
 
 /// <summary>
 /// Construction kit model catalog for GitHub base class

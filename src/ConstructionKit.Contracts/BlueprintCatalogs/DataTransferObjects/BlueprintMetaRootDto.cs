@@ -43,10 +43,24 @@ public class BlueprintMetaRootDto : BlueprintPropertiesDto
     public List<BlueprintIdVersionRange>? BlueprintDependencies { get; set; }
 
     /// <summary>
-    ///     Gets or sets the path to the seed data file (relative to blueprint root).
+    ///     Gets or sets the path to the seed data file (relative to blueprint root). Single-file
+    ///     form; use <see cref="SeedDataPaths" /> to split a large seed across several files.
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? SeedDataPath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the paths to the seed data files (relative to blueprint root). Lets a large
+    ///     seed be split across several files and folders (e.g. one pipeline plus its data flow per
+    ///     file). Every listed file is loaded and merged into a single runtime model before the
+    ///     import runs, so associations may reference entities declared in any other listed file —
+    ///     the order of the list does not affect the result. It only fixes the order in which
+    ///     duplicate <c>rtId</c>s are reported. When both this and <see cref="SeedDataPath" /> are
+    ///     set the single path is loaded first and the list follows; duplicate paths are collapsed.
+    ///     Use <see cref="BlueprintSeedData.ResolvePaths" /> to obtain the effective list.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<string>? SeedDataPaths { get; set; }
 
     /// <summary>
     ///     Gets or sets the migration scripts from previous versions.

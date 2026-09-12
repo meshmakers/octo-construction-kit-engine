@@ -24,7 +24,7 @@ public class CkAttributeGraph
         ValueCkRecordId = attributeDto.ValueCkRecordId;
         ValueCkEnumId = attributeDto.ValueCkEnumId;
         DefaultValues = attributeDto.DefaultValues;
-        IsRuntimeState = attributeDto.IsRuntimeState;
+        Ownership = AttributeOwnership.Resolve(attributeDto.Ownership, attributeDto.IsRuntimeState);
         Description = attributeDto.Description;
         MetaData = attributeDto.MetaData;
     }
@@ -41,7 +41,11 @@ public class CkAttributeGraph
     /// <param name="description">An optional description to the attribute</param>
     /// <param name="metaData">Optional meta data of the attribute</param>
     /// <param name="isRuntimeState">
-    /// When true, blueprint re-apply preserves the existing runtime value of this attribute.
+    /// DEPRECATED alias for <see cref="Ownership"/>, kept so CK caches and callers that pre-date
+    /// AB#5187 keep working: it seeds <see cref="Ownership"/> (true →
+    /// <see cref="AttributeOwnershipDto.RuntimeState"/>, false →
+    /// <see cref="AttributeOwnershipDto.SeedOwned"/>) and a deserialized <c>ownership</c> key,
+    /// when present, then overwrites it.
     /// Trailing + defaulted so existing positional callers (e.g. the mesh-adapter SDK tests
     /// that instantiate <see cref="CkTypeAttributeGraph"/> / <see cref="CkAttributeGraph"/>
     /// directly) compile unchanged. STJ binds the constructor by parameter name, so the JSON
@@ -57,7 +61,13 @@ public class CkAttributeGraph
         ValueCkRecordId = valueCkRecordId;
         ValueCkEnumId = valueCkEnumId;
         DefaultValues = defaultValues;
-        IsRuntimeState = isRuntimeState;
+        // `ownership` is not a constructor parameter: STJ requires a parameter's type to
+        // match its property's, and a nullable parameter cannot bind to the non-nullable resolved
+        // property. It is deserialized through the property setter instead, which STJ applies
+        // AFTER the constructor — so a cache written by an older engine (no `ownership` key) keeps
+        // the value resolved here from the deprecated alias, and a current cache overwrites it
+        // with the exact declared value.
+        Ownership = AttributeOwnership.Resolve(null, isRuntimeState);
         Description = description;
         MetaData = metaData;
     }
@@ -88,10 +98,21 @@ public class CkAttributeGraph
     public ICollection<object>? DefaultValues { get; }
 
     /// <summary>
-    ///     When true, blueprint re-apply preserves the existing runtime value of this attribute
-    ///     instead of overwriting it with the seed value. See <see cref="CkAttributeDto.IsRuntimeState"/>.
+    ///     Resolved ownership of the attribute definition (AB#5187): the declared
+    ///     <see cref="CkAttributeDto.Ownership"/>, or the deprecated <c>isRuntimeState</c> alias
+    ///     mapped onto it. Never null — an undeclared attribute resolves to
+    ///     <see cref="AttributeOwnershipDto.SeedOwned"/>.
     /// </summary>
-    public bool IsRuntimeState { get; }
+    public AttributeOwnershipDto Ownership { get; set; }
+
+    /// <summary>
+    ///     DEPRECATED mirror of <see cref="Ownership"/> meaning "preserved on Upsert". Kept for
+    ///     the JSON cache wire format and for consumers that pre-date AB#5187; new code asks
+    ///     <see cref="Ownership"/> the specific question it has
+    ///     (<see cref="AttributeOwnership.IsPreservedOnUpsert"/> /
+    ///     <see cref="AttributeOwnership.IsExcludedFromExport"/>).
+    /// </summary>
+    public bool IsRuntimeState => Ownership.IsPreservedOnUpsert();
 
     /// <summary>
     ///     An optional description of the attribute

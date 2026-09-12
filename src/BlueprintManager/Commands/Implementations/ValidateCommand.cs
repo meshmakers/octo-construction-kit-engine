@@ -52,9 +52,14 @@ internal class ValidateCommand : Command<BpmToolOptions>
             Logger.LogInformation("  CK Dependencies: {Count}",
                 blueprintMeta.CkModelDependencies?.Count ?? 0);
 
-            if (!string.IsNullOrEmpty(blueprintMeta.SeedDataPath))
+            var seedDataPaths = BlueprintSeedData.ResolvePaths(blueprintMeta);
+            if (seedDataPaths.Count > 0)
             {
-                Logger.LogInformation("  Seed Data: {SeedDataPath}", blueprintMeta.SeedDataPath);
+                Logger.LogInformation("  Seed Data: {SeedDataFileCount} file(s)", seedDataPaths.Count);
+                foreach (var seedDataPath in seedDataPaths)
+                {
+                    Logger.LogInformation("    - {SeedDataPath}", seedDataPath);
+                }
             }
         }
         catch (BlueprintCatalogException)

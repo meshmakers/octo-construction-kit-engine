@@ -18,7 +18,8 @@ public class PublicGitHubBlueprintCatalog(
     IOptions<PublicGitHubBlueprintCatalogOptions> gitHubOptions) : GitHubBlueprintCatalog(blueprintSerializer,
     httpClientFactory,
     gitHubClientFactory,
-    gitHubOptions.Value, 20, "PublicGitHubBlueprintCatalog", "Public GitHub blueprint catalog");
+    gitHubOptions.Value, 20, "PublicGitHubBlueprintCatalog",
+    GitHubCatalogDescription.ForRepository("Public GitHub blueprint catalog", gitHubOptions.Value));
 
 /// <summary>
 /// Private catalog on GitHub for blueprints
@@ -31,7 +32,10 @@ public class PrivateGitHubBlueprintCatalog(
     httpClientFactory,
     gitHubClientFactory,
     gitHubOptions.Value, 21, "PrivateGitHubBlueprintCatalog",
-    "Private GitHub blueprint catalog for development and testing");
+    // Repository coordinates in the description: see GitHubCatalogDescription (AB#5139) — the same
+    // catalog name points at a different repository per installation.
+    GitHubCatalogDescription.ForRepository("Private GitHub blueprint catalog for development and testing",
+        gitHubOptions.Value));
 
 /// <summary>
 /// Blueprint catalog for GitHub base class.

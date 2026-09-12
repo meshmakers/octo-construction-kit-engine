@@ -629,10 +629,13 @@ internal class ImportRtModelCommand(
 
     /// <summary>
     /// For every entity in the import model that already exists in the tenant repo, replaces the
-    /// incoming values for CK-attributes flagged <c>isRuntimeState</c> (see
-    /// <see cref="ConstructionKit.Contracts.DataTransferObjects.CkAttributeDto.IsRuntimeState"/>)
-    /// with the existing runtime value. Runs only for <see cref="ImportStrategy.Upsert"/> (an Insert
-    /// cannot overwrite an existing entity). Fresh tenants and brand-new entities are silent no-ops.
+    /// incoming values for CK-attributes the TENANT owns with the existing value — i.e. every
+    /// attribute whose effective <see cref="AttributeOwnershipDto"/> is not
+    /// <see cref="AttributeOwnershipDto.SeedOwned"/> (AB#5187): <c>TenantOwned</c>,
+    /// <c>RuntimeState</c> and <c>Secret</c>. Attributes declared with the deprecated
+    /// <c>isRuntimeState: true</c> alias resolve to <c>RuntimeState</c> and behave exactly as
+    /// before. Runs only for <see cref="ImportStrategy.Upsert"/> (an Insert cannot overwrite an
+    /// existing entity). Fresh tenants and brand-new entities are silent no-ops.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -681,10 +684,8 @@ internal class ImportRtModelCommand(
                 continue;
             }
 
-            // Materialize the flagged-attribute set once per type.
-            var flaggedAttributes = ckTypeGraph!.AllAttributes.Values
-                .Where(a => a.IsRuntimeState)
-                .ToList();
+            // Materialize the preserved-attribute set once per type.
+            var flaggedAttributes = SelectPreservedAttributes(ckTypeGraph!);
 
             if (flaggedAttributes.Count == 0)
             {
@@ -796,6 +797,29 @@ internal class ImportRtModelCommand(
         }
 
         return dto;
+    }
+
+    /// <summary>
+    /// The attributes of a CK type whose value the TENANT owns, i.e. the ones an Upsert must not
+    /// overwrite with the seed's value: every effective ownership except
+    /// <see cref="AttributeOwnershipDto.SeedOwned"/> (AB#5187). The effective value already has the
+    /// per-assignment override applied (<see cref="CkTypeAttributeGraph.Ownership"/>), so a shared
+    /// definition can be preserved on one type and seed-managed on another.
+    /// </summary>
+    /// <remarks>
+    /// Granularity is unchanged from the <c>isRuntimeState</c> era and deliberate rather than
+    /// inherited: only top-level type attributes are inspected (<c>AllAttributes</c>, which
+    /// includes inherited ones). Record MEMBERS are never inspected — a record-valued attribute is
+    /// preserved as one unit, verbatim including its nested values — which is the opposite of the
+    /// export side, where <c>RtEntityToTcDtoConverter</c> recurses and evaluates each member. The
+    /// two granularities are correct for what each does: preservation replaces a whole attribute
+    /// value in the incoming model, export decides per emitted field.
+    /// </remarks>
+    internal static List<CkTypeAttributeGraph> SelectPreservedAttributes(CkTypeWithAttributesGraph ckTypeGraph)
+    {
+        return ckTypeGraph.AllAttributes.Values
+            .Where(a => a.Ownership.IsPreservedOnUpsert())
+            .ToList();
     }
 
     /// <summary>

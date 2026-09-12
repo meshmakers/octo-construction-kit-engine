@@ -38,6 +38,28 @@ public class BlueprintSchemaValidatorTests
         Assert.True(operationResult.HasErrors);
     }
 
+    [Fact]
+    public void ValidateMetaInYaml_SplitSeedDataPaths_ReturnsTrue()
+    {
+        // The meta schema sets additionalProperties:false, so seedDataPaths (AB#4758) has to be
+        // declared there or every blueprint using it fails the build-time BlueprintEmbed gate.
+        const string yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            seedDataPaths:
+              - seed-data/configurations/base.yaml
+              - seed-data/data-flows/camt053.yaml
+            """;
+
+        using var stream = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(yaml));
+        var operationResult = new OperationResult();
+
+        var isValid = _validator.ValidateMetaInYaml(stream, "test.yaml", operationResult);
+
+        Assert.True(isValid);
+        Assert.Empty(operationResult.Messages);
+    }
+
     #endregion
 
     #region Meta Schema - JSON Tests

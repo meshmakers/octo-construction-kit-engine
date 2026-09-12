@@ -561,16 +561,18 @@ internal class BlueprintService : IBlueprintService
             // Note: This would check against the CK catalog
             // For now, we just collect the dependencies for validation
 
-            // Validate seed data file exists
-            if (!string.IsNullOrEmpty(blueprint.SeedDataPath))
+            // Validate every declared seed data file exists. A blueprint may split its seed across
+            // several files (AB#4758), and each of them has to be reachable — a partially available
+            // seed would provision a partially initialised tenant.
+            foreach (var seedDataPath in BlueprintSeedData.ResolvePaths(blueprint))
             {
                 var seedStream = await _blueprintCatalogManager
-                    .TryOpenBlueprintFileAsync(blueprintId, blueprint.SeedDataPath!)
+                    .TryOpenBlueprintFileAsync(blueprintId, seedDataPath)
                     .ConfigureAwait(false);
 
                 if (seedStream == null)
                 {
-                    missingSeedDataFiles.Add(BlueprintFileDescription(blueprintId, blueprint.SeedDataPath!));
+                    missingSeedDataFiles.Add(BlueprintFileDescription(blueprintId, seedDataPath));
                 }
                 else
                 {
@@ -947,33 +949,25 @@ internal class BlueprintService : IBlueprintService
     {
         var diff = new BlueprintUpdateDiff();
 
-        if (string.IsNullOrEmpty(targetBlueprint.SeedDataPath))
+        var seedDataPaths = BlueprintSeedData.ResolvePaths(targetBlueprint);
+        if (seedDataPaths.Count == 0)
         {
             diff.Warnings.Add("Target blueprint has no seed data; nothing to compare");
-            return diff;
-        }
-
-        var seedDescription = BlueprintFileDescription(targetVersion, targetBlueprint.SeedDataPath!);
-        var seedStream = await _blueprintCatalogManager
-            .TryOpenBlueprintFileAsync(targetVersion, targetBlueprint.SeedDataPath!,
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
-
-        if (seedStream == null)
-        {
-            diff.Warnings.Add($"Seed data file not found: {seedDescription}");
             return diff;
         }
 
         var opResult = new OperationResult();
         var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
-        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, targetVersion, variables, opResult)
+        var seedRoot = await LoadAndTagSeedAsync(targetVersion, seedDataPaths, variables, opResult,
+                loadedFiles: null, cancellationToken)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
+            // The missing-file case of the single-file form is a warning, everything else an error.
+            // The diff degrades to "nothing to compare" either way, so surface both.
             diff.Warnings.AddRange(opResult.Messages
-                .Where(m => m.MessageLevel == MessageLevel.Error)
+                .Where(m => m.MessageLevel is MessageLevel.Error or MessageLevel.Warning)
                 .Select(m => m.MessageText));
             return diff;
         }
@@ -1985,25 +1979,17 @@ internal class BlueprintService : IBlueprintService
         var opResult = new OperationResult();
         var catalogBlueprint = await _blueprintCatalogManager
             .GetAsync(blueprintId, opResult).ConfigureAwait(false);
-        if (opResult.HasErrors || string.IsNullOrEmpty(catalogBlueprint.SeedDataPath))
+        var seedDataPaths = BlueprintSeedData.ResolvePaths(catalogBlueprint);
+        if (opResult.HasErrors || seedDataPaths.Count == 0)
         {
             // No seed data → nothing to erase.
             return 0;
         }
 
-        var seedDescription = BlueprintFileDescription(blueprintId, catalogBlueprint.SeedDataPath!);
-        var seedStream = await _blueprintCatalogManager
-            .TryOpenBlueprintFileAsync(blueprintId, catalogBlueprint.SeedDataPath!)
-            .ConfigureAwait(false);
-
-        if (seedStream == null)
-        {
-            return 0;
-        }
-
         var variables = await _variableProvider.GetVariablesAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
-        var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, variables, opResult)
+        var seedRoot = await LoadAndTagSeedAsync(blueprintId, seedDataPaths, variables, opResult,
+                loadedFiles: null, cancellationToken)
             .ConfigureAwait(false);
         if (seedRoot == null)
         {
@@ -2103,39 +2089,32 @@ internal class BlueprintService : IBlueprintService
         List<string> appliedSeedDataFiles,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrEmpty(blueprint.SeedDataPath))
+        var seedDataPaths = BlueprintSeedData.ResolvePaths(blueprint);
+        if (seedDataPaths.Count == 0)
         {
             return 0;
         }
 
         try
         {
-            var seedDescription = BlueprintFileDescription(blueprint.BlueprintId, blueprint.SeedDataPath!);
-            var seedStream = await _blueprintCatalogManager
-                .TryOpenBlueprintFileAsync(blueprint.BlueprintId, blueprint.SeedDataPath!,
-                    cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-
-            if (seedStream == null)
-            {
-                _logger.LogWarning("Seed data file not found: {Source}", seedDescription);
-                operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Warning, seedDescription, 20, "Seed data file not found"));
-                return 0;
-            }
-
             var repository = await _runtimeRepositoryProvider
                 .GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
             if (repository == null)
             {
-                seedStream.Dispose();
                 operationResult.AddMessage(new OperationMessage(
-                    MessageLevel.Error, seedDescription, 22,
+                    MessageLevel.Error, SeedDataDescription(blueprint), 22,
                     $"No runtime repository available for tenant {tenantId}"));
                 return 0;
             }
 
-            var seedRoot = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprint.BlueprintId, variables, operationResult)
+            // All declared seed files are merged into one model and imported in a single call.
+            // Importing them one by one would flush entities and associations per file, and an
+            // association pointing at an entity declared in a later file would be dropped as
+            // dangling (see ImportRtModelCommand.FilterDanglingAssociationsAsync) — which is what
+            // makes the split order-independent (AB#4758).
+            var loadedFiles = new List<string>();
+            var seedRoot = await LoadAndTagSeedAsync(blueprint.BlueprintId, seedDataPaths, variables,
+                    operationResult, loadedFiles, cancellationToken)
                 .ConfigureAwait(false);
             if (seedRoot == null)
             {
@@ -2151,7 +2130,7 @@ internal class BlueprintService : IBlueprintService
             await _importRtModelCommand.ImportModelAsync(
                 repository, seedRoot, ImportStrategy.Upsert, cancellationToken).ConfigureAwait(false);
 
-            appliedSeedDataFiles.Add(seedDescription);
+            appliedSeedDataFiles.AddRange(loadedFiles);
             return seedRoot.Entities.Count;
         }
         catch (Exception ex)
@@ -2159,10 +2138,149 @@ internal class BlueprintService : IBlueprintService
             _logger.LogError(ex, "Error applying seed data for blueprint {BlueprintId}",
                 blueprint.BlueprintId);
             operationResult.AddMessage(new OperationMessage(
-                MessageLevel.Error, blueprint.SeedDataPath, 21,
+                MessageLevel.Error, SeedDataDescription(blueprint), 21,
                 $"Error applying seed data: {ex.Message}"));
             return 0;
         }
+    }
+
+    /// <summary>
+    /// Loads every seed-data file a blueprint declares and merges them into one runtime model.
+    /// Returns <c>null</c> when the seed could not be loaded completely; diagnostics are pushed onto
+    /// <paramref name="operationResult" />. Each successfully loaded file is appended to
+    /// <paramref name="loadedFiles" /> (only when the whole seed loaded).
+    /// </summary>
+    /// <remarks>
+    /// A missing file is tolerated as a warning only for the single-file form, which is how the
+    /// engine has always behaved. Once a blueprint lists several files (AB#4758) a missing one is an
+    /// error: importing the remaining files would leave the tenant with a silently partial seed,
+    /// and the caller would still report success. Duplicate <c>rtId</c>s across two files are
+    /// rejected for the same reason — one entity would win at random depending on file order.
+    /// Duplicates inside a single file keep their historic behaviour (reported by the importer).
+    /// The identity of a seed entity is its CK type plus its <c>rtId</c>, not the <c>rtId</c>
+    /// alone: entities live in a collection per CK type, associations carry the target type next
+    /// to the target id, and existing blueprints do reuse an id across two types. Only a repeat of
+    /// the same pair is ambiguous.
+    /// </remarks>
+    private async Task<RtModelRootTcDto?> LoadAndTagSeedAsync(
+        BlueprintId blueprintId,
+        IReadOnlyList<string> seedDataPaths,
+        IReadOnlyDictionary<string, string> variables,
+        OperationResult operationResult,
+        ICollection<string>? loadedFiles,
+        CancellationToken cancellationToken)
+    {
+        if (seedDataPaths.Count == 0)
+        {
+            return null;
+        }
+
+        var merged = new RtModelRootTcDto();
+        var knownDependencies = new HashSet<string>(StringComparer.Ordinal);
+        // (ckTypeId, rtId) -> description of the file that declared it first, to spot cross-file
+        // duplicates.
+        var rtIdOrigins = new Dictionary<(string CkTypeId, OctoObjectId RtId), string>();
+        var loaded = new List<string>(seedDataPaths.Count);
+        var hasErrors = false;
+
+        foreach (var seedDataPath in seedDataPaths)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var seedDescription = BlueprintFileDescription(blueprintId, seedDataPath);
+            var seedStream = await _blueprintCatalogManager
+                .TryOpenBlueprintFileAsync(blueprintId, seedDataPath, cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
+
+            if (seedStream == null)
+            {
+                if (seedDataPaths.Count == 1)
+                {
+                    _logger.LogWarning("Seed data file not found: {Source}", seedDescription);
+                    operationResult.AddMessage(new OperationMessage(
+                        MessageLevel.Warning, seedDescription, 20, "Seed data file not found"));
+                    return null;
+                }
+
+                _logger.LogError("Seed data file not found: {Source}", seedDescription);
+                operationResult.AddMessage(new OperationMessage(
+                    MessageLevel.Error, seedDescription, 20,
+                    "Seed data file not found. The blueprint declares several seed data files; "
+                    + "importing only some of them would leave the tenant partially seeded"));
+                hasErrors = true;
+                continue;
+            }
+
+            var root = await LoadAndTagSeedAsync(seedStream, seedDescription, blueprintId, variables, operationResult)
+                .ConfigureAwait(false);
+            if (root == null)
+            {
+                hasErrors = true;
+                continue;
+            }
+
+            foreach (var dependency in root.Dependencies)
+            {
+                if (knownDependencies.Add(dependency.ToString()))
+                {
+                    merged.Dependencies.Add(dependency);
+                }
+            }
+
+            foreach (var entity in root.Entities)
+            {
+                if (!entity.RtId.Equals(OctoObjectId.Empty))
+                {
+                    var identity = (entity.CkTypeId?.ToString() ?? string.Empty, entity.RtId);
+                    if (rtIdOrigins.TryGetValue(identity, out var declaredIn))
+                    {
+                        if (!string.Equals(declaredIn, seedDescription, StringComparison.Ordinal))
+                        {
+                            _logger.LogError(
+                                "Duplicate entity {CkTypeId}@{RtId} in seed data of {BlueprintId}: declared in {FirstFile} and {SecondFile}",
+                                entity.CkTypeId, entity.RtId, blueprintId, declaredIn, seedDescription);
+                            operationResult.AddMessage(new OperationMessage(
+                                MessageLevel.Error, seedDescription, 24,
+                                $"Duplicate entity '{entity.CkTypeId}@{entity.RtId}' — already declared in '{declaredIn}'"));
+                            hasErrors = true;
+                        }
+                    }
+                    else
+                    {
+                        rtIdOrigins[identity] = seedDescription;
+                    }
+                }
+
+                merged.Entities.Add(entity);
+            }
+
+            loaded.Add(seedDescription);
+        }
+
+        if (hasErrors)
+        {
+            return null;
+        }
+
+        if (loadedFiles != null)
+        {
+            foreach (var file in loaded)
+            {
+                loadedFiles.Add(file);
+            }
+        }
+
+        return merged;
+    }
+
+    /// <summary>
+    /// Renders a blueprint's declared seed-data path(s) as one string, for use as the source
+    /// reference of an <see cref="OperationMessage" /> that is not tied to a single file.
+    /// </summary>
+    private static string? SeedDataDescription(BlueprintMetaRootDto blueprint)
+    {
+        var paths = BlueprintSeedData.ResolvePaths(blueprint);
+        return paths.Count == 0 ? null : string.Join(", ", paths);
     }
 
     /// <summary>

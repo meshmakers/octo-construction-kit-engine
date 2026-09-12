@@ -144,6 +144,54 @@ public class BlueprintYamlSerializerTests
     }
 
     [Fact]
+    public void Deserialize_WithSeedDataPaths_ParsesCorrectly()
+    {
+        // AB#4758: a large seed may be split across several files/folders.
+        var yaml = """
+            $schema: https://schemas.meshmakers.cloud/blueprint-meta.schema.json
+            blueprintId: TestBlueprint-1.0.0
+            description: A test blueprint
+            seedDataPaths:
+              - seed-data/configurations/base.yaml
+              - seed-data/data-flows/camt053.yaml
+            """;
+
+        var operationResult = new OperationResult();
+        var result = _serializer.DeserializeBlueprintMeta(yaml, "test.yaml", operationResult);
+
+        Assert.NotNull(result);
+        Assert.Null(result.SeedDataPath);
+        Assert.NotNull(result.SeedDataPaths);
+        Assert.Equal(
+            ["seed-data/configurations/base.yaml", "seed-data/data-flows/camt053.yaml"],
+            result.SeedDataPaths);
+    }
+
+    [Fact]
+    public async Task Serialize_WithoutSeedDataPaths_OmitsTheProperty()
+    {
+        // Every existing single-file blueprint must round-trip byte-identical, so the new list may
+        // not appear as an empty node.
+        var blueprint = new BlueprintMetaRootDto
+        {
+            BlueprintId = new BlueprintId("TestBlueprint", "1.0.0"),
+            SeedDataPath = "seed-data/entities.yaml"
+        };
+
+        using var stream = new MemoryStream();
+        await using var writer = new StreamWriter(stream);
+        await _serializer.SerializeAsync(writer, blueprint);
+        await writer.FlushAsync(TestContext.Current.CancellationToken);
+
+        stream.Position = 0;
+        using var reader = new StreamReader(stream);
+        var yaml = await reader.ReadToEndAsync(TestContext.Current.CancellationToken);
+
+        Assert.Contains("seedDataPath: seed-data/entities.yaml", yaml);
+        Assert.DoesNotContain("seedDataPaths", yaml);
+    }
+
+    [Fact]
     public void Deserialize_CompleteBlueprint_ParsesCorrectly()
     {
         var yaml = """

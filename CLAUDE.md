@@ -288,11 +288,25 @@ import choke point** so every Upsert caller gets it automatically:
   (import layer) decides — assuming the entity is being imported — which
   specific attributes survive the upsert.
 - **What it does not do**: preservation only rewrites the incoming model
-  in-memory, so the actual import stays a `ReplaceOne`. Attributes not in the
-  import model are still cleared on the upsert in line with prior behaviour;
-  preservation can only *replace* an imported value for an attribute the model
-  already declares. Fresh tenants / brand-new entities (no existing entity)
-  are silent no-ops.
+  in-memory, so the actual import stays a `ReplaceOne`. Fresh tenants /
+  brand-new entities (no existing entity) are silent no-ops.
+
+- **Omitted preserved attributes are injected, not cleared (AB#5232)**: because
+  the upsert is a full `ReplaceOne`, a preserved attribute the import model
+  *omits* would be cleared — and omission is the NORMAL seed shape for
+  engine-owned bookkeeping that is null on a fresh tenant. The concrete
+  incident: blueprint seeds never declare `RollupArchive.LastAggregatedBucketEnd`
+  (null before the first orchestrator run), so every `InstallBlueprint -f`
+  nulled the rollup watermark and the RollupOrchestrator skipped the rollup
+  forever ("watermark is null … Skipping until set").
+  `PreserveAttributesForEntity` therefore now *adds* the existing value to the
+  incoming model (through the same `ToTransportValue` conversion as the
+  overwrite path) when the model omits a preserved attribute the tenant has a
+  value for. Attributes the existing entity has no value for are still left
+  alone, and non-preserved (`SeedOwned`) attributes keep the old clear-on-omit
+  `ReplaceOne` semantics. System.StreamData 1.10.0 flags
+  `RollupArchive.LastAggregatedBucketEnd` and `RollupArchive.FrozenUntil` as
+  runtime-state to close the incident.
 
 - **Record-typed values need converting, not copying (AB#4784)**: the value
   read from the repository is in *repository* shape, the import model holds

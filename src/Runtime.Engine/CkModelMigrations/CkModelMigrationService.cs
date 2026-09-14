@@ -973,20 +973,93 @@ internal class CkModelMigrationService : ICkModelMigrationService
         }
     }
 
+    /// <summary>
+    ///     Rewrites the persisted association role id on every stored edge.
+    /// </summary>
+    /// <remarks>
+    ///     Renaming an association role in a CK model is a Major change, and the role id is
+    ///     persisted on EVERY edge (<c>RtAssociation.AssociationRoleId</c>). No other transform
+    ///     touches it: <c>ChangeCkType</c> rewrites <c>originCkTypeId</c> / <c>targetCkTypeId</c>
+    ///     on edges but deliberately leaves the role alone, and the attribute transforms operate
+    ///     on entities. Without this transform a role rename silently orphans every existing
+    ///     edge — the navigation returns nothing and no error is raised anywhere, which is the
+    ///     worst possible failure shape for a data migration.
+    ///
+    ///     Runs outside a transaction, exactly like the association half of ChangeCkType: it is a
+    ///     single idempotent <c>UpdateMany</c>, and wrapping a rewrite of 90K+ association
+    ///     documents in a transaction risks exceeding MongoDB's oplog entry size limit.
+    ///     Idempotent because the filter matches only rows that still carry the OLD role id, so a
+    ///     retry after a partial failure simply finishes the job.
+    /// </remarks>
+    private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)>
+        ExecuteRenameAssociationRoleAsync(IRuntimeRepository repository, CkMigrationStepDto step)
+    {
+        var source = step.Transform!.SourceAssociationRoleId;
+        var target = step.Transform.TargetAssociationRoleId;
+
+        if (string.IsNullOrEmpty(source) || string.IsNullOrEmpty(target))
+        {
+            return (false, 0, 0, 0,
+                "RenameAssociationRole requires both sourceAssociationRoleId and targetAssociationRoleId");
+        }
+
+        if (string.Equals(source, target, StringComparison.Ordinal))
+        {
+            return (false, 0, 0, 0,
+                "RenameAssociationRole requires sourceAssociationRoleId and targetAssociationRoleId to differ");
+        }
+
+        _logger.LogInformation(
+            "Transform step {StepId}: renaming association role {OldRoleId} to {NewRoleId}",
+            step.StepId, source, target);
+
+        try
+        {
+            var session = await repository.GetSessionAsync().ConfigureAwait(false);
+            var updated = await repository.UpdateAssociationRoleIdsForMigrationAsync(
+                    session,
+                    new RtCkId<CkAssociationRoleId>(source),
+                    new RtCkId<CkAssociationRoleId>(target))
+                .ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "Renamed association role {OldRoleId} to {NewRoleId} on {Count} associations",
+                source, target, updated);
+
+            return (true, 0, updated, 0, null);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to rename association role {OldRoleId} to {NewRoleId}. Associations still " +
+                "carrying the old role id are orphaned until the migration is retried.",
+                source, target);
+            return (false, 0, 0, 0, $"Association role rename failed: {ex.Message}");
+        }
+    }
+
     private async Task<(bool Success, int Added, int Updated, int Deleted, string? Error)> ExecuteTransformAsync(
         string tenantId,
         IRuntimeRepository repository,
         CkMigrationStepDto step,
         CancellationToken cancellationToken)
     {
-        if (step.Target == null || string.IsNullOrEmpty(step.Target.CkTypeId))
-        {
-            return (false, 0, 0, 0, "Transform step requires a target with CkTypeId");
-        }
-
         if (step.Transform == null)
         {
             return (false, 0, 0, 0, "Transform step requires transform configuration");
+        }
+
+        // RenameAssociationRole is handled before the target guard on purpose: it rewrites the
+        // association collection, not entities of one CK type, so it has no meaningful
+        // target.ckTypeId. Requiring one would force every author to invent a placeholder.
+        if (step.Transform.Type == CkMigrationTransformType.RenameAssociationRole)
+        {
+            return await ExecuteRenameAssociationRoleAsync(repository, step).ConfigureAwait(false);
+        }
+
+        if (step.Target == null || string.IsNullOrEmpty(step.Target.CkTypeId))
+        {
+            return (false, 0, 0, 0, "Transform step requires a target with CkTypeId");
         }
 
         _logger.LogInformation("Transform step {StepId}: Target={CkTypeId}, Transform={TransformType}",

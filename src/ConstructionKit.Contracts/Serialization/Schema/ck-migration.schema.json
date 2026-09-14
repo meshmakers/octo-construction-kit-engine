@@ -166,7 +166,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue", "WrapScalarInRecord"],
+          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue", "WrapScalarInRecord", "RenameAssociationRole"],
           "description": "Type of transformation"
         },
         "targetAttribute": {
@@ -201,6 +201,14 @@
           "type": "object",
           "additionalProperties": true,
           "description": "Literal default values for the remaining attributes on the wrapper record (for WrapScalarInRecord), keyed by CK attribute id"
+        },
+        "sourceAssociationRoleId": {
+          "type": "string",
+          "description": "Association role id to rename away from (for RenameAssociationRole), e.g. 'System.Communication/Manages'"
+        },
+        "targetAssociationRoleId": {
+          "type": "string",
+          "description": "Association role id to rename to (for RenameAssociationRole), e.g. 'System.Communication/Hosts'"
         }
       },
       "required": ["type"],

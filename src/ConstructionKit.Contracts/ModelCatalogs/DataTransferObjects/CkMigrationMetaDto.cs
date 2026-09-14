@@ -394,6 +394,20 @@ public class CkMigrationTransformDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public Dictionary<string, object>? RecordDefaults { get; set; }
+
+    /// <summary>
+    /// Association role id to rename away from (for RenameAssociationRole).
+    /// Example: <c>System.Communication/Manages</c>.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? SourceAssociationRoleId { get; set; }
+
+    /// <summary>
+    /// Association role id to rename to (for RenameAssociationRole).
+    /// Example: <c>System.Communication/Hosts</c>.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? TargetAssociationRoleId { get; set; }
 }
 
 /// <summary>
@@ -416,6 +430,14 @@ public enum CkMigrationTransformType
     /// Rename an attribute
     /// </summary>
     RenameAttribute,
+
+    /// <summary>
+    /// Rename an association role, rewriting the persisted associationRoleId on every stored
+    /// edge. Renaming an association role in a CK model is a Major change, and without this
+    /// transform every existing edge of the old role is orphaned: the role id is persisted per
+    /// edge and no other transform touches it.
+    /// </summary>
+    RenameAssociationRole,
 
     /// <summary>
     /// Copy an attribute to a new name

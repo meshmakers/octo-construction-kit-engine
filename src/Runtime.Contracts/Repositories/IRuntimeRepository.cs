@@ -699,6 +699,21 @@ public interface IRuntimeRepository
         IOctoSession session, RtCkId<CkTypeId> oldCkTypeId, RtCkId<CkTypeId> newCkTypeId);
 
     /// <summary>
+    /// Rewrites the persisted <c>associationRoleId</c> of every stored edge that still carries
+    /// <paramref name="oldRoleId" /> so that it carries <paramref name="newRoleId" /> instead.
+    /// Renaming an association role in a CK model is a Major change and the role id is stored on
+    /// every edge, so without this rewrite every existing edge of the old role is orphaned: the
+    /// model no longer defines the role the data refers to, and the navigation silently returns
+    /// nothing. No other migration transform touches the role id.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="oldRoleId">The association role id to find</param>
+    /// <param name="newRoleId">The association role id to replace it with</param>
+    /// <returns>The number of associations updated</returns>
+    Task<int> UpdateAssociationRoleIdsForMigrationAsync(
+        IOctoSession session, RtCkId<CkAssociationRoleId> oldRoleId, RtCkId<CkAssociationRoleId> newRoleId);
+
+    /// <summary>
     /// Drops the collection for the specified type if it is empty.
     /// This is used during CK model migrations after a ChangeCkType transform to clean up
     /// the now-empty source collection.

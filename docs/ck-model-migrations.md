@@ -128,6 +128,38 @@ postValidations:
 | `DeleteAttribute`    | Deletes an attribute                                                                       | `targetAttribute`                                                                     |
 | `MapValue`           | Maps values to new values                                                                  | `targetAttribute`, `valueMapping`                                                     |
 | `WrapScalarInRecord` | Wraps each scalar entry of a list-typed attribute into a record of the configured CK shape | `sourceAttribute`, `targetRecordCkRecordId`, `recordValueAttribute`, `recordDefaults` |
+| `RenameAssociationRole` | Rewrites the persisted `associationRoleId` on every stored edge                            | `sourceAssociationRoleId`, `targetAssociationRoleId`                                  |
+
+### `RenameAssociationRole`
+
+Renaming an association role in a CK model is a **Major** change (`ck-semver-rules.md`:
+"`inboundName` / `outboundName` of an association role changed"). The role id is persisted on
+**every stored edge** as `RtAssociation.AssociationRoleId`, and no other transform touches it —
+`ChangeCkType` rewrites `originCkTypeId` / `targetCkTypeId` on edges but deliberately leaves the
+role alone, and the attribute transforms operate on entities. Without this transform a role
+rename silently **orphans every existing edge**: the model no longer defines the role the stored
+data refers to, the navigation returns nothing, and nothing anywhere raises an error.
+
+```yaml
+  - stepId: rename-manages-to-hosts
+    description: "Rename association role Manages to Hosts"
+    action: Transform
+    transform:
+      type: RenameAssociationRole
+      sourceAssociationRoleId: System.Communication/Manages
+      targetAssociationRoleId: System.Communication/Hosts
+```
+
+Unlike every other transform this step takes **no `target`**: it rewrites the association
+collection rather than entities of one CK type, so there is no meaningful `target.ckTypeId` to
+supply. It runs outside the step transaction — the same treatment as the association half of
+`ChangeCkType` — because it is a single idempotent `UpdateMany` and wrapping a rewrite of 90K+
+association documents in a transaction risks exceeding MongoDB's oplog entry size limit. The
+filter matches only rows still carrying the *old* role id, so a retry after a partial failure
+simply finishes the job.
+
+Pair it with a `ChangeCkType` step in the same script when the role's target type is renamed
+too; order does not matter, because the two rewrite different fields of the same documents.
 
 ### `WrapScalarInRecord`
 

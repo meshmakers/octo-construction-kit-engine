@@ -715,6 +715,14 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     }
 
     /// <inheritdoc />
+    public virtual Task<int> UpdateAssociationRoleIdsForMigrationAsync(
+        IOctoSession session, RtCkId<CkAssociationRoleId> oldRoleId, RtCkId<CkAssociationRoleId> newRoleId)
+    {
+        throw new NotSupportedException(
+            "UpdateAssociationRoleIdsForMigrationAsync is not supported by this repository implementation.");
+    }
+
+    /// <inheritdoc />
     public virtual Task<bool> DropCollectionIfEmptyForMigrationAsync(RtCkId<CkTypeId> rtCkTypeId)
     {
         throw new NotSupportedException(

@@ -18,6 +18,9 @@ types:
       - id: ${this}/Archive.MaxRetroactiveReachMs
         name: MaxRetroactiveReachMs
         isOptional: true
+      - id: ${this}/Archive.ConflictVersionColumn
+        name: ConflictVersionColumn
+        isOptional: true
       # ---------- Recompute dirty-tracking + observability (AB#4184) ----------
       - id: ${this}/Archive.DirtyWindows
         name: DirtyWindows

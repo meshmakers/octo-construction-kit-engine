@@ -71,6 +71,19 @@ public sealed record ArchiveSnapshot(
     /// path; manual <c>recomputeArchive</c> / <c>rewindRollupWatermark</c> stay unbounded.
     /// </summary>
     public long? MaxRetroactiveReachMs { get; init; }
+
+    /// <summary>
+    /// Opt-in conflict resolution: the name of one of this archive's own columns whose value orders
+    /// competing writes to the same row key. <c>null</c> (the default) keeps the historical
+    /// last-write-wins upsert, where a re-delivered or out-of-order data point overwrites whatever
+    /// is stored and the stored value therefore reflects arrival order rather than source order.
+    /// When set, the conflict update is guarded: an incoming point only replaces the stored values
+    /// when its version is <c>&gt;=</c> the stored one. A stored <c>null</c> version is always
+    /// replaceable (rows written before the archive opted in carry none); an incoming <c>null</c>
+    /// version never displaces a stored row that has one. Names a column, not a CK attribute path —
+    /// the storage layer resolves it against the archive's own column set.
+    /// </summary>
+    public string? ConflictVersionColumn { get; init; }
 }
 
 /// <summary>

@@ -76,9 +76,9 @@ Subtype of `CkArchive`. `CkArchive` must lose `isFinal: true` to allow this.
 | `SourceArchiveRtId` | `OctoObjectId?` | **Deprecated since 1.8.0**, optional. A set value is normalised into one unbounded `Sources` entry on read; the platform never writes it. |
 | `BucketSize` | `Duration` | Bucket width, e.g. `PT1M`, `PT1H`, `P1D`. Must be a positive interval supported by CrateDB's `date_trunc` or `date_bin`. Immutable after `Activated`. |
 | `WatermarkLag` | `Duration` | How far behind real-time the orchestrator stays to absorb late inserts. Default `PT5M`. Mutable. |
-| `LastAggregatedBucketEnd` | `DateTime?` | The end timestamp (exclusive) of the most recently committed bucket. `null` before the first run. Maintained by the orchestrator. |
+| `LastAggregatedBucketEnd` | `DateTime?` | The end timestamp (exclusive) of the most recently committed bucket. `null` before the first run. Maintained by the orchestrator. Runtime-state since System.StreamData 1.10.0 (AB#5232): a blueprint re-apply / `ImportRt -r` preserves the live watermark instead of nulling it (seeds never declare it) and stalling the rollup forever. |
 | `Aggregations` | `RecordArray<CkRollupAggregation>` | Defines target columns. At least one entry required. Immutable after `Activated`. |
-| `FrozenUntil` | `DateTime?` | When set, the rollup is read-only and no new buckets are produced past this point. See §6. |
+| `FrozenUntil` | `DateTime?` | When set, the rollup is read-only and no new buckets are produced past this point. See §6. Runtime-state since System.StreamData 1.10.0 (AB#5232): engine-written protection state that must survive re-imports. |
 
 `CkArchive.Columns` and `CkArchive.TargetCkTypeId` are inherited but populated automatically at activation (see §4). Direct user editing of `Columns` on a `CkRollupArchive` is rejected.
 

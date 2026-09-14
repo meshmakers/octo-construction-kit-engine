@@ -17,15 +17,17 @@ attributes:
     defaultValues:
       - 300000
   - id: RollupArchive.LastAggregatedBucketEnd
-    description: "Exclusive end timestamp of the most recently committed bucket. Null before the first run. Maintained exclusively by the rollup orchestrator; manual edits go through the rewindRollupWatermark mutation."
+    description: "Exclusive end timestamp of the most recently committed bucket. Null before the first run. Maintained exclusively by the rollup orchestrator; manual edits go through the rewindRollupWatermark mutation. Runtime-state (AB#5232): blueprint seeds never declare a watermark, so without the flag a blueprint re-apply (InstallBlueprint -f) or plain ImportRt -r reset it to null and the orchestrator skipped the rollup forever ('watermark is null … Skipping until set')."
     valueType: DateTime
+    isRuntimeState: true
   - id: RollupArchive.Aggregations
     description: "List of aggregation definitions. At least one entry is required at activation time. Immutable after activation; schema changes require creating a new rollup."
     valueType: RecordArray
     valueCkRecordId: ${this}/CkRollupAggregation
   - id: RollupArchive.FrozenUntil
-    description: "When set, the rollup is read-only up to this timestamp: the orchestrator will not produce new buckets whose bucketEnd is ≤ FrozenUntil. Set automatically when the source archive is truncated for the covered range, so the already-aggregated history is preserved. Monotonic; can only move forward."
+    description: "When set, the rollup is read-only up to this timestamp: the orchestrator will not produce new buckets whose bucketEnd is ≤ FrozenUntil. Set automatically when the source archive is truncated for the covered range, so the already-aggregated history is preserved. Monotonic; can only move forward. Runtime-state (AB#5232): engine-written protection state, never part of a seed — a re-import clearing it would let the orchestrator recompute over the truncated source range and destroy the preserved history."
     valueType: DateTime
+    isRuntimeState: true
   - id: RollupArchive.BucketAlignment
     description: "Bucket-boundary alignment. FixedSize (default, key 0) preserves the legacy 'LastAggregatedBucketEnd + BucketSizeMs' arithmetic. Calendar/Iso8601 values align bucket boundaries to wall-clock UTC boundaries so monthly / weekly / yearly rollups become expressible without forcing BucketSizeMs into a single TimeSpan. Pre-1.4.0 entities resolve to FixedSize at read time. Immutable after activation."
     valueType: Enum

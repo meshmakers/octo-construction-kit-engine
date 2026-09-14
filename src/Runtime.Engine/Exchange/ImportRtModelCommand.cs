@@ -651,10 +651,12 @@ internal class ImportRtModelCommand(
     /// <para>
     /// This lives at the single import choke point so every Upsert caller — blueprint seed apply,
     /// the plain <c>ImportRt</c> CLI path, and CK-model migration entity writes — gets the guarantee
-    /// automatically. Preservation only rewrites incoming values in place for attributes the model
-    /// already declares AND the existing entity already has a value for; additive attributes (new in
-    /// this CK bump) fall through to the imported value on a pre-existing entity, and entities that
-    /// don't exist yet are untouched.
+    /// automatically. Preservation carries every existing preserved value into the incoming model:
+    /// values the model declares are overwritten in place, and values the model OMITS are injected
+    /// (AB#5232 — the full ReplaceOne would otherwise clear them; omission is the normal seed shape
+    /// for engine-owned bookkeeping like the rollup watermark). Additive attributes (new in this CK
+    /// bump) fall through to the imported value on a pre-existing entity, and entities that don't
+    /// exist yet are untouched.
     /// </para>
     /// </remarks>
     private async Task PreserveRuntimeStateAttributesAsync(IOctoSession session,
@@ -824,10 +826,15 @@ internal class ImportRtModelCommand(
 
     /// <summary>
     /// Per-entity preserve loop. For each <paramref name="flaggedAttributes"/> entry that has a
-    /// value on <paramref name="existing"/> AND a value on <paramref name="modelEntity"/>, copies
-    /// the existing value over the imported value in-place on <paramref name="modelEntity"/>. Returns
-    /// the count of attributes preserved. Pure function so it can be unit-tested without mocking
-    /// the repository / cache surface.
+    /// value on <paramref name="existing"/>, carries that value into <paramref name="modelEntity"/>
+    /// in place: when the import model declares the attribute its imported value is overwritten,
+    /// and when the import model omits it the attribute is ADDED with the existing value (AB#5232).
+    /// The Upsert is a full <c>ReplaceOne</c>, so an omitted attribute would otherwise be cleared —
+    /// and omission is the NORMAL seed shape for engine-owned bookkeeping like
+    /// <c>RollupArchive.LastAggregatedBucketEnd</c> (null before the first run, so blueprint authors
+    /// never declare it); clearing it made the rollup orchestrator skip the rollup forever after
+    /// every <c>InstallBlueprint -f</c>. Returns the count of attributes preserved. Pure function so
+    /// it can be unit-tested without mocking the repository / cache surface.
     /// </summary>
     /// <param name="modelEntity">The imported entity whose values are overwritten in place.</param>
     /// <param name="existing">The entity as it currently stands on the tenant.</param>
@@ -846,19 +853,29 @@ internal class ImportRtModelCommand(
         var preserved = 0;
         foreach (var flaggedAttr in flaggedAttributes)
         {
-            var modelAttr = modelEntity.Attributes.FirstOrDefault(a =>
-                a.Id.Equals(flaggedAttr.CkAttributeId));
-            if (modelAttr == null)
-            {
-                // Import model doesn't carry this attribute (e.g. additive CK bump) — nothing to overwrite.
-                continue;
-            }
-
             if (!existing.Attributes.TryGetValue(flaggedAttr.AttributeName, out var existingValue))
             {
                 // Existing entity doesn't have a value for this attr (e.g. the attr was just added
                 // in this CK bump on a pre-existing entity); fall through to the imported value so the
-                // new attr lands with its imported default.
+                // new attr lands with its imported default (when the model declares one).
+                continue;
+            }
+
+            var modelAttr = modelEntity.Attributes.FirstOrDefault(a =>
+                a.Id.Equals(flaggedAttr.CkAttributeId));
+            if (modelAttr == null)
+            {
+                // The import model omits this preserved attribute but the tenant has a value.
+                // The Upsert is a full ReplaceOne, so doing nothing here would CLEAR the existing
+                // value (AB#5232: blueprint re-apply nulled RollupArchive.LastAggregatedBucketEnd
+                // and the orchestrator skipped the rollup forever). Inject the existing value into
+                // the model so the replace carries it forward.
+                modelEntity.Attributes.Add(new RtAttributeTcDto
+                {
+                    Id = flaggedAttr.CkAttributeId.ToRtCkId(),
+                    Value = convertValue(existingValue),
+                });
+                preserved++;
                 continue;
             }
 

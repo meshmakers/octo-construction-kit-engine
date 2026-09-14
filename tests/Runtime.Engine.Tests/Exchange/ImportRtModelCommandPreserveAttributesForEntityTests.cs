@@ -109,13 +109,13 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
     }
 
     [Fact]
-    public void FlaggedAttrMissingFromModel_NoOp()
+    public void FlaggedAttrMissingFromModel_InjectsExistingValue()
     {
         // The CK type defines a runtime-state attribute (e.g. LastDeploymentError),
-        // but the import model deliberately omits it because there's no sensible
-        // default. We should NOT touch the model in this case — there's nothing to
-        // rewrite, and the entity keeps whatever value it had before (via the
-        // separate value on the CK default of the attribute).
+        // but the import model omits it because there's no sensible default. The Upsert
+        // is a full ReplaceOne, so leaving the model untouched would CLEAR the tenant's
+        // value (AB#5232) — the existing value must be injected into the model so the
+        // replace carries it forward. The unflagged Hostname stays the imported value.
         var flagged = new[]
         {
             BuildTypeAttr("LastDeploymentError", isRuntimeState: true),
@@ -127,8 +127,55 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
 
         var preserved = Preserve(model, existing, flagged);
 
+        Assert.Equal(1, preserved);
+        Assert.Equal("previous failure",
+            model.Attributes.Single(a => a.Id.ElementId.Name == "LastDeploymentError").Value);
+        Assert.Equal("adapter.new", model.Attributes.Single(a => a.Id.ElementId.Name == "Hostname").Value);
+    }
+
+    [Fact]
+    public void RollupWatermark_SeedOmitsWatermark_ExistingValueIsInjected()
+    {
+        // AB#5232: blueprint seeds never declare RollupArchive.LastAggregatedBucketEnd —
+        // it is null before the first orchestrator run, so authors have nothing to seed.
+        // A blueprint re-apply (InstallBlueprint -f) therefore used to null the watermark
+        // via the ReplaceOne, after which the RollupOrchestrator skipped the rollup forever
+        // ("watermark is null … Skipping until set"). With the attribute flagged runtime-state
+        // AND the omitted-attribute injection, the live watermark survives the re-apply.
+        var watermark = new DateTime(2026, 9, 14, 10, 0, 0, DateTimeKind.Utc);
+        var flagged = new[]
+        {
+            BuildTypeAttr("LastAggregatedBucketEnd", isRuntimeState: true),
+        };
+        var model = ModelEntity(("BucketSizeMs", 3600000)); // seed shape: no watermark attribute
+        var existing = ExistingEntity(
+            ("LastAggregatedBucketEnd", watermark),
+            ("BucketSizeMs", 3600000));
+
+        var preserved = Preserve(model, existing, flagged);
+
+        Assert.Equal(1, preserved);
+        Assert.Equal(watermark,
+            model.Attributes.Single(a => a.Id.ElementId.Name == "LastAggregatedBucketEnd").Value);
+    }
+
+    [Fact]
+    public void RollupWatermark_RollupNeverRan_NothingInjected()
+    {
+        // Counterpart: a rollup that has never produced a bucket has no watermark on the
+        // existing entity either. Nothing may be injected — the entity keeps its null
+        // watermark and the orchestrator initialises it at activation as before.
+        var flagged = new[]
+        {
+            BuildTypeAttr("LastAggregatedBucketEnd", isRuntimeState: true),
+        };
+        var model = ModelEntity(("BucketSizeMs", 3600000));
+        var existing = ExistingEntity(("BucketSizeMs", 3600000));
+
+        var preserved = Preserve(model, existing, flagged);
+
         Assert.Equal(0, preserved);
-        Assert.DoesNotContain(model.Attributes, a => a.Id.ElementId.Name == "LastDeploymentError");
+        Assert.DoesNotContain(model.Attributes, a => a.Id.ElementId.Name == "LastAggregatedBucketEnd");
     }
 
     [Fact]
@@ -309,28 +356,39 @@ public class ImportRtModelCommandPreserveAttributesForEntityTests
     }
 
     [Fact]
-    public void ExistingOnlyRecordAttr_DoesNotInvokeTheConverter()
+    public void ExistingOnlyRecordAttr_InjectsTheConvertedValue()
     {
-        // The model doesn't declare the attribute, so there is nothing to overwrite — and no
-        // conversion to pay for. Pins that the converter sits behind the same guard as the
-        // assignment rather than running eagerly per flagged attribute.
+        // The model doesn't declare the attribute but the tenant has a value — the injection
+        // path (AB#5232) must go through the SAME repository-to-transport conversion as the
+        // overwrite path (AB#4784), or a record-valued runtime-state attribute would land in
+        // repository shape and blow up AssignAttributes downstream.
         var flagged = new[]
         {
             BuildTypeAttr("Values", isRuntimeState: true),
         };
+        var existingRecords = new List<RtRecord>
+        {
+            new(new RtCkId<CkRecordId>($"{TestRtModelId}/ValueOverride"),
+                new Dictionary<string, object?> { ["Path"] = "publicUri", ["Value"] = "https://live" }),
+        };
         var model = ModelEntity(("Hostname", "app.example"));
-        var existing = ExistingEntity(("Values", new List<RtRecord>()));
+        var existing = ExistingEntity(("Values", existingRecords));
 
-        var converterCalls = 0;
+        object? converterSaw = null;
+        var converted = new List<RtRecordTcDto>
+            { new() { CkRecordId = new RtCkId<CkRecordId>($"{TestRtModelId}/ValueOverride") } };
 
         var preserved = Preserve(model, existing, flagged, value =>
         {
-            converterCalls++;
-            return value;
+            converterSaw = value;
+            return converted;
         });
 
-        Assert.Equal(0, preserved);
-        Assert.Equal(0, converterCalls);
+        Assert.Equal(1, preserved);
+        Assert.Same(existingRecords, converterSaw);
+        var landed = model.Attributes.Single(a => a.Id.ElementId.Name == "Values").Value;
+        Assert.Same(converted, landed);
+        Assert.IsNotType<List<RtRecord>>(landed);
     }
 
     /// <summary>

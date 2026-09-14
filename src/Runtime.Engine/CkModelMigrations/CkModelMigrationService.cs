@@ -928,19 +928,18 @@ internal class CkModelMigrationService : ICkModelMigrationService
         CkMigrationOptions options,
         CancellationToken cancellationToken)
     {
-        if (options.DryRun)
-        {
-            _logger.LogInformation("DryRun: Would execute step {StepId} with action {Action}",
-                step.StepId, step.Action);
-            return (true, 0, 0, 0, null);
-        }
-
         var repository = await _repositoryProvider.GetRepositoryAsync(tenantId, cancellationToken)
             .ConfigureAwait(false);
 
         if (repository == null)
         {
             return (false, 0, 0, 0, $"No repository available for tenant {tenantId}");
+        }
+
+        if (options.DryRun)
+        {
+            await ReportDryRunStepAsync(repository, step).ConfigureAwait(false);
+            return (true, 0, 0, 0, null);
         }
 
         try
@@ -970,6 +969,74 @@ internal class CkModelMigrationService : ICkModelMigrationService
         catch (Exception ex)
         {
             return (false, 0, 0, 0, ex.Message);
+        }
+    }
+
+    /// <summary>
+    ///     Says what a step <b>would</b> do, with a number rather than a shrug.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         🔴 A dry run used to log "Would execute step X with action Y" and return zero counts
+    ///         for everything (AB#4924 increment 9). The rollout runbook for a major bump asks the
+    ///         operator to dry-run against a copy of a production tenant database and check that the
+    ///         entity counts survive — against output that carried no counts at all. Counting the
+    ///         entities the step targets is what turns that instruction into something a person can
+    ///         actually follow at two in the morning.
+    ///     </para>
+    ///     <para>
+    ///         The counters in the result stay <b>zero</b>, deliberately. They mean "entities this
+    ///         run changed", and a dry run changed none; filling them with a would-be figure is how
+    ///         a dry run gets mistaken for a real one in a migration history.
+    ///     </para>
+    ///     <para>
+    ///         🔴 <b>An association-role rename cannot be pre-counted here</b>, and the log says so
+    ///         rather than implying the step is a no-op. Counting edges by role needs a repository
+    ///         API that does not exist; see the leasing implementation plan §11.6.
+    ///     </para>
+    /// </remarks>
+    private async Task ReportDryRunStepAsync(IRuntimeRepository repository, CkMigrationStepDto step)
+    {
+        var transformType = step.Transform?.Type;
+
+        if (transformType == CkMigrationTransformType.RenameAssociationRole)
+        {
+            _logger.LogInformation(
+                "DryRun: step {StepId} would rename the association role {SourceRoleId} to {TargetRoleId} on "
+                + "every stored edge. The number of affected edges cannot be counted without applying the "
+                + "step; the real run reports it as the step's updated count",
+                step.StepId, step.Transform!.SourceAssociationRoleId, step.Transform.TargetAssociationRoleId);
+            return;
+        }
+
+        var ckTypeIdString = step.Target?.CkTypeId;
+        if (string.IsNullOrEmpty(ckTypeIdString))
+        {
+            _logger.LogInformation("DryRun: Would execute step {StepId} with action {Action}",
+                step.StepId, step.Action);
+            return;
+        }
+
+        try
+        {
+            var ckTypeId = ParseCkTypeId(ckTypeIdString);
+            using var session = await repository.GetSessionAsync().ConfigureAwait(false);
+            var (entities, _) = await repository.GetRtEntitiesByTypeForMigrationAsync(session, ckTypeId)
+                .ConfigureAwait(false);
+
+            _logger.LogInformation(
+                "DryRun: step {StepId} ({Action}/{TransformType}) would affect {EntityCount} entit"
+                + "{EntitySuffix} of type {CkTypeId}",
+                step.StepId, step.Action, transformType?.ToString() ?? "-", entities.Count,
+                entities.Count == 1 ? "y" : "ies", ckTypeIdString);
+        }
+        catch (Exception ex)
+        {
+            // Never fails the dry run: the point of a dry run is to learn what would happen, and a
+            // type the engine cannot read is itself worth knowing about.
+            _logger.LogWarning(ex,
+                "DryRun: step {StepId} targets type {CkTypeId}, which could not be counted",
+                step.StepId, ckTypeIdString);
         }
     }
 
@@ -1816,16 +1883,93 @@ internal class CkModelMigrationService : ICkModelMigrationService
         ApplyTransformation(entity, transform);
     }
 
-    private Task<(bool Passed, string? Message)> RunPostValidationAsync(
+    /// <summary>
+    ///     Runs one post-migration validation against the tenant's data.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         🔴 <b>This used to be a stub that returned <c>Passed = true</c> unconditionally</b>
+    ///         (AB#4924 increment 9). Every <c>postValidations</c> block in every migration script in
+    ///         the estate therefore passed without looking at anything — including the
+    ///         <c>severity: Error</c> entries whose entire purpose is to stop a migration that left
+    ///         data behind. A validation that always passes is worse than no validation, because the
+    ///         script reads as if it is guarded and the rollout runbook says so too.
+    ///     </para>
+    ///     <para>
+    ///         Read through <c>GetRtEntitiesByTypeForMigrationAsync</c> rather than the ordinary
+    ///         query path, for the same reason <c>ChangeCkType</c> uses it: after a type rename the
+    ///         source type no longer exists in the CK cache, and <c>NoEntitiesOfType</c> is asked
+    ///         about exactly that type. The cached path would throw instead of answering "none left".
+    ///     </para>
+    ///     <para>
+    ///         A validation that cannot be evaluated <b>fails</b> rather than passing quietly. The
+    ///         alternative — treat "I could not check" as "it is fine" — is the behaviour being
+    ///         removed here.
+    ///     </para>
+    /// </remarks>
+    private async Task<(bool Passed, string? Message)> RunPostValidationAsync(
         string tenantId,
         CkMigrationPostValidationDto validation,
         CancellationToken cancellationToken)
     {
-        // TODO: Implement actual validation using runtime repository
-
         _logger.LogDebug("Running post-validation: {ValidationId}", validation.ValidationId);
 
-        return Task.FromResult((true, (string?)null));
+        var ckTypeIdString = validation.Target?.CkTypeId;
+        if (string.IsNullOrEmpty(ckTypeIdString))
+        {
+            return (false,
+                $"Validation '{validation.ValidationId}' names no target CkTypeId and cannot be evaluated.");
+        }
+
+        var repository = await _repositoryProvider.GetRepositoryAsync(tenantId, cancellationToken)
+            .ConfigureAwait(false);
+        if (repository == null)
+        {
+            return (false,
+                $"Validation '{validation.ValidationId}' could not be evaluated: no repository for tenant " +
+                $"'{tenantId}'.");
+        }
+
+        int count;
+        try
+        {
+            var ckTypeId = ParseCkTypeId(ckTypeIdString);
+            using var session = await repository.GetSessionAsync().ConfigureAwait(false);
+            var (entities, _) = await repository.GetRtEntitiesByTypeForMigrationAsync(session, ckTypeId)
+                .ConfigureAwait(false);
+            count = entities.Count;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Post-validation {ValidationId} could not read entities of type {CkTypeId}",
+                validation.ValidationId, ckTypeIdString);
+            return (false,
+                $"Validation '{validation.ValidationId}' could not read entities of type '{ckTypeIdString}': " +
+                ex.Message);
+        }
+
+        return validation.Type switch
+        {
+            CkMigrationValidationType.NoEntitiesOfType => count == 0
+                ? (true, null)
+                : (false, $"{count} entit{(count == 1 ? "y" : "ies")} of type '{ckTypeIdString}' still exist."),
+
+            CkMigrationValidationType.EntityExists => count > 0
+                ? (true, null)
+                : (false, $"No entity of type '{ckTypeIdString}' exists."),
+
+            CkMigrationValidationType.EntityCount => validation.ExpectedCount is not { } expected
+                ? (false,
+                    $"Validation '{validation.ValidationId}' is an EntityCount check with no expectedCount.")
+                : count == expected
+                    ? (true, null)
+                    : (false,
+                        $"Expected {expected} entit{(expected == 1 ? "y" : "ies")} of type " +
+                        $"'{ckTypeIdString}', found {count}."),
+
+            _ => (false,
+                $"Validation '{validation.ValidationId}' has unsupported type '{validation.Type}'.")
+        };
     }
 
     private async Task RecordMigrationHistoryAsync(

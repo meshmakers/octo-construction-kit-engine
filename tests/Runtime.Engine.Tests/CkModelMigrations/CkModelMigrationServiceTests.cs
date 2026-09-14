@@ -864,6 +864,16 @@ public class CkModelMigrationServiceTests
         A.CallTo(() => _contentProvider.GetMigrationAsync(toModel, "1.0.0", "2.0.0", A<CancellationToken>._))
             .Returns(script);
 
+        // A real repository fake, so the dry run's read path is exercised and the write
+        // assertions below have something to be about.
+        var repository = A.Fake<IRuntimeRepository>();
+        A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
+            .Returns(repository);
+        A.CallTo(() => repository.GetSessionAsync()).Returns(A.Fake<IOctoSession>());
+        A.CallTo(() => repository.GetRtEntitiesByTypeForMigrationAsync(A<IOctoSession>._,
+                A<RtCkId<CkTypeId>>._))
+            .Returns(((IReadOnlyList<RtEntity>)[], false));
+
         var options = new CkMigrationOptions { DryRun = true };
         var ct = TestContext.Current.CancellationToken;
 
@@ -872,8 +882,24 @@ public class CkModelMigrationServiceTests
 
         // Assert
         Assert.True(result.Success);
-        A.CallTo(() => _repositoryProvider.GetRepositoryAsync(A<string>._, A<CancellationToken>._))
-            .MustNotHaveHappened();
+        Assert.Equal(0, result.EntitiesAdded);
+        Assert.Equal(0, result.EntitiesUpdated);
+        Assert.Equal(0, result.EntitiesDeleted);
+
+        // 🔴 This used to assert that a dry run never even resolved a repository (AB#4924
+        // increment 9). It does now, and on purpose: the rollout runbook for a major bump asks the
+        // operator to dry-run against a copy of a production tenant database and check that the
+        // entity counts survive, and the old form reported no counts at all — it logged "would
+        // execute step X" and returned zeroes. A dry run therefore READS. What it must never do is
+        // write, which is what the assertions below actually pin.
+        A.CallTo(() => repository.UpdateOneRtEntityByIdAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+            A<OctoObjectId>._, A<RtEntity>._)).MustNotHaveHappened();
+        A.CallTo(() => repository.UpdateCkTypeIdForMigrationAsync(A<IOctoSession>._, A<OctoObjectId>._,
+            A<RtCkId<CkTypeId>>._)).MustNotHaveHappened();
+        A.CallTo(() => repository.DeleteOneRtEntityForMigrationAsync(A<IOctoSession>._,
+            A<RtCkId<CkTypeId>>._, A<OctoObjectId>._)).MustNotHaveHappened();
+        A.CallTo(() => repository.InsertOneRtEntityForMigrationAsync(A<IOctoSession>._,
+            A<RtCkId<CkTypeId>>._, A<RtEntity>._)).MustNotHaveHappened();
     }
 
     #endregion

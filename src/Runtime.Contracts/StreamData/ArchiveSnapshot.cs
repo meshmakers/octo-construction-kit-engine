@@ -73,18 +73,52 @@ public sealed record ArchiveSnapshot(
     public long? MaxRetroactiveReachMs { get; init; }
 
     /// <summary>
-    /// Opt-in conflict resolution: the name of one of this archive's own columns whose value orders
-    /// competing writes to the same row key. <c>null</c> (the default) keeps the historical
-    /// last-write-wins upsert, where a re-delivered or out-of-order data point overwrites whatever
-    /// is stored and the stored value therefore reflects arrival order rather than source order.
-    /// When set, the conflict update is guarded: an incoming point only replaces the stored values
-    /// when its version is <c>&gt;=</c> the stored one. A stored <c>null</c> version is always
-    /// replaceable (rows written before the archive opted in carry none); an incoming <c>null</c>
-    /// version never displaces a stored row that has one. Names a column, not a CK attribute path —
-    /// the storage layer resolves it against the archive's own column set.
+    /// Opt-in conflict resolution: the ordered keys that decide which of two competing writes to the
+    /// same archive row survives. Empty (the default) keeps the historical last-write-wins upsert,
+    /// where a re-delivered or out-of-order data point overwrites whatever is stored and the stored
+    /// value therefore reflects arrival order rather than the data.
     /// </summary>
-    public string? ConflictVersionColumn { get; init; }
+    /// <remarks>
+    /// Keys are compared lexicographically in declaration order: the first decides, a later one only
+    /// breaks a tie in every key before it. That is a total order over the data itself, so the
+    /// surviving value is its maximum — the same value whichever write lands first. Delivery order
+    /// stops mattering rather than merely being satisfied, which is the difference between this and
+    /// sorting the producer.
+    /// <para>
+    /// A stored row whose key is null is always replaceable (rows written before the archive opted in
+    /// carry none); an incoming null key never displaces a stored non-null one.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<ArchiveConflictKey> ConflictPrecedence { get; init; } =
+        System.Array.Empty<ArchiveConflictKey>();
 }
+
+/// <summary>
+/// Which direction of a conflict-precedence key counts as better.
+/// </summary>
+public enum ConflictKeyOrder
+{
+    /// <summary>The greater value wins — timestamps, sequence numbers, versions.</summary>
+    HigherWins = 0,
+
+    /// <summary>
+    /// The smaller value wins — rank-like codes numbered best-first, such as an OBIS data quality
+    /// where 1 is measured and 3 is estimated and a measurement must never be displaced by an
+    /// estimate.
+    /// </summary>
+    LowerWins = 1
+}
+
+/// <summary>
+/// One key of an archive's conflict precedence: a column of that archive plus the direction of it
+/// that counts as better.
+/// </summary>
+/// <param name="Column">
+/// Attribute path of the column, as the author declared it in <c>Columns[].Path</c>. The storage
+/// layer maps it onto the physical column name.
+/// </param>
+/// <param name="Order">Which direction of the column counts as better.</param>
+public sealed record ArchiveConflictKey(string Column, ConflictKeyOrder Order);
 
 /// <summary>
 /// Minimal projection of a <c>CkArchive.columns[]</c> entry — enough for the data-store provider

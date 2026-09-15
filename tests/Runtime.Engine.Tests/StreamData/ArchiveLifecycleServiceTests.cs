@@ -66,7 +66,7 @@ public class ArchiveLifecycleServiceTests
         // the table was provisioned, and provisioning is the only place that reconciles the two.
         // Skipping it left the declaration and the physical table permanently disagreeing: everything
         // written to the new column is dropped as unknown, or — once something references it in SQL,
-        // as an opt-in ConflictVersionColumn does — every write to the archive fails. The only way to
+        // as an opt-in ConflictPrecedence key does — every write to the archive fails. The only way to
         // adopt such a change was then to drop the table, which for a populated archive means losing
         // its history. Provisioning is idempotent by contract, so this costs one catalogue query when
         // there is nothing to do.

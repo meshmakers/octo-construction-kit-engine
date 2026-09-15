@@ -85,7 +85,17 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         switch (snapshot.Status)
         {
             case CkArchiveStatus.Activated:
-                return; // idempotent
+                // Nothing to transition — but the archive DEFINITION may have gained a column since
+                // the table was provisioned, and provisioning is the only place that reconciles the
+                // two. Returning here left the declaration and the physical table permanently
+                // disagreeing: everything written to the new column is dropped as unknown, or, once
+                // something references it in SQL, every write to the archive fails. The only way to
+                // adopt such a change was to drop the table, which for a populated archive means
+                // losing its history. Provisioning is idempotent by contract (CREATE TABLE IF NOT
+                // EXISTS plus an add-only column reconciliation), so running it costs one
+                // information_schema query when there is nothing to do.
+                await EnsureCrateProvisionedAsync(snapshot);
+                return;
             case CkArchiveStatus.Created:
             case CkArchiveStatus.Disabled:
             case CkArchiveStatus.Failed:

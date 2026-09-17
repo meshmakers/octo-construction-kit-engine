@@ -166,7 +166,7 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue", "WrapScalarInRecord", "RenameAssociationRole"],
+          "enum": ["ChangeCkType", "SetValue", "RenameAttribute", "CopyAttribute", "DeleteAttribute", "MapValue", "WrapScalarInRecord", "RenameAssociationRole", "SetWellKnownName"],
           "description": "Type of transformation"
         },
         "targetAttribute": {
@@ -178,7 +178,7 @@
           "description": "Source attribute name (for Rename, Copy, WrapScalarInRecord)"
         },
         "value": {
-          "description": "Value to set (for SetValue)"
+          "description": "Value to set (for SetValue, and the new RtWellKnownName for SetWellKnownName)"
         },
         "valueMapping": {
           "type": "object",

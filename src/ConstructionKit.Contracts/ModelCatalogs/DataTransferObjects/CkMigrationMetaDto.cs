@@ -440,6 +440,16 @@ public enum CkMigrationTransformType
     RenameAssociationRole,
 
     /// <summary>
+    /// Set <c>RtWellKnownName</c> on the matched entities. The well-known name is identity, not
+    /// display text: blueprint seed data re-applies against it, so a seed that renames it while
+    /// the stored entities keep the old name creates a SECOND entity on every provisioned tenant
+    /// instead of updating the existing one. Renaming it therefore has to happen in the same
+    /// migration as the seed change, and no other transform touches it -- <see cref="SetValue"/>
+    /// writes CK attributes, and the well-known name is a field on the entity itself.
+    /// </summary>
+    SetWellKnownName,
+
+    /// <summary>
     /// Copy an attribute to a new name
     /// </summary>
     CopyAttribute,

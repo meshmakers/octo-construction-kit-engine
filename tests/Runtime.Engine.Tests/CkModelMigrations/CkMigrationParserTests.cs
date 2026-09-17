@@ -241,6 +241,44 @@ public class CkMigrationParserTests
         Assert.Equal("active", step.Transform.Value);
     }
 
+    /// <summary>
+    ///     AB#4924 — SetWellKnownName, with the target selector that makes it safe to run.
+    ///
+    ///     🔴 The selector matters as much as the transform. RtWellKnownName is identity: blueprint
+    ///     seed data re-applies against it, so the rename has to hit exactly the seeded entity that
+    ///     still carries the old name, never every entity of the type. Targeting by
+    ///     <c>rtWellKnownName</c> makes the step idempotent -- a second run matches nothing.
+    /// </summary>
+    [Fact]
+    public void ParseScript_WithSetWellKnownNameTransform_ShouldParseValueAndSelector()
+    {
+        // Arrange
+        var yaml = """
+            sourceVersion: "3.35.0"
+            targetVersion: "4.0.0"
+            steps:
+              - stepId: rename-well-known-name
+                action: Transform
+                target:
+                  ckTypeId: System.Communication/DeploymentSite
+                  rtWellKnownName: CommunicationPool
+                transform:
+                  type: SetWellKnownName
+                  value: DeploymentSite
+            """;
+
+        // Act
+        var result = _sut.ParseScript(yaml);
+
+        // Assert
+        var step = result.Steps[0];
+        Assert.NotNull(step.Transform);
+        Assert.Equal(CkMigrationTransformType.SetWellKnownName, step.Transform.Type);
+        Assert.Equal("DeploymentSite", step.Transform.Value);
+        Assert.NotNull(step.Target);
+        Assert.Equal("CommunicationPool", step.Target.RtWellKnownName);
+    }
+
     [Fact]
     public void ParseScript_WithMapValueTransform_ShouldParseValueMapping()
     {

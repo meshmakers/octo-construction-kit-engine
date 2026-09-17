@@ -1815,6 +1815,18 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 }
                 break;
 
+            // 🔴 The well-known name is a field on the entity, not a CK attribute, which is why
+            // SetValue cannot reach it: that one goes through SetAttributeValue. Blueprint seed
+            // data re-applies against this name, so a seed that renames it while stored entities
+            // keep the old one creates a SECOND entity per tenant rather than updating the
+            // existing one -- the rename has to travel with the seed, in the same migration.
+            case CkMigrationTransformType.SetWellKnownName:
+                if (transform.Value is string wellKnownName && !string.IsNullOrWhiteSpace(wellKnownName))
+                {
+                    entity.RtWellKnownName = wellKnownName;
+                }
+                break;
+
             case CkMigrationTransformType.RenameAttribute:
                 if (!string.IsNullOrEmpty(transform.SourceAttribute) && !string.IsNullOrEmpty(transform.TargetAttribute))
                 {

@@ -35,6 +35,23 @@ public class ModelCatalogException : Exception
         return new ModelCatalogException($"Publishing model '{modelId}' to catalog '{catalogName}' failed: {exception.Message}", exception);
     }
 
+    /// <summary>
+    /// A GitHub Contents API call gave up. AB#5298: Octokit's own message is the constant
+    /// "An error occurred with this API request" - the status code and GitHub's error text live
+    /// on properties nobody logs - so a failed publish told an operator nothing about whether it
+    /// was a rate limit, a 5xx or a stale ref. Put all of it into the message the publish command
+    /// prints, plus which file and how many attempts, so the next occurrence is diagnosable from
+    /// the build log alone.
+    /// </summary>
+    internal static Exception GitHubRequestFailed(string operation, string path, int statusCode,
+        string? apiErrorMessage, int attempts, Exception inner)
+    {
+        var detail = string.IsNullOrWhiteSpace(apiErrorMessage) ? string.Empty : $": {apiErrorMessage}";
+        var tries = attempts == 1 ? "1 attempt" : $"{attempts} attempts";
+        return new ModelCatalogException(
+            $"GitHub {operation} of '{path}' failed after {tries} with HTTP {statusCode}{detail}", inner);
+    }
+
     internal static Exception ModelAlreadyExists(CkModelId ckModelId, string catalogName)
     {
         return new ModelCatalogException($"Model '{ckModelId}' already exists in catalog '{catalogName}'.");

@@ -1,3 +1,4 @@
+using System.Net;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Engine.Configuration;
 using Octokit;
@@ -70,6 +71,14 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
                 }
                 currentSha = refreshed.Value.Item2;
             }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("update", filePath, ex, attempt + 1);
+            }
         }
     }
 
@@ -95,6 +104,14 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
                         .ConfigureAwait(false);
                     return;
                 }
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("create", filePath, ex, attempt + 1);
             }
         }
     }
@@ -135,6 +152,14 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
             {
                 await Task.Delay(BaseDelayMs * (attempt + 1)).ConfigureAwait(false);
             }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("upsert", filePath, ex, attempt + 1);
+            }
         }
     }
 
@@ -166,6 +191,14 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
                     return;
                 }
                 currentSha = refreshed.Value.Item2;
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("delete", filePath, ex, attempt + 1);
             }
         }
     }
@@ -208,6 +241,73 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
                 // Symlinks / submodules are not part of a blueprint payload; ignore them.
             }
         }
+    }
+
+    /// <summary>
+    /// AB#5298: the second class of "try again", next to the SHA conflicts below. A release
+    /// publishes the CK model and the blueprint into the SAME catalog repository within minutes,
+    /// dozens of single-file commits each. GitHub answers bursts like that with a secondary rate
+    /// limit (403, Octokit: <see cref="SecondaryRateLimitExceededException" /> /
+    /// <see cref="AbuseException" />), and its Contents API also throws the occasional 5xx while
+    /// the branch is being written to. None of those matched <see cref="IsShaConflict" />, so a
+    /// single such answer killed the whole publish - and the log carried only Octokit's generic
+    /// message (see <see cref="Enrich" />). Retrying these is safe: the request either did not
+    /// reach the repository or is a plain retry of an idempotent content write.
+    /// </summary>
+    internal static bool IsTransient(ApiException ex)
+    {
+        if (ex is SecondaryRateLimitExceededException or AbuseException or RateLimitExceededException)
+        {
+            return true;
+        }
+
+        var status = (int)ex.StatusCode;
+        if (status >= 500)
+        {
+            return true;
+        }
+
+        // Belt and braces for a 403 that Octokit did not type: GitHub's own text names it.
+        return ex.StatusCode == HttpStatusCode.Forbidden
+               && (ex.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase)
+                   || (ex.ApiError?.Message?.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ?? false));
+    }
+
+    /// <summary>
+    /// Exponential back-off from <see cref="BaseDelayMs" />, capped at 30 s. A primary rate limit
+    /// tells us when it resets; wait for that instead (capped at 60 s) - retrying earlier is
+    /// guaranteed to fail again.
+    /// </summary>
+    internal static TimeSpan RetryDelay(ApiException ex, int attempt)
+    {
+        var backoff = TimeSpan.FromMilliseconds(BaseDelayMs * Math.Pow(2, attempt));
+        if (backoff > TimeSpan.FromSeconds(30))
+        {
+            backoff = TimeSpan.FromSeconds(30);
+        }
+
+        if (ex is RateLimitExceededException limit)
+        {
+            var untilReset = limit.Reset - DateTimeOffset.UtcNow;
+            if (untilReset > backoff)
+            {
+                backoff = untilReset > TimeSpan.FromSeconds(60) ? TimeSpan.FromSeconds(60) : untilReset;
+            }
+        }
+
+        return backoff;
+    }
+
+    /// <summary>
+    /// Wrap an exhausted or non-retriable <see cref="ApiException" /> with what Octokit's message
+    /// leaves out: the status code, GitHub's error text, the file and the attempt count. Before
+    /// AB#5298 the publish log for a failed release read "An error occurred with this API
+    /// request" and nothing else.
+    /// </summary>
+    private static Exception Enrich(string operation, string path, ApiException ex, int attempts)
+    {
+        return ModelCatalogException.GitHubRequestFailed(operation, path, (int)ex.StatusCode,
+            ex.ApiError?.Message, attempts, ex);
     }
 
     private static bool IsShaConflict(ApiException ex)

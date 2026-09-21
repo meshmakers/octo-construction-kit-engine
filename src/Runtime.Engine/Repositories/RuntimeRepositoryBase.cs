@@ -1,4 +1,4 @@
-using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -982,6 +982,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     {
         return await RepositoryDataSource.RtAssociations.BulkImportAsync(session, rtAssociations, options)
             .ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task DeleteRtAssociationsByIdAsync(IOctoSession session, IEnumerable<OctoObjectId> associationIds)
+    {
+        await RepositoryDataSource.RtAssociations.DeleteOneAsync(session, associationIds).ConfigureAwait(false);
     }
 
     #endregion Advanced functionality

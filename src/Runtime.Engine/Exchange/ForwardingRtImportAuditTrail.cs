@@ -1,4 +1,4 @@
-using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 
@@ -79,6 +79,39 @@ public sealed class ForwardingRtImportAuditTrail : IRtImportAuditTrail
             Metadata = new Dictionary<string, object?>
             {
                 ["skippedCount"] = skippedCount,
+                ["sampleEdges"] = sampleEdgeDescriptions,
+            }
+        });
+    }
+
+    /// <inheritdoc />
+    public Task RecordReplacedToOneEdgesAsync(
+        string? tenantId,
+        int replacedCount,
+        IReadOnlyList<string> sampleEdgeDescriptions)
+    {
+        var sample = string.Join("; ", sampleEdgeDescriptions);
+        var message =
+            $"Replaced {replacedCount} association edge(s) during import because the import points a " +
+            "to-one association role (multiplicity one / zero-or-one) at a different target than the " +
+            "entity carried in this tenant. The previous edge was deleted so the role keeps a single " +
+            "target; had it been kept, the entity would carry two edges on a role that allows one, " +
+            "which every later change through the API rejects. If the previous target was the " +
+            $"intended one, correct the imported seed/archive and re-import. Replaced: {sample}";
+        if (replacedCount > sampleEdgeDescriptions.Count)
+        {
+            message += $"; and {replacedCount - sampleEdgeDescriptions.Count} more";
+        }
+
+        return _sink.PublishAsync(new AuditEvent(
+            tenantId,
+            AuditEventLevel.Warning,
+            "RtImport.ReplacedToOneEdges",
+            message)
+        {
+            Metadata = new Dictionary<string, object?>
+            {
+                ["replacedCount"] = replacedCount,
                 ["sampleEdges"] = sampleEdgeDescriptions,
             }
         });

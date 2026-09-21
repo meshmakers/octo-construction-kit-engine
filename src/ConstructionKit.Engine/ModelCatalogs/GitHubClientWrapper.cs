@@ -31,22 +31,40 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
 
     public async Task<(string, string)?> GetFileAsync(string filePath)
     {
-        try
+        // The read is half of every write: the publish pre-reads each file to pick create vs
+        // update, and the SHA-conflict recoveries re-read from inside a catch body, where a
+        // sibling catch cannot help. So the retry policy has to live HERE too (AB#5298 review) -
+        // otherwise a rate-limited or 5xx read still aborts the publish with Octokit's generic
+        // message, exactly the failure the write-side retry was added against.
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            // Currently there is no way to check if a file exists without trying to get it and catching the exception
-            var file = await _client.Repository.Content.GetAllContentsByRef(
-                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
-                gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
-            if (file.Count == 0)
+            try
+            {
+                // Currently there is no way to check if a file exists without trying to get it and catching the exception
+                var file = await _client.Repository.Content.GetAllContentsByRef(
+                    gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, filePath,
+                    gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+                if (file.Count == 0)
+                {
+                    return null;
+                }
+                return (file.First().Content, file.First().Sha);
+            }
+            catch (NotFoundException)
             {
                 return null;
             }
-            return (file.First().Content, file.First().Sha);
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("read", filePath, ex, attempt + 1);
+            }
         }
-        catch (NotFoundException)
-        {
-            return null;
-        }
+
+        throw new InvalidOperationException($"Unreachable: GetFileAsync('{filePath}') left its retry loop");
     }
 
     public async Task UpdateFileAsync(string filePath, string commitMessage, string content, string sha)
@@ -216,16 +234,33 @@ internal class GitHubClientWrapper : IGitHubClientWrapper
 
     private async Task CollectFilesRecursiveAsync(string directoryPath, List<(string path, string sha)> files)
     {
-        IReadOnlyList<RepositoryContent> contents;
-        try
+        IReadOnlyList<RepositoryContent>? contents = null;
+        for (var attempt = 0; attempt <= MaxRetries; attempt++)
         {
-            contents = await _client.Repository.Content.GetAllContentsByRef(
-                gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, directoryPath,
-                gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+            try
+            {
+                contents = await _client.Repository.Content.GetAllContentsByRef(
+                    gitHubOptions.GitHubRepositoryOwner, gitHubOptions.GitHubRepositoryName, directoryPath,
+                    gitHubOptions.GitHubRepositoryBranch).ConfigureAwait(false);
+                break;
+            }
+            catch (NotFoundException)
+            {
+                return;
+            }
+            catch (ApiException ex) when (attempt < MaxRetries && IsTransient(ex))
+            {
+                await Task.Delay(RetryDelay(ex, attempt)).ConfigureAwait(false);
+            }
+            catch (ApiException ex)
+            {
+                throw Enrich("list", directoryPath, ex, attempt + 1);
+            }
         }
-        catch (NotFoundException)
+
+        if (contents == null)
         {
-            return;
+            throw new InvalidOperationException($"Unreachable: listing '{directoryPath}' left its retry loop");
         }
 
         foreach (var item in contents)

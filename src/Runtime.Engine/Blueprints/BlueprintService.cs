@@ -15,6 +15,7 @@ using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
 using Microsoft.Extensions.Logging;
+using Meshmakers.Octo.Runtime.Engine.Exchange;
 
 namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 
@@ -868,8 +869,15 @@ internal class BlueprintService : IBlueprintService
 
             preview.EntitiesToAdd = diff.ToAdd;
             preview.EntitiesToUpdate = diff.ToUpdate;
+            preview.EntitiesUnchanged = diff.Unchanged;
             preview.EntitiesToDelete = diff.ToDelete;
+            preview.Changes.AddRange(diff.ChangedEntities);
             preview.Warnings.AddRange(diff.Warnings);
+            if (diff.ChangedEntities.Count > 0)
+            {
+                preview.Warnings.Add(
+                    $"{diff.ChangedEntities.Count} blueprint-managed entities carry attribute changes (see Changes); {diff.Unchanged} are re-applied unchanged");
+            }
             foreach (var conflict in diff.Conflicts)
             {
                 preview.Conflicts.Add(conflict);
@@ -988,6 +996,10 @@ internal class BlueprintService : IBlueprintService
             var ckTypeId = typeGroup.Key;
             var seedEntitiesOfType = typeGroup.ToList();
 
+            // Needed by the attribute comparison below; null when the cache does not know the
+            // type (the import would fail on it anyway, and the compare then over-reports).
+            _ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var ckTypeGraph);
+
             IResultSet<RtEntity> tenantEntities;
             try
             {
@@ -1038,8 +1050,43 @@ internal class BlueprintService : IBlueprintService
                         ?? true;
                     if (locked)
                     {
-                        diff.ToUpdate++;
+                        // The apply re-imports every locked entity (upsert), so the import set keeps
+                        // all of them. What the preview REPORTS is a different question (AB#5297):
+                        // only the entities whose stored attributes the seed would move. Without
+                        // this split a target identical to the tenant read "137 updates", and the
+                        // three enabled-flag resets hiding among them were invisible.
                         diff.EntitiesToUpdate.Add(seed);
+
+                        var attributeChanges = ckTypeGraph == null
+                            ? null
+                            : BlueprintEntityComparer.Compare(seed, tenant, ckTypeGraph,
+                                v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
+                                enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null);
+
+                        if (attributeChanges == null)
+                        {
+                            // No CK type at hand: cannot compare, so count it as a change rather
+                            // than hide it - over-reporting is the acceptable failure direction.
+                            diff.ToUpdate++;
+                            diff.Warnings.Add(
+                                $"Entity '{key}' of type {ckTypeId} could not be compared (CK type not cached); reported as an update");
+                        }
+                        else if (attributeChanges.Count > 0)
+                        {
+                            diff.ToUpdate++;
+                            diff.ChangedEntities.Add(new BlueprintEntityChange
+                            {
+                                EntityId = tenant.RtId.ToString() ?? string.Empty,
+                                EntityWellKnownName = tenant.RtWellKnownName,
+                                EntityDisplayName = tenant.RtDisplayName,
+                                EntityCkTypeId = ckTypeId.ToString(),
+                                Attributes = attributeChanges
+                            });
+                        }
+                        else
+                        {
+                            diff.Unchanged++;
+                        }
                     }
                     else
                     {
@@ -1122,7 +1169,9 @@ internal class BlueprintService : IBlueprintService
     {
         public int ToAdd { get; set; }
         public int ToUpdate { get; set; }
+        public int Unchanged { get; set; }
         public int ToDelete { get; set; }
+        public List<BlueprintEntityChange> ChangedEntities { get; } = [];
         public List<BlueprintUpdateConflict> Conflicts { get; } = [];
         public List<string> Warnings { get; } = [];
         public List<RtEntityTcDto> EntitiesToAdd { get; } = [];
@@ -1228,7 +1277,9 @@ internal class BlueprintService : IBlueprintService
                 result.Success = true;
                 result.EntitiesAdded = preview.EntitiesToAdd;
                 result.EntitiesUpdated = preview.EntitiesToUpdate;
+                result.EntitiesUnchanged = preview.EntitiesUnchanged;
                 result.EntitiesDeleted = preview.EntitiesToDelete;
+                result.Warnings.AddRange(preview.Warnings);
                 result.Warnings.Add("DryRun: No changes were made");
                 return result;
             }
@@ -1590,10 +1641,14 @@ internal class BlueprintService : IBlueprintService
         // Bucket counts after overrides — mode-driven counts plus promoted
         // conflicts, which always apply regardless of mode (an explicit per-
         // entity override beats the mode default).
-        var modeUpserts = mode == BlueprintUpdateMode.Safe ? 0 : diff.EntitiesToUpdate.Count;
+        // Updated = entities whose attributes actually move (AB#5297); the locked entities that
+        // are re-applied verbatim are counted apart, so the result reads like the preview.
+        var modeUpserts = mode == BlueprintUpdateMode.Safe ? 0 : diff.ToUpdate;
+        var modeUnchanged = mode == BlueprintUpdateMode.Safe ? 0 : diff.Unchanged;
         var modeDeletes = mode == BlueprintUpdateMode.Full ? diff.EntitiesToDelete.Count : 0;
         result.EntitiesAdded += diff.EntitiesToAdd.Count;
         result.EntitiesUpdated += modeUpserts + diff.PromotedConflictUpserts.Count;
+        result.EntitiesUnchanged += modeUnchanged;
         result.EntitiesDeleted += modeDeletes + diff.PromotedConflictDeletions.Count;
         result.EntitiesSkipped += diff.Conflicts.Count(c => c.SuggestedResolution == ConflictResolution.Skip);
 

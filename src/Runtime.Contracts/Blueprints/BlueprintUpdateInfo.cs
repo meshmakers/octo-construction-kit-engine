@@ -44,14 +44,33 @@ public class BlueprintUpdatePreview
     public int EntitiesToAdd { get; set; }
 
     /// <summary>
-    /// Number of entities that would be updated
+    /// Number of entities whose stored attributes would actually change. AB#5297: this used to
+    /// be the number of blueprint-managed (locked) entities, whatever their content - a target
+    /// identical to the tenant reported 137 updates - and the three enabled-flag resets hiding
+    /// among them were invisible. Every entity counted here appears in <see cref="Changes" />.
     /// </summary>
     public int EntitiesToUpdate { get; set; }
+
+    /// <summary>
+    /// Locked entities the update re-applies without changing a single attribute (the apply
+    /// still rewrites them so their blueprint stamp stays consistent). Reported separately so
+    /// "137 entities" no longer reads as "137 things will change".
+    /// </summary>
+    public int EntitiesUnchanged { get; set; }
 
     /// <summary>
     /// Number of entities that would be deleted
     /// </summary>
     public int EntitiesToDelete { get; set; }
+
+    /// <summary>
+    /// Per entity, the attributes the update would set to a different value than the tenant
+    /// holds now - old and new value included. Attributes the tenant owns (RuntimeState,
+    /// TenantOwned, Secret) are preserved by the apply and therefore never listed. An entry with
+    /// a null new value means the seed no longer carries the attribute and the upsert would clear
+    /// it. This is the list an operator has to read before applying to production.
+    /// </summary>
+    public List<BlueprintEntityChange> Changes { get; set; } = [];
 
     /// <summary>
     /// Detected conflicts that need resolution
@@ -67,6 +86,62 @@ public class BlueprintUpdatePreview
     /// Whether the update can proceed without manual intervention
     /// </summary>
     public bool CanProceed => Conflicts.Count == 0;
+}
+
+/// <summary>
+/// One blueprint-managed entity whose stored attributes the update would change (AB#5297).
+/// </summary>
+public class BlueprintEntityChange
+{
+    /// <summary>
+    /// Runtime id of the tenant entity.
+    /// </summary>
+    public required string EntityId { get; set; }
+
+    /// <summary>
+    /// Well-known name of the entity, when it has one.
+    /// </summary>
+    public string? EntityWellKnownName { get; set; }
+
+    /// <summary>
+    /// The entity's <c>rtDisplayName</c> as stored on the tenant - what an operator recognises
+    /// it by ("Email Import (Microsoft 365)"), where the well-known name is often absent.
+    /// </summary>
+    public string? EntityDisplayName { get; set; }
+
+    /// <summary>
+    /// CK type of the entity.
+    /// </summary>
+    public required string EntityCkTypeId { get; set; }
+
+    /// <summary>
+    /// The attributes that differ, with the value the tenant holds and the value the seed
+    /// would write.
+    /// </summary>
+    public List<BlueprintAttributeChange> Attributes { get; set; } = [];
+}
+
+/// <summary>
+/// One attribute of a <see cref="BlueprintEntityChange" />: what is stored now and what the
+/// seed would write. Values are in transport shape (records as DTOs, enums as their key).
+/// </summary>
+public class BlueprintAttributeChange
+{
+    /// <summary>
+    /// Attribute name as declared on the CK type.
+    /// </summary>
+    public required string AttributeName { get; set; }
+
+    /// <summary>
+    /// The value stored on the tenant today; null when the tenant has no value.
+    /// </summary>
+    public object? OldValue { get; set; }
+
+    /// <summary>
+    /// The value the seed would write; null when the seed omits the attribute, which the upsert
+    /// turns into a cleared value.
+    /// </summary>
+    public object? NewValue { get; set; }
 }
 
 /// <summary>
@@ -204,6 +279,12 @@ public class BlueprintUpdateResult
     /// Number of entities updated
     /// </summary>
     public int EntitiesUpdated { get; set; }
+
+    /// <summary>
+    /// Locked entities re-applied without any attribute change (AB#5297). Counted apart from
+    /// <see cref="EntitiesUpdated" /> so the result matches the preview's reading.
+    /// </summary>
+    public int EntitiesUnchanged { get; set; }
 
     /// <summary>
     /// Number of entities deleted

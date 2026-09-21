@@ -3,6 +3,7 @@ using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Blueprints;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
@@ -33,6 +34,18 @@ namespace Meshmakers.Octo.Runtime.Engine.Blueprints;
 /// </summary>
 internal static class BlueprintEntityComparer
 {
+    /// <summary>
+    /// The blueprint's own bookkeeping on every managed entity. LoadAndTagSeedAsync stamps the
+    /// target version and a fresh UtcNow onto each seed before the comparison runs, so these
+    /// differ on every locked entity by construction - they are the apply's provenance, not a
+    /// change to the entity, and the review of AB#5297 caught that they would have turned the
+    /// promised "3 changed / 134 unchanged" back into 137.
+    /// </summary>
+    private static readonly HashSet<string> BlueprintBookkeeping = new(StringComparer.Ordinal)
+    {
+        "RtBlueprintSource", "RtBlueprintAppliedAt", "RtBlueprintLocked"
+    };
+
     /// <param name="seed">The entity as the target blueprint's seed defines it.</param>
     /// <param name="tenant">The entity as stored on the tenant.</param>
     /// <param name="ckType">The entity's CK type, for attribute names, ownership and value types.</param>
@@ -49,6 +62,11 @@ internal static class BlueprintEntityComparer
 
         foreach (var attribute in ckType.AllAttributes.Values)
         {
+            if (BlueprintBookkeeping.Contains(attribute.AttributeName))
+            {
+                continue;
+            }
+
             if (attribute.Ownership.IsPreservedOnUpsert())
             {
                 // The apply carries the stored value over (ImportRtModelCommand.PreserveAttributesForEntity);
@@ -57,10 +75,30 @@ internal static class BlueprintEntityComparer
             }
 
             var seedAttribute = seed.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
-            var seedValue = Normalise(seedAttribute?.Value, attribute, resolveEnum);
-
             tenant.Attributes.TryGetValue(attribute.AttributeName, out var storedRaw);
-            var storedValue = Normalise(toTransport(storedRaw), attribute, resolveEnum);
+
+            object? seedValue;
+            object? storedValue;
+            if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+            {
+                // Records: the seed carries transport DTOs, the repository RtRecords. Compare in
+                // transport shape. Member-level import conversions (trimming, enum names inside a
+                // record) are not replayed here, so a record that differs only in those reports
+                // as a change - over-reporting, the acceptable direction.
+                seedValue = seedAttribute?.Value;
+                storedValue = toTransport(storedRaw);
+            }
+            else
+            {
+                // Scalars and primitive lists: run BOTH sides through the converter the import
+                // applies on write (AttributeValueConverter: trims strings, parses booleans and
+                // doubles, turns tick strings into TimeSpans, list wrappers into plain lists) so a
+                // seed "  x " against a stored "x", or a stored AttributeStringValueList against a
+                // seed string[], compare as what they would be once written - not as the shapes
+                // they happen to arrive in. Enums resolve to their key on top of that.
+                seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
+                storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
+            }
 
             if (ValuesEqual(seedValue, storedValue))
             {
@@ -76,6 +114,28 @@ internal static class BlueprintEntityComparer
         }
 
         return changes;
+    }
+
+    /// <summary>
+    /// The import's own write-side conversion (<see cref="AttributeValueConverter" />), applied to
+    /// a value regardless of which side it came from. A conversion the converter refuses leaves
+    /// the raw value in place, which at worst reports a change that the apply would not make.
+    /// </summary>
+    private static object? ConvertLikeTheImport(CkTypeAttributeGraph attribute, object? value)
+    {
+        if (value == null || attribute.ValueType == AttributeValueTypesDto.Enum)
+        {
+            return value;
+        }
+
+        try
+        {
+            return AttributeValueConverter.ConvertAttributeValue(attribute.ValueType, value) ?? value;
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException or ArgumentException)
+        {
+            return value;
+        }
     }
 
     /// <summary>

@@ -868,15 +868,22 @@ internal class BlueprintService : IBlueprintService
                 .ConfigureAwait(false);
 
             preview.EntitiesToAdd = diff.ToAdd;
-            preview.EntitiesToUpdate = diff.ToUpdate;
-            preview.EntitiesUnchanged = diff.Unchanged;
             preview.EntitiesToDelete = diff.ToDelete;
-            preview.Changes.AddRange(diff.ChangedEntities);
             preview.Warnings.AddRange(diff.Warnings);
-            if (diff.ChangedEntities.Count > 0)
+
+            // Safe adds only - it never touches an existing entity, so there is nothing to
+            // report as updated, unchanged or changed. The counts describe what the apply
+            // would do in the requested mode, not what the seed differs in.
+            if (updateMode != BlueprintUpdateMode.Safe)
             {
-                preview.Warnings.Add(
-                    $"{diff.ChangedEntities.Count} blueprint-managed entities carry attribute changes (see Changes); {diff.Unchanged} are re-applied unchanged");
+                preview.EntitiesToUpdate = diff.ToUpdate;
+                preview.EntitiesUnchanged = diff.Unchanged;
+                preview.Changes.AddRange(diff.ChangedEntities);
+                if (diff.ChangedEntities.Count > 0)
+                {
+                    preview.Warnings.Add(
+                        $"{diff.ChangedEntities.Count} blueprint-managed entities carry attribute changes (see Changes); {diff.Unchanged} are re-applied unchanged");
+                }
             }
             foreach (var conflict in diff.Conflicts)
             {
@@ -1067,9 +1074,17 @@ internal class BlueprintService : IBlueprintService
                         {
                             // No CK type at hand: cannot compare, so count it as a change rather
                             // than hide it - over-reporting is the acceptable failure direction.
+                            // Listed in Changes all the same (with a note instead of attributes),
+                            // so every counted update stays identifiable.
                             diff.ToUpdate++;
-                            diff.Warnings.Add(
-                                $"Entity '{key}' of type {ckTypeId} could not be compared (CK type not cached); reported as an update");
+                            diff.ChangedEntities.Add(new BlueprintEntityChange
+                            {
+                                EntityId = tenant.RtId.ToString() ?? string.Empty,
+                                EntityWellKnownName = tenant.RtWellKnownName,
+                                EntityDisplayName = tenant.RtDisplayName,
+                                EntityCkTypeId = ckTypeId.ToString(),
+                                Note = "CK type not cached; could not compare attributes - reported as an update"
+                            });
                         }
                         else if (attributeChanges.Count > 0)
                         {

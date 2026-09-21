@@ -116,9 +116,17 @@ public class BlueprintEntityChange
 
     /// <summary>
     /// The attributes that differ, with the value the tenant holds and the value the seed
-    /// would write.
+    /// would write. Empty when <see cref="Note" /> explains why no comparison was possible.
     /// </summary>
     public List<BlueprintAttributeChange> Attributes { get; set; } = [];
+
+    /// <summary>
+    /// Set when the entity is counted as an update without an attribute list - the CK type was
+    /// not available to compare against, so the preview reports it rather than hides it. Every
+    /// entity counted in <see cref="BlueprintUpdatePreview.EntitiesToUpdate" /> is listed, one
+    /// way or the other.
+    /// </summary>
+    public string? Note { get; set; }
 }
 
 /// <summary>

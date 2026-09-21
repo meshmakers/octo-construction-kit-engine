@@ -121,6 +121,47 @@ public class BlueprintEntityComparerTests
     }
 
     [Fact]
+    public void FreshBlueprintStamps_AreNotAChange()
+    {
+        // LoadAndTagSeedAsync stamps the target version and UtcNow onto every seed before the
+        // comparison runs. Without this exclusion every locked entity reported two changes and
+        // the preview was back at "137" - the review of AB#5297 caught it.
+        var type = BuildType(
+            Attr("RtBlueprintSource", AttributeValueTypesDto.String),
+            Attr("RtBlueprintAppliedAt", AttributeValueTypesDto.DateTime),
+            Attr("RtBlueprintLocked", AttributeValueTypesDto.Boolean),
+            Attr("Name", AttributeValueTypesDto.String));
+        var seed = Seed(("RtBlueprintSource", "MeshmakersAccounting-1.0.1"),
+            ("RtBlueprintAppliedAt", DateTime.UtcNow), ("RtBlueprintLocked", true), ("Name", "x"));
+        var stored = Stored(("RtBlueprintSource", "MeshmakersAccounting-1.0.0"),
+            ("RtBlueprintAppliedAt", new DateTime(2026, 9, 16, 9, 45, 49, DateTimeKind.Utc)),
+            ("RtBlueprintLocked", true), ("Name", "x"));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void SeedWithUntrimmedString_EqualsTheTrimmedStoredValue()
+    {
+        // The import trims on write (AttributeValueConverter); the stored value is the trimmed one.
+        var type = BuildType(Attr("Name", AttributeValueTypesDto.String));
+        var seed = Seed(("Name", "  Email Import  "));
+        var stored = Stored(("Name", "Email Import"));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void StringArray_ComparesByElements_NotByListType()
+    {
+        var type = BuildType(Attr("Tags", AttributeValueTypesDto.StringArray));
+        var seed = Seed(("Tags", new[] { "a", " b " }));
+        var stored = Stored(("Tags", new List<object> { "a", "b" }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
     public void AttributeNeitherSideHas_IsNotAChange()
     {
         var type = BuildType(Attr("Optional", AttributeValueTypesDto.String));

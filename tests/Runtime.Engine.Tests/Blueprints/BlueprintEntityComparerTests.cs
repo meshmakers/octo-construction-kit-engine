@@ -20,6 +20,7 @@ public class BlueprintEntityComparerTests
     private const string Model = "Test-1.0.0";
     private static readonly CkId<CkEnumId> StateEnumId = new($"{Model}/State");
     private static readonly CkId<CkRecordId> ColumnRecordId = new($"{Model}/AggregationQueryColumn");
+    private static readonly CkId<CkRecordId> DerivedColumnRecordId = new($"{Model}/DerivedQueryColumn");
 
     [Fact]
     public void IdenticalSeed_ReportsNoChange()
@@ -382,6 +383,76 @@ public class BlueprintEntityComparerTests
         Assert.Single(Compare(seed, stored, type));
     }
 
+    [Fact]
+    public void EnumMemberDeclaredOnlyOnADerivedRecord_EqualsItsStoredKey()
+    {
+        // Review of AB#5308: the attribute declares the BASE record, the tenant stores a DERIVED
+        // one. Looking the member up in the declared graph misses anything the derived record adds,
+        // and the comparison falls back to raw - a phantom again for exactly the enum case the fix
+        // was about. The graph has to come from the instance.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("AttributePath", "netTotal"), ("DerivedState", 1L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("AttributePath", "netTotal"), ("DerivedState", "Matched"))
+        }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void ADifferentEnumMemberOnADerivedRecord_IsStillAChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("DerivedState", 1L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("DerivedState", "Unreviewed"))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void NestedRecordArrayNullInTheSeed_EqualsAStoredEmptyList()
+    {
+        // Review of AB#5308: the empty-list write rule applies one level down too - a RecordArray
+        // MEMBER whose seed value is null lands as an empty list, same as a top-level one.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("Children", new List<object?>()))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("Children", null))
+        }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void NestedRecordArrayNullInTheSeed_IsAChangeWhenTheTenantHasEntries()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("Children", new List<object?> { Record(ColumnRecordId, ("AttributePath", "x")) }))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("Children", null))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
     // ---- helpers -------------------------------------------------------------------------
 
     private static List<Meshmakers.Octo.Runtime.Contracts.Blueprints.BlueprintAttributeChange> Compare(
@@ -390,23 +461,41 @@ public class BlueprintEntityComparerTests
         return BlueprintEntityComparer.Compare(seed, stored, type, v => v, ResolveEnum, ResolveRecord);
     }
 
+    /// <summary>
+    ///     Two record graphs: the base one a record-valued attribute declares, and a DERIVED one
+    ///     that adds a member of its own - the case the review of AB#5308 asked for, where the
+    ///     attribute's declaration alone does not describe the stored instance.
+    /// </summary>
     private static CkRecordGraph? ResolveRecord(RtCkId<CkRecordId> id)
     {
         // RtCkId renders without the model version, CkId with it - compare like for like.
-        if (!string.Equals(id.ToString(), ColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
+        var wanted = id.ToString();
+
+        if (string.Equals(wanted, ColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
         {
-            return null;
+            return RecordGraph(ColumnRecordId,
+                Attr("AttributePath", AttributeValueTypesDto.String),
+                EnumAttr("State"),
+                RecordArrayAttr("Children"));
         }
 
-        var path = Attr("AttributePath", AttributeValueTypesDto.String);
-        var state = EnumAttr("State");
-        return new CkRecordGraph(ColumnRecordId, isAbstract: false, isFinal: false,
+        if (string.Equals(wanted, DerivedColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
+        {
+            return RecordGraph(DerivedColumnRecordId,
+                Attr("AttributePath", AttributeValueTypesDto.String),
+                EnumAttr("State"),
+                EnumAttr("DerivedState"),
+                RecordArrayAttr("Children"));
+        }
+
+        return null;
+    }
+
+    private static CkRecordGraph RecordGraph(CkId<CkRecordId> recordId, params CkTypeAttributeGraph[] members)
+    {
+        return new CkRecordGraph(recordId, isAbstract: false, isFinal: false,
             baseRecords: [], derivedFromCkRecordId: null, derivedRecords: [], definedAttributes: [],
-            allAttributes: new Dictionary<CkId<CkAttributeId>, CkTypeAttributeGraph>
-            {
-                [path.CkAttributeId] = path,
-                [state.CkAttributeId] = state
-            },
+            allAttributes: members.ToDictionary(m => m.CkAttributeId, m => m),
             description: "test record");
     }
 

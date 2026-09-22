@@ -450,6 +450,14 @@ internal static class BlueprintEntityComparer
             return false;
         }
 
+        // Resolve the graph from the record INSTANCE, not from the attribute's declaration: a
+        // record-valued attribute may store a DERIVED record, and a member declared only on the
+        // derived record is absent from the base graph - it would fall through to the raw
+        // comparison and report a phantom again (review of AB#5308). Both sides carry the same
+        // CkRecordId at this point (checked above); the declared graph stays as the fallback.
+        var graph = (resolveRecord != null && a.CkRecordId != null ? resolveRecord(a.CkRecordId) : null)
+                    ?? recordGraph;
+
         // Attribute sets by id; an attribute present on one side only counts as a difference,
         // except when its value is null on the side that has it (absent == null in storage).
         var byIdA = a.Attributes.ToDictionary(x => x.Id.ToString(), x => x.Value, StringComparer.Ordinal);
@@ -467,7 +475,7 @@ internal static class BlueprintEntityComparer
             // graph holds CkId (versioned) and the two render differently, so comparing
             // CkAttributeId.ToString() against the DTO key never matched and every member fell
             // through to the raw comparison.
-            var member = recordGraph?.AllAttributes.Values.FirstOrDefault(m =>
+            var member = graph?.AllAttributes.Values.FirstOrDefault(m =>
                 string.Equals(m.CkAttributeId.ToRtCkId().ToString(), key, StringComparison.Ordinal));
 
             if (member == null)
@@ -482,12 +490,20 @@ internal static class BlueprintEntityComparer
 
             if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
             {
-                if (!ValuesEqual(va, vb, NestedRecordGraph(member, resolveRecord), resolveEnum, resolveRecord))
+                if (ValuesEqual(va, vb, NestedRecordGraph(member, resolveRecord), resolveEnum, resolveRecord))
                 {
-                    return false;
+                    continue;
                 }
 
-                continue;
+                // A nested RecordArray follows the same write rule as a top-level one: null lands
+                // as an empty list, so the two are the same stored state (review of AB#5308).
+                if (member.ValueType == AttributeValueTypesDto.RecordArray
+                    && IsEmptyOrNullSequence(va) && IsEmptyOrNullSequence(vb))
+                {
+                    continue;
+                }
+
+                return false;
             }
 
             if (resolveEnum == null)

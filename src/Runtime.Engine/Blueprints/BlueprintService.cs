@@ -1068,7 +1068,8 @@ internal class BlueprintService : IBlueprintService
                             ? null
                             : BlueprintEntityComparer.Compare(seed, tenant, ckTypeGraph,
                                 v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
-                                enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null);
+                                enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
+                                recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null);
 
                         if (attributeChanges == null)
                         {

@@ -264,11 +264,12 @@ public class BlueprintEntityComparerTests
     // ---- AB#5308: what the WRITE does, not what the seed says --------------------------------
 
     [Fact]
-    public void SeedOmittingAMandatoryAttributeWithADefault_IsNotAChange()
+    public void SeedOmittingAnAttributeWithADefault_IsNotAChange()
     {
-        // prod-1: Adapter.LifecycleMode (default 0) and IdleTimeoutMinutes (default 30) are
-        // mandatory and the accounting seed declares neither. The rule engine refills the default
-        // on every Replace, so the stored value does not move - the preview claimed it did.
+        // prod-1: the accounting seed declares neither Adapter.LifecycleMode (default 0) nor
+        // IdleTimeoutMinutes (default 30). CreateTransientRtEntity pre-populates both and
+        // AssignAttributes only touches declared attributes, so the stored value does not move -
+        // the preview claimed it did.
         var type = BuildType(
             Defaulted("LifecycleMode", AttributeValueTypesDto.Integer, 0),
             Defaulted("IdleTimeoutMinutes", AttributeValueTypesDto.Integer, 30));
@@ -278,12 +279,19 @@ public class BlueprintEntityComparerTests
     }
 
     [Fact]
-    public void SeedNullingAMandatoryAttributeWithADefault_IsNotAChange()
+    public void SeedNullingAnAttributeWithADefault_ReportsTheClear()
     {
-        // Same rule: SetDefaultValuesOnInsert fires on a declared null too.
+        // The opposite of omitting it: AssignAttributes writes what the seed declares, so a
+        // declared null overwrites the pre-populated default and the value really is cleared.
+        // (Review of AB#5308 - the first version of this fix had it the other way round, modelling
+        // EntityRuleEngine, which the bulk import path bypasses entirely.)
         var type = BuildType(Defaulted("NavigationFilterMode", AttributeValueTypesDto.Integer, 0));
 
-        Assert.Empty(Compare(Seed(("NavigationFilterMode", null)), Stored(("NavigationFilterMode", 0L)), type));
+        var change = Assert.Single(
+            Compare(Seed(("NavigationFilterMode", null)), Stored(("NavigationFilterMode", 0L)), type));
+        Assert.Equal("NavigationFilterMode", change.AttributeName);
+        Assert.Equal(0L, change.OldValue);
+        Assert.Null(change.NewValue);
     }
 
     [Fact]
@@ -295,20 +303,43 @@ public class BlueprintEntityComparerTests
 
         var change = Assert.Single(Compare(Seed(), Stored(("IdleTimeoutMinutes", 5L)), type));
         Assert.Equal("IdleTimeoutMinutes", change.AttributeName);
+        Assert.Equal("IdleTimeoutMinutes", change.AttributeName);
         Assert.Equal(5L, change.OldValue);
         Assert.Equal(30L, change.NewValue);
     }
 
     [Fact]
-    public void SeedOmittingAnOptionalAttributeWithADefault_StillReportsTheClear()
+    public void SeedOmittingAnOptionalAttributeWithADefault_IsNotAChangeEither()
     {
-        // Optional attributes are NOT refilled (SetDefaultValuesOnInsert skips them), so the
-        // Replace really does clear them.
-        var type = BuildType(Defaulted("Comment", AttributeValueTypesDto.String, "seeded", isOptional: true));
+        // CreateTransientRtEntity pre-populates defaults for OPTIONAL attributes too, so
+        // optionality does not enter into it - only "does the seed declare it".
+        var type = BuildType(Defaulted("Mode", AttributeValueTypesDto.Integer, 0, isOptional: true));
+
+        Assert.Empty(Compare(Seed(), Stored(("Mode", 0L)), type));
+    }
+
+    [Fact]
+    public void SeedOmittingAnAttributeWithoutADefault_StillReportsTheClear()
+    {
+        // No default to inherit: the upsert is a full replace, so the stored value is cleared.
+        var type = BuildType(Attr("Comment", AttributeValueTypesDto.String));
 
         var change = Assert.Single(Compare(Seed(), Stored(("Comment", "set by an operator")), type));
         Assert.Equal("set by an operator", change.OldValue);
         Assert.Null(change.NewValue);
+    }
+
+    [Fact]
+    public void DefaultsMirrorTheTransientEntity_CollectionForStringArray_FirstEntryOtherwise()
+    {
+        // Parity with RuntimeRepositoryBase.CreateTransientRtEntity: StringArray and IntArray take
+        // the whole defaultValues collection, every other type - RecordArray included - the first
+        // entry. Getting this wrong would report a phantom on any seeded default.
+        var stringArray = BuildType(DefaultedMany("Tags", AttributeValueTypesDto.StringArray, "a", "b"));
+        Assert.Empty(Compare(Seed(), Stored(("Tags", new List<object?> { "a", "b" })), stringArray));
+
+        var scalar = BuildType(DefaultedMany("Take", AttributeValueTypesDto.Integer64, 500, 900));
+        Assert.Empty(Compare(Seed(), Stored(("Take", 500L)), scalar));
     }
 
     [Fact]
@@ -574,14 +605,26 @@ public class BlueprintEntityComparerTests
             new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name }, definition);
     }
 
-    /// <summary>Mandatory (unless told otherwise) attribute declaring a CK <c>defaultValues</c> entry.</summary>
+    /// <summary>Attribute declaring one CK <c>defaultValues</c> entry.</summary>
     private static CkTypeAttributeGraph Defaulted(string name, AttributeValueTypesDto valueType, object defaultValue,
         bool isOptional = false)
+    {
+        return DefaultedMany(name, valueType, isOptional, defaultValue);
+    }
+
+    private static CkTypeAttributeGraph DefaultedMany(string name, AttributeValueTypesDto valueType,
+        params object[] defaultValues)
+    {
+        return DefaultedMany(name, valueType, false, defaultValues);
+    }
+
+    private static CkTypeAttributeGraph DefaultedMany(string name, AttributeValueTypesDto valueType, bool isOptional,
+        params object[] defaultValues)
     {
         var attrId = new CkId<CkAttributeId>($"{Model}/{name}");
         var definition = new CkAttributeGraph(attrId, new CkAttributeDto
         {
-            AttributeId = name, ValueType = valueType, DefaultValues = [defaultValue]
+            AttributeId = name, ValueType = valueType, DefaultValues = [..defaultValues]
         });
         return new CkTypeAttributeGraph(attrId,
             new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name, IsOptional = isOptional },

@@ -85,13 +85,13 @@ internal static class BlueprintEntityComparer
 
             // What the WRITE will put there, not what the seed literally says. Two ways those
             // differ, both of which made a zero-change target report changes (AB#5308):
-            //  * a mandatory attribute the seed omits (or nulls) is refilled from the CK model's
-            //    defaultValues on every Insert AND Replace (EntityRuleEngine.SetDefaultValuesOnInsert)
-            //    and a blueprint apply is a Replace - the seed saying nothing about
-            //    Adapter.LifecycleMode re-writes the stored 0, it does not clear it;
+            //  * an attribute the seed OMITS keeps the CK defaultValues entry the import created
+            //    the entity with (RuntimeRepositoryBase.CreateTransientRtEntity, then
+            //    AssignAttributes only touches what the seed declares) - the seed saying nothing
+            //    about Adapter.LifecycleMode re-writes the stored 0, it does not clear it;
             //  * a RecordArray whose seed value is null lands as an EMPTY LIST, because
-            //    ImportRtModelCommand.AssignAttributes builds its List<RtRecord> and assigns it
-            //    unconditionally - "Sorting: null" in the seed and a stored [] are the same state.
+            //    AssignAttributes builds its List<RtRecord> and assigns it unconditionally -
+            //    "Sorting: null" in the seed and a stored [] are the same state.
             var seedRaw = EffectiveSeedValue(attribute, seedAttribute);
 
             // ONE failure boundary around preparation and comparison alike. The conversions
@@ -177,29 +177,38 @@ internal static class BlueprintEntityComparer
     /// the raw value in place, which at worst reports a change that the apply would not make.
     /// </summary>
     /// <summary>
-    ///     The value the apply will actually write for <paramref name="attribute" />: the seed's own
-    ///     value, or - when the seed carries none (or an explicit null) for a MANDATORY attribute
-    ///     that declares <c>defaultValues</c> - that default, exactly as
-    ///     <c>EntityRuleEngine.SetDefaultValuesOnInsert</c> fills it on a Replace (the whole
-    ///     collection for array types, the first entry otherwise).
+    ///     The value the apply will actually write for <paramref name="attribute" />, mirroring the
+    ///     import path rather than the rule engine: the blueprint apply goes through
+    ///     <c>ImportRtModelCommand</c>, whose bulk path deliberately BYPASSES
+    ///     <c>EntityRuleEngine</c> (AB#4772 - that is why it collects mandatory-attribute
+    ///     violations itself), so <c>SetDefaultValuesOnInsert</c> never runs here.
+    ///     <para>
+    ///     What runs instead: <c>RuntimeRepositoryBase.CreateTransientRtEntity</c> pre-populates
+    ///     every attribute that declares <c>defaultValues</c> - optional ones included - and then
+    ///     <c>AssignAttributes</c> overwrites only the attributes the seed actually declares. So an
+    ///     OMITTED attribute keeps its default, while an attribute the seed declares as null is
+    ///     written as null and the default is gone. The pre-population switch is mirrored exactly,
+    ///     <see cref="AttributeValueTypesDto.StringArray" /> / <see cref="AttributeValueTypesDto.IntArray" />
+    ///     taking the whole collection and everything else - RecordArray included - the first entry.
+    ///     </para>
+    ///     The RecordArray "null writes an empty list" rule is the caller's, because it applies
+    ///     whether or not the attribute declares a default.
     /// </summary>
     internal static object? EffectiveSeedValue(CkTypeAttributeGraph attribute, RtAttributeTcDto? seedAttribute)
     {
-        if (seedAttribute?.Value != null)
+        if (seedAttribute != null)
         {
             return seedAttribute.Value;
         }
 
-        if (attribute.IsOptional || attribute.DefaultValues == null || attribute.DefaultValues.Count == 0)
+        if (attribute.DefaultValues == null || attribute.DefaultValues.Count == 0)
         {
-            return seedAttribute?.Value;
+            return null;
         }
 
         return attribute.ValueType switch
         {
-            AttributeValueTypesDto.IntArray
-                or AttributeValueTypesDto.StringArray
-                or AttributeValueTypesDto.RecordArray => attribute.DefaultValues,
+            AttributeValueTypesDto.IntArray or AttributeValueTypesDto.StringArray => attribute.DefaultValues,
             _ => attribute.DefaultValues.FirstOrDefault()
         };
     }

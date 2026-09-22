@@ -196,6 +196,54 @@ public class BlueprintEntityComparerTests
     }
 
     [Fact]
+    public void AdjacentDoubles_AreAChange()
+    {
+        // Routing doubles through decimal rounded both to the same 15 digits and hid the change.
+        var type = BuildType(Attr("Factor", AttributeValueTypesDto.Double));
+        var seed = Seed(("Factor", Math.BitIncrement(1.0)));
+        var stored = Stored(("Factor", 1.0));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void JsonContainers_FromDifferentDocuments_CompareByContent()
+    {
+        var a = System.Text.Json.JsonDocument.Parse("{\"street\":\"x\",\"tags\":[1,2]}").RootElement;
+        var b = System.Text.Json.JsonDocument.Parse("{\"street\":\"x\",\"tags\":[1,2]}").RootElement;
+        var c = System.Text.Json.JsonDocument.Parse("{\"street\":\"y\",\"tags\":[1,2]}").RootElement;
+
+        Assert.True(BlueprintEntityComparer.ValuesEqual(a, b));
+        Assert.False(BlueprintEntityComparer.ValuesEqual(a, c));
+    }
+
+    [Fact]
+    public void JsonNull_EqualsClrNull()
+    {
+        var jsonNull = System.Text.Json.JsonDocument.Parse("null").RootElement;
+
+        Assert.True(BlueprintEntityComparer.ValuesEqual(jsonNull, null));
+        Assert.True(BlueprintEntityComparer.ValuesEqual(null, jsonNull));
+        Assert.True(BlueprintEntityComparer.ValuesEqual(jsonNull, jsonNull));
+    }
+
+    [Fact]
+    public void AThrowingConversion_IsReportedAsAChange_NotAsAFailure()
+    {
+        // ToTransportValue resolves record definitions through the CK cache; a stale record
+        // throws there. The preview must survive that and report the attribute.
+        var type = BuildType(Attr("Address", AttributeValueTypesDto.Record));
+        var seed = Seed(("Address", Record(("Street", "x"))));
+        var stored = Stored(("Address", new object()));
+
+        var changes = BlueprintEntityComparer.Compare(seed, stored, type,
+            _ => throw new InvalidOperationException("stale record definition"), ResolveEnum);
+
+        var change = Assert.Single(changes);
+        Assert.Equal("Address", change.AttributeName);
+    }
+
+    [Fact]
     public void ValuesEqual_NeverThrows_OnShapesItDoesNotKnow()
     {
         // Two distinct opaque instances: not equal, and above all no exception.

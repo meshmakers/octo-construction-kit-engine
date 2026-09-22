@@ -77,39 +77,41 @@ internal static class BlueprintEntityComparer
             var seedAttribute = seed.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
             tenant.Attributes.TryGetValue(attribute.AttributeName, out var storedRaw);
 
-            object? seedValue;
-            object? storedValue;
-            if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
-            {
-                // Records: the seed carries transport DTOs, the repository RtRecords. Compare in
-                // transport shape. Member-level import conversions (trimming, enum names inside a
-                // record) are not replayed here, so a record that differs only in those reports
-                // as a change - over-reporting, the acceptable direction.
-                seedValue = seedAttribute?.Value;
-                storedValue = toTransport(storedRaw);
-            }
-            else
-            {
-                // Scalars and primitive lists: run BOTH sides through the converter the import
-                // applies on write (AttributeValueConverter: trims strings, parses booleans and
-                // doubles, turns tick strings into TimeSpans, list wrappers into plain lists) so a
-                // seed "  x " against a stored "x", or a stored AttributeStringValueList against a
-                // seed string[], compare as what they would be once written - not as the shapes
-                // they happen to arrive in. Enums resolve to their key on top of that.
-                seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
-                storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
-            }
-
+            // ONE failure boundary around preparation and comparison alike. The conversions
+            // can throw too - ToTransportValue resolves record definitions through the CK cache
+            // and a stale or orphaned record blows up there - and a value the comparer cannot
+            // prepare must surface as a change with the raw values, never as a failed preview
+            // (3.4.124 took PreviewBlueprintUpdate AND UpdateBlueprint down on prod-1 with an
+            // exception from inside this loop).
+            object? seedValue = seedAttribute?.Value;
+            object? storedValue = storedRaw;
             bool equal;
             try
             {
+                if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+                {
+                    // Records: the seed carries transport DTOs, the repository RtRecords. Compare
+                    // in transport shape. Member-level import conversions (trimming, enum names
+                    // inside a record) are not replayed here, so a record that differs only in
+                    // those reports as a change - over-reporting, the acceptable direction.
+                    storedValue = toTransport(storedRaw);
+                }
+                else
+                {
+                    // Scalars and primitive lists: run BOTH sides through the converter the
+                    // import applies on write (AttributeValueConverter: trims strings, parses
+                    // booleans and doubles, turns tick strings into TimeSpans, list wrappers
+                    // into plain lists) so a seed "  x " against a stored "x", or a stored
+                    // AttributeStringValueList against a seed string[], compare as what they
+                    // would be once written. Enums resolve to their key on top of that.
+                    seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
+                    storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
+                }
+
                 equal = ValuesEqual(seedValue, storedValue);
             }
             catch (Exception)
             {
-                // A value shape the comparer does not understand is reported as a change, never
-                // as a failed preview: 3.4.124 took PreviewBlueprintUpdate AND UpdateBlueprint
-                // down on prod-1 with a serializer exception from inside this comparison.
                 equal = false;
             }
 
@@ -287,6 +289,30 @@ internal static class BlueprintEntityComparer
     /// </summary>
     internal static bool ValuesEqual(object? a, object? b)
     {
+        // JSON first: a JSON null is a null, and two containers from different documents are
+        // equal by content, not by instance. Both would otherwise fall through to
+        // JsonElement.Equals, which is reference-like and says "different".
+        if (a is JsonElement ea)
+        {
+            if (ea.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                a = null;
+            }
+            else if (b is JsonElement eb0)
+            {
+                return JsonElement.DeepEquals(ea, eb0);
+            }
+            else
+            {
+                a = FromJsonElement(ea);
+            }
+        }
+
+        if (b is JsonElement eb)
+        {
+            b = eb.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? null : FromJsonElement(eb);
+        }
+
         if (a == null && b == null)
         {
             return true;
@@ -300,16 +326,6 @@ internal static class BlueprintEntityComparer
         if (a is RtRecordTcDto ra && b is RtRecordTcDto rb)
         {
             return RecordsEqual(ra, rb);
-        }
-
-        if (a is JsonElement ea)
-        {
-            a = FromJsonElement(ea) ?? a;
-        }
-
-        if (b is JsonElement eb)
-        {
-            b = FromJsonElement(eb) ?? b;
         }
 
         if (IsNumber(a) && IsNumber(b))
@@ -378,15 +394,30 @@ internal static class BlueprintEntityComparer
     private static bool IsNumber(object o) =>
         o is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal;
 
+    private static bool IsFloating(object o) => o is float or double;
+
+    /// <summary>
+    /// Integral pairs compare exactly through decimal (int vs long from YAML vs Mongo);
+    /// floating pairs compare as doubles, exactly - routing them through decimal rounded to 15
+    /// significant digits and hid a real change between adjacent doubles. A mixed pair compares
+    /// as doubles too: that is the shape the import would store for a Double attribute.
+    /// </summary>
     private static bool NumbersEqual(object a, object b)
     {
+        if (IsFloating(a) || IsFloating(b))
+        {
+            return Convert.ToDouble(a, CultureInfo.InvariantCulture)
+                .Equals(Convert.ToDouble(b, CultureInfo.InvariantCulture));
+        }
+
         try
         {
             return Convert.ToDecimal(a, CultureInfo.InvariantCulture) == Convert.ToDecimal(b, CultureInfo.InvariantCulture);
         }
         catch (OverflowException)
         {
-            return Convert.ToDouble(a, CultureInfo.InvariantCulture).Equals(Convert.ToDouble(b, CultureInfo.InvariantCulture));
+            return Convert.ToDouble(a, CultureInfo.InvariantCulture)
+                .Equals(Convert.ToDouble(b, CultureInfo.InvariantCulture));
         }
     }
 }

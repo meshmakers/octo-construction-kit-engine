@@ -491,6 +491,15 @@ internal class ImportRtModelCommand(
                     importEntities, importAssociations).ConfigureAwait(false);
             }
 
+            if (importAssociations.Any() && importStrategy == ImportStrategy.Upsert)
+            {
+                // The bulk write upserts an edge on (role, origin, target) and never checks the
+                // role's cardinality, so a to-one role pointed at a different target than the
+                // tenant holds would gain a second edge (AB#5296). Replace instead of append.
+                importAssociations = await ReplaceToOneAssociationsAsync(session, runtimeRepository,
+                    importAssociations).ConfigureAwait(false);
+            }
+
             if (importAssociations.Any())
             {
                 logger.LogInformation("Adding associations...");
@@ -583,6 +592,171 @@ internal class ImportRtModelCommand(
         }
 
         return kept;
+    }
+
+    /// <summary>
+    /// On an Upsert import, makes an imported edge of a to-one outbound association role
+    /// (multiplicity One / ZeroOrOne on the origin type) REPLACE the edge the origin currently
+    /// carries on that role, instead of being appended next to it (AB#5296). The bulk association
+    /// write upserts on (role, origin, target) without any cardinality check, so a seed or archive
+    /// that points a to-one role at a different target than the tenant holds used to leave two
+    /// edges on a role that allows one — the state the GraphQL path's cardinality guard
+    /// (<c>GraphRuleEngine</c>, AB#1922) forbids and the UI cannot untangle (the FinAPI adapter on
+    /// prod-1 carried both the seeded meshmakers-dev and the hand-set meshmakers-public
+    /// HelmRepository edge). Stale edges are deleted in the same session before the write; an edge
+    /// whose target already matches is left to the upsert. A duplicate to-one edge inside the import
+    /// itself keeps its first declaration. Replacements are surfaced through
+    /// <see cref="IRtImportAuditTrail"/> plus a warning log. Insert imports are untouched: they
+    /// target empty tenants and cannot overwrite an existing entity anyway.
+    /// </summary>
+    private async Task<List<RtAssociation>> ReplaceToOneAssociationsAsync(IOctoSession session,
+        IRuntimeRepository runtimeRepository, List<RtAssociation> importAssociations)
+    {
+        var toOneByRole = new Dictionary<(RtCkId<CkTypeId> OriginCkTypeId, RtCkId<CkAssociationRoleId> RoleId), bool>();
+
+        bool IsToOne(RtAssociation association)
+        {
+            if (association.AssociationRoleId == null)
+            {
+                return false;
+            }
+
+            var key = (OriginCkTypeId: association.OriginCkTypeId, RoleId: association.AssociationRoleId);
+            if (!toOneByRole.TryGetValue(key, out var isToOne))
+            {
+                isToOne = IsToOneOutboundRole(runtimeRepository.TenantId, key.OriginCkTypeId, key.RoleId);
+                toOneByRole[key] = isToOne;
+            }
+
+            return isToOne;
+        }
+
+        var toOneImports = importAssociations.Where(IsToOne).ToList();
+        if (toOneImports.Count == 0)
+        {
+            return importAssociations;
+        }
+
+        // The query options carry a single role id, so read the tenant's current edges one role
+        // at a time, for exactly the origins the import touches on that role.
+        var existingEdges = new List<RtAssociation>();
+        foreach (var roleGroup in toOneImports.GroupBy(a => a.AssociationRoleId!))
+        {
+            var origins = roleGroup
+                .Select(a => new RtEntityId(a.OriginCkTypeId, a.OriginRtId))
+                .Distinct()
+                .ToList();
+            var resultSet = await runtimeRepository.GetRtAssociationsAsync(session, origins,
+                    RtAssociationExtendedQueryOptions.Create(GraphDirections.Outbound, roleGroup.Key))
+                .ConfigureAwait(false);
+            existingEdges.AddRange(resultSet.Values.SelectMany(r => r.Items));
+        }
+
+        var (kept, stale, samples) = PartitionToOneAssociations(importAssociations, IsToOne, existingEdges);
+        var droppedDuplicates = importAssociations.Count - kept.Count;
+        if (droppedDuplicates > 0)
+        {
+            logger.LogWarning(
+                "Dropped {DroppedCount} imported edge(s) into '{TenantId}' that declare a second target for a " +
+                "to-one association role already declared by the same import; the first declaration wins",
+                droppedDuplicates, runtimeRepository.TenantId);
+        }
+
+        if (stale.Count == 0)
+        {
+            return kept;
+        }
+
+        logger.LogWarning(
+            "Replacing {ReplacedCount} existing to-one association edge(s) in '{TenantId}' because the import " +
+            "points the role at a different target. Sample: {Sample}",
+            stale.Count, runtimeRepository.TenantId, string.Join("; ", samples));
+
+        await runtimeRepository.DeleteRtAssociationsByIdAsync(session, stale.Select(e => e.AssociationId))
+            .ConfigureAwait(false);
+
+        try
+        {
+            await rtImportAuditTrail
+                .RecordReplacedToOneEdgesAsync(runtimeRepository.TenantId, stale.Count, samples)
+                .ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Failed to publish the replaced-to-one-edges audit event");
+        }
+
+        return kept;
+    }
+
+    private bool IsToOneOutboundRole(string tenantId, RtCkId<CkTypeId> originCkTypeId,
+        RtCkId<CkAssociationRoleId> roleId)
+    {
+        if (!cacheService.TryGetRtCkType(tenantId, originCkTypeId, out var ckTypeGraph) || ckTypeGraph == null)
+        {
+            // Unknown origin type: the import fails downstream anyway; nothing to replace here.
+            return false;
+        }
+
+        var associationGraph = ckTypeGraph.Associations.Out.All
+            .FirstOrDefault(a => a.CkRoleId.ToRtCkId() == roleId);
+        return associationGraph is { Multiplicity: MultiplicitiesDto.One or MultiplicitiesDto.ZeroOrOne };
+    }
+
+    /// <summary>
+    /// Pure partition for the to-one replacement (AB#5296): returns the imported edges to write
+    /// (a second imported target for the same origin + to-one role is dropped, first declaration
+    /// wins), the existing tenant edges that must be deleted because the import points the same
+    /// origin + role at a different target, and a bounded human-readable sample of those
+    /// replacements. <paramref name="isToOne"/> tells which imported edges belong to a to-one role;
+    /// <paramref name="existingEdges"/> are the tenant's current outbound edges on those roles for
+    /// the imported origins. Exposed as the testable seam of the replacement step.
+    /// </summary>
+    internal static (List<RtAssociation> Kept, List<RtAssociation> StaleExisting, List<string> ReplacedSamples)
+        PartitionToOneAssociations(IReadOnlyList<RtAssociation> importAssociations,
+            Func<RtAssociation, bool> isToOne, IReadOnlyList<RtAssociation> existingEdges, int sampleCap = 10)
+    {
+        var kept = new List<RtAssociation>(importAssociations.Count);
+        var importedTargetByOriginRole =
+            new Dictionary<(OctoObjectId Origin, RtCkId<CkAssociationRoleId> Role), RtAssociation>();
+
+        foreach (var association in importAssociations)
+        {
+            if (!isToOne(association) || association.AssociationRoleId == null)
+            {
+                kept.Add(association);
+                continue;
+            }
+
+            var key = (association.OriginRtId, association.AssociationRoleId);
+            if (importedTargetByOriginRole.TryAdd(key, association))
+            {
+                kept.Add(association);
+            }
+        }
+
+        var stale = new List<RtAssociation>();
+        var samples = new List<string>();
+        foreach (var existing in existingEdges)
+        {
+            if (existing.AssociationRoleId == null ||
+                !importedTargetByOriginRole.TryGetValue((existing.OriginRtId, existing.AssociationRoleId),
+                    out var imported) ||
+                existing.TargetRtId == imported.TargetRtId)
+            {
+                continue;
+            }
+
+            stale.Add(existing);
+            if (samples.Count < sampleCap)
+            {
+                samples.Add(
+                    $"{existing.AssociationRoleId} {existing.OriginCkTypeId}@{existing.OriginRtId}: " +
+                    $"{existing.TargetCkTypeId}@{existing.TargetRtId} -> {imported.TargetCkTypeId}@{imported.TargetRtId}");
+            }
+        }
+
+        return (kept, stale, samples);
     }
 
     /// <summary>

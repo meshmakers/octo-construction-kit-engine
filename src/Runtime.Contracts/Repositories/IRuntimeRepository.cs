@@ -1,4 +1,4 @@
-using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
@@ -623,6 +623,15 @@ public interface IRuntimeRepository
     /// <returns>Aggregated result of the bulk import operation</returns>
     Task<IBulkImportResult> BulkRtAssociationsAsync(IOctoSession session, IEnumerable<RtAssociation> rtAssociations,
         BulkOperationOptions options);
+
+    /// <summary>
+    /// Deletes association edges by their association ids, bypassing the graph rule engine.
+    /// Intended for the bulk import path only, which owns the consistency of what it writes
+    /// (e.g. replacing the stale edge of a to-one role before upserting the imported one).
+    /// </summary>
+    /// <param name="session">Session object for transaction handling</param>
+    /// <param name="associationIds">Ids (<see cref="RtAssociation.AssociationId"/>) of the edges to delete</param>
+    Task DeleteRtAssociationsByIdAsync(IOctoSession session, IEnumerable<OctoObjectId> associationIds);
 
     #endregion Advanced functionality
 

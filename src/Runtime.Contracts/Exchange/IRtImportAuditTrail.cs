@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 
@@ -47,5 +47,24 @@ public interface IRtImportAuditTrail
     Task RecordSkippedDanglingEdgesAsync(
         string? tenantId,
         int skippedCount,
+        IReadOnlyList<string> sampleEdgeDescriptions);
+
+    /// <summary>
+    /// Records that an Upsert import replaced the edge a to-one association role (multiplicity
+    /// One / ZeroOrOne on the origin type) already carried in the tenant, because the import
+    /// points that role at a different target. The bulk import upserts edges on
+    /// (role, origin, target) and never checked cardinality, so the imported edge used to be
+    /// appended next to the existing one — leaving two edges on a role that allows a single one,
+    /// which the GraphQL path's cardinality guard rejects and which the UI cannot untangle.
+    /// </summary>
+    /// <param name="tenantId">Tenant the import targets.</param>
+    /// <param name="replacedCount">Number of existing edges deleted in favour of the imported one.</param>
+    /// <param name="sampleEdgeDescriptions">
+    /// A bounded sample of the replacements (role, origin, old target, new target); the caller caps
+    /// the sample size and passes <paramref name="replacedCount"/> as the true total.
+    /// </param>
+    Task RecordReplacedToOneEdgesAsync(
+        string? tenantId,
+        int replacedCount,
         IReadOnlyList<string> sampleEdgeDescriptions);
 }

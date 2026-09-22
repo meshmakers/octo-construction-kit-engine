@@ -19,6 +19,8 @@ public class BlueprintEntityComparerTests
 {
     private const string Model = "Test-1.0.0";
     private static readonly CkId<CkEnumId> StateEnumId = new($"{Model}/State");
+    private static readonly CkId<CkRecordId> ColumnRecordId = new($"{Model}/AggregationQueryColumn");
+    private static readonly CkId<CkRecordId> DerivedColumnRecordId = new($"{Model}/DerivedQueryColumn");
 
     [Fact]
     public void IdenticalSeed_ReportsNoChange()
@@ -259,12 +261,273 @@ public class BlueprintEntityComparerTests
         Assert.Empty(Compare(Seed(), Stored(), type));
     }
 
+    // ---- AB#5308: what the WRITE does, not what the seed says --------------------------------
+
+    [Fact]
+    public void SeedOmittingAnAttributeWithADefault_IsNotAChange()
+    {
+        // prod-1: the accounting seed declares neither Adapter.LifecycleMode (default 0) nor
+        // IdleTimeoutMinutes (default 30). CreateTransientRtEntity pre-populates both and
+        // AssignAttributes only touches declared attributes, so the stored value does not move -
+        // the preview claimed it did.
+        var type = BuildType(
+            Defaulted("LifecycleMode", AttributeValueTypesDto.Integer, 0),
+            Defaulted("IdleTimeoutMinutes", AttributeValueTypesDto.Integer, 30));
+        var stored = Stored(("LifecycleMode", 0L), ("IdleTimeoutMinutes", 30L));
+
+        Assert.Empty(Compare(Seed(), stored, type));
+    }
+
+    [Fact]
+    public void SeedNullingAnAttributeWithADefault_ReportsTheClear()
+    {
+        // The opposite of omitting it: AssignAttributes writes what the seed declares, so a
+        // declared null overwrites the pre-populated default and the value really is cleared.
+        // (Review of AB#5308 - the first version of this fix had it the other way round, modelling
+        // EntityRuleEngine, which the bulk import path bypasses entirely.)
+        var type = BuildType(Defaulted("NavigationFilterMode", AttributeValueTypesDto.Integer, 0));
+
+        var change = Assert.Single(
+            Compare(Seed(("NavigationFilterMode", null)), Stored(("NavigationFilterMode", 0L)), type));
+        Assert.Equal("NavigationFilterMode", change.AttributeName);
+        Assert.Equal(0L, change.OldValue);
+        Assert.Null(change.NewValue);
+    }
+
+    [Fact]
+    public void SeedOmittingAMandatoryAttributeWithADefault_IsAChangeWhenTheTenantDivergedFromIt()
+    {
+        // The rule only says "the default lands", not "anything goes": an operator who moved the
+        // value away from the default still has to see that the apply resets it.
+        var type = BuildType(Defaulted("IdleTimeoutMinutes", AttributeValueTypesDto.Integer, 30));
+
+        var change = Assert.Single(Compare(Seed(), Stored(("IdleTimeoutMinutes", 5L)), type));
+        Assert.Equal("IdleTimeoutMinutes", change.AttributeName);
+        Assert.Equal("IdleTimeoutMinutes", change.AttributeName);
+        Assert.Equal(5L, change.OldValue);
+        Assert.Equal(30L, change.NewValue);
+    }
+
+    [Fact]
+    public void SeedOmittingAnOptionalAttributeWithADefault_IsNotAChangeEither()
+    {
+        // CreateTransientRtEntity pre-populates defaults for OPTIONAL attributes too, so
+        // optionality does not enter into it - only "does the seed declare it".
+        var type = BuildType(Defaulted("Mode", AttributeValueTypesDto.Integer, 0, isOptional: true));
+
+        Assert.Empty(Compare(Seed(), Stored(("Mode", 0L)), type));
+    }
+
+    [Fact]
+    public void SeedOmittingAnAttributeWithoutADefault_StillReportsTheClear()
+    {
+        // No default to inherit: the upsert is a full replace, so the stored value is cleared.
+        var type = BuildType(Attr("Comment", AttributeValueTypesDto.String));
+
+        var change = Assert.Single(Compare(Seed(), Stored(("Comment", "set by an operator")), type));
+        Assert.Equal("set by an operator", change.OldValue);
+        Assert.Null(change.NewValue);
+    }
+
+    [Fact]
+    public void DefaultsMirrorTheTransientEntity_CollectionForStringArray_FirstEntryOtherwise()
+    {
+        // Parity with RuntimeRepositoryBase.CreateTransientRtEntity: StringArray and IntArray take
+        // the whole defaultValues collection, every other type - RecordArray included - the first
+        // entry. Getting this wrong would report a phantom on any seeded default.
+        var stringArray = BuildType(DefaultedMany("Tags", AttributeValueTypesDto.StringArray, "a", "b"));
+        Assert.Empty(Compare(Seed(), Stored(("Tags", new List<object?> { "a", "b" })), stringArray));
+
+        var scalar = BuildType(DefaultedMany("Take", AttributeValueTypesDto.Integer64, 500, 900));
+        Assert.Empty(Compare(Seed(), Stored(("Take", 500L)), scalar));
+    }
+
+    [Fact]
+    public void RecordArrayNullInTheSeed_EqualsAStoredEmptyList()
+    {
+        // prod-1: five dashboard queries seed "Sorting: null" and store []. AssignAttributes
+        // assigns its List<RtRecord> unconditionally, so null writes an empty list - same state.
+        var type = BuildType(RecordArrayAttr("Sorting"));
+
+        Assert.Empty(Compare(Seed(("Sorting", null)), Stored(("Sorting", new List<object?>())), type));
+        Assert.Empty(Compare(Seed(), Stored(("Sorting", new List<object?>())), type));
+    }
+
+    [Fact]
+    public void RecordArrayNullInTheSeed_IsAChangeWhenTheTenantHasEntries()
+    {
+        var type = BuildType(RecordArrayAttr("Sorting"));
+        var stored = Stored(("Sorting", new List<object?> { Record(ColumnRecordId, ("AttributePath", "name")) }));
+
+        var change = Assert.Single(Compare(Seed(("Sorting", null)), stored, type));
+        Assert.Equal("Sorting", change.AttributeName);
+    }
+
+    [Fact]
+    public void EnumMemberInsideARecord_EqualsItsStoredKey()
+    {
+        // prod-1: three aggregation queries seed the column's AggregationType as the text "1"
+        // (and elsewhere as its name), the repository holds the key 1. The import resolves both
+        // to the key, so neither is a change.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("State", 1L))
+        }));
+
+        foreach (var seedValue in new object[] { "1", 1, "Matched" })
+        {
+            var seed = Seed(("Columns", new List<object?>
+            {
+                Record(ColumnRecordId, ("AttributePath", "netTotal"), ("State", seedValue))
+            }));
+
+            Assert.Empty(Compare(seed, stored, type));
+        }
+    }
+
+    [Fact]
+    public void ADifferentEnumMemberInsideARecord_IsStillAChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("State", 1L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("State", "Unreviewed"))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void RecordMembersTheRecordDoesNotDeclare_CompareRaw()
+    {
+        // Unknown member (stale record definition): no conversion to apply, compare as-is rather
+        // than claim equality.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?> { Record(ColumnRecordId, ("Ghost", "a")) }));
+        var seed = Seed(("Columns", new List<object?> { Record(ColumnRecordId, ("Ghost", "b")) }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void EnumMemberDeclaredOnlyOnADerivedRecord_EqualsItsStoredKey()
+    {
+        // Review of AB#5308: the attribute declares the BASE record, the tenant stores a DERIVED
+        // one. Looking the member up in the declared graph misses anything the derived record adds,
+        // and the comparison falls back to raw - a phantom again for exactly the enum case the fix
+        // was about. The graph has to come from the instance.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("AttributePath", "netTotal"), ("DerivedState", 1L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("AttributePath", "netTotal"), ("DerivedState", "Matched"))
+        }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void ADifferentEnumMemberOnADerivedRecord_IsStillAChange()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("DerivedState", 1L))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(DerivedColumnRecordId, ("DerivedState", "Unreviewed"))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void NestedRecordArrayNullInTheSeed_EqualsAStoredEmptyList()
+    {
+        // Review of AB#5308: the empty-list write rule applies one level down too - a RecordArray
+        // MEMBER whose seed value is null lands as an empty list, same as a top-level one.
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("Children", new List<object?>()))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("AttributePath", "netTotal"), ("Children", null))
+        }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void NestedRecordArrayNullInTheSeed_IsAChangeWhenTheTenantHasEntries()
+    {
+        var type = BuildType(RecordArrayAttr("Columns"));
+        var stored = Stored(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("Children", new List<object?> { Record(ColumnRecordId, ("AttributePath", "x")) }))
+        }));
+        var seed = Seed(("Columns", new List<object?>
+        {
+            Record(ColumnRecordId, ("Children", null))
+        }));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
     // ---- helpers -------------------------------------------------------------------------
 
     private static List<Meshmakers.Octo.Runtime.Contracts.Blueprints.BlueprintAttributeChange> Compare(
         RtEntityTcDto seed, RtEntity stored, CkTypeGraph type)
     {
-        return BlueprintEntityComparer.Compare(seed, stored, type, v => v, ResolveEnum);
+        return BlueprintEntityComparer.Compare(seed, stored, type, v => v, ResolveEnum, ResolveRecord);
+    }
+
+    /// <summary>
+    ///     Two record graphs: the base one a record-valued attribute declares, and a DERIVED one
+    ///     that adds a member of its own - the case the review of AB#5308 asked for, where the
+    ///     attribute's declaration alone does not describe the stored instance.
+    /// </summary>
+    private static CkRecordGraph? ResolveRecord(RtCkId<CkRecordId> id)
+    {
+        // RtCkId renders without the model version, CkId with it - compare like for like.
+        var wanted = id.ToString();
+
+        if (string.Equals(wanted, ColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
+        {
+            return RecordGraph(ColumnRecordId,
+                Attr("AttributePath", AttributeValueTypesDto.String),
+                EnumAttr("State"),
+                RecordArrayAttr("Children"));
+        }
+
+        if (string.Equals(wanted, DerivedColumnRecordId.ToRtCkId().ToString(), StringComparison.Ordinal))
+        {
+            return RecordGraph(DerivedColumnRecordId,
+                Attr("AttributePath", AttributeValueTypesDto.String),
+                EnumAttr("State"),
+                EnumAttr("DerivedState"),
+                RecordArrayAttr("Children"));
+        }
+
+        return null;
+    }
+
+    private static CkRecordGraph RecordGraph(CkId<CkRecordId> recordId, params CkTypeAttributeGraph[] members)
+    {
+        return new CkRecordGraph(recordId, isAbstract: false, isFinal: false,
+            baseRecords: [], derivedFromCkRecordId: null, derivedRecords: [], definedAttributes: [],
+            allAttributes: members.ToDictionary(m => m.CkAttributeId, m => m),
+            description: "test record");
     }
 
     private static CkEnumGraph? ResolveEnum(CkId<CkEnumId> id)
@@ -287,7 +550,12 @@ public class BlueprintEntityComparerTests
 
     private static RtRecordTcDto Record(params (string name, object? value)[] members)
     {
-        var record = new RtRecordTcDto { CkRecordId = new RtCkId<CkRecordId>($"{Model}/TestRecord") };
+        return Record(new CkId<CkRecordId>($"{Model}/TestRecord"), members);
+    }
+
+    private static RtRecordTcDto Record(CkId<CkRecordId> recordId, params (string name, object? value)[] members)
+    {
+        var record = new RtRecordTcDto { CkRecordId = recordId.ToRtCkId() };
         foreach (var (name, value) in members)
         {
             record.Attributes.Add(new RtAttributeTcDto
@@ -335,6 +603,44 @@ public class BlueprintEntityComparerTests
         });
         return new CkTypeAttributeGraph(attrId,
             new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name }, definition);
+    }
+
+    /// <summary>Attribute declaring one CK <c>defaultValues</c> entry.</summary>
+    private static CkTypeAttributeGraph Defaulted(string name, AttributeValueTypesDto valueType, object defaultValue,
+        bool isOptional = false)
+    {
+        return DefaultedMany(name, valueType, isOptional, defaultValue);
+    }
+
+    private static CkTypeAttributeGraph DefaultedMany(string name, AttributeValueTypesDto valueType,
+        params object[] defaultValues)
+    {
+        return DefaultedMany(name, valueType, false, defaultValues);
+    }
+
+    private static CkTypeAttributeGraph DefaultedMany(string name, AttributeValueTypesDto valueType, bool isOptional,
+        params object[] defaultValues)
+    {
+        var attrId = new CkId<CkAttributeId>($"{Model}/{name}");
+        var definition = new CkAttributeGraph(attrId, new CkAttributeDto
+        {
+            AttributeId = name, ValueType = valueType, DefaultValues = [..defaultValues]
+        });
+        return new CkTypeAttributeGraph(attrId,
+            new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name, IsOptional = isOptional },
+            definition);
+    }
+
+    /// <summary>RecordArray attribute pointing at the record <see cref="ResolveRecord" /> knows.</summary>
+    private static CkTypeAttributeGraph RecordArrayAttr(string name)
+    {
+        var attrId = new CkId<CkAttributeId>($"{Model}/{name}");
+        var definition = new CkAttributeGraph(attrId, new CkAttributeDto
+        {
+            AttributeId = name, ValueType = AttributeValueTypesDto.RecordArray, ValueCkRecordId = ColumnRecordId
+        });
+        return new CkTypeAttributeGraph(attrId,
+            new CkTypeAttributeDto { CkAttributeId = attrId, AttributeName = name, IsOptional = true }, definition);
     }
 
     private static CkTypeAttributeGraph EnumAttr(string name)

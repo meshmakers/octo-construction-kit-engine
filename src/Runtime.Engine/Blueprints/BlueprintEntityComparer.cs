@@ -50,13 +50,19 @@ internal static class BlueprintEntityComparer
     /// <param name="tenant">The entity as stored on the tenant.</param>
     /// <param name="ckType">The entity's CK type, for attribute names, ownership and value types.</param>
     /// <param name="toTransport">Repository value to transport shape (production: <see cref="ImportRtModelCommand.ToTransportValue" />).</param>
+    /// <param name="resolveRecord">
+    /// Resolves a record id to its CK graph so record MEMBERS run through the same conversions as
+    /// top-level attributes (AB#5308). Without it an enum member the seed writes as "4" compares
+    /// unequal to the stored key 4, and every dashboard query reports a phantom change.
+    /// </param>
     /// <param name="resolveEnum">Enum lookup by id; null when the enum is unknown.</param>
     internal static List<BlueprintAttributeChange> Compare(
         RtEntityTcDto seed,
         RtEntity tenant,
         CkTypeWithAttributesGraph ckType,
         Func<object?, object?> toTransport,
-        Func<CkId<CkEnumId>, CkEnumGraph?> resolveEnum)
+        Func<CkId<CkEnumId>, CkEnumGraph?> resolveEnum,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord = null)
     {
         var changes = new List<BlueprintAttributeChange>();
 
@@ -77,13 +83,24 @@ internal static class BlueprintEntityComparer
             var seedAttribute = seed.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
             tenant.Attributes.TryGetValue(attribute.AttributeName, out var storedRaw);
 
+            // What the WRITE will put there, not what the seed literally says. Two ways those
+            // differ, both of which made a zero-change target report changes (AB#5308):
+            //  * an attribute the seed OMITS keeps the CK defaultValues entry the import created
+            //    the entity with (RuntimeRepositoryBase.CreateTransientRtEntity, then
+            //    AssignAttributes only touches what the seed declares) - the seed saying nothing
+            //    about Adapter.LifecycleMode re-writes the stored 0, it does not clear it;
+            //  * a RecordArray whose seed value is null lands as an EMPTY LIST, because
+            //    AssignAttributes builds its List<RtRecord> and assigns it unconditionally -
+            //    "Sorting: null" in the seed and a stored [] are the same state.
+            var seedRaw = EffectiveSeedValue(attribute, seedAttribute);
+
             // ONE failure boundary around preparation and comparison alike. The conversions
             // can throw too - ToTransportValue resolves record definitions through the CK cache
             // and a stale or orphaned record blows up there - and a value the comparer cannot
             // prepare must surface as a change with the raw values, never as a failed preview
             // (3.4.124 took PreviewBlueprintUpdate AND UpdateBlueprint down on prod-1 with an
             // exception from inside this loop).
-            object? seedValue = seedAttribute?.Value;
+            object? seedValue = seedRaw;
             object? storedValue = storedRaw;
             bool equal;
             try
@@ -92,9 +109,32 @@ internal static class BlueprintEntityComparer
                 {
                     // Records: the seed carries transport DTOs, the repository RtRecords. Compare
                     // in transport shape. Member-level import conversions (trimming, enum names
-                    // inside a record) are not replayed here, so a record that differs only in
-                    // those reports as a change - over-reporting, the acceptable direction.
+                    // inside a record) run through the member's own declaration since AB#5308,
+                    // resolved through its record graph - an enum member the seed writes as "4"
+                    // is the stored key 4 once imported.
                     storedValue = toTransport(storedRaw);
+                    equal = ValuesEqual(seedValue, storedValue,
+                        NestedRecordGraph(attribute, resolveRecord), resolveEnum, resolveRecord);
+
+                    // A RecordArray seed null writes an empty list (see EffectiveSeedValue).
+                    if (!equal && attribute.ValueType == AttributeValueTypesDto.RecordArray
+                              && IsEmptyOrNullSequence(seedValue) && IsEmptyOrNullSequence(storedValue))
+                    {
+                        equal = true;
+                    }
+
+                    if (equal)
+                    {
+                        continue;
+                    }
+
+                    changes.Add(new BlueprintAttributeChange
+                    {
+                        AttributeName = attribute.AttributeName,
+                        OldValue = storedValue,
+                        NewValue = seedValue
+                    });
+                    continue;
                 }
                 else
                 {
@@ -104,7 +144,7 @@ internal static class BlueprintEntityComparer
                     // into plain lists) so a seed "  x " against a stored "x", or a stored
                     // AttributeStringValueList against a seed string[], compare as what they
                     // would be once written. Enums resolve to their key on top of that.
-                    seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
+                    seedValue = Normalise(ConvertLikeTheImport(attribute, seedRaw), attribute, resolveEnum);
                     storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
                 }
 
@@ -136,6 +176,62 @@ internal static class BlueprintEntityComparer
     /// a value regardless of which side it came from. A conversion the converter refuses leaves
     /// the raw value in place, which at worst reports a change that the apply would not make.
     /// </summary>
+    /// <summary>
+    ///     The value the apply will actually write for <paramref name="attribute" />, mirroring the
+    ///     import path rather than the rule engine: the blueprint apply goes through
+    ///     <c>ImportRtModelCommand</c>, whose bulk path deliberately BYPASSES
+    ///     <c>EntityRuleEngine</c> (AB#4772 - that is why it collects mandatory-attribute
+    ///     violations itself), so <c>SetDefaultValuesOnInsert</c> never runs here.
+    ///     <para>
+    ///     What runs instead: <c>RuntimeRepositoryBase.CreateTransientRtEntity</c> pre-populates
+    ///     every attribute that declares <c>defaultValues</c> - optional ones included - and then
+    ///     <c>AssignAttributes</c> overwrites only the attributes the seed actually declares. So an
+    ///     OMITTED attribute keeps its default, while an attribute the seed declares as null is
+    ///     written as null and the default is gone. The pre-population switch is mirrored exactly,
+    ///     <see cref="AttributeValueTypesDto.StringArray" /> / <see cref="AttributeValueTypesDto.IntArray" />
+    ///     taking the whole collection and everything else - RecordArray included - the first entry.
+    ///     </para>
+    ///     The RecordArray "null writes an empty list" rule is the caller's, because it applies
+    ///     whether or not the attribute declares a default.
+    /// </summary>
+    internal static object? EffectiveSeedValue(CkTypeAttributeGraph attribute, RtAttributeTcDto? seedAttribute)
+    {
+        if (seedAttribute != null)
+        {
+            return seedAttribute.Value;
+        }
+
+        if (attribute.DefaultValues == null || attribute.DefaultValues.Count == 0)
+        {
+            return null;
+        }
+
+        return attribute.ValueType switch
+        {
+            AttributeValueTypesDto.IntArray or AttributeValueTypesDto.StringArray => attribute.DefaultValues,
+            _ => attribute.DefaultValues.FirstOrDefault()
+        };
+    }
+
+    private static CkRecordGraph? NestedRecordGraph(CkTypeAttributeGraph attribute,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord)
+    {
+        return attribute.ValueCkRecordId == null || resolveRecord == null
+            ? null
+            : resolveRecord(attribute.ValueCkRecordId.ToRtCkId());
+    }
+
+    private static bool IsEmptyOrNullSequence(object? value)
+    {
+        return value switch
+        {
+            null => true,
+            string => false,
+            System.Collections.IEnumerable items => !items.Cast<object?>().Any(),
+            _ => false
+        };
+    }
+
     private static object? ConvertLikeTheImport(CkTypeAttributeGraph attribute, object? value)
     {
         if (value == null || attribute.ValueType == AttributeValueTypesDto.Enum)
@@ -289,6 +385,13 @@ internal static class BlueprintEntityComparer
     /// </summary>
     internal static bool ValuesEqual(object? a, object? b)
     {
+        return ValuesEqual(a, b, null, null, null);
+    }
+
+    private static bool ValuesEqual(object? a, object? b, CkRecordGraph? recordGraph,
+        Func<CkId<CkEnumId>, CkEnumGraph?>? resolveEnum,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord)
+    {
         // JSON first: a JSON null is a null, and two containers from different documents are
         // equal by content, not by instance. Both would otherwise fall through to
         // JsonElement.Equals, which is reference-like and says "different".
@@ -325,7 +428,7 @@ internal static class BlueprintEntityComparer
 
         if (a is RtRecordTcDto ra && b is RtRecordTcDto rb)
         {
-            return RecordsEqual(ra, rb);
+            return RecordsEqual(ra, rb, recordGraph, resolveEnum, resolveRecord);
         }
 
         if (IsNumber(a) && IsNumber(b))
@@ -341,18 +444,28 @@ internal static class BlueprintEntityComparer
         if (a is not string && b is not string
             && a is System.Collections.IEnumerable seqA && b is System.Collections.IEnumerable seqB)
         {
-            return SequencesEqual(seqA, seqB);
+            return SequencesEqual(seqA, seqB, recordGraph, resolveEnum, resolveRecord);
         }
 
         return a.Equals(b);
     }
 
-    private static bool RecordsEqual(RtRecordTcDto a, RtRecordTcDto b)
+    private static bool RecordsEqual(RtRecordTcDto a, RtRecordTcDto b, CkRecordGraph? recordGraph,
+        Func<CkId<CkEnumId>, CkEnumGraph?>? resolveEnum,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord)
     {
         if (!string.Equals(a.CkRecordId?.ToString(), b.CkRecordId?.ToString(), StringComparison.Ordinal))
         {
             return false;
         }
+
+        // Resolve the graph from the record INSTANCE, not from the attribute's declaration: a
+        // record-valued attribute may store a DERIVED record, and a member declared only on the
+        // derived record is absent from the base graph - it would fall through to the raw
+        // comparison and report a phantom again (review of AB#5308). Both sides carry the same
+        // CkRecordId at this point (checked above); the declared graph stays as the fallback.
+        var graph = (resolveRecord != null && a.CkRecordId != null ? resolveRecord(a.CkRecordId) : null)
+                    ?? recordGraph;
 
         // Attribute sets by id; an attribute present on one side only counts as a difference,
         // except when its value is null on the side that has it (absent == null in storage).
@@ -362,7 +475,60 @@ internal static class BlueprintEntityComparer
         {
             byIdA.TryGetValue(key, out var va);
             byIdB.TryGetValue(key, out var vb);
-            if (!ValuesEqual(va, vb))
+
+            // The member's own declaration decides how its value compares: an enum member reaches
+            // the repository as its key while the seed writes the name or the key as text
+            // (AB#5308). No graph, or a member the record does not declare: compare raw, which is
+            // the pre-AB#5308 behaviour and over-reports at worst.
+            // Match on the RUNTIME id: the DTO carries RtCkId (model name, no version) while the
+            // graph holds CkId (versioned) and the two render differently, so comparing
+            // CkAttributeId.ToString() against the DTO key never matched and every member fell
+            // through to the raw comparison.
+            var member = graph?.AllAttributes.Values.FirstOrDefault(m =>
+                string.Equals(m.CkAttributeId.ToRtCkId().ToString(), key, StringComparison.Ordinal));
+
+            if (member == null)
+            {
+                if (!ValuesEqual(va, vb, null, resolveEnum, resolveRecord))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+            {
+                if (ValuesEqual(va, vb, NestedRecordGraph(member, resolveRecord), resolveEnum, resolveRecord))
+                {
+                    continue;
+                }
+
+                // A nested RecordArray follows the same write rule as a top-level one: null lands
+                // as an empty list, so the two are the same stored state (review of AB#5308).
+                if (member.ValueType == AttributeValueTypesDto.RecordArray
+                    && IsEmptyOrNullSequence(va) && IsEmptyOrNullSequence(vb))
+                {
+                    continue;
+                }
+
+                return false;
+            }
+
+            if (resolveEnum == null)
+            {
+                if (!ValuesEqual(va, vb, null, null, resolveRecord))
+                {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (!ValuesEqual(
+                    Normalise(ConvertLikeTheImport(member, va), member, resolveEnum),
+                    Normalise(ConvertLikeTheImport(member, vb), member, resolveEnum),
+                    null, resolveEnum, resolveRecord))
             {
                 return false;
             }
@@ -371,7 +537,10 @@ internal static class BlueprintEntityComparer
         return true;
     }
 
-    private static bool SequencesEqual(System.Collections.IEnumerable a, System.Collections.IEnumerable b)
+    private static bool SequencesEqual(System.Collections.IEnumerable a, System.Collections.IEnumerable b,
+        CkRecordGraph? recordGraph,
+        Func<CkId<CkEnumId>, CkEnumGraph?>? resolveEnum,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord)
     {
         var listA = a.Cast<object?>().ToList();
         var listB = b.Cast<object?>().ToList();
@@ -382,7 +551,7 @@ internal static class BlueprintEntityComparer
 
         for (var i = 0; i < listA.Count; i++)
         {
-            if (!ValuesEqual(listA[i], listB[i]))
+            if (!ValuesEqual(listA[i], listB[i], recordGraph, resolveEnum, resolveRecord))
             {
                 return false;
             }

@@ -77,30 +77,45 @@ internal static class BlueprintEntityComparer
             var seedAttribute = seed.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
             tenant.Attributes.TryGetValue(attribute.AttributeName, out var storedRaw);
 
-            object? seedValue;
-            object? storedValue;
-            if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+            // ONE failure boundary around preparation and comparison alike. The conversions
+            // can throw too - ToTransportValue resolves record definitions through the CK cache
+            // and a stale or orphaned record blows up there - and a value the comparer cannot
+            // prepare must surface as a change with the raw values, never as a failed preview
+            // (3.4.124 took PreviewBlueprintUpdate AND UpdateBlueprint down on prod-1 with an
+            // exception from inside this loop).
+            object? seedValue = seedAttribute?.Value;
+            object? storedValue = storedRaw;
+            bool equal;
+            try
             {
-                // Records: the seed carries transport DTOs, the repository RtRecords. Compare in
-                // transport shape. Member-level import conversions (trimming, enum names inside a
-                // record) are not replayed here, so a record that differs only in those reports
-                // as a change - over-reporting, the acceptable direction.
-                seedValue = seedAttribute?.Value;
-                storedValue = toTransport(storedRaw);
+                if (attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray)
+                {
+                    // Records: the seed carries transport DTOs, the repository RtRecords. Compare
+                    // in transport shape. Member-level import conversions (trimming, enum names
+                    // inside a record) are not replayed here, so a record that differs only in
+                    // those reports as a change - over-reporting, the acceptable direction.
+                    storedValue = toTransport(storedRaw);
+                }
+                else
+                {
+                    // Scalars and primitive lists: run BOTH sides through the converter the
+                    // import applies on write (AttributeValueConverter: trims strings, parses
+                    // booleans and doubles, turns tick strings into TimeSpans, list wrappers
+                    // into plain lists) so a seed "  x " against a stored "x", or a stored
+                    // AttributeStringValueList against a seed string[], compare as what they
+                    // would be once written. Enums resolve to their key on top of that.
+                    seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
+                    storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
+                }
+
+                equal = ValuesEqual(seedValue, storedValue);
             }
-            else
+            catch (Exception)
             {
-                // Scalars and primitive lists: run BOTH sides through the converter the import
-                // applies on write (AttributeValueConverter: trims strings, parses booleans and
-                // doubles, turns tick strings into TimeSpans, list wrappers into plain lists) so a
-                // seed "  x " against a stored "x", or a stored AttributeStringValueList against a
-                // seed string[], compare as what they would be once written - not as the shapes
-                // they happen to arrive in. Enums resolve to their key on top of that.
-                seedValue = Normalise(ConvertLikeTheImport(attribute, seedAttribute?.Value), attribute, resolveEnum);
-                storedValue = Normalise(ConvertLikeTheImport(attribute, storedRaw), attribute, resolveEnum);
+                equal = false;
             }
 
-            if (ValuesEqual(seedValue, storedValue))
+            if (equal)
             {
                 continue;
             }
@@ -132,8 +147,10 @@ internal static class BlueprintEntityComparer
         {
             return AttributeValueConverter.ConvertAttributeValue(attribute.ValueType, value) ?? value;
         }
-        catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException or ArgumentException)
+        catch (Exception)
         {
+            // Whatever the converter refuses stays raw and compares as-is; a refused conversion
+            // is at worst a reported change, never a failed preview.
             return value;
         }
     }
@@ -260,12 +277,42 @@ internal static class BlueprintEntityComparer
     }
 
     /// <summary>
-    /// Structural equality through the JSON shape: records, lists and scalars alike, after both
-    /// sides went through <see cref="Normalise" />. Two values that serialise identically are the
-    /// same stored document.
+    /// Structural equality without a serializer. The first version serialised both sides with
+    /// the default System.Text.Json options and compared the text - and the engine's transport
+    /// DTOs are not meant for those options: <c>RtRecordTcDto.CkRecordId</c> carries a converter
+    /// attribute that only works inside <c>RtSystemTextJsonSerializer</c>'s registered set, so
+    /// the first record-valued attribute on prod-1 threw and took PreviewBlueprintUpdate and
+    /// UpdateBlueprint down with it (3.4.124). Walk the shapes directly instead: records by id
+    /// and attribute set, sequences element by element, scalars by value with numeric
+    /// cross-type tolerance. Anything unrecognised compares by <see cref="object.Equals(object)" />
+    /// - which for two distinct instances says "different", the over-reporting direction.
     /// </summary>
     internal static bool ValuesEqual(object? a, object? b)
     {
+        // JSON first: a JSON null is a null, and two containers from different documents are
+        // equal by content, not by instance. Both would otherwise fall through to
+        // JsonElement.Equals, which is reference-like and says "different".
+        if (a is JsonElement ea)
+        {
+            if (ea.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                a = null;
+            }
+            else if (b is JsonElement eb0)
+            {
+                return JsonElement.DeepEquals(ea, eb0);
+            }
+            else
+            {
+                a = FromJsonElement(ea);
+            }
+        }
+
+        if (b is JsonElement eb)
+        {
+            b = eb.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined ? null : FromJsonElement(eb);
+        }
+
         if (a == null && b == null)
         {
             return true;
@@ -276,21 +323,101 @@ internal static class BlueprintEntityComparer
             return false;
         }
 
-        if (a.Equals(b))
+        if (a is RtRecordTcDto ra && b is RtRecordTcDto rb)
         {
-            return true;
+            return RecordsEqual(ra, rb);
+        }
+
+        if (IsNumber(a) && IsNumber(b))
+        {
+            return NumbersEqual(a, b);
+        }
+
+        if (a is string sa && b is string sb)
+        {
+            return string.Equals(sa, sb, StringComparison.Ordinal);
+        }
+
+        if (a is not string && b is not string
+            && a is System.Collections.IEnumerable seqA && b is System.Collections.IEnumerable seqB)
+        {
+            return SequencesEqual(seqA, seqB);
+        }
+
+        return a.Equals(b);
+    }
+
+    private static bool RecordsEqual(RtRecordTcDto a, RtRecordTcDto b)
+    {
+        if (!string.Equals(a.CkRecordId?.ToString(), b.CkRecordId?.ToString(), StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // Attribute sets by id; an attribute present on one side only counts as a difference,
+        // except when its value is null on the side that has it (absent == null in storage).
+        var byIdA = a.Attributes.ToDictionary(x => x.Id.ToString(), x => x.Value, StringComparer.Ordinal);
+        var byIdB = b.Attributes.ToDictionary(x => x.Id.ToString(), x => x.Value, StringComparer.Ordinal);
+        foreach (var key in byIdA.Keys.Union(byIdB.Keys, StringComparer.Ordinal))
+        {
+            byIdA.TryGetValue(key, out var va);
+            byIdB.TryGetValue(key, out var vb);
+            if (!ValuesEqual(va, vb))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool SequencesEqual(System.Collections.IEnumerable a, System.Collections.IEnumerable b)
+    {
+        var listA = a.Cast<object?>().ToList();
+        var listB = b.Cast<object?>().ToList();
+        if (listA.Count != listB.Count)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < listA.Count; i++)
+        {
+            if (!ValuesEqual(listA[i], listB[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsNumber(object o) =>
+        o is byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal;
+
+    private static bool IsFloating(object o) => o is float or double;
+
+    /// <summary>
+    /// Integral pairs compare exactly through decimal (int vs long from YAML vs Mongo);
+    /// floating pairs compare as doubles, exactly - routing them through decimal rounded to 15
+    /// significant digits and hid a real change between adjacent doubles. A mixed pair compares
+    /// as doubles too: that is the shape the import would store for a Double attribute.
+    /// </summary>
+    private static bool NumbersEqual(object a, object b)
+    {
+        if (IsFloating(a) || IsFloating(b))
+        {
+            return Convert.ToDouble(a, CultureInfo.InvariantCulture)
+                .Equals(Convert.ToDouble(b, CultureInfo.InvariantCulture));
         }
 
         try
         {
-            return string.Equals(
-                JsonSerializer.Serialize(a, a.GetType()),
-                JsonSerializer.Serialize(b, b.GetType()),
-                StringComparison.Ordinal);
+            return Convert.ToDecimal(a, CultureInfo.InvariantCulture) == Convert.ToDecimal(b, CultureInfo.InvariantCulture);
         }
-        catch (NotSupportedException)
+        catch (OverflowException)
         {
-            return false;
+            return Convert.ToDouble(a, CultureInfo.InvariantCulture)
+                .Equals(Convert.ToDouble(b, CultureInfo.InvariantCulture));
         }
     }
 }

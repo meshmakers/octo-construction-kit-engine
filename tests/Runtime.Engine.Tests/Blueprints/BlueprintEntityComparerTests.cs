@@ -162,6 +162,96 @@ public class BlueprintEntityComparerTests
     }
 
     [Fact]
+    public void IdenticalRecords_AreNotAChange_AndDoNotNeedASerializer()
+    {
+        // The 3.4.124 prod-1 failure: the first version serialised RtRecordTcDto with the
+        // default System.Text.Json options, whose converter attribute on CkRecordId is not
+        // usable there, and the exception took the whole preview down.
+        var type = BuildType(Attr("Address", AttributeValueTypesDto.Record));
+        var seed = Seed(("Address", Record(("Street", "Firmianstr. 31A"), ("Zip", 5020))));
+        var stored = Stored(("Address", Record(("Street", "Firmianstr. 31A"), ("Zip", 5020L))));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void RecordWithADifferentMember_IsAChange()
+    {
+        var type = BuildType(Attr("Address", AttributeValueTypesDto.Record));
+        var seed = Seed(("Address", Record(("Street", "Rottmayrgasse 1"))));
+        var stored = Stored(("Address", Record(("Street", "Firmianstr. 31A"))));
+
+        var change = Assert.Single(Compare(seed, stored, type));
+        Assert.Equal("Address", change.AttributeName);
+    }
+
+    [Fact]
+    public void RecordArrays_CompareElementWise()
+    {
+        var type = BuildType(Attr("Lines", AttributeValueTypesDto.RecordArray));
+        var seed = Seed(("Lines", new List<RtRecordTcDto> { Record(("Qty", 1)), Record(("Qty", 2)) }));
+        var stored = Stored(("Lines", new List<RtRecordTcDto> { Record(("Qty", 1L)), Record(("Qty", 2L)) }));
+
+        Assert.Empty(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void AdjacentDoubles_AreAChange()
+    {
+        // Routing doubles through decimal rounded both to the same 15 digits and hid the change.
+        var type = BuildType(Attr("Factor", AttributeValueTypesDto.Double));
+        var seed = Seed(("Factor", Math.BitIncrement(1.0)));
+        var stored = Stored(("Factor", 1.0));
+
+        Assert.Single(Compare(seed, stored, type));
+    }
+
+    [Fact]
+    public void JsonContainers_FromDifferentDocuments_CompareByContent()
+    {
+        var a = System.Text.Json.JsonDocument.Parse("{\"street\":\"x\",\"tags\":[1,2]}").RootElement;
+        var b = System.Text.Json.JsonDocument.Parse("{\"street\":\"x\",\"tags\":[1,2]}").RootElement;
+        var c = System.Text.Json.JsonDocument.Parse("{\"street\":\"y\",\"tags\":[1,2]}").RootElement;
+
+        Assert.True(BlueprintEntityComparer.ValuesEqual(a, b));
+        Assert.False(BlueprintEntityComparer.ValuesEqual(a, c));
+    }
+
+    [Fact]
+    public void JsonNull_EqualsClrNull()
+    {
+        var jsonNull = System.Text.Json.JsonDocument.Parse("null").RootElement;
+
+        Assert.True(BlueprintEntityComparer.ValuesEqual(jsonNull, null));
+        Assert.True(BlueprintEntityComparer.ValuesEqual(null, jsonNull));
+        Assert.True(BlueprintEntityComparer.ValuesEqual(jsonNull, jsonNull));
+    }
+
+    [Fact]
+    public void AThrowingConversion_IsReportedAsAChange_NotAsAFailure()
+    {
+        // ToTransportValue resolves record definitions through the CK cache; a stale record
+        // throws there. The preview must survive that and report the attribute.
+        var type = BuildType(Attr("Address", AttributeValueTypesDto.Record));
+        var seed = Seed(("Address", Record(("Street", "x"))));
+        var stored = Stored(("Address", new object()));
+
+        var changes = BlueprintEntityComparer.Compare(seed, stored, type,
+            _ => throw new InvalidOperationException("stale record definition"), ResolveEnum);
+
+        var change = Assert.Single(changes);
+        Assert.Equal("Address", change.AttributeName);
+    }
+
+    [Fact]
+    public void ValuesEqual_NeverThrows_OnShapesItDoesNotKnow()
+    {
+        // Two distinct opaque instances: not equal, and above all no exception.
+        Assert.False(BlueprintEntityComparer.ValuesEqual(new object(), new object()));
+        Assert.False(BlueprintEntityComparer.ValuesEqual(new object(), "x"));
+    }
+
+    [Fact]
     public void AttributeNeitherSideHas_IsNotAChange()
     {
         var type = BuildType(Attr("Optional", AttributeValueTypesDto.String));
@@ -193,6 +283,21 @@ public class BlueprintEntityComparerTests
                 new CkEnumValueDto { Key = 1, Name = "Matched" }
             ]
         });
+    }
+
+    private static RtRecordTcDto Record(params (string name, object? value)[] members)
+    {
+        var record = new RtRecordTcDto { CkRecordId = new RtCkId<CkRecordId>($"{Model}/TestRecord") };
+        foreach (var (name, value) in members)
+        {
+            record.Attributes.Add(new RtAttributeTcDto
+            {
+                Id = new CkId<CkAttributeId>($"{Model}/{name}").ToRtCkId(),
+                Value = value
+            });
+        }
+
+        return record;
     }
 
     private static RtEntityTcDto Seed(params (string name, object? value)[] attrs)

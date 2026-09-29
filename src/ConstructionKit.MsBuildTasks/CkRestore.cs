@@ -57,6 +57,33 @@ public class CkRestore : Microsoft.Build.Utilities.Task
     public bool IsPrivateGitHubCatalogEnabled { get; set; } = true;
 
     /// <summary>
+    /// Repository owner of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    /// <remarks>
+    /// AB#5412: the private catalog slot is lane-scoped, see
+    /// <see cref="PrivateGitHubCatalogCoordinates" />. Set as a group from the pipeline
+    /// (OctoPrivateGitHubCatalogOwner / ...RepositoryName / ...Branch / ...PagesUri); a partial set is
+    /// accepted and merges with the defaults, which is only ever useful for a branch override.
+    /// </remarks>
+    public string? PrivateGitHubCatalogOwner { get; set; }
+
+    /// <summary>
+    /// Repository name of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    public string? PrivateGitHubCatalogRepositoryName { get; set; }
+
+    /// <summary>
+    /// Repository branch of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    public string? PrivateGitHubCatalogBranch { get; set; }
+
+    /// <summary>
+    /// GitHub Pages URI the PRIVATE GitHub catalog is READ from. Empty keeps the compiled-in default.
+    /// Publishes always go through the GitHub API, so a wrong value here fails reads, not writes.
+    /// </summary>
+    public string? PrivateGitHubCatalogPagesUri { get; set; }
+
+    /// <summary>
     /// A list of compiled models that has been generated
     /// </summary>
     [Output]
@@ -70,6 +97,16 @@ public class CkRestore : Microsoft.Build.Utilities.Task
 
     public override bool Execute()
     {
+        // AB#5412: fail before anything touches a catalog — an unexpanded macro must never be
+        // mistaken for a repository name.
+        if (!PrivateGitHubCatalogCoordinates.Validate(PrivateGitHubCatalogOwner,
+                PrivateGitHubCatalogRepositoryName, PrivateGitHubCatalogBranch, PrivateGitHubCatalogPagesUri,
+                out var coordinateError))
+        {
+            Log.LogError(coordinateError);
+            return false;
+        }
+
         var services = new ServiceCollection();
         services.AddLogging(loggingBuilder =>
         {
@@ -92,6 +129,8 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         services.Configure<PrivateGitHubCatalogOptions>(options =>
         {
             options.IsEnabled = IsPrivateGitHubCatalogEnabled;
+            PrivateGitHubCatalogCoordinates.Apply(options, PrivateGitHubCatalogOwner,
+                PrivateGitHubCatalogRepositoryName, PrivateGitHubCatalogBranch, PrivateGitHubCatalogPagesUri);
         });
 
         var serviceProvider = services.BuildServiceProvider();
@@ -103,6 +142,12 @@ public class CkRestore : Microsoft.Build.Utilities.Task
         Log.LogMessage(MessageImportance.High,
             "Local file system catalog root: '{0}' (enabled: {1})",
             localCatalogOptions.RootPath, localCatalogOptions.IsEnabled);
+
+        // AB#5412: restore resolves dependencies from the private catalog too, so its identity belongs
+        // in the log — the lane reads a different repository than main under the same catalog name.
+        var privateCatalogOptions = serviceProvider.GetRequiredService<IOptions<PrivateGitHubCatalogOptions>>().Value;
+        Log.LogMessage(MessageImportance.High, "Private GitHub catalog: {0} (enabled: {1})",
+            PrivateGitHubCatalogCoordinates.Describe(privateCatalogOptions), privateCatalogOptions.IsEnabled);
 
         var compiledModelFiles = new List<string>();
         var cacheFiles = new List<string>();

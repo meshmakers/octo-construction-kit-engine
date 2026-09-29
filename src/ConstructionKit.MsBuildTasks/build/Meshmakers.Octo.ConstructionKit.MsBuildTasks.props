@@ -33,6 +33,20 @@
         <OctoLocalCatalogRootPath Condition="'$(OctoLocalCatalogRootPath)' == '' And '$(OctoRepoRootPath)' != ''">$(OctoRepoRootPath)../.octo/local-catalog</OctoLocalCatalogRootPath>
         <OctoPublicGitHubCatalogIsEnabled Condition="'$(OctoPublicGitHubCatalogIsEnabled)' == ''">true</OctoPublicGitHubCatalogIsEnabled>
         <OctoPrivateGitHubCatalogIsEnabled Condition="'$(OctoPrivateGitHubCatalogIsEnabled)' == ''">true</OctoPrivateGitHubCatalogIsEnabled>
+        <!--
+            AB#5412: repository coordinates of the PRIVATE GitHub catalog. Deliberately WITHOUT a
+            default: empty means "use the compiled-in coordinates"
+            (meshmakers/construction-kit-libraries-build@main), which is what main and every r-tag
+            build must keep doing. The 0.2-dev lane sets all four from the pipeline
+            (octo-pipeline-templates > update-build-number.yml) so it resolves and publishes through
+            meshmakers/octo-catalog-dev instead — the private catalog slot is lane-scoped, see
+            AB#5139. Set them as a GROUP; a partial set merges with the defaults and is only ever
+            useful for a branch override.
+              OctoPrivateGitHubCatalogOwner
+              OctoPrivateGitHubCatalogRepositoryName
+              OctoPrivateGitHubCatalogBranch
+              OctoPrivateGitHubCatalogPagesUri     (read path; publishes go through the GitHub API)
+        -->
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
         <!--

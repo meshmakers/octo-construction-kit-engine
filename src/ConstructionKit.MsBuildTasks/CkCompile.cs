@@ -99,6 +99,33 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public string? PrivateGitHubApiKey { get; set; }
 
     /// <summary>
+    /// Repository owner of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    /// <remarks>
+    /// AB#5412: the private catalog slot is lane-scoped, see
+    /// <see cref="PrivateGitHubCatalogCoordinates" />. Set as a group from the pipeline
+    /// (OctoPrivateGitHubCatalogOwner / ...RepositoryName / ...Branch / ...PagesUri); a partial set is
+    /// accepted and merges with the defaults, which is only ever useful for a branch override.
+    /// </remarks>
+    public string? PrivateGitHubCatalogOwner { get; set; }
+
+    /// <summary>
+    /// Repository name of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    public string? PrivateGitHubCatalogRepositoryName { get; set; }
+
+    /// <summary>
+    /// Repository branch of the PRIVATE GitHub catalog. Empty keeps the compiled-in default.
+    /// </summary>
+    public string? PrivateGitHubCatalogBranch { get; set; }
+
+    /// <summary>
+    /// GitHub Pages URI the PRIVATE GitHub catalog is READ from. Empty keeps the compiled-in default.
+    /// Publishes always go through the GitHub API, so a wrong value here fails reads, not writes.
+    /// </summary>
+    public string? PrivateGitHubCatalogPagesUri { get; set; }
+
+    /// <summary>
     /// Gets or sets the output path
     /// </summary>
     [Required]
@@ -124,6 +151,16 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
     public override bool Execute()
     {
+        // AB#5412: fail before anything touches a catalog — an unexpanded macro must never be
+        // mistaken for a repository name.
+        if (!PrivateGitHubCatalogCoordinates.Validate(PrivateGitHubCatalogOwner,
+                PrivateGitHubCatalogRepositoryName, PrivateGitHubCatalogBranch, PrivateGitHubCatalogPagesUri,
+                out var coordinateError))
+        {
+            Log.LogError(coordinateError);
+            return false;
+        }
+
         var services = new ServiceCollection();
         services.AddLogging(loggingBuilder =>
         {
@@ -155,9 +192,19 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             {
                 options.GitHubApiToken = PrivateGitHubApiKey;
             }
+
+            PrivateGitHubCatalogCoordinates.Apply(options, PrivateGitHubCatalogOwner,
+                PrivateGitHubCatalogRepositoryName, PrivateGitHubCatalogBranch, PrivateGitHubCatalogPagesUri);
         });
 
         var serviceProvider = services.BuildServiceProvider();
+
+        // AB#5412: log the EFFECTIVE private catalog. Resolving the options here also forces the
+        // Configure delegate above to run before the first catalog call, so a coordinate typo shows up
+        // in the log next to the publish target instead of as a puzzling 404 later.
+        var privateCatalogOptions = serviceProvider.GetRequiredService<IOptions<PrivateGitHubCatalogOptions>>().Value;
+        Log.LogMessage(MessageImportance.High, "Private GitHub catalog: {0} (enabled: {1})",
+            PrivateGitHubCatalogCoordinates.Describe(privateCatalogOptions), privateCatalogOptions.IsEnabled);
 
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
         var catalogService = serviceProvider.GetRequiredService<ICatalogService>();

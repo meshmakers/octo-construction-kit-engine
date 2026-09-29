@@ -64,6 +64,10 @@
                    IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
                    PrivateGitHubApiKey="$(OctoPrivateGitHubApiKey)"
                    PublicGitHubApiKey="$(OctoPublicGitHubApiKey)"
+                   PrivateGitHubCatalogOwner="$(OctoPrivateGitHubCatalogOwner)"
+                   PrivateGitHubCatalogRepositoryName="$(OctoPrivateGitHubCatalogRepositoryName)"
+                   PrivateGitHubCatalogBranch="$(OctoPrivateGitHubCatalogBranch)"
+                   PrivateGitHubCatalogPagesUri="$(OctoPrivateGitHubCatalogPagesUri)"
                    GenerateCkDocumentation="$(OctoGenerateCkDocumentation)"
                    CkLinkPath="$(OctoCkLinkPath)"
                    RefreshRemoteCatalogs="$(OctoRefreshRemoteCatalogs)">
@@ -100,6 +104,10 @@
                    LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"
                    IsPublicGitHubCatalogEnabled="$(OctoPublicGitHubCatalogIsEnabled)"
                    IsPrivateGitHubCatalogEnabled="$(OctoPrivateGitHubCatalogIsEnabled)"
+                   PrivateGitHubCatalogOwner="$(OctoPrivateGitHubCatalogOwner)"
+                   PrivateGitHubCatalogRepositoryName="$(OctoPrivateGitHubCatalogRepositoryName)"
+                   PrivateGitHubCatalogBranch="$(OctoPrivateGitHubCatalogBranch)"
+                   PrivateGitHubCatalogPagesUri="$(OctoPrivateGitHubCatalogPagesUri)"
                    OutputPath="$(OctoCkCompileOutputImportFolder)"
                    CacheFilePath="$(OctoCkCompileCacheImportFolder)">
             <Output TaskParameter="CompiledModelFiles" ItemName="CompiledModelFiles" />

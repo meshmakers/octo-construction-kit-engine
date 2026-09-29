@@ -102,6 +102,58 @@ public class PrivateGitHubCatalogCoordinatesTests
     }
 
     [Fact]
+    public void Apply_WithoutCoordinates_KeepsTheHistoricalCacheFileName()
+    {
+        // Must stay byte-identical for main / r-tags: a new name would silently invalidate every
+        // existing cache on every machine.
+        var options = new PrivateGitHubCatalogOptions();
+
+        PrivateGitHubCatalogCoordinates.Apply(options, null, null, null, null);
+
+        Assert.Equal("private-github-catalog-cache.json", options.CacheFileName);
+    }
+
+    [Fact]
+    public void Apply_WithLaneCoordinates_ScopesTheCacheFileToTheRepository()
+    {
+        // Two repositories under one catalog NAME shared one cache file, and a cache inside its age
+        // window is served without contacting GitHub — so a retargeted build could resolve the other
+        // lane's models (observed: System.Communication 3.36.0, which only the main-lane catalog has).
+        var options = new PrivateGitHubCatalogOptions();
+
+        PrivateGitHubCatalogCoordinates.Apply(options, "meshmakers", "octo-catalog-dev", "main",
+            "https://meshmakers.github.io/octo-catalog-dev/");
+
+        Assert.Equal("private-github-catalog-cache-meshmakers-octo-catalog-dev-main.json",
+            options.CacheFileName);
+    }
+
+    [Fact]
+    public void Apply_WithSlashInBranch_ProducesAUsableFileName()
+    {
+        var options = new PrivateGitHubCatalogOptions();
+
+        PrivateGitHubCatalogCoordinates.Apply(options, null, "octo-catalog-dev", "test/0.2-dev", null);
+
+        Assert.Equal("private-github-catalog-cache-meshmakers-octo-catalog-dev-test-0.2-dev.json",
+            options.CacheFileName);
+        Assert.DoesNotContain("/", options.CacheFileName);
+    }
+
+    [Fact]
+    public void Apply_DifferentRepositories_NeverShareACacheFile()
+    {
+        var lane = new PrivateGitHubCatalogOptions();
+        var other = new PrivateGitHubCatalogOptions();
+
+        PrivateGitHubCatalogCoordinates.Apply(lane, "meshmakers", "octo-catalog-dev", "main", null);
+        PrivateGitHubCatalogCoordinates.Apply(other, "meshmakers", "construction-kit-libraries-build", "main",
+            null);
+
+        Assert.NotEqual(lane.CacheFileName, other.CacheFileName);
+    }
+
+    [Fact]
     public void Describe_NamesRepositoryAndBranch()
     {
         var options = new PrivateGitHubCatalogOptions();

@@ -87,6 +87,73 @@ internal static class PrivateGitHubCatalogCoordinates
             options.GitHubPagesUri = pagesUri!.Trim();
         }
 
+        ScopeCacheFileToRepository(options, owner, repositoryName, branch, pagesUri);
+    }
+
+    /// <summary>
+    ///     Gives the read cache a file name that includes the repository, but ONLY when a coordinate
+    ///     was actually overridden — the default coordinates keep the historical file name, so no
+    ///     existing cache is invalidated.
+    /// </summary>
+    /// <remarks>
+    ///     🔴 Without this, retargeting silently reads the OTHER lane's content. The cache file name
+    ///     is derived from the catalog NAME (<c>private-github-catalog-cache.json</c>), which is the
+    ///     same string for both repositories, and a cache younger than its max age is served without
+    ///     contacting GitHub at all. Measured on 2026-09-29: a build with the dev-catalog coordinates
+    ///     resolved <c>System.Communication 3.36.0</c> — a version that exists only in
+    ///     construction-kit-libraries-build, written into the shared cache seconds earlier by a build
+    ///     with the default coordinates — and failed with "'System.Communication-[4.0,5.0)' is not a
+    ///     known construction kit model" even though the dev catalog served 4.4.1 over Pages at that
+    ///     moment. Repeating the same build after the age window had passed refreshed against the
+    ///     right repository and succeeded, which is the worst possible failure shape: transient,
+    ///     order-dependent, and it points at the model rather than at the cache.
+    ///     <para>
+    ///         In CI containers HOME is fresh per build, so the collision cannot happen there. It bites
+    ///         on a developer machine and on the self-hosted ADO agents, where the MSBuild task uses
+    ///         the real HOME — only the SemVer gate step isolates it to the job temp directory.
+    ///     </para>
+    /// </remarks>
+    private static void ScopeCacheFileToRepository(GitHubCatalogOptions options, string? owner,
+        string? repositoryName, string? branch, string? pagesUri)
+    {
+        var isRetargeted = !string.IsNullOrWhiteSpace(owner) || !string.IsNullOrWhiteSpace(repositoryName)
+                                                            || !string.IsNullOrWhiteSpace(branch)
+                                                            || !string.IsNullOrWhiteSpace(pagesUri);
+        if (!isRetargeted)
+        {
+            return;
+        }
+
+        var stem = Path.GetFileNameWithoutExtension(options.CacheFileName);
+        var extension = Path.GetExtension(options.CacheFileName);
+        var scope = Sanitize(options.GitHubRepositoryOwner) + "-" + Sanitize(options.GitHubRepositoryName) + "-" +
+                    Sanitize(options.GitHubRepositoryBranch);
+
+        options.CacheFileName = stem + "-" + scope + extension;
+    }
+
+    /// <summary>
+    ///     Reduces a coordinate to characters that are safe in a file name on every platform; a branch
+    ///     name in particular carries slashes.
+    /// </summary>
+    private static string Sanitize(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "none";
+        }
+
+        var chars = value!.Trim().ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            var c = chars[i];
+            if (!char.IsLetterOrDigit(c) && c != '.' && c != '-' && c != '_')
+            {
+                chars[i] = '-';
+            }
+        }
+
+        return new string(chars);
     }
 
     /// <summary>

@@ -128,13 +128,35 @@ stages:
             inputs:
               command: 'build'
               projects: 'samples/**/*.csproj'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer)'
+              # Pinned for the same reason as the Test step below (AB#5413). No sample
+              # owns a CK model today, so this changes nothing now — it keeps a future
+              # one from reintroducing the leak silently.
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+          # 🔴 /p:OctoPublishCatalog is NOT optional here, even though this step only
+          # runs tests (AB#5413). This repo cannot consume its own MsBuildTasks
+          # package, so it bootstraps through its own Directory.Build.targets, which
+          # publishes with `octo-ckc -c publish -c $(OctoPublishCatalog) -r` on every
+          # build of a CK-model project — and the test projects reference those. With
+          # no /p: switch, MSBuild picks OctoPublishCatalog up from the ENVIRONMENT:
+          # the agent exports every pipeline variable, and update-build-number emits
+          # OctoPublishCatalog = PrivateGitHubCatalog on every branch (it is the
+          # "where would a publish go" value, gated by effectivePublishCatalog).
+          # Result on the lane: System, System.TestIdentity and Test were force
+          # published into the MAIN-lane catalog construction-kit-libraries-build,
+          # twice on 2026-09-29 alone. No damage yet only because the versions were
+          # content-identical, so the writes produced zero-diff commits; a lane change
+          # without a version bump would have overwritten main's model in place.
+          #
+          # Note this is specific to THIS repo's Exec-based publish. The packaged
+          # targets used everywhere else do not re-enter the publish path in a test
+          # step — verified against controller build 48077, where all 12 publishes
+          # went to LocalFileSystemCatalog.
           - task: DotNetCoreCLI@2
             retryCountOnTaskFailure: 2
             displayName: 'Test'
             inputs:
               command: 'test'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
               projects: |
                 **/*Tests.csproj
                 !**/*SystemTests.csproj

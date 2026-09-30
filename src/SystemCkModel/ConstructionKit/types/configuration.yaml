@@ -24,3 +24,9 @@ types:
         name: EnvironmentMode
       - id: ${this}/MaintenanceLevel
         name: MaintenanceLevel
+      - id: ${this}/PublishCkModelObservability
+        name: PublishCkModelObservability
+        isOptional: true
+      - id: ${this}/PublishWorkloadObservability
+        name: PublishWorkloadObservability
+        isOptional: true

@@ -43,7 +43,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v0.5.3
+      ref: refs/tags/tpl-v0.7.0
 
 trigger:
   batch: true
@@ -71,36 +71,28 @@ variables:
     value: ${{ eq(variables['Build.SourceBranch'], 'refs/heads/main') }}
   - name: isTest
     value: ${{ startsWith(variables['Build.SourceBranch'], 'refs/heads/test') }}
-  # CK publish routing (effectivePublishCatalog: GitHub catalogs only on main/r* tags —
-  # incident: Industry.Basic-2.1.1 pinned by Industry.Energy/Fluid/Maintenance/
-  # Manufacturing without itself being published) and the per-run local catalog root
-  # (OctoLocalCatalogRootPath -> Agent.TempDirectory, AB#4167) are exported as runtime
-  # variables by the shared update-build-number.yml template (tpl-v0.3.1). The local
-  # catalog this repo needs for its interdependent CK models is therefore isolated
-  # per run instead of shared via ~/.octo on the agent.
+  # Publish routing for this repo's CK models (System, System.StreamData, and the test
+  # models Test / System.TestIdentity). Two publishers, never the same catalog:
   #
-  # Publish routing truth table for this repo's CK models (System, System.StreamData,
-  # and the test models Test / System.TestIdentity). Two variables are in play, and
-  # only ONE of them is the routing decision:
+  #   Shared validate-ck-versions step (after Test) — the ONLY publisher to the shared
+  #   catalogs, for all four models. Routing comes from update-build-number
+  #   (OctoPublishCkCatalogs): refs/heads/main -> PrivateGitHubCatalog
+  #   (meshmakers/construction-kit-libraries-build); refs/tags/r<X.Y.Z> -> private AND
+  #   PublicGitHubCatalog; every other branch validates only. Published versions are
+  #   never replaced.
   #
-  #   OctoPublishCatalog       "where would a GitHub publish go" — PrivateGitHubCatalog
-  #                            on every branch, PublicGitHubCatalog on r* tags. The
-  #                            agent exports it as an ENV VAR, so MSBuild picks it up
-  #                            as a global property on any step that does not override
-  #                            it. It is NOT the gate.
-  #   effectivePublishCatalog  the gate. main / r* -> OctoPublishCatalog;
-  #                            everything else -> LocalFileSystemCatalog.
+  #   MSBuild steps — publish ONLY to the run-isolated LocalFileSystemCatalog
+  #   (OctoLocalCatalogRootPath -> Agent.TempDirectory, AB#4167). This repo cannot
+  #   consume its own MsBuildTasks package and bootstraps through Directory.Build.targets,
+  #   whose CkCompile runs `octo-ckc -c publish -c $(OctoPublishCatalog) -r` on every
+  #   build of a CK-model project. OctoPublishCkModel stays on: its local publish is what
+  #   lets StreamData and the test models resolve System within the same run.
   #
-  #   refs/heads/main          -> PrivateGitHubCatalog  (meshmakers/construction-kit-libraries-build)
-  #   refs/tags/r<X.Y.Z>       -> PublicGitHubCatalog   (the public catalog)
-  #   refs/heads/test/0.2-dev  -> LocalFileSystemCatalog on this branch line; the lane
-  #                               catalog (meshmakers/octo-catalog-dev) requires the
-  #                               publishCkModelsToLaneCatalog opt-in of tpl-v0.6.x,
-  #                               which this branch deliberately does NOT set
-  #   refs/heads/dev/*         -> LocalFileSystemCatalog (per-run, Agent.TempDirectory)
-  #
-  # THEREFORE: every MSBuild step that can reach the CkCompile publish path must pass
-  # /p:OctoPublishCatalog="$(effectivePublishCatalog)" explicitly. All three do below.
+  # THEREFORE: every MSBuild step that can reach CkCompile passes
+  # /p:OctoPublishCatalog=LocalFileSystemCatalog explicitly. Without it MSBuild reads
+  # OctoPublishCatalog from the ENVIRONMENT — update-build-number exports
+  # PrivateGitHubCatalog on every branch — which force published into the main-lane
+  # catalog from non-main branches (AB#5413, builds 48061 and 48096). All three do below.
   #
   # Anti-regression note (2026-09-30): "System 2.3.0 is missing from
   # PrivateGitHubCatalog" was investigated and REFUTED. Builds 48269 and 48297 (both
@@ -127,17 +119,6 @@ stages:
           - checkout: self
             clean: true
           - template: templates/steps/set-version.yml@pipelineTemplates
-          # CK SemVer honesty gate (AB#4420): CK models are published DURING
-          # 'Build src' (/p:OctoPublishCatalog), so the gate must fail first.
-          # Paths in dependency order (System before StreamData). Note: this
-          # validates with the latest RELEASED octo-ckc from the feed — brand-new
-          # schema features introduced in this repo may need a toolVersion pin
-          # until released.
-          - template: templates/steps/validate-ck-versions.yml@pipelineTemplates
-            parameters:
-              constructionKitPaths:
-                - 'src/SystemCkModel/ConstructionKit'
-                - 'src/StreamDataCkModel/ConstructionKit'
           # This repo builds interdependent CK models in the same run (StreamData ->
           # System, Test/TestIdentity -> System). The glob compiles them alphabetically,
           # so a dependent (e.g. StreamData) compiles before its dependency (System) is
@@ -154,7 +135,7 @@ stages:
               projects: |
                 src/**/*.csproj
                 !src/**/Generated*.csproj
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)" /p:OctoLocalCatalogIsEnabled=true /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog=LocalFileSystemCatalog /p:OctoLocalCatalogIsEnabled=true /p:OctoPrivateGitHubApiKey=$(GitHubPAT) /p:OctoPublicGitHubApiKey=$(GitHubPAT)'
           - task: DotNetCoreCLI@2
             retryCountOnTaskFailure: 2
             displayName: 'Build samples'
@@ -164,7 +145,7 @@ stages:
               # Pinned for the same reason as the Test step below (AB#5413). No sample
               # owns a CK model today, so this changes nothing now — it keeps a future
               # one from reintroducing the leak silently.
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog=LocalFileSystemCatalog'
           # 🔴 /p:OctoPublishCatalog is NOT optional here, even though this step only
           # runs tests (AB#5413). This repo cannot consume its own MsBuildTasks
           # package, so it bootstraps through its own Directory.Build.targets, which
@@ -172,22 +153,18 @@ stages:
           # build of a CK-model project — and the test projects reference those. With
           # no /p: switch, MSBuild picks OctoPublishCatalog up from the ENVIRONMENT:
           # the agent exports every pipeline variable, and update-build-number emits
-          # OctoPublishCatalog = PrivateGitHubCatalog on every branch (it is the
-          # "where would a publish go" value, gated by effectivePublishCatalog).
-          # On main and on r-tags the two values are identical, so pinning changes
-          # nothing there. It matters on every OTHER branch this pipeline triggers on
-          # (dev/*, test/* without a lane opt-in): effectivePublishCatalog is
-          # LocalFileSystemCatalog while the exported OctoPublishCatalog still says
-          # PrivateGitHubCatalog, so an unpinned step force published System,
-          # System.TestIdentity and Test straight into the MAIN-lane catalog
-          # construction-kit-libraries-build. Observed twice on 2026-09-29 from the
-          # 0.2-dev lane (builds 48061 and 48096), proven by "Publishing construction
-          # kit library .../SystemCkModel/out/ck-system-2.yaml to catalog
-          # PrivateGitHubCatalog" inside the step that starts as `Starting: Test`.
-          # No damage yet only because the versions were content-identical, so the
-          # writes produced zero-diff commits; a branch change without a version bump
+          # OctoPublishCatalog = PrivateGitHubCatalog on every branch. An unpinned step
+          # therefore force published System, System.TestIdentity and Test straight
+          # into the MAIN-lane catalog construction-kit-libraries-build from non-main
+          # branches. Observed twice on 2026-09-29 from the 0.2-dev lane (builds 48061
+          # and 48096), proven by "Publishing construction kit library
+          # .../SystemCkModel/out/ck-system-2.yaml to catalog PrivateGitHubCatalog"
+          # inside the step that starts as `Starting: Test`. No damage only because the
+          # versions were content-identical; a branch change without a version bump
           # would have overwritten main's model in place, and ImportCkModelAsync
           # short-circuits on equal versions, so no tenant would ever see a correction.
+          # Pinned to LocalFileSystemCatalog on every branch: the shared CK step below
+          # is the only publisher to the shared catalogs.
           #
           # Note this is specific to THIS repo's Exec-based publish. The packaged
           # targets used everywhere else do not re-enter the publish path in a test
@@ -198,11 +175,36 @@ stages:
             displayName: 'Test'
             inputs:
               command: 'test'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog=LocalFileSystemCatalog'
               projects: |
                 **/*Tests.csproj
                 !**/*SystemTests.csproj
               testRunTitle: 'CI'
+          # CK SemVer and schema gate (AB#4420), and since tpl-v0.7.0 also the publish
+          # of System, System.StreamData and the test models System.TestIdentity and
+          # Test (AB#5121) — the test models were published from the build before and
+          # sit in both catalogs, so they keep being published: main -> private
+          # catalog, r* tags -> private AND public, never replacing a published
+          # version. Paths in dependency order (System first; StreamData and both test
+          # models depend only on it); ValidateVersion seeds the step's local catalog,
+          # so they resolve a System bumped in the same commit. It runs after Test so a run whose build or tests fail never leaves
+          # a version in a shared catalog — a published version cannot be withdrawn —
+          # and before the image, the docs and the NuGet push.
+          #
+          # ⚠️ The step compiles and publishes with octo-ckc from the private feed,
+          # derived from the branch line (the highest 0.1.* on main) — i.e. the tool
+          # of this repo's PREVIOUS build, not the one this run builds. A commit that
+          # adds a schema feature to the compiler and uses it in System at the same
+          # time cannot pass; split it into two commits, compiler first, model second.
+          # A toolVersion pin does not help, the tool is not on the feed yet
+          # (AB#5459 tracks lifting this).
+          - template: templates/steps/validate-ck-versions.yml@pipelineTemplates
+            parameters:
+              constructionKitPaths:
+                - 'src/SystemCkModel/ConstructionKit'
+                - 'src/StreamDataCkModel/ConstructionKit'
+                - 'tests/TestCkModel/ConstructionKit'
+                - 'tests/TestCkModel/CkTest/ConstructionKit'
           # Multi-arch image (AB#4451): arm64 for Apple-Silicon kind clusters and
           # edge devices, amd64 for the managed clusters.
           - template: templates/steps/build-and-push-docker.yml@pipelineTemplates

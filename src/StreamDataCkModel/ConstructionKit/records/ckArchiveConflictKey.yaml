@@ -1,7 +1,7 @@
 $schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
 records:
   - recordId: CkArchiveConflictKey
-    description: "One key of an archive's conflict precedence. The keys are compared in declaration order, lexicographically: the first key decides, and a later key only breaks a tie in every key before it. That ordering is what makes the outcome independent of the order writes arrive in — the surviving value is the maximum of a total order over the competing writes, which is the same whichever one is written first. Two writes that are equal in every key are not ordered: the row stored first stays, so the keys have to tell apart every pair of writes that can carry different values. Name a column of this archive; Order says which direction of it counts as better."
+    description: "One key of an archive's conflict precedence. The keys are compared in declaration order, lexicographically: the first key decides, and a later key only breaks a tie in every key before it. That ordering is what makes the outcome independent of the order writes arrive in — the surviving value is the maximum of a total order over the competing writes, which is the same whichever one is written first. Two writes that are equal in every key are not ordered by them: the later write replaces the stored row, so the keys have to tell apart every pair of writes that can carry different values. Name a column of this archive; Order says which direction of it counts as better."
     attributes:
       - id: ${this}/CkArchiveConflictKey.Column
         name: Column

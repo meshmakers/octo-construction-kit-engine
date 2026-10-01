@@ -86,9 +86,10 @@ public sealed record ArchiveSnapshot(
     /// sorting the producer.
     /// <para>
     /// The guarantee covers writes the keys tell apart. Two writes that are equal in every key are
-    /// not ordered: the incoming row replaces the stored one only when it ranks strictly better, so
-    /// the row stored first stays. Declare enough keys to distinguish every pair of writes that can
-    /// carry different values.
+    /// not ordered by them: the last key admits equality, so the later write replaces the stored
+    /// row. That keeps an identical re-delivery an idempotent upsert and lets rows without keys
+    /// behave as they did before the archive opted in. Declare enough keys to distinguish every
+    /// pair of writes that can carry different values.
     /// </para>
     /// <para>
     /// A stored row whose key is null is always replaceable (rows written before the archive opted in

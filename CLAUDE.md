@@ -542,8 +542,8 @@ for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
 This repo's CK models (`System`, `System.StreamData`, and the test models `Test` /
 `System.TestIdentity`) have two publishers in CI, and they never share a catalog:
 
-- **The shared `validate-ck-versions` step** (`meshmakers/octo-pipeline-templates`, pinned
-  here at `tpl-v0.7.0`) is the only publisher to the shared catalogs, for all four models —
+- **The shared `validate-and-publish-ck-versions` step** (`meshmakers/octo-pipeline-templates`, pinned
+  here at `tpl-v1.0.0`) is the only publisher to the shared catalogs, for all four models —
   the test models included, since they were published from the build before and sit in both
   catalogs. It runs after the tests, gates version and schema, and publishes to
   the catalogs `update-build-number.yml` routes the channel to (`OctoPublishCkCatalogs`).

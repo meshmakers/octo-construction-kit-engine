@@ -37,7 +37,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v0.7.0
+      ref: refs/tags/tpl-v1.0.0
 
 trigger:
   batch: true
@@ -68,7 +68,7 @@ variables:
   # Publish routing for this repo's CK models (System, System.StreamData, and the test
   # models Test / System.TestIdentity). Two publishers, never the same catalog:
   #
-  #   Shared validate-ck-versions step (after Test) — the ONLY publisher to the shared
+  #   Shared validate-and-publish-ck-versions step (after Test) — the ONLY publisher to the shared
   #   catalogs, for all four models. Routing comes from update-build-number
   #   (OctoPublishCkCatalogs): refs/heads/main -> PrivateGitHubCatalog
   #   (meshmakers/construction-kit-libraries-build); refs/tags/r<X.Y.Z> -> private AND
@@ -174,7 +174,7 @@ stages:
                 **/*Tests.csproj
                 !**/*SystemTests.csproj
               testRunTitle: 'CI'
-          # CK SemVer and schema gate (AB#4420), and since tpl-v0.7.0 also the publish
+          # CK SemVer and schema gate (AB#4420), and since tpl-v1.0.0 also the publish
           # of System, System.StreamData and the test models System.TestIdentity and
           # Test (AB#5121) — the test models were published from the build before and
           # sit in both catalogs, so they keep being published: main -> private
@@ -192,7 +192,7 @@ stages:
           # time cannot pass; split it into two commits, compiler first, model second.
           # A toolVersion pin does not help, the tool is not on the feed yet
           # (AB#5459 tracks lifting this).
-          - template: templates/steps/validate-ck-versions.yml@pipelineTemplates
+          - template: templates/steps/validate-and-publish-ck-versions.yml@pipelineTemplates
             parameters:
               constructionKitPaths:
                 - 'src/SystemCkModel/ConstructionKit'

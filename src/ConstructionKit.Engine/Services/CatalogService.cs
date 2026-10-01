@@ -2,6 +2,7 @@ using Meshmakers.Common.Shared;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelRepositories;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -96,17 +97,39 @@ internal class CatalogService : ICatalogService
         return _catalogManager.GetCatalogList(sourceIdentifier);
     }
 
-    public async Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel,
+    /// <inheritdoc />
+    public Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel,
         OriginFileResolver originFileResolver, bool isForced,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        OperationResult operationResult = new();
+        return PublishAsync(catalogName, ckCompiledModel, originFileResolver, isForced, new OperationResult(),
+            sourceIdentifier, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel,
+        OriginFileResolver originFileResolver, bool isForced, OperationResult operationResult,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        // Only the messages produced by THIS resolve decide whether the publish may proceed: the caller
+        // may hand in a result that already carries messages from an earlier step, and attributing those
+        // to the publish would both misreport the cause and change which step is blamed.
+        var messageCountBeforeResolve = operationResult.Messages.Count;
         await _catalogModelResolver.HardResolveAsync(ckCompiledModel, originFileResolver, operationResult)
             .ConfigureAwait(false);
-        if (operationResult.HasErrors)
+        var resolveMessages = operationResult.Messages.Skip(messageCountBeforeResolve).ToList();
+
+        // AB#5453: a resolve that collects errors instead of throwing (unknown type/record/attribute
+        // reference, duplicate id, broken display rule, circular dependency, ...) used to return here
+        // quietly. The caller then logged "published" for a model that never reached the catalog and
+        // exited 0, which let the catalogs release train record a model as published that is not there.
+        // The dependency half of the same resolve has always thrown (ModelValidationException.UnknownCkModels);
+        // this makes the remaining half just as loud.
+        if (resolveMessages.Exists(x =>
+                x.MessageLevel is MessageLevel.Error or MessageLevel.FatalError))
         {
-            operationResult.WriteMessagesToLogger(_logger);
-            return;
+            throw CompilerException.PublishFailedWithErrors(catalogName, ckCompiledModel.ModelId, resolveMessages,
+                operationResult);
         }
 
         await _catalogManager

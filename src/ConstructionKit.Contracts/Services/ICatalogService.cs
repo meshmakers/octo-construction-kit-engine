@@ -106,7 +106,10 @@ public interface ICatalogService
     IEnumerable<Tuple<string, string>> GetCatalogList(object? sourceIdentifier = null);
 
     /// <summary>
-    ///     Publishes a model to a catalog
+    ///     Publishes a model to a catalog. The model is hard-resolved first; when the resolve reports
+    ///     errors the model is NOT written to the catalog and a <see cref="CompilerException" /> is
+    ///     thrown (AB#5453 — this used to return quietly, so callers logged success for a model that
+    ///     never reached the catalog).
     /// </summary>
     /// <param name="catalogName">Name of catalog.</param>
     /// <param name="ckCompiledModel">Deserialized construction kit model.</param>
@@ -116,9 +119,32 @@ public interface ICatalogService
     /// that describes the source
     /// which the catalog should search set it to null to use default</param>
     /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <exception cref="CompilerException">The model could not be resolved and was not published.</exception>
     /// <returns></returns>
     Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, OriginFileResolver originFileResolver,
         bool isForced, object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    ///     Publishes a model to a catalog and collects the resolve messages in the caller's
+    ///     <paramref name="operationResult" />. Use this overload from hosts that render an
+    ///     <see cref="OperationResult" /> themselves (the MSBuild tasks do: their
+    ///     <see cref="Microsoft.Extensions.Logging.ILogger" /> providers are cleared, so messages that
+    ///     only reach the logger are lost). Behaves exactly like the other overload otherwise.
+    /// </summary>
+    /// <param name="catalogName">Name of catalog.</param>
+    /// <param name="ckCompiledModel">Deserialized construction kit model.</param>
+    /// <param name="originFileResolver">Origin file resolver</param>
+    /// <param name="isForced">When true, existing construction kit models are replaced.</param>
+    /// <param name="operationResult">Receives the messages produced while resolving the model.</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <exception cref="CompilerException">The model could not be resolved and was not published.</exception>
+    /// <returns></returns>
+    Task PublishAsync(string catalogName, CkCompiledModelRoot ckCompiledModel, OriginFileResolver originFileResolver,
+        bool isForced, OperationResult operationResult, object? sourceIdentifier = null,
+        CancellationToken? cancellationToken = null);
 
     /// <summary>
     ///     Returns true if the model exists in a given catalog

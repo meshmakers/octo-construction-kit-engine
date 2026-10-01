@@ -45,9 +45,13 @@ internal class GetCommand : Command<OctoToolOptions>
 
         if (operationResult.HasErrors || operationResult.HasFatalErrors)
         {
+            // AB#5453 (same failure mode as Publish): returning here left the exit code at 0.
+            // The 'model not found' case below stays a warning with exit code 0 — that is an answer,
+            // not a failure.
             Logger.LogError("Error looking up model configuration '{CkModelId}' in repository '{Repository}'", ckModelId, repositoryName);
-            operationResult.WriteMessagesToLogger(Logger);
-            return;
+            throw new CompilerException(
+                $"Construction kit model '{ckModelId}' could not be read from repository '{repositoryName}'.",
+                operationResult);
         }
 
         if (result == null)

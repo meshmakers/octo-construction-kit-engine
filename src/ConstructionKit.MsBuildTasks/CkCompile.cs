@@ -271,8 +271,15 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     return;
                                 }
 
+                                // AB#5453: pass the task's own OperationResult. This task clears every
+                                // logging provider, so resolve messages that only reach the engine's
+                                // ILogger are lost; routed through the result they are rendered by the
+                                // finally-block's LogOperationResults as MSBuild errors, which is what
+                                // makes Execute() return false. PublishAsync additionally throws now, so
+                                // the "published" line below cannot be reached for a model that is not
+                                // in the catalog.
                                 await catalogService.PublishAsync(PublishCatalogName, ckCompiledModelRoot,
-                                    originFileResolver, true);
+                                    originFileResolver, true, operationResult);
                                 Log.LogMessage(MessageImportance.High,
                                     $"Construction kit model published to '{PublishCatalogName}'");
 
@@ -284,8 +291,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                     !string.Equals(PublishCatalogName, LocalFileSystemCatalog.Name,
                                         StringComparison.OrdinalIgnoreCase))
                                 {
+                                    // Deliberately handled exactly like the remote publish: a model that
+                                    // cannot be resolved must not enter ANY catalog. A silently missing
+                                    // local entry surfaces later as a confusing "unknown model" while a
+                                    // sibling project compiles, far from its cause.
                                     await catalogService.PublishAsync(LocalFileSystemCatalog.Name,
-                                        ckCompiledModelRoot, originFileResolver, true);
+                                        ckCompiledModelRoot, originFileResolver, true, operationResult);
                                     Log.LogMessage(MessageImportance.High,
                                         $"Construction kit model also published to '{LocalFileSystemCatalog.Name}'");
                                 }
@@ -346,13 +357,15 @@ public class CkCompile : Microsoft.Build.Utilities.Task
 
                         Log.LogMessage(MessageImportance.Normal, "Finished");
                     }
-                    catch (ModelValidationException)
+                    catch (ModelValidationException ex)
                     {
-                        // Left blank intentionally
+                        // The messages normally live in operationResult and are rendered by the finally
+                        // block below; swallowing the exception keeps the remaining folders going.
+                        ReportUnreportedFailure(operationResult, ex);
                     }
-                    catch (CompilerException)
+                    catch (CompilerException ex)
                     {
-                        // Left blank intentionally
+                        ReportUnreportedFailure(operationResult, ex);
                     }
                     finally
                     {
@@ -393,6 +406,23 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         }
 
         return !Log.HasLoggedErrors;
+    }
+
+    /// <summary>
+    ///     AB#5453 safety net: the two catch blocks above were empty on the assumption that the
+    ///     <see cref="OperationResult" /> always carries the reason, and <c>Execute</c> returns
+    ///     <c>!Log.HasLoggedErrors</c>. When that assumption does not hold the build went green on a
+    ///     failed step. Log an error exactly when nothing else will, so the build fails either way
+    ///     without double-reporting what <see cref="LogOperationResults" /> already prints.
+    /// </summary>
+    private void ReportUnreportedFailure(OperationResult operationResult, Exception exception)
+    {
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
+        {
+            return;
+        }
+
+        Log.LogError("Construction kit step failed: {0}", exception.Message);
     }
 
     private void LogOperationResults(OperationResult operationResult)

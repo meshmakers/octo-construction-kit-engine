@@ -1,0 +1,13 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: CkConflictKeyOrder
+    useFlags: false
+    isExtensible: false
+    description: "Which direction of a conflict-precedence key counts as better, i.e. which of two competing values for the same archive row is allowed to survive. Needed because 'better' is domain-specific and not always 'larger': a document timestamp orders by recency (higher wins), while a quality or priority code is usually numbered best-first (lower wins, e.g. an OBIS data quality where 1 = measured and 3 = estimated)."
+    values:
+      - key: 0
+        name: HigherWins
+        description: "The greater value is the better one. Use for timestamps, sequence numbers and versions, where later or higher supersedes earlier."
+      - key: 1
+        name: LowerWins
+        description: "The smaller value is the better one. Use for rank-like codes numbered best-first, where a lower code must never be displaced by a higher one."

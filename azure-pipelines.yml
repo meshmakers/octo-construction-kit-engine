@@ -1,11 +1,5 @@
 # Root-level CI pipeline using shared templates from octo-pipeline-templates.
 #
-# Phase 1 pilot 2 of the YAML migration (see octo-mesh-deployment's
-# docs/pipeline-architecture-concept.md). The first pilot (DEH, PR #10/#11)
-# proved out the L1 templates for a Lib without Docker; this one adds the
-# consolidated build-and-push-docker template (tpl-v0.2.0) so the rest of the
-# Lib + Adapter migrations don't have to invent it again.
-#
 # scripts/createDocumentation.ps1 was moved here from devops-build/ when the
 # legacy folder was deleted in the cleanup PR.
 

@@ -85,6 +85,12 @@ public sealed record ArchiveSnapshot(
     /// stops mattering rather than merely being satisfied, which is the difference between this and
     /// sorting the producer.
     /// <para>
+    /// The guarantee covers writes the keys tell apart. Two writes that are equal in every key are
+    /// not ordered: the incoming row replaces the stored one only when it ranks strictly better, so
+    /// the row stored first stays. Declare enough keys to distinguish every pair of writes that can
+    /// carry different values.
+    /// </para>
+    /// <para>
     /// A stored row whose key is null is always replaceable (rows written before the archive opted in
     /// carry none); an incoming null key never displaces a stored non-null one.
     /// </para>

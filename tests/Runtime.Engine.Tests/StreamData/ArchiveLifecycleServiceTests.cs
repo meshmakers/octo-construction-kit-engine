@@ -79,6 +79,24 @@ public class ArchiveLifecycleServiceTests
     }
 
     [Fact]
+    public async Task Activate_AlreadyActivated_ReconciliationFails_ThrowsButKeepsTheArchiveActivated()
+    {
+        // The table an activated archive writes to is untouched when adding a declared column
+        // fails. Flipping the archive to Failed would stop every write to it over an error that
+        // may well be transient.
+        Stub(CkArchiveStatus.Activated);
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<ArchiveSnapshot>.That.Matches(s => s.RtId == Rt)))
+            .Throws(new InvalidOperationException("crate boom"));
+
+        await Assert.ThrowsAsync<ArchiveActivationFailedException>(() => NewSut().ActivateAsync(Rt));
+
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordTransitionAsync(
+                A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._, A<CkArchiveStatus>._, A<string>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
     public async Task Activate_DdlFails_FlipsToFailedAndThrowsActivationFailedException()
     {
         Stub(CkArchiveStatus.Created);

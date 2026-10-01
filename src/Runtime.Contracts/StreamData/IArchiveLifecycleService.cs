@@ -13,7 +13,11 @@ namespace Meshmakers.Octo.Runtime.Contracts.StreamData;
 /// Transition rules (see streamdata-archive-concept §3, §11):
 /// <list type="bullet">
 ///   <item><c>Created → Activated</c>: provision Crate table; on DDL failure transition to <c>Failed</c>.</item>
-///   <item><c>Activated ↔ Disabled</c>: status only, no Crate side-effect.</item>
+///   <item><c>Activated → Disabled</c>: status only, no Crate side-effect. <c>Disabled → Activated</c> runs the
+///   idempotent provisioning again.</item>
+///   <item><c>Activated → Activated</c>: no transition; the idempotent provisioning runs again so that a
+///   column declared after the table was created is added to it. A failure is thrown to the caller and
+///   leaves the archive <c>Activated</c>.</item>
 ///   <item><c>Failed → Activated</c>: retry DDL; idempotent.</item>
 ///   <item>Delete from any state: drop the Crate table and soft-delete the entity (rtState = Archived).</item>
 /// </list>
@@ -25,7 +29,10 @@ public interface IArchiveLifecycleService
     /// <summary>
     /// Activates the archive: provisions the Crate table and sets <c>status = Activated</c>.
     /// Allowed from <c>Created</c>, <c>Disabled</c>, and <c>Failed</c>. Re-validates all column
-    /// paths against the current CK model before any DDL runs.
+    /// paths against the current CK model before any DDL runs. On an archive that is already
+    /// <c>Activated</c> it changes no status and adds the declared columns the table does not have yet;
+    /// if that fails, <see cref="ArchiveActivationFailedException"/> is thrown and the archive stays
+    /// <c>Activated</c>.
     /// </summary>
     Task ActivateAsync(OctoObjectId archiveRtId);
 

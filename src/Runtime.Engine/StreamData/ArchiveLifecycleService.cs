@@ -93,7 +93,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
                 // adopt such a change was to drop the table, which for a populated archive means
                 // losing its history. Provisioning is idempotent by contract (CREATE TABLE IF NOT
                 // EXISTS plus an add-only column reconciliation), so running it costs one
-                // information_schema query when there is nothing to do.
+                // information_schema query when there is nothing to do. A failure here surfaces
+                // to the caller but leaves the archive Activated (see EnsureCrateProvisionedAsync).
                 await EnsureCrateProvisionedAsync(snapshot);
                 return;
             case CkArchiveStatus.Created:
@@ -532,6 +533,15 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             _logger.LogError(ex,
                 "Failed to provision Crate table for archive {ArchiveRtId} (was {FromStatus})",
                 snapshot.RtId, snapshot.Status);
+
+            // An archive that is already Activated keeps its status: the table it writes to exists
+            // and is unchanged, only the reconciliation of a newly declared column failed. Flipping
+            // it to Failed would turn a transient catalogue or DDL error into an outage, because a
+            // non-activated archive refuses every write. The caller still gets the exception.
+            if (snapshot.Status == CkArchiveStatus.Activated)
+            {
+                throw new ArchiveActivationFailedException(snapshot.RtId, ex);
+            }
 
             // Best-effort flip to Failed so the studio reflects reality. If this also fails the
             // outer exception still surfaces; the next reconciliation pass (T23) closes the loop.

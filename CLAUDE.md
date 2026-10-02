@@ -565,9 +565,12 @@ Resulting truth table:
 
 **Therefore every MSBuild step that can reach `CkCompile` passes
 `/p:OctoPublishCatalog=LocalFileSystemCatalog` explicitly** — `Build src`, `Build samples`
-and `Test` all do. Omitting it on any one of them lets MSBuild read `OctoPublishCatalog`
-from the environment: `update-build-number` exports `PrivateGitHubCatalog` on *every*
-branch, so a non-main build would force-publish into the main-lane catalog (AB#5413).
+and `Test` all do. `Directory.Build.props` defaults to that catalog only when the
+property is empty, and MSBuild also reads `OctoPublishCatalog` from the environment:
+`update-build-number` exported `PrivateGitHubCatalog` on *every* branch before
+`tpl-v1.0.0`, so a non-main build force-published into the main-lane catalog (AB#5413).
+The export is gone; the explicit switch keeps any environment value from redirecting the
+publish again.
 
 **The shared step compiles with the previous build's `octo-ckc`.** It installs the tool
 from the private feed, derived from the branch line (the highest `0.1.*` on main) — the

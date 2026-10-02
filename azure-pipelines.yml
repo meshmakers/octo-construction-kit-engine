@@ -83,10 +83,13 @@ variables:
   #   lets StreamData and the test models resolve System within the same run.
   #
   # THEREFORE: every MSBuild step that can reach CkCompile passes
-  # /p:OctoPublishCatalog=LocalFileSystemCatalog explicitly. Without it MSBuild reads
-  # OctoPublishCatalog from the ENVIRONMENT — update-build-number exports
-  # PrivateGitHubCatalog on every branch — which force published into the main-lane
-  # catalog from non-main branches (AB#5413, builds 48061 and 48096). All three do below.
+  # /p:OctoPublishCatalog=LocalFileSystemCatalog explicitly. Directory.Build.props
+  # defaults to that catalog, but only when the property is empty, and MSBuild also
+  # reads it from the ENVIRONMENT. update-build-number exported PrivateGitHubCatalog
+  # on every branch before tpl-v1.0.0, which force published into the main-lane
+  # catalog from non-main branches (AB#5413, builds 48061 and 48096). The export is
+  # gone, and the explicit switch keeps any environment value from redirecting the
+  # publish again. All three do below.
   #
   # Anti-regression note (2026-09-30): "System 2.3.0 is missing from
   # PrivateGitHubCatalog" was investigated and REFUTED. Builds 48269 and 48297 (both
@@ -140,15 +143,16 @@ stages:
               # owns a CK model today, so this changes nothing now — it keeps a future
               # one from reintroducing the leak silently.
               arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog=LocalFileSystemCatalog'
-          # 🔴 /p:OctoPublishCatalog is NOT optional here, even though this step only
-          # runs tests (AB#5413). This repo cannot consume its own MsBuildTasks
-          # package, so it bootstraps through its own Directory.Build.targets, which
-          # publishes with `octo-ckc -c publish -c $(OctoPublishCatalog) -r` on every
-          # build of a CK-model project — and the test projects reference those. With
-          # no /p: switch, MSBuild picks OctoPublishCatalog up from the ENVIRONMENT:
-          # the agent exports every pipeline variable, and update-build-number emits
-          # OctoPublishCatalog = PrivateGitHubCatalog on every branch. An unpinned step
-          # therefore force published System, System.TestIdentity and Test straight
+          # 🔴 Keep /p:OctoPublishCatalog here, even though this step only runs tests
+          # (AB#5413). This repo cannot consume its own MsBuildTasks package, so it
+          # bootstraps through its own Directory.Build.targets, which publishes with
+          # `octo-ckc -c publish -c $(OctoPublishCatalog) -r` on every build of a
+          # CK-model project — and the test projects reference those. With no /p:
+          # switch, MSBuild picks OctoPublishCatalog up from the ENVIRONMENT: the agent
+          # exports every pipeline variable, and update-build-number emitted
+          # OctoPublishCatalog = PrivateGitHubCatalog on every branch before
+          # tpl-v1.0.0. An unpinned step therefore force published System,
+          # System.TestIdentity and Test straight
           # into the MAIN-lane catalog construction-kit-libraries-build from non-main
           # branches. Observed twice on 2026-09-29 from the 0.2-dev lane (builds 48061
           # and 48096), proven by "Publishing construction kit library

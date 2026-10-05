@@ -6,6 +6,8 @@ using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
+using Meshmakers.Octo.Runtime.Engine.Messages;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
@@ -15,11 +17,15 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 internal class BulkRtMutation(
     IEntityRuleEngine entityRuleEngine,
     IGraphRuleEngine graphRuleEngine,
-    IEnumerable<IPreDocumentModification<RtEntity>> preDocumentModifications)
+    IEnumerable<IPreDocumentModification<RtEntity>> preDocumentModifications,
+    ISecretWriteNormalizer secretWriteNormalizer)
     : IBulkRtMutation
 {
     private readonly List<IPreDocumentModification<RtEntity>> _preDocumentModifications =
         preDocumentModifications.ToList();
+
+    /// <inheritdoc />
+    public ISecretWriteNormalizer SecretWriteNormalizer => secretWriteNormalizer;
 
     /// <inheritdoc />
     public async Task ApplyChangesAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
@@ -122,6 +128,11 @@ internal class BulkRtMutation(
             var ckTypeId = rtEntityGrouping.Key;
 
             var ckTypeGraph = ckCacheService.GetRtCkType(repositoryDataSource.TenantId, ckTypeId);
+
+            // AB#5532: Secret write rules before anything is written (see ApplySecretWriteRules).
+            ApplySecretWriteRules(repositoryDataSource.TenantId, ckCacheService, ckTypeGraph, rtEntityGrouping.ToList(),
+                SecretWriteOperation.Insert, null);
+
             await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntityGrouping.ToList())
                 .ConfigureAwait(false);
 
@@ -196,6 +207,19 @@ internal class BulkRtMutation(
         }
 
         var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
+
+        // AB#5532: Secret write rules. An update only needs the stored entities when it rewrites a
+        // record attribute containing secrets (carry-over by record key).
+        if (secretWriteNormalizer.HasSecretAttributes(ckCacheService, repositoryDataSource.TenantId, ckTypeGraph))
+        {
+            var needStored = rtEntities.Where(e => secretWriteNormalizer.NeedsStoredEntity(ckCacheService,
+                repositoryDataSource.TenantId, ckTypeGraph, e, SecretWriteOperation.Update)).ToList();
+            var storedById = needStored.Count == 0
+                ? new Dictionary<OctoObjectId, RtEntity>()
+                : await ReadStoredEntitiesAsync(session, collection, needStored).ConfigureAwait(false);
+            ApplySecretWriteRules(repositoryDataSource.TenantId, ckCacheService, ckTypeGraph, rtEntities,
+                SecretWriteOperation.Update, storedById);
+        }
 
         foreach (var ckTypeAttributeGraph in ckTypeGraph.AllAttributes.Values.Where(a =>
                      a.ValueType == AttributeValueTypesDto.BinaryLinked))
@@ -319,15 +343,25 @@ internal class BulkRtMutation(
             keyValuePair.Value.RtId = keyValuePair.Key.RtId;
             keyValuePair.Value.CkTypeId = keyValuePair.Key.CkTypeId;
             keyValuePair.Value.RtChangedDateTime = DateTime.UtcNow;
+        }
 
+        var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
+
+        // One read of the stored documents serves both the creator preservation and the Secret
+        // carry-over (AB#5532). The Secret rules run BEFORE anything is deleted or written: a replace
+        // that would leave a required secret without a value is rejected without side effects.
+        var storedById = await ReadStoredEntitiesAsync(session, collection, rtEntities).ConfigureAwait(false);
+        ApplySecretWriteRules(repositoryDataSource.TenantId, ckCacheService, ckTypeGraph, rtEntities,
+            SecretWriteOperation.Replace, storedById);
+
+        foreach (var keyValuePair in rtEntityGrouping)
+        {
             // We need to delete the binary data from the file system if it is a linked binary
             await HandleDeleteLinkedBinary(session, repositoryDataSource, ckTypeGraph, keyValuePair.Key)
                 .ConfigureAwait(false);
         }
 
-        var rtEntities = rtEntityGrouping.Select(x => x.Value).ToList();
-
-        await PreserveCreatedByForReplacesAsync(session, collection, rtEntities).ConfigureAwait(false);
+        PreserveCreatedByForReplaces(session, storedById, rtEntities);
 
         // Upload the new linked binary data
         await HandleUploadLinkedBinary(session, repositoryDataSource, ckTypeGraph, rtEntities).ConfigureAwait(false);
@@ -349,20 +383,15 @@ internal class BulkRtMutation(
     ///     would erase the stored creator. The stored value always wins; a replace that creates a new document
     ///     stamps like an insert.
     /// </summary>
-    private static async Task PreserveCreatedByForReplacesAsync(IOctoSession session,
-        IDataSourceCollection<OctoObjectId, RtEntity> collection, IReadOnlyList<RtEntity> rtEntities)
+    private static void PreserveCreatedByForReplaces(IOctoSession session,
+        IReadOnlyDictionary<OctoObjectId, RtEntity> storedById, IReadOnlyList<RtEntity> rtEntities)
     {
-        var rtIds = rtEntities.Select(e => e.RtId).ToList();
-        var storedEntities = await collection.FindManyAsync(session, f => rtIds.Contains(f.RtId))
-            .ConfigureAwait(false);
-        var storedCreatedBy = storedEntities.ToDictionary(e => e.RtId, e => e.RtCreatedBy);
-
         var securityContext = session.GetSecurityContext();
         foreach (var rtEntity in rtEntities)
         {
-            if (storedCreatedBy.TryGetValue(rtEntity.RtId, out var createdBy))
+            if (storedById.TryGetValue(rtEntity.RtId, out var stored))
             {
-                rtEntity.RtCreatedBy = createdBy;
+                rtEntity.RtCreatedBy = stored.RtCreatedBy;
             }
             else if (!securityContext.IsSystem)
             {
@@ -463,11 +492,60 @@ internal class BulkRtMutation(
             .ConfigureAwait(false);
     }
 
-    // TODO AB#5532 (SECRET write path, concept §3.6): insert, replace and update-by-type must run
-    // every Secret attribute (and Secret record sub-attribute, keyed by CkRecordGraph.RecordKey)
-    // through the secret write step next to the linked-binary handling below: RtSecretValue.Pending
-    // non-empty -> ISecretAttributeProtector.Protect; "" -> keep the stored value; placeholder
-    // (SecretAttributeConventions.IsPlaceholder) -> null; Protected -> pass through; null -> clear.
+    #region Secret attributes
+
+    /// <summary>
+    ///     Reads the stored documents of the given entities once (by rtId).
+    /// </summary>
+    private static async Task<Dictionary<OctoObjectId, RtEntity>> ReadStoredEntitiesAsync(IOctoSession session,
+        IDataSourceCollection<OctoObjectId, RtEntity> collection, IReadOnlyList<RtEntity> rtEntities)
+    {
+        var rtIds = rtEntities.Select(e => e.RtId).ToList();
+        var storedEntities = await collection.FindManyAsync(session, f => rtIds.Contains(f.RtId))
+            .ConfigureAwait(false);
+        var storedById = new Dictionary<OctoObjectId, RtEntity>();
+        foreach (var stored in storedEntities)
+        {
+            storedById.TryAdd(stored.RtId, stored);
+        }
+
+        return storedById;
+    }
+
+    /// <summary>
+    ///     AB#5532 (concept §3.6, §4.6): runs every Secret attribute - and every Secret sub-attribute of a
+    ///     (nested) record - through the Secret write step, unconditionally, like the linked-binary
+    ///     handling. After it no plaintext is left in a Secret slot. A required secret that ends up
+    ///     without a value (e.g. a replace with nothing to carry over) rejects the whole batch; the
+    ///     message names the attribute, never the value.
+    /// </summary>
+    private void ApplySecretWriteRules(string tenantId, ICkCacheService ckCacheService, CkTypeGraph ckTypeGraph,
+        IReadOnlyList<RtEntity> rtEntities, SecretWriteOperation operation,
+        IReadOnlyDictionary<OctoObjectId, RtEntity>? storedById)
+    {
+        if (!secretWriteNormalizer.HasSecretAttributes(ckCacheService, tenantId, ckTypeGraph))
+        {
+            return;
+        }
+
+        var operationResult = new OperationResult();
+        foreach (var rtEntity in rtEntities)
+        {
+            RtEntity? stored = null;
+            storedById?.TryGetValue(rtEntity.RtId, out stored);
+            var result = secretWriteNormalizer.Normalize(ckCacheService, tenantId, ckTypeGraph, rtEntity, operation,
+                stored);
+            foreach (var attributePath in result.MissingRequiredAttributes)
+            {
+                operationResult.AddMessage(MessageCodes.MandatorySecretMissing(null, tenantId, attributePath,
+                    rtEntity.CkTypeId ?? ckTypeGraph.CkTypeId.ToRtCkId(), rtEntity.RtId));
+            }
+        }
+
+        RuntimeRepositoryException.ThrowIfOperationResultError(operationResult);
+    }
+
+    #endregion Secret attributes
 
     #region Linked Binary
 

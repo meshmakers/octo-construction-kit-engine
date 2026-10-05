@@ -64,7 +64,10 @@ public class RtEntityToTcDtoConverter(ICkCacheService ckCacheService) : IRtEntit
             // attribute that is itself excluded never gets here, so members only matter inside an
             // exported record; authors must give the members the same ownership as the record-valued
             // attribute that contains them, or a TenantOwned record exports with its members stripped.
-            if (ckTypeAttributeGraph.Ownership.IsExcludedFromExport())
+            // AB#5532: a Secret value is never exported - its ownership is always Secret (compiler
+            // rule); the value-type check also covers a stale cache.
+            if (ckTypeAttributeGraph.Ownership.IsExcludedFromExport() ||
+                ckTypeAttributeGraph.ValueType == AttributeValueTypesDto.Secret)
             {
                 continue;
             }

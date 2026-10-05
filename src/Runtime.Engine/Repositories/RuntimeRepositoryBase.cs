@@ -10,6 +10,7 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Meshmakers.Octo.Runtime.Engine.Security;
 using Microsoft.Extensions.Logging;
 
@@ -859,10 +860,10 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         foreach (var ckTypeAttributeDto in ckTypeGraph.AllAttributes.Values)
         {
             object? value = null;
-            // AB#5528: Secret attributes never take a default (the compiler forbids them).
-            // TODO AB#5532: CreateTransientRtEntity, BulkInsertRtEntitiesAsync,
-            // InsertOneRtEntityForMigrationAsync and RewriteAttributeValueForMigrationAsync bypass
-            // BulkRtMutation and must call the secret write step explicitly (concept §3.6).
+            // AB#5528/AB#5532: a transient entity never carries a Secret value - Secret attributes take
+            // no default (the compiler forbids them), so nothing reaches a Secret slot here and the
+            // write step has nothing to do. Values assigned later are normalised when the entity is
+            // written (BulkRtMutation, BulkInsertRtEntitiesAsync).
             if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any()
                 && ckTypeAttributeDto.ValueType != AttributeValueTypesDto.Secret)
             {
@@ -1082,8 +1083,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
             var ckTypeGraph = await GetCkTypeGraphAsync(groupedEntities.Key).ConfigureAwait(false);
 
+            // AB#5532: the bulk import bypasses BulkRtMutation, so it runs the Secret write step itself
+            // (insert semantics: "" and placeholders are not set, plaintext is encrypted, protected
+            // values - e.g. preserved by the import's upsert preservation - pass through). Required
+            // secrets are not enforced here: the import reports missing mandatory attributes itself
+            // (AB#4772, ImportRtModelCommand.FindMissingMandatoryAttributes).
+            var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+            var entities = groupedEntities.ToList();
+            if (BulkRtMutation.SecretWriteNormalizer.HasSecretAttributes(cacheService, TenantId, ckTypeGraph))
+            {
+                foreach (var entity in entities)
+                {
+                    BulkRtMutation.SecretWriteNormalizer.Normalize(cacheService, TenantId, ckTypeGraph, entity,
+                        SecretWriteOperation.Insert);
+                }
+            }
+
             results.Add(await RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph)
-                .BulkImportAsync(session, groupedEntities, options).ConfigureAwait(false));
+                .BulkImportAsync(session, entities, options).ConfigureAwait(false));
         }
 
         return new AggregatedBulkImportResult(results);

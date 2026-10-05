@@ -73,6 +73,10 @@ public static class ServiceCollectionExtensions
                     StringComparer.OrdinalIgnoreCase);
             });
         services.TryAddSingleton<ISecretAttributeProtector, SecretAttributeProtector>();
+        // Secret write step (AB#5532, concept §3.6) used by BulkRtMutation and the paths that bypass it,
+        // and the sweep service (verify / encrypt / reprotect / clear unknown kid / emergency decrypt).
+        services.TryAddSingleton<ISecretWriteNormalizer, SecretWriteNormalizer>();
+        services.TryAddTransient<ISecretMaintenanceService, SecretMaintenanceService>();
 
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();

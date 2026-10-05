@@ -324,6 +324,12 @@ public static class AttributeValueConverter
             string text => RtSecretValue.Pending(text),
             JsonElement { ValueKind: JsonValueKind.String } element => RtSecretValue.Pending(element.GetString() ?? string.Empty),
             JValue { Type: JTokenType.String } token => RtSecretValue.Pending((string?)token ?? string.Empty),
+            // AB#5532: the read marker {"isSet":...} (or any structured value) sent back on a write
+            // carries no secret - it means "unchanged", never the text of the object.
+            JsonElement { ValueKind: JsonValueKind.Object or JsonValueKind.Array } => RtSecretValue.Pending(string.Empty),
+            JContainer => RtSecretValue.Pending(string.Empty),
+            IDictionary => RtSecretValue.Pending(string.Empty),
+            IReadOnlyDictionary<string, object?> => RtSecretValue.Pending(string.Empty),
             _ => RtSecretValue.Pending(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
         };
     }

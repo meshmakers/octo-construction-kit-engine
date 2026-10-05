@@ -808,4 +808,16 @@ public abstract class RtTypeWithAttributes
     {
         _attributes[attributeName] = attributeValue;
     }
+
+    /// <summary>
+    ///     Removes an attribute from the attribute dictionary, so a write leaves the stored value
+    ///     unchanged (partial update) instead of overwriting it. Used by the Secret write step
+    ///     (AB#5532, concept §3.6: <c>""</c> means "unchanged").
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns>True when the attribute was present</returns>
+    internal bool RemoveAttribute(string attributeName)
+    {
+        return _attributes.Remove(attributeName);
+    }
 }

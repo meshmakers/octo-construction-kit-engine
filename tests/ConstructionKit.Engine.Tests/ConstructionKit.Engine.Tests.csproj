@@ -138,5 +138,12 @@
                           SetTargetFramework="TargetFramework=net10.0" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- AB#5532: unit tests of the source generator's attribute emitters. The generator project is a
+             netstandard2.0 Roslyn component whose bundled dependencies clash with this test project, so
+             the (dependency-free) emitter source is compiled in directly. -->
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\AttributeCodeGenerator.cs" Link="SourceGeneration\AttributeCodeGenerator.cs" />
+    </ItemGroup>
+
 
 </Project>

@@ -46,6 +46,12 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     public string? ActiveKeyId => _keyRing.Value.ActiveKeyId;
 
     /// <inheritdoc />
+    public bool IsKnownKeyId(string? keyId)
+    {
+        return keyId != null && _keyRing.Value.Keys.ContainsKey(keyId);
+    }
+
+    /// <inheritdoc />
     public RtSecretValue Protect(string plaintext)
     {
         ArgumentNullException.ThrowIfNull(plaintext);

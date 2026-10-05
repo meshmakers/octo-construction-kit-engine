@@ -35,14 +35,44 @@ public static class SecretAttributeConventions
     ];
 
     /// <summary>
-    ///     True when <paramref name="value" /> is a placeholder: a non-empty text enclosed in angle
-    ///     brackets such as <c>&lt;set-after-install&gt;</c> or <c>&lt;FINAPI_CLIENT_SECRET&gt;</c>.
-    ///     Blueprint seeds may only carry placeholders or empty values for Secret attributes
-    ///     (decision 9); the write path stores a placeholder as "not set" (concept §3.6).
+    ///     Prefix of the <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> placeholder form (see
+    ///     <see cref="IsTodoSetPlaceholder" />).
+    /// </summary>
+    public const string TodoSetPlaceholderPrefix = "TODO_SET_";
+
+    /// <summary>
+    ///     True when <paramref name="value" /> is a placeholder in one of the two accepted forms:
+    ///     <list type="bullet">
+    ///         <item>
+    ///             a non-empty text enclosed in exactly one pair of angle brackets such as
+    ///             <c>&lt;set-after-install&gt;</c> or <c>&lt;FINAPI_CLIENT_SECRET&gt;</c>
+    ///             (<see cref="IsAngleBracketPlaceholder" />);
+    ///         </item>
+    ///         <item>
+    ///             <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> such as <c>TODO_SET_CLIENT_SECRET</c>
+    ///             (<see cref="IsTodoSetPlaceholder" />) - the form the MeshmakersAccounting seed and
+    ///             its frontend already use (AB#5532).
+    ///         </item>
+    ///     </list>
+    ///     Leading and trailing whitespace is ignored. Blueprint seeds may only carry placeholders or
+    ///     empty values for Secret attributes (decision 9, the seed lint); the runtime write path stores
+    ///     a placeholder as "not set" (concept §3.6). Both use this one method.
     /// </summary>
     /// <param name="value">The value to check</param>
     /// <returns>True for a placeholder</returns>
     public static bool IsPlaceholder(string? value)
+    {
+        return IsAngleBracketPlaceholder(value) || IsTodoSetPlaceholder(value);
+    }
+
+    /// <summary>
+    ///     True when <paramref name="value" /> is a non-empty text enclosed in exactly one pair of angle
+    ///     brackets, e.g. <c>&lt;set-after-install&gt;</c>. <c>&lt;&gt;</c>, <c>&lt;a&gt;&lt;b&gt;</c> and
+    ///     <c>&lt;&lt;x&gt;&gt;</c> are not placeholders.
+    /// </summary>
+    /// <param name="value">The value to check</param>
+    /// <returns>True for an angle-bracket placeholder</returns>
+    public static bool IsAngleBracketPlaceholder(string? value)
     {
         if (value == null)
         {
@@ -66,6 +96,54 @@ public static class SecretAttributeConventions
         }
 
         return true;
+    }
+
+    /// <summary>
+    ///     True when <paramref name="value" /> is <c>TODO_SET_</c> followed by one or more
+    ///     upper-case snake-case words: <c>[A-Z0-9]+(_[A-Z0-9]+)*</c>, e.g. <c>TODO_SET_PASSWORD</c>
+    ///     or <c>TODO_SET_AZURE_TENANT_ID</c>. The bare prefix, lower-case letters, a trailing or
+    ///     doubled underscore and any other character make it a regular value.
+    /// </summary>
+    /// <param name="value">The value to check</param>
+    /// <returns>True for a <c>TODO_SET_</c> placeholder</returns>
+    public static bool IsTodoSetPlaceholder(string? value)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        if (trimmed.Length <= TodoSetPlaceholderPrefix.Length ||
+            !trimmed.StartsWith(TodoSetPlaceholderPrefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var previousWasUnderscore = true; // the prefix ends with '_'
+        for (var i = TodoSetPlaceholderPrefix.Length; i < trimmed.Length; i++)
+        {
+            var c = trimmed[i];
+            if (c == '_')
+            {
+                if (previousWasUnderscore)
+                {
+                    return false;
+                }
+
+                previousWasUnderscore = true;
+                continue;
+            }
+
+            if (!((c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')))
+            {
+                return false;
+            }
+
+            previousWasUnderscore = false;
+        }
+
+        return !previousWasUnderscore;
     }
 
     /// <summary>

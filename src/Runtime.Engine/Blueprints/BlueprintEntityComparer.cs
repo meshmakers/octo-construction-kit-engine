@@ -73,6 +73,14 @@ internal static class BlueprintEntityComparer
                 continue;
             }
 
+            if (attribute.ValueType == AttributeValueTypesDto.Secret)
+            {
+                // AB#5532: a Secret is never diffed - its ownership is always Secret (the compiler
+                // enforces it; this guard also covers a stale cache), the stored value is ciphertext
+                // and the seed only carries placeholders. The apply keeps the stored value.
+                continue;
+            }
+
             if (attribute.Ownership.IsPreservedOnUpsert())
             {
                 // The apply carries the stored value over (ImportRtModelCommand.PreserveAttributesForEntity);
@@ -128,11 +136,13 @@ internal static class BlueprintEntityComparer
                         continue;
                     }
 
+                    // AB#5532: Secret members of the record never leave the comparer - not as ciphertext
+                    // (stored side), not as a placeholder (seed side).
                     changes.Add(new BlueprintAttributeChange
                     {
                         AttributeName = attribute.AttributeName,
-                        OldValue = storedValue,
-                        NewValue = seedValue
+                        OldValue = RedactSecretMembers(storedValue, resolveRecord),
+                        NewValue = RedactSecretMembers(seedValue, resolveRecord)
                     });
                     continue;
                 }
@@ -487,6 +497,14 @@ internal static class BlueprintEntityComparer
             var member = graph?.AllAttributes.Values.FirstOrDefault(m =>
                 string.Equals(m.CkAttributeId.ToRtCkId().ToString(), key, StringComparison.Ordinal));
 
+            if (member?.ValueType == AttributeValueTypesDto.Secret)
+            {
+                // AB#5532: a Secret member is never compared - ciphertext against a seed placeholder
+                // would be a phantom change on every preview, and the write step keeps the stored
+                // secret of an element with the same record key anyway (carry-over, concept §4.6).
+                continue;
+            }
+
             if (member == null)
             {
                 if (!ValuesEqual(va, vb, null, resolveEnum, resolveRecord))
@@ -535,6 +553,46 @@ internal static class BlueprintEntityComparer
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// AB#5532: a copy of a record (array) transport value in which every Secret member value is
+    /// replaced by <see cref="RtSecretValue.Mask" /> (set) or <c>null</c> (not set), recursively. Without
+    /// a record resolver every member that is an <see cref="RtSecretValue" /> is masked, which still
+    /// keeps ciphertext out. Values that are not records are returned unchanged.
+    /// </summary>
+    internal static object? RedactSecretMembers(object? value, Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord)
+    {
+        switch (value)
+        {
+            case RtRecordTcDto record:
+            {
+                var graph = resolveRecord != null && record.CkRecordId != null ? resolveRecord(record.CkRecordId) : null;
+                var copy = new RtRecordTcDto { CkRecordId = record.CkRecordId! };
+                foreach (var attribute in record.Attributes)
+                {
+                    var member = graph?.AllAttributes.Values.FirstOrDefault(m =>
+                        string.Equals(m.CkAttributeId.ToRtCkId().ToString(), attribute.Id?.ToString(),
+                            StringComparison.Ordinal));
+                    var isSecret = member?.ValueType == AttributeValueTypesDto.Secret || attribute.Value is RtSecretValue;
+                    copy.Attributes.Add(new RtAttributeTcDto
+                    {
+                        Id = attribute.Id!,
+                        Value = isSecret
+                            ? attribute.Value == null ? null : RtSecretValue.Mask
+                            : RedactSecretMembers(attribute.Value, resolveRecord)
+                    });
+                }
+
+                return copy;
+            }
+            case string:
+                return value;
+            case System.Collections.IEnumerable items when value is not JsonElement:
+                return items.Cast<object?>().Select(item => RedactSecretMembers(item, resolveRecord)).ToList();
+            default:
+                return value;
+        }
     }
 
     private static bool SequencesEqual(System.Collections.IEnumerable a, System.Collections.IEnumerable b,

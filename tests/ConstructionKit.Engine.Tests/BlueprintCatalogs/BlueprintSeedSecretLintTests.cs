@@ -73,6 +73,8 @@ public class BlueprintSeedSecretLintTests : IDisposable
 
     [Theory]
     [InlineData("        value: '<SET_AFTER_INSTALL>'")]
+    [InlineData("        value: TODO_SET_PASSWORD")]
+    [InlineData("        value: 'TODO_SET_AZURE_TENANT_ID'")]
     [InlineData("        value: ''")]
     [InlineData("        value:")]
     [InlineData("        value: null")]
@@ -164,8 +166,51 @@ public class BlueprintSeedSecretLintTests : IDisposable
     [InlineData("<a><b>", false)]
     [InlineData("pass<word>", false)]
     [InlineData("Hunter2", false)]
+    [InlineData("TODO_SET_PASSWORD", true)]
+    [InlineData(" TODO_SET_CLIENT_SECRET ", true)]
+    [InlineData("TODO_SET_", false)]
+    [InlineData("TODO_SET_password", false)]
     public void AllowedSeedValues(string? value, bool allowed)
     {
         Assert.Equal(allowed, SecretAttributeConventions.IsAllowedSeedValue(value));
+    }
+
+    /// <summary>
+    ///     AB#5532: both placeholder forms - <c>&lt;...&gt;</c> and <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c>
+    ///     (MeshmakersAccounting seed) - are recognised by the one method the seed lint and the runtime
+    ///     write path share.
+    /// </summary>
+    [Theory]
+    [InlineData("<SET_AFTER_INSTALL>", true)]
+    [InlineData("<set-after-install>", true)]
+    [InlineData("TODO_SET_PASSWORD", true)]
+    [InlineData("TODO_SET_AZURE_TENANT_ID", true)]
+    [InlineData("TODO_SET_K1", true)]
+    [InlineData("  TODO_SET_EMAIL_ADDRESS\t", true)]
+    [InlineData("TODO_SET_", false)]
+    [InlineData("TODO_SET__PASSWORD", false)]
+    [InlineData("TODO_SET_PASSWORD_", false)]
+    [InlineData("TODO_SET_PASS WORD", false)]
+    [InlineData("TODO_SET_Password", false)]
+    [InlineData("todo_set_password", false)]
+    [InlineData("XTODO_SET_PASSWORD", false)]
+    [InlineData("TODO_SET_PASSWORD!", false)]
+    [InlineData("<>", false)]
+    [InlineData("<<x>>", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    [InlineData("Hunter2", false)]
+    public void IsPlaceholder_RecognisesBothForms(string? value, bool expected)
+    {
+        Assert.Equal(expected, SecretAttributeConventions.IsPlaceholder(value));
+    }
+
+    [Fact]
+    public void IsPlaceholder_Forms_AreDistinguishable()
+    {
+        Assert.True(SecretAttributeConventions.IsAngleBracketPlaceholder("<X>"));
+        Assert.False(SecretAttributeConventions.IsTodoSetPlaceholder("<X>"));
+        Assert.True(SecretAttributeConventions.IsTodoSetPlaceholder("TODO_SET_X"));
+        Assert.False(SecretAttributeConventions.IsAngleBracketPlaceholder("TODO_SET_X"));
     }
 }

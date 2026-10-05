@@ -2,6 +2,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 
 namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 
@@ -10,6 +11,14 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 /// </summary>
 public interface IBulkRtMutation
 {
+    /// <summary>
+    ///     The Secret write step this mutation applies to every insert, update and replace (AB#5532).
+    ///     Repository paths that write without <see cref="ApplyChangesAsync" /> - bulk import, CK migration
+    ///     writes - must run their entities through it as well (see
+    ///     <see cref="RuntimeRepositoryBase.BulkInsertRtEntitiesAsync" />).
+    /// </summary>
+    ISecretWriteNormalizer SecretWriteNormalizer { get; }
+
     /// <summary>
     ///     Applies the changes to the data source
     /// </summary>

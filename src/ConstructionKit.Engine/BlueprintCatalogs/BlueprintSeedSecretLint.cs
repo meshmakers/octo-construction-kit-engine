@@ -6,7 +6,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
 ///     Blueprint seed lint for Secret attributes (AB#5528, decision 9): a seed may carry only an
-///     empty value or a <c>&lt;placeholder&gt;</c> for a Secret attribute - secrets are set after
+///     empty value or a placeholder (<c>&lt;placeholder&gt;</c> or <c>TODO_SET_&lt;NAME&gt;</c>, see
+///     <see cref="SecretAttributeConventions.IsPlaceholder" />) for a Secret attribute - secrets are set after
 ///     installation (Studio, CLI, rotate endpoints), never shipped in a blueprint (AB#5529).
 /// </summary>
 /// <remarks>
@@ -154,7 +155,8 @@ public static class BlueprintSeedSecretLint
                         seedDataPath,
                         SecretSeedValueMessageNumber,
                         $"Seed entity '{identity}' sets Secret attribute '{attributeId}' to a value. Seeds may only "
-                        + "contain an empty value or a '<placeholder>' for Secret attributes; set the secret after "
+                        + "contain an empty value or a placeholder ('<placeholder>' or 'TODO_SET_<NAME>') for Secret "
+                        + "attributes; set the secret after "
                         + "installation (Studio, octo-cli) and rotate any credential that was committed."));
                 }
 

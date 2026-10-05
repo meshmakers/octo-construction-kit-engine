@@ -1,4 +1,5 @@
 using Meshmakers.Octo.Runtime.Contracts.Secrets;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
 
 namespace Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 
@@ -37,6 +38,13 @@ public enum RtSecretValueState
 ///     ciphertext, i.e. the value was carried over and not re-entered). Pending and legacy values
 ///     compare by state and value. The hash code never derives from plaintext.
 /// </remarks>
+/// <remarks>
+///     Serialisation (AB#5532): the type carries marker-only converters for System.Text.Json and
+///     Newtonsoft (<see cref="RtSecretValueJsonConverter" />, <see cref="RtSecretValueNewtonsoftConverter" />),
+///     so any JSON serialisation of an entity writes <c>{"isSet":true}</c> instead of the envelope.
+/// </remarks>
+[System.Text.Json.Serialization.JsonConverter(typeof(RtSecretValueJsonConverter))]
+[Newtonsoft.Json.JsonConverter(typeof(RtSecretValueNewtonsoftConverter))]
 public sealed class RtSecretValue : IEquatable<RtSecretValue>
 {
     /// <summary>
@@ -76,11 +84,15 @@ public sealed class RtSecretValue : IEquatable<RtSecretValue>
     ///     The envelope of a protected value (ciphertext, safe to store and copy between
     ///     repositories of the same key ring); <c>null</c> for every other state.
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
     public string? Envelope => State == RtSecretValueState.Protected ? _value : null;
 
     /// <summary>
     ///     The key id of a protected value; <c>null</c> for every other state.
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
     public string? KeyId =>
         State == RtSecretValueState.Protected && SecretEnvelope.TryParse(_value, out var info) ? info.KeyId : null;
 

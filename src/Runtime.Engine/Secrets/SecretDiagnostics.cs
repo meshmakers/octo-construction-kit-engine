@@ -1,4 +1,7 @@
+using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Meshmakers.Octo.Runtime.Contracts.Secrets;
 
 namespace Meshmakers.Octo.Runtime.Engine.Secrets;
 
@@ -34,4 +37,83 @@ public static class SecretDiagnostics
         "octo.secrets.plaintext_reads",
         unit: "{read}",
         description: "Count of reads of Secret attribute values that were still stored as clear text.");
+
+    /// <summary>
+    ///     Incremented by the secret sweep for every value it changed (AB#5532). Tags: <c>tenant</c>,
+    ///     <c>mode</c> (<c>verify</c>, <c>encrypt</c>, <c>reprotect</c>, <c>clear_unknown_kid</c>,
+    ///     <c>decrypt</c>, <c>normalize_placeholders</c>).
+    /// </summary>
+    public static readonly Counter<long> SweepValuesRewritten = Meter.CreateCounter<long>(
+        "octo.secrets.sweep.rewritten",
+        unit: "{value}",
+        description: "Count of Secret attribute values changed by the secret sweep.");
+
+    /// <summary>
+    ///     Incremented by the secret sweep for every value it could not process (AB#5532). Tags:
+    ///     <c>tenant</c>, <c>mode</c>.
+    /// </summary>
+    public static readonly Counter<long> SweepFailures = Meter.CreateCounter<long>(
+        "octo.secrets.sweep.failed",
+        unit: "{value}",
+        description: "Count of Secret attribute values the secret sweep could not process.");
+
+    private static readonly ConcurrentDictionary<string, IReadOnlyList<Measurement<long>>> LastSweepValues =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    ///     <c>octo.secrets.values{tenant, model, form, kid}</c> (concept §5.3): the stored forms found by the
+    ///     LAST sweep of each tenant in this process. Only the process that runs the sweeps (the bot
+    ///     <c>SecretSweepJob</c>, WP9) reports it; the alert "plaintext &gt; 0 after strict mode" builds on it.
+    ///     The <c>env</c> dimension comes from the OTel resource attributes of the host.
+    /// </summary>
+    // ReSharper disable once UnusedMember.Local - the instrument lives as long as the meter.
+    private static readonly ObservableGauge<long> Values = Meter.CreateObservableGauge(
+        "octo.secrets.values",
+        () => LastSweepValues.Values.SelectMany(v => v),
+        unit: "{value}",
+        description: "Secret attribute values per stored form, as found by the last secret sweep of a tenant.");
+
+    /// <summary>
+    ///     Records the forms found by a sweep as the current value of <c>octo.secrets.values</c> for the
+    ///     tenant (replacing the previous sweep's values).
+    /// </summary>
+    /// <param name="tenantId">Tenant</param>
+    /// <param name="countsPerModel">Counts per CK model name</param>
+    public static void RecordSweepValues(string tenantId, IReadOnlyDictionary<string, SecretFormCounts> countsPerModel)
+    {
+        ArgumentNullException.ThrowIfNull(tenantId);
+        ArgumentNullException.ThrowIfNull(countsPerModel);
+
+        var measurements = new List<Measurement<long>>();
+        foreach (var (model, counts) in countsPerModel)
+        {
+            Add(measurements, tenantId, model, "not_set", null, counts.NotSet);
+            Add(measurements, tenantId, model, "placeholder", null, counts.Placeholder);
+            Add(measurements, tenantId, model, "plaintext", null, counts.Plaintext);
+            Add(measurements, tenantId, model, "enc_v1", null, counts.EncV1);
+            foreach (var (keyId, count) in counts.EncV2ByKeyId)
+            {
+                Add(measurements, tenantId, model, "enc_v2", keyId, count);
+            }
+
+            foreach (var (keyId, count) in counts.UnknownKeyIdByKeyId)
+            {
+                Add(measurements, tenantId, model, "unknown_kid", keyId, count);
+            }
+        }
+
+        LastSweepValues[tenantId] = measurements;
+    }
+
+    private static void Add(List<Measurement<long>> measurements, string tenantId, string model, string form,
+        string? keyId, long count)
+    {
+        var tags = new TagList { { "tenant", tenantId }, { "model", model }, { "form", form } };
+        if (keyId != null)
+        {
+            tags.Add("kid", keyId);
+        }
+
+        measurements.Add(new Measurement<long>(count, tags));
+    }
 }

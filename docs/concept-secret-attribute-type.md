@@ -72,6 +72,15 @@ In `Runtime.Engine/Repositories/BulkRtMutation.cs` (insert, replace, update-by-t
 
 Paths that bypass `BulkRtMutation` call the step explicitly: `RuntimeRepositoryBase.BulkInsertRtEntitiesAsync`, `InsertOneRtEntityForMigrationAsync`, `RewriteAttributeValueForMigrationAsync`, `CreateTransientRtEntity`.
 
+**Implementation (AB#5532).** The step is `ISecretWriteNormalizer` / `SecretWriteNormalizer` (`Runtime.Engine.Secrets`, singleton, exposed as `IBulkRtMutation.SecretWriteNormalizer`). Concrete choices:
+- An **omitted** secret on a replace is carried over like `""` (clearing is explicit, §4.3); `null` clears. A replace that leaves a required secret without a value is rejected before anything is deleted or written.
+- `LegacyPlaintext` is re-encrypted when a key is configured (an `enc:v1` value is decrypted first); without keys it is kept as stored. Only new input (`Pending`, plain string) requires a key. A plain string is input on the API path and legacy on storage paths (`SecretValueOrigin`).
+- Placeholders are `<…>` **and** `TODO_SET_<UPPER_SNAKE>` (`SecretAttributeConventions.IsPlaceholder`, shared by the seed lint and the write path).
+- Clearing: `IEntityUpdateInfo.ClearSecretAttributes` (factories `EntityUpdateInfo.CreateUpdate/CreateReplace(id, entity, clearSecretAttributes)`); the rule engine validates it (messages 21–23) and turns each entry into an explicit `null`. Required secrets on create: `""`, placeholders and `null` count as missing (message 2); after carry-over: message 24.
+- The CK migration writes are normalised by their engine caller (`CkModelMigrationService`), not inside the MongoDB overrides; `CreateTransientRtEntity` never sets a Secret value. The bulk import does not enforce required secrets (AB#4772 policy).
+- Blueprint re-apply keeps stored secrets inside seed-owned records too (`ImportRtModelCommand.PreserveSecretRecordMembers`, by record key); the comparer never diffs Secret attributes or members and masks them in reported record changes.
+- Engine serialisers write an `RtSecretValue` as `{"isSet":…}` only (type-level STJ/Newtonsoft converters, YAML converter); a marker or object sent back means "unchanged"; `ExportRt` omits Secret attributes by value type as well as by ownership.
+
 ### 3.7 Server-side decryption
 `ISecretAttributeProtector` (contract in Runtime.Contracts, implementation in Runtime.Engine): `Protect`, `Unprotect` (handles `enc:v1`, `enc:v2`, legacy plaintext with a warning counter), `IsProtectedEnvelope` (strict), `TryParseEnvelope`, `NeedsReprotect`, `Reprotect`. Extension `rtEntity.GetSecretPlaintext(attr, protector)`. Every decrypt increments `octo.secrets.decrypt{tenant,ckType,attribute,service}`; logs never contain the value. No public decrypt endpoint in v1. Architecture tests in asset repo and MCP forbid `Unprotect` outside an allowlist.
 
@@ -101,6 +110,7 @@ Paths that bypass `BulkRtMutation` call the step explicitly: `RuntimeRepositoryB
    - Compiler: a record whose own or inherited attributes contain a Secret attribute must have an effective `recordKey` (message 76) — on the record type, regardless of whether it is used as `Record` or `RecordArray`, because a record type defined for single use can be reused in an array by another model. A declared key must name a required `String`, `Int`, `Int64` or `Enum` sub-attribute that is not Secret (message 77).
    - SemVer: setting, clearing or changing `recordKey` is Minor.
    - Single `Record` attributes still carry over by position (there is exactly one element); the key is used for `RecordArray`. The carry-over itself is WP2 (AB#5532).
+   - **Implementation (AB#5532):** carry-over applies on update and replace, at any nesting depth; `null`, `""` or an omitted sub-value is carried over, a placeholder clears it (the only way to clear a secret inside a record). Keys compare by value (integers across CLR types, otherwise ordinal text). A record array without a key (pre-AB#5531 models) gets no carry-over.
    - WP3 (AB#5533): the MongoDB CK record document must round-trip `recordKey`, otherwise the runtime cache reads `null` (same failure class as AB#4589 for `isRuntimeState`).
 7. **MCP**: entity CRUD tools inherit the server behaviour; tools that set secrets are classified high risk; `clearSecretAttributes` argument added. **octo-cli**: new admin command `SecretStatus` (wraps the verify sweep) and `ReprotectSecrets`.
 
@@ -138,6 +148,8 @@ Shared attribute definitions used by non-secret attributes must be split first �
 Rollback: phases 1–3 are code-only. After phase 4, older binaries cannot read ciphertext; the emergency path is `Sweep(Decrypt)` with the key, not a binary rollback. Phase 2 code must have shipped one release before phase 4.
 
 Sweep API: `ISecretMaintenanceService.SweepTenantAsync(tenantId, mode: Verify | Encrypt | Reprotect | ClearUnknownKid | Decrypt)` returning counts per form and key id; system-API endpoint and octo-cli commands.
+
+**Implementation (AB#5532).** Contract in `Runtime.Contracts.Secrets` (`ISecretMaintenanceService`, `SecretSweepMode`, `SecretSweepOptions`, `SecretSweepResult`, `SecretFormCounts`, `SecretSlotReport`, `SecretSweepClearedValue`, `SecretSweepFailure`), implementation in `Runtime.Engine` over `IRuntimeRepositoryProvider` + `GetRtEntitiesByTypeAsync` (batches, archived included) + `RewriteAttributeValueForMigrationAsync`. Counts are the forms as found (`notSet`, `placeholder`, `plaintext`, `enc_v1`, `enc_v2` per kid, unknown kid per kid, failed) per tenant and per CK type / attribute path; `Cleared` is the re-entry list. `Encrypt` also turns stored placeholders into `null`; `Decrypt` needs `ConfirmDecrypt`. `NormalizePlaceholdersAsync(tenant, ckModelName)` is the phase-3 migration hook, called by `CkModelMigrationService` after every successful migration (no key needed). Meter `Meshmakers.Octo.Secrets`: counters `octo.secrets.sweep.rewritten` / `octo.secrets.sweep.failed`, observable gauge `octo.secrets.values{tenant,model,form,kid}` from the last full sweep in the process (the bot job's process).
 
 ### 5.3 Verification
 OTel gauge `octo.secrets.values{env,tenant,model,form=plaintext|enc_v1|enc_v2,kid}` from the sweep, alert when plaintext > 0 after strict mode; counter `octo.secrets.plaintext_reads` from legacy reads; per-tenant sweep report in the job result; raw-BSON integration tests asserting plaintext bytes are absent.

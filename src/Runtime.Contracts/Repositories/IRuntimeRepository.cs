@@ -681,6 +681,13 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="rtCkTypeId">The CK type id of the target collection (may not exist in current CK cache)</param>
     /// <param name="rtEntity">The entity to insert</param>
+    /// <remarks>
+    ///     AB#5532: this path bypasses the Secret write step of the regular mutation path. Callers run the
+    ///     entity through <c>ISecretWriteNormalizer</c> (Runtime.Engine) first - the CK migration service
+    ///     does - so Secret slots hold only <c>null</c> or an <c>RtSecretValue</c> (<c>Protected</c>, or
+    ///     <c>LegacyPlaintext</c> on hosts without keys). Implementations persist those through the Secret
+    ///     serializer (AB#5533) and must refuse <c>RtSecretValueState.Pending</c>.
+    /// </remarks>
     Task InsertOneRtEntityForMigrationAsync(
         IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, RtEntity rtEntity);
 
@@ -733,6 +740,15 @@ public interface IRuntimeRepository
     /// <param name="rtId">The runtime object id of the entity to rewrite</param>
     /// <param name="attributeId">The CK attribute id of the slot to overwrite</param>
     /// <param name="newValue">The new value to assign to the slot</param>
+    /// <remarks>
+    ///     AB#5532: callers normalise Secret values first (<c>ISecretWriteNormalizer.NormalizeAttributeValue</c>);
+    ///     the secret sweep (<c>ISecretMaintenanceService</c>) writes through this method too. The value of a
+    ///     Secret slot is <c>null</c>, an <c>RtSecretValue</c> (<c>Protected</c> → BSON sub-document
+    ///     <c>{ _t: "OctoSecret", e: ... }</c>, <c>LegacyPlaintext</c> → the string unchanged), a plain
+    ///     <see cref="string" /> (only the emergency <c>Decrypt</c> sweep), or a record (array) whose Secret
+    ///     sub-values follow the same rules. Implementations (AB#5533) must refuse
+    ///     <c>RtSecretValueState.Pending</c>.
+    /// </remarks>
     Task RewriteAttributeValueForMigrationAsync(
         IOctoSession session,
         RtCkId<CkTypeId> rtCkTypeId,

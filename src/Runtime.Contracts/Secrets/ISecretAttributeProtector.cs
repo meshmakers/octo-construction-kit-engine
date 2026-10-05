@@ -45,6 +45,13 @@ public interface ISecretAttributeProtector
     string? ActiveKeyId { get; }
 
     /// <summary>
+    ///     True when <paramref name="keyId" /> names a key of the key ring (case-insensitive), i.e. an
+    ///     <c>enc:v2</c> envelope with this key id can be decrypted. The sweep (AB#5532) classifies
+    ///     values with an unknown key id (decision 5: restored from another environment) with it.
+    /// </summary>
+    bool IsKnownKeyId(string? keyId);
+
+    /// <summary>
     ///     Encrypts a plaintext with the active key: <c>enc:v2:&lt;kid&gt;:...</c>, AES-256-GCM, random
     ///     nonce, associated data = the ASCII header.
     /// </summary>

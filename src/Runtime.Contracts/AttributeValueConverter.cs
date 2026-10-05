@@ -314,7 +314,9 @@ public static class AttributeValueConverter
     ///     NOT trimmed, whitespace is part of a credential. The write step (AB#5532) decides what a
     ///     pending value means: non-empty is encrypted, <c>""</c> keeps the stored value, a
     ///     <c>&lt;placeholder&gt;</c> is stored as "not set". Read paths that find a string in the
-    ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533).
+    ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533). The read
+    ///     marker (a JSON object / dictionary such as <c>{"isSet":true}</c>) means "unchanged"; any other
+    ///     non-string input throws <see cref="InvalidAttributeValueException" />.
     /// </summary>
     private static object ConvertSecretValue(object value)
     {
@@ -324,13 +326,17 @@ public static class AttributeValueConverter
             string text => RtSecretValue.Pending(text),
             JsonElement { ValueKind: JsonValueKind.String } element => RtSecretValue.Pending(element.GetString() ?? string.Empty),
             JValue { Type: JTokenType.String } token => RtSecretValue.Pending((string?)token ?? string.Empty),
-            // AB#5532: the read marker {"isSet":...} (or any structured value) sent back on a write
-            // carries no secret - it means "unchanged", never the text of the object.
-            JsonElement { ValueKind: JsonValueKind.Object or JsonValueKind.Array } => RtSecretValue.Pending(string.Empty),
-            JContainer => RtSecretValue.Pending(string.Empty),
+            // AB#5532: the read marker {"isSet":...} sent back on a write carries no secret - it means
+            // "unchanged", never the text of the object.
+            JsonElement { ValueKind: JsonValueKind.Object } => RtSecretValue.Pending(string.Empty),
+            JObject => RtSecretValue.Pending(string.Empty),
             IDictionary => RtSecretValue.Pending(string.Empty),
             IReadOnlyDictionary<string, object?> => RtSecretValue.Pending(string.Empty),
-            _ => RtSecretValue.Pending(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
+            IDictionary<string, object?> => RtSecretValue.Pending(string.Empty), // ExpandoObject
+            // Anything else (numbers, booleans, lists, arbitrary objects) is not a secret: encrypting its
+            // ToString() would store "System.Collections.Generic.List`1[...]" or a number nobody typed as a
+            // credential. The message names the type only, never the value.
+            _ => throw InvalidAttributeValueException.InvalidSecretValue(value.GetType())
         };
     }
 }

@@ -62,6 +62,13 @@ public class InvalidAttributeValueException : PersistenceException
             "server-side through ISecretAttributeProtector.");
     }
 
+    internal static Exception InvalidSecretValue(Type actualType)
+    {
+        return new InvalidAttributeValueException(
+            $"A Secret attribute value must be a string (the secret to store), null (clear) or the read marker " +
+            $"{{\"isSet\": ...}} (unchanged), but a value of type '{actualType.Name}' was given.");
+    }
+
     internal static Exception InvalidDataType(string getLocation, string attributeName, Type actualType, Type expectType)
     {
         return new InvalidAttributeValueException(

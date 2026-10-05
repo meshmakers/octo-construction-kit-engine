@@ -15,8 +15,10 @@ namespace Meshmakers.Octo.Runtime.Contracts.Secrets;
 ///         The service walks every concrete CK type of the tenant that has a Secret attribute (top-level
 ///         or inside a record, at any nesting depth), reads the entities in batches through
 ///         <c>IRuntimeRepository.GetRtEntitiesByTypeAsync</c> (archived entities included) and rewrites
-///         changed attributes through <c>IRuntimeRepository.RewriteAttributeValueForMigrationAsync</c>
-///         (a record-valued attribute is rewritten as a whole). It works on the values as the
+///         changed attributes through <c>IRuntimeRepository.RewriteAttributeValueIfUnchangedForMigrationAsync</c>
+///         (a record-valued attribute is rewritten as a whole). The rewrite is conditional on the stored
+///         value still being the one the sweep read; an attribute changed in between is skipped and
+///         counted in <c>SecretSweepResult.SkippedConcurrentlyModified</c>. It works on the values as the
 ///         repository returns them: <c>RtSecretValue.Protected</c> for an <c>enc:v2</c> sub-document,
 ///         <c>RtSecretValue.LegacyPlaintext</c> or a plain string for a legacy string slot.
 ///     </para>
@@ -70,7 +72,7 @@ public interface ISecretMaintenanceService
     ///     <c>null</c> = every type with a Secret attribute
     /// </param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>The scan result; <see cref="SecretSweepResult.Cleared" /> lists the normalised slots</returns>
+    /// <returns>The scan result; <see cref="SecretSweepResult.PlaceholdersNormalized" /> counts the normalised slots</returns>
     Task<SecretSweepResult> NormalizePlaceholdersAsync(string tenantId, string? ckModelName,
         CancellationToken cancellationToken = default);
 }
@@ -394,9 +396,27 @@ public sealed class SecretSweepResult
     public List<SecretSlotReport> Slots { get; } = [];
 
     /// <summary>
-    ///     Values set to <c>null</c> (unknown key id, placeholders) - the re-entry report.
+    ///     Values set to <c>null</c> because they were lost (an <c>enc:v2</c> envelope with an unknown key id,
+    ///     <see cref="SecretSweepMode.ClearUnknownKid" />) - the re-entry report (decision 5). Normalised
+    ///     placeholders are not listed here; they were never set (see <see cref="PlaceholdersNormalized" />).
     /// </summary>
     public List<SecretSweepClearedValue> Cleared { get; } = [];
+
+    /// <summary>
+    ///     Placeholders (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>) and empty strings in Secret slots that were
+    ///     set to <c>null</c> ("not set") by <see cref="SecretSweepMode.Encrypt" />,
+    ///     <see cref="SecretSweepMode.Reprotect" /> or <see cref="ISecretMaintenanceService.NormalizePlaceholdersAsync" />.
+    ///     Included in <see cref="ValuesRewritten" />.
+    /// </summary>
+    public long PlaceholdersNormalized { get; set; }
+
+    /// <summary>
+    ///     Attributes the sweep would have rewritten but left alone because their stored value changed
+    ///     after the sweep read it (conditional rewrite, AB#5532). Not a failure: the newer value was
+    ///     written by someone else and the next sweep processes it. Their changes are not counted in
+    ///     <see cref="ValuesRewritten" />.
+    /// </summary>
+    public long SkippedConcurrentlyModified { get; set; }
 
     /// <summary>
     ///     Values that could not be processed.

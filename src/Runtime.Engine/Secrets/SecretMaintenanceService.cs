@@ -16,7 +16,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Secrets;
 /// <summary>
 ///     Implementation of <see cref="ISecretMaintenanceService" /> (AB#5532) over the repository
 ///     abstractions: <see cref="IRuntimeRepositoryProvider" />, the CK cache and
-///     <see cref="IRuntimeRepository.RewriteAttributeValueForMigrationAsync" />. Logs names and counts,
+///     <see cref="IRuntimeRepository.RewriteAttributeValueIfUnchangedForMigrationAsync" />. Logs names and counts,
 ///     never a value.
 /// </summary>
 internal sealed class SecretMaintenanceService(
@@ -187,10 +187,12 @@ internal sealed class SecretMaintenanceService(
         logger.LogInformation(
             "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities, {Total} values " +
             "(not set {NotSet}, placeholder {Placeholder}, plaintext {Plaintext}, enc_v1 {EncV1}, enc_v2 {EncV2}, " +
-            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Cleared} cleared, {Failed} failed",
+            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Cleared} cleared, {PlaceholdersNormalized} placeholder(s) " +
+            "normalised, {Skipped} skipped (modified concurrently), {Failed} failed",
             modeTag, tenantId, result.EntitiesScanned, result.Totals.Total, result.Totals.NotSet,
             result.Totals.Placeholder, result.Totals.Plaintext, result.Totals.EncV1, result.Totals.EncV2,
-            result.Totals.UnknownKeyId, result.ValuesRewritten, result.Cleared.Count, result.Totals.Failed);
+            result.Totals.UnknownKeyId, result.ValuesRewritten, result.Cleared.Count, result.PlaceholdersNormalized,
+            result.SkippedConcurrentlyModified, result.Totals.Failed);
 
         return result;
     }
@@ -221,14 +223,18 @@ internal sealed class SecretMaintenanceService(
             entity.Attributes.TryGetValue(attribute.AttributeName, out var value);
             bool changed;
             object? newValue;
-            var valuesBefore = context.Result.ValuesRewritten;
-            var clearedBefore = context.Result.Cleared.Count;
+            object? expectedValue;
+            var countsBefore = new RewriteCounts(context.Result);
             if (attribute.ValueType == AttributeValueTypesDto.Secret)
             {
+                expectedValue = value;
                 (changed, newValue) = ProcessSlot(context, attribute.AttributeName, attribute.AttributeName, value);
             }
             else
             {
+                // The record walk changes the read value in place; keep what was read for the
+                // conditional rewrite.
+                expectedValue = CopyAttributeValue(value);
                 newValue = value;
                 changed = ProcessRecordValue(context, attribute, value, attribute.AttributeName, attribute.AttributeName);
             }
@@ -240,21 +246,30 @@ internal sealed class SecretMaintenanceService(
 
             try
             {
-                await repository.RewriteAttributeValueForMigrationAsync(session,
+                // Compare-and-swap: the value may have changed since the page was read (an API write, a
+                // second sweep); writing a transformation of the old value would undo that change.
+                var written = await repository.RewriteAttributeValueIfUnchangedForMigrationAsync(session,
                         entity.CkTypeId ?? entityGraph.CkTypeId.ToRtCkId(), entity.RtId, attribute.AttributeName,
-                        newValue)
+                        expectedValue, newValue)
                     .ConfigureAwait(false);
-                rewrittenAny = true;
+                if (written)
+                {
+                    rewrittenAny = true;
+                    continue;
+                }
+
+                // Not a failure: the current value is someone else's newer write; the next sweep sees it.
+                countsBefore.Restore(context.Result);
+                context.Result.SkippedConcurrentlyModified++;
+                logger.LogInformation(
+                    "Secret sweep skipped attribute {AttributeName} of {CkTypeId}@{RtId} (tenant {TenantId}): modified concurrently",
+                    attribute.AttributeName, context.CkTypeId, context.RtId, context.TenantId);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // The rewrite did not happen: take back what was counted for it.
-                var rewrittenHere = context.Result.ValuesRewritten - valuesBefore;
-                context.Result.ValuesRewritten = valuesBefore;
-                if (context.Result.Cleared.Count > clearedBefore)
-                {
-                    context.Result.Cleared.RemoveRange(clearedBefore, context.Result.Cleared.Count - clearedBefore);
-                }
+                var rewrittenHere = context.Result.ValuesRewritten - countsBefore.ValuesRewritten;
+                countsBefore.Restore(context.Result);
 
                 context.Result.Totals.AddFailure();
                 context.ModelCounts.AddFailure();
@@ -387,14 +402,20 @@ internal sealed class SecretMaintenanceService(
 
         try
         {
-            var (changed, newValue, cleared) = Decide(context, form.Value, keyId, raw, value);
+            var (changed, newValue, effect) = Decide(context, form.Value, keyId, raw, value);
             if (changed)
             {
                 context.Result.ValuesRewritten++;
-                if (cleared)
+                switch (effect)
                 {
-                    context.Result.Cleared.Add(new SecretSweepClearedValue(context.CkTypeId, context.RtId,
-                        elementPath, form.Value, keyId));
+                    case SlotEffect.Cleared:
+                        // Only values that were lost belong in the re-entry report (decision 5).
+                        context.Result.Cleared.Add(new SecretSweepClearedValue(context.CkTypeId, context.RtId,
+                            elementPath, form.Value, keyId));
+                        break;
+                    case SlotEffect.PlaceholderNormalized:
+                        context.Result.PlaceholdersNormalized++;
+                        break;
                 }
             }
 
@@ -414,30 +435,32 @@ internal sealed class SecretMaintenanceService(
         }
     }
 
-    private (bool Changed, object? NewValue, bool Cleared) Decide(SweepContext context, SecretValueForm form,
+    private (bool Changed, object? NewValue, SlotEffect Effect) Decide(SweepContext context, SecretValueForm form,
         string? keyId, string? raw, object? value)
     {
         var access = new SecretAccessContext(context.TenantId, context.CkTypeId, null, "secret-sweep");
         if (context.NormalizePlaceholdersOnly)
         {
-            return form == SecretValueForm.Placeholder ? (true, null, true) : (false, null, false);
+            return form == SecretValueForm.Placeholder
+                ? (true, null, SlotEffect.PlaceholderNormalized)
+                : (false, null, SlotEffect.None);
         }
 
         switch (context.Mode)
         {
             case SecretSweepMode.Verify:
-                return (false, null, false);
+                return (false, null, SlotEffect.None);
 
             case SecretSweepMode.Encrypt:
             case SecretSweepMode.Reprotect:
                 switch (form)
                 {
                     case SecretValueForm.Placeholder:
-                        return (true, null, true);
+                        return (true, null, SlotEffect.PlaceholderNormalized);
                     case SecretValueForm.Plaintext:
-                        return (true, protector.Protect(raw!), false);
+                        return (true, protector.Protect(raw!), SlotEffect.None);
                     case SecretValueForm.EncV1:
-                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), false);
+                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
                     case SecretValueForm.EncV2:
                     {
                         // An enc:v2 envelope kept in a string slot becomes a protected value.
@@ -447,18 +470,20 @@ internal sealed class SecretMaintenanceService(
                             : RtSecretValue.Protected(raw!);
                         if (context.Mode == SecretSweepMode.Reprotect && protector.NeedsReprotect(stored))
                         {
-                            return (true, protector.Reprotect(stored, access), false);
+                            return (true, protector.Reprotect(stored, access), SlotEffect.None);
                         }
 
                         // Encrypt leaves enc:v2 alone; a string-stored envelope moves to the sub-document form.
-                        return storedAsString ? (true, stored, false) : (false, null, false);
+                        return storedAsString ? (true, stored, SlotEffect.None) : (false, null, SlotEffect.None);
                     }
                     default:
-                        return (false, null, false);
+                        return (false, null, SlotEffect.None);
                 }
 
             case SecretSweepMode.ClearUnknownKid:
-                return form == SecretValueForm.UnknownKeyId ? (true, null, true) : (false, null, false);
+                return form == SecretValueForm.UnknownKeyId
+                    ? (true, null, SlotEffect.Cleared)
+                    : (false, null, SlotEffect.None);
 
             case SecretSweepMode.Decrypt:
                 switch (form)
@@ -466,15 +491,15 @@ internal sealed class SecretMaintenanceService(
                     case SecretValueForm.EncV1:
                     case SecretValueForm.EncV2:
                         // EMERGENCY path: clear text goes back into a string slot (concept §5.2 rollback).
-                        return (true, protector.Unprotect(raw!, access), false);
+                        return (true, protector.Unprotect(raw!, access), SlotEffect.None);
                     case SecretValueForm.UnknownKeyId:
                         throw new UnknownSecretKeyIdException(keyId ?? string.Empty);
                     default:
-                        return (false, null, false);
+                        return (false, null, SlotEffect.None);
                 }
 
             default:
-                return (false, null, false);
+                return (false, null, SlotEffect.None);
         }
     }
 
@@ -537,6 +562,60 @@ internal sealed class SecretMaintenanceService(
             SecretSweepMode.Decrypt => "decrypt",
             _ => mode.ToString()
         };
+    }
+
+    /// <summary>
+    ///     Deep copy of an attribute value as read: records and arrays are copied (the record walk changes
+    ///     them in place), scalars and <see cref="RtSecretValue" />s are immutable and shared.
+    /// </summary>
+    internal static object? CopyAttributeValue(object? value)
+    {
+        switch (value)
+        {
+            case null:
+                return null;
+            case RtRecord record:
+                return new RtRecord(record.CkRecordId,
+                    record.Attributes.ToDictionary(p => p.Key, p => CopyAttributeValue(p.Value), StringComparer.Ordinal));
+            case string or byte[] or IDictionary:
+                return value;
+            case IEnumerable<RtRecord> records:
+                return records.Select(r => (RtRecord)CopyAttributeValue(r)!).ToList();
+            case IEnumerable elements:
+                return elements.Cast<object?>().Select(CopyAttributeValue).ToList();
+            default:
+                return value;
+        }
+    }
+
+    private enum SlotEffect
+    {
+        None,
+        Cleared,
+        PlaceholderNormalized
+    }
+
+    /// <summary>
+    ///     The result counters an attribute rewrite adds to, taken before the attribute is processed so a
+    ///     rewrite that does not happen (failure, concurrent modification) can take its counts back.
+    /// </summary>
+    private readonly struct RewriteCounts(SecretSweepResult result)
+    {
+        public long ValuesRewritten { get; } = result.ValuesRewritten;
+
+        private int Cleared { get; } = result.Cleared.Count;
+
+        private long PlaceholdersNormalized { get; } = result.PlaceholdersNormalized;
+
+        public void Restore(SecretSweepResult target)
+        {
+            target.ValuesRewritten = ValuesRewritten;
+            target.PlaceholdersNormalized = PlaceholdersNormalized;
+            if (target.Cleared.Count > Cleared)
+            {
+                target.Cleared.RemoveRange(Cleared, target.Cleared.Count - Cleared);
+            }
+        }
     }
 
     private sealed record SweepContext(

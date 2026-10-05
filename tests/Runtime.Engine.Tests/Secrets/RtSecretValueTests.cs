@@ -106,4 +106,52 @@ public class RtSecretValueTests
             AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, protectedValue));
         Assert.Null(AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, null));
     }
+
+    public static TheoryData<object> NonStringSecretInputs => new()
+    {
+        12345,
+        true,
+        3.5,
+        new List<object> { "hunter2" },
+        new[] { "hunter2" },
+        new JArray("hunter2"),
+        new JValue(42),
+        System.Text.Json.JsonDocument.Parse("[\"hunter2\"]").RootElement,
+        System.Text.Json.JsonDocument.Parse("42").RootElement,
+        new Uri("https://hunter2.example")
+    };
+
+    [Theory]
+    [MemberData(nameof(NonStringSecretInputs))]
+    public void Converter_RejectsNonStringNonMarkerInput_WithoutTheValueInTheMessage(object input)
+    {
+        var exception = Assert.Throws<InvalidAttributeValueException>(() =>
+            AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, input));
+
+        Assert.Contains("Secret attribute", exception.Message);
+        Assert.DoesNotContain("hunter2", exception.Message);
+        Assert.DoesNotContain("12345", exception.Message);
+    }
+
+    [Fact]
+    public void Converter_TreatsTheReadMarkerAsUnchanged()
+    {
+        var expando = new System.Dynamic.ExpandoObject();
+        ((IDictionary<string, object?>)expando)["isSet"] = true;
+        object[] markers =
+        [
+            new Dictionary<string, object?> { ["isSet"] = true },
+            expando,
+            JObject.Parse("{\"isSet\":true}"),
+            System.Text.Json.JsonDocument.Parse("{\"isSet\":true}").RootElement
+        ];
+
+        foreach (var marker in markers)
+        {
+            var converted = Assert.IsType<RtSecretValue>(
+                AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, marker));
+            Assert.True(converted.IsPending);
+            Assert.Equal(string.Empty, converted.RawValue);
+        }
+    }
 }

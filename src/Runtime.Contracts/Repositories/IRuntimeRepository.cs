@@ -756,5 +756,45 @@ public interface IRuntimeRepository
         string attributeId,
         object? newValue);
 
+    /// <summary>
+    ///     Conditional variant of
+    ///     <see cref="RewriteAttributeValueForMigrationAsync(IOctoSession, RtCkId{CkTypeId}, OctoObjectId, string, object?)" />
+    ///     (compare-and-swap, AB#5532): the slot is rewritten only when the value stored right now still
+    ///     equals <paramref name="expectedValue" />, the value the caller read before it computed
+    ///     <paramref name="newValue" />. A caller that reads an entity, transforms an attribute and writes
+    ///     it back (the secret sweep) would otherwise overwrite a value changed in between with a
+    ///     transformation of the old one.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id of the entity's collection (may not exist in current CK cache)</param>
+    /// <param name="rtId">The runtime object id of the entity to rewrite</param>
+    /// <param name="attributeId">The CK attribute id of the slot to overwrite</param>
+    /// <param name="expectedValue">
+    ///     The value the caller read; <c>null</c> matches a null or missing slot. Compared with
+    ///     <see cref="Secrets.StoredAttributeValueComparer" />: a protected secret by its envelope, a legacy
+    ///     secret by its text, a record (array) as a whole.
+    /// </param>
+    /// <param name="newValue">The new value to assign to the slot (same rules as the unconditional rewrite)</param>
+    /// <returns>
+    ///     <c>true</c> when the slot was rewritten; <c>false</c> when the stored value no longer equals
+    ///     <paramref name="expectedValue" /> or the entity no longer exists - nothing was written.
+    /// </returns>
+    /// <remarks>
+    ///     The default implementation throws <see cref="NotSupportedException" />, like the unconditional
+    ///     rewrite on repositories without CK-cache-free write support.
+    /// </remarks>
+    Task<bool> RewriteAttributeValueIfUnchangedForMigrationAsync(
+        IOctoSession session,
+        RtCkId<CkTypeId> rtCkTypeId,
+        OctoObjectId rtId,
+        string attributeId,
+        object? expectedValue,
+        object? newValue)
+    {
+        throw new NotSupportedException(
+            "RewriteAttributeValueIfUnchangedForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can conditionally mutate a single attribute slot without CK cache validation.");
+    }
+
     #endregion Migration support
 }

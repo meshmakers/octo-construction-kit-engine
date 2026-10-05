@@ -299,7 +299,7 @@ public class BulkRtMutationSecretTests
     /// <summary>
     ///     The graph rule engine is internal to the contracts; these tests write no associations.
     /// </summary>
-    private sealed class NoAssociationsGraphRuleEngine : IGraphRuleEngine
+    internal sealed class NoAssociationsGraphRuleEngine : IGraphRuleEngine
     {
         public Task<GraphRuleEngineResult> ValidateAsync(IOctoSession session, IRepositoryDataSource repositoryDataSource,
             IReadOnlyList<IEntityUpdateInfo<RtEntity>> entityUpdateInfoList, IOriginFileResolver originFileResolver,

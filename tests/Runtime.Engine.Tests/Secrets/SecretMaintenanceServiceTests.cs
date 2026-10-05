@@ -68,19 +68,47 @@ public class SecretMaintenanceServiceTests
                 var skip = call.GetArgument<int?>(3) ?? 0;
                 var take = call.GetArgument<int?>(4) ?? int.MaxValue;
                 var all = _store.TryGetValue(typeId.FullName, out var list) ? list : [];
-                IResultSet<RtEntity> page = new ResultSet<RtEntity>(all.Skip(skip).Take(take), all.Count, null, null);
+                // Like a real repository, a read hands out copies: the sweep must not see later writes
+                // through the objects it read, and the store must not see the sweep's in-place changes.
+                IResultSet<RtEntity> page = new ResultSet<RtEntity>(all.Skip(skip).Take(take).Select(Copy).ToList(),
+                    all.Count, null, null);
                 return Task.FromResult(page);
             });
-        A.CallTo(() => _repository.RewriteAttributeValueForMigrationAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
-                A<OctoObjectId>._, A<string>._, A<object?>._))
-            .Invokes(call =>
+        A.CallTo(() => _repository.RewriteAttributeValueIfUnchangedForMigrationAsync(A<IOctoSession>._,
+                A<RtCkId<CkTypeId>>._, A<OctoObjectId>._, A<string>._, A<object?>._, A<object?>._))
+            .ReturnsLazily(call =>
             {
                 var rtId = call.GetArgument<OctoObjectId>(2);
                 var attribute = call.GetArgument<string>(3)!;
-                _rewrites.Add((rtId, attribute));
                 var entity = _store.Values.SelectMany(l => l).Single(e => e.RtId == rtId);
-                entity.SetAttributeRawValue(attribute, call.GetArgument<object?>(4));
+                _beforeConditionalRewrite?.Invoke(entity, attribute);
+                entity.Attributes.TryGetValue(attribute, out var stored);
+                if (!StoredAttributeValueComparer.AreEqual(stored, call.GetArgument<object?>(4)))
+                {
+                    return Task.FromResult(false);
+                }
+
+                _rewrites.Add((rtId, attribute));
+                entity.SetAttributeRawValue(attribute, call.GetArgument<object?>(5));
+                return Task.FromResult(true);
             });
+    }
+
+    /// <summary>
+    ///     Runs inside the faked conditional rewrite before the compare - simulates a write that lands
+    ///     between the sweep's read and its rewrite.
+    /// </summary>
+    private Action<RtEntity, string>? _beforeConditionalRewrite;
+
+    private static RtEntity Copy(RtEntity entity)
+    {
+        var copy = new RtEntity(entity.CkTypeId!, entity.RtId);
+        foreach (var (name, value) in entity.Attributes)
+        {
+            copy.SetAttributeRawValue(name, SecretMaintenanceService.CopyAttributeValue(value));
+        }
+
+        return copy;
     }
 
     private static RtSecretValue ProtectWithK2(string plaintext)
@@ -180,7 +208,10 @@ public class SecretMaintenanceServiceTests
         Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)credentials[0].Attributes["Value"]!).Envelope);
         Assert.Equal("k2", ((RtSecretValue)_e3.Attributes["Password"]!).KeyId); // Encrypt leaves enc:v2 alone
         Assert.Null(_e5.Attributes["Password"]);
-        Assert.Contains(result.Cleared, c => c.AttributePath == "Password" && c.PreviousForm == SecretValueForm.Placeholder);
+        // Placeholders were never set: they are counted, not listed for re-entry (decision 5).
+        Assert.Equal(2, result.PlaceholdersNormalized);
+        Assert.Empty(result.Cleared);
+        Assert.Equal(0, result.SkippedConcurrentlyModified);
         AssertResultCarriesNoValue(result);
 
         _rewrites.Clear();
@@ -279,8 +310,8 @@ public class SecretMaintenanceServiceTests
     [Fact]
     public async Task RewriteFailure_IsCountedAndNotReportedAsRewritten()
     {
-        A.CallTo(() => _repository.RewriteAttributeValueForMigrationAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
-                _e1.RtId, "Password", A<object?>._))
+        A.CallTo(() => _repository.RewriteAttributeValueIfUnchangedForMigrationAsync(A<IOctoSession>._,
+                A<RtCkId<CkTypeId>>._, _e1.RtId, "Password", A<object?>._, A<object?>._))
             .Throws(new InvalidOperationException("storage down"));
 
         var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
@@ -305,7 +336,96 @@ public class SecretMaintenanceServiceTests
         Assert.Null(_e5.Attributes["Password"]);
         Assert.Equal("plain-1", _e1.Attributes["Password"]);
         Assert.Equal(SecretTestModel.V1Vector, _e2.Attributes["ApiKey"]);
-        Assert.Equal(2, result.Cleared.Count);
+        Assert.Equal(2, result.PlaceholdersNormalized);
+        Assert.Empty(result.Cleared);
+    }
+
+    [Fact]
+    public async Task ConcurrentlyModifiedSecret_IsSkipped_AndTheNewerValueSurvives()
+    {
+        var newer = _protector.Protect("set-in-between");
+        _beforeConditionalRewrite = (entity, attribute) =>
+        {
+            if (entity.RtId == _e1.RtId && attribute == "Password")
+            {
+                entity.SetAttributeRawValue("Password", newer);
+            }
+        };
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
+            TestContext.Current.CancellationToken);
+
+        Assert.Same(newer, _e1.Attributes["Password"]);
+        Assert.Equal(1, result.SkippedConcurrentlyModified);
+        Assert.Equal(5, result.ValuesRewritten); // the skipped value is not counted as rewritten
+        Assert.True(result.Success);             // and it is not a failure
+        Assert.DoesNotContain(_rewrites, r => r.RtId == _e1.RtId && r.Attribute == "Password");
+        AssertResultCarriesNoValue(result);
+    }
+
+    [Fact]
+    public async Task ConcurrentlyModifiedPlaceholder_IsSkipped_AndNotCountedAsNormalised()
+    {
+        _beforeConditionalRewrite = (entity, attribute) =>
+        {
+            if (entity.RtId == _e2.RtId && attribute == "Password")
+            {
+                entity.SetAttributeRawValue("Password", _protector.Protect("entered-meanwhile"));
+            }
+        };
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("entered-meanwhile", _protector.Unprotect((RtSecretValue)_e2.Attributes["Password"]!));
+        Assert.Equal(1, result.PlaceholdersNormalized); // only _e5's placeholder
+        Assert.Equal(1, result.SkippedConcurrentlyModified);
+    }
+
+    [Fact]
+    public async Task ConcurrentlyModifiedRecordArray_IsSkipped_AsAWhole()
+    {
+        // Another writer replaces a non-secret member of the record array after the sweep read it.
+        _beforeConditionalRewrite = (entity, attribute) =>
+        {
+            if (entity.RtId == _e4.RtId && attribute == "Credentials")
+            {
+                entity.SetAttributeRawValue("Credentials", new List<RtRecord>
+                {
+                    _model.CredentialRecord("a", RtSecretValue.Protected(UnknownKidEnvelope)),
+                    _model.CredentialRecord("b", "rec-plain"),
+                    _model.CredentialRecord("c", "added-meanwhile")
+                });
+            }
+        };
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
+            TestContext.Current.CancellationToken);
+
+        var credentials = ((IEnumerable<RtRecord>)_e4.Attributes["Credentials"]!).ToList();
+        Assert.Equal(3, credentials.Count);
+        Assert.Equal("rec-plain", credentials[1].Attributes["Value"]); // the old array was not written back
+        Assert.Equal(1, result.SkippedConcurrentlyModified);
+        Assert.Equal(5, result.ValuesRewritten);
+    }
+
+    [Fact]
+    public async Task UnchangedRecordArray_IsRewritten_WithTheValueReadAsExpectedValue()
+    {
+        var calls = new List<object?>();
+        A.CallTo(() => _repository.RewriteAttributeValueIfUnchangedForMigrationAsync(A<IOctoSession>._,
+                A<RtCkId<CkTypeId>>._, _e4.RtId, "Credentials", A<object?>._, A<object?>._))
+            .Invokes(call => calls.Add(call.GetArgument<object?>(4)))
+            .Returns(Task.FromResult(true));
+
+        await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
+            TestContext.Current.CancellationToken);
+
+        // The expected value is the record array as read - with the plaintext member, not the encrypted one.
+        var expected = Assert.Single(calls);
+        var records = ((IEnumerable<object?>)expected!).Cast<RtRecord>().ToList();
+        Assert.Equal("rec-plain", records[1].Attributes["Value"]);
+        Assert.True(StoredAttributeValueComparer.AreEqual(_e4.Attributes["Credentials"], expected));
     }
 
     [Fact]

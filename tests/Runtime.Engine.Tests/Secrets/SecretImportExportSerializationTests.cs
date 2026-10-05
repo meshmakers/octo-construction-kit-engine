@@ -161,6 +161,32 @@ public class SecretImportExportSerializationTests
         Assert.Contains(values, v => Equals(v, RtSecretValue.Mask));
     }
 
+    [Fact]
+    public void Comparer_RecordConversionFails_FallbackChangeStillMasksSecretMembers()
+    {
+        // The fallback reports the raw repository values when a record conversion throws (AB#5532 review):
+        // a legacy clear-text string in a Secret member of a raw RtRecord must not leave the comparer.
+        var tenant = _model.NewConfig();
+        tenant.SetAttributeRawValue("Credentials", new List<RtRecord> { _model.CredentialRecord("a", Plain) });
+        var seed = new RtEntityTcDto { RtId = tenant.RtId, CkTypeId = tenant.CkTypeId! };
+        seed.Attributes.Add(new RtAttributeTcDto
+        {
+            Id = AttrId(_model.Config, "Credentials"), Value = new List<object> { CredentialDto("a", "<SET>") }
+        });
+
+        object? Throwing(object? value) =>
+            value is IEnumerable<RtRecord> ? throw new InvalidOperationException("stale record") : value;
+
+        var changes = BlueprintEntityComparer.Compare(seed, tenant, _model.Config, Throwing, _ => null, ResolveRecord);
+
+        var change = Assert.Single(changes, c => c.AttributeName == "Credentials");
+        var stored = Assert.IsAssignableFrom<System.Collections.IEnumerable>(change.OldValue).Cast<object>().ToList();
+        var record = Assert.IsType<RtRecord>(Assert.Single(stored));
+        Assert.Equal(RtSecretValue.Mask, record.Attributes["Value"]);
+        Assert.Equal("a", record.Attributes["Key"]);
+        Assert.DoesNotContain(MemberValues(change.NewValue), v => v is string text && text == "<SET>");
+    }
+
     private static IEnumerable<object?> MemberValues(object? value)
     {
         switch (value)

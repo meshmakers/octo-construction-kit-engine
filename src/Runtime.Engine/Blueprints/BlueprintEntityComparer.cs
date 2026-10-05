@@ -170,11 +170,14 @@ internal static class BlueprintEntityComparer
                 continue;
             }
 
+            // AB#5532: the fallback after a failed record conversion reports the raw values - their
+            // Secret members are redacted here too (a raw RtRecord may carry a legacy string).
+            var isRecordValued = attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray;
             changes.Add(new BlueprintAttributeChange
             {
                 AttributeName = attribute.AttributeName,
-                OldValue = storedValue,
-                NewValue = seedValue
+                OldValue = isRecordValued ? RedactSecretMembers(storedValue, resolveRecord) : storedValue,
+                NewValue = isRecordValued ? RedactSecretMembers(seedValue, resolveRecord) : seedValue
             });
         }
 
@@ -585,6 +588,25 @@ internal static class BlueprintEntityComparer
                 }
 
                 return copy;
+            }
+            case RtRecord raw:
+            {
+                // Repository shape (only reached on the comparer's fallback path).
+                var graph = resolveRecord != null && raw.CkRecordId is { IsEmpty: false }
+                    ? resolveRecord(raw.CkRecordId)
+                    : null;
+                var members = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var (name, memberValue) in raw.Attributes)
+                {
+                    var isSecret = memberValue is RtSecretValue ||
+                                   (graph != null && graph.AllAttributesByName.TryGetValue(name, out var member) &&
+                                    member.ValueType == AttributeValueTypesDto.Secret);
+                    members[name] = isSecret
+                        ? memberValue == null ? null : RtSecretValue.Mask
+                        : RedactSecretMembers(memberValue, resolveRecord);
+                }
+
+                return new RtRecord(raw.CkRecordId!, members);
             }
             case string:
                 return value;

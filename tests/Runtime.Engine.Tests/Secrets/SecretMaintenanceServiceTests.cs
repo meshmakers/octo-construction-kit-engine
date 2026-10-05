@@ -329,6 +329,28 @@ public class SecretMaintenanceServiceTests
     }
 
     [Fact]
+    public async Task Paging_UsesADeterministicRtIdOrder_AndIncludesArchivedEntities()
+    {
+        var seen = new List<RtEntityQueryOptions>();
+        A.CallTo(() => _repository.GetRtEntitiesByTypeAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+                A<RtEntityQueryOptions>._, A<int?>._, A<int?>._))
+            .Invokes(call => seen.Add(call.GetArgument<RtEntityQueryOptions>(2)!))
+            .Returns(Task.FromResult<IResultSet<RtEntity>>(new ResultSet<RtEntity>([], 0, null, null)));
+
+        await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Verify,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotEmpty(seen);
+        Assert.All(seen, options =>
+        {
+            var sort = Assert.Single(options.SortOrders!);
+            Assert.Equal(SecretMaintenanceService.RtIdSortPath, sort.AttributePath);
+            Assert.Equal(SortOrders.Ascending, sort.SortOrder);
+            Assert.True(options.GlobalFilter?.IncludeArchived);
+        });
+    }
+
+    [Fact]
     public async Task UnknownTenant_Throws()
     {
         A.CallTo(() => _provider.GetRepositoryAsync("nope", A<CancellationToken>._))

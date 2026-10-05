@@ -28,6 +28,11 @@ internal sealed class SecretMaintenanceService(
 {
     private const string NormalizePlaceholdersModeTag = "normalize_placeholders";
 
+    /// <summary>
+    ///     Paging cursor of the sweep: the runtime id (resolved to <c>_id</c> by the MongoDB field resolver).
+    /// </summary>
+    internal const string RtIdSortPath = "rtId";
+
     /// <inheritdoc />
     public Task<SecretSweepResult> SweepTenantAsync(string tenantId, SecretSweepMode mode,
         CancellationToken cancellationToken = default)
@@ -104,9 +109,13 @@ internal sealed class SecretMaintenanceService(
             while (true)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                // Archived entities hold secrets too. No sort order: rewrites never change membership or
-                // the storage order of a document, so offset paging is stable.
-                var queryOptions = RtEntityQueryOptions.Create().Global(true).WithCachingDisabled();
+                // Archived entities hold secrets too. Offset paging needs a deterministic order: without a
+                // sort the backend may return pages in plan order (index or natural order), which is not
+                // guaranteed to be stable across the queries of one sweep, so an entity could be skipped
+                // (left as plaintext) or seen twice. rtId ("_id") is indexed and never changes on a
+                // rewrite - same cursor as the display rule sweep (AB#5532 review).
+                var queryOptions = RtEntityQueryOptions.Create().Global(true).WithCachingDisabled()
+                    .SortOrder(RtIdSortPath, SortOrders.Ascending);
                 var page = await repository.GetRtEntitiesByTypeAsync(session, type.CkTypeId.ToRtCkId(),
                     queryOptions, skip, batchSize).ConfigureAwait(false);
                 var entities = page.Items.ToList();

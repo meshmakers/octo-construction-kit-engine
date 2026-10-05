@@ -40,7 +40,19 @@
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
-    <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
+    <!--
+        CkCompile, CkRestore and CkIncludeFiles run right before PrepareResources, i.e. after
+        ResolveProjectReferences has built the projects this one references, and before the embedded
+        resources and the AdditionalFiles of the source generator are consumed. (Hooking
+        AfterTargets="ResolveProjectReferences" instead re-runs the targets in the inner project calls
+        of GeneratePackageOnBuild and publishes every model twice.) A CK model project that depends on another CK model of this
+        repository (System.StreamData on System) references its project; the referenced project
+        publishes its model to the local file system catalog while it builds, so the dependent compile
+        resolves the version built here instead of whatever the remote catalog cache last saw. Running
+        before BeforeBuild (as before AB#5532) compiled the dependent model before its dependency was
+        built - System.StreamData 1.14.0 pinned System 2.3.0 that way.
+    -->
+    <Target Name="CkCompile" BeforeTargets="PrepareResources" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
@@ -78,14 +90,14 @@
         </Exec>
     </Target>
 
-    <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
+    <Target Name="CkRestore" BeforeTargets="PrepareResources"
             DependsOnTargets="GatherImportFiles">      
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder) $(_OctoLcrArg)">
         </Exec>
     </Target>
     
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild" >
+    <Target Name="CkIncludeFiles" DependsOnTargets="CkRestore;CkCompile" BeforeTargets="PrepareResources" >
         <ItemGroup>
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">

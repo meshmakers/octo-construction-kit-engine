@@ -12,6 +12,11 @@
         <!-- See SystemCkModel.csproj for the rationale on _IsPacking. -->
         <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoPublishCkModel>
         <OctoGenerateCkDocumentation Condition="'$(TargetFramework)' == 'net10.0' AND '$(_IsPacking)' != 'true'">true</OctoGenerateCkDocumentation>
+        <!-- System.StreamData depends on System, which SystemCkModel (a project reference) publishes to the
+             local file system catalog while it builds. The local catalog must take part in the compile, or
+             the dependency resolves from the remote catalog cache, which only knows the System versions
+             published so far (a new System minor would fail the System floor, AB#5532). -->
+        <OctoLocalCatalogIsEnabled>true</OctoLocalCatalogIsEnabled>
     </PropertyGroup>
 
     <ItemGroup>

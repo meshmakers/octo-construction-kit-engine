@@ -38,6 +38,16 @@ public class CkRecordDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public bool IsAbstract { get; set; }
+
+    /// <summary>
+    ///     Name of the sub-attribute that identifies an element of this record inside a record
+    ///     array (AB#5528, concept §4.6). Required when the record contains a
+    ///     <see cref="AttributeValueTypesDto.Secret" /> sub-attribute: when a record array is
+    ///     replaced, a secret sub-value the client left empty is carried over from the stored
+    ///     element with the same key. Inherited by derived records unless they declare their own.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public string? RecordKey { get; set; }
     
     /// <summary>
     ///     An optional description of the record

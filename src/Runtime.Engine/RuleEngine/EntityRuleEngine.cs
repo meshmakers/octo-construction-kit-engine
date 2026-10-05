@@ -163,7 +163,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
             if (!attribute.IsOptional && (!rtType.Attributes.ContainsKey(attribute.AttributeName) ||
                                           rtType.Attributes[attribute.AttributeName] == null))
             {
-                if (attribute.DefaultValues != null)
+                // AB#5528: a Secret attribute never takes a default (the compiler forbids them) - a
+                // required secret without a value is reported as missing below.
+                if (attribute.DefaultValues != null && attribute.ValueType != AttributeValueTypesDto.Secret)
                 {
                     switch (attribute.ValueType)
                     {

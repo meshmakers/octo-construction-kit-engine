@@ -99,4 +99,15 @@ public enum AttributeValueTypesDto
     /// Geo spatial data according to RFC 7946 section 3.2.1
     /// </summary>
     GeospatialPoint = 16,
+
+    /// <summary>
+    ///     A credential (password, client secret, API key, token, private key). The value is a
+    ///     string on input, but the engine never stores or returns it in clear text: it is
+    ///     encrypted with the instance key ring (envelope <c>enc:v2:&lt;kid&gt;:...</c>) and read
+    ///     back as an <c>RtSecretValue</c>. Secret attributes are always owned by the tenant
+    ///     (ownership <see cref="AttributeOwnershipDto.Secret" />), cannot carry default values,
+    ///     cannot be indexed, filtered, sorted or used in query columns, and a model that uses
+    ///     them must depend on <c>System &gt;= 2.5</c> (AB#5528).
+    /// </summary>
+    Secret = 17,
 }

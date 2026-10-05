@@ -67,7 +67,7 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkRecordDto)] =
             [
                 nameof(CkRecordDto.RecordId), nameof(CkRecordDto.DerivedFromCkRecordId), nameof(CkRecordDto.IsFinal),
-                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description)
+                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description), nameof(CkRecordDto.RecordKey)
             ],
             [typeof(CkAssociationRoleDto)] =
             [
@@ -244,6 +244,8 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatReference(currentRecord.DerivedFromCkRecordId, modelName));
                 AddModified(recordChanges, CkModelElementKind.Record, id, "isFinal", baselineRecord.IsFinal, currentRecord.IsFinal);
                 AddModified(recordChanges, CkModelElementKind.Record, id, "isAbstract", baselineRecord.IsAbstract, currentRecord.IsAbstract);
+                AddModified(recordChanges, CkModelElementKind.Record, id, "recordKey",
+                    baselineRecord.RecordKey, currentRecord.RecordKey);
                 AddModified(recordChanges, CkModelElementKind.Record, id, "description",
                     baselineRecord.Description, currentRecord.Description);
 

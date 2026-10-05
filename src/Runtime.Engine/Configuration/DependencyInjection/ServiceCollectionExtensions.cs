@@ -5,6 +5,7 @@ using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.RuleEngine;
+using Meshmakers.Octo.Runtime.Contracts.Secrets;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer;
@@ -15,10 +16,12 @@ using Meshmakers.Octo.Runtime.Engine.Configuration.DependencyInjection;
 using Meshmakers.Octo.Runtime.Engine.Exchange;
 using Meshmakers.Octo.Runtime.Engine.Repositories;
 using Meshmakers.Octo.Runtime.Engine.RuleEngine;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Meshmakers.Octo.Runtime.Engine.Security;
 using Meshmakers.Octo.Runtime.Engine.Serialization;
 using Meshmakers.Octo.Runtime.Engine.StreamData;
 using Meshmakers.Octo.Runtime.Engine.TransportContainer;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
@@ -55,6 +58,21 @@ public static class ServiceCollectionExtensions
         // and the caller-specific read-filter factory
         services.TryAddSingleton<IDataPermissionResolver, DataPermissionResolver>();
         services.TryAddSingleton<IDataSecurityFilterFactory, DataSecurityFilterFactory>();
+
+        // Secret attribute key ring (AB#5528, concept §3.5): bound from SecretEncryption in the
+        // host configuration, so every engine host gets it. Without keys the host still starts;
+        // encrypting/decrypting then throws SecretEncryptionNotConfiguredException. IConfiguration
+        // is optional on purpose: tools like the CK compiler register no configuration.
+        services.AddOptions<SecretEncryptionOptions>()
+            .Configure<IServiceProvider>((options, serviceProvider) =>
+            {
+                var configuration = serviceProvider.GetService<IConfiguration>();
+                configuration?.GetSection(SecretEncryptionOptions.SectionName).Bind(options);
+                // Key ids are matched case-insensitively whatever dictionary the binder produced.
+                options.Keys = new Dictionary<string, string>(options.Keys ?? new Dictionary<string, string>(),
+                    StringComparer.OrdinalIgnoreCase);
+            });
+        services.TryAddSingleton<ISecretAttributeProtector, SecretAttributeProtector>();
 
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();

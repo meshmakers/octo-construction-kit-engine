@@ -93,6 +93,10 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 change.NewValue == "true"
                     ? (CkSemVerLevel.Major, "instantiation/derivation breaks")
                     : (CkSemVerLevel.Minor, "relaxation"),
+            // AB#5528: the record key only decides how secret sub-values are carried over when a
+            // record array is replaced; no stored data or schema shape changes.
+            { ElementKind: CkModelElementKind.Record, Property: "recordKey" } =>
+                (CkSemVerLevel.Minor, "record element identity for secret carry-over changes, no data break"),
             { ElementKind: CkModelElementKind.Type, Property: "isCollectionRoot" } =>
                 change.NewValue == "true"
                     ? (CkSemVerLevel.Minor, "type becomes a collection root")
@@ -105,6 +109,14 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "ownership semantics for owned-only data permissions change"),
 
             // ── Attribute definitions ───────────────────────────────────────────────────────
+            // AB#5528 decision 2: String -> Secret keeps stored data readable - readers accept the
+            // legacy plaintext during the transition and the sweep encrypts it afterwards - so the
+            // conversion of a credential attribute is Minor. Every other value-type change,
+            // including Secret -> String, stays Major.
+            { ElementKind: CkModelElementKind.Attribute, Property: "valueType",
+                OldValue: nameof(AttributeValueTypesDto.String), NewValue: nameof(AttributeValueTypesDto.Secret) } =>
+                (CkSemVerLevel.Minor,
+                    "String -> Secret: stored values stay readable (legacy plaintext is accepted until the sweep encrypts it); clients that select the value must switch to the is-set state"),
             { ElementKind: CkModelElementKind.Attribute, Property: "valueType" } =>
                 (CkSemVerLevel.Major, "data format breaks"),
             { ElementKind: CkModelElementKind.Attribute, Property: "valueCkEnumId" or "valueCkRecordId" } =>

@@ -463,6 +463,12 @@ internal class BulkRtMutation(
             .ConfigureAwait(false);
     }
 
+    // TODO AB#5532 (SECRET write path, concept §3.6): insert, replace and update-by-type must run
+    // every Secret attribute (and Secret record sub-attribute, keyed by CkRecordGraph.RecordKey)
+    // through the secret write step next to the linked-binary handling below: RtSecretValue.Pending
+    // non-empty -> ISecretAttributeProtector.Protect; "" -> keep the stored value; placeholder
+    // (SecretAttributeConventions.IsPlaceholder) -> null; Protected -> pass through; null -> clear.
+
     #region Linked Binary
 
     private static async Task HandleDeleteLinkedBinary(IOctoSession session,

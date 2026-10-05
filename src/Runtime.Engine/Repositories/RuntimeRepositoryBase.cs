@@ -859,7 +859,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         foreach (var ckTypeAttributeDto in ckTypeGraph.AllAttributes.Values)
         {
             object? value = null;
-            if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any())
+            // AB#5528: Secret attributes never take a default (the compiler forbids them).
+            // TODO AB#5532: CreateTransientRtEntity, BulkInsertRtEntitiesAsync,
+            // InsertOneRtEntityForMigrationAsync and RewriteAttributeValueForMigrationAsync bypass
+            // BulkRtMutation and must call the secret write step explicitly (concept §3.6).
+            if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any()
+                && ckTypeAttributeDto.ValueType != AttributeValueTypesDto.Secret)
             {
                 switch (ckTypeAttributeDto.ValueType)
                 {

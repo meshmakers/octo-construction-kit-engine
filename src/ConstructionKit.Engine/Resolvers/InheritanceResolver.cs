@@ -220,7 +220,15 @@ internal class InheritanceResolver : IInheritanceResolver
 
             if (i == segments.Length - 1)
             {
-                if (attribute.ValueType != AttributeValueTypesDto.String)
+                if (attribute.ValueType == AttributeValueTypesDto.Secret)
+                {
+                    // AB#5528: a Secret attribute is stored encrypted and never compared or
+                    // projected, so it can never identify the owner of an entity.
+                    operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
+                        ownerAttributePath,
+                        "the terminal attribute is a Secret attribute - secrets cannot be owner attributes"));
+                }
+                else if (attribute.ValueType != AttributeValueTypesDto.String)
                 {
                     operationResult.AddMessage(MessageCodes.OwnerAttributeInvalid(location, ckTypeId,
                         ownerAttributePath,
@@ -331,6 +339,23 @@ internal class InheritanceResolver : IInheritanceResolver
     }
 
     /// <summary>
+    /// Fills an undeclared record key from the base-record chain (AB#5528, concept §4.6). The chain
+    /// is ordered nearest-first, so the nearest declaring base wins; a key declared on the record
+    /// itself is never overwritten.
+    /// </summary>
+    private static void InheritRecordKey(CkModelGraph modelGraph, CkRecordGraph recordGraph,
+        IEnumerable<CkGraphRecordInheritance> baseRecords)
+    {
+        foreach (var baseRecord in baseRecords)
+        {
+            if (modelGraph.Records.TryGetValue(baseRecord.BaseCkRecordId, out var baseGraph))
+            {
+                recordGraph.InheritRecordKey(baseGraph.RecordKey);
+            }
+        }
+    }
+
+    /// <summary>
     /// Safe version of GetBaseTypes that does not throw on broken inheritance chains.
     /// Returns null if the type's model should be marked as failed.
     /// </summary>
@@ -420,6 +445,7 @@ internal class InheritanceResolver : IInheritanceResolver
             }
 
             recordGraph.AddBaseRecords(baseTypes);
+            InheritRecordKey(modelGraph, recordGraph, baseTypes);
 
             foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
             {
@@ -705,6 +731,7 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             var baseTypes = GetBaseRecords(modelGraph, ckRecordId, originFileResolver, operationResult);
             recordGraph.AddBaseRecords(baseTypes);
+            InheritRecordKey(modelGraph, recordGraph, baseTypes);
 
             foreach (var ckTypeAttribute in recordGraph.DefinedAttributes)
             {

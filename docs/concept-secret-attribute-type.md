@@ -83,6 +83,25 @@ Paths that bypass `BulkRtMutation` call the step explicitly: `RuntimeRepositoryB
 4. **Filters**: only `IS_NULL` / `IS_NOT_NULL`. Sort, text search, aggregations, group-by are refused (`SecretAttributeNotQueryable`). Secret attributes are excluded from query columns, RtQuery, archive paths and CrateDB columns.
 5. **Data permissions** stay type-level row filters: read shows `isSet`, writing a secret needs write permission. No permission grants decryption through the public API.
 6. **Secrets in records (decision 4)**: a record (array) attribute is written as a whole, so "unchanged" must be resolved per element. Rule: when a record array is replaced, a secret sub-value that is `null`/`""` in an incoming element is carried over from the stored element **with the same record key** — a record type with secret sub-attributes must declare a key sub-attribute (new compiler rule: `recordKey`), otherwise by **position** for single records. Projection of a record element shows `{ isSet }` for the secret sub-field. This also brings `ValueOverride.Value` (`IsSecret`) and AI provider records under the SECRET type; their `enc:v1` values migrate like any other.
+
+   **Record key — implementation (AB#5531).** The key is declared on the record definition, not on the attribute assignment, because it is a property of the record type that every record-array attribute using it shares:
+
+   ```yaml
+   records:
+     - recordId: ValueOverride
+       recordKey: Key            # names a sub-attribute of the record
+       attributes:
+         - id: ${this}/Key
+           name: Key
+         - id: ${this}/OverrideValue
+           name: Value            # valueType: Secret
+   ```
+
+   - Schema: `recordKey` (string, PascalCase attribute name) in `construction-kit-elements-record.schema.json`; `CkRecordDto.RecordKey`; the effective key (own or inherited from the nearest base record) is `CkRecordGraph.RecordKey`.
+   - Compiler: a record whose own or inherited attributes contain a Secret attribute must have an effective `recordKey` (message 76) — on the record type, regardless of whether it is used as `Record` or `RecordArray`, because a record type defined for single use can be reused in an array by another model. A declared key must name a required `String`, `Int`, `Int64` or `Enum` sub-attribute that is not Secret (message 77).
+   - SemVer: setting, clearing or changing `recordKey` is Minor.
+   - Single `Record` attributes still carry over by position (there is exactly one element); the key is used for `RecordArray`. The carry-over itself is WP2 (AB#5532).
+   - WP3 (AB#5533): the MongoDB CK record document must round-trip `recordKey`, otherwise the runtime cache reads `null` (same failure class as AB#4589 for `isRuntimeState`).
 7. **MCP**: entity CRUD tools inherit the server behaviour; tools that set secrets are classified high risk; `clearSecretAttributes` argument added. **octo-cli**: new admin command `SecretStatus` (wraps the verify sweep) and `ReprotectSecrets`.
 
 ## 5. Existing secrets — migration

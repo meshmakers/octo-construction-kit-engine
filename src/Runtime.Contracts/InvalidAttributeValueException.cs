@@ -54,6 +54,14 @@ public class InvalidAttributeValueException : PersistenceException
             $"Attribute with name '{attributeName}' does not exist for '{location}'");
     }
 
+    internal static Exception SecretNotReadableAsString(string location, string attributeName)
+    {
+        return new InvalidAttributeValueException(
+            $"Attribute '{attributeName}' of '{location}' is a Secret attribute and cannot be read as a string. " +
+            "Use GetAttributeSecretValueOrDefault to check whether it is set; the plaintext is only available " +
+            "server-side through ISecretAttributeProtector.");
+    }
+
     internal static Exception InvalidDataType(string getLocation, string attributeName, Type actualType, Type expectType)
     {
         return new InvalidAttributeValueException(

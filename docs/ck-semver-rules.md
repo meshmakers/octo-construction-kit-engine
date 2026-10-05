@@ -115,7 +115,7 @@ surface in the dependency diff.
 | ------ | --------- |
 | Type, attribute, enum, record, or association role **removed** | Consumers reference the element |
 | Attribute assignment removed from a type, record, or association role | Consumers reference the attribute |
-| `valueType` of an attribute changed | Data format breaks |
+| `valueType` of an attribute changed (every change except `String → Secret`, including `Secret → String`) | Data format breaks |
 | `valueCkEnumId` / `valueCkRecordId` changed | Reference target breaks |
 | Attribute assignment references a different attribute definition (`id` changed) | Value semantics may break (defensive) |
 | Type attribute changed from optional to **required** (`isOptional: true → false`) | Existing instances may become invalid |
@@ -153,6 +153,8 @@ surface in the dependency diff.
 | `isRuntimeState` changed (deprecated alias) | Blueprint re-apply behavior changes |
 | Attribute `ownership` changed (resolved value) | Blueprint re-apply and export behavior change |
 | Attribute-assignment `ownership` override set, cleared or changed | Re-apply and export behavior change for that assignment |
+| `valueType` changed from `String` to `Secret` (AB#5528, decision 2) | Stored values stay readable: readers accept legacy plaintext in a Secret slot until the encrypt sweep has run, and the effective ownership becomes `Secret` (re-apply keeps the value, export drops it). Clients that select the value as a string must switch to the is-set state before the model change (concept phase 2) |
+| Record `recordKey` set, cleared or changed (AB#5528) | Only decides how secret sub-values are carried over when a record array is replaced; no data or schema change |
 | Attribute `metaData` changed | Metadata only, no data break |
 | `enableChangeStreamPreAndPostImages` changed | Change stream behavior, no data break |
 | Type becomes a collection root (`isCollectionRoot: false → true`) | Additive |

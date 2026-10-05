@@ -347,7 +347,7 @@
       "number": 58,
       "level": "ERROR",
       "text": "Enum '{ckEnumId}', key '{CKEnumKey}' cannot be negative."
-    }, 
+    },
     {
       "key": "AttributeUsesUnknownCkEnumId",
       "number": 59,
@@ -395,6 +395,72 @@
       "number": 66,
       "level": "FATALERROR",
       "text": "Multiple versions of construction kit model '{modelName}' were resolved as transitive dependencies: {versions}. Conflicting versions are referenced by: {origins}. This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled)."
+    },
+    {
+      "key": "DisplayRuleSyntaxInvalid",
+      "number": 67,
+      "level": "ERROR",
+      "text": "Display rule '{ruleProperty}' of type '{ckTypeId}' is invalid: {errorMessage}"
+    },
+    {
+      "key": "DisplayRuleAttributePathUnknown",
+      "number": 68,
+      "level": "ERROR",
+      "text": "Display rule '{ruleProperty}' of type '{ckTypeId}' references unknown attribute path '{attributePath}'. Only own attributes (including record paths) can be referenced; associations are not supported."
+    },
+    {
+      "key": "OwnerAttributeInvalid",
+      "number": 69,
+      "level": "ERROR",
+      "text": "Owner attribute '{ownerAttributePath}' of type '{ckTypeId}' is invalid: {reason}"
+    },
+    {
+      "key": "SecretAttributeHasDefaultValues",
+      "number": 70,
+      "level": "ERROR",
+      "text": "Secret attribute '{ckAttributeId}' declares defaultValues. A Secret attribute cannot have default values - a credential must never ship with the model; set it after installation."
+    },
+    {
+      "key": "SecretAttributeAssignmentInvalid",
+      "number": 71,
+      "level": "ERROR",
+      "text": "Secret attribute '{attributeName}' ('{ckAttributeId}') of '{ckElementId}' is invalid: {reason}"
+    },
+    {
+      "key": "SecretAttributeOwnershipNotSecret",
+      "number": 72,
+      "level": "ERROR",
+      "text": "Secret attribute '{attributeName}' of '{ckElementId}' declares ownership '{ownership}'. The effective ownership of a Secret attribute is always 'Secret'; remove the override or declare 'ownership: Secret'."
+    },
+    {
+      "key": "SecretAttributeIndexed",
+      "number": 73,
+      "level": "ERROR",
+      "text": "Index of type '{ckTypeId}' references Secret attribute path '{attributePath}'. Secret attributes cannot be indexed - the stored value is ciphertext."
+    },
+    {
+      "key": "SecretAttributeReferencedByDisplayRule",
+      "number": 74,
+      "level": "ERROR",
+      "text": "Display rule '{ruleProperty}' of type '{ckTypeId}' references Secret attribute path '{attributePath}'. Display rules cannot reveal Secret attributes."
+    },
+    {
+      "key": "SecretAttributeRequiresSystemDependency",
+      "number": 75,
+      "level": "ERROR",
+      "text": "Construction kit model '{modelId}' uses Secret attributes and must depend on System >= {minimumVersion} (declared: {declaredDependency}). Declare the dependency as 'System-[{minimumVersion},3.0)' so engines that do not know the Secret value type fail with a dependency error."
+    },
+    {
+      "key": "RecordWithSecretRequiresRecordKey",
+      "number": 76,
+      "level": "ERROR",
+      "text": "Record '{ckRecordId}' contains Secret attribute(s) {secretAttributes} but declares no 'recordKey'. A record with Secret sub-attributes must name the sub-attribute that identifies an element, so a secret left empty on a record array replace can be carried over from the stored element with the same key."
+    },
+    {
+      "key": "RecordKeyInvalid",
+      "number": 77,
+      "level": "ERROR",
+      "text": "Record key '{recordKey}' of record '{ckRecordId}' is invalid: {reason}"
     }
   ]
 }

@@ -171,6 +171,18 @@ internal static class AttributeCodeGenerator
                               "), AttributeValueTypesDto.BinaryLinked, value);");
                 sb.AppendLine("  }");
                 break;
+            case AttributeValueTypesDto.Secret:
+                // AB#5528: a Secret attribute is never a string property - consumers that read
+                // `.Password` as a string must stop compiling instead of silently receiving
+                // ciphertext. Always nullable: reads only tell whether a secret is set; the
+                // plaintext is only available through ISecretAttributeProtector.
+                sb.AppendLine($"  public RtSecretValue? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeSecretValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.Secret, value);");
+                sb.AppendLine("  }");
+                break;
             default:
                 sb.AppendLine($"  // Unsupported by Generator: {ckTypeAttributeDto.AttributeName} (Type: {ckAttributeGraph.ValueType})");
                 break;            
@@ -330,6 +342,18 @@ internal static class AttributeCodeGenerator
                 sb.AppendLine("      get => GetAttributeLinkedBinaryValue(nameof(" + ckTypeAttributeDto.AttributeName + "));");
                 sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
                               "), AttributeValueTypesDto.BinaryLinked, value);");
+                sb.AppendLine("  }");
+                break;
+            case AttributeValueTypesDto.Secret:
+                // AB#5528: a Secret attribute is never a string property - consumers that read
+                // `.Password` as a string must stop compiling instead of silently receiving
+                // ciphertext. Always nullable: reads only tell whether a secret is set; the
+                // plaintext is only available through ISecretAttributeProtector.
+                sb.AppendLine($"  public RtSecretValue? {ckTypeAttributeDto.AttributeName}");
+                sb.AppendLine("  {");
+                sb.AppendLine("      get => GetAttributeSecretValueOrDefault(nameof(" + ckTypeAttributeDto.AttributeName + "));");
+                sb.AppendLine("      set => SetAttributeValue(nameof(" + ckTypeAttributeDto.AttributeName +
+                              "), AttributeValueTypesDto.Secret, value);");
                 sb.AppendLine("  }");
                 break;
             default:

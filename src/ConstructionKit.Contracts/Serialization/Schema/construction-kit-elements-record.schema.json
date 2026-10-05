@@ -30,6 +30,11 @@
             "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-attribute.schema.json#/definitions/CkTypeAttribute"
           }
         },
+        "recordKey": {
+          "type": "string",
+          "pattern": "^[A-Z][a-zA-Z0-9]*$",
+          "description": "Name of the sub-attribute that identifies an element of this record inside a record array (AB#5528). Required when the record (or a base record) contains a Secret sub-attribute: when a record array is replaced, a secret the client left empty is carried over from the stored element with the same key. The key attribute must be a required String, Int, Int64 or Enum attribute of the record. Inherited by derived records unless they declare their own."
+        },
         "enableChangeStreamPreAndPostImages": {
           "type": "boolean"
         },

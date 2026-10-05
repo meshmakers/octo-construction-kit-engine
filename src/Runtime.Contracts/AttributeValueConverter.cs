@@ -44,6 +44,8 @@ public static class AttributeValueConverter
                 return typeof(string[]);
             case AttributeValueTypesDto.TimeSpan:
                 return typeof(TimeSpan);
+            case AttributeValueTypesDto.Secret:
+                return typeof(RtSecretValue);
             default:
                 throw new NotSupportedException($"AttributeValueTypesDto '{attributeValueTypes}' is not supported.");
         }
@@ -287,6 +289,8 @@ public static class AttributeValueConverter
                 var rtRecord = (RtRecord)value;
 
                 return new RtRecord(rtRecord.CkRecordId, rtRecord.Attributes);
+            case AttributeValueTypesDto.Secret:
+                return ConvertSecretValue(value);
             case AttributeValueTypesDto.BinaryLinked:
                 if (value is EntityBinaryInfo binaryInfo)
                 {
@@ -301,5 +305,26 @@ public static class AttributeValueConverter
         }
 
         return value;
+    }
+
+    /// <summary>
+    ///     AB#5528: a Secret slot always holds an <see cref="RtSecretValue" />. An existing value is
+    ///     passed through (upsert preservation, restore and sweep hand in protected values); any
+    ///     string-like input is API input and becomes <see cref="RtSecretValueState.Pending" /> -
+    ///     NOT trimmed, whitespace is part of a credential. The write step (AB#5532) decides what a
+    ///     pending value means: non-empty is encrypted, <c>""</c> keeps the stored value, a
+    ///     <c>&lt;placeholder&gt;</c> is stored as "not set". Read paths that find a string in the
+    ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533).
+    /// </summary>
+    private static object ConvertSecretValue(object value)
+    {
+        return value switch
+        {
+            RtSecretValue secretValue => secretValue,
+            string text => RtSecretValue.Pending(text),
+            JsonElement { ValueKind: JsonValueKind.String } element => RtSecretValue.Pending(element.GetString() ?? string.Empty),
+            JValue { Type: JTokenType.String } token => RtSecretValue.Pending((string?)token ?? string.Empty),
+            _ => RtSecretValue.Pending(Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty)
+        };
     }
 }

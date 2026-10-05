@@ -407,6 +407,11 @@ internal class CkTypeQueryColumnCollector(CkModelGraph ckModelGraph)
 
                     TrackProducedColumns(recordColumns.Count * 2);
                     break;
+                case AttributeValueTypesDto.Secret:
+                    // AB#5528: a Secret attribute is never a query column - not filterable,
+                    // sortable or projectable (concept §4.4). Excluding it here keeps it out of
+                    // GraphQL query columns, RtQuery and every consumer of the column list.
+                    break;
                 case AttributeValueTypesDto.StringArray:
                 case AttributeValueTypesDto.IntArray:
 

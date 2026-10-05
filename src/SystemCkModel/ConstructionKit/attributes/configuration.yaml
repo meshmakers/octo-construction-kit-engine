@@ -9,12 +9,21 @@ attributes:
     valueCkEnumId: ${this}/EnvironmentModes
     defaultValues:
       - 0
+  # AB#5497 - MaintenanceLevel and the two observability switches below are operator decisions
+  # taken on the running tenant, not seed content: the System.TenantMode seed only carries the
+  # start value. The platform-services tenant-online refresh re-applies that blueprint with
+  # force, and until these were TenantOwned every re-apply (nightly on prod-1, 2.-5.10.2026)
+  # reset them to the seed - MaintenanceLevel back to Off, both switches back to false, and
+  # with them every octo.workload.* / octo.pipeline.* series the controller publishes. TenantOwned
+  # rather than RuntimeState: an export has to carry them, or a transferred tenant would come up
+  # dark and out of its maintenance window.
   - id: MaintenanceLevel
     description: "Defines the maintenance state of the tenant (Off, UserApps, FullSystem)."
     valueType: Enum
     valueCkEnumId: ${this}/MaintenanceLevels
     defaultValues:
       - 0
+    ownership: TenantOwned
   # Per-tenant observability opt-in. Two separate switches rather than one, because the
   # two areas are produced by different services from different data and a tenant can
   # reasonably want one without the other. Deliberately NOT a flags enum: the CK model
@@ -29,6 +38,7 @@ attributes:
     valueType: Boolean
     defaultValues:
       - false
+    ownership: TenantOwned
   # Requires the communication controller to be enabled for the tenant. If it is not,
   # the emitting job skips the tenant SILENTLY - the setting states the intent, the job
   # decides what is possible. Validating it in the UI would force the configuration page
@@ -38,3 +48,4 @@ attributes:
     valueType: Boolean
     defaultValues:
       - false
+    ownership: TenantOwned

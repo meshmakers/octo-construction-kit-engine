@@ -60,6 +60,8 @@ Final full build after round 2: 38/38 green. Round-2 test run (final HEADs; asse
 Decided by the PO (authorised): SecretManagement is granted automatically only to holders of both AdminPanelManagement and TenantManagement (and TenantOwners), run-once marker, never re-added after an admin removes it; MCP inventory summary is opt-in (`summary=false` by default) because it scans the whole tenant.
 Live check 12:39: key ring active locally (keyRingConfigured=true, activeKeyId k1, no controller key errors) after starting the stack from main/octo-tools. Final full build 38/38; suites green (sdk 462, bot 344, mcp 975, identity 19+266+327+209, ai 7+242, engine 1435, asset-repo unit 263).
 
+- Decided by the user 2026-10-06 (AB#5566, closed): MongoDB DR backups are kept; legacy plaintext in DR backups taken before the Encrypt sweep is an accepted residual risk until they expire under the DR retention.
+
 ### Backup/restore storage (AB#5559, AB#5560, AB#5561, AB#5562–5565), 2026-10-06
 
 | Change | Repo: commits |

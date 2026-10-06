@@ -203,4 +203,8 @@ sweep.
 | AB#5563 | staging-1: artifact container + bot configuration | 2157 |
 | AB#5564 | prod-1: SOS artifact bucket + bot configuration | 2157 |
 | AB#5565 | prod-2: artifact container + bot configuration (last; gate for the first Encrypt sweep) | 2157 |
-| AB#5566 | Plaintext in MongoDB DR backups after the Encrypt sweep (decision) | 4969 |
+| AB#5566 | Plaintext in MongoDB DR backups after the Encrypt sweep — **decided 2026-10-06 (user): existing DR backups are kept; the residual risk of legacy plaintext in DR backups for up to their retention after the Encrypt sweep is accepted.** Closed. | 4969 |
+
+## Decision 2026-10-06 — DR backups
+
+Existing MongoDB DR backups are kept unchanged. Backups taken before an environment's Encrypt sweep still contain legacy plaintext secrets until they age out under the normal DR retention; this residual risk is accepted (AB#5566, closed). No trimming of DR backups.

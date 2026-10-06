@@ -191,3 +191,16 @@ sweep.
   delete and versioning settings), or does each AKS cluster need a dedicated account?
 - **Q5:** Workload identity on AKS: when? Static keys are phase 1.
 - **Q6:** Plaintext in DR backups after the `Encrypt` sweep (§5): accept, or trim?
+
+## Work items (created 2026-10-06)
+
+| WI | Scope | Epic |
+|---|---|---|
+| AB#5559 | Bot: encrypt pre-sweep dumps with the key ring, restore job | 4969 |
+| AB#5560 | octo-mesh chart: bot persistence and artifact-store values | 2157 |
+| AB#5561 | Platform artifact store (pre-sweep dumps, tenant dumps, restore staging) | 2157 |
+| AB#5562 | test-2: artifact bucket + bot configuration (pilot) | 2157 |
+| AB#5563 | staging-1: artifact container + bot configuration | 2157 |
+| AB#5564 | prod-1: SOS artifact bucket + bot configuration | 2157 |
+| AB#5565 | prod-2: artifact container + bot configuration (last; gate for the first Encrypt sweep) | 2157 |
+| AB#5566 | Plaintext in MongoDB DR backups after the Encrypt sweep (decision) | 4969 |

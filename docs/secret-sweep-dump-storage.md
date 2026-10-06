@@ -1,0 +1,193 @@
+# Durable storage for pre-sweep dumps (AB#5539)
+
+Status: concept, 2026-10-06. Scope: where `octo-bot-services` keeps the tenant dump it takes before every
+writing secret sweep, and how that generalizes to a platform-level artifact store. Parent concept:
+`concept-secret-attribute-type.md` (decision 10: pre-sweep plaintext backups kept 7 days, treated as
+secrets, then deleted).
+
+## 1. Current state
+
+**Bot implementation** (`octo-bot-services`, branch `feat/gerald/secret-attribute-type`):
+
+- `SecretSweepCoordinator.TakeBackupAsync` runs `mongodump` in the bot pod (`systemContext.BackupTenantAsync`)
+  for every writing mode (`Encrypt`, `Reprotect`, `CleanupUnreadable`) into
+  `Bot:SecretSweep:BackupStoragePath/<tenant>/<tenant>-<utc>-<guid>.presweep.tar.gz`.
+  If the dump fails, the tenant is skipped (`RequirePreSweepBackup=true`).
+- `BackupFileStorageService` creates the directories as `0700` and the file as `0600`, and refuses a
+  path inside the tus or dump roots, because the hourly cleanup deletes those after a few hours.
+- Retention: `CleanupStaleFilesJob` (hourly) deletes dumps older than `BackupRetentionDays` = 7 and
+  writes `deletedAt` into the run history. `DELETE {tenant}/v1/secrets/sweep-runs/{runId}/dump` deletes a
+  dump early. A dump can never be downloaded, and **no restore path for a pre-sweep dump exists yet**.
+- Default path: `Path.GetTempPath()/octo-bot/secret-backups`. The chart sets no override, so the dump sits
+  in the container's writable layer. That means:
+  - the dump is **lost** on every restart, reschedule or rollout. The bot uses the `Recreate` strategy, so
+    every helm upgrade loses it;
+  - the dump uses the **node's disk**. On test-2 the node disks are already at 75–85 %, and parallel image
+    pulls have hit ENOSPC there before, so one large tenant dump can push a node into disk pressure;
+  - only the pod that wrote the dump can see it. Today that is fine, because the bot runs 1 replica.
+- The first `Encrypt` dump of each environment holds **secret plaintext**. Later dumps (`Reprotect`,
+  `CleanupUnreadable`) hold `enc:v2` ciphertext plus every other piece of tenant data.
+
+**Tenant dumps and restores share the same weakness.** `DumpRepositoryJob` writes
+`.tar.gz` / `.octobak.zip` files to `Bot:DumpStoragePath`, and tus uploads that a restore stages go to
+`Bot:TusStoragePath`. Both default to the temp directory, are served or consumed by the same pod, and are
+gone after a restart. A download or restore that crosses a pod restart fails.
+
+**Chart** (`octo-helm-core/src/octo-mesh`, `main` and `feat/gerald/secret-key-ring`): `services.bot`
+runs `replicaCount: 1` with `recreateStrategy: true` (exclusive RabbitMQ queues). There is no PVC
+template and no securityContext; the image runs as root. A generic `pod.volumes` / `pod.volumeMounts`
+pass-through exists. There is no env value for the storage paths; the setting would be
+`OCTO_BOT__SECRETSWEEP__BACKUPSTORAGEPATH`. test-2 runs three instances (main, dev, release), so it has
+three bot deployments.
+
+**Existing DR backups we can use as a template** (`meshmakers-infrastructure`,
+`docs/MONGODB-BACKUP-RESTORE.md`, `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md`, group_vars, terraform):
+
+| Cluster | MongoDB DR (daily 03:00, keep last 5) | CrateDB DR snapshots | Object storage available | Credentials (Vault) |
+| --- | --- | --- | --- | --- |
+| test-2 (Proxmox RKE2) | PVC on `smb-hetzner` (Hetzner Storage Box, SMB `vers=2.1`, mount forces `uid=10001`, `file_mode=0664`) | Hetzner Object Storage (S3), bucket `meshmakers`, `cratedb/` | Hetzner Object Storage | `secret/meshmakers/test-2/hetzner-s3` |
+| staging-1 (AKS) | Azure File Share `mongodb-backups` (RWX) | Azure Blob `cratedb-backups` | Storage account `mmstaging1backups` (Standard LRS, account key, no lifecycle policy, no workload identity) | `secret/meshmakers/staging-1/azure-storage` |
+| prod-2 (AKS) | Azure File Share `mongodb-backups` (RWX) | Azure Blob `cratedb-backups` | Storage account `meshmakersprod2backups` (same set-up as staging-1) | `secret/meshmakers/prod-2/azure-storage` |
+| prod-1 (Exoscale SKS) | PVC `exoscale-sbs` (RWO), then upload to SOS `mongodb/` | SOS `cratedb/` (keep 7 daily + 4 weekly) | SOS bucket `prod-1-backups`; the IAM key is scoped to that one bucket | `secret/meshmakers/prod-1/sos` |
+
+Storage classes: test-2 has `proxmox-data-xfs` (RWO, local SSD) and `smb-hetzner` (RWX). AKS has
+`default` / managed-csi (RWO, Azure Disk) and azurefile-csi (RWX). prod-1 has `exoscale-sbs` (RWO) only,
+with no RWX class. I found no MinIO, Longhorn or NFS on any cluster. Retention in the DR jobs is enforced
+by the jobs themselves (count-based); no bucket or container has a lifecycle rule.
+
+## 2. Requirements
+
+1. **Durable for the retention period.** The dump survives pod restarts, reschedules, rollouts and node
+   loss for 7 days.
+2. **Reachable from every bot replica.** Hangfire can run the sweep, the hourly cleanup and the delete
+   endpoint on different servers. One replica works with RWO; more than one needs RWX or object storage.
+3. **Confidential.** The dump is secret material. Encryption at rest is required, access is limited to the
+   bot's identity, the dump is never downloadable, and it is not copied into other backups (a volume
+   snapshot or backup would outlive the retention).
+4. **Guaranteed deletion.** The app deletes the dump after 7 days or earlier on request. An independent
+   backstop must delete it even when the bot is down or misconfigured.
+5. **No node-disk pressure.** Large dumps must not land on the node's root or overlay disk.
+6. **Per-environment parity.** One mechanism across test-2, staging-1, prod-1 and prod-2 (S3 or Azure Blob).
+7. **Restorable.** An operator can turn a dump back into a tenant (see open question Q1).
+
+## 3. Options per environment
+
+| Option | test-2 | staging-1 / prod-2 | prod-1 | Assessment |
+| --- | --- | --- | --- | --- |
+| A. Status quo (container temp) | yes | yes | yes | Fails 1, 4 (no backstop) and 5. |
+| B. PVC RWO (block) | `proxmox-data-xfs`, not encrypted at rest (local SSD, no LUKS) | managed-csi (Azure Disk, SSE at rest by default) | `exoscale-sbs` (encryption at rest: **verify**) | Meets 1 for a single replica (works with `Recreate`). Fails 2 for more than one replica. A zone-bound disk can block rescheduling. Any volume snapshot must be excluded. No backstop beyond the app. Cost: one small disk, about €1–5/month. |
+| C. PVC RWX (file share) | `smb-hetzner`: off-cluster and shared, but SMB 2.1 (no transport encryption), and the mount forces `0664`/`uid 10001`, so `0600` is a no-op | azurefile-csi (SSE at rest, SMB 3 in transit). SMB also ignores `chmod` | not available (would need our own NFS server) | Meets 2, but not on prod-1. File permissions do not protect anything. No lifecycle rules on file shares. |
+| D. Object storage | Hetzner Object Storage (S3), already in use | Azure Blob in the existing backup account, new container | Exoscale SOS, new bucket (the existing IAM key covers all of `prod-1-backups`) | Meets 1, 2, 5 and 6. Server-side encryption at rest (Azure SSE always; SOS and Hetzner: **verify**). Lifecycle expiry acts as the deletion backstop (Azure: yes, runs about daily; Hetzner and SOS: **verify** support; if a store lacks it, a CronJob takes over). Cost: dump volume × 7 days at about €0.02/GB-month, i.e. cents to low euros. Hetzner is flat-rate and already paid. |
+
+Cost does not decide between these options; every one stays in the single-digit euros per month.
+
+## 4. Recommendation: a platform artifact store per cluster
+
+Use **option D as a platform service, not as a bot special case.** Each cluster gets one object-storage
+target for operational artifacts. It is separate from the DR buckets, because DR and operational
+artifacts have different retention, principals and blast radius.
+
+- **Target per cluster:** test-2 → Hetzner Object Storage bucket `test-2-octo-artifacts`.
+  staging-1 / prod-2 → container `octo-artifacts` in `mmstaging1backups` / `meshmakersprod2backups`
+  (blob versioning and soft delete off for this container's account scope, see §5). prod-1 → SOS bucket
+  `prod-1-octo-artifacts` with its own IAM role and key limited to that bucket.
+- **Layout:** `<instancePrefix>/<kind>/<tenantId>/<file>`, where kind is `presweep`, `tenant-dumps` or
+  `restore-staging`. The instance prefix keeps test-2 main, dev and release apart. The tenant id is
+  lower-cased and validated as today (`ResolveTenantDirectory` rules).
+- **Lifecycle rules per prefix (backstop, not primary):** `*/presweep/` expires after 8 days (retention +
+  1 day, because lifecycle runs once a day). `*/tenant-dumps/` and `*/restore-staging/` expire after
+  1 day, matching `FileRetentionHours`. For S3 versioned buckets, add a noncurrent-version expiry or keep
+  versioning off.
+- **Credentials:** phase 1 uses static, bucket-scoped keys from Vault
+  (`secret/meshmakers/<cluster>/octo-artifacts`), rendered by the chart into the backend secret. This is
+  the same pattern the DR jobs use. Later, AKS workload identity (needs `oidc_issuer_enabled` and
+  `workload_identity_enabled` in terraform, neither is set today) and an Exoscale IAM key per service.
+- **Bot code:** an `IArtifactStore` abstraction (`LocalFileSystem` for dev and the PVC fallback, `S3` for
+  Hetzner and SOS, `AzureBlob`) behind `IBackupFileStorageService`. `mongodump` keeps writing to a local
+  scratch volume (`emptyDir` with `sizeLimit`, ideally a generic ephemeral volume, so the dump never
+  touches the node's root disk). The bot encrypts the file, uploads it, and deletes the scratch copy.
+  Cleanup, run-history `Exists`/`SizeBytes` and the delete endpoint work against the store. Streaming
+  `mongodump --archive` straight into a multipart upload is a later optimization.
+- **Same store for tenant dumps and restores:** the job result keeps a store key instead of a pod-local
+  path. Downloads stream from the store, and tus uploads are moved into `restore-staging/` when they
+  complete. Downloads and restores then survive restarts and any number of replicas.
+
+**Why not a PVC per service:** a PVC per service and cluster means 4 storage-class variants, no RWX on
+prod-1, permissions that SMB ignores, no lifecycle backstop, and a separate answer for tenant dumps.
+Object storage already exists on every cluster and is already wired to Vault.
+
+**Interim, if the first `Encrypt` sweep has to run before the store exists:** a single RWO PVC for the bot
+(chart value `services.bot.persistence`, see the work items), mounted at `/data/octo-bot` and with
+`OCTO_BOT__SECRETSWEEP__BACKUPSTORAGEPATH=/data/octo-bot/secret-backups`, plus dump-file encryption
+(§5). This is acceptable because the bot stays at 1 replica with `Recreate`. Exclude the PVC from any
+volume-snapshot or backup tooling.
+
+## 5. Security
+
+**Encrypt the dump itself, in addition to encryption at rest. Recommended for every option.**
+
+- Format `*.presweep.octoenc`, envelope encryption:
+  - a random 256-bit data key per dump;
+  - the body in chunks (e.g. 1 MiB), each sealed with AES-256-GCM: nonce = random prefix ‖ chunk counter,
+    a last-chunk flag and the header bound as AAD (the standard streaming-AEAD construction; a single
+    GCM call cannot cover multi-GB dumps);
+  - the data key wrapped with AES-256-GCM under a key-encryption key derived as
+    `HKDF-SHA256(ring[kid], info="octo/dump/v1")`, so a ring key is never used directly for a second
+    purpose;
+  - the header records magic, version, `kid`, wrapped key and chunk size.
+- The bot already holds the key ring (`ISecretAttributeProtector`, active kid). The header names the
+  `kid` that encrypted the dump.
+- Effect: storage, SMB permissions and the object store's own encryption no longer have to be trusted.
+  A leaked bucket key or file-share mount does not expose secrets. For the first `Encrypt` dump, the
+  plaintext secrets are protected by the same key that protects them in the database, so the dump is
+  never weaker than the live data.
+- **Key loss = dump unreadable. That is acceptable** given 7-day retention. Rule for rotation: do not
+  remove a `kid` from the ring until its newest dump has expired (≥ 7 days after the `Reprotect` run).
+  This tightens the "remove the source key again" step in concept §6.
+- If the ring is not configured, the sweep cannot write anyway (`Encrypt` needs a key). Writing modes
+  therefore always have a key for the dump.
+
+**Access:** only the bot identity holds store credentials, scoped to the artifact bucket or container.
+The DR keys stay separate. There is no download endpoint. The store must not be public, and Azure
+containers use `private` access. Avoid SAS URLs.
+
+**Guaranteed deletion:** the app's hourly cleanup is primary. The lifecycle rule (8 days) is the
+backstop. Blob soft delete, versioning and immutability (WORM) policies must be **off** for this target,
+because they would keep "deleted" dumps or block the early-delete endpoint. Dumps must not be included in
+volume snapshots, Velero or DR backups.
+
+**Related finding (out of scope, follow-up):** for the days after the `Encrypt` sweep, the daily MongoDB
+DR backups (keep last 5, locally and on SOS) still hold plaintext secrets from before the sweep. That
+satisfies decision 10 only if the operator accepts "≤ 5 days" for DR copies, or trims them after the
+sweep.
+
+## 6. Migration / rollout
+
+1. **Bot:** dump-file encryption (`.octoenc`), plus a restore path for a pre-sweep dump (Q1), behind the
+   current local-file storage. Can ship without infrastructure.
+2. **Chart:** a `services.bot.persistence` (PVC) option and a `services.bot.artifactStore` block (type
+   `s3`/`azureBlob`, endpoint, bucket or container, secret refs, instance prefix), plus a scratch
+   `emptyDir` with `sizeLimit`. Both default to off, so the chart behaves as today.
+3. **Infrastructure per cluster:** bucket or container, scoped credentials in Vault, lifecycle rules,
+   no versioning or soft delete. Order: test-2 pilot → staging-1 → prod-1 → prod-2. Each step is
+   verified with a test tenant: run `Encrypt`, restart the bot pod, the dump still exists, early delete
+   works, and the lifecycle rule is visible.
+4. **Bot:** the `IArtifactStore` implementations and moving tenant dumps and restore staging onto the store.
+5. **Run the environment's first `Encrypt` sweep only after step 1, plus step 3 or the interim PVC, is
+   live on that cluster.**
+
+## 7. Open questions
+
+- **Q1 Restore of a pre-sweep dump:** a bot admin job (decrypt as a stream into `mongorestore --archive`,
+  role `SecretManagement`, `confirm=true`, same tenant only), or an ops tool (octo-cli / Semaphore)? The
+  bot job is preferred because the key never leaves the bot.
+- **Q2:** Do Hetzner Object Storage and Exoscale SOS support lifecycle expiration and server-side
+  encryption at rest? Is `exoscale-sbs` encrypted at rest? If a store has no lifecycle support, a small
+  CronJob takes over the backstop.
+- **Q3:** Doc and terraform disagree on names: SOS bucket `prod-1-backups` (terraform and group_vars) vs
+  `meshmakers-prod-1-backups` (MongoDB doc), and staging account `mmstaging1backups` (terraform) vs
+  `meshmakersstaging1backups` (CrateDB doc). The live names need confirming.
+- **Q4:** Are the existing backup storage accounts acceptable for the new container (account-wide soft
+  delete and versioning settings), or does each AKS cluster need a dedicated account?
+- **Q5:** Workload identity on AKS: when? Static keys are phase 1.
+- **Q6:** Plaintext in DR backups after the `Encrypt` sweep (§5): accept, or trim?

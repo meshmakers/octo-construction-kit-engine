@@ -3,6 +3,8 @@
 > Epic AB#5528 · concept: [concept-secret-attribute-type.md](concept-secret-attribute-type.md) · frontend handover: [secret-frontend-handover.md](secret-frontend-handover.md) · app/adapter model changes: [secret-app-model-changes.md](secret-app-model-changes.md)
 > Local branches only (`feat/gerald/secret-attribute-type`; key ring: `feat/gerald/secret-key-ring`). Nothing pushed, published or deployed. State 2026-10-06 (round 2 included).
 
+> **2026-10-06 cleanup:** sdk, comm-sdk, asset-repo, identity, mesh-adapter (6b) and engine were rewritten locally for wave 1 (squashes, CLAUDE.md moves). SHAs above for these repos are pre-cleanup; they stay resolvable via `backup/<branch>-pre-cleanup`. Current tips and the push checklist: `wave1-push-pr-plan-backend.md` §13.
+
 ## Status per work package
 
 | WP | WI | Repo(s) | Status | Commits | Tests (final run) |

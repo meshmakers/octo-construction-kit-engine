@@ -208,3 +208,185 @@ sweep.
 ## Decision 2026-10-06 — DR backups
 
 Existing MongoDB DR backups are kept unchanged. Backups taken before an environment's Encrypt sweep still contain legacy plaintext secrets until they age out under the normal DR retention; this residual risk is accepted (AB#5566, closed). No trimming of DR backups.
+
+## Provider capabilities (verified 2026-10-06)
+
+Answers Q2 and Q3 and part of Q4. Sources are official vendor docs; all were accessed on 2026-10-06.
+Bucket and account names come from a read-only look at the local infra repos (`meshmakers-infrastructure`
+at `b6a17b9`; `infrastructure-helm-charts`, `maintenance-deployment` and `octo-mesh-deployment` define no
+object storage). No live system was queried, so live names still need one `aws s3 ls` / `az storage account
+show` check during AB#5562–5565.
+
+### Summary
+
+| Capability | Exoscale SOS (prod-1) | Hetzner Object Storage (test-2) | Azure Blob (staging-1, prod-2) |
+| --- | --- | --- | --- |
+| Lifecycle expiry by prefix | **Yes** (`Expiration.Days` + `Filter.Prefix`, runs daily at 00:00 UTC). One contradicting doc page, see notes | **Yes** (`Expiration.Days` + prefix filter, via `put-bucket-lifecycle-configuration`) | **Yes** (`prefixMatch` + `delete.daysAfterCreationGreaterThan` / `daysAfterModificationGreaterThan`) |
+| Encryption at rest by default | **Yes**: SSE-SOS (AES-256, Exoscale-managed keys) is on by default for **new** buckets. Older buckets need `put-bucket-encryption` | **No**: "no default data-at-rest encryption". Only SSE-C (customer key on every request) | **Yes**: always on, cannot be disabled, AES-256, Microsoft-managed keys by default |
+| Credentials limited to a single bucket/container | **Yes**: IAM v3 role with `parameters.bucket == '<bucket>'` plus an API key bound to that role (prod-1 already does this for `prod-1-backups`) | **Only through a bucket policy**: keys are valid for every bucket in the project. A bucket policy that denies everyone except the key's ARN restricts the bucket, but the key itself still reaches all other buckets in the project | **Not with account keys** (full access to the whole account). **Yes** with Entra ID: an RBAC role (`Storage Blob Data Contributor`) at container scope, used by workload identity, or a user-delegation SAS |
+| Versioning default | Off (un-versioned until enabled) | Off, but forced on and permanent for buckets created with Object Lock | Off; account-level setting. The portal does not turn it on by default |
+| Soft delete / WORM default | No soft delete; legal hold only on request | Object Lock only if chosen at bucket creation | Blob soft delete is **on by default when the account is created in the portal**, off when created with CLI, PowerShell or ARM/Terraform without `deleteRetentionPolicy`. Account-wide, not per container |
+
+### Exoscale SOS (prod-1)
+
+- **Lifecycle:** supports expiration after N days, prefix (and object-size) filters,
+  `NoncurrentVersionExpiration`, `AbortIncompleteMultipartUpload` and `ExpiredObjectDeleteMarker`. Storage-class
+  transitions are not supported. Rules are set with the S3 `put-bucket-lifecycle-configuration` call or
+  `exo storage bucket lifecycle set`, and every rule needs a `Filter` (it may be empty). "Bucket Lifecycle
+  evaluation runs every day at midnight UTC. There might be some delay between evaluating a bucket's
+  configuration and deleting the respective objects." The page was updated 2026-10-05.
+  https://community.exoscale.com/product/storage/object-storage/how-to/bucketlifecycle/ ·
+  https://community.exoscale.com/reference/cli/exo/storage/bucket/lifecycle/set/
+  - **Contradiction:** the "Limits and Quotas" page (updated 2026-09-14) still lists "Object Lifecycle
+    Management" under functionality that "cannot be used on Exoscale", and a search snippet called the
+    feature "Early Access". Treat lifecycle as supported but **verify on the new bucket**: run
+    `get-bucket-lifecycle-configuration` after setting it, and check that a test object under the prefix
+    disappears. The app-side cleanup stays primary anyway.
+    https://community.exoscale.com/product/storage/object-storage/service-boundaries/limits-and-quotas/
+- **Encryption at rest:** "All new buckets are created with SSE-SOS encryption enabled by default"
+  (AES256, Exoscale-managed keys). Existing buckets have to be switched on with `put-bucket-encryption`, and the
+  setting cannot be turned off afterwards. SSE-C is available but blocked by default per bucket.
+  A new `prod-1-octo-artifacts` bucket therefore gets SSE-SOS automatically, so the client does not need to send
+  `x-amz-server-side-encryption`.
+  https://community.exoscale.com/product/storage/object-storage/how-to/encryption/ ·
+  https://www.exoscale.com/compliance/encryption/
+- **Versioning:** "By default buckets are un-versioned and versioning needs to be activated." Object lock
+  exists only as a legal hold, applied explicitly.
+  https://community.exoscale.com/product/storage/object-storage/how-to/versioning/
+- **IAM v3 bucket scoping:** policy expressions on the `sos` service can use `parameters.bucket`.
+  `list-buckets` has no parameters, so it cannot be limited to one bucket. That is why the existing prod-1
+  role also allows `operation in ['list-sos-buckets-usage', 'list-buckets']`. A key only needs to *see*
+  other bucket names; it cannot read them. Lifecycle operations are `put-bucket-lifecycle` and
+  `delete-bucket-lifecycle`. Leave them out of the bot's role so the bot cannot remove its own backstop;
+  terraform sets the rule with an operator key.
+  https://community.exoscale.com/reference/iam/sos/
+- **Limits:** multipart uploads allow at most 10,000 parts of 5 MiB (except the last part) to 5 GiB each, and
+  objects up to 4 TiB. **At most 20 buckets per account** (quota 100), so check the current bucket count before
+  adding `prod-1-octo-artifacts`. At most 1,000 versions per object.
+  https://community.exoscale.com/product/storage/object-storage/service-boundaries/limits-and-quotas/
+
+### Hetzner Object Storage (test-2)
+
+- **Lifecycle:** supports `Expiration` (days, or a fixed date), a prefix filter, `NoncurrentVersionExpiration`
+  (only `NoncurrentDays`), `AbortIncompleteMultipartUpload` and `ExpiredObjectDeleteMarker`. Rules are applied
+  with `aws s3api put-bucket-lifecycle-configuration` or `mc ilm rule import`. The docs say nothing about
+  timing. Object lock overrides expiry.
+  https://docs.hetzner.com/storage/object-storage/howto-protect-objects/manage-lifecycle/
+- **Encryption at rest: none by default.** "There is no default data-at-rest encryption of objects, but
+  you can encrypt your data during the upload using SSE-C." SSE-C is the only server-side encryption type
+  ("Only this encryption type: SSE-C"). The server does not store the key, metadata is not encrypted, and
+  SSE-C objects cannot be copied.
+  https://docs.hetzner.com/storage/object-storage/faq/general/ ·
+  https://docs.hetzner.com/storage/object-storage/supported-actions/ ·
+  https://docs.hetzner.com/storage/object-storage/howto-protect-objects/encrypt-with-sse-c/
+  - **Consequence:** on test-2 the `.octoenc` envelope (§5) is the **only** encryption at rest, so it is
+    mandatory for every category on this provider, not optional. `S3:ServerSideEncryption` (AES256 /
+    `x-amz-server-side-encryption`) must stay **unset** for Hetzner, because only SSE-C is supported and an
+    SSE-S3 header is unsupported. SSE-C would add a second key to manage and gives nothing that `.octoenc`
+    does not already give.
+- **Versioning / object lock:** versioning has to be enabled explicitly, and the bucket FAQ gives no default.
+  Object Lock can only be enabled at bucket creation. "Buckets with Object Lock always have versioning
+  enabled and it is not possible to disable it." Buckets are private by default.
+  https://docs.hetzner.com/storage/object-storage/howto-protect-objects/protect-versioning/ ·
+  https://docs.hetzner.com/storage/object-storage/faq/buckets-objects/
+  → Create `test-2-octo-artifacts` **without** Object Lock and leave versioning off.
+- **Credential scoping:** "each key pair is automatically valid for every Bucket within the same
+  project", with read and write access. To restrict a bucket, a bucket policy denies all principals except
+  `arn:aws:iam:::user/p<project_id>:<access_key>`. After that, Hetzner Console can no longer list the bucket.
+  https://docs.hetzner.com/storage/object-storage/faq/s3-credentials/
+  - **Consequence:** a bucket policy protects the *artifact bucket* from other keys, but the bot's key
+    can still read the DR bucket `meshmakers` (CrateDB snapshots) in the same project. True isolation needs a
+    **separate Hetzner project** for the artifact bucket, or acceptance that keys are project-wide on test-2.
+    New decision point **Q7**.
+- **Limits:** the docs recommend multipart uploads above 100 MB. The FAQ pages state no part or object size
+  limits.
+
+### Azure Blob Storage (staging-1, prod-2)
+
+- **Lifecycle:** a policy holds up to 100 rules. Filters are `blobTypes` (required, `blockBlob`) and
+  `prefixMatch`, with up to 10 case-sensitive prefixes per rule. Each "prefix string must start with a
+  container name", e.g. `octo-artifacts/main/presweep/`, and wildcards are not supported. The `delete` action
+  on `baseBlob` takes `daysAfterModificationGreaterThan` or `daysAfterCreationGreaterThan`.
+  "When you add or edit the rules of a lifecycle policy, it can take up to 24 hours for changes to go into
+  effect and for the first execution to start." A policy is always replaced as a whole. Delete does not work
+  in immutable containers, and with soft delete enabled a lifecycle delete only soft-deletes.
+  https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-overview ·
+  https://learn.microsoft.com/en-us/azure/storage/blobs/lifecycle-management-policy-structure
+  - **Consequence for the layout:** an instance prefix `<instance>/presweep/` cannot be matched with a wildcard
+    such as `*/presweep/`. Write one `prefixMatch` per instance prefix (`octo-artifacts/<instance>/presweep/`),
+    which allows up to 10 per rule; that is enough for one instance per AKS cluster. The S3 providers accept
+    exactly one prefix per rule, so the same applies there: one rule per instance and category. test-2 has 3
+    instances × 3 categories = 9 rules.
+- **Encryption at rest:** "Azure Storage encryption is enabled for all storage accounts. You can't disable
+  Azure Storage encryption." It uses AES-256 (GCM for objects), and "Data in a new storage account is
+  encrypted with Microsoft-managed keys by default."
+  https://learn.microsoft.com/en-us/azure/storage/common/storage-service-encryption
+- **Soft delete / versioning defaults:** "Blob soft delete is enabled by default when you create a new
+  storage account with the Azure portal". It is *not* enabled when the account is created with PowerShell or
+  Azure CLI. It is configured per storage account (`blobServices/default.deleteRetentionPolicy`), with a
+  retention of 1–365 days. Versioning is also an account-level setting and is off unless enabled.
+  https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-enable ·
+  https://learn.microsoft.com/en-us/azure/storage/blobs/soft-delete-blob-overview ·
+  https://learn.microsoft.com/en-us/azure/storage/blobs/versioning-overview
+  - `mmstaging1backups` and `meshmakersprod2backups` are created by terraform (`azurerm_storage_account`
+    without a `blob_properties` block). That points to soft delete and versioning being **off**, but the
+    live value must be checked with `az storage account blob-service-properties show`. Because the setting
+    is account-wide, keeping it off for `octo-artifacts` means keeping it off for the DR containers
+    (`mongodb-backups`, `cratedb-backups`) as well. That matches today's terraform. If someone later wants
+    soft delete for DR, `octo-artifacts` needs its own account (Q4).
+- **Credentials:** "Storage account access keys provide full access to the storage account data". An account
+  key from Vault (`secret/meshmakers/<cluster>/azure-storage`) would therefore give the bot the DR containers
+  too. The right scope is the RBAC role `Storage Blob Data Contributor` on
+  `/subscriptions/…/storageAccounts/<account>/blobServices/default/containers/octo-artifacts`.
+  https://learn.microsoft.com/en-us/azure/storage/common/storage-account-keys-manage ·
+  https://learn.microsoft.com/en-us/azure/storage/blobs/assign-azure-role-data-access
+- **Workload identity (AKS):** the cluster needs the OIDC issuer and `--enable-workload-identity`; the
+  terraform for both AKS clusters sets neither today. Then create a user-assigned managed identity (or an app
+  registration) with a federated credential for the bot's service account, at most 20 per identity. The
+  service account gets the annotation `azure.workload.identity/client-id`, and the pod needs the label
+  `azure.workload.identity/use: "true"`. The webhook injects `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+  `AZURE_FEDERATED_TOKEN_FILE`. `DefaultAzureCredential` (Azure.Identity ≥ 1.9.0) picks it up through
+  `WorkloadIdentityCredential`.
+  https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview
+  - **Consequence:** with account keys (phase 1), "scoped to the container" is **not achievable** on Azure.
+    The options are: (a) accept account-key scope for phase 1; (b) a dedicated storage account just for
+    `octo-artifacts`, so the key's blast radius equals the container; or (c) workload identity with a
+    container-scoped role. (b) is the cheapest way to get real isolation without changing AKS; (c) is the
+    target state. Both are recorded under Q4/Q5.
+
+### Exoscale Block Storage (`exoscale-sbs`, interim PVC on prod-1)
+
+- "Every new Block Storage volume is encrypted at rest by default" with AES-256-XTS at the hypervisor
+  layer, using a unique key per volume that is destroyed when the volume is deleted. The compliance page adds:
+  "Default for new volumes. Existing volumes are not re-encrypted." A new interim PVC from the `exoscale-sbs`
+  StorageClass (CSI add-on) is therefore encrypted at rest.
+  https://www.exoscale.com/compliance/encryption/ ·
+  https://community.exoscale.com/product/storage/block-storage/how-to/per-vol/
+  → This closes the "**verify**" in §3 option B for prod-1.
+
+### Resolved names per cluster (Q3)
+
+| Cluster | Provider | Existing DR target (source of truth) | Doc mismatch | Proposed artifact target |
+| --- | --- | --- | --- | --- |
+| test-2 | Hetzner Object Storage | Bucket and endpoint live **only in Vault** (`secret/meshmakers/test-2/hetzner-s3`, keys `bucket`, `endpoint`). `docs/CLUSTER-SERVICES-OVERVIEW.md` names bucket `meshmakers` (prefix `cratedb/`); `test_2_infrastructure.yml` has no bucket name. The location is not in the repo | none, but unconfirmed | `test-2-octo-artifacts` (same project unless Q7 decides otherwise) |
+| staging-1 | Azure Blob | Account **`mmstaging1backups`** (terraform `variables.tf` default and `staging_1_infrastructure.yml`), westeurope, Standard LRS; containers `mongodb-backups`, `cratedb-backups` (private) | `docs/CONCEPT-CRATEDB-DISASTER-RECOVERY.md` says `meshmakersstaging1backups`, which is **stale** | container `octo-artifacts` in `mmstaging1backups` (or a dedicated account, Q4) |
+| prod-2 | Azure Blob | Account **`meshmakersprod2backups`** (terraform and `prod_2_infrastructure.yml`), westeurope, Standard LRS; the same two containers | none | container `octo-artifacts` in `meshmakersprod2backups` (or a dedicated account) |
+| prod-1 | Exoscale SOS | Bucket **`prod-1-backups`** (`aws_s3_bucket "${var.cluster_name}-backups"`, `cluster_name = "prod-1"`; `exoscale_sos.bucket` in `prod_1_infrastructure.yml`), endpoint `https://sos-at-vie-1.exo.io`, zone `at-vie-1`; prefixes `mongodb/`, `cratedb/`, `signal-bridge/`. IAM role/key `prod-1-sos-backup` is limited to that bucket | `docs/MONGODB-BACKUP-RESTORE.md` says `meshmakers-prod-1-backups`, which is **stale** | bucket `prod-1-octo-artifacts`, its own IAM role/key `prod-1-octo-artifacts` (bucket count < 20 to be checked) |
+
+Vault paths (names only): `secret/meshmakers/test-2/hetzner-s3`, `secret/meshmakers/staging-1/azure-storage`,
+`secret/meshmakers/prod-2/azure-storage`, `secret/meshmakers/prod-1/sos`.
+
+### Effect on the design
+
+1. A lifecycle backstop is available on all three providers, so no CronJob fallback is needed. On SOS, check
+   once that the rule is actually honored, because of the contradicting limits page.
+2. Encryption at rest: Azure and SOS (new bucket) encrypt by default; **Hetzner does not**. The
+   `.octoenc` envelope is therefore mandatory on test-2 and recommended everywhere. Keep
+   `S3:ServerSideEncryption` unset on Hetzner. On SOS it is redundant, because the bucket default applies.
+3. Single-bucket credentials: only SOS gives them natively. Hetzner needs a bucket policy plus a decision
+   on a separate project (Q7). Azure needs a dedicated account or workload identity (Q4/Q5).
+4. Lifecycle prefixes cannot contain wildcards on any provider. Write one rule per `<instancePrefix>/<category>/`
+   from the infra config, rather than a single `*/presweep/` rule.
+
+**Q7 (new):** test-2: put the artifact bucket in its own Hetzner project (true key isolation from the DR bucket),
+or accept project-wide keys plus a bucket policy?

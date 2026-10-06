@@ -189,8 +189,39 @@ sweep.
   `meshmakersstaging1backups` (CrateDB doc). The live names need confirming.
 - **Q4:** Are the existing backup storage accounts acceptable for the new container (account-wide soft
   delete and versioning settings), or does each AKS cluster need a dedicated account?
+  **Decided 2026-10-06 (PO):** a dedicated storage account per AKS cluster, only for operational artifacts
+  (`mmstaging1artifacts`, `meshmakersprod2artifacts`; names to be checked for global availability):
+  versioning off, blob and container soft delete off, private, HTTPS only, TLS 1.2 minimum, shared key
+  allowed for phase 1. The account key's blast radius is then the artifact container, and the DR account
+  keeps its own settings.
 - **Q5:** Workload identity on AKS: when? Static keys are phase 1.
+  **Decided 2026-10-06 (PO):** phase 1 = connection string of the dedicated account (Vault
+  `secret/meshmakers/<cluster>/octo-artifacts`, key `connectionString`) and is the default. Phase 2 =
+  workload identity (AKS OIDC issuer + workload identity, user-assigned identity federated with the bot
+  service account, `Storage Blob Data Contributor` on the container only, then shared key off). Both are
+  prepared in terraform and chart values; phase 2 is switched off by default.
 - **Q6:** Plaintext in DR backups after the `Encrypt` sweep (§5): accept, or trim?
+  **Decided 2026-10-06:** accept (AB#5566, see "Decision 2026-10-06 — DR backups").
+- **Q7:** test-2: put the artifact bucket in its own Hetzner project, or accept project-wide keys plus a
+  bucket policy? **Decided 2026-10-06 (PO):** a **dedicated Hetzner project** for `test-2-octo-artifacts`,
+  so the bot key cannot reach the DR bucket `meshmakers`. On Hetzner the `.octoenc` envelope is the only
+  encryption at rest and therefore mandatory; `S3:ServerSideEncryption` stays empty.
+- **prod-1 (decided 2026-10-06, PO):** new SOS bucket `prod-1-octo-artifacts` with its own IAM v3 role and
+  API key scoped by `parameters.bucket`; the role denies bucket administration (lifecycle, policy, ACL,
+  versioning, encryption, object lock, delete bucket, presigned URLs) so the bot cannot remove its own
+  backstop. Encryption at rest = SSE-SOS bucket default, no client SSE header.
+- **Lifecycle (decided 2026-10-06, PO):** one rule per `<instancePrefix>/<category>/` — `presweep` 8 days,
+  `tenant-dumps` 1 day, `restore-staging` 1 day — configurable per cluster in terraform. Instance prefixes:
+  test-2 `main` (namespace `octo`; the release-chart smoke deploys write to the same helm release
+  `octo-mesh`, so test-2 has two bot deployments, not three) and `dev` (`octo-dev`); staging-1, prod-1 and
+  prod-2 `octo-mesh`.
+- **Implementation (AB#5562–5565, 2026-10-06, local branches `feat/gerald/artifact-storage`, nothing
+  applied):** `meshmakers-infrastructure` — terraform per cluster (test-2: own root
+  `src/infrastructure/octo-artifacts`; prod-1: `src/prod-1/octo-artifacts.tf`; staging-1/prod-2:
+  `src/<cluster>/terraform/octo-artifacts.tf`), the `octo-artifact-storage` ansible component that copies the
+  Vault credential into the Secret `octo-artifact-storage` per OctoMesh namespace, and runbooks
+  `docs/runbooks/octo-artifact-storage-<cluster>.md`; `octo-mesh-deployment` —
+  `services.bot.artifactStorage` in `clusters/<cluster>/values-octo-mesh*.yaml`.
 
 ## Work items (created 2026-10-06)
 

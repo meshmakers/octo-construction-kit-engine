@@ -185,6 +185,9 @@ internal sealed class SecretMaintenanceService(
             }
 
             entity.Attributes.TryGetValue(attribute.AttributeName, out var value);
+            // Re-entry, cleared and failure entries use the inventory's attribute path (camelCase,
+            // "endpoints[key=prod].token") so a report entry links to its inventory row (handover §7, §9).
+            var elementPath = SecretInventoryService.ToCamelCase(attribute.AttributeName);
             bool changed;
             object? newValue;
             object? expectedValue;
@@ -192,7 +195,7 @@ internal sealed class SecretMaintenanceService(
             if (attribute.ValueType == AttributeValueTypesDto.Secret)
             {
                 expectedValue = value;
-                (changed, newValue) = ProcessSlot(context, attribute.AttributeName, attribute.AttributeName, value);
+                (changed, newValue) = ProcessSlot(context, attribute.AttributeName, elementPath, value);
             }
             else
             {
@@ -200,7 +203,7 @@ internal sealed class SecretMaintenanceService(
                 // conditional rewrite.
                 expectedValue = CopyAttributeValue(value);
                 newValue = value;
-                changed = ProcessRecordValue(context, attribute, value, attribute.AttributeName, attribute.AttributeName);
+                changed = ProcessRecordValue(context, attribute, value, attribute.AttributeName, elementPath);
             }
 
             if (!changed)
@@ -238,7 +241,7 @@ internal sealed class SecretMaintenanceService(
                 context.Result.Totals.AddFailure();
                 context.ModelCounts.AddFailure();
                 context.Result.Failures.Add(new SecretSweepFailure(context.CkTypeId, context.RtId,
-                    attribute.AttributeName,
+                    elementPath,
                     $"{ex.GetType().Name} while writing {rewrittenHere} changed value(s) of the attribute"));
                 logger.LogWarning(
                     "Secret sweep could not rewrite attribute {AttributeName} of {CkTypeId}@{RtId} (tenant {TenantId}): {ExceptionType}",
@@ -280,7 +283,7 @@ internal sealed class SecretMaintenanceService(
             {
                 var graph = _scanner.ResolveRecord(context.TenantId, record, attribute);
                 changed |= ProcessRecord(context, attribute, record, reportPath + "[]",
-                    SecretWriteNormalizer.BuildElementPath(elementPath, graph?.RecordKey, record, index), graph);
+                    SecretInventoryService.BuildElementPath(elementPath, graph?.RecordKey, record, index), graph);
             }
 
             index++;
@@ -307,7 +310,7 @@ internal sealed class SecretMaintenanceService(
             }
 
             var memberReportPath = reportPath + "." + member.AttributeName;
-            var memberElementPath = elementPath + "." + member.AttributeName;
+            var memberElementPath = elementPath + "." + SecretInventoryService.ToCamelCase(member.AttributeName);
             record.Attributes.TryGetValue(member.AttributeName, out var memberValue);
             if (member.ValueType == AttributeValueTypesDto.Secret)
             {

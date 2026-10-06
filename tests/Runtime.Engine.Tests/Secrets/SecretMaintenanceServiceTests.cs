@@ -160,8 +160,8 @@ public class SecretMaintenanceServiceTests
         Assert.True(result.Success);
         // Decisions 2026-10-06 item 2: unknown key ids are kept and listed as re-entry tasks.
         Assert.Equal(2, result.Unreadable.Count);
-        Assert.Contains(result.Unreadable, u => u.RtId == _e3.RtId && u.AttributePath == "ApiKey" && u.KeyId == "k9");
-        Assert.Contains(result.Unreadable, u => u.RtId == _e4.RtId && u.AttributePath == "Credentials[Key=a].Value" &&
+        Assert.Contains(result.Unreadable, u => u.RtId == _e3.RtId && u.AttributePath == "apiKey" && u.KeyId == "k9");
+        Assert.Contains(result.Unreadable, u => u.RtId == _e4.RtId && u.AttributePath == "credentials[key=a].value" &&
                                                 u.KeyId == "k9");
         Assert.Empty(result.Cleared);
 
@@ -307,9 +307,9 @@ public class SecretMaintenanceServiceTests
         Assert.Equal("rec-plain", credentials[1].Attributes["Value"]); // untouched
 
         Assert.Equal(2, result.Cleared.Count);
-        Assert.Contains(result.Cleared, c => c.RtId == _e3.RtId && c.AttributePath == "ApiKey" && c.KeyId == "k9" &&
+        Assert.Contains(result.Cleared, c => c.RtId == _e3.RtId && c.AttributePath == "apiKey" && c.KeyId == "k9" &&
                                              c.PreviousForm == SecretValueForm.UnknownKeyId);
-        Assert.Contains(result.Cleared, c => c.RtId == _e4.RtId && c.AttributePath == "Credentials[Key=a].Value");
+        Assert.Contains(result.Cleared, c => c.RtId == _e4.RtId && c.AttributePath == "credentials[key=a].value");
         Assert.Empty(result.Unreadable);
         AssertResultCarriesNoValue(result);
     }
@@ -355,7 +355,7 @@ public class SecretMaintenanceServiceTests
             TestContext.Current.CancellationToken);
 
         var failure = Assert.Single(result.Failures, f => f.RtId == _e3.RtId);
-        Assert.Equal("Password", failure.AttributePath);
+        Assert.Equal("password", failure.AttributePath);
         Assert.DoesNotContain("pw-3", failure.Reason);
         Assert.Equal(flipped, ((RtSecretValue)_e3.Attributes["Password"]!).Envelope); // untouched
         AssertResultCarriesNoValue(result);
@@ -373,7 +373,7 @@ public class SecretMaintenanceServiceTests
 
         Assert.Equal(5, result.ValuesRewritten);
         Assert.Equal(1, result.Totals.Failed);
-        Assert.Contains(result.Failures, f => f.RtId == _e1.RtId && f.AttributePath == "Password" &&
+        Assert.Contains(result.Failures, f => f.RtId == _e1.RtId && f.AttributePath == "password" &&
                                               f.Reason.StartsWith(nameof(InvalidOperationException)));
     }
 
@@ -392,7 +392,7 @@ public class SecretMaintenanceServiceTests
         Assert.Equal(_e4.RtId, cleared.RtId);
         var unreadable = Assert.Single(result.Unreadable);
         Assert.Equal(_e3.RtId, unreadable.RtId);
-        Assert.Equal("ApiKey", unreadable.AttributePath);
+        Assert.Equal("apiKey", unreadable.AttributePath);
         Assert.Equal("k9", unreadable.KeyId);
     }
 

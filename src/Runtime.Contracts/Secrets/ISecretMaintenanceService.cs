@@ -332,8 +332,9 @@ public sealed record SecretSlotReport(string CkTypeId, string AttributePath, Sec
 /// <param name="CkTypeId">CK type of the entity</param>
 /// <param name="RtId">Runtime id of the entity</param>
 /// <param name="AttributePath">
-///     Attribute name or record path; a record array element is addressed by its record key, e.g.
-///     <c>Overrides[Key=apiToken].Value</c>, or by index when the record declares no key
+///     Attribute path in the inventory format (camelCase, as <see cref="SecretInventoryItem.AttributePath" />);
+///     a record array element is addressed by its record key, e.g. <c>overrides[path=apiToken].secretValue</c>,
+///     or by index when the record declares no key
 /// </param>
 /// <param name="PreviousForm">The form the value had</param>
 /// <param name="KeyId">The key id of the envelope (unknown key id) or <c>null</c></param>
@@ -352,8 +353,9 @@ public sealed record SecretSweepClearedValue(
 /// <param name="CkTypeId">CK type of the entity</param>
 /// <param name="RtId">Runtime id of the entity</param>
 /// <param name="AttributePath">
-///     Attribute name or record path; a record array element is addressed by its record key, e.g.
-///     <c>Overrides[Key=apiToken].Value</c>, or by index when the record declares no key
+///     Attribute path in the inventory format (camelCase, as <see cref="SecretInventoryItem.AttributePath" />);
+///     a record array element is addressed by its record key, e.g. <c>overrides[path=apiToken].secretValue</c>,
+///     or by index when the record declares no key
 /// </param>
 /// <param name="KeyId">The key id of the envelope</param>
 public sealed record SecretSweepUnreadableValue(
@@ -367,7 +369,7 @@ public sealed record SecretSweepUnreadableValue(
 /// </summary>
 /// <param name="CkTypeId">CK type of the entity</param>
 /// <param name="RtId">Runtime id of the entity</param>
-/// <param name="AttributePath">Attribute name or record path</param>
+/// <param name="AttributePath">Attribute path in the inventory format (camelCase)</param>
 /// <param name="Reason">Exception type and a value-free description</param>
 public sealed record SecretSweepFailure(string CkTypeId, OctoObjectId RtId, string AttributePath, string Reason);
 

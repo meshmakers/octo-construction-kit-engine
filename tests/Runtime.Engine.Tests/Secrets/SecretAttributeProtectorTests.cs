@@ -507,4 +507,77 @@ public class SecretAttributeProtectorTests
 
         Assert.False(protector.IsConfigured);
     }
+
+    #region AB#5532 enc:v2 as legacy string (decryption oracle)
+
+    [Fact]
+    public void Unprotect_LegacyValueWithV2Envelope_IsRefusedWithoutDecrypting()
+    {
+        var protector = Create();
+
+        var exception = Assert.Throws<SecretEnvelopeNotAllowedException>(() =>
+            protector.Unprotect(RtSecretValue.LegacyPlaintext(V2Vector),
+                new SecretAccessContext("t1", "Test/Config", "Password")));
+
+        Assert.Equal("Password", exception.AttributeName);
+        Assert.DoesNotContain("hunter2", exception.Message);
+        Assert.DoesNotContain(V2Vector, exception.Message);
+    }
+
+    [Fact]
+    public void Unprotect_LegacyValueWithV2EnvelopeOfUnknownKid_IsRefused()
+    {
+        var protector = Create();
+
+        Assert.Throws<SecretEnvelopeNotAllowedException>(() =>
+            protector.Unprotect(RtSecretValue.LegacyPlaintext("enc:v2:k9:" + V2Vector["enc:v2:k1:".Length..])));
+    }
+
+    [Fact]
+    public void Reprotect_LegacyValueWithV2Envelope_IsRefused()
+    {
+        var protector = Create();
+
+        Assert.Throws<SecretEnvelopeNotAllowedException>(() =>
+            protector.Reprotect(RtSecretValue.LegacyPlaintext(V2Vector)));
+    }
+
+    [Fact]
+    public void Unprotect_LegacyValueWithV2Envelope_IsRefusedInStrictModeToo()
+    {
+        var protector = Create(o => o.StrictMode = true);
+
+        Assert.Throws<SecretEnvelopeNotAllowedException>(() =>
+            protector.Unprotect(RtSecretValue.LegacyPlaintext(V2Vector)));
+    }
+
+    [Fact]
+    public void Unprotect_LegacyValueWithV1Envelope_IsStillDecrypted()
+    {
+        var protector = Create();
+
+        // A real enc:v1 legacy value keeps working (decision 3) - also through Reprotect.
+        Assert.Equal("Pässwort-v1!", protector.Unprotect(RtSecretValue.LegacyPlaintext(V1Vector)));
+        var reprotected = protector.Reprotect(RtSecretValue.LegacyPlaintext(V1Vector));
+        Assert.True(reprotected.IsProtected);
+        Assert.Equal("Pässwort-v1!", protector.Unprotect(reprotected));
+    }
+
+    [Fact]
+    public void Unprotect_ProtectedAndExplicitEnvelopeString_StillDecryptV2()
+    {
+        var protector = Create();
+
+        Assert.Equal("hunter2", protector.Unprotect(RtSecretValue.Protected(V2Vector)));
+        Assert.Equal("hunter2", protector.Unprotect(V2Vector));
+    }
+
+    [Fact]
+    public void Unprotect_PendingValueWithV2Text_ReturnsTheTextVerbatim()
+    {
+        // Pending = what the author typed; it is never decrypted, whatever it looks like.
+        Assert.Equal(V2Vector, Create().Unprotect(RtSecretValue.Pending(V2Vector)));
+    }
+
+    #endregion
 }

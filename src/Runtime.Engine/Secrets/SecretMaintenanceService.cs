@@ -384,6 +384,22 @@ internal sealed class SecretMaintenanceService(
         object? value)
     {
         var slot = context.GetSlot(reportPath);
+        if (IsEnvelopeStoredAsLegacyString(value))
+        {
+            // AB#5532: an enc:v2 envelope in a string slot has no legitimate source (the engine stores
+            // enc:v2 only as the protected sub-document); it was copied there. Reported, never decrypted,
+            // re-protected or adopted as a protected value, and left as stored - in every mode.
+            slot.Counts.AddFailure();
+            context.Result.Totals.AddFailure();
+            context.ModelCounts.AddFailure();
+            context.Result.Failures.Add(new SecretSweepFailure(context.CkTypeId, context.RtId, elementPath,
+                "An 'enc:v2' envelope is stored as a legacy string; it is not decrypted. Enter the secret again."));
+            logger.LogWarning(
+                "Secret sweep found an enc:v2 envelope stored as a legacy string in {AttributePath} of {CkTypeId}@{RtId} (tenant {TenantId}); left as stored",
+                elementPath, context.CkTypeId, context.RtId, context.TenantId);
+            return (false, null);
+        }
+
         var (form, keyId, raw) = Classify(value);
         if (form == null)
         {
@@ -465,18 +481,15 @@ internal sealed class SecretMaintenanceService(
                         return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
                     case SecretValueForm.EncV2:
                     {
-                        // An enc:v2 envelope kept in a string slot becomes a protected value.
-                        var storedAsString = value is not RtSecretValue { IsProtected: true };
-                        var stored = value is RtSecretValue { IsProtected: true } protectedValue
-                            ? protectedValue
-                            : RtSecretValue.Protected(raw!);
+                        // Only protected values get here: an enc:v2 envelope stored as a legacy string is
+                        // a failure (ProcessSlot), never adopted as a protected value (AB#5532).
+                        var stored = (RtSecretValue)value!;
                         if (context.Mode == SecretSweepMode.Reprotect && protector.NeedsReprotect(stored))
                         {
                             return (true, protector.Reprotect(stored, access), SlotEffect.None);
                         }
 
-                        // Encrypt leaves enc:v2 alone; a string-stored envelope moves to the sub-document form.
-                        return storedAsString ? (true, stored, SlotEffect.None) : (false, null, SlotEffect.None);
+                        return (false, null, SlotEffect.None);
                     }
                     default:
                         return (false, null, SlotEffect.None);
@@ -551,6 +564,22 @@ internal sealed class SecretMaintenanceService(
         }
 
         return (SecretValueForm.Plaintext, null, raw);
+    }
+
+    /// <summary>
+    ///     True for a string (or a non-protected <see cref="RtSecretValue" />) in a Secret slot whose text is
+    ///     a structurally valid <c>enc:v2</c> envelope (any key id).
+    /// </summary>
+    internal static bool IsEnvelopeStoredAsLegacyString(object? value)
+    {
+        var text = value switch
+        {
+            string s => s,
+            RtSecretValue { IsProtected: false } secret => secret.RawValue,
+            _ => null
+        };
+
+        return text != null && SecretEnvelope.TryParse(text, out var info) && info.Version != 1;
     }
 
     private static string ModeTag(SecretSweepMode mode)

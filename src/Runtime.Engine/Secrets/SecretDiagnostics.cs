@@ -49,6 +49,17 @@ public static class SecretDiagnostics
         description: "Count of legacy plaintext Secret reads rejected by strict mode.");
 
     /// <summary>
+    ///     Incremented when an <c>enc:v2</c> envelope stored as a legacy string was refused instead of
+    ///     decrypted (AB#5532, <see cref="Meshmakers.Octo.Runtime.Contracts.Secrets.SecretEnvelopeNotAllowedException" />).
+    ///     Nothing legitimate produces one, so any count is worth a look. Tags: <c>tenant</c>, <c>ckType</c>,
+    ///     <c>attribute</c>, <c>service</c> (where known). Never carries a value.
+    /// </summary>
+    public static readonly Counter<long> EnvelopeNotAllowedReads = Meter.CreateCounter<long>(
+        "octo.secrets.envelope_not_allowed",
+        unit: "{read}",
+        description: "Count of enc:v2 envelopes found as legacy strings in Secret slots and refused.");
+
+    /// <summary>
     ///     Incremented by the secret sweep for every value it changed (AB#5532). Tags: <c>tenant</c>,
     ///     <c>mode</c> (<c>verify</c>, <c>encrypt</c>, <c>reprotect</c>, <c>clear_unknown_kid</c>,
     ///     <c>decrypt</c>, <c>normalize_placeholders</c>).

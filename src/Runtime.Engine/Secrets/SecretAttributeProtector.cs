@@ -96,7 +96,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     /// <inheritdoc />
     public string Unprotect(string storedValue, SecretAccessContext? context = null)
     {
-        return Unprotect(storedValue, context, allowPlaintext: false);
+        return Unprotect(storedValue, context, allowPlaintext: false, isLegacyValue: false);
     }
 
     private string Unprotect(RtSecretValue value, SecretAccessContext? context, bool allowPlaintext)
@@ -110,7 +110,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
                 Count(FormPending, context);
                 return value.RawValue;
             default:
-                return Unprotect(value.RawValue, context, allowPlaintext);
+                return Unprotect(value.RawValue, context, allowPlaintext, isLegacyValue: true);
         }
     }
 
@@ -121,11 +121,26 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     ///     sweep and the write path): it must convert the remaining clear text even in strict mode. The read
     ///     is still counted as a plaintext read.
     /// </param>
-    private string Unprotect(string storedValue, SecretAccessContext? context, bool allowPlaintext)
+    /// <param name="isLegacyValue">
+    ///     True for the text of a <see cref="RtSecretValueState.LegacyPlaintext" /> value (a string found in
+    ///     a Secret slot). Such a text may be clear text or <c>enc:v1</c>; an <c>enc:v2</c> envelope there
+    ///     has no legitimate source (the engine stores <c>enc:v2</c> only as the protected sub-document) and
+    ///     is refused with <see cref="SecretEnvelopeNotAllowedException" /> instead of being decrypted -
+    ///     otherwise a copied envelope would be decrypted for whoever can write the string (AB#5532).
+    /// </param>
+    private string Unprotect(string storedValue, SecretAccessContext? context, bool allowPlaintext,
+        bool isLegacyValue)
     {
         ArgumentNullException.ThrowIfNull(storedValue);
         if (SecretEnvelope.IsEnvelope(storedValue))
         {
+            if (isLegacyValue && !storedValue.StartsWith(SecretEnvelope.PrefixV1, StringComparison.Ordinal))
+            {
+                SecretDiagnostics.EnvelopeNotAllowedReads.Add(1, BuildTags(null, context));
+                throw new SecretEnvelopeNotAllowedException(context?.TenantId, context?.CkTypeId,
+                    context?.AttributeName);
+            }
+
             return Decrypt(storedValue, context);
         }
 

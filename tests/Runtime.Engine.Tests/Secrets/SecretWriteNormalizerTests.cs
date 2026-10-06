@@ -525,4 +525,63 @@ public class SecretWriteNormalizerTests
     }
 
     #endregion
+
+    #region AB#5532 enc:v2 as legacy string (decryption oracle)
+
+    [Fact]
+    public void Replace_StoredLegacyV2EnvelopeString_IsKeptAsTheOpaqueLegacyString_NeverAdopted()
+    {
+        var foreign = _protector.Protect("victim-secret").Envelope!;
+        var stored = _model.NewConfig();
+        stored.SetAttributeRawValue("ApiKey", foreign); // copied into the slot before it became Secret
+        var incoming = _model.NewConfig(stored.RtId);
+
+        Normalize(incoming, SecretWriteOperation.Replace, stored);
+
+        var carried = Assert.IsType<RtSecretValue>(incoming.Attributes["ApiKey"]);
+        Assert.True(carried.IsLegacyPlaintext);
+        Assert.False(carried.IsProtected);
+        Assert.Throws<SecretEnvelopeNotAllowedException>(() => _protector.Unprotect(carried));
+    }
+
+    [Fact]
+    public void StorageOrigin_LegacyV2EnvelopeString_IsKeptAsTheOpaqueLegacyString()
+    {
+        var foreign = _protector.Protect("victim-secret").Envelope!;
+        var entity = _model.NewConfig();
+        entity.SetAttributeRawValue("ApiKey", RtSecretValue.LegacyPlaintext(foreign));
+
+        Normalize(entity, SecretWriteOperation.Insert, origin: SecretValueOrigin.Storage);
+
+        var kept = Assert.IsType<RtSecretValue>(entity.Attributes["ApiKey"]);
+        Assert.True(kept.IsLegacyPlaintext);
+        Assert.Throws<SecretEnvelopeNotAllowedException>(() => _protector.Unprotect(kept));
+    }
+
+    [Fact]
+    public void Input_V2EnvelopeString_IsEncryptedAsPlaintext_NeverDecrypted()
+    {
+        var foreign = _protector.Protect("victim-secret").Envelope!;
+        var entity = _model.NewConfig();
+        entity.SetAttributeRawValue("ApiKey", foreign);
+
+        Normalize(entity, SecretWriteOperation.Insert);
+
+        // The new ciphertext wraps the envelope text itself: decrypting it yields the copied text, not
+        // the victim's secret.
+        Assert.Equal(foreign, Decrypt(entity.Attributes["ApiKey"]));
+    }
+
+    [Fact]
+    public void StorageOrigin_LegacyV1String_IsStillPromotedToProtected()
+    {
+        var entity = _model.NewConfig();
+        entity.SetAttributeRawValue("ApiKey", RtSecretValue.LegacyPlaintext(SecretTestModel.V1Vector));
+
+        Normalize(entity, SecretWriteOperation.Insert, origin: SecretValueOrigin.Storage);
+
+        Assert.Equal(SecretTestModel.V1VectorPlaintext, Decrypt(entity.Attributes["ApiKey"]));
+    }
+
+    #endregion
 }

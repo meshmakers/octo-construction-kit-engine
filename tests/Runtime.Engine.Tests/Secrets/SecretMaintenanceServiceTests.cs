@@ -498,4 +498,42 @@ public class SecretMaintenanceServiceTests
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             CreateService().SweepTenantAsync("nope", SecretSweepMode.Verify, TestContext.Current.CancellationToken));
     }
+
+    #region AB#5532 enc:v2 as legacy string (decryption oracle)
+
+    [Theory]
+    [InlineData(SecretSweepMode.Verify)]
+    [InlineData(SecretSweepMode.Encrypt)]
+    [InlineData(SecretSweepMode.Reprotect)]
+    [InlineData(SecretSweepMode.ClearUnknownKid)]
+    [InlineData(SecretSweepMode.Decrypt)]
+    public async Task LegacyStringWithV2Envelope_IsReportedAsFailed_AndLeftAsStored(SecretSweepMode mode)
+    {
+        var foreign = _protector.Protect("victim-secret").Envelope!;
+        var foreignUnknownKid = UnknownKidEnvelope;
+        var copy = _model.NewConfig();
+        copy.SetAttributeRawValue("Password", foreign);
+        copy.SetAttributeRawValue("ApiKey", RtSecretValue.LegacyPlaintext(foreignUnknownKid));
+        copy.SetAttributeRawValue("Credentials", new List<RtRecord> { _model.CredentialRecord("x", foreign) });
+        _store[_model.Config.CkTypeId.ToRtCkId().FullName] = [copy];
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, mode,
+            new SecretSweepOptions { ConfirmDecrypt = true }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(3, result.Totals.Failed);
+        Assert.Equal(0, result.Totals.EncV2);
+        Assert.Equal(0, result.Totals.UnknownKeyId);
+        Assert.Equal(3, result.Failures.Count(f => f.RtId == copy.RtId && f.Reason.Contains("enc:v2")));
+        Assert.Empty(result.Cleared);
+        Assert.DoesNotContain(_rewrites, r => r.RtId == copy.RtId);
+        Assert.Equal(foreign, copy.Attributes["Password"]);
+        Assert.Equal(foreignUnknownKid, ((RtSecretValue)copy.Attributes["ApiKey"]!).RawValue);
+        var element = ((IEnumerable<RtRecord>)copy.Attributes["Credentials"]!).Single();
+        Assert.Equal(foreign, element.Attributes["Value"]);
+        var json = JsonSerializer.Serialize(result);
+        Assert.DoesNotContain("victim-secret", json);
+        Assert.DoesNotContain(foreign, json);
+    }
+
+    #endregion
 }

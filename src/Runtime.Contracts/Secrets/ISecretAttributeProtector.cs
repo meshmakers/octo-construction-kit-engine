@@ -72,8 +72,12 @@ public interface ISecretAttributeProtector
     ///     Returns the plaintext of a secret value: decrypts <c>enc:v2</c> (key ring) and <c>enc:v1</c>
     ///     (legacy key), returns legacy clear text (counted as a plaintext read) and the plaintext of
     ///     a pending value. In strict mode (<see cref="IsStrictMode" />) legacy clear text is rejected.
+    ///     A legacy value (a string found in a Secret slot) may be clear text or <c>enc:v1</c>; an
+    ///     <c>enc:v2</c> envelope as legacy text is never decrypted (AB#5532: the engine stores <c>enc:v2</c>
+    ///     only in the protected form, so such a text was copied there).
     /// </summary>
     /// <exception cref="LegacyPlaintextSecretRejectedException">Strict mode and the value is legacy clear text</exception>
+    /// <exception cref="SecretEnvelopeNotAllowedException">A legacy value whose text is an <c>enc:v2</c> envelope</exception>
     /// <exception cref="SecretEncryptionNotConfiguredException">The needed key material is not configured</exception>
     /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The value was tampered with or the key is wrong</exception>
@@ -84,6 +88,13 @@ public interface ISecretAttributeProtector
     ///     decrypted, anything else is treated as legacy clear text (counted as a plaintext read; rejected
     ///     in strict mode, see <see cref="IsStrictMode" />).
     /// </summary>
+    /// <remarks>
+    ///     This overload is the explicit envelope entry point (a caller that holds an envelope it trusts,
+    ///     e.g. <c>InstanceSecretCrypto</c>) and still decrypts <c>enc:v2</c>. Values read from a Secret
+    ///     slot go through <see cref="Unprotect(RtSecretValue, SecretAccessContext?)" />, which refuses an
+    ///     <c>enc:v2</c> envelope stored as a legacy string; never pass the text of a
+    ///     <see cref="RtSecretValueState.LegacyPlaintext" /> value here.
+    /// </remarks>
     /// <exception cref="LegacyPlaintextSecretRejectedException">Strict mode and the value is clear text</exception>
     /// <exception cref="SecretEncryptionNotConfiguredException">The needed key material is not configured</exception>
     /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
@@ -111,7 +122,10 @@ public interface ISecretAttributeProtector
     ///     Returns the value protected with the active key; a value that already is, is returned
     ///     unchanged. Decrypting for the re-encryption is counted like any other decrypt. Legacy clear
     ///     text is converted in strict mode as well (the strict check is bypassed and the read is counted
-    ///     as a plaintext read): the encrypt / reprotect sweep must be able to clear the remainder.
+    ///     as a plaintext read): the encrypt / reprotect sweep must be able to clear the remainder. A legacy
+    ///     value whose text is an <c>enc:v2</c> envelope is refused like in
+    ///     <see cref="Unprotect(RtSecretValue, SecretAccessContext?)" />.
     /// </summary>
+    /// <exception cref="SecretEnvelopeNotAllowedException">A legacy value whose text is an <c>enc:v2</c> envelope</exception>
     RtSecretValue Reprotect(RtSecretValue value, SecretAccessContext? context = null);
 }

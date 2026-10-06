@@ -58,6 +58,54 @@ public class LegacyPlaintextSecretRejectedException : InvalidOperationException
 }
 
 /// <summary>
+///     Thrown when an <c>enc:v2</c> envelope is found where only legacy values may be: as the text of a
+///     <see cref="RtSecretValueState.LegacyPlaintext" /> value, i.e. a string stored in a Secret slot
+///     (AB#5532, decryption-oracle hardening).
+/// </summary>
+/// <remarks>
+///     A legacy string is clear text or <c>enc:v1</c> written before the attribute became Secret; nothing
+///     legitimate stores an <c>enc:v2</c> envelope as a string - the engine always writes it as the
+///     protected sub-document. An <c>enc:v2</c> text in a string slot was copied there (for example into a
+///     String attribute before it was migrated to Secret), and decrypting or re-protecting it would hand
+///     another entity's secret to whoever can write that string. It is refused, never decrypted; the
+///     secret sweep reports it as failed and leaves it as stored. The message never contains the value.
+/// </remarks>
+public class SecretEnvelopeNotAllowedException : InvalidOperationException
+{
+    /// <summary>
+    ///     Creates a new instance.
+    /// </summary>
+    /// <param name="tenantId">Tenant of the entity, when known</param>
+    /// <param name="ckTypeId">CK type of the entity, when known</param>
+    /// <param name="attributeName">Name of the Secret attribute, when known</param>
+    public SecretEnvelopeNotAllowedException(string? tenantId = null, string? ckTypeId = null,
+        string? attributeName = null)
+        : base($"Secret attribute '{attributeName ?? "?"}' of '{ckTypeId ?? "?"}' (tenant '{tenantId ?? "?"}') " +
+               "holds an 'enc:v2' envelope stored as a legacy string. Only clear text and 'enc:v1' values are " +
+               "accepted as legacy strings; the value is not decrypted. Enter the secret again.")
+    {
+        TenantId = tenantId;
+        CkTypeId = ckTypeId;
+        AttributeName = attributeName;
+    }
+
+    /// <summary>
+    ///     Tenant of the entity, when known.
+    /// </summary>
+    public string? TenantId { get; }
+
+    /// <summary>
+    ///     CK type of the entity, when known.
+    /// </summary>
+    public string? CkTypeId { get; }
+
+    /// <summary>
+    ///     Name of the Secret attribute, when known.
+    /// </summary>
+    public string? AttributeName { get; }
+}
+
+/// <summary>
 ///     Thrown when an <c>enc:v2</c> envelope names a key id that is not in the key ring - typically a
 ///     value restored from another environment (decision 5: such secrets become "not set").
 /// </summary>

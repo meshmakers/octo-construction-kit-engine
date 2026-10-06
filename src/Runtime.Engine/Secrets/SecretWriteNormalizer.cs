@@ -518,10 +518,13 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
     {
         if (SecretEnvelope.TryParse(legacy.RawValue, out var info))
         {
-            if (info.Version == SecretEnvelope.CurrentVersion)
+            if (info.Version != 1)
             {
-                // An enc:v2 envelope that was stored as a string: it already is ciphertext.
-                return RtSecretValue.Protected(legacy.RawValue);
+                // AB#5532: an enc:v2 envelope stored as a string has no legitimate source - it was copied
+                // there. Adopting it as a protected value would make a foreign ciphertext decryptable for
+                // whoever wrote the string (decryption oracle). It stays the opaque legacy string it was
+                // (Unprotect refuses it, the secret sweep reports it as failed).
+                return legacy;
             }
 
             if (!_protector.IsConfigured)

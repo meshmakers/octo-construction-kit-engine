@@ -7,9 +7,12 @@
 > progress: [secret-rollout-progress.md](secret-rollout-progress.md).
 > State: scanned read-only on 2026-10-06 against local `main` of every repo listed. Nothing was
 > changed in these repos. octo-ai-services is implemented (last section).
+> Amended 2026-10-06 for the round-2 decisions (concept §2.1): **placeholders are ordinary values**
+> (seeds must leave Secret slots empty; `TODO_SET_*` / `<…>` fail the seed lint), and a stored value
+> whose key id is not in the ring is **kept** and reads as `isSet: false, keyMissing: true`.
 
 No credential values are quoted in this document. Where a seed holds a value it is described by
-its form only (placeholder / empty).
+its form only (placeholder / empty / value).
 
 ## 0. Rules that apply to every repo below
 
@@ -21,9 +24,12 @@ its form only (placeholder / empty).
 2. **Required secrets**: an empty string no longer satisfies a required attribute, and clearing a
    required secret is refused (rule engine message 22). A secret that a flow clears or that is
    legitimately absent must be `isOptional: true` on the type (Minor).
-3. **Seeds**: only `<…>`, `TODO_SET_<UPPER_SNAKE>` or empty values (decision 9). Placeholders are
-   stored as "not set" (the phase-3 migration hook `NormalizePlaceholdersAsync` turns stored
-   placeholders and empty strings into `null`).
+3. **Seeds**: a Secret slot may only be **empty or omitted** (decision 9, concept §2.1 item 1).
+   `<…>` and `TODO_SET_<UPPER_SNAKE>` are values now and fail the seed lint (`BlueprintSeedSecretLint`,
+   message 10) — replace them with `''` or drop the attribute. Only values that are *already stored* as
+   legacy plaintext placeholders are converted once to "not set" (phase-3 migration hook
+   `NormalizePlaceholdersAsync`, encrypt sweep). A placeholder written through any API after the switch
+   is encrypted and reads as `isSet: true`.
 4. **Pipelines**:
    - `GetRtEntities*` / queries return a Secret only as the marker `{ "isSet": true|false }`.
      Reading the plaintext needs **`RevealSecret@1`** (mesh adapter). `If@1`, `SetPrimitiveValue@1`,
@@ -36,12 +42,14 @@ its form only (placeholder / empty).
      working unchanged: the communication controller reveals Secret values when it ships the
      configuration to the adapter (AB#5537). They are cached until the DataFlow is redeployed.
    - Writing a plaintext with `CreateUpdateInfo@1` (`attributeValueType: String`) sets / rotates the
-     secret (the engine encrypts it). **`""` now means "unchanged"**; clearing needs `null` (or a
-     placeholder, which is stored as "not set").
+     secret (the engine encrypts it). **`""` now means "unchanged"**; clearing needs `null`. A
+     placeholder string is an ordinary value (it would be stored encrypted and read as set).
    - Anonymous HTTP routes have no caller to read as: use `identity: ServiceAccount`
      (`System` is refused by `RevealSecret@1`).
-5. **GraphQL**: a Secret is never returned. Typed field `x: OctoSecretState { isSet }`, generic
-   projection `value: null` + `secretIsSet`. Filters on a Secret allow only `IS_NULL` /
+5. **GraphQL**: a Secret is never returned. Typed field `x: OctoSecretState { isSet, keyMissing }`,
+   generic projection `value: null` + `secretIsSet` + `secretKeyMissing`. `keyMissing: true` = a value is
+   stored but its key is not in the ring (restore from another environment) — treat it as not set and
+   ask for re-entry; required checks still see it as present. Never decide "set?" by comparing strings. Filters on a Secret allow only `IS_NULL` /
    `IS_NOT_NULL`; `IN`, `EQUALS`, `MATCH_REG_EX`, sort, search fail with `SecretAttributeNotQueryable`.
    Inputs stay `String`; `""`/omitted = unchanged; explicit clear via `clearSecretAttributes`.
 6. **Order per environment**: phase 2 (consumers tolerant to both forms) before phase 3 (model
@@ -64,7 +72,7 @@ the Tesla add-on model.
 | `src/Meshmakers.Accounting.Tesla.CkModel/ConstructionKit/attributes/teslaConfigurationAttributes.yaml` | `ClientSecret`, `RefreshToken`: `valueType: String`, `isRuntimeState: true` | `valueType: Secret`, `ownership: Secret`, drop `isRuntimeState`. Descriptions: "write the plaintext; reads only report whether it is set". |
 | `src/Meshmakers.Accounting.Tesla.CkModel/ConstructionKit/types/teslaConfiguration.yaml` | `RefreshToken` required, `ClientSecret` optional | Keep. (`RefreshToken` stays required: the pipeline only ever overwrites it.) |
 | `src/Meshmakers.Accounting.Tesla.CkModel/ConstructionKit/ckModel.yaml` | `Meshmakers.Accounting.Tesla-1.1.0`, `System-[2.0,3.0)` | `Meshmakers.Accounting.Tesla-1.2.0`, `System-[2.5,3.0)` |
-| `src/blueprints/MeshmakersAccounting.Tesla/seed-data/configurations/tesla.yaml` | `ClientSecret`, `RefreshToken` = `<…>` placeholders | No value change (placeholders are allowed). Raise header dependency `Meshmakers.Accounting.Tesla-[1.0,2.0)` → `[1.2,2.0)`. |
+| `src/blueprints/MeshmakersAccounting.Tesla/seed-data/configurations/tesla.yaml` | `ClientSecret`, `RefreshToken` = `<…>` placeholders | Set both to `''` (placeholders fail the seed lint since 2026-10-06). Raise header dependency `Meshmakers.Accounting.Tesla-[1.0,2.0)` → `[1.2,2.0)`. |
 | `src/blueprints/MeshmakersAccounting.Tesla/blueprint.yaml` | `MeshmakersAccounting.Tesla-1.12.0`; `System-[2.0,)`, `Meshmakers.Accounting.Tesla-[1.1.0,2.0)` | `1.13.0`; `System-[2.5,)`, `Meshmakers.Accounting.Tesla-[1.2.0,2.0)`. Update the post-install text (secrets are write-only; re-apply keeps them via Secret ownership). |
 
 ### 1.2 Tesla fetcher pipeline — phase 3 (same blueprint version as 1.1)
@@ -111,24 +119,27 @@ become Secret in System.Communication 3.40. After the switch they fail with
 | `src/app/graphQL/getAiSecretState.graphql` | `fieldFilter: [{ attributePath: "ApiKey", operator: IN, comparisonValue: $unsetValues }]` on `systemCommunicationAiConfiguration` | New document `getAiSecretUnset.graphql`: `fieldFilter: [{ attributePath: "ApiKey", operator: IS_NULL }]` → `totalCount` (1 = not set). Keep the old one as fallback until 3.40 is everywhere. |
 | `src/app/graphQL/getGraphSecretState.graphql` | same with `ClientSecret` on `systemCommunicationMicrosoftGraphConfiguration` | same pattern, `IS_NULL` on `ClientSecret` |
 | `src/app/graphQL/getImapPasswordState.graphql` | same with `Password` on `systemCommunicationEMailReceiverConfiguration` | same pattern, `IS_NULL` on `Password` |
-| `src/app/pages/settings/ai-settings.ts` (`SECRET_UNSET_VALUES`, l. 30/97), `src/app/services/graph-credentials.service.ts` (`SECRET_UNSET_VALUES`, l. 15/66), `src/app/services/imap-connection.service.ts` (`PASSWORD_UNSET_VALUES`, l. 11/86) | compare against `TODO_SET_*` / `<…>` / `""` via the `IN` query | Run the legacy `IN` query; on a GraphQL error with code `SecretAttributeNotQueryable` run the `IS_NULL` query (works in both phases; before 3.40 `IS_NULL` would report a placeholder as "set"). Drop the fallback and the `*_UNSET_VALUES` constants once 3.40 is rolled out everywhere. Placeholders are stored as `null` after the switch, so `IS_NULL` covers them. |
+| `src/app/pages/settings/ai-settings.ts` (`SECRET_UNSET_VALUES`, l. 30/97), `src/app/services/graph-credentials.service.ts` (`SECRET_UNSET_VALUES`, l. 12–15/66), `src/app/services/imap-connection.service.ts` (`PASSWORD_UNSET_VALUES`, l. 9–11/86) | compare against `TODO_SET_*` / `<…>` / `""` via the `IN` query (string comparison) | **Switch to `isSet`** (plus `keyMissing` → show "key missing — re-enter"): select the typed `OctoSecretState { isSet keyMissing }` field (or `secretIsSet` / `secretKeyMissing` in the generic projection) of the one configuration entity instead of filtering by value. Transition until 3.40 is everywhere: run the legacy `IN` query and on a GraphQL error with code `SecretAttributeNotQueryable` use `isSet`. Then delete `SECRET_UNSET_VALUES` / `PASSWORD_UNSET_VALUES` and every `TODO_SET_*` comparison for Secret attributes — a placeholder is a value now (it would read as `isSet: true`), and the seed no longer carries any (§1.4). The non-secret placeholder constants (`PLACEHOLDER_AZURE_TENANT_ID`, `PLACEHOLDER_CLIENT_ID`, `PLACEHOLDER_USERNAME`) are not affected by the value type; drop them together with the seed placeholders of those String attributes if the seed switches them to empty as well. |
 | `src/app/graphQL/getTeslaConfig.graphql` + `src/app/models/tesla-config.model.ts` (`isUnset`, `clientSecretSet`, `refreshTokenSet`) | generic `attributes { items { attributeName value } }` — today this **sends ClientSecret and RefreshToken to the browser in clear text**; set-ness derived from the value | Select `attributes { items { attributeName value secretIsSet } }`; `clientSecretSet = secretIsSet ?? !isUnset(value)` (same for `refreshToken`). After phase 3 `value` is `null` and `secretIsSet` decides. |
 | `src/app/pages/settings/tesla-config.ts` (`saveConfig`) | sends secrets only when entered | No change (matches the write-only contract; `""` would now mean "unchanged" anyway). |
 | `src/schema.graphql` + `*.generated.ts` | String fields | Re-run codegen against the 3.40 / Tesla 1.2.0 schema (typed fields become `OctoSecretState`). |
 | `src/app/graphQL/updateImapConnection.graphql`, `updateAiApiKey.graphql`, `getAiConfiguration.graphql`, `getImapConnection.graphql`, `getGraphCredentials.graphql` | already never select a secret, mutations return only `rtId` | No change. |
 
-### 1.4 Pipelines and seeds of the base blueprint — no change needed
+### 1.4 Pipelines and seeds of the base blueprint — pipelines unchanged, seeds must drop placeholders
 
 - `src/blueprints/MeshmakersAccounting/seed-data/data-flows/*.yaml`, `data/_pipelines/*.yaml`:
   `AnthropicAiQuery@1` uses `apiKeyConfigurationName: AnthropicAiConfig`, `FinApiAuth@1` uses
   `clientSecretPath`/`passwordPath: $.config.*` from `GetPipelineConfigByWellKnownName@1`. No
   inline API key or password in any stored pipeline definition. No pipeline reads a credential
   entity with `GetRtEntities*`.
-- `src/blueprints/MeshmakersAccounting/seed-data/configurations/integrations.yaml`,
-  `data/_general/rt-config-email-*.yaml`: all credential attributes hold `<…>` or `TODO_SET_*`
-  placeholders — compliant with the seed lint.
-- AB#5529: the credentials committed earlier are no longer in the current seeds, but remain in git
-  history (and the public catalog history); rotation is tracked by AB#5529.
+- **Seed change required (MeshmakersAccounting blueprint, same version as the 3.40 dependency bump):**
+  `src/blueprints/MeshmakersAccounting/seed-data/configurations/integrations.yaml` and
+  `data/_general/rt-config-email-*.yaml` hold `<…>` / `TODO_SET_*` placeholders in credential
+  attributes that become Secret in System.Communication 3.40 (`ClientSecret`, `Password`, `ApiKey`).
+  Replace them with empty values (`''`) — placeholders fail the seed lint since 2026-10-06 and would be
+  stored encrypted as "set". Already installed tenants: stored legacy placeholders are converted to
+  "not set" once by the CK migration hook / encrypt sweep; Secret ownership keeps real values on
+  re-apply. The frontend must not rely on `TODO_SET_*` for those attributes any more (§1.3).
 
 ### 1.5 `scripts/om_set_secrets.ps1` — phase 3 note
 
@@ -315,7 +326,7 @@ participant submits; the jury reads it: `src/we-are-developers-landing-page/src/
 selects `secretKey`, `pages/submissions/submissions.html` shows it, `submissions.ts` has a grid column
 and `submissions.util.ts` exports it to CSV. It is not a credential to a system.
 
-**Open decision (recommendation: do not convert).** Converting makes the value unreadable to the jury
+**Decided 2026-10-06: not converted** (concept §2.1 item 3). Background: converting makes the value unreadable to the jury
 (the UI and CSV would show nothing) and would need a privileged reveal pipeline for a puzzle answer.
 Recommendation: keep `String`, remove it from the §5.1 inventory, and if wanted rename it later
 (Major) to avoid the misleading name. If the PO decides to convert anyway: `valueType: Secret`,
@@ -327,12 +338,12 @@ Recommendation: keep `String`, remove it from the §5.1 inventory, and if wanted
 
 | Repo | Model bump | Blueprint bump | Pipeline change | Frontend / code change | Phase |
 |---|---|---|---|---|---|
-| meshmakers-app | Meshmakers.Accounting.Tesla 1.1.0 → 1.2.0 | MeshmakersAccounting.Tesla 1.12.0 → 1.13.0 | Tesla fetcher: `RevealSecret@1` for RefreshToken | 3 state queries → `IS_NULL` with fallback; Tesla `secretIsSet`; codegen; `om_set_secrets.ps1` clear semantics | frontend 2, model+pipeline 3 |
+| meshmakers-app | Meshmakers.Accounting.Tesla 1.1.0 → 1.2.0 | MeshmakersAccounting.Tesla 1.12.0 → 1.13.0; MeshmakersAccounting: seed placeholders → empty | Tesla fetcher: `RevealSecret@1` for RefreshToken | 3 state checks → `isSet`/`keyMissing` (no string comparison) with fallback; Tesla `secretIsSet`; codegen; `om_set_secrets.ps1` clear semantics | frontend 2, model+pipeline+seed 3 |
 | energy-community | EnergyCommunity.Registration 2.4.0 → 2.5.0 | EnergyCommunity.Billing 2.4.2 → 2.5.0 | member-registration: `.isSet` + `RevealSecret@1` | captcha state query → `IS_NOT_NULL` with fallback; codegen | frontend 2, model+pipeline 3 |
 | octo-adapter-loxone | Loxone 4.9.0 → 4.10.0 (unused definition) | — | — | `RegisterSecret` in the Loxone nodes; deprecate inline `password` | code 2, model 3 |
 | octo-report-services | System.Reporting 2.2.0 → 2.3.0 | — | — | `OctoSettingsStorage` reveal / pending write | 3 (one release) |
 | one-time-ticket | Demo.Tickets 1.0.1 → 1.1.0 (`Secret` optional) | OneTimeTicket.* 1.0.5 → 1.1.0 | redeem: `RevealSecret@1`, burn with `null` | — | 3 |
-| wwc26-landing-page | none (open decision) | — | — | — | — |
+| wwc26-landing-page | none (decided: not converted) | — | — | — | — |
 | octo-ai-services | System.Ai 3.12.0 → 3.13.0 | — (seeds none) | — | implemented, see §8 | 3 (code tolerates both forms) |
 
 ## 8. octo-ai-services — implemented (AB#5541)

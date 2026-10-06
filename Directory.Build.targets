@@ -41,7 +41,7 @@
     
     <!--It is generated a target which is executed before the compilation-->
     <!--
-        CkCompile, CkRestore and CkIncludeFiles run right before PrepareResources, i.e. after
+        CkCompile, CkRestore and CkIncludeFiles run as the first dependency of PrepareResources, i.e. after
         ResolveProjectReferences has built the projects this one references, and before the embedded
         resources and the AdditionalFiles of the source generator are consumed. (Hooking
         AfterTargets="ResolveProjectReferences" instead re-runs the targets in the inner project calls
@@ -52,7 +52,7 @@
         before BeforeBuild (as before AB#5532) compiled the dependent model before its dependency was
         built - System.StreamData 1.14.0 pinned System 2.3.0 that way.
     -->
-    <Target Name="CkCompile" BeforeTargets="PrepareResources" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
+    <Target Name="CkCompile" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
@@ -90,14 +90,28 @@
         </Exec>
     </Target>
 
-    <Target Name="CkRestore" BeforeTargets="PrepareResources"
+    <Target Name="CkRestore"
             DependsOnTargets="GatherImportFiles">      
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder) $(_OctoLcrArg)">
         </Exec>
     </Target>
     
-    <Target Name="CkIncludeFiles" DependsOnTargets="CkRestore;CkCompile" BeforeTargets="PrepareResources" >
+    <!--
+        CkIncludeFiles must run as the FIRST dependency of PrepareResources, not BeforeTargets="PrepareResources":
+        BeforeTargets fires only after the target's own DependsOnTargets have run, and PrepareResources depends on
+        PrepareResourceNames (AssignTargetPaths, CreateManifestResourceNames), which turns @(EmbeddedResource)
+        into the manifest resources handed to the compiler. An EmbeddedResource added after that is silently
+        dropped. Locally it went unnoticed because the evaluation-time ItemGroups below pick up the yaml of the
+        PREVIOUS build from bin/; a clean CI checkout has none, so 0.1.2610.6005 shipped the System.StreamData
+        assembly without ck-system.streamdata.yaml (CI build 49921). Directory.Build.targets is imported after
+        Microsoft.Common.CurrentVersion.targets, so prepending here keeps the SDK's own dependencies.
+    -->
+    <PropertyGroup>
+        <PrepareResourcesDependsOn>CkIncludeFiles;$(PrepareResourcesDependsOn)</PrepareResourcesDependsOn>
+    </PropertyGroup>
+
+    <Target Name="CkIncludeFiles" DependsOnTargets="CkRestore;CkCompile">
         <ItemGroup>
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">

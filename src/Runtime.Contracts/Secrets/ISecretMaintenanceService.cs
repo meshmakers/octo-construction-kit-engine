@@ -4,8 +4,11 @@ namespace Meshmakers.Octo.Runtime.Contracts.Secrets;
 
 /// <summary>
 ///     Maintenance of the stored values of <c>Secret</c> attributes of a tenant (AB#5532, concept §5.2
-///     phase 4, §5.3, §6): verify, encrypt legacy values, re-protect with the active key, clear values
-///     of unknown key ids after a cross-environment restore, and the emergency decrypt. Implemented in
+///     phase 4, §5.3, §6): verify, encrypt legacy values, re-protect with the active key, the explicit
+///     admin cleanup of unreadable values (unknown key id) and the engine-internal emergency decrypt.
+///     Values whose key id is not in the ring are KEPT by every mode except
+///     <see cref="SecretSweepMode.CleanupUnreadable" /> and reported in <see cref="SecretSweepResult.Unreadable" />
+///     as the re-entry list (decisions 2026-10-06, item 2). Implemented in
 ///     Runtime.Engine (<c>SecretMaintenanceService</c>) and registered by <c>AddRuntimeEngine()</c>.
 ///     The bot <c>SecretSweepJob</c> (WP9), the system API and the octo-cli commands
 ///     (<c>SecretStatus</c>, <c>ReprotectSecrets</c>) build on it.
@@ -31,8 +34,9 @@ public interface ISecretMaintenanceService
 {
     /// <summary>
     ///     Runs a sweep over all Secret values of a tenant with the default options.
-    ///     <see cref="SecretSweepMode.Decrypt" /> is refused here; it needs
-    ///     <see cref="SecretSweepOptions.ConfirmDecrypt" /> through the other overload.
+    ///     <see cref="SecretSweepMode.Decrypt" /> and <see cref="SecretSweepMode.CleanupUnreadable" /> are
+    ///     refused here; they need <see cref="SecretSweepOptions.ConfirmDecrypt" /> /
+    ///     <see cref="SecretSweepOptions.ConfirmCleanupUnreadable" /> through the other overload.
     /// </summary>
     /// <param name="tenantId">Tenant to sweep</param>
     /// <param name="mode">What to do with the values found</param>
@@ -46,11 +50,12 @@ public interface ISecretMaintenanceService
     /// </summary>
     /// <param name="tenantId">Tenant to sweep</param>
     /// <param name="mode">What to do with the values found</param>
-    /// <param name="options">Batch size, decrypt confirmation, CK model filter</param>
+    /// <param name="options">Batch size, decrypt / cleanup confirmation, CK model filter</param>
     /// <param name="cancellationToken">Cancellation token; a cancelled sweep keeps what it already rewrote</param>
     /// <returns>Counts per form and per CK type / attribute, cleared values and failures</returns>
     /// <exception cref="InvalidOperationException">
-    ///     <see cref="SecretSweepMode.Decrypt" /> without <see cref="SecretSweepOptions.ConfirmDecrypt" />
+    ///     <see cref="SecretSweepMode.Decrypt" /> without <see cref="SecretSweepOptions.ConfirmDecrypt" />, or
+    ///     <see cref="SecretSweepMode.CleanupUnreadable" /> without <see cref="SecretSweepOptions.ConfirmCleanupUnreadable" />
     /// </exception>
     /// <exception cref="SecretEncryptionNotConfiguredException">
     ///     A mode that writes or decrypts (everything but <see cref="SecretSweepMode.Verify" />) on a host
@@ -61,8 +66,9 @@ public interface ISecretMaintenanceService
 
     /// <summary>
     ///     CK migration hook (concept §5.2 phase 3): when a model switches attributes from <c>String</c> to
-    ///     <c>Secret</c>, stored placeholders (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>) and empty strings in
-    ///     Secret slots become <c>null</c> ("not set"). Nothing is encrypted and no key is needed - the
+    ///     <c>Secret</c>, stored LEGACY strings in Secret slots that are exactly a placeholder
+    ///     (<see cref="SecretAttributeConventions.IsLegacyPlaceholder" />: <c>&lt;...&gt;</c>, <c>TODO_SET_...</c>)
+    ///     or empty become <c>null</c> ("not set"), once. Nothing is encrypted and no key is needed - the
     ///     encrypt sweep does that later. Called by the CK model migration service after a successful
     ///     migration of <paramref name="ckModelName" />.
     /// </summary>
@@ -89,31 +95,40 @@ public enum SecretSweepMode
     Verify = 0,
 
     /// <summary>
-    ///     Legacy values (clear text and <c>enc:v1</c>) become <c>enc:v2</c> with the active key;
-    ///     placeholders and empty strings become <c>null</c>. <c>enc:v2</c> values stay as they are,
-    ///     whatever their key id.
+    ///     Legacy values (clear text and <c>enc:v1</c>) become <c>enc:v2</c> with the active key; legacy
+    ///     strings that are exactly a placeholder (<see cref="SecretAttributeConventions.IsLegacyPlaceholder" />)
+    ///     or empty become <c>null</c>, once (<see cref="SecretSweepResult.PlaceholdersNormalized" />).
+    ///     <c>enc:v2</c> values stay as they are, whatever their key id; values with an unknown key id are kept
+    ///     and listed in <see cref="SecretSweepResult.Unreadable" />. This is also the restore flow
+    ///     (Verify, then Encrypt).
     /// </summary>
     Encrypt = 1,
 
     /// <summary>
     ///     Everything not protected with the active key (legacy and <c>enc:v2</c> of another known key id)
-    ///     is re-encrypted with the active key - key rotation. Values with an unknown key id cannot be
-    ///     decrypted and are only counted (use <see cref="ClearUnknownKid" />).
+    ///     is re-encrypted with the active key - key rotation, and the optional ops step of an environment
+    ///     handover (source key added to the ring temporarily). Values with an unknown key id cannot be
+    ///     decrypted: they are kept and listed in <see cref="SecretSweepResult.Unreadable" />.
     /// </summary>
     Reprotect = 2,
 
     /// <summary>
-    ///     <c>enc:v2</c> values whose key id is not in the key ring become <c>null</c> ("not set") and are
-    ///     listed in <see cref="SecretSweepResult.Cleared" /> - the re-entry report after a
-    ///     cross-environment or child-tenant restore (decision 5).
+    ///     ADMIN, HIGH RISK (replaces the former <c>ClearUnknownKid</c>, same numeric value): <c>enc:v2</c>
+    ///     values whose key id is not in the key ring are DELETED (set to <c>null</c>, "not set") and listed in
+    ///     <see cref="SecretSweepResult.Cleared" />. Requires <see cref="SecretSweepOptions.ConfirmCleanupUnreadable" />.
+    ///     Without it such values are kept, read as "key missing" and become readable again once their key is
+    ///     added to the ring (decisions 2026-10-06, item 2) - only run it when the key is gone for good, and
+    ///     take a dump first. Callers gate it by role.
     /// </summary>
-    ClearUnknownKid = 3,
+    CleanupUnreadable = 3,
 
     /// <summary>
-    ///     EMERGENCY ONLY (rollback after phase 4, concept §5.2): every decryptable value is written back
-    ///     as a clear-text string, so binaries without the Secret type can read it again. Requires
-    ///     <see cref="SecretSweepOptions.ConfirmDecrypt" />. Treat the tenant as exposed afterwards and run
-    ///     <see cref="Encrypt" /> as soon as the emergency is over.
+    ///     EMERGENCY ONLY, ENGINE-INTERNAL (rollback after phase 4, concept §5.2): every decryptable value is
+    ///     written back as a clear-text string, so binaries without the Secret type can read it again.
+    ///     Requires <see cref="SecretSweepOptions.ConfirmDecrypt" />. No API (system API, bot job, octo-cli, MCP)
+    ///     exposes this mode (decisions 2026-10-06, item 2: no decrypt / plaintext export through any API); it
+    ///     is reachable only by code running in the engine process. Treat the tenant as exposed afterwards and
+    ///     run <see cref="Encrypt" /> as soon as the emergency is over.
     /// </summary>
     Decrypt = 4
 }
@@ -133,6 +148,12 @@ public sealed class SecretSweepOptions
     ///     clear text is written back to the database on purpose (emergency rollback only).
     /// </summary>
     public bool ConfirmDecrypt { get; init; }
+
+    /// <summary>
+    ///     Must be <c>true</c> for <see cref="SecretSweepMode.CleanupUnreadable" /> - the explicit confirmation
+    ///     that values whose key id is not in the key ring are deleted for good.
+    /// </summary>
+    public bool ConfirmCleanupUnreadable { get; init; }
 
     /// <summary>
     ///     Restricts the sweep to CK types of this model or types whose Secret attributes are defined by
@@ -157,8 +178,10 @@ public enum SecretValueForm
     NotSet = 0,
 
     /// <summary>
-    ///     A legacy string slot holding a placeholder (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>) or <c>""</c> -
-    ///     semantically "not set", normalised to <c>null</c> by <see cref="SecretSweepMode.Encrypt" />.
+    ///     A legacy string slot holding exactly a legacy placeholder
+    ///     (<see cref="SecretAttributeConventions.IsLegacyPlaceholder" />) or <c>""</c> - "not set", normalised to
+    ///     <c>null</c> once by <see cref="SecretSweepMode.Encrypt" /> and the CK migration hook. Protected values
+    ///     are never classified as placeholders, whatever they decrypt to.
     /// </summary>
     Placeholder = 1,
 
@@ -178,7 +201,8 @@ public enum SecretValueForm
     EncV2 = 4,
 
     /// <summary>
-    ///     An <c>enc:v2:&lt;kid&gt;:</c> envelope whose key id is NOT in the key ring.
+    ///     An <c>enc:v2:&lt;kid&gt;:</c> envelope whose key id is NOT in the key ring - kept, reads as
+    ///     "key missing" and is listed in <see cref="SecretSweepResult.Unreadable" />.
     /// </summary>
     UnknownKeyId = 5
 }
@@ -303,7 +327,7 @@ public sealed class SecretFormCounts
 public sealed record SecretSlotReport(string CkTypeId, string AttributePath, SecretFormCounts Counts);
 
 /// <summary>
-///     A Secret value the sweep set to <c>null</c> - the re-entry report (decision 5).
+///     A Secret value the sweep set to <c>null</c> (<see cref="SecretSweepMode.CleanupUnreadable" />).
 /// </summary>
 /// <param name="CkTypeId">CK type of the entity</param>
 /// <param name="RtId">Runtime id of the entity</param>
@@ -318,6 +342,24 @@ public sealed record SecretSweepClearedValue(
     OctoObjectId RtId,
     string AttributePath,
     SecretValueForm PreviousForm,
+    string? KeyId);
+
+/// <summary>
+///     A stored Secret value that cannot be read because its key id is not in the key ring - an entry of the
+///     re-entry list (decisions 2026-10-06, item 2). The value is kept: it becomes readable once the key is
+///     added to the ring, and is replaced by entering the secret again.
+/// </summary>
+/// <param name="CkTypeId">CK type of the entity</param>
+/// <param name="RtId">Runtime id of the entity</param>
+/// <param name="AttributePath">
+///     Attribute name or record path; a record array element is addressed by its record key, e.g.
+///     <c>Overrides[Key=apiToken].Value</c>, or by index when the record declares no key
+/// </param>
+/// <param name="KeyId">The key id of the envelope</param>
+public sealed record SecretSweepUnreadableValue(
+    string CkTypeId,
+    OctoObjectId RtId,
+    string AttributePath,
     string? KeyId);
 
 /// <summary>
@@ -396,15 +438,24 @@ public sealed class SecretSweepResult
     public List<SecretSlotReport> Slots { get; } = [];
 
     /// <summary>
-    ///     Values set to <c>null</c> because they were lost (an <c>enc:v2</c> envelope with an unknown key id,
-    ///     <see cref="SecretSweepMode.ClearUnknownKid" />) - the re-entry report (decision 5). Normalised
-    ///     placeholders are not listed here; they were never set (see <see cref="PlaceholdersNormalized" />).
+    ///     Values deleted by <see cref="SecretSweepMode.CleanupUnreadable" /> (an <c>enc:v2</c> envelope with an
+    ///     unknown key id) - these need re-entry. No other mode clears a value; normalised legacy placeholders
+    ///     are not listed here, they were never set (see <see cref="PlaceholdersNormalized" />).
     /// </summary>
     public List<SecretSweepClearedValue> Cleared { get; } = [];
 
     /// <summary>
-    ///     Placeholders (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>) and empty strings in Secret slots that were
-    ///     set to <c>null</c> ("not set") by <see cref="SecretSweepMode.Encrypt" />,
+    ///     Values whose key id is not in the key ring, found and KEPT by every mode except
+    ///     <see cref="SecretSweepMode.CleanupUnreadable" /> (which lists them in <see cref="Cleared" />) - the
+    ///     re-entry list after a restore from another environment (decisions 2026-10-06, item 2). Counted in
+    ///     <see cref="SecretFormCounts.UnknownKeyId" /> as well.
+    /// </summary>
+    public List<SecretSweepUnreadableValue> Unreadable { get; } = [];
+
+    /// <summary>
+    ///     Legacy strings in Secret slots that were exactly a placeholder (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>,
+    ///     <see cref="SecretAttributeConventions.IsLegacyPlaceholder" />) or empty and were set to <c>null</c>
+    ///     ("not set") by <see cref="SecretSweepMode.Encrypt" />,
     ///     <see cref="SecretSweepMode.Reprotect" /> or <see cref="ISecretMaintenanceService.NormalizePlaceholdersAsync" />.
     ///     Included in <see cref="ValuesRewritten" />.
     /// </summary>

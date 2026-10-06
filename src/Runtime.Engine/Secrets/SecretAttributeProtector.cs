@@ -22,6 +22,9 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     private const string FormV1 = "enc_v1";
     private const string FormPlaintext = "plaintext";
     private const string FormPending = "pending";
+    private const string UnreadableUnknownKeyId = "unknown_key_id";
+    private const string UnreadableCorrupt = "corrupt";
+    private const string UnreadableDecryptFailed = "decrypt_failed";
 
     private static readonly string? DefaultServiceName =
         Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") is { Length: > 0 } serviceName
@@ -165,6 +168,86 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         return storedValue;
+    }
+
+    /// <inheritdoc />
+    public SecretValueState GetReadState(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        var state = SecretValueStates.GetReadState(value, IsKnownKeyId);
+        if (state == SecretValueState.NotSet && SecretValueStates.IsCorrupt(value))
+        {
+            // Corrupt envelope reads as not set + warning (decisions 2026-10-06, item 3) - never the value.
+            SecretDiagnostics.UnreadableValues.Add(1, BuildUnreadableTags(UnreadableCorrupt, context));
+            _logger.LogWarning(
+                "Secret attribute {AttributeName} of {CkTypeId} (tenant {TenantId}) holds a corrupt value (an enc:v2 envelope stored as a legacy string); it reads as not set - enter the secret again",
+                context?.AttributeName, context?.CkTypeId, context?.TenantId);
+        }
+
+        return state;
+    }
+
+    /// <inheritdoc />
+    public string? RevealOrNull(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        var state = SecretValueStates.GetReadState(value, IsKnownKeyId);
+        switch (state)
+        {
+            case SecretValueState.KeyMissing:
+                if (_keyRing.Value.Keys.Count == 0)
+                {
+                    // A host without any key is a configuration problem, not unreadable data.
+                    throw new SecretEncryptionNotConfiguredException(
+                        "Cannot decrypt a secret: no keys are configured (SecretEncryption:Keys)." +
+                        _keyRing.Value.ProblemSuffix);
+                }
+
+                ReportUnreadable(UnreadableUnknownKeyId, value!.KeyId, context);
+                return null;
+            case SecretValueState.NotSet:
+                if (SecretValueStates.IsCorrupt(value))
+                {
+                    ReportUnreadable(UnreadableCorrupt, null, context);
+                }
+
+                return null;
+        }
+
+        try
+        {
+            return Unprotect(value!, context);
+        }
+        catch (UnknownSecretKeyIdException ex)
+        {
+            // The ring changed between the classification and the decrypt.
+            ReportUnreadable(UnreadableUnknownKeyId, ex.KeyId, context);
+            return null;
+        }
+        catch (SecretEnvelopeNotAllowedException)
+        {
+            ReportUnreadable(UnreadableCorrupt, null, context);
+            return null;
+        }
+        catch (CryptographicException)
+        {
+            ReportUnreadable(UnreadableDecryptFailed, value!.KeyId, context);
+            return null;
+        }
+    }
+
+    private void ReportUnreadable(string reason, string? keyId, SecretAccessContext? context)
+    {
+        SecretDiagnostics.UnreadableValues.Add(1, BuildUnreadableTags(reason, context));
+        // Key ids are identifiers, not secrets; the value is never logged.
+        _logger.LogError(
+            "Secret attribute {AttributeName} of {CkTypeId} (tenant {TenantId}) cannot be read ({Reason}, key id {KeyId}); it is treated as not set. Add the key to the key ring or enter the secret again",
+            context?.AttributeName, context?.CkTypeId, context?.TenantId, reason, keyId);
+    }
+
+    private static TagList BuildUnreadableTags(string reason, SecretAccessContext? context)
+    {
+        var tags = BuildTags(null, context);
+        tags.Add("reason", reason);
+        return tags;
     }
 
     /// <inheritdoc />

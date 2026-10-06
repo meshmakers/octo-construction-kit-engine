@@ -54,6 +54,14 @@ internal sealed class SecretMaintenanceService(
                 "it requires SecretSweepOptions.ConfirmDecrypt = true.");
         }
 
+        if (mode == SecretSweepMode.CleanupUnreadable && !options.ConfirmCleanupUnreadable)
+        {
+            throw new InvalidOperationException(
+                "The CleanupUnreadable sweep deletes every Secret value whose key id is not in the key ring; such " +
+                "values become readable again once their key is added. It requires " +
+                "SecretSweepOptions.ConfirmCleanupUnreadable = true.");
+        }
+
         if (mode != SecretSweepMode.Verify && !protector.IsConfigured)
         {
             throw new SecretEncryptionNotConfiguredException(
@@ -187,11 +195,12 @@ internal sealed class SecretMaintenanceService(
         logger.LogInformation(
             "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities, {Total} values " +
             "(not set {NotSet}, placeholder {Placeholder}, plaintext {Plaintext}, enc_v1 {EncV1}, enc_v2 {EncV2}, " +
-            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Cleared} cleared, {PlaceholdersNormalized} placeholder(s) " +
+            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Unreadable} unreadable (kept), {Cleared} cleared, {PlaceholdersNormalized} placeholder(s) " +
             "normalised, {Skipped} skipped (modified concurrently), {Failed} failed",
             modeTag, tenantId, result.EntitiesScanned, result.Totals.Total, result.Totals.NotSet,
             result.Totals.Placeholder, result.Totals.Plaintext, result.Totals.EncV1, result.Totals.EncV2,
-            result.Totals.UnknownKeyId, result.ValuesRewritten, result.Cleared.Count, result.PlaceholdersNormalized,
+            result.Totals.UnknownKeyId, result.ValuesRewritten, result.Unreadable.Count, result.Cleared.Count,
+            result.PlaceholdersNormalized,
             result.SkippedConcurrentlyModified, result.Totals.Failed);
 
         return result;
@@ -416,6 +425,13 @@ internal sealed class SecretMaintenanceService(
         context.Result.Totals.Add(form.Value, keyId);
         context.ModelCounts.Add(form.Value, keyId);
 
+        if (form == SecretValueForm.UnknownKeyId && context.Mode != SecretSweepMode.CleanupUnreadable)
+        {
+            // Decisions 2026-10-06, item 2: kept as stored and reported as a re-entry task.
+            context.Result.Unreadable.Add(new SecretSweepUnreadableValue(context.CkTypeId, context.RtId, elementPath,
+                keyId));
+        }
+
         try
         {
             var (changed, newValue, effect) = Decide(context, form.Value, keyId, raw, value);
@@ -425,7 +441,7 @@ internal sealed class SecretMaintenanceService(
                 switch (effect)
                 {
                     case SlotEffect.Cleared:
-                        // Only values that were lost belong in the re-entry report (decision 5).
+                        // Only values deleted by CleanupUnreadable belong here.
                         context.Result.Cleared.Add(new SecretSweepClearedValue(context.CkTypeId, context.RtId,
                             elementPath, form.Value, keyId));
                         break;
@@ -495,7 +511,8 @@ internal sealed class SecretMaintenanceService(
                         return (false, null, SlotEffect.None);
                 }
 
-            case SecretSweepMode.ClearUnknownKid:
+            case SecretSweepMode.CleanupUnreadable:
+                // The only mode that deletes a value of an unknown key id (explicitly confirmed).
                 return form == SecretValueForm.UnknownKeyId
                     ? (true, null, SlotEffect.Cleared)
                     : (false, null, SlotEffect.None);
@@ -590,7 +607,7 @@ internal sealed class SecretMaintenanceService(
             SecretSweepMode.Verify => "verify",
             SecretSweepMode.Encrypt => "encrypt",
             SecretSweepMode.Reprotect => "reprotect",
-            SecretSweepMode.ClearUnknownKid => "clear_unknown_kid",
+            SecretSweepMode.CleanupUnreadable => "cleanup_unreadable",
             SecretSweepMode.Decrypt => "decrypt",
             _ => mode.ToString()
         };
@@ -645,6 +662,16 @@ internal sealed class SecretMaintenanceService(
             target.PlaceholdersNormalized = PlaceholdersNormalized;
             if (target.Cleared.Count > Cleared)
             {
+                // The deletion did not happen: the values are still stored and unreadable.
+                foreach (var notCleared in target.Cleared.Skip(Cleared))
+                {
+                    if (notCleared.PreviousForm == SecretValueForm.UnknownKeyId)
+                    {
+                        target.Unreadable.Add(new SecretSweepUnreadableValue(notCleared.CkTypeId, notCleared.RtId,
+                            notCleared.AttributePath, notCleared.KeyId));
+                    }
+                }
+
                 target.Cleared.RemoveRange(Cleared, target.Cleared.Count - Cleared);
             }
         }

@@ -60,8 +60,20 @@ public static class SecretDiagnostics
         description: "Count of enc:v2 envelopes found as legacy strings in Secret slots and refused.");
 
     /// <summary>
+    ///     Incremented when a stored Secret value could not be read and was treated as not set
+    ///     (decisions 2026-10-06, items 2 and 3): <see cref="ISecretAttributeProtector.RevealOrNull" /> and
+    ///     <see cref="ISecretAttributeProtector.GetReadState" />. Tags: <c>reason</c> (<c>unknown_key_id</c>,
+    ///     <c>corrupt</c>, <c>decrypt_failed</c>), <c>tenant</c>, <c>ckType</c>, <c>attribute</c>, <c>service</c>
+    ///     (where known). Never carries a value.
+    /// </summary>
+    public static readonly Counter<long> UnreadableValues = Meter.CreateCounter<long>(
+        "octo.secrets.unreadable",
+        unit: "{read}",
+        description: "Count of stored Secret values that could not be read and were treated as not set.");
+
+    /// <summary>
     ///     Incremented by the secret sweep for every value it changed (AB#5532). Tags: <c>tenant</c>,
-    ///     <c>mode</c> (<c>verify</c>, <c>encrypt</c>, <c>reprotect</c>, <c>clear_unknown_kid</c>,
+    ///     <c>mode</c> (<c>verify</c>, <c>encrypt</c>, <c>reprotect</c>, <c>cleanup_unreadable</c>,
     ///     <c>decrypt</c>, <c>normalize_placeholders</c>).
     /// </summary>
     public static readonly Counter<long> SweepValuesRewritten = Meter.CreateCounter<long>(

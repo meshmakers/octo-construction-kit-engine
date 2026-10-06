@@ -2,6 +2,7 @@ using System.Collections;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.Secrets;
 using Newtonsoft.Json.Linq;
 
 namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
@@ -36,19 +37,21 @@ public static class RtSecretValueWireFormat
         "A Secret value must be a string (the secret to store), null (clear) or the marker {\"isSet\":true|false} (unchanged)";
 
     /// <summary>
-    ///     True when the value holds a secret: a protected value, a non-empty pending value (a
-    ///     placeholder-looking input is an ordinary value), or a legacy value that is neither empty nor a
-    ///     legacy placeholder (migration only).
+    ///     True when the value holds a secret, classified WITHOUT a key ring
+    ///     (<see cref="SecretValueStates.GetReadState(RtSecretValue?, Func{string?, bool}?)" /> with <c>null</c>):
+    ///     every protected value, a non-empty pending value (a placeholder-looking input is an ordinary
+    ///     value), and a legacy value that is neither empty, a legacy placeholder nor corrupt.
     /// </summary>
+    /// <remarks>
+    ///     The wire marker is written by serializers that have no key ring, so a protected value whose key
+    ///     id is not in the ring is marked <c>isSet: true</c> here. APIs that report the read state to users
+    ///     (GraphQL <c>isSet</c> / <c>keyMissing</c>, the SDK DTO mapper with a protector) must use
+    ///     <see cref="ISecretAttributeProtector.GetReadState" /> instead (decisions 2026-10-06, item 2).
+    /// </remarks>
     public static bool IsSet(RtSecretValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.State switch
-        {
-            RtSecretValueState.Protected => true,
-            RtSecretValueState.Pending => value.RawValue.Length > 0,
-            _ => value.RawValue.Length > 0 && !SecretAttributeConventions.IsLegacyPlaceholder(value.RawValue)
-        };
+        return SecretValueStates.GetReadState(value, (Func<string?, bool>?)null) == SecretValueState.Set;
     }
 
     /// <summary>

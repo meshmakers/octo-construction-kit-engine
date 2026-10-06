@@ -158,6 +158,12 @@ public class SecretMaintenanceServiceTests
         Assert.Equal(0, result.ValuesRewritten);
         Assert.Empty(_rewrites);
         Assert.True(result.Success);
+        // Decisions 2026-10-06 item 2: unknown key ids are kept and listed as re-entry tasks.
+        Assert.Equal(2, result.Unreadable.Count);
+        Assert.Contains(result.Unreadable, u => u.RtId == _e3.RtId && u.AttributePath == "ApiKey" && u.KeyId == "k9");
+        Assert.Contains(result.Unreadable, u => u.RtId == _e4.RtId && u.AttributePath == "Credentials[Key=a].Value" &&
+                                                u.KeyId == "k9");
+        Assert.Empty(result.Cleared);
 
         var configType = _model.Config.CkTypeId.ToRtCkId().ToString();
         var credentialSlot = Assert.Single(result.Slots, s => s.CkTypeId == configType && s.AttributePath == "Credentials[].Value");
@@ -180,12 +186,13 @@ public class SecretMaintenanceServiceTests
     [Theory]
     [InlineData(SecretSweepMode.Encrypt)]
     [InlineData(SecretSweepMode.Reprotect)]
-    [InlineData(SecretSweepMode.ClearUnknownKid)]
+    [InlineData(SecretSweepMode.CleanupUnreadable)]
     public async Task WritingModes_WithoutKeys_Throw(SecretSweepMode mode)
     {
         await Assert.ThrowsAsync<SecretEncryptionNotConfiguredException>(() =>
             CreateService(SecretTestModel.CreateProtector(configured: false))
-                .SweepTenantAsync(SecretTestModel.TenantId, mode, TestContext.Current.CancellationToken));
+                .SweepTenantAsync(SecretTestModel.TenantId, mode, new SecretSweepOptions { ConfirmCleanupUnreadable = true },
+                    TestContext.Current.CancellationToken));
         Assert.Empty(_rewrites);
     }
 
@@ -228,9 +235,12 @@ public class SecretMaintenanceServiceTests
         Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)credentials[0].Attributes["Value"]!).Envelope);
         Assert.Equal("k2", ((RtSecretValue)_e3.Attributes["Password"]!).KeyId); // Encrypt leaves enc:v2 alone
         Assert.Null(_e5.Attributes["Password"]);
-        // Placeholders were never set: they are counted, not listed for re-entry (decision 5).
+        // Legacy placeholders were never set: they are counted, not listed for re-entry.
         Assert.Equal(2, result.PlaceholdersNormalized);
         Assert.Empty(result.Cleared);
+        // Unknown key ids are kept (decisions 2026-10-06 item 2) and reported for re-entry.
+        Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)_e3.Attributes["ApiKey"]!).Envelope);
+        Assert.Equal(2, result.Unreadable.Count);
         Assert.Equal(0, result.SkippedConcurrentlyModified);
         AssertResultCarriesNoValue(result);
 
@@ -259,13 +269,36 @@ public class SecretMaintenanceServiceTests
         Assert.Equal("pw-3", _protector.Unprotect(password));
         Assert.Equal(2, result.Totals.UnknownKeyId);
         Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)_e3.Attributes["ApiKey"]!).Envelope);
+        Assert.Equal(2, result.Unreadable.Count);
+        Assert.Empty(result.Cleared);
     }
 
     [Fact]
-    public async Task ClearUnknownKid_SetsNull_AndReportsTheSlotsForReEntry()
+    public async Task CleanupUnreadable_RequiresConfirmation()
     {
-        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.ClearUnknownKid,
-            TestContext.Current.CancellationToken);
+        var service = CreateService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+                new SecretSweepOptions { ConfirmDecrypt = true }, TestContext.Current.CancellationToken));
+        Assert.Empty(_rewrites);
+        Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)_e3.Attributes["ApiKey"]!).Envelope);
+    }
+
+    [Fact]
+    public void CleanupUnreadable_KeepsTheNumericValueOfTheFormerClearUnknownKid()
+    {
+        Assert.Equal(3, (int)SecretSweepMode.CleanupUnreadable);
+    }
+
+    [Fact]
+    public async Task CleanupUnreadable_Confirmed_SetsNull_AndReportsTheSlotsForReEntry()
+    {
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+            new SecretSweepOptions { ConfirmCleanupUnreadable = true }, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.ValuesRewritten);
         Assert.Null(_e3.Attributes["ApiKey"]);
@@ -277,6 +310,7 @@ public class SecretMaintenanceServiceTests
         Assert.Contains(result.Cleared, c => c.RtId == _e3.RtId && c.AttributePath == "ApiKey" && c.KeyId == "k9" &&
                                              c.PreviousForm == SecretValueForm.UnknownKeyId);
         Assert.Contains(result.Cleared, c => c.RtId == _e4.RtId && c.AttributePath == "Credentials[Key=a].Value");
+        Assert.Empty(result.Unreadable);
         AssertResultCarriesNoValue(result);
     }
 
@@ -341,6 +375,43 @@ public class SecretMaintenanceServiceTests
         Assert.Equal(1, result.Totals.Failed);
         Assert.Contains(result.Failures, f => f.RtId == _e1.RtId && f.AttributePath == "Password" &&
                                               f.Reason.StartsWith(nameof(InvalidOperationException)));
+    }
+
+    [Fact]
+    public async Task CleanupUnreadable_RewriteFailure_KeepsTheValueInTheUnreadableList()
+    {
+        A.CallTo(() => _repository.RewriteAttributeValueIfUnchangedForMigrationAsync(A<IOctoSession>._,
+                A<RtCkId<CkTypeId>>._, _e3.RtId, "ApiKey", A<object?>._, A<object?>._))
+            .Throws(new InvalidOperationException("storage down"));
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+            new SecretSweepOptions { ConfirmCleanupUnreadable = true }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.ValuesRewritten);
+        var cleared = Assert.Single(result.Cleared);
+        Assert.Equal(_e4.RtId, cleared.RtId);
+        var unreadable = Assert.Single(result.Unreadable);
+        Assert.Equal(_e3.RtId, unreadable.RtId);
+        Assert.Equal("ApiKey", unreadable.AttributePath);
+        Assert.Equal("k9", unreadable.KeyId);
+    }
+
+    /// <summary>
+    ///     Decisions 2026-10-06 item 1: only a LEGACY string is a placeholder; a protected value is never
+    ///     normalised, whatever it decrypts to.
+    /// </summary>
+    [Fact]
+    public async Task Encrypt_DoesNotNormaliseAProtectedPlaceholderLookingValue()
+    {
+        var protectedPlaceholder = _protector.Protect("TODO_SET_PASSWORD");
+        _e5.SetAttributeRawValue("Password", protectedPlaceholder);
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.PlaceholdersNormalized); // only _e2's legacy TODO_SET_PASSWORD
+        Assert.Equal(protectedPlaceholder, _e5.Attributes["Password"]);
+        Assert.Null(_e2.Attributes["Password"]);
     }
 
     [Fact]
@@ -505,7 +576,7 @@ public class SecretMaintenanceServiceTests
     [InlineData(SecretSweepMode.Verify)]
     [InlineData(SecretSweepMode.Encrypt)]
     [InlineData(SecretSweepMode.Reprotect)]
-    [InlineData(SecretSweepMode.ClearUnknownKid)]
+    [InlineData(SecretSweepMode.CleanupUnreadable)]
     [InlineData(SecretSweepMode.Decrypt)]
     public async Task LegacyStringWithV2Envelope_IsReportedAsFailed_AndLeftAsStored(SecretSweepMode mode)
     {
@@ -518,7 +589,8 @@ public class SecretMaintenanceServiceTests
         _store[_model.Config.CkTypeId.ToRtCkId().FullName] = [copy];
 
         var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, mode,
-            new SecretSweepOptions { ConfirmDecrypt = true }, TestContext.Current.CancellationToken);
+            new SecretSweepOptions { ConfirmDecrypt = true, ConfirmCleanupUnreadable = true },
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.Totals.Failed);
         Assert.Equal(0, result.Totals.EncV2);

@@ -102,6 +102,66 @@ public interface ISecretAttributeProtector
     string Unprotect(string storedValue, SecretAccessContext? context = null);
 
     /// <summary>
+    ///     Classifies a value for readers (decisions 2026-10-06, item 2) without decrypting it:
+    ///     <see cref="SecretValueState.Set" /> (protected with a known key id, non-empty legacy or pending),
+    ///     <see cref="SecretValueState.KeyMissing" /> (protected, key id not in the ring - the ciphertext is
+    ///     kept and becomes readable once the key is added) or <see cref="SecretValueState.NotSet" />
+    ///     (<c>null</c>, empty, a legacy placeholder, or corrupt - see <see cref="SecretValueStates.IsCorrupt" />).
+    ///     APIs map it to <c>isSet = (state == Set)</c> and <c>keyMissing = (state == KeyMissing)</c>.
+    /// </summary>
+    /// <remarks>
+    ///     The default implementation is <see cref="SecretValueStates.GetReadState(RtSecretValue?, Func{string?, bool}?)" />
+    ///     with <see cref="IsKnownKeyId" />; the engine implementation additionally logs a warning and counts
+    ///     (<c>octo.secrets.unreadable</c>, <c>reason=corrupt</c>) a corrupt value - never the value.
+    /// </remarks>
+    /// <param name="value">The stored value; <c>null</c> = not set</param>
+    /// <param name="context">Where the value comes from (log and counter tags only)</param>
+    /// <returns>The read state</returns>
+    SecretValueState GetReadState(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        return SecretValueStates.GetReadState(value, IsKnownKeyId);
+    }
+
+    /// <summary>
+    ///     Reveal helper for the server-side paths that need the plaintext (controller adapter
+    ///     configuration, mesh adapter <c>RevealSecret@1</c>, identity providers, AI services, service-account
+    ///     tokens; decisions 2026-10-06, item 2): like <see cref="Unprotect(RtSecretValue, SecretAccessContext?)" />,
+    ///     but a value that is stored and cannot be read is treated as NOT SET and returns <c>null</c> instead of
+    ///     throwing - an unknown key id (<see cref="UnknownSecretKeyIdException" />), a tampered / wrong-key
+    ///     envelope (<see cref="System.Security.Cryptography.CryptographicException" />) and an <c>enc:v2</c>
+    ///     envelope stored as a legacy string (<see cref="SecretEnvelopeNotAllowedException" />). <c>null</c>,
+    ///     empty values and legacy placeholders return <c>null</c> as well. The stored value is never changed.
+    /// </summary>
+    /// <remarks>
+    ///     Configuration problems still throw: <see cref="SecretEncryptionNotConfiguredException" /> (no keys at
+    ///     all / no legacy key on this host - the engine implementation; the default implementation maps an
+    ///     unknown key id to <c>null</c> without that distinction) and, in strict mode, <see cref="LegacyPlaintextSecretRejectedException" />.
+    ///     The engine implementation logs an error (tenant, CK type, attribute, key id - never the value) and
+    ///     counts <c>octo.secrets.unreadable</c> for every value it maps to <c>null</c>. The default
+    ///     implementation only maps.
+    /// </remarks>
+    /// <param name="value">The stored value</param>
+    /// <param name="context">Reader (decrypt counter, log)</param>
+    /// <returns>The plaintext, or <c>null</c> when not set or unreadable</returns>
+    string? RevealOrNull(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        if (GetReadState(value, context) != SecretValueState.Set)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Unprotect(value!, context);
+        }
+        catch (Exception ex) when (ex is UnknownSecretKeyIdException or SecretEnvelopeNotAllowedException or
+                                       System.Security.Cryptography.CryptographicException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     ///     Strict check: true only for a structurally valid <c>enc:v1</c> or <c>enc:v2</c> envelope
     ///     (see <see cref="SecretEnvelope" />). A plaintext starting with <c>enc:</c> is not one.
     /// </summary>

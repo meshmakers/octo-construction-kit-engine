@@ -30,10 +30,14 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
     }
 
     /// <summary>
-    ///     True when a value counts as "not set" for a Secret slot: <c>null</c>, <c>""</c>, a placeholder
-    ///     (<see cref="SecretAttributeConventions.IsPlaceholder" />) - as a plain string or inside a
-    ///     <see cref="RtSecretValueState.Pending" /> / <see cref="RtSecretValueState.LegacyPlaintext" />
-    ///     value. The rule engine uses it for "creating requires a value for required secrets".
+    ///     True when a value counts as "not set" for a Secret slot: <c>null</c>, <c>""</c> (a plain string or
+    ///     an empty <see cref="RtSecretValueState.Pending" /> value), or a <see cref="RtSecretValueState.LegacyPlaintext" />
+    ///     value (a string found in storage) that is empty or exactly a legacy placeholder
+    ///     (<see cref="SecretAttributeConventions.IsLegacyPlaceholder" />, migration only). An input string that
+    ///     looks like a placeholder is an ordinary value (decisions 2026-10-06, item 1). A protected value -
+    ///     also one whose key id is not in the key ring - is a value: for "required" checks a stored but
+    ///     unreadable secret counts as present (item 2). The rule engine uses it for "creating requires a
+    ///     value for required secrets".
     /// </summary>
     /// <param name="value">Value of a Secret slot</param>
     /// <returns>True when the slot would hold no value after the write</returns>
@@ -42,17 +46,18 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
         return value switch
         {
             null => true,
-            string text => text.Length == 0 || SecretAttributeConventions.IsPlaceholder(text),
+            string text => text.Length == 0,
             RtSecretValue { IsProtected: true } => false,
+            RtSecretValue { IsPending: true } secret => secret.RawValue.Length == 0,
             RtSecretValue secret => secret.RawValue.Length == 0 ||
-                                    SecretAttributeConventions.IsPlaceholder(secret.RawValue),
+                                    SecretAttributeConventions.IsLegacyPlaceholder(secret.RawValue),
             _ => false
         };
     }
 
     /// <summary>
-    ///     True when a value of a Secret slot is a non-empty input value - neither <c>null</c>, <c>""</c>
-    ///     nor a placeholder. Used to detect "set and cleared in the same operation".
+    ///     True when a value of a Secret slot is a non-empty input value - neither <c>null</c> nor <c>""</c>.
+    ///     Used to detect "set and cleared in the same operation".
     /// </summary>
     internal static bool IsNonEmptyValue(object? value)
     {
@@ -185,7 +190,8 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
             case SlotKind.Value:
                 incoming.SetAttributeRawValue(name, Protect(context, secret!));
                 break;
-            case SlotKind.Placeholder:
+            case SlotKind.LegacyNotSet:
+                // A legacy string from storage that is empty or a legacy placeholder (migration only).
                 incoming.SetAttributeRawValue(name, null);
                 break;
             case SlotKind.Null:
@@ -318,13 +324,16 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
             case SlotKind.Value:
                 incoming.SetAttributeRawValue(name, Protect(context, secret!));
                 break;
-            case SlotKind.Placeholder:
-                // The explicit "not set" inside a record (null / "" mean "unchanged" there).
+            case SlotKind.LegacyNotSet:
+                // A legacy string from storage that is empty or a legacy placeholder (migration only).
                 incoming.SetAttributeRawValue(name, null);
                 break;
             case SlotKind.Null:
             case SlotKind.Empty:
             case SlotKind.Absent:
+                // Inside records null, "" and an omitted member all mean "unchanged": the stored value of
+                // the element with the same record key is kept. A record secret is cleared by removing
+                // the element (or the single record) - there is no "clear" value inside records.
                 if (kind == SlotKind.Empty)
                 {
                     incoming.RemoveAttribute(name);
@@ -430,7 +439,7 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
         var secret = ToSecretValue(storedValue, SecretValueOrigin.Storage);
         if (Classify(secret) != SlotKind.Value)
         {
-            // A stored placeholder / empty legacy string is "not set".
+            // A stored empty legacy string or legacy placeholder is "not set" (migration only).
             incoming.SetAttributeRawValue(name, null);
             return;
         }
@@ -486,16 +495,14 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
             case RtSecretValueState.Protected:
                 return SlotKind.Value;
             case RtSecretValueState.Pending:
-                if (secret.RawValue.Length == 0)
-                {
-                    return SlotKind.Empty;
-                }
-
-                return SecretAttributeConventions.IsPlaceholder(secret.RawValue) ? SlotKind.Placeholder : SlotKind.Value;
+                // Input: "" = unchanged; anything else - also a placeholder-looking text - is a value
+                // (decisions 2026-10-06, item 1).
+                return secret.RawValue.Length == 0 ? SlotKind.Empty : SlotKind.Value;
             default:
-                // A stored empty string or placeholder is "not set", not "unchanged".
-                return secret.RawValue.Length == 0 || SecretAttributeConventions.IsPlaceholder(secret.RawValue)
-                    ? SlotKind.Placeholder
+                // A stored legacy empty string or legacy placeholder is "not set", not "unchanged" -
+                // the one-time migration of pre-Secret values.
+                return secret.RawValue.Length == 0 || SecretAttributeConventions.IsLegacyPlaceholder(secret.RawValue)
+                    ? SlotKind.LegacyNotSet
                     : SlotKind.Value;
         }
     }
@@ -644,7 +651,7 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
         Absent,
         Null,
         Empty,
-        Placeholder,
+        LegacyNotSet,
         Value
     }
 

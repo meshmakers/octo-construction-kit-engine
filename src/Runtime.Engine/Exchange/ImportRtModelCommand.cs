@@ -269,7 +269,7 @@ internal class ImportRtModelCommand(
             }
 
             if (rtType.Attributes.TryGetValue(attribute.AttributeName, out var value) && value != null &&
-                // AB#5532: "" and placeholders in a Secret slot are stored as "not set".
+                // AB#5532: "" in a Secret slot is stored as "not set".
                 !(attribute.ValueType == AttributeValueTypesDto.Secret && SecretWriteNormalizer.IsNotSetValue(value)))
             {
                 continue;
@@ -867,7 +867,7 @@ internal class ImportRtModelCommand(
             var flaggedAttributes = SelectPreservedAttributes(ckTypeGraph!);
 
             // AB#5532: seed-owned record attributes whose records hold Secret members. The seed record
-            // replaces the stored one, but a seed only carries placeholders for secrets (decision 9) -
+            // replaces the stored one, but a seed only carries empty values for secrets (decision 9) -
             // the stored secret of the element with the same record key is kept.
             var resolveRecord = ResolveRecordFunc(runtimeRepository.TenantId);
             var secretRecordAttributes = ckTypeGraph!.AllAttributes.Values
@@ -1029,8 +1029,8 @@ internal class ImportRtModelCommand(
 
     /// <summary>
     /// AB#5532 (concept §4.6, §6): blueprint re-apply must keep stored secrets inside seed-owned records.
-    /// For every Secret member of a seed record whose value is not set (<c>null</c>, <c>""</c>, a
-    /// placeholder), the stored value of the element with the same record key (record arrays) or of
+    /// For every Secret member of a seed record whose value is not set (<c>null</c>, <c>""</c>), the
+    /// stored value of the element with the same record key (record arrays) or of
     /// the stored record (single record, by position) is carried into the import model, typed as
     /// stored (<see cref="AsStoredSecret" />). Nested records are walked the same way. Returns the
     /// number of carried values. Pure apart from the injected resolver.

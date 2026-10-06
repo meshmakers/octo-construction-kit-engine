@@ -313,8 +313,8 @@ public static class AttributeValueConverter
     ///     passed through (upsert preservation, restore and sweep hand in protected values); any
     ///     string-like input is API input and becomes <see cref="RtSecretValueState.Pending" /> -
     ///     NOT trimmed, whitespace is part of a credential. The write step (AB#5532) decides what a
-    ///     pending value means: non-empty is encrypted, <c>""</c> keeps the stored value, a
-    ///     <c>&lt;placeholder&gt;</c> is stored as "not set". Read paths that find a string in the
+    ///     pending value means: non-empty is encrypted (a placeholder-looking text too), <c>""</c> keeps
+    ///     the stored value. Read paths that find a string in the
     ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533). The read
     ///     marker (a JSON object / dictionary that is empty or holds only a boolean <c>isSet</c>) means
     ///     "unchanged"; any other non-string input - including other objects - throws

@@ -547,7 +547,8 @@ internal sealed class SecretMaintenanceService(
                 return (null, null, null);
         }
 
-        if (raw.Length == 0 || SecretAttributeConventions.IsPlaceholder(raw))
+        // Migration only: a legacy string that is exactly a placeholder (or empty) is "not set".
+        if (raw.Length == 0 || SecretAttributeConventions.IsLegacyPlaceholder(raw))
         {
             return (SecretValueForm.Placeholder, null, raw);
         }

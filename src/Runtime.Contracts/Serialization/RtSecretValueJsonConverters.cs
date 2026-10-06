@@ -36,14 +36,19 @@ public static class RtSecretValueWireFormat
         "A Secret value must be a string (the secret to store), null (clear) or the marker {\"isSet\":true|false} (unchanged)";
 
     /// <summary>
-    ///     True when the value holds a secret: a protected value, or a pending / legacy value that is
-    ///     neither empty nor a placeholder.
+    ///     True when the value holds a secret: a protected value, a non-empty pending value (a
+    ///     placeholder-looking input is an ordinary value), or a legacy value that is neither empty nor a
+    ///     legacy placeholder (migration only).
     /// </summary>
     public static bool IsSet(RtSecretValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
-        return value.IsProtected ||
-               (value.RawValue.Length > 0 && !SecretAttributeConventions.IsPlaceholder(value.RawValue));
+        return value.State switch
+        {
+            RtSecretValueState.Protected => true,
+            RtSecretValueState.Pending => value.RawValue.Length > 0,
+            _ => value.RawValue.Length > 0 && !SecretAttributeConventions.IsLegacyPlaceholder(value.RawValue)
+        };
     }
 
     /// <summary>

@@ -245,7 +245,7 @@ internal static class MessageCodes
         {
             "MandatorySecretMissing",
              new OperationMessageTemplate(MessageLevel.FatalError,
-                 24, "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values and placeholders count as not set).",
+                 24, "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values count as not set).",
                  ["tenantId", "attributePath", "rtEntityCkTypeId", "rtId"])
         },
     };

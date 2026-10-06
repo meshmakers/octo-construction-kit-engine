@@ -36,7 +36,7 @@ public class SecretBypassWritePathTests
     #region BulkInsertRtEntitiesAsync
 
     [Fact]
-    public async Task BulkInsert_EncryptsPlaintext_DropsPlaceholders_AndKeepsProtectedValues()
+    public async Task BulkInsert_EncryptsPlaintext_AndPlaceholderLookingValues_AndKeepsProtectedValues()
     {
         var (repository, imported) = CreateBulkRepository();
         var preserved = _protector.Protect("preserved-by-upsert");
@@ -61,11 +61,12 @@ public class SecretBypassWritePathTests
         Assert.Same(preserved, config.Attributes["ApiKey"]);
         var credentials = ((IEnumerable<RtRecord>)config.Attributes["Credentials"]!).ToList();
         Assert.Equal(RecordPlain, _protector.Unprotect((RtSecretValue)credentials[0].Attributes["Value"]!));
-        Assert.Null(credentials[1].Attributes.GetValueOrDefault("Value"));
+        // Decisions 2026-10-06 item 1: input placeholders are ordinary values.
+        Assert.Equal("<SET_ME>", _protector.Unprotect((RtSecretValue)credentials[1].Attributes["Value"]!));
         Assert.Equal("cfg", config.Attributes["Name"]);
 
         var optional = imported.Single(e => e.RtId == placeholderOnly.RtId);
-        Assert.Null(optional.Attributes.GetValueOrDefault("Password"));
+        Assert.Equal("TODO_SET_PASSWORD", _protector.Unprotect((RtSecretValue)optional.Attributes["Password"]!));
 
         AssertNoPlaintext(imported, Plain, RecordPlain, "TODO_SET_PASSWORD", "<SET_ME>");
     }
@@ -76,7 +77,7 @@ public class SecretBypassWritePathTests
         // AB#4772: the import reports missing mandatory attributes itself; the write step must not throw.
         var (repository, imported) = CreateBulkRepository();
         var entity = _model.NewConfig();
-        entity.SetAttributeRawValue("ApiKey", "<SET>");
+        entity.SetAttributeRawValue("ApiKey", "");
 
         await repository.BulkInsertRtEntitiesAsync(A.Fake<IOctoSession>(), [entity], new BulkOperationOptions());
 

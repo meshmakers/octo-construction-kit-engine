@@ -67,19 +67,17 @@ public class BlueprintSeedSecretLintTests : IDisposable
                           - id: System.Communication/Key
                             value: Token
                           - id: System.Communication/OverrideValue
-                            value: '<TOKEN>'
+                            value: ''
             """);
     }
 
     [Theory]
-    [InlineData("        value: '<SET_AFTER_INSTALL>'")]
-    [InlineData("        value: TODO_SET_PASSWORD")]
-    [InlineData("        value: 'TODO_SET_AZURE_TENANT_ID'")]
     [InlineData("        value: ''")]
+    [InlineData("        value: '   '")]
     [InlineData("        value:")]
     [InlineData("        value: null")]
     [InlineData("")]
-    public async Task ValidateAsync_PlaceholderOrEmpty_IsValid(string secretValueYaml)
+    public async Task ValidateAsync_EmptyOrOmitted_IsValid(string secretValueYaml)
     {
         WriteBlueprint(secretValueYaml);
         var resolver = new FakeResolver("System.Communication/Password-1", "System.Communication/OverrideValue-1");
@@ -113,13 +111,40 @@ public class BlueprintSeedSecretLintTests : IDisposable
         Assert.DoesNotContain("Hunter2", error.MessageText);
     }
 
+    /// <summary>
+    ///     Decisions 2026-10-06 item 1: the former placeholder forms are ordinary values - a seed that carries
+    ///     one in a Secret slot fails the lint like any other value.
+    /// </summary>
+    [Theory]
+    [InlineData("        value: '<SET_AFTER_INSTALL>'")]
+    [InlineData("        value: TODO_SET_PASSWORD")]
+    [InlineData("        value: 'TODO_SET_AZURE_TENANT_ID'")]
+    public async Task ValidateAsync_Placeholder_IsError(string secretValueYaml)
+    {
+        WriteBlueprint(secretValueYaml);
+        var compiler = new BlueprintCompilerService(new BlueprintYamlSerializer(),
+            NullLogger<BlueprintCompilerService>.Instance, new FakeResolver("System.Communication/Password-1"));
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAsync<BlueprintCatalogException>(() =>
+            compiler.ValidateAsync(_blueprintDirectory, operationResult, TestContext.Current.CancellationToken));
+
+        var error = Assert.Single(operationResult.Messages, m => m.MessageLevel == MessageLevel.Error);
+        Assert.Equal(BlueprintSeedSecretLint.SecretSeedValueMessageNumber, error.MessageNumber);
+        Assert.Contains("TODO_SET_<NAME>", error.MessageText);
+        Assert.DoesNotContain("SET_AFTER_INSTALL", error.MessageText);
+        Assert.DoesNotContain("TODO_SET_PASSWORD", error.MessageText);
+        Assert.DoesNotContain("AZURE_TENANT_ID", error.MessageText);
+    }
+
     [Fact]
     public async Task ValidateAsync_SecretInsideRecordArray_IsError()
     {
-        WriteBlueprint("        value: '<PW>'");
+        WriteBlueprint("        value: ''");
         // Turn the record's OverrideValue into a real value.
         var seedPath = Path.Combine(_blueprintDirectory, "seed-data", "entities.yaml");
-        File.WriteAllText(seedPath, File.ReadAllText(seedPath).Replace("'<TOKEN>'", "abc123"));
+        File.WriteAllText(seedPath, System.Text.RegularExpressions.Regex.Replace(File.ReadAllText(seedPath),
+            @"(OverrideValue\s*\n\s*value: )''", "${1}abc123"));
         var compiler = new BlueprintCompilerService(new BlueprintYamlSerializer(),
             NullLogger<BlueprintCompilerService>.Instance,
             new FakeResolver("System.Communication/Password-1", "System.Communication/OverrideValue-1"));
@@ -157,17 +182,17 @@ public class BlueprintSeedSecretLintTests : IDisposable
     }
 
     [Theory]
-    [InlineData("<SET_AFTER_INSTALL>", true)]
-    [InlineData(" <x> ", true)]
     [InlineData("", true)]
     [InlineData("   ", true)]
     [InlineData(null, true)]
+    [InlineData("<SET_AFTER_INSTALL>", false)]
+    [InlineData(" <x> ", false)]
     [InlineData("<>", false)]
     [InlineData("<a><b>", false)]
     [InlineData("pass<word>", false)]
     [InlineData("Hunter2", false)]
-    [InlineData("TODO_SET_PASSWORD", true)]
-    [InlineData(" TODO_SET_CLIENT_SECRET ", true)]
+    [InlineData("TODO_SET_PASSWORD", false)]
+    [InlineData(" TODO_SET_CLIENT_SECRET ", false)]
     [InlineData("TODO_SET_", false)]
     [InlineData("TODO_SET_password", false)]
     public void AllowedSeedValues(string? value, bool allowed)
@@ -176,9 +201,8 @@ public class BlueprintSeedSecretLintTests : IDisposable
     }
 
     /// <summary>
-    ///     AB#5532: both placeholder forms - <c>&lt;...&gt;</c> and <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c>
-    ///     (MeshmakersAccounting seed) - are recognised by the one method the seed lint and the runtime
-    ///     write path share.
+    ///     Both legacy placeholder forms - <c>&lt;...&gt;</c> and <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> - are
+    ///     recognised by the migration-only check (decisions 2026-10-06 item 1).
     /// </summary>
     [Theory]
     [InlineData("<SET_AFTER_INSTALL>", true)]
@@ -200,13 +224,13 @@ public class BlueprintSeedSecretLintTests : IDisposable
     [InlineData("", false)]
     [InlineData(null, false)]
     [InlineData("Hunter2", false)]
-    public void IsPlaceholder_RecognisesBothForms(string? value, bool expected)
+    public void IsLegacyPlaceholder_RecognisesBothForms(string? value, bool expected)
     {
-        Assert.Equal(expected, SecretAttributeConventions.IsPlaceholder(value));
+        Assert.Equal(expected, SecretAttributeConventions.IsLegacyPlaceholder(value));
     }
 
     [Fact]
-    public void IsPlaceholder_Forms_AreDistinguishable()
+    public void IsLegacyPlaceholder_Forms_AreDistinguishable()
     {
         Assert.True(SecretAttributeConventions.IsAngleBracketPlaceholder("<X>"));
         Assert.False(SecretAttributeConventions.IsTodoSetPlaceholder("<X>"));

@@ -5,10 +5,11 @@ using YamlDotNet.RepresentationModel;
 namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 
 /// <summary>
-///     Blueprint seed lint for Secret attributes (AB#5528, decision 9): a seed may carry only an
-///     empty value or a placeholder (<c>&lt;placeholder&gt;</c> or <c>TODO_SET_&lt;NAME&gt;</c>, see
-///     <see cref="SecretAttributeConventions.IsPlaceholder" />) for a Secret attribute - secrets are set after
-///     installation (Studio, CLI, rotate endpoints), never shipped in a blueprint (AB#5529).
+///     Blueprint seed lint for Secret attributes (AB#5528, decision 9, decisions 2026-10-06 item 1): a
+///     seed may carry only an empty or omitted value for a Secret attribute
+///     (<see cref="SecretAttributeConventions.IsAllowedSeedValue" />). Any other value - including the former
+///     placeholders <c>&lt;...&gt;</c> and <c>TODO_SET_&lt;NAME&gt;</c>, which are ordinary values now - is an
+///     error: secrets are set after installation (Studio, CLI, rotate endpoints), never shipped in a blueprint.
 /// </summary>
 /// <remarks>
 ///     Works on the YAML representation model like the rtId check of
@@ -155,8 +156,8 @@ public static class BlueprintSeedSecretLint
                         seedDataPath,
                         SecretSeedValueMessageNumber,
                         $"Seed entity '{identity}' sets Secret attribute '{attributeId}' to a value. Seeds may only "
-                        + "contain an empty value or a placeholder ('<placeholder>' or 'TODO_SET_<NAME>') for Secret "
-                        + "attributes; set the secret after "
+                        + "leave Secret attributes empty or omit them; placeholders such as '<...>' or 'TODO_SET_<NAME>' "
+                        + "are values and not allowed either. Set the secret after "
                         + "installation (Studio, octo-cli) and rotate any credential that was committed."));
                 }
 

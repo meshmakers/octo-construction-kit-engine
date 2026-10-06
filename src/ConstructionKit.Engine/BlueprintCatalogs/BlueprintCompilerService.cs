@@ -143,7 +143,7 @@ public class BlueprintCompilerService : IBlueprintCompilerService
         // twice across them.
         ValidateSeedData(path, blueprintMeta, blueprintMetaPath, operationResult);
 
-        // Seeds may only carry empty values or placeholders for Secret attributes (AB#5528).
+        // Seeds may only leave Secret attributes empty (AB#5528, decisions 2026-10-06 item 1).
         await LintSecretSeedValuesAsync(path, blueprintMeta, blueprintMetaPath, operationResult, cancellationToken)
             .ConfigureAwait(false);
 

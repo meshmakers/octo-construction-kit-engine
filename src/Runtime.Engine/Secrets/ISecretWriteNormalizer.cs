@@ -96,15 +96,21 @@ public sealed class SecretWriteResult
 ///         <item><term>omitted</term><description>insert/update: nothing; replace: carried over from the stored entity</description></item>
 ///         <item><term><c>Protected</c></term><description>passed through (trusted internal callers: upsert preservation, restore, sweep)</description></item>
 ///         <item><term><c>LegacyPlaintext</c></term><description>re-encrypted with the active key (an <c>enc:v1</c> value is decrypted first); without a key it is kept as it is - it was already stored that way</description></item>
+///         <item><term><c>LegacyPlaintext</c> that is empty or exactly a legacy placeholder</term><description>stored as <c>null</c> ("not set") - the one-time migration of pre-Secret values (<c>SecretAttributeConventions.IsLegacyPlaceholder</c>)</description></item>
 ///         <item><term><c>null</c></term><description>cleared</description></item>
-///         <item><term>placeholder (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>)</term><description>stored as <c>null</c> ("not set")</description></item>
 ///     </list>
 ///     <para>
-///         Secret sub-attributes of records (any nesting depth): a non-empty value or placeholder follows
-///         the rules above; <c>null</c>, <c>""</c> or an omitted sub-value is carried over from the stored
-///         element with the same record key (<c>CkRecordGraph.RecordKey</c>) for record arrays, from the
-///         stored record (by position) for a single record. Without a matching stored element the
-///         sub-value is not set. A placeholder is therefore the way to clear a secret inside a record.
+///         There are no placeholder semantics for input (decisions 2026-10-06, item 1): a <c>&lt;...&gt;</c> or
+///         <c>TODO_SET_...</c> string is an ordinary value and is encrypted.
+///     </para>
+///     <para>
+///         Secret sub-attributes of records (any nesting depth): a non-empty value follows the rules above;
+///         <c>null</c>, <c>""</c> or an omitted sub-value is carried over from the stored element with the
+///         same record key (<c>CkRecordGraph.RecordKey</c>) for record arrays, from the stored record (by
+///         position) for a single record. Without a matching stored element the sub-value is not set. There
+///         is no clear value inside records: a record secret is cleared by removing its element (record
+///         array) or the record (single record, <c>null</c> for the record attribute); an element added with
+///         a new record key starts without a secret.
 ///     </para>
 /// </remarks>
 public interface ISecretWriteNormalizer
@@ -148,8 +154,9 @@ public interface ISecretWriteNormalizer
 
     /// <summary>
     ///     Applies the write rules to a single attribute value for a write that sets one slot (CK
-    ///     migration rewrite): a Secret value or a record (array) value containing secrets. <c>""</c> and
-    ///     placeholders become <c>null</c> (a single-slot write cannot "leave unchanged"); there is no
+    ///     migration rewrite): a Secret value or a record (array) value containing secrets. <c>""</c> becomes
+    ///     <c>null</c> (a single-slot write cannot "leave unchanged"), and so does a legacy string from storage
+    ///     (<see cref="SecretValueOrigin.Storage" />) that is exactly a legacy placeholder; there is no
     ///     carry-over. Values of other attribute types are returned unchanged.
     /// </summary>
     object? NormalizeAttributeValue(ICkCacheService ckCacheService, string tenantId, CkTypeAttributeGraph attribute,

@@ -49,7 +49,7 @@ public class SecretImportExportSerializationTests
         var existing = _model.NewConfig();
         existing.SetAttributeRawValue("ApiKey", SecretTestModel.V1Vector);
         var seed = new RtEntityTcDto { RtId = existing.RtId, CkTypeId = existing.CkTypeId! };
-        seed.Attributes.Add(new RtAttributeTcDto { Id = AttrId(_model.Config, "ApiKey"), Value = "<SET>" });
+        seed.Attributes.Add(new RtAttributeTcDto { Id = AttrId(_model.Config, "ApiKey"), Value = "" });
 
         var preserved = ImportRtModelCommand.PreserveAttributesForEntity(seed, existing,
             [_model.Config.AllAttributesByName["ApiKey"]], v => v);
@@ -72,7 +72,7 @@ public class SecretImportExportSerializationTests
         seed.Attributes.Add(new RtAttributeTcDto
         {
             Id = AttrId(_model.Config, "Credentials"),
-            Value = new List<object> { CredentialDto("b", "TODO_SET_B"), CredentialDto("a", "<SET>"), CredentialDto("c", "") }
+            Value = new List<object> { CredentialDto("b", ""), CredentialDto("a", null), CredentialDto("c", "") }
         });
 
         var preserved = ImportRtModelCommand.PreserveSecretRecordMembers(seed, existing,
@@ -86,14 +86,49 @@ public class SecretImportExportSerializationTests
     }
 
     [Fact]
-    public void FindMissingMandatoryAttributes_SecretPlaceholderCountsAsMissing()
+    public void PreserveSecretRecordMembers_PlaceholderLookingSeedValue_IsAValue_AndNotReplaced()
+    {
+        // Decisions 2026-10-06 item 1 (the seed lint rejects such a seed; the import treats it as a value).
+        var existing = _model.NewConfig();
+        existing.SetAttributeRawValue("Credentials", new List<RtRecord> { _model.CredentialRecord("a", _protector.Protect(Plain)) });
+        var seed = new RtEntityTcDto { RtId = existing.RtId, CkTypeId = existing.CkTypeId! };
+        seed.Attributes.Add(new RtAttributeTcDto
+        {
+            Id = AttrId(_model.Config, "Credentials"), Value = new List<object> { CredentialDto("a", "TODO_SET_A") }
+        });
+
+        var preserved = ImportRtModelCommand.PreserveSecretRecordMembers(seed, existing,
+            [_model.Config.AllAttributesByName["Credentials"]], ResolveRecord);
+
+        Assert.Equal(0, preserved);
+        var element = ((List<object>)seed.Attributes.Single().Value!).Cast<RtRecordTcDto>().Single();
+        Assert.Equal("TODO_SET_A", element.Attributes[1].Value);
+    }
+
+    [Fact]
+    public void FindMissingMandatoryAttributes_EmptySecretCountsAsMissing()
     {
         var entity = _model.NewConfig();
-        entity.SetAttributeRawValue("ApiKey", RtSecretValue.Pending("TODO_SET_API_KEY"));
+        entity.SetAttributeRawValue("ApiKey", RtSecretValue.Pending(""));
 
         var missing = ImportRtModelCommand.FindMissingMandatoryAttributes(_model.Config.AllAttributes.Values, entity);
 
         Assert.Contains(missing, a => a.AttributeName == "ApiKey");
+    }
+
+    [Fact]
+    public void FindMissingMandatoryAttributes_PlaceholderLookingSecret_AndUnreadableSecret_CountAsPresent()
+    {
+        var placeholder = _model.NewConfig();
+        placeholder.SetAttributeRawValue("ApiKey", RtSecretValue.Pending("TODO_SET_API_KEY"));
+        var unreadable = _model.NewConfig();
+        unreadable.SetAttributeRawValue("ApiKey",
+            RtSecretValue.Protected("enc:v2:k9:AAECAwQFBgcICQoLce30XInwk1La5ADQECWjFW2r_6nUXsA"));
+
+        Assert.DoesNotContain(ImportRtModelCommand.FindMissingMandatoryAttributes(_model.Config.AllAttributes.Values,
+            placeholder), a => a.AttributeName == "ApiKey");
+        Assert.DoesNotContain(ImportRtModelCommand.FindMissingMandatoryAttributes(_model.Config.AllAttributes.Values,
+            unreadable), a => a.AttributeName == "ApiKey");
     }
 
     #endregion

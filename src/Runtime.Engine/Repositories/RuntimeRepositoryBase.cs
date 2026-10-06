@@ -1098,7 +1098,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             var ckTypeGraph = await GetCkTypeGraphAsync(groupedEntities.Key).ConfigureAwait(false);
 
             // AB#5532: the bulk import bypasses BulkRtMutation, so it runs the Secret write step itself
-            // (insert semantics: "" and placeholders are not set, plaintext is encrypted, protected
+            // (insert semantics: "" is not set, plaintext is encrypted, protected
             // values - e.g. preserved by the import's upsert preservation - pass through). Required
             // secrets are not enforced here: the import reports missing mandatory attributes itself
             // (AB#4772, ImportRtModelCommand.FindMissingMandatoryAttributes).

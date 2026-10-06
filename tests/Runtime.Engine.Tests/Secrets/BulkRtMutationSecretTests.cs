@@ -101,9 +101,8 @@ public class BulkRtMutationSecretTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("<SET_AFTER_INSTALL>")]
-    [InlineData("TODO_SET_API_KEY")]
-    public async Task Insert_RequiredSecretWithoutValue_IsRejected(string value)
+    [InlineData(null)]
+    public async Task Insert_RequiredSecretWithoutValue_IsRejected(string? value)
     {
         var entity = _model.NewConfig();
         entity.SetAttributeRawValue("ApiKey", value);
@@ -256,11 +255,42 @@ public class BulkRtMutationSecretTests
         Assert.Null(_written.Single().Attributes["Password"]);
     }
 
+    /// <summary>
+    ///     Decisions 2026-10-06 item 1: a placeholder-looking text is an ordinary value - encrypted, and it
+    ///     satisfies a required secret.
+    /// </summary>
+    [Theory]
+    [InlineData("<SET_AFTER_INSTALL>")]
+    [InlineData("TODO_SET_API_KEY")]
+    public async Task Insert_PlaceholderLookingValue_IsStoredEncrypted(string value)
+    {
+        var entity = _model.NewConfig();
+        entity.SetAttributeRawValue("ApiKey", value);
+
+        await ApplyAsync(EntityUpdateInfo<RtEntity>.CreateInsert(entity));
+
+        AssertNoPlaintextWritten(value);
+        var written = Assert.Single(_written);
+        Assert.Equal(value, _protector.Unprotect((RtSecretValue)written.Attributes["ApiKey"]!));
+    }
+
     [Fact]
-    public async Task Update_PlaceholderOnRequiredSecret_IsRejected()
+    public async Task Update_PlaceholderLookingValueOnRequiredSecret_IsStoredEncrypted()
     {
         var entity = _model.NewConfig();
         entity.SetAttributeRawValue("ApiKey", "TODO_SET_API_KEY");
+
+        await ApplyAsync(EntityUpdateInfo<RtEntity>.CreateUpdate(IdOf(entity), entity));
+
+        var written = Assert.Single(_written);
+        Assert.Equal("TODO_SET_API_KEY", _protector.Unprotect((RtSecretValue)written.Attributes["ApiKey"]!));
+    }
+
+    [Fact]
+    public async Task Update_NullOnRequiredSecret_IsRejected()
+    {
+        var entity = _model.NewConfig();
+        entity.SetAttributeRawValue("ApiKey", null);
 
         var ex = await Assert.ThrowsAsync<RuntimeRepositoryException>(() =>
             ApplyAsync(EntityUpdateInfo<RtEntity>.CreateUpdate(IdOf(entity), entity)));

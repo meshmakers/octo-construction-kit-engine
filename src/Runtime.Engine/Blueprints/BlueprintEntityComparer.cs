@@ -77,7 +77,7 @@ internal static class BlueprintEntityComparer
             {
                 // AB#5532: a Secret is never diffed - its ownership is always Secret (the compiler
                 // enforces it; this guard also covers a stale cache), the stored value is ciphertext
-                // and the seed only carries placeholders. The apply keeps the stored value.
+                // and the seed only carries empty values. The apply keeps the stored value.
                 continue;
             }
 
@@ -137,7 +137,7 @@ internal static class BlueprintEntityComparer
                     }
 
                     // AB#5532: Secret members of the record never leave the comparer - not as ciphertext
-                    // (stored side), not as a placeholder (seed side).
+                    // (stored side), not as a seed value (seed side).
                     changes.Add(new BlueprintAttributeChange
                     {
                         AttributeName = attribute.AttributeName,
@@ -502,7 +502,7 @@ internal static class BlueprintEntityComparer
 
             if (member?.ValueType == AttributeValueTypesDto.Secret)
             {
-                // AB#5532: a Secret member is never compared - ciphertext against a seed placeholder
+                // AB#5532: a Secret member is never compared - ciphertext against an empty seed value
                 // would be a phantom change on every preview, and the write step keeps the stored
                 // secret of an element with the same record key anyway (carry-over, concept §4.6).
                 continue;

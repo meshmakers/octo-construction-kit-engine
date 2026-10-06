@@ -35,32 +35,38 @@ public static class SecretAttributeConventions
     ];
 
     /// <summary>
-    ///     Prefix of the <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> placeholder form (see
+    ///     Prefix of the <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> legacy placeholder form (see
     ///     <see cref="IsTodoSetPlaceholder" />).
     /// </summary>
     public const string TodoSetPlaceholderPrefix = "TODO_SET_";
 
     /// <summary>
-    ///     True when <paramref name="value" /> is a placeholder in one of the two accepted forms:
+    ///     MIGRATION ONLY (decisions 2026-10-06, item 1): true when a LEGACY value - a string found in a
+    ///     Secret slot in storage, written before the slot became a Secret - is exactly a placeholder in one
+    ///     of the two forms that blueprints and apps used before the Secret value type:
     ///     <list type="bullet">
     ///         <item>
     ///             a non-empty text enclosed in exactly one pair of angle brackets such as
-    ///             <c>&lt;set-after-install&gt;</c> or <c>&lt;FINAPI_CLIENT_SECRET&gt;</c>
-    ///             (<see cref="IsAngleBracketPlaceholder" />);
+    ///             <c>&lt;set-after-install&gt;</c> (<see cref="IsAngleBracketPlaceholder" />);
     ///         </item>
     ///         <item>
     ///             <c>TODO_SET_&lt;UPPER_SNAKE&gt;</c> such as <c>TODO_SET_CLIENT_SECRET</c>
-    ///             (<see cref="IsTodoSetPlaceholder" />) - the form the MeshmakersAccounting seed and
-    ///             its frontend already use (AB#5532).
+    ///             (<see cref="IsTodoSetPlaceholder" />).
     ///         </item>
     ///     </list>
-    ///     Leading and trailing whitespace is ignored. Blueprint seeds may only carry placeholders or
-    ///     empty values for Secret attributes (decision 9, the seed lint); the runtime write path stores
-    ///     a placeholder as "not set" (concept §3.6). Both use this one method.
+    ///     Leading and trailing whitespace is ignored. Such a legacy value is converted once to "not set"
+    ///     (the encrypt sweep, the CK migration hook, and the write step when it meets a stored legacy
+    ///     string, e.g. on carry-over) and counted as a normalised placeholder.
+    ///     <para>
+    ///         Placeholders have NO meaning anywhere else: a <c>&lt;...&gt;</c> or <c>TODO_SET_...</c> string
+    ///         sent through any API is an ordinary value and is encrypted like any other, and blueprint seeds
+    ///         may not carry one in a Secret slot (<see cref="IsAllowedSeedValue" />). Never call this for
+    ///         input values.
+    ///     </para>
     /// </summary>
-    /// <param name="value">The value to check</param>
-    /// <returns>True for a placeholder</returns>
-    public static bool IsPlaceholder(string? value)
+    /// <param name="value">The legacy stored text</param>
+    /// <returns>True for a legacy placeholder</returns>
+    public static bool IsLegacyPlaceholder(string? value)
     {
         return IsAngleBracketPlaceholder(value) || IsTodoSetPlaceholder(value);
     }
@@ -71,6 +77,7 @@ public static class SecretAttributeConventions
     ///     <c>&lt;&lt;x&gt;&gt;</c> are not placeholders.
     /// </summary>
     /// <param name="value">The value to check</param>
+    /// <remarks>Migration only, see <see cref="IsLegacyPlaceholder" />.</remarks>
     /// <returns>True for an angle-bracket placeholder</returns>
     public static bool IsAngleBracketPlaceholder(string? value)
     {
@@ -105,6 +112,7 @@ public static class SecretAttributeConventions
     ///     doubled underscore and any other character make it a regular value.
     /// </summary>
     /// <param name="value">The value to check</param>
+    /// <remarks>Migration only, see <see cref="IsLegacyPlaceholder" />.</remarks>
     /// <returns>True for a <c>TODO_SET_</c> placeholder</returns>
     public static bool IsTodoSetPlaceholder(string? value)
     {
@@ -147,14 +155,14 @@ public static class SecretAttributeConventions
     }
 
     /// <summary>
-    ///     True when a blueprint seed may carry <paramref name="value" /> for a Secret attribute:
-    ///     <c>null</c>, an empty or whitespace-only string, or a placeholder
-    ///     (<see cref="IsPlaceholder" />).
+    ///     True when a blueprint seed may carry <paramref name="value" /> for a Secret attribute: only
+    ///     <c>null</c> or an empty or whitespace-only string (decisions 2026-10-06, item 1). A placeholder
+    ///     (<c>&lt;...&gt;</c>, <c>TODO_SET_...</c>) is a value and therefore not allowed.
     /// </summary>
     /// <param name="value">The seed value</param>
     /// <returns>True when the value is allowed in a seed</returns>
     public static bool IsAllowedSeedValue(string? value)
     {
-        return string.IsNullOrWhiteSpace(value) || IsPlaceholder(value);
+        return string.IsNullOrWhiteSpace(value);
     }
 }

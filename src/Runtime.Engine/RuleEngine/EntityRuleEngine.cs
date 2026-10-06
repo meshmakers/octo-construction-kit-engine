@@ -67,7 +67,9 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
                 {
                     if (!attribute.IsOptional && info.RtEntity != null &&
                         info.RtEntity.Attributes.TryGetValue(attribute.AttributeName, out var updatedValue) &&
-                        (updatedValue == null || IsSecretPlaceholder(attribute, updatedValue)))
+                        // AB#5532: only an explicit null clears; a placeholder-looking text is a value
+                        // (decisions 2026-10-06, item 1).
+                        updatedValue == null)
                     {
                         operationResult.AddMessage(MessageCodes.MandatoryAttributeMissingAtUpdate(
                             originFileResolver.Resolve(tenantId),
@@ -214,26 +216,6 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
         return isInError;
     }
 
-    /// <summary>
-    ///     A placeholder written to a Secret attribute is stored as "not set" (concept §3.6) - for a required
-    ///     secret on update that is a clear. <c>""</c> is not a placeholder: it means "unchanged".
-    /// </summary>
-    private static bool IsSecretPlaceholder(CkTypeAttributeGraph attribute, object value)
-    {
-        return attribute.ValueType == AttributeValueTypesDto.Secret &&
-               SecretWriteNormalizer.IsNotSetValue(value) && !IsEmptySecretInput(value);
-    }
-
-    private static bool IsEmptySecretInput(object value)
-    {
-        return value switch
-        {
-            string text => text.Length == 0,
-            RtSecretValue { IsPending: true } secret => secret.RawValue.Length == 0,
-            _ => false
-        };
-    }
-
     private bool SetDefaultValuesOnInsert(string tenantId, ICollection<CkTypeAttributeGraph> attributeGraphs,
         RtTypeWithAttributes rtType,
         IOriginFileResolver originFileResolver, OperationResult operationResult, string reference,
@@ -245,7 +227,8 @@ internal class EntityRuleEngine(ICkCacheService ckCache) : IEntityRuleEngine
             if (attribute.ValueType == AttributeValueTypesDto.Secret)
             {
                 // AB#5532: a Secret attribute never takes a default (the compiler forbids them). Creating
-                // requires a value for a required secret - "", a placeholder and null count as not set.
+                // requires a value for a required secret - "" and null count as not set (a placeholder-looking
+                // text is a value, decisions 2026-10-06 item 1).
                 // On replace the value may be carried over from the stored entity; the write step checks.
                 if (!attribute.IsOptional && !deferSecretCheck &&
                     (!rtType.Attributes.TryGetValue(attribute.AttributeName, out var secretValue) ||

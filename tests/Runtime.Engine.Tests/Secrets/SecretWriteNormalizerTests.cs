@@ -11,6 +11,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Tests.Secrets;
 public class SecretWriteNormalizerTests
 {
     private const string Plain = "s3cr3t-Plain!";
+    private const string UnknownKidEnvelope = "enc:v2:k9:AAECAwQFBgcICQoLce30XInwk1La5ADQECWjFW2r_6nUXsA";
     private readonly SecretTestModel _model = new();
     private readonly SecretAttributeProtector _protector = SecretTestModel.CreateProtector();
     private readonly SecretWriteNormalizer _normalizer;
@@ -106,19 +107,26 @@ public class SecretWriteNormalizerTests
         Assert.False(entity.Attributes.ContainsKey("Password"));
     }
 
+    /// <summary>
+    ///     Decisions 2026-10-06 item 1: no placeholder semantics on input - a placeholder-looking text is an
+    ///     ordinary value and is encrypted as it is.
+    /// </summary>
     [Theory]
-    [InlineData("<SET_AFTER_INSTALL>")]
-    [InlineData("TODO_SET_PASSWORD")]
-    [InlineData(" <x> ")]
-    public void Placeholder_IsStoredAsNull(string placeholder)
+    [InlineData("<SET_AFTER_INSTALL>", SecretWriteOperation.Update)]
+    [InlineData("TODO_SET_PASSWORD", SecretWriteOperation.Update)]
+    [InlineData(" <x> ", SecretWriteOperation.Insert)]
+    [InlineData("TODO_SET_PASSWORD", SecretWriteOperation.Insert)]
+    public void PlaceholderLookingInput_IsAnOrdinaryValue_AndEncrypted(string placeholder, SecretWriteOperation operation)
     {
         var entity = _model.NewConfig();
         entity.SetAttributeRawValue("Password", placeholder);
 
-        Normalize(entity, SecretWriteOperation.Update);
+        var result = Normalize(entity, operation);
 
-        Assert.True(entity.Attributes.ContainsKey("Password"));
-        Assert.Null(entity.Attributes["Password"]);
+        var stored = Assert.IsType<RtSecretValue>(entity.Attributes["Password"]);
+        Assert.True(stored.IsProtected);
+        Assert.Equal(placeholder, Decrypt(stored));
+        Assert.DoesNotContain("Password", result.MissingRequiredAttributes);
     }
 
     [Fact]
@@ -335,7 +343,7 @@ public class SecretWriteNormalizerTests
     }
 
     [Fact]
-    public void RecordArray_Placeholder_ClearsTheStoredSubValue()
+    public void RecordArray_PlaceholderLookingValue_IsAnOrdinaryValue()
     {
         var stored = _model.NewConfig();
         stored.SetAttributeRawValue("Credentials", new List<RtRecord> { _model.CredentialRecord("a", _protector.Protect("x")) });
@@ -345,7 +353,35 @@ public class SecretWriteNormalizerTests
         Normalize(incoming, SecretWriteOperation.Replace, stored);
 
         var element = ((IEnumerable<RtRecord>)incoming.Attributes["Credentials"]!).Single();
-        Assert.Null(element.Attributes["Value"]);
+        Assert.Equal("<CLEAR>", Decrypt(element.Attributes["Value"]));
+    }
+
+    /// <summary>
+    ///     Inside records there is no clear value (null and "" keep); a record secret is cleared by removing
+    ///     its element - an element with a new record key starts without a secret.
+    /// </summary>
+    [Fact]
+    public void RecordArray_RemovingOrRekeyingTheElement_IsTheWayToClear()
+    {
+        var stored = _model.NewConfig();
+        stored.SetAttributeRawValue("Credentials", new List<RtRecord>
+        {
+            _model.CredentialRecord("a", _protector.Protect("x")),
+            _model.CredentialRecord("b", _protector.Protect("y"))
+        });
+        var incoming = _model.NewConfig(stored.RtId);
+        incoming.SetAttributeRawValue("Credentials", new List<RtRecord>
+        {
+            _model.CredentialRecord("a", null),
+            _model.CredentialRecord("c", null)
+        });
+
+        Normalize(incoming, SecretWriteOperation.Update, stored);
+
+        var elements = ((IEnumerable<RtRecord>)incoming.Attributes["Credentials"]!).ToList();
+        Assert.Equal(2, elements.Count);
+        Assert.Equal("x", Decrypt(elements[0].Attributes["Value"])); // null keeps
+        Assert.False(elements[1].Attributes.TryGetValue("Value", out var cleared) && cleared != null); // "b" removed, "c" new
     }
 
     [Fact]
@@ -426,12 +462,12 @@ public class SecretWriteNormalizerTests
     }
 
     [Fact]
-    public void NoKeyConfigured_EmptyNullPlaceholderAndLegacy_StillWork()
+    public void NoKeyConfigured_EmptyNullAndLegacy_StillWork()
     {
         var normalizer = new SecretWriteNormalizer(SecretTestModel.CreateProtector(configured: false));
         var legacy = RtSecretValue.LegacyPlaintext("stored-before");
         var entity = _model.NewConfig();
-        entity.SetAttributeRawValue("Password", "<SET>");
+        entity.SetAttributeRawValue("Password", RtSecretValue.LegacyPlaintext("TODO_SET_PASSWORD"));
         entity.SetAttributeRawValue("ApiKey", legacy);
         var other = _model.NewOptionalOnly();
         other.SetAttributeRawValue("Password", "");
@@ -442,7 +478,7 @@ public class SecretWriteNormalizerTests
         normalizer.Normalize(_model.Cache, SecretTestModel.TenantId, _model.OptionalOnly, other, SecretWriteOperation.Update);
         normalizer.Normalize(_model.Cache, SecretTestModel.TenantId, _model.OptionalOnly, third, SecretWriteOperation.Update);
 
-        Assert.Null(entity.Attributes["Password"]);
+        Assert.Null(entity.Attributes["Password"]); // a legacy placeholder is "not set" (migration)
         Assert.Same(legacy, entity.Attributes["ApiKey"]); // already stored that way - kept until the sweep
         Assert.False(other.Attributes.ContainsKey("Password"));
         Assert.Null(third.Attributes["Password"]);
@@ -484,6 +520,9 @@ public class SecretWriteNormalizerTests
 
         Assert.Null(_normalizer.NormalizeAttributeValue(_model.Cache, tenant, password, "", SecretValueOrigin.Storage));
         Assert.Null(_normalizer.NormalizeAttributeValue(_model.Cache, tenant, password, "TODO_SET_X", SecretValueOrigin.Storage));
+        // Input: a placeholder-looking text is a value (decisions 2026-10-06 item 1).
+        Assert.Equal("TODO_SET_X", Decrypt(_normalizer.NormalizeAttributeValue(_model.Cache, tenant, password, "TODO_SET_X",
+            SecretValueOrigin.Input)));
         Assert.Null(_normalizer.NormalizeAttributeValue(_model.Cache, tenant, password, null, SecretValueOrigin.Storage));
         Assert.Equal(SecretTestModel.V1VectorPlaintext, Decrypt(_normalizer.NormalizeAttributeValue(_model.Cache, tenant,
             password, SecretTestModel.V1Vector, SecretValueOrigin.Storage)));
@@ -498,20 +537,44 @@ public class SecretWriteNormalizerTests
     }
 
     [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("<X>", true)]
-    [InlineData("TODO_SET_X", true)]
-    [InlineData("value", false)]
-    [InlineData(" ", false)]
-    public void IsNotSetValue(string? value, bool expected)
+    [InlineData(null, true, true)]
+    [InlineData("", true, true)]
+    [InlineData("<X>", false, true)]
+    [InlineData("TODO_SET_X", false, true)]
+    [InlineData("value", false, false)]
+    [InlineData(" ", false, false)]
+    public void IsNotSetValue(string? value, bool expectedForInput, bool expectedForLegacy)
     {
-        Assert.Equal(expected, SecretWriteNormalizer.IsNotSetValue(value));
+        // Input (plain string / Pending): only null and "" are not set. Legacy (stored string): legacy
+        // placeholders are not set as well - migration only.
+        Assert.Equal(expectedForInput, SecretWriteNormalizer.IsNotSetValue(value));
         if (value != null)
         {
-            Assert.Equal(expected, SecretWriteNormalizer.IsNotSetValue(RtSecretValue.Pending(value)));
-            Assert.Equal(expected, SecretWriteNormalizer.IsNotSetValue(RtSecretValue.LegacyPlaintext(value)));
+            Assert.Equal(expectedForInput, SecretWriteNormalizer.IsNotSetValue(RtSecretValue.Pending(value)));
+            Assert.Equal(expectedForLegacy, SecretWriteNormalizer.IsNotSetValue(RtSecretValue.LegacyPlaintext(value)));
         }
+    }
+
+    [Fact]
+    public void IsNotSetValue_ProtectedWithUnknownKeyId_IsAValue()
+    {
+        // Decisions 2026-10-06 item 2: a stored but unreadable secret counts as present for required checks.
+        Assert.False(SecretWriteNormalizer.IsNotSetValue(RtSecretValue.Protected(UnknownKidEnvelope)));
+    }
+
+    [Fact]
+    public void Replace_RequiredSecretWithUnknownKeyId_IsCarriedOver_AndCountsAsPresent()
+    {
+        var stored = _model.NewConfig();
+        stored.SetAttributeRawValue("Password", RtSecretValue.Protected(UnknownKidEnvelope));
+        stored.SetAttributeRawValue("ApiKey", RtSecretValue.Protected(UnknownKidEnvelope));
+        var incoming = _model.NewConfig(stored.RtId);
+
+        var result = Normalize(incoming, SecretWriteOperation.Replace, stored);
+
+        Assert.Empty(result.MissingRequiredAttributes);
+        Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)incoming.Attributes["Password"]!).Envelope);
+        Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)incoming.Attributes["ApiKey"]!).Envelope);
     }
 
     [Fact]

@@ -63,7 +63,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
         ISecretMaintenanceService? secretMaintenanceService = null)
     {
         // AB#5532: the CK cache and the Secret write step normalise Secret values on the migration
-        // writes that bypass BulkRtMutation; the maintenance service turns stored placeholders into
+        // writes that bypass BulkRtMutation; the maintenance service turns stored legacy placeholders into
         // "not set" after a model switched attributes from String to Secret. Optional so hosts and tests
         // without them keep working (then no Secret handling happens on these paths).
         _ckCacheService = ckCacheService;
@@ -172,8 +172,9 @@ internal class CkModelMigrationService : ICkModelMigrationService
     }
 
     /// <summary>
-    ///     AB#5532 (concept §5.2 phase 3): after a model version is migrated, stored placeholders and empty
-    ///     strings in its Secret slots become <c>null</c> ("not set") - the only data change a String →
+    ///     AB#5532 (concept §5.2 phase 3): after a model version is migrated, stored legacy strings in its
+    ///     Secret slots that are exactly a placeholder (<c>SecretAttributeConventions.IsLegacyPlaceholder</c>) or
+    ///     empty become <c>null</c> ("not set"), once - the only data change a String →
     ///     Secret switch needs. Idempotent and cheap on models without Secret attributes. A failure is a
     ///     warning: the encrypt sweep normalises the same values later.
     /// </summary>

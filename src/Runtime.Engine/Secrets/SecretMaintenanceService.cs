@@ -162,12 +162,13 @@ internal sealed class SecretMaintenanceService(
         logger.LogInformation(
             "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities, {Total} values " +
             "(not set {NotSet}, placeholder {Placeholder}, plaintext {Plaintext}, enc_v1 {EncV1}, enc_v2 {EncV2}, " +
-            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Unreadable} unreadable (kept), {Cleared} cleared, {PlaceholdersNormalized} placeholder(s) " +
+            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Unreadable} unreadable (kept), {Cleared} cleared, " +
+            "{SkippedLegacyV1KeyMissing} enc_v1 kept by cleanup (legacy key missing), {PlaceholdersNormalized} placeholder(s) " +
             "normalised, {Skipped} skipped (modified concurrently), {Failed} failed",
             modeTag, tenantId, result.EntitiesScanned, result.Totals.Total, result.Totals.NotSet,
             result.Totals.Placeholder, result.Totals.Plaintext, result.Totals.EncV1, result.Totals.EncV2,
             result.Totals.UnknownKeyId, result.ValuesRewritten, result.Unreadable.Count, result.Cleared.Count,
-            result.PlaceholdersNormalized,
+            result.SkippedLegacyV1KeyMissing, result.PlaceholdersNormalized,
             result.SkippedConcurrentlyModified, result.Totals.Failed);
 
         return result;
@@ -369,7 +370,11 @@ internal sealed class SecretMaintenanceService(
         context.Result.Totals.Add(form.Value, keyId);
         context.ModelCounts.Add(form.Value, keyId);
 
-        if (form == SecretValueForm.UnknownKeyId && context.Mode != SecretSweepMode.CleanupUnreadable)
+        // A legacy enc:v1 string on a host without SecretEncryption:LegacyV1Key is a configuration gap of this
+        // host (recoverable by configuring the legacy key), not key loss: even CleanupUnreadable keeps it.
+        var legacyV1KeyMissing = form == SecretValueForm.UnknownKeyId && IsLegacyV1WithoutKey(value, keyId);
+        if (form == SecretValueForm.UnknownKeyId &&
+            (context.Mode != SecretSweepMode.CleanupUnreadable || legacyV1KeyMissing))
         {
             // Decisions 2026-10-06, item 2: kept as stored and reported as a re-entry task.
             context.Result.Unreadable.Add(new SecretSweepUnreadableValue(context.CkTypeId, context.RtId, elementPath,
@@ -456,10 +461,22 @@ internal sealed class SecretMaintenanceService(
                 }
 
             case SecretSweepMode.CleanupUnreadable:
+                if (form != SecretValueForm.UnknownKeyId)
+                {
+                    return (false, null, SlotEffect.None);
+                }
+
+                if (IsLegacyV1WithoutKey(value, keyId))
+                {
+                    // PO decision (AB#5532): an enc:v1 value is unreadable here only because the legacy key is
+                    // not configured - configuring it makes the value readable again, so it is never deleted.
+                    // Kept in Unreadable (ProcessSlot) and counted separately.
+                    context.Result.SkippedLegacyV1KeyMissing++;
+                    return (false, null, SlotEffect.None);
+                }
+
                 // The only mode that deletes a value of an unknown key id (explicitly confirmed).
-                return form == SecretValueForm.UnknownKeyId
-                    ? (true, null, SlotEffect.Cleared)
-                    : (false, null, SlotEffect.None);
+                return (true, null, SlotEffect.Cleared);
 
             case SecretSweepMode.Decrypt:
                 switch (form)
@@ -530,6 +547,17 @@ internal sealed class SecretMaintenanceService(
         }
 
         return (SecretValueForm.Plaintext, null, raw);
+    }
+
+    /// <summary>
+    ///     True for a legacy <c>enc:v1</c> string that <see cref="Classify" /> reported as
+    ///     <see cref="SecretValueForm.UnknownKeyId" /> because the legacy key is not configured on this host
+    ///     (key id <see cref="SecretValueStates.LegacyV1KeyId" />, never a protected value).
+    /// </summary>
+    private static bool IsLegacyV1WithoutKey(object? value, string? keyId)
+    {
+        return value is not RtSecretValue { IsProtected: true } &&
+               string.Equals(keyId, SecretValueStates.LegacyV1KeyId, StringComparison.Ordinal);
     }
 
     /// <summary>

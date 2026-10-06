@@ -122,7 +122,11 @@ public enum SecretSweepMode
     ///     <see cref="SecretSweepResult.Cleared" />. Requires <see cref="SecretSweepOptions.ConfirmCleanupUnreadable" />.
     ///     Without it such values are kept, read as "key missing" and become readable again once their key is
     ///     added to the ring (decisions 2026-10-06, item 2) - only run it when the key is gone for good, and
-    ///     take a dump first. Callers gate it by role.
+    ///     take a dump first. Callers gate it by role. A legacy <c>enc:v1</c> string that is unreadable only
+    ///     because <c>SecretEncryption:LegacyV1Key</c> is not configured (key id
+    ///     <see cref="SecretValueStates.LegacyV1KeyId" />) is NOT deleted - a configuration gap, recoverable by
+    ///     configuring the legacy key: it stays in <see cref="SecretSweepResult.Unreadable" /> and is counted in
+    ///     <see cref="SecretSweepResult.SkippedLegacyV1KeyMissing" />.
     /// </summary>
     CleanupUnreadable = 3,
 
@@ -459,7 +463,9 @@ public sealed class SecretSweepResult
 
     /// <summary>
     ///     Values whose key id is not in the key ring, found and KEPT by every mode except
-    ///     <see cref="SecretSweepMode.CleanupUnreadable" /> (which lists them in <see cref="Cleared" />) - the
+    ///     <see cref="SecretSweepMode.CleanupUnreadable" /> (which lists them in <see cref="Cleared" />; it keeps
+    ///     and lists here only the <c>enc:v1</c> strings of a host without legacy key,
+    ///     <see cref="SkippedLegacyV1KeyMissing" />) - the
     ///     re-entry list after a restore from another environment (decisions 2026-10-06, item 2). Counted in
     ///     <see cref="SecretFormCounts.UnknownKeyId" /> as well.
     /// </summary>
@@ -481,6 +487,14 @@ public sealed class SecretSweepResult
     ///     <see cref="ValuesRewritten" />.
     /// </summary>
     public long SkippedConcurrentlyModified { get; set; }
+
+    /// <summary>
+    ///     <see cref="SecretSweepMode.CleanupUnreadable" /> only: legacy <c>enc:v1</c> strings that were NOT deleted
+    ///     although unreadable, because the only thing missing is the legacy key (<c>SecretEncryption:LegacyV1Key</c>)
+    ///     - a configuration gap, not key loss (AB#5532). They stay in <see cref="Unreadable" /> (key id
+    ///     <see cref="SecretValueStates.LegacyV1KeyId" />) and become readable once the legacy key is configured.
+    /// </summary>
+    public long SkippedLegacyV1KeyMissing { get; set; }
 
     /// <summary>
     ///     Values that could not be processed.

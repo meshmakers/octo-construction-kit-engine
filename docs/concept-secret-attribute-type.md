@@ -188,7 +188,7 @@ Assume every value was read. Order: (1) cross-tenant/platform: Grafana `AdminPas
 - **Disaster recovery / environment handover** (cross-environment or child-tenant restore, a new environment with a new key ring):
   - *Default:* secrets arrive unreadable (`keyMissing = true`) and are re-entered from the re-entry list (Studio, octo-cli, rotate endpoints). Re-entry replaces the kept ciphertext.
   - *Optional ops step* (keeps the secrets without re-entry): temporarily add the source environment's key to the target key ring (`SecretEncryption:Keys:<source kid>`, not active) → restore → run the `Reprotect` sweep (everything moves to the target's active key) → verify that `Unreadable` is empty → remove the source key from the ring again. The source key travels only through the secret store (Vault/Keeper), never with the dump.
-  - Only when a key is gone for good may an admin run `CleanupUnreadable` (dump first) to delete the remaining unreadable values.
+  - Only when a key is gone for good may an admin run `CleanupUnreadable` (dump first) to delete the remaining unreadable values. It never deletes an `enc:v1` value that is unreadable only because `LegacyV1Key` is not configured (a configuration gap, recoverable by setting the legacy key): such values stay in `Unreadable` and are counted in `SecretSweepResult.SkippedLegacyV1KeyMissing`.
 - `ExportRt` / deep-graph export never contain SECRET values (ownership Secret); identity-provider secrets, report connection strings and the Loxone adapter password stop being exported once converted.
 - Separately: inline API keys/passwords inside stored pipeline definitions (`AnthropicAiQueryNode.ApiKey`, `FinApiAuthNode.Password`) are not covered by the value type — scan and move them to configuration entities.
 

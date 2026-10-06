@@ -362,6 +362,45 @@ public class SecretMaintenanceServiceTests
         AssertResultCarriesNoValue(result);
     }
 
+    /// <summary>
+    ///     PO decision (AB#5532): an enc:v1 value that is unreadable only because the legacy key is not configured
+    ///     is a configuration gap, not key loss - CleanupUnreadable keeps it, lists it as unreadable and counts it
+    ///     separately; enc:v2 values of unknown key ids are still deleted.
+    /// </summary>
+    [Fact]
+    public async Task CleanupUnreadable_WithoutLegacyKey_KeepsEncV1_AndCountsItSeparately()
+    {
+        var result = await CreateService(SecretTestModel.CreateProtector(legacyV1Key: false)).SweepTenantAsync(
+            SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+            new SecretSweepOptions { ConfirmCleanupUnreadable = true }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(SecretTestModel.V1Vector, _e2.Attributes["ApiKey"]);
+        Assert.DoesNotContain(_rewrites, r => r.RtId == _e2.RtId && r.Attribute == "ApiKey");
+        Assert.Equal(1, result.SkippedLegacyV1KeyMissing);
+        var kept = Assert.Single(result.Unreadable);
+        Assert.Equal(_e2.RtId, kept.RtId);
+        Assert.Equal("apiKey", kept.AttributePath);
+        Assert.Equal(SecretValueStates.LegacyV1KeyId, kept.KeyId);
+        Assert.DoesNotContain(result.Cleared, c => c.KeyId == SecretValueStates.LegacyV1KeyId);
+
+        // The enc:v2 values of an unknown key id are deleted as before.
+        Assert.Equal(2, result.ValuesRewritten);
+        Assert.Equal(2, result.Cleared.Count);
+        Assert.Null(_e3.Attributes["ApiKey"]);
+        Assert.Equal(0, result.Totals.Failed);
+        AssertResultCarriesNoValue(result);
+    }
+
+    [Fact]
+    public async Task CleanupUnreadable_WithLegacyKey_DoesNotCountSkippedLegacyValues()
+    {
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+            new SecretSweepOptions { ConfirmCleanupUnreadable = true }, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.SkippedLegacyV1KeyMissing);
+        Assert.Equal(SecretTestModel.V1Vector, _e2.Attributes["ApiKey"]); // readable enc:v1 is not unreadable
+    }
+
     [Fact]
     public async Task Decrypt_RequiresConfirmation()
     {

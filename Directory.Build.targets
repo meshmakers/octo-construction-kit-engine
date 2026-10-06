@@ -139,6 +139,26 @@
         </ItemGroup>
     </Target>
 
+    <!--
+        Guard (CI build 49921): every model yaml the CK compiler produced must reach the C# compiler as a
+        manifest resource. An EmbeddedResource that is added too late (after PrepareResourceNames) carries no
+        WithCulture/Type metadata and is silently left out of _CoreCompileResourceInputs, which ships a model
+        package without its model - fail the build instead. Runs before CoreCompile even when that is skipped
+        as up to date, so it checks every build.
+    -->
+    <Target Name="CkVerifyEmbeddedModelResources" BeforeTargets="CoreCompile"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoVerifyEmbeddedCkModel)' != 'false'">
+        <ItemGroup>
+            <_CkExpectedModelResource Include="@(_OctoCompilerResourceFiles->'$(RootNamespace).%(Filename)%(Extension)');@(_OctoCompilerResourceFilesNew->'$(RootNamespace).%(Filename)%(Extension)')" />
+            <_CkActualModelResource Include="@(_CoreCompileResourceInputs->'%(LogicalName)')" />
+            <_CkMissingModelResource Include="@(_CkExpectedModelResource)" Exclude="@(_CkActualModelResource)" />
+        </ItemGroup>
+        <Error Condition="'@(_CkExpectedModelResource)' == ''"
+               Text="Construction kit project $(MSBuildProjectName) compiled no model yaml into '$(OctoCkCompileOutputCompilerFolder)'; the assembly would ship without its CK model." />
+        <Error Condition="'@(_CkMissingModelResource)' != ''"
+               Text="Construction kit model resource(s) @(_CkMissingModelResource, ', ') of $(MSBuildProjectName) are not passed to the compiler as embedded resources; the assembly would ship without its CK model (see CkIncludeFiles in Directory.Build.targets)." />
+    </Target>
+
     <ItemGroup>
         <_OctoCompilerResourceFiles Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" />
         <EmbeddedResource Include="@(_OctoCompilerResourceFiles)">

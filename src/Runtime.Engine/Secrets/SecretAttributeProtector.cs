@@ -54,6 +54,9 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     public bool IsStrictMode => _strictMode;
 
     /// <inheritdoc />
+    public bool IsLegacyV1KeyConfigured => _keyRing.Value.LegacyV1Key != null;
+
+    /// <inheritdoc />
     public bool IsKnownKeyId(string? keyId)
     {
         return keyId != null && _keyRing.Value.Keys.ContainsKey(keyId);
@@ -174,7 +177,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     /// <inheritdoc />
     public SecretValueState GetReadState(RtSecretValue? value, SecretAccessContext? context = null)
     {
-        var state = SecretValueStates.GetReadState(value, IsKnownKeyId);
+        var state = SecretValueStates.GetReadState(value, IsKnownKeyId, IsLegacyV1KeyConfigured);
         if (state == SecretValueState.NotSet && SecretValueStates.IsCorrupt(value))
         {
             // Corrupt envelope reads as not set + warning (decisions 2026-10-06, item 3) - never the value.
@@ -192,16 +195,25 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     {
         // GetReadState logs / counts a corrupt value.
         GetReadState(value, context);
-        return SecretValueStates.Describe(value, IsKnownKeyId);
+        return SecretValueStates.Describe(value, IsKnownKeyId, IsLegacyV1KeyConfigured);
     }
 
     /// <inheritdoc />
     public string? RevealOrNull(RtSecretValue? value, SecretAccessContext? context = null)
     {
-        var state = SecretValueStates.GetReadState(value, IsKnownKeyId);
+        var state = SecretValueStates.GetReadState(value, IsKnownKeyId, IsLegacyV1KeyConfigured);
         switch (state)
         {
             case SecretValueState.KeyMissing:
+                if (!value!.IsProtected)
+                {
+                    // A legacy enc:v1 string without the legacy key: a configuration problem of this host
+                    // (unchanged behaviour of Unprotect), not unreadable data.
+                    throw new SecretEncryptionNotConfiguredException(
+                        "Cannot decrypt an 'enc:v1' secret: SecretEncryption:LegacyV1Key is not configured." +
+                        _keyRing.Value.ProblemSuffix);
+                }
+
                 if (_keyRing.Value.Keys.Count == 0)
                 {
                     // A host without any key is a configuration problem, not unreadable data.
@@ -210,7 +222,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
                         _keyRing.Value.ProblemSuffix);
                 }
 
-                ReportUnreadable(UnreadableUnknownKeyId, value!.KeyId, context);
+                ReportUnreadable(UnreadableUnknownKeyId, value.KeyId, context);
                 return null;
             case SecretValueState.NotSet:
                 if (SecretValueStates.IsCorrupt(value))

@@ -65,6 +65,39 @@ public class SecretReadStateTests
     }
 
     [Fact]
+    public void EncV1_WithoutLegacyKey_IsKeyMissing()
+    {
+        var v1 = RtSecretValue.LegacyPlaintext(SecretTestModel.V1Vector);
+
+        // Pure helper: the two-argument overloads assume the legacy key is available.
+        Assert.Equal(SecretValueState.Set, SecretValueStates.GetReadState(v1, (Func<string?, bool>?)null));
+        Assert.Equal(SecretValueState.KeyMissing, SecretValueStates.GetReadState(v1, null, false));
+        Assert.Equal(new SecretReadInfo(SecretValueState.KeyMissing, SecretStorageForm.KeyMissing,
+            SecretValueStates.LegacyV1KeyId, null), SecretValueStates.Describe(v1, null, false));
+        // Clear text is not affected.
+        Assert.Equal(SecretValueState.Set,
+            SecretValueStates.GetReadState(RtSecretValue.LegacyPlaintext("clear"), null, false));
+
+        foreach (var protector in new[]
+                 {
+                     SecretTestModel.CreateProtector(legacyV1Key: false),
+                     SecretTestModel.CreateProtector(configured: false)
+                 })
+        {
+            Assert.False(protector.IsLegacyV1KeyConfigured);
+            Assert.Equal(SecretValueState.KeyMissing, protector.GetReadState(v1));
+            var info = protector.DescribeSecret(v1);
+            Assert.Equal((SecretStorageForm.KeyMissing, SecretValueStates.LegacyV1KeyId, false, true),
+                (info.Form, info.KeyId, info.IsSet, info.KeyMissing));
+            // Revealing stays a configuration error on this host (unchanged).
+            Assert.Throws<SecretEncryptionNotConfiguredException>(() => protector.RevealOrNull(v1));
+        }
+
+        Assert.True(_protector.IsLegacyV1KeyConfigured);
+        Assert.Equal(SecretStorageForm.EncV1, _protector.DescribeSecret(v1).Form);
+    }
+
+    [Fact]
     public void WireMarker_HasNoKeyRing_AndFollowsTheSameRules()
     {
         Assert.True(RtSecretValueWireFormat.IsSet(RtSecretValue.Protected(UnknownKidEnvelope)));

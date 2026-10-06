@@ -60,7 +60,8 @@ public enum SecretStorageForm
     EncV2 = 3,
 
     /// <summary>
-    ///     Protected, key id NOT in the key ring (kept; reads as not set + key missing).
+    ///     Protected, key id NOT in the key ring (kept; reads as not set + key missing). Also a legacy
+    ///     <c>enc:v1</c> string on a host without the legacy key (key id <see cref="SecretValueStates.LegacyV1KeyId" />).
     /// </summary>
     KeyMissing = 4,
 
@@ -106,6 +107,15 @@ public readonly record struct SecretReadInfo(
 public static class SecretValueStates
 {
     /// <summary>
+    ///     Key id reported for a legacy <c>enc:v1</c> string when the legacy key
+    ///     (<c>SecretEncryption:LegacyV1Key</c>) is not configured: such a value is classified as
+    ///     <see cref="SecretValueState.KeyMissing" /> / <see cref="SecretStorageForm.KeyMissing" /> with this key id
+    ///     (inventory, sweep <c>Unreadable</c> entries and per-key-id counts). It is not a valid key-ring key id
+    ///     (it contains a colon), so it never collides with a real one.
+    /// </summary>
+    public const string LegacyV1KeyId = "enc:v1";
+
+    /// <summary>
     ///     Classifies a stored or pending Secret value. Never decrypts.
     /// </summary>
     /// <param name="value">The value; <c>null</c> = not set</param>
@@ -125,10 +135,26 @@ public static class SecretValueStates
     ///         <item><term>pending (input)</term><description><see cref="SecretValueState.Set" /> when non-empty - a placeholder-looking input is an ordinary value</description></item>
     ///         <item><term>legacy string: empty or legacy placeholder</term><description><see cref="SecretValueState.NotSet" /> (normalised once by the migration)</description></item>
     ///         <item><term>legacy string: <c>enc:v2</c> envelope</term><description><see cref="SecretValueState.NotSet" /> - corrupt (<see cref="IsCorrupt" />), never decrypted</description></item>
-    ///         <item><term>legacy string: other (clear text, <c>enc:v1</c>)</term><description><see cref="SecretValueState.Set" /></description></item>
+    ///         <item><term>legacy string: other (clear text, <c>enc:v1</c>)</term><description><see cref="SecretValueState.Set" /> (an <c>enc:v1</c> string is <see cref="SecretValueState.KeyMissing" /> through the overload with <c>legacyV1KeyConfigured = false</c>)</description></item>
     ///     </list>
     /// </remarks>
     public static SecretValueState GetReadState(RtSecretValue? value, Func<string?, bool>? isKnownKeyId)
+    {
+        return GetReadState(value, isKnownKeyId, true);
+    }
+
+    /// <summary>
+    ///     Like <see cref="GetReadState(RtSecretValue?, Func{string?, bool}?)" />, plus whether the legacy
+    ///     <c>enc:v1</c> key is configured: when <paramref name="legacyV1KeyConfigured" /> is <c>false</c>, a legacy
+    ///     <c>enc:v1</c> string is <see cref="SecretValueState.KeyMissing" /> (stored, cannot be read on this host,
+    ///     key id <see cref="LegacyV1KeyId" />) instead of <see cref="SecretValueState.Set" /> (AB#5532).
+    /// </summary>
+    /// <param name="value">The value; <c>null</c> = not set</param>
+    /// <param name="isKnownKeyId">True when a key id is in the key ring; <c>null</c> = no key ring</param>
+    /// <param name="legacyV1KeyConfigured">True when the legacy <c>enc:v1</c> key is configured</param>
+    /// <returns>The state</returns>
+    public static SecretValueState GetReadState(RtSecretValue? value, Func<string?, bool>? isKnownKeyId,
+        bool legacyV1KeyConfigured)
     {
         if (value == null)
         {
@@ -144,10 +170,15 @@ public static class SecretValueStates
             case RtSecretValueState.Pending:
                 return value.RawValue.Length > 0 ? SecretValueState.Set : SecretValueState.NotSet;
             default:
-                return value.RawValue.Length == 0 ||
-                       SecretAttributeConventions.IsLegacyPlaceholder(value.RawValue) ||
-                       IsCorrupt(value)
-                    ? SecretValueState.NotSet
+                if (value.RawValue.Length == 0 ||
+                    SecretAttributeConventions.IsLegacyPlaceholder(value.RawValue) ||
+                    IsCorrupt(value))
+                {
+                    return SecretValueState.NotSet;
+                }
+
+                return !legacyV1KeyConfigured && IsLegacyV1Envelope(value.RawValue)
+                    ? SecretValueState.KeyMissing
                     : SecretValueState.Set;
         }
     }
@@ -163,7 +194,23 @@ public static class SecretValueStates
     /// <returns>The description</returns>
     public static SecretReadInfo Describe(RtSecretValue? value, Func<string?, bool>? isKnownKeyId)
     {
-        var state = GetReadState(value, isKnownKeyId);
+        return Describe(value, isKnownKeyId, true);
+    }
+
+    /// <summary>
+    ///     Like <see cref="Describe(RtSecretValue?, Func{string?, bool}?)" />, plus whether the legacy <c>enc:v1</c>
+    ///     key is configured: without it a legacy <c>enc:v1</c> string is described as
+    ///     <see cref="SecretValueState.KeyMissing" /> / <see cref="SecretStorageForm.KeyMissing" /> with key id
+    ///     <see cref="LegacyV1KeyId" /> (AB#5532).
+    /// </summary>
+    /// <param name="value">The value; <c>null</c> = not set</param>
+    /// <param name="isKnownKeyId">True when a key id is in the key ring; <c>null</c> = no key ring</param>
+    /// <param name="legacyV1KeyConfigured">True when the legacy <c>enc:v1</c> key is configured</param>
+    /// <returns>The description</returns>
+    public static SecretReadInfo Describe(RtSecretValue? value, Func<string?, bool>? isKnownKeyId,
+        bool legacyV1KeyConfigured)
+    {
+        var state = GetReadState(value, isKnownKeyId, legacyV1KeyConfigured);
         if (value == null)
         {
             return new SecretReadInfo(state, SecretStorageForm.NotSet, null, null);
@@ -189,6 +236,12 @@ public static class SecretValueStates
                     return new SecretReadInfo(state, SecretStorageForm.NotSet, null, null);
                 }
 
+                if (state == SecretValueState.KeyMissing)
+                {
+                    // A legacy enc:v1 string on a host without the legacy key.
+                    return new SecretReadInfo(state, SecretStorageForm.KeyMissing, LegacyV1KeyId, null);
+                }
+
                 return new SecretReadInfo(state,
                     SecretEnvelope.TryParse(value.RawValue, out var info) && info.Version == 1
                         ? SecretStorageForm.EncV1
@@ -208,6 +261,11 @@ public static class SecretValueStates
         ArgumentNullException.ThrowIfNull(knownKeyIds);
         var known = new HashSet<string>(knownKeyIds, StringComparer.OrdinalIgnoreCase);
         return GetReadState(value, kid => kid != null && known.Contains(kid));
+    }
+
+    private static bool IsLegacyV1Envelope(string text)
+    {
+        return SecretEnvelope.TryParse(text, out var info) && info.Version == 1;
     }
 
     /// <summary>

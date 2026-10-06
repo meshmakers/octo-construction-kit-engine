@@ -90,7 +90,11 @@ public enum SecretSweepMode
 {
     /// <summary>
     ///     Count only - nothing is decrypted or written. Recurring after the encrypt sweep; strict mode
-    ///     starts 14 days after it reports zero plaintext (decision 10).
+    ///     starts 14 days after it reports zero plaintext (decision 10). Needs no key material (AB#5532): it
+    ///     classifies by key id, so on a host without key ring (or without the legacy key) the protected values
+    ///     whose key id is not in the - possibly empty - ring and the <c>enc:v1</c> strings are reported as
+    ///     <see cref="SecretValueForm.UnknownKeyId" /> and listed in <see cref="SecretSweepResult.Unreadable" />
+    ///     (the re-entry list of a restore without keys). Clear text stays <see cref="SecretValueForm.Plaintext" />.
     /// </summary>
     Verify = 0,
 
@@ -202,7 +206,11 @@ public enum SecretValueForm
 
     /// <summary>
     ///     An <c>enc:v2:&lt;kid&gt;:</c> envelope whose key id is NOT in the key ring - kept, reads as
-    ///     "key missing" and is listed in <see cref="SecretSweepResult.Unreadable" />.
+    ///     "key missing" and is listed in <see cref="SecretSweepResult.Unreadable" />. A legacy <c>enc:v1</c>
+    ///     string on a host without the legacy key (<c>SecretEncryption:LegacyV1Key</c>) is classified the same
+    ///     way, with key id <see cref="SecretValueStates.LegacyV1KeyId" /> (AB#5532). <see cref="SecretSweepMode.Verify" />
+    ///     classifies without any key material, so on a host without key ring every protected value and every
+    ///     <c>enc:v1</c> string lands here.
     /// </summary>
     UnknownKeyId = 5
 }
@@ -357,7 +365,10 @@ public sealed record SecretSweepClearedValue(
 ///     a record array element is addressed by its record key, e.g. <c>overrides[path=apiToken].secretValue</c>,
 ///     or by index when the record declares no key
 /// </param>
-/// <param name="KeyId">The key id of the envelope</param>
+/// <param name="KeyId">
+///     The key id of the envelope; <see cref="SecretValueStates.LegacyV1KeyId" /> (<c>"enc:v1"</c>) for a legacy
+///     <c>enc:v1</c> string on a host without the legacy key
+/// </param>
 public sealed record SecretSweepUnreadableValue(
     string CkTypeId,
     OctoObjectId RtId,

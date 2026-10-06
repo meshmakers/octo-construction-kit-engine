@@ -89,14 +89,14 @@ internal sealed class SecretTestModel
     public CkRecordGraph Settings { get; }
 
     public static SecretAttributeProtector CreateProtector(bool configured = true, string activeKeyId = "k1",
-        bool strictMode = false)
+        bool strictMode = false, bool legacyV1Key = true)
     {
         var options = configured
             ? new SecretEncryptionOptions
             {
                 Keys = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["k1"] = K1, ["k2"] = K2 },
                 ActiveKeyId = activeKeyId,
-                LegacyV1Key = V1Key,
+                LegacyV1Key = legacyV1Key ? V1Key : null,
                 StrictMode = strictMode
             }
             : new SecretEncryptionOptions { StrictMode = strictMode };

@@ -13,7 +13,7 @@ namespace Meshmakers.Octo.Runtime.Engine.Secrets;
 /// <summary>
 ///     Implementation of <see cref="ISecretInventoryService" /> (AB#5532) over <see cref="SecretEntityScanner" />,
 ///     the scan the secret sweep uses. Read-only; classifies values with
-///     <see cref="SecretValueStates.Describe" /> and the key ring of <see cref="ISecretAttributeProtector" />.
+///     <see cref="SecretValueStates.Describe(RtSecretValue?, Func{string?, bool}?, bool)" /> and the key ring of <see cref="ISecretAttributeProtector" />.
 ///     Never decrypts, never returns or logs a value.
 /// </summary>
 internal sealed class SecretInventoryService(
@@ -218,9 +218,9 @@ internal sealed class SecretInventoryService(
         var info = value switch
         {
             null => new SecretReadInfo(SecretValueState.NotSet, SecretStorageForm.NotSet, null, null),
-            RtSecretValue secret => SecretValueStates.Describe(secret, protector.IsKnownKeyId),
+            RtSecretValue secret => SecretValueStates.Describe(secret, protector.IsKnownKeyId, protector.IsLegacyV1KeyConfigured),
             // A plain string in a Secret slot is a legacy stored value.
-            string text => SecretValueStates.Describe(RtSecretValue.LegacyPlaintext(text), protector.IsKnownKeyId),
+            string text => SecretValueStates.Describe(RtSecretValue.LegacyPlaintext(text), protector.IsKnownKeyId, protector.IsLegacyV1KeyConfigured),
             // Not a value a Secret slot can hold.
             _ => new SecretReadInfo(SecretValueState.NotSet, SecretStorageForm.Corrupt, null, null)
         };

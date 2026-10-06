@@ -134,7 +134,9 @@ public class SecretMaintenanceServiceTests
             Assert.DoesNotContain(plaintext, json);
         }
 
-        Assert.DoesNotContain("enc:v", json);
+        // No envelope (prefix with its separator); the key id "enc:v1" of SecretValueStates.LegacyV1KeyId is allowed.
+        Assert.DoesNotContain("enc:v1:", json);
+        Assert.DoesNotContain("enc:v2:", json);
     }
 
     [Fact]
@@ -180,7 +182,53 @@ public class SecretMaintenanceServiceTests
             .SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Verify, TestContext.Current.CancellationToken);
 
         Assert.Equal(11, result.Totals.Total);
-        Assert.Equal(4, result.Totals.UnknownKeyId); // without a key ring every key id is unknown
+        // AB#5532: key-free classification - without a key ring every key id is unknown and the enc:v1
+        // string (no legacy key) is key-missing too; clear text stays clear text.
+        Assert.Equal(5, result.Totals.UnknownKeyId);
+        Assert.Equal(1, result.Totals.UnknownKeyIdByKeyId[SecretValueStates.LegacyV1KeyId]);
+        Assert.Equal(0, result.Totals.EncV1);
+        Assert.Equal(0, result.Totals.EncV2);
+        Assert.Equal(3, result.Totals.Plaintext);
+        Assert.Equal(0, result.Totals.Failed);
+        Assert.True(result.Success);
+        Assert.Equal(5, result.Unreadable.Count);
+        Assert.Contains(result.Unreadable, u => u.RtId == _e1.RtId && u.AttributePath == "apiKey" && u.KeyId == "k1");
+        Assert.Contains(result.Unreadable, u => u.RtId == _e3.RtId && u.AttributePath == "password" && u.KeyId == "k2");
+        Assert.Contains(result.Unreadable,
+            u => u.RtId == _e2.RtId && u.AttributePath == "apiKey" && u.KeyId == SecretValueStates.LegacyV1KeyId);
+        Assert.Equal(0, result.ValuesRewritten);
+        Assert.Empty(result.Cleared);
+        Assert.Empty(_rewrites);
+        AssertResultCarriesNoValue(result);
+    }
+
+    [Fact]
+    public async Task Verify_WithoutLegacyKey_ListsEncV1AsUnreadable()
+    {
+        var result = await CreateService(SecretTestModel.CreateProtector(legacyV1Key: false))
+            .SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Verify, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.Totals.EncV1);
+        Assert.Equal(2, result.Totals.EncV2);
+        Assert.Equal(3, result.Totals.UnknownKeyId);
+        Assert.Equal(1, result.Totals.UnknownKeyIdByKeyId[SecretValueStates.LegacyV1KeyId]);
+        Assert.Single(result.Unreadable, u => u.KeyId == SecretValueStates.LegacyV1KeyId);
+        Assert.Empty(_rewrites);
+    }
+
+    [Fact]
+    public async Task Encrypt_WithoutLegacyKey_KeepsEncV1_AndListsItForReEntry()
+    {
+        var result = await CreateService(SecretTestModel.CreateProtector(legacyV1Key: false))
+            .SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.Encrypt, TestContext.Current.CancellationToken);
+
+        // Not a failure: the enc:v1 value is kept (readable once the legacy key is configured).
+        Assert.Equal(0, result.Totals.Failed);
+        Assert.Equal(SecretTestModel.V1Vector, _e2.Attributes["ApiKey"]);
+        Assert.DoesNotContain(_rewrites, r => r.RtId == _e2.RtId && r.Attribute == "ApiKey");
+        Assert.Contains(result.Unreadable,
+            u => u.RtId == _e2.RtId && u.AttributePath == "apiKey" && u.KeyId == SecretValueStates.LegacyV1KeyId);
+        Assert.Empty(result.Cleared);
     }
 
     [Theory]

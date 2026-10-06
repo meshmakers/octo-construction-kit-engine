@@ -55,6 +55,16 @@ public interface ISecretAttributeProtector
     bool IsStrictMode => false;
 
     /// <summary>
+    ///     True when the legacy <c>enc:v1</c> key (configuration <c>SecretEncryption:LegacyV1Key</c>) is
+    ///     configured, i.e. a legacy <c>enc:v1</c> string can be decrypted. Without it such a value is
+    ///     classified like a protected value with an unknown key id (<see cref="SecretValueState.KeyMissing" />,
+    ///     key id <see cref="SecretValueStates.LegacyV1KeyId" />) by <see cref="GetReadState" />,
+    ///     <see cref="DescribeSecret" />, the secrets overview and the sweep (AB#5532: a key-free Verify lists it
+    ///     as a re-entry task). Implementations without that knowledge return <c>true</c> (the value counts as set).
+    /// </summary>
+    bool IsLegacyV1KeyConfigured => true;
+
+    /// <summary>
     ///     True when <paramref name="keyId" /> names a key of the key ring (case-insensitive), i.e. an
     ///     <c>enc:v2</c> envelope with this key id can be decrypted. The sweep (AB#5532) classifies
     ///     values with an unknown key id (decision 5: restored from another environment) with it.
@@ -111,8 +121,9 @@ public interface ISecretAttributeProtector
     ///     APIs map it to <c>isSet = (state == Set)</c> and <c>keyMissing = (state == KeyMissing)</c>.
     /// </summary>
     /// <remarks>
-    ///     The default implementation is <see cref="SecretValueStates.GetReadState(RtSecretValue?, Func{string?, bool}?)" />
-    ///     with <see cref="IsKnownKeyId" />; the engine implementation additionally logs a warning and counts
+    ///     The default implementation is <see cref="SecretValueStates.GetReadState(RtSecretValue?, Func{string?, bool}?, bool)" />
+    ///     with <see cref="IsKnownKeyId" /> and <see cref="IsLegacyV1KeyConfigured" /> (a legacy <c>enc:v1</c> string
+    ///     without the legacy key is <see cref="SecretValueState.KeyMissing" />); the engine implementation additionally logs a warning and counts
     ///     (<c>octo.secrets.unreadable</c>, <c>reason=corrupt</c>) a corrupt value - never the value.
     /// </remarks>
     /// <param name="value">The stored value; <c>null</c> = not set</param>
@@ -120,7 +131,7 @@ public interface ISecretAttributeProtector
     /// <returns>The read state</returns>
     SecretValueState GetReadState(RtSecretValue? value, SecretAccessContext? context = null)
     {
-        return SecretValueStates.GetReadState(value, IsKnownKeyId);
+        return SecretValueStates.GetReadState(value, IsKnownKeyId, IsLegacyV1KeyConfigured);
     }
 
     /// <summary>
@@ -133,7 +144,7 @@ public interface ISecretAttributeProtector
     /// <returns>The description</returns>
     SecretReadInfo DescribeSecret(RtSecretValue? value, SecretAccessContext? context = null)
     {
-        return SecretValueStates.Describe(value, IsKnownKeyId);
+        return SecretValueStates.Describe(value, IsKnownKeyId, IsLegacyV1KeyConfigured);
     }
 
     /// <summary>

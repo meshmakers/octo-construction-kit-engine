@@ -518,7 +518,11 @@ internal sealed class SecretMaintenanceService(
         {
             if (info.Version == 1)
             {
-                return (SecretValueForm.EncV1, null, raw);
+                // AB#5532: without the legacy key an enc:v1 string cannot be read on this host - it is
+                // classified like an unknown key id (kept, listed as a re-entry task, key id "enc:v1").
+                return protector.IsLegacyV1KeyConfigured
+                    ? (SecretValueForm.EncV1, null, raw)
+                    : (SecretValueForm.UnknownKeyId, SecretValueStates.LegacyV1KeyId, raw);
             }
 
             return (protector.IsKnownKeyId(info.KeyId) ? SecretValueForm.EncV2 : SecretValueForm.UnknownKeyId,

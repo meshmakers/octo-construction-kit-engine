@@ -191,6 +191,12 @@ public class SecretInventoryServiceTests
 
         Assert.Equal(SecretStorageForm.KeyMissing,
             Assert.Single(page.Items, i => i.AttributePath == "credentials[key=prod].value").Form);
+        // AB#5532: an enc:v1 string without the legacy key is key-missing as well, with the documented key id.
+        var primary = Assert.Single(page.Items, i => i.AttributePath == "primary.value");
+        Assert.Equal((SecretStorageForm.KeyMissing, SecretValueStates.LegacyV1KeyId, true),
+            (primary.Form, primary.KeyId, primary.NeedsReEntry));
+        Assert.Equal(SecretStorageForm.Plaintext,
+            Assert.Single(page.Items, i => i.RtId == _config.RtId && i.AttributePath == "password").Form);
     }
 
     [Fact]

@@ -232,7 +232,7 @@ PR titles use the WP id; body bullets are proposals.
 | mesh-deployment (18b) | `AB#5562 New: Bot artifact storage values for all clusters` | test-2 Hetzner S3, staging-1/prod-2 Azure Blob, prod-1 Exoscale SOS · **merge per cluster only after its Secret exists** (otherwise the bot pod does not start) |
 | infrastructure | `AB#5562 New: Artifact storage buckets and bot credential distribution` | per-cluster bucket/account + lifecycle backstop · runbooks keep keys off process args · opt-in `octo_artifacts_enabled` (default false) |
 
-## 7. Cleanup proposals (proposals only — no history was rewritten)
+## 7. Cleanup proposals (applied 2026-10-06 for sdk, comm-sdk, asset-repo, identity, engine, mesh-adapter, operator — see §13.1)
 
 | Repo | Commits | Proposal |
 |---|---|---|
@@ -367,3 +367,602 @@ State: main has System.UI **2.6.0** (published, pins System-2.4.0). `feat/gerald
 - Then rebase `feat/gerald/studio-rebuild` onto it: its tip version 2.8.0 stays valid (MINOR over 2.7.0, EntityForm/display attributes are additive); the intermediate "2.7.0" commit message becomes historical (never published). Raise the floor on the branch to `System-[2.5,3.0)` too.
 - Why not inside 2.8.0: it would couple the fleet-wide System cascade to the readiness of the Studio rebuild (EntityForms, cockpit blueprints, frontend), and Stage B cannot ship until that branch is reviewed; a failed or late Studio PR would leave System.UI `ResolveFailed` fleet-wide. The separate re-pin is a one-line change with no schema risk.
 - Local note: the shared `main/.octo/local-catalog` already holds the studio branch's 2.7.0/2.8.0 (pinning System-2.5.0); a main-lineage 2.7.0 re-pin would collide locally with the studio 2.7.0 entry — build it with an isolated `OctoLocalCatalogRootPath` as done for the other re-pins.
+
+## 13. Push checklist
+
+> State 2026-10-06 after the local history cleanup (backups `backup/<branch>-pre-cleanup` in each rewritten repo, see §13.1). Nothing pushed, no PR opened. SHAs in §1–§12 are pre-cleanup where a repo was rewritten. "Ahead" = commits ahead of the PR base after `git fetch`. Remote branch name = local branch name in every row. Engine row: the tip is the commit that adds this section (HEAD of the branch); its code/doc content before this section is `024369b7`.
+
+| # | Repo | Remote (fetch) | Local → remote branch | Tip | Ahead of base | PR base | Train |
+|---|---|---|---|---|---|---|---|
+| 16a | octo-helm-core | `git@github.com:meshmakers/octo-helm-core.git` | `feat/gerald/secret-key-ring` → `feat/gerald/secret-key-ring` | `fefebc6` | 1 | `main` | A |
+| 17 | octo-communication-operator | `git@github.com:meshmakers/octo-communication-operator.git` | `feat/gerald/secret-key-ring` → `feat/gerald/secret-key-ring` | `9a279c8` | 2 | `main` | A |
+| 18a | octo-mesh-deployment | `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/octo-mesh-deployment` | `feat/gerald/secret-key-ring` → `feat/gerald/secret-key-ring` | `294f6b3` | 1 (behind main 1) | `main` | A |
+| 15 | octo-helm-pro | `git@github.com:meshmakers/octo-helm-pro.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `ef37529` | 1 | `main` | A |
+| 6a | octo-mesh-adapter | `https://github.com/meshmakers/octo-mesh-adapter.git` | `feat/gerald/secret-key-ring` → `feat/gerald/secret-key-ring` | `511f415` | 2 | `main` | A |
+| 16b | octo-helm-core | `git@github.com:meshmakers/octo-helm-core.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `7eca5c9` | 1 | `feat/gerald/secret-key-ring` | A |
+| 19 | meshmakers-infrastructure | `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/meshmakers-infrastructure` | `feat/gerald/artifact-storage` → `feat/gerald/artifact-storage` | `4c18705` | 7 | `main` | A |
+| 1 | octo-construction-kit-engine | `git@github.com:meshmakers/octo-construction-kit-engine.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `HEAD (see note)` | 35 | `main` | N |
+| 2 | octo-sdk | `git@github.com:meshmakers/octo-sdk.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `62d6af7` | 19 | `main` | N |
+| 3 | octo-construction-kit-engine-mongodb | `git@github.com:meshmakers/octo-construction-kit-engine-mongodb.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `00f7dea` | 8 | `main` | N |
+| 4 | octo-common-services | `git@github.com:meshmakers/octo-common-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `1d7abe7` | 3 | `main` | N |
+| 24 | octo-common-services | `git@github.com:meshmakers/octo-common-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `4b16dd3` | 2 | `main` | N |
+| 5 | octo-communication-sdk | `https://github.com/meshmakers/octo-communication-sdk.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `f9ef0ab` | 9 | `main` | N |
+| 20 | octo-bot-services | `git@github.com:meshmakers/octo-bot-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `e5457f3` | 2 | `main` | N |
+| 21 | octo-communication-controller-services | `git@github.com:meshmakers/octo-communication-controller-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `1b819a7` | 2 | `main` | N |
+| 23 | octo-ai-services | `git@github.com:meshmakers/octo-ai-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `0576959` | 2 | `main` | N |
+| 22 | octo-identity-services | `git@github.com:meshmakers/octo-identity-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `e26c87b` | 2 | `main` | N |
+| 25 | octo-report-services | `git@github.com:meshmakers/octo-report-services.git` | `feat/gerald/system-2.5-repin` → `feat/gerald/system-2.5-repin` | `dcece8e` | 2 | `main` | N |
+| 6b | octo-mesh-adapter | `https://github.com/meshmakers/octo-mesh-adapter.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `7c92bf8` | 9 | `feat/gerald/secret-key-ring` | N |
+| 7 | octo-bot-services | `git@github.com:meshmakers/octo-bot-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `73e610e` | 17 | `main` | N |
+| 9 | octo-asset-repo-services | `git@github.com:meshmakers/octo-asset-repo-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `30cc91e` | 9 | `main` | N |
+| 12 | octo-mcp-service | `git@github.com:meshmakers/octo-mcp-service.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `2ffad1a` | 7 | `main` | N |
+| 13 | octo-cli | `git@github.com:meshmakers/octo-cli.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `242fe9f` | 5 | `main` | N |
+| 14 | octo-documentation | `git@github.com:meshmakers/octo-documentation.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `f7205bcb` | 8 | `main` | N |
+| 18b | octo-mesh-deployment | `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/octo-mesh-deployment` | `feat/gerald/artifact-storage` → `feat/gerald/artifact-storage` | `71ab58b` | 4 (behind main 1) | `feat/gerald/secret-key-ring` | N+1 |
+| 8 | octo-communication-controller-services | `git@github.com:meshmakers/octo-communication-controller-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `ec53210` | 14 | `main` | N+2 |
+| 10 | octo-identity-services | `git@github.com:meshmakers/octo-identity-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `1470177` | 10 | `main` | N+2 |
+| 11 | octo-ai-services | `git@github.com:meshmakers/octo-ai-services.git` | `feat/gerald/secret-attribute-type` → `feat/gerald/secret-attribute-type` | `c74dad7` | 7 | `main` | N+2 |
+
+Push order = train order (Stage A → Train N → N+1 → N+2); within Train N follow §9.2 (B1 … B10). Stacked PRs (6b, 16b, 18b) are opened against `feat/gerald/secret-key-ring` and retargeted to `main` once the key-ring PR is merged with a merge commit. The Train N+2 branches are pushed only when phase 3 starts and after rebasing onto their re-pin (§9.2 note).
+
+### 13.16a octo-helm-core · `feat/gerald/secret-key-ring` (Stage A)
+
+- Remote: `git@github.com:meshmakers/octo-helm-core.git`  ·  push: `git push -u origin feat/gerald/secret-key-ring`
+- Tip: `fefebc6`  ·  ahead of `main`: 1
+- PR title: `AB#5536 New: Deliver the SECRET attribute key ring to every engine host`
+- PR base: `main`
+
+```markdown
+## Summary
+- Derives the key ring from the existing instance secret (`k1` + legacy v1 key) for every engine host chart
+- Optional rotation override, validated at render time
+- Operator chart 0.11.0: `clusterSecrets.instanceSecretKey`
+- Old engines ignore the new env, so the PR is inert until the engines ship
+
+## Tests
+- Helm render checked locally (`helm template` with and without the key ring); no .NET code.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.17 octo-communication-operator · `feat/gerald/secret-key-ring` (Stage A)
+
+- Remote: `git@github.com:meshmakers/octo-communication-operator.git`  ·  push: `git push -u origin feat/gerald/secret-key-ring`
+- Tip: `9a279c8`  ·  ahead of `main`: 2
+- PR title: `AB#5536 New: Inject the SECRET attribute key ring into opted-in workloads`
+- PR base: `main`
+
+```markdown
+## Summary
+- `ClusterSecrets.SecretEncryptionKeys` / `SecretEncryptionActiveKeyId` / `SecretEncryptionLegacyV1Key`
+- Same `ReceivesClusterSecrets` gate as the data-store credentials; keys secret-flagged, emitted in ordinal kid order
+- Notes live in the README (CLAUDE.md unchanged versus main)
+- Merge after helm-core 16a (chart 0.11.0 wires the values)
+
+## Tests
+- After the cleanup: Invoke-BuildAll 38/38 green, CommunicationOperator.Tests 235/235.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.18a octo-mesh-deployment · `feat/gerald/secret-key-ring` (Stage A)
+
+- Remote: `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/octo-mesh-deployment`  ·  push: `git push -u origin feat/gerald/secret-key-ring`
+- Tip: `294f6b3`  ·  ahead of `main`: 1 (behind main 1)
+- PR title: `AB#5536 New: Instance secret as SECRET key k1 for the operator`
+- PR base: `main`
+
+```markdown
+## Summary
+- Wires `VAULT_instance_secret_key` into the operator values with an unresolved-macro guard
+- VAULT-SETUP doc: never rotate an existing `instance_secret_key`, back it up in Keeper
+- Merge after helm-core 16a and operator 17 are released
+- Branch is 1 behind main (`ff82235` release manifest); trial rebase was clean, merge with a merge commit
+
+## Tests
+- No build (deployment values); trial rebase onto main clean.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.15 octo-helm-pro · `feat/gerald/secret-attribute-type` (Stage A)
+
+- Remote: `git@github.com:meshmakers/octo-helm-pro.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `ef37529`  ·  ahead of `main`: 1
+- PR title: `AB#5536 New: Secret encryption key ring env for reporting, MCP and AI charts`
+- PR base: `main`
+
+```markdown
+## Summary
+- Key ring env derived from `communicationInstanceSecretKey`
+- Nothing rendered when the value is unset
+- Chart bumps: reporting 0.3.0, mcp 0.2.0, ai 0.24.0
+
+## Tests
+- Helm render checked locally (unset value renders byte-identical); no .NET code.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.6a octo-mesh-adapter · `feat/gerald/secret-key-ring` (Stage A)
+
+- Remote: `https://github.com/meshmakers/octo-mesh-adapter.git`  ·  push: `git push -u origin feat/gerald/secret-key-ring`
+- Tip: `511f415`  ·  ahead of `main`: 2
+- PR title: `AB#5536 New: SECRET attribute key ring in the mesh adapter chart`
+- PR base: `main`
+
+```markdown
+## Summary
+- Renders `OCTO_SECRETENCRYPTION__KEYS__<kid>`, `__ACTIVEKEYID`, `__LEGACYV1KEY` only when set
+- Keys accept the operator's `valueFrom` maps or plaintext; active key id defaults to the only key
+- Chart notes moved from CLAUDE.md to the README (CLAUDE.md unchanged versus main)
+- Merge with a merge commit or rebase-merge (6b is stacked on it), not squash
+
+## Tests
+- Chart-only change; DebugL build green in Invoke-BuildAll (38/38) after the cleanup; MeshAdapter.Sdk.Tests 2005/2005 re-run on the cleaned branch.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.16b octo-helm-core · `feat/gerald/secret-attribute-type` (Stage A)
+
+- Remote: `git@github.com:meshmakers/octo-helm-core.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `7eca5c9`  ·  ahead of `feat/gerald/secret-key-ring`: 1
+- PR title: `AB#5560 New: Bot persistence and artifact storage values`
+- PR base: `feat/gerald/secret-key-ring`
+
+```markdown
+## Summary
+- Bot PVC, scratch volume, `artifactStorage` and serviceAccount/workload identity values
+- All off by default, byte-identical renders
+- Stacked on 16a: open against `feat/gerald/secret-key-ring`, retarget to main after 16a merges
+
+## Tests
+- Helm render checked locally (defaults byte-identical).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.19 meshmakers-infrastructure · `feat/gerald/artifact-storage` (Stage A)
+
+- Remote: `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/meshmakers-infrastructure`  ·  push: `git push -u origin feat/gerald/artifact-storage`
+- Tip: `4c18705`  ·  ahead of `main`: 7
+- PR title: `AB#5562 New: Artifact storage buckets and bot credential distribution`
+- PR base: `main`
+
+```markdown
+## Summary
+- Per-cluster bucket/storage account + lifecycle backstop (test-2 Hetzner, staging-1/prod-2 Azure, prod-1 Exoscale SOS)
+- Runbooks keep keys off process arguments (stdin JSON into Vault)
+- Opt-in `octo_artifacts_enabled` (default false): merge is inert, apply is a human step
+
+## Tests
+- No build (Terraform/Ansible); not applied anywhere.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.1 octo-construction-kit-engine · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-construction-kit-engine.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `HEAD (see note)`  ·  ahead of `main`: 35
+- PR title: `AB#5531 New: SECRET attribute value type in the engine (System 2.5.0)`
+- PR base: `main`
+
+```markdown
+## Summary
+- SECRET value type, schema, `RtSecretValue`, protector + key ring (`enc:v2:<kid>`), compiler/SemVer rules
+- Write path, record carry-over, clear, sweep service (Encrypt/Reprotect/CleanupUnreadable), strict mode off by default
+- Set-at timestamp, secret inventory service, OCTOENC1 streaming file protector for pre-sweep dumps
+- System 2.5.0 + System.StreamData 1.17.0: **starts the System cascade**, merge only as Train N batch (B1)
+- Concept, rollout progress, frontend handover and wave-1 plan docs (one commit per doc chain)
+
+## Tests
+- Last local DebugL run: Runtime 1435, CK.Engine 925, Compiler 11+6, Blueprint 32, SystemTests 54+9 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.2 octo-sdk · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-sdk.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `62d6af7`  ·  ahead of `main`: 19
+- PR title: `AB#5534 New: SECRET attribute value type support in the SDK`
+- PR base: `main`
+
+```markdown
+## Summary
+- Mapper, `ClearSecretAttributes`, generator; JSON converters delegate to the engine wire format
+- `InstanceSecretCrypto` decrypts enc:v1 only
+- Bot client: sweeps, runs, restore-dump, environment status
+- `ClientSecretIsSet`, `SecretManagement` role, redacted debug paths
+
+## Tests
+- Last local DebugL run: 462 tests green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.3 octo-construction-kit-engine-mongodb · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-construction-kit-engine-mongodb.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `00f7dea`  ·  ahead of `main`: 8
+- PR title: `AB#5533 New: Store, query-guard and index-guard SECRET attributes in MongoDB`
+- PR base: `main`
+
+```markdown
+## Summary
+- BSON sub-document with set-at timestamp
+- Query/index refusals, diagnostics and log redaction
+- Legacy plaintext normalised on reads; conditional rewrite incl. derived types in the root collection
+
+## Tests
+- Last local DebugL run: 925 unit + 518 integration green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.4 octo-common-services · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-common-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `1d7abe7`  ·  ahead of `main`: 3
+- PR title: `AB#5561 New: Artifact storage abstraction and secrets meter`
+- PR base: `main`
+
+```markdown
+## Summary
+- FileSystem / S3 / Azure Blob artifact storage providers
+- `Meshmakers.Octo.Secrets` meter registered in observability
+- No behaviour change unless configured
+
+## Tests
+- DebugL build green in Invoke-BuildAll; per-suite counts not recorded in the progress doc.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.24 octo-common-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-common-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `4b16dd3`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Notification 2.4.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- `System-[2.0,3.0)` → `System-[2.5,3.0)`, System.Notification 2.4.0 (minor, CI version gate)
+- Nothing else changed; blueprints unchanged
+- Merge right after common-services (B2), before communication-sdk
+
+## Tests
+- DebugL green, 192/192 (SystemTests excluded); `octo-ckc ValidateVersion` VALID against the published baseline.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.5 octo-communication-sdk · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `https://github.com/meshmakers/octo-communication-sdk.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `f9ef0ab`  ·  ahead of `main`: 9
+- PR title: `AB#5538 New: Secret-safe pipeline diagnostics`
+- PR base: `main`
+
+```markdown
+## Summary
+- Mask revealed secrets in node errors, snapshots and execution errors
+- Refuse Secret values in type-switch nodes
+- Redacted JSONPaths on debug snapshots, key-missing markers
+- Notes in `docs/secret-values-in-pipelines.md` (no CLAUDE.md change in any commit)
+
+## Tests
+- Last local DebugL run: 1270 + 230 + 5 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.20 octo-bot-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-bot-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `e5457f3`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Bot 3.4.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- `System-[2.0,3.0)` → `System-[2.5,3.0)`, System.Bot 3.4.0 (minor, CI version gate)
+- Must be in PrivateGitHubCatalog before the controller re-pin builds (B3)
+
+## Tests
+- DebugL green, 181/181; ValidateVersion VALID.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.21 octo-communication-controller-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-communication-controller-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `1b819a7`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Communication 3.40.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- System.Communication 3.40.0 pinned to System 2.5.0 and System.Bot 3.4.0
+- Needs System 2.5.0 and System.Bot 3.4.0 in the catalog first (B4)
+- Phase-3 model moves to 3.41.0 (Train N+2)
+
+## Tests
+- DebugL green, unit 1042/1042; integration 56/56 when built against a matching catalog (see §4.2); ValidateVersion VALID.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.23 octo-ai-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-ai-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `0576959`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Ai 3.13.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- System.Ai 3.13.0 pinned to System 2.5.0, System.Communication 3.40.0, System.Bot 3.4.0
+- Needs the Bot and Communication re-pins in the catalog first (B5)
+- Phase-3 model moves to 3.14.0 (Train N+2)
+
+## Tests
+- DebugL green, unit 7/7; integration 214/214 against a matching catalog (see §4.2); ValidateVersion VALID.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.22 octo-identity-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-identity-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `e26c87b`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Identity 2.22.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- System.Identity 2.22.0 pinned to System 2.5.0 (minor, CI version gate)
+- Phase-3 model moves to 2.23.0 (Train N+2)
+
+## Tests
+- DebugL green, unit 550/550 + integration 202 passed / 1 skipped; ValidateVersion VALID.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.25 octo-report-services · `feat/gerald/system-2.5-repin` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-report-services.git`  ·  push: `git push -u origin feat/gerald/system-2.5-repin`
+- Tip: `dcece8e`  ·  ahead of `main`: 2
+- PR title: `AB#5528 Fix: Repin System.Reporting 2.3.0 on System 2.5`
+- PR base: `main`
+
+```markdown
+## Summary
+- System.Reporting 2.3.0 pinned to System 2.5.0 (minor, CI version gate)
+- Nothing else changed
+
+## Tests
+- DebugL green, 4/4; ValidateVersion VALID.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.6b octo-mesh-adapter · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `https://github.com/meshmakers/octo-mesh-adapter.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `7c92bf8`  ·  ahead of `feat/gerald/secret-key-ring`: 9
+- PR title: `AB#5538 New: RevealSecret@1 and SECRET handling in the mesh adapter`
+- PR base: `feat/gerald/secret-key-ring`
+
+```markdown
+## Summary
+- `RevealSecret@1` (refuses the System identity)
+- GetRtEntities/ApplyChanges handle SECRET; strict-mode refusals; unknown key id reads as not set
+- Mail and configuration credentials registered for masking
+- Integration MongoDB image pinned to 8.0.15
+- Stacked on 6a: open against `feat/gerald/secret-key-ring`, retarget to main after 6a merges
+
+## Tests
+- After the cleanup: Invoke-BuildAll 38/38, MeshAdapter.Sdk.Tests 2005/2005; integration 89/89 green in the last recorded run (content unchanged since).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.7 octo-bot-services · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-bot-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `73e610e`  ·  ahead of `main`: 17
+- PR title: `AB#5539 New: Secret sweep job, post-restore handling and artifact store`
+- PR base: `main`
+
+```markdown
+## Summary
+- Sweep jobs serialized per tenant, run history, admin API with platform-role policies
+- Restore without key ring runs a key-free Verify and still lists secrets to re-enter
+- Artifact store for pre-sweep dumps, tenant dumps and restore staging (opt-in); pre-sweep restore job, required key ids
+- Merge after re-pin 20 (B7); rebase onto it if the CI needs System.Bot 3.4.0
+
+## Tests
+- Last local DebugL run: 344 tests green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.9 octo-asset-repo-services · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-asset-repo-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `30cc91e`  ·  ahead of `main`: 9
+- PR title: `AB#5535 New: SECRET attribute value type in the GraphQL API`
+- PR base: `main`
+
+```markdown
+## Summary
+- `OctoSecretState {isSet,keyMissing,setAt}`, `clearSecretAttributes`, query/mutation refusals
+- Admin GraphQL `secrets {inventory, summary, usages}` (AB#5544)
+- Notes in `docs/secret-attributes.md` (no CLAUDE.md change in any commit)
+- Needs a SchemaProvider image rebuild after merge
+
+## Tests
+- Last local DebugL run: unit 263 + integration 471 (1 known locale-dependent failure, pre-existing).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.12 octo-mcp-service · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-mcp-service.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `2ffad1a`  ·  ahead of `main`: 7
+- PR title: `AB#5543 New: Secret-safe MCP tools and secret sweep tools`
+- PR base: `main`
+
+```markdown
+## Summary
+- `set_entity_secrets` / `create_entity_with_secrets` (high risk)
+- Sweep, status, runs, inventory and restore-dump tools
+- Provider client secrets scrubbed from tool output
+
+## Tests
+- Last local DebugL run: 975 tests green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.13 octo-cli · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-cli.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `242fe9f`  ·  ahead of `main`: 5
+- PR title: `AB#5543 New: SecretStatus, ReprotectSecrets and restore-dump commands`
+- PR base: `main`
+
+```markdown
+## Summary
+- Write-only provider secret; `GetIdentityProviders` never prints it
+- CleanupUnreadable, DeleteSecretSweepDump, restore-dump commands
+
+## Tests
+- Last local DebugL run: 45 + 97 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.14 octo-documentation · `feat/gerald/secret-attribute-type` (Train N)
+
+- Remote: `git@github.com:meshmakers/octo-documentation.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `f7205bcb`  ·  ahead of `main`: 8
+- PR title: `AB#5543 New: Documentation for the SECRET value type and the key ring`
+- PR base: `main`
+
+```markdown
+## Summary
+- User and operator guide, key-ring guide, restore flow, metrics
+- Versioning rules (EN + DE)
+- Merge with the release (B10): documents unreleased features
+
+## Tests
+- English site build green; German build has a pre-existing duplicate-label failure.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.18b octo-mesh-deployment · `feat/gerald/artifact-storage` (Train N+1)
+
+- Remote: `git@ssh.dev.azure.com:v3/meshmakers/OctoMesh/octo-mesh-deployment`  ·  push: `git push -u origin feat/gerald/artifact-storage`
+- Tip: `71ab58b`  ·  ahead of `feat/gerald/secret-key-ring`: 4 (behind main 1)
+- PR title: `AB#5562 New: Bot artifact storage values for all clusters`
+- PR base: `feat/gerald/secret-key-ring`
+
+```markdown
+## Summary
+- test-2 Hetzner S3, staging-1/prod-2 Azure Blob, prod-1 Exoscale SOS values
+- **Merge per cluster only after its `octo-artifact-storage` Secret exists** (otherwise the bot pod does not start)
+- Stacked on 18a: open against `feat/gerald/secret-key-ring`, retarget to main after 18a merges
+- Branch is 1 behind main (`ff82235`); trial rebase was clean
+
+## Tests
+- No build (deployment values).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.8 octo-communication-controller-services · `feat/gerald/secret-attribute-type` (Train N+2)
+
+- Remote: `git@github.com:meshmakers/octo-communication-controller-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `ec53210`  ·  ahead of `main`: 14
+- PR title: `AB#5537 New: Reveal and protect secrets in the communication controller (System.Communication 3.41.0)`
+- PR base: `main`
+
+```markdown
+## Summary
+- Reveal for adapter configuration; decryption oracle closed; secrets keyed by Path
+- System.Communication 3.41.0 credential attributes, `ValueOverride.SecretValue`
+- Deploys refused when a service-account secret is unreadable; redacted debug paths
+- Contains AB#5583 (`fda4ef7`, `4fc499d`, `FoldedBefore`), coupled to 3.41.0, see §7
+- Rebase onto re-pin 21 before opening; model version must stay above 3.40.0
+
+## Tests
+- Last local DebugL run: unit 1138 + integration 59 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.10 octo-identity-services · `feat/gerald/secret-attribute-type` (Train N+2)
+
+- Remote: `git@github.com:meshmakers/octo-identity-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `1470177`  ·  ahead of `main`: 10
+- PR title: `AB#5540 New: Identity-provider ClientSecret as SECRET (System.Identity 2.23.0)`
+- PR base: `main`
+
+```markdown
+## Summary
+- ClientSecret as Secret; `clientSecretIsSet/KeyMissing/SetAt`
+- Providers with unreadable secrets skipped; 503 `SecretEncryptionNotConfigured`
+- `SecretManagement` role + Bootstrap 1.4.0 + one-time grant (AB#5544)
+- Rebase onto re-pin 22 before opening
+
+## Tests
+- Last local DebugL run: 19 + 266 + 327 + 209 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.11 octo-ai-services · `feat/gerald/secret-attribute-type` (Train N+2)
+
+- Remote: `git@github.com:meshmakers/octo-ai-services.git`  ·  push: `git push -u origin feat/gerald/secret-attribute-type`
+- Tip: `c74dad7`  ·  ahead of `main`: 7
+- PR title: `AB#5541 New: AI model secrets as SECRET value type (System.Ai 3.14.0)`
+- PR base: `main`
+
+```markdown
+## Summary
+- AI secrets read through `RevealOrNull`
+- enc:v2 text in legacy slots is never unwrapped
+- Masked credential tails
+- Rebase onto re-pin 23 before opening
+
+## Tests
+- Last local DebugL run: unit 7 + integration 242 green.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
+### 13.1 Local history cleanup record (2026-10-06)
+
+Backups: `backup/<branch>-pre-cleanup` in the same repo (e.g. `backup/feat/gerald/secret-attribute-type-pre-cleanup`). Check after every rewrite: `git diff <backup> <new tip>` is empty, except the two intended CLAUDE.md → README moves.
+
+| Repo · branch | Old tip → new tip | What changed | Content diff vs backup |
+|---|---|---|---|
+| octo-communication-operator · secret-key-ring (17) | `bd14682` → `9a279c8` | **added** `AB#5536 Fix: Move notes from CLAUDE.md to docs` (no rewrite) | README +2 lines, CLAUDE.md back to main |
+| octo-mesh-adapter · secret-key-ring (6a) | `3295807` → `511f415` | **added** `AB#5536 Fix: Move notes from CLAUDE.md to docs` (no rewrite) | README +16 lines, CLAUDE.md back to main |
+| octo-mesh-adapter · secret-attribute-type (6b) | `67205e3` → `7c92bf8` | rebased onto the new 6a tip (9 commits replayed, no conflicts) | only the CLAUDE.md → README move |
+| octo-sdk · secret-attribute-type (2) | `0383660` → `62d6af7` | `23e3da9` + `8fbb226` squashed into `AB#5534 Fix: SDK secret converters delegate to the engine wire format` (every commit builds now) | empty |
+| octo-communication-sdk · secret-attribute-type (5) | `fdb2bf7` → `f9ef0ab` | `a3802ae` folded into `346a2ab` | empty; no commit touches CLAUDE.md |
+| octo-asset-repo-services · secret-attribute-type (9) | `a7ba91a` → `30cc91e` | `6b1c858` folded into `0590d0f` | empty; no commit touches CLAUDE.md |
+| octo-identity-services · secret-attribute-type (10) | `df1c14f` → `1470177` | `b127d86` folded into `3b3e090` | empty; no commit touches CLAUDE.md |
+| octo-construction-kit-engine · secret-attribute-type (1) | `7bd7ebec` → `024369b7` (+ this section) | progress chain (9 commits) → one commit at the position of `f8b9d000`; handover chain (8 commits) → one commit at the position of `f2b15c36`; 49 → 34 commits. Code commits unchanged and in order (code part of every commit has the same patch-id). Five doc hunks were re-resolved because doc commits moved past `02aaa711`, `f9f7b91c`, `f489b4cd` (doc parts only) | empty |
+
+Not rewritten: key-ring branches (helm-core 16a, operator 17 and mesh-adapter 6a only got an added commit, mesh-deployment 18a untouched), helm-core 16b (no CLAUDE.md change, still stacked on 16a), mesh-deployment 18a/18b (1 behind main = `ff82235` release manifest; not rebased because 18a must not be rewritten and 18b is stacked on it; trial rebase was clean, §1), all other branches (no cleanup needed). Verification after the cleanup: `Invoke-BuildAll -configuration DebugL -excludeFrontend $true` 38/38 green, 0 warnings / 0 errors; operator tests 235/235, MeshAdapter.Sdk.Tests 2005/2005 (the only repos whose content changed, docs only).

@@ -90,6 +90,26 @@ public static class SecretDiagnostics
         unit: "{value}",
         description: "Count of Secret attribute values the secret sweep could not process.");
 
+    /// <summary>
+    ///     Incremented for every file encrypted by <see cref="ISecretFileProtector.ProtectAsync" /> (AB#5559),
+    ///     e.g. a pre-sweep dump. Tags: <c>kid</c>, <c>result</c> (<c>ok</c>), <c>tenant</c>, <c>purpose</c>,
+    ///     <c>service</c> (where known). Never carries content.
+    /// </summary>
+    public static readonly Counter<long> FileProtects = Meter.CreateCounter<long>(
+        "octo.secrets.file_protect",
+        unit: "{file}",
+        description: "Count of files encrypted with the secret key ring.");
+
+    /// <summary>
+    ///     Incremented for every decrypt attempt of <see cref="ISecretFileProtector.UnprotectAsync" /> (AB#5559).
+    ///     Tags: <c>result</c> (<c>ok</c>, <c>unknown_key_id</c>, <c>invalid</c>, <c>not_configured</c>),
+    ///     <c>kid</c>, <c>tenant</c>, <c>purpose</c>, <c>service</c> (where known). Never carries content.
+    /// </summary>
+    public static readonly Counter<long> FileUnprotects = Meter.CreateCounter<long>(
+        "octo.secrets.file_unprotect",
+        unit: "{file}",
+        description: "Count of attempts to decrypt files encrypted with the secret key ring.");
+
     private static readonly ConcurrentDictionary<string, IReadOnlyList<Measurement<long>>> LastSweepValues =
         new(StringComparer.Ordinal);
 

@@ -132,7 +132,7 @@ volume-snapshot or backup tooling.
     a last-chunk flag and the header bound as AAD (the standard streaming-AEAD construction; a single
     GCM call cannot cover multi-GB dumps);
   - the data key wrapped with AES-256-GCM under a key-encryption key derived as
-    `HKDF-SHA256(ring[kid], info="octo/dump/v1")`, so a ring key is never used directly for a second
+    `HKDF-SHA256(ring[kid], info="octo-secret-file-v1")`, so a ring key is never used directly for a second
     purpose;
   - the header records magic, version, `kid`, wrapped key and chunk size.
 - The bot already holds the key ring (`ISecretAttributeProtector`, active kid). The header names the
@@ -390,3 +390,66 @@ Vault paths (names only): `secret/meshmakers/test-2/hetzner-s3`, `secret/meshmak
 
 **Q7 (new):** test-2: put the artifact bucket in its own Hetzner project (true key isolation from the DR bucket),
 or accept project-wide keys plus a bucket policy?
+
+## Encrypted dump file format (AB#5559)
+
+Status: implemented in the engine (`Runtime.Contracts.Secrets.ISecretFileProtector`, implementation
+`Runtime.Engine.Secrets.SecretFileProtector`, registered as a singleton by `AddRuntimeEngine()`). It uses the
+same key ring as Secret attributes (`SecretEncryption:Keys` / `ActiveKeyId`); key material never leaves the
+engine. File extension: `.octoenc` (`SecretFileFormat.FileExtension`), e.g. `<tenant>-<utc>-<guid>.presweep.octoenc`.
+
+**API**
+
+| Member | Behaviour |
+| --- | --- |
+| `bool IsConfigured` | An active key exists, so `ProtectAsync` can work. |
+| `Task ProtectAsync(Stream plaintext, Stream output, SecretFileContext? context = null, CancellationToken ct = default)` | Encrypts to the end of `plaintext` with the active kid. Throws `SecretEncryptionNotConfiguredException` without an active key. |
+| `Task UnprotectAsync(Stream input, Stream output, SecretFileContext? context = null, CancellationToken ct = default)` | Decrypts and verifies. Throws `InvalidSecretFileException` (a `CryptographicException`) for a wrong magic or version, a tampered header or chunk, truncation, reordering or trailing data. Throws `UnknownSecretKeyIdException` for an unknown kid and `SecretEncryptionNotConfiguredException` when the ring is empty. |
+| `SecretFileHeader ReadHeader(Stream input)` | Reads the clear-text header without any key: `Version`, `KeyId`, `CreatedAt` (UTC), `ChunkSize`, `HeaderLength`. Leaves the stream after the header. Does not verify integrity. |
+| `bool CanUnprotect(SecretFileHeader header)` | The header's kid is in the ring. |
+
+`SecretFileContext(TenantId, Purpose, Service)` only tags the metrics. Neither stream has to be seekable, and
+neither is disposed. Memory is bounded by the chunk size: one plaintext buffer and one ciphertext buffer per
+call, whatever the file size.
+
+**Layout** (integers big-endian):
+
+| Offset | Size | Field |
+| --- | --- | --- |
+| 0 | 8 | magic `OCTOENC1` (ASCII) |
+| 8 | 1 | format version, `1` |
+| 9 | 1 | kid length `n` (1–32) |
+| 10 | n | kid (ASCII, `[A-Za-z0-9_-]`) |
+| 10+n | 8 | `createdAt`, Unix time in ms (UTC) |
+| 18+n | 4 | chunk size (plaintext bytes per chunk; default 1 MiB, allowed 1 KiB–16 MiB) |
+| 22+n | 12 | base nonce (random) |
+| 34+n | 12 | wrap nonce (random) |
+| 46+n | 32 | wrapped file key |
+| 78+n | 16 | wrap tag |
+| 94+n | … | body: chunks |
+
+- **File key:** 256 random bits per file. It is wrapped with AES-256-GCM under
+  `KEK = HKDF-SHA256(ikm = ring[kid], salt = empty, info = "octo-secret-file-v1", 32 bytes)`, so the ring key
+  is never used directly for a second purpose. The associated data of the wrap is the header from offset 0
+  up to and including the base nonce: changing the kid, time, chunk size or base nonce fails the unwrap.
+- **Chunk i** (i = 0, 1, …): `AES-256-GCM(fileKey, nonce_i, plaintext_i, aad_i)`, stored as ciphertext
+  followed by its 16-byte tag. `nonce_i` = base nonce with its last 8 bytes XOR `i` (uint64). `aad_i` =
+  `SHA-256(entire header)` ‖ `i` (uint64) ‖ final flag (1 byte, `0x01` for the last chunk). Every chunk except
+  the last holds exactly chunk-size bytes. The last chunk always holds fewer (possibly 0, i.e. a bare tag), so
+  a plaintext that is a multiple of the chunk size ends with an empty final chunk.
+- **What is detected:** a changed header byte fails the unwrap or chunk 0. A changed ciphertext or tag byte
+  fails that chunk. Swapped chunks, or a chunk copied from another file, fail through the index and header
+  hash. Truncation inside a chunk turns it into a "final" chunk whose tag fails. Truncation exactly at a chunk
+  boundary leaves a missing final chunk, which is reported. Data after the final chunk is rejected.
+- **Streaming caveat:** `UnprotectAsync` writes each chunk only after it is verified, but earlier chunks are
+  already in `output` when a later one fails. Callers must decrypt into a scratch file or pipe, and discard it
+  (or abort `mongorestore`) when the call throws.
+
+**Metrics** (meter `Meshmakers.Octo.Secrets`): `octo.secrets.file_protect` (tags `kid`, `result=ok`,
+`tenant`, `purpose`, `service`) and `octo.secrets.file_unprotect` (tag `result` = `ok`, `unknown_key_id`,
+`invalid` or `not_configured`, plus the same tags). Logs carry the kid, size, chunk count, tenant and
+purpose, never content or keys.
+
+**Key-id retention:** a kid must stay in the ring until the newest `.octoenc` file encrypted with it has
+expired. Without the key the file cannot be read. `ReadHeader` plus `CanUnprotect` let the bot report
+`DumpKeyMissing` / `KeyIdRetentionViolation` without decrypting anything.

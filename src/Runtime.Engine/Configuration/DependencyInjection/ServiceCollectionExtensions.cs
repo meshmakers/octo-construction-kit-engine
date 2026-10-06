@@ -73,6 +73,8 @@ public static class ServiceCollectionExtensions
                     StringComparer.OrdinalIgnoreCase);
             });
         services.TryAddSingleton<ISecretAttributeProtector, SecretAttributeProtector>();
+        // Streaming file encryption with the same key ring (AB#5559): pre-sweep and tenant dumps (.octoenc).
+        services.TryAddSingleton<ISecretFileProtector, SecretFileProtector>();
         // Secret write step (AB#5532, concept §3.6) used by BulkRtMutation and the paths that bypass it,
         // and the sweep service (verify / encrypt / reprotect / clear unknown kid / emergency decrypt).
         services.TryAddSingleton<ISecretWriteNormalizer, SecretWriteNormalizer>();

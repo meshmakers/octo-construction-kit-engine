@@ -32,7 +32,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
             : Assembly.GetEntryAssembly()?.GetName().Name;
 
     private readonly ILogger<SecretAttributeProtector> _logger;
-    private readonly Lazy<KeyRing> _keyRing;
+    private readonly Lazy<SecretKeyRing> _keyRing;
     private readonly ConcurrentDictionary<string, bool> _plaintextWarnings = new(StringComparer.Ordinal);
     private readonly bool _strictMode;
 
@@ -41,7 +41,7 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         _logger = logger;
         var value = options.Value;
         _strictMode = value.StrictMode;
-        _keyRing = new Lazy<KeyRing>(() => KeyRing.Create(value), LazyThreadSafetyMode.ExecutionAndPublication);
+        _keyRing = new Lazy<SecretKeyRing>(() => SecretKeyRing.Create(value), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
     /// <inheritdoc />
@@ -403,101 +403,5 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         return tags;
-    }
-
-    /// <summary>
-    ///     The parsed key ring. Invalid entries are skipped and reported once in the log-free problem
-    ///     text that accompanies <see cref="SecretEncryptionNotConfiguredException" />; the service keeps
-    ///     running (concept §3.5).
-    /// </summary>
-    private sealed class KeyRing
-    {
-        private KeyRing(Dictionary<string, byte[]> keys, string? activeKeyId, byte[]? activeKey,
-            byte[]? legacyV1Key, IReadOnlyList<string> problems)
-        {
-            Keys = keys;
-            ActiveKeyId = activeKeyId;
-            ActiveKey = activeKey;
-            LegacyV1Key = legacyV1Key;
-            ProblemSuffix = problems.Count == 0 ? string.Empty : " Configuration problems: " + string.Join("; ", problems);
-        }
-
-        public Dictionary<string, byte[]> Keys { get; }
-
-        public string? ActiveKeyId { get; }
-
-        public byte[]? ActiveKey { get; }
-
-        public byte[]? LegacyV1Key { get; }
-
-        public string ProblemSuffix { get; }
-
-        public static KeyRing Create(SecretEncryptionOptions options)
-        {
-            var problems = new List<string>();
-            var keys = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
-            foreach (var (keyId, encodedKey) in options.Keys ?? new Dictionary<string, string>())
-            {
-                if (!SecretEnvelope.IsValidKeyId(keyId))
-                {
-                    problems.Add($"key id '{keyId}' is invalid (1-32 characters of [A-Za-z0-9_-])");
-                    continue;
-                }
-
-                var key = DecodeKey(encodedKey);
-                if (key == null)
-                {
-                    problems.Add($"key '{keyId}' is not a base64-encoded 32-byte key");
-                    continue;
-                }
-
-                keys[keyId] = key;
-            }
-
-            string? activeKeyId = null;
-            byte[]? activeKey = null;
-            if (!string.IsNullOrWhiteSpace(options.ActiveKeyId))
-            {
-                if (keys.TryGetValue(options.ActiveKeyId, out activeKey))
-                {
-                    // The header carries the key id exactly as configured (AB#5536).
-                    activeKeyId = options.ActiveKeyId;
-                }
-                else
-                {
-                    problems.Add($"active key id '{options.ActiveKeyId}' is not in the key ring");
-                }
-            }
-
-            byte[]? legacyKey = null;
-            if (!string.IsNullOrWhiteSpace(options.LegacyV1Key))
-            {
-                legacyKey = DecodeKey(options.LegacyV1Key);
-                if (legacyKey == null)
-                {
-                    problems.Add("LegacyV1Key is not a base64-encoded 32-byte key");
-                }
-            }
-
-            return new KeyRing(keys, activeKeyId, activeKey, legacyKey, problems);
-        }
-
-        private static byte[]? DecodeKey(string? encodedKey)
-        {
-            if (string.IsNullOrWhiteSpace(encodedKey))
-            {
-                return null;
-            }
-
-            try
-            {
-                var key = Convert.FromBase64String(encodedKey.Trim());
-                return key.Length == LegacyInstanceSecretCrypto.KeyLength ? key : null;
-            }
-            catch (FormatException)
-            {
-                return null;
-            }
-        }
     }
 }

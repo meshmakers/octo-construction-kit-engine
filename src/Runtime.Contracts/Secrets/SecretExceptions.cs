@@ -204,3 +204,25 @@ public sealed class SecretValueNotStorableException : InvalidOperationException
     /// </summary>
     public RtSecretValueState State { get; }
 }
+
+/// <summary>
+///     Thrown by <see cref="ISecretFileProtector" /> when a stream is not a valid encrypted secret file:
+///     wrong magic, unsupported version, invalid header, or a body that was tampered with, truncated,
+///     reordered or extended (AB#5559). The message never contains file content.
+/// </summary>
+public class InvalidSecretFileException : CryptographicException
+{
+    /// <summary>
+    ///     Creates a new instance.
+    /// </summary>
+    public InvalidSecretFileException(string message) : base(message)
+    {
+    }
+
+    /// <summary>
+    ///     Creates a new instance with the causing exception.
+    /// </summary>
+    public InvalidSecretFileException(string message, Exception innerException) : base(message, innerException)
+    {
+    }
+}

@@ -167,7 +167,7 @@ type SecretsQuery {
     ckTypeId: String,                 # exact CK type (derived types included)
     forms: [SecretStorageForm!],      # filter by storage form
     needsReEntry: Boolean,            # only re-entry tasks
-    search: String                    # matches rtId, rtWellKnownName, display name, attribute path (never values)
+    search: String                    # matches rtId, ckTypeId (full or short type name), rtWellKnownName, display name, attribute path (never values)
   ): SecretInventoryConnection!
   summary: SecretInventorySummary!
   usages(ckTypeId: String!, rtId: OctoObjectId!, attributePath: String!): [SecretUsage!]!
@@ -188,7 +188,7 @@ type SecretInventoryItem {
   ckTypeId: String!
   rtId: OctoObjectId!
   rtWellKnownName: String
-  displayName: String            # entity display name (display rule), may be null
+  displayName: String            # stored display name → string `Name` attribute → rtWellKnownName; null = show rtId
   attributePath: String!         # camelCase; record members as "endpoints[key=prod].token" / "credentials.token"
   attributeName: String!         # CK attribute name (PascalCase) of the top-level attribute
   required: Boolean!
@@ -215,6 +215,10 @@ type SecretInventorySummary {
 }
 type KeyIdCount { keyId: String!, count: Int! }
 ```
+
+Listing rule: inside records, an optional Secret member that is not set is omitted (nothing to re-enter, e.g. a Helm value override that is a plain value); set, key-missing, corrupt and required-but-missing members are listed, while top-level optional secrets that are not set stay listed (entity-level settings); `summary` counts follow the same rule.
+Search also matches the CK type, case-insensitively: the full `ckTypeId` (e.g. `System.Communication/Application`) or the short type name after the slash (`Application`).
+`displayName` falls back consistently: stored display name → the type's string `Name` attribute → `rtWellKnownName` → null (the UI then shows the rtId).
 
 Re-entry tasks (Q5) are **live**: `inventory(needsReEntry: true)`. A task is done when a new value is set (→ `ENC_V2`) or the secret is explicitly cleared via `clearSecretAttributes` ("Not needed", optional secrets only) or removed by the `CleanupUnreadable` sweep. Works the same in a child tenant after a child-tenant restore. Values are never returned.
 

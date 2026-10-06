@@ -80,10 +80,10 @@ public class SecretInventoryServiceTests
         var page = await ListAsync();
         var configType = _model.Config.CkTypeId.ToRtCkId().ToString();
 
-        Assert.Equal(6, page.TotalCount);
+        Assert.Equal(5, page.TotalCount);
         var byPath = page.Items.Where(i => i.RtId == _config.RtId).ToDictionary(i => i.AttributePath);
-        Assert.Equal(["password", "apiKey", "credentials[key=prod].value", "credentials[key=test].value", "primary.value"],
-            byPath.Keys);
+        // credentials[key=test].value is an optional record member that is not set: omitted.
+        Assert.Equal(["password", "apiKey", "credentials[key=prod].value", "primary.value"], byPath.Keys);
 
         var password = byPath["password"];
         Assert.Equal((SecretStorageForm.Plaintext, false, false, "Password"),
@@ -99,8 +99,6 @@ public class SecretInventoryServiceTests
         var prod = byPath["credentials[key=prod].value"];
         Assert.Equal((SecretStorageForm.EncV2, "k1", Earlier, false, "Credentials"),
             (prod.Form, prod.KeyId, prod.SetAt, prod.NeedsReEntry, prod.AttributeName));
-        Assert.Equal(SecretStorageForm.NotSet, byPath["credentials[key=test].value"].Form);
-        Assert.False(byPath["credentials[key=test].value"].NeedsReEntry); // optional
         Assert.Equal(SecretStorageForm.EncV1, byPath["primary.value"].Form);
         Assert.Null(byPath["primary.value"].SetAt);
 
@@ -150,15 +148,15 @@ public class SecretInventoryServiceTests
         var unknownType = await ListAsync(new SecretInventoryQuery { CkTypeId = "Nope/Missing", Take = 100 });
         Assert.Equal(0, unknownType.TotalCount);
 
-        Assert.Equal(5, (await ListAsync(new SecretInventoryQuery { Search = "MAILBOX", Take = 100 })).TotalCount);
-        Assert.Equal(2, (await ListAsync(new SecretInventoryQuery { Search = "credentials[", Take = 100 })).TotalCount);
+        Assert.Equal(4, (await ListAsync(new SecretInventoryQuery { Search = "MAILBOX", Take = 100 })).TotalCount);
+        Assert.Equal(1, (await ListAsync(new SecretInventoryQuery { Search = "credentials[", Take = 100 })).TotalCount);
         Assert.Equal(1, (await ListAsync(new SecretInventoryQuery { Search = _optional.RtId.ToString(), Take = 100 })).TotalCount);
         // Values are never matched.
         Assert.Equal(0, (await ListAsync(new SecretInventoryQuery { Search = "legacy-clear", Take = 100 })).TotalCount);
 
         var all = await ListAsync();
         var page = await ListAsync(new SecretInventoryQuery { Skip = 2, Take = 3 });
-        Assert.Equal(6, page.TotalCount);
+        Assert.Equal(5, page.TotalCount);
         Assert.Equal(all.Items.Skip(2).Take(3).Select(i => i.AttributePath + i.RtId),
             page.Items.Select(i => i.AttributePath + i.RtId));
     }
@@ -169,8 +167,8 @@ public class SecretInventoryServiceTests
         var summary = await CreateService().SummarizeAsync(SecretTestModel.TenantId,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(6, summary.Total);
-        Assert.Equal(1, summary.NotSet);
+        Assert.Equal(5, summary.Total);
+        Assert.Equal(0, summary.NotSet); // the optional record member that is not set is not counted
         Assert.Equal(1, summary.Plaintext);
         Assert.Equal(1, summary.EncV1);
         Assert.Equal(1, summary.EncV2);
@@ -197,6 +195,97 @@ public class SecretInventoryServiceTests
             (primary.Form, primary.KeyId, primary.NeedsReEntry));
         Assert.Equal(SecretStorageForm.Plaintext,
             Assert.Single(page.Items, i => i.RtId == _config.RtId && i.AttributePath == "password").Form);
+    }
+
+    [Fact]
+    public async Task List_RecordMembers_OptionalNotSetOmitted_OthersListed_TopLevelOptionalNotSetListed()
+    {
+        _config.SetAttributeRawValue("Credentials", new List<RtRecord>
+        {
+            _model.CredentialRecord("unset", null),
+            _model.CredentialRecord("missing", null, includeValue: false),
+            _model.CredentialRecord("lost", RtSecretValue.Protected(UnknownKidEnvelope, Earlier)),
+            _model.CredentialRecord("broken", 42),
+            _model.CredentialRecord("set", _protector.Protect("p"))
+        });
+        var unset = _model.NewOptionalOnly();
+        _store[_model.OptionalOnly.CkTypeId.ToRtCkId().FullName].Add(unset);
+
+        var page = await ListAsync();
+
+        var credentials = page.Items.Where(i => i.AttributeName == "Credentials").ToDictionary(i => i.AttributePath);
+        Assert.Equal(["credentials[key=lost].value", "credentials[key=broken].value", "credentials[key=set].value"],
+            credentials.Keys);
+        Assert.Equal(SecretStorageForm.KeyMissing, credentials["credentials[key=lost].value"].Form);
+        Assert.Equal(SecretStorageForm.Corrupt, credentials["credentials[key=broken].value"].Form);
+        Assert.Equal(SecretStorageForm.EncV2, credentials["credentials[key=set].value"].Form);
+
+        // Top-level optional secret that is not set: an entity-level setting, still listed (not a task).
+        var topLevel = Assert.Single(page.Items, i => i.RtId == unset.RtId);
+        Assert.Equal(("password", SecretStorageForm.NotSet, false, false),
+            (topLevel.AttributePath, topLevel.Form, topLevel.Required, topLevel.NeedsReEntry));
+
+        var summary = await CreateService().SummarizeAsync(SecretTestModel.TenantId,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(page.TotalCount, summary.Total);
+        Assert.Equal(1, summary.NotSet);
+    }
+
+    [Fact]
+    public async Task List_Search_MatchesCkTypeId_FullAndShortName_CaseInsensitive()
+    {
+        var configType = _model.Config.CkTypeId.ToRtCkId().ToString();
+        var optionalType = _model.OptionalOnly.CkTypeId.ToRtCkId().ToString();
+        Assert.Contains('/', configType);
+
+        var full = await ListAsync(new SecretInventoryQuery { Search = configType.ToUpperInvariant(), Take = 100 });
+        Assert.Equal(4, full.TotalCount);
+        Assert.All(full.Items, i => Assert.Equal(_config.RtId, i.RtId));
+
+        var shortName = await ListAsync(new SecretInventoryQuery { Search = "optionalonly", Take = 100 });
+        Assert.Equal(optionalType, Assert.Single(shortName.Items).CkTypeId);
+
+        var partial = await ListAsync(new SecretInventoryQuery { Search = "onfi", Take = 100 });
+        Assert.Equal(4, partial.TotalCount);
+    }
+
+    [Fact]
+    public async Task List_DisplayName_FallsBackToNameAttribute_ThenWellKnownName_ThenNull()
+    {
+        _config.RtDisplayName = null;
+        _config.SetAttributeRawValue("Name", "Mailbox config");
+        _optional.RtWellKnownName = "optional-wk";
+        var bare = _model.NewOptionalOnly();
+        var blankName = _model.NewOptionalOnly();
+        blankName.RtDisplayName = " ";
+        blankName.SetAttributeRawValue("Name", "");
+        var displayed = _model.NewOptionalOnly();
+        displayed.RtDisplayName = "Shown";
+        displayed.RtWellKnownName = "ignored";
+        displayed.SetAttributeRawValue("Name", "ignored too");
+        _store[_model.OptionalOnly.CkTypeId.ToRtCkId().FullName].AddRange([bare, blankName, displayed]);
+
+        var page = await ListAsync();
+
+        Assert.All(page.Items.Where(i => i.RtId == _config.RtId), i => Assert.Equal("Mailbox config", i.DisplayName));
+        Assert.Equal("optional-wk", Assert.Single(page.Items, i => i.RtId == _optional.RtId).DisplayName);
+        Assert.Null(Assert.Single(page.Items, i => i.RtId == bare.RtId).DisplayName);
+        Assert.Null(Assert.Single(page.Items, i => i.RtId == blankName.RtId).DisplayName);
+        Assert.Equal("Shown", Assert.Single(page.Items, i => i.RtId == displayed.RtId).DisplayName);
+
+        // The resolved display name is searchable.
+        Assert.Equal(4, (await ListAsync(new SecretInventoryQuery { Search = "mailbox CONFIG", Take = 100 })).TotalCount);
+    }
+
+    [Fact]
+    public void ResolveDisplayName_IgnoresNonStringNameValue()
+    {
+        var entity = new RtEntity(_model.Config.CkTypeId.ToRtCkId(), OctoObjectId.GenerateNewId());
+        entity.SetAttributeRawValue("Name", 42);
+        Assert.Null(SecretInventoryService.ResolveDisplayName(entity, _model.Config));
+
+        entity.RtWellKnownName = "wk";
+        Assert.Equal("wk", SecretInventoryService.ResolveDisplayName(entity, _model.Config));
     }
 
     [Fact]

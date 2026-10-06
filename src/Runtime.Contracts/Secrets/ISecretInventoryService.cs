@@ -59,8 +59,9 @@ public sealed class SecretInventoryQuery
     public bool? NeedsReEntry { get; init; }
 
     /// <summary>
-    ///     Case-insensitive substring of the rtId, the well-known name, the display name or the attribute path
-    ///     (never matched against values). <c>null</c> or empty = no text filter.
+    ///     Case-insensitive substring of the rtId, the CK type id (full id such as
+    ///     <c>System.Communication/Application</c> or the short type name after the slash), the well-known name,
+    ///     the display name or the attribute path (never matched against values). <c>null</c> or empty = no text filter.
     /// </summary>
     public string? Search { get; init; }
 
@@ -81,7 +82,10 @@ public sealed class SecretInventoryQuery
 /// <param name="CkTypeId">CK type of the entity (runtime id)</param>
 /// <param name="RtId">Runtime id of the entity</param>
 /// <param name="RtWellKnownName">Well-known name of the entity, if any</param>
-/// <param name="DisplayName">Stored display name of the entity (display rule), if any</param>
+/// <param name="DisplayName">
+///     Display name of the entity: the stored display name, else a string <c>Name</c> attribute of the type,
+///     else the well-known name; <c>null</c> otherwise (show the rtId)
+/// </param>
 /// <param name="AttributePath">
 ///     camelCase path of the slot: <c>password</c>; record members <c>endpoints[key=prod].token</c> (record array,
 ///     element addressed by its record key; <c>endpoints[0].token</c> when the record declares no key) and

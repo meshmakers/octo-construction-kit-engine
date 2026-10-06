@@ -23,6 +23,7 @@ internal sealed class SecretInventoryService(
     ISecretWriteNormalizer writeNormalizer) : ISecretInventoryService
 {
     private const int BatchSize = 500;
+    private const string NameAttributeName = "Name";
 
     private readonly SecretEntityScanner _scanner = new(repositoryProvider, ckCacheService, writeNormalizer);
 
@@ -112,7 +113,8 @@ internal sealed class SecretInventoryService(
                         continue;
                     }
 
-                    var context = new EntityContext(tenantId, entityGraph.CkTypeId.ToRtCkId().ToString(), entity);
+                    var context = new EntityContext(tenantId, entityGraph.CkTypeId.ToRtCkId().ToString(), entity,
+                        ResolveDisplayName(entity, entityGraph));
                     foreach (var item in WalkEntity(context, entityGraph))
                     {
                         yield return item;
@@ -201,7 +203,15 @@ internal sealed class SecretInventoryService(
             var memberPath = path + "." + ToCamelCase(member.AttributeName);
             if (member.ValueType == AttributeValueTypesDto.Secret)
             {
-                yield return CreateItem(context, topLevelName, memberPath, !member.IsOptional, memberValue);
+                var item = CreateItem(context, topLevelName, memberPath, !member.IsOptional, memberValue);
+                // An optional record member that is not set is not actionable (nothing to re-enter, e.g. a
+                // Helm value override that is a plain value): omitted. Top-level optional secrets stay listed -
+                // they are entity-level settings (AB#5532).
+                if (item.Form != SecretStorageForm.NotSet || item.Required)
+                {
+                    yield return item;
+                }
+
                 continue;
             }
 
@@ -226,13 +236,38 @@ internal sealed class SecretInventoryService(
         };
 
         return new SecretInventoryItem(context.CkTypeId, context.Entity.RtId, context.Entity.RtWellKnownName,
-            context.Entity.RtDisplayName, path, attributeName, required, info.Form, info.KeyId, info.SetAt,
+            context.DisplayName, path, attributeName, required, info.Form, info.KeyId, info.SetAt,
             SecretInventoryItem.IsReEntryNeeded(info.Form, required));
+    }
+
+    /// <summary>
+    ///     Display name of an entity with a consistent fallback: the stored display name, then a string
+    ///     <c>Name</c> attribute of the type, then the well-known name; null otherwise (callers show the rtId).
+    /// </summary>
+    internal static string? ResolveDisplayName(RtEntity entity, CkTypeGraph entityGraph)
+    {
+        if (!string.IsNullOrWhiteSpace(entity.RtDisplayName))
+        {
+            return entity.RtDisplayName;
+        }
+
+        var nameAttribute = entityGraph.AllAttributes.Values.FirstOrDefault(a =>
+            a.ValueType == AttributeValueTypesDto.String &&
+            string.Equals(a.AttributeName, NameAttributeName, StringComparison.Ordinal));
+        if (nameAttribute != null &&
+            entity.Attributes.TryGetValue(nameAttribute.AttributeName, out var name) &&
+            name is string text && !string.IsNullOrWhiteSpace(text))
+        {
+            return text;
+        }
+
+        return string.IsNullOrWhiteSpace(entity.RtWellKnownName) ? null : entity.RtWellKnownName;
     }
 
     private static bool Matches(SecretInventoryItem item, string search)
     {
         return item.RtId.ToString().Contains(search, StringComparison.OrdinalIgnoreCase) ||
+               item.CkTypeId.Contains(search, StringComparison.OrdinalIgnoreCase) ||
                (item.RtWellKnownName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
                (item.DisplayName?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false) ||
                item.AttributePath.Contains(search, StringComparison.OrdinalIgnoreCase);
@@ -259,5 +294,5 @@ internal sealed class SecretInventoryService(
             : char.ToLowerInvariant(name[0]) + name.Substring(1);
     }
 
-    private sealed record EntityContext(string TenantId, string CkTypeId, RtEntity Entity);
+    private sealed record EntityContext(string TenantId, string CkTypeId, RtEntity Entity, string? DisplayName);
 }

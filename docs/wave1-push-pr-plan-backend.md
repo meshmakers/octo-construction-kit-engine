@@ -17,10 +17,10 @@
 | 6a | octo-mesh-adapter | feat/gerald/secret-key-ring | GitHub meshmakers | 1 / 0 | clean (fast-forward) | skipped | safe now (chart, inert without values) |
 | 6b | octo-mesh-adapter | feat/gerald/secret-attribute-type (contains 6a) | GitHub meshmakers | 9 / 0 | clean (fast-forward) | skipped | System-cascade member (image is deployed to every tenant) |
 | 7 | octo-bot-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 17 / 0 | clean (fast-forward) | skipped | safe after engine/common (artifact store opt-in) |
-| 8 | octo-communication-controller-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 13 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Communication 3.40.0)** |
+| 8 | octo-communication-controller-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 13 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Communication 3.41.0)** |
 | 9 | octo-asset-repo-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 10 / 0 | clean (fast-forward) | skipped | safe after engine; SchemaProvider rebuild |
-| 10 | octo-identity-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 10 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Identity 2.22.0)** |
-| 11 | octo-ai-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 6 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Ai 3.13.0)** |
+| 10 | octo-identity-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 10 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Identity 2.23.0)** |
+| 11 | octo-ai-services | feat/gerald/secret-attribute-type | GitHub meshmakers | 6 / 0 | clean (fast-forward) | skipped | **must wait (phase 3: System.Ai 3.14.0)** |
 | 12 | octo-mcp-service | feat/gerald/secret-attribute-type | GitHub meshmakers | 7 / 0 | clean (fast-forward) | skipped | safe after sdk + bot |
 | 13 | octo-cli | feat/gerald/secret-attribute-type | GitHub meshmakers | 5 / 0 | clean (fast-forward) | skipped | safe after sdk + bot |
 | 14 | octo-documentation | feat/gerald/secret-attribute-type | GitHub meshmakers | 7 / 0 | clean (fast-forward) | skipped | merge with the release (documents unreleased features) |
@@ -72,7 +72,7 @@ Stage B (one coordinated release — System 2.5.0 cascade, see §4; exact order 
   docs (14) with the release
 
 Stage C (phase 3, after key ring is live everywhere + adapter/operator hub Enforce AB#5063/AB#5059 + Studio phase 2 + app model changes):
-  controller (System.Communication 3.40.0) ► identity (System.Identity 2.22.0 + System.Identity.Bootstrap 1.4.0) ► ai (System.Ai 3.13.0)
+  controller (System.Communication 3.41.0) ► identity (System.Identity 2.23.0 + System.Identity.Bootstrap 1.4.0) ► ai (System.Ai 3.14.0)
   ► app models (meshmakers-app, energy-community, one-time-ticket, report-services) with RevealSecret@1 pipelines
 
 Stage D (per cluster): infra apply ► Vault ► k8s Secret octo-artifact-storage ► octo-mesh-deployment artifact-storage values (18b)
@@ -82,10 +82,10 @@ Stage D (per cluster): infra apply ► Vault ► k8s Secret octo-artifact-storag
 |---|---|---|---|---|
 | System | 2.5.0 (modelId-only change, the "engine knows SECRET" marker, decision 12) | engine | — | Stage B |
 | System.StreamData | 1.17.0 (re-pin only; 1.16.0 pinned System 2.4.0 hard) | engine | System-[2.5,3.0) | Stage B |
-| System.Communication | 3.40.0 (Secret credential attributes **+ AB#5583 `FoldedBefore`**) | controller | System-[2.5,3.0), System.Bot-[3.0,4.0) | Stage C |
-| System.Identity | 2.22.0 (IdP ClientSecret → Secret) | identity | System-[2.5,3.0) | Stage C |
+| System.Communication | 3.41.0 (Secret credential attributes **+ AB#5583 `FoldedBefore`**) | controller | System-[2.5,3.0), System.Bot-[3.0,4.0) | Stage C |
+| System.Identity | 2.23.0 (IdP ClientSecret → Secret) | identity | System-[2.5,3.0) | Stage C |
 | System.Identity.Bootstrap | 1.4.0 (role `SecretManagement`) | identity | — | Stage C (or split earlier, §6) |
-| System.Ai | 3.13.0 | ai | System-[2.5,3.0), System.Communication-[3.0,4.0) | Stage C |
+| System.Ai | 3.14.0 | ai | System-[2.5,3.0), System.Communication-[3.0,4.0) | Stage C |
 
 ## 4. The System 2.5.0 gate (lessons from the 2026-10-05 test-2 incident)
 
@@ -105,12 +105,12 @@ Owned service models — prepared locally on `feat/gerald/system-2.5-repin` (wor
 
 | Model | Published (private) pins | Prepared (PATCH, as instructed) | Gate-conformant (§4.4) | Repo / worktree | Commit |
 |---|---|---|---|---|---|
-| System.Bot | 3.3.0 → System-2.4.0 | 3.3.1 | **3.4.0** | octo-bot-services / `main/wt-repin-bot-services` | `64b7d89` |
-| System.Communication | 3.39.0 → System-2.4.0, System.Bot-3.3.0 | 3.39.1 (compiled: System-2.5.0, System.Bot-3.3.1) | **3.40.0** ⇒ phase 3 becomes 3.41.0 | octo-communication-controller-services / `main/wt-repin-communication-controller-services` | `a5ed45f` |
-| System.Identity | 2.21.0 → System-2.4.0 | 2.21.1 | **2.22.0** ⇒ phase 3 becomes 2.23.0 | octo-identity-services / `main/wt-repin-identity-services` | `2561283` |
-| System.Ai | 3.12.0 → System-2.4.0, System.Communication-3.39.0, System.Bot-3.3.0 | 3.12.1 (compiled: System-2.5.0, System.Communication-3.39.1, System.Bot-3.3.1) | **3.13.0** ⇒ phase 3 becomes 3.14.0 | octo-ai-services / `main/wt-repin-ai-services` | `9075792` |
-| System.Notification | 2.3.0 → System-2.4.0 | 2.3.1 | **2.4.0** | octo-common-services / `main/wt-repin-common-services` | `eddc2b5` |
-| System.Reporting | 2.2.0 → System-2.4.0 | 2.2.1 | **2.3.0** | octo-report-services / `main/wt-repin-report-services` | `d479719` |
+| System.Bot | 3.3.0 → System-2.4.0 | 3.3.1 | **3.4.0** | octo-bot-services / `main/wt-repin-bot-services` | `64b7d89` + `e5457f3` |
+| System.Communication | 3.39.0 → System-2.4.0, System.Bot-3.3.0 | 3.39.1 (compiled: System-2.5.0, System.Bot-3.3.1) | **3.40.0** ⇒ phase 3 becomes 3.41.0 | octo-communication-controller-services / `main/wt-repin-communication-controller-services` | `a5ed45f` + `1b819a7` |
+| System.Identity | 2.21.0 → System-2.4.0 | 2.21.1 | **2.22.0** ⇒ phase 3 becomes 2.23.0 | octo-identity-services / `main/wt-repin-identity-services` | `2561283` + `e26c87b` |
+| System.Ai | 3.12.0 → System-2.4.0, System.Communication-3.39.0, System.Bot-3.3.0 | 3.12.1 (compiled: System-2.5.0, System.Communication-3.39.1, System.Bot-3.3.1) | **3.13.0** ⇒ phase 3 becomes 3.14.0 | octo-ai-services / `main/wt-repin-ai-services` | `9075792` + `0576959` |
+| System.Notification | 2.3.0 → System-2.4.0 | 2.3.1 | **2.4.0** | octo-common-services / `main/wt-repin-common-services` | `eddc2b5` + `4b16dd3` |
+| System.Reporting | 2.2.0 → System-2.4.0 | 2.2.1 | **2.3.0** | octo-report-services / `main/wt-repin-report-services` | `d479719` + `dcece8e` |
 | System.StreamData | 1.16.0 → System-2.4.0 | 1.17.0 already on the engine branch, floor `System-[2.5,3.0)`, compiled output pins `System-2.5.0` (verified in `bin/DebugL`) — MINOR, gate-conformant | — | engine | (branch) |
 | System.UI | 2.6.0 → System-2.4.0 (main); 2.7.0/2.8.0 only on `feat/gerald/studio-rebuild` (unpushed) | **not touched** (octo-platform-services is off-limits) | **2.7.0** from main, see §12 | octo-platform-services | — |
 
@@ -149,6 +149,8 @@ Two consequences, independent of the version numbers:
 2. Every dependency floor in the dependency chain must be satisfiable by the published catalog at CI time (`CheckDependenciesAsync`, OCTO-CK103): System 2.5.0 must be published before any re-pin PR builds.
 
 **Open decision G1 (PO).** The prepared commits use PATCH versions as instructed; they will fail CI as they are.
+
+> **Decided 2026-10-06: G1-a.** Each re-pin worktree got a second commit `AB#5528 Fix: Repin as minor version (CI version rule)` (no amend; hashes in the §4.2 table). Rebuilt with an isolated catalog (System 2.3/2.4/2.5 only, catalog order bot → controller → ai): every compiled model pins `System-2.5.0`, System.Communication 3.40.0 pins `System.Bot-3.4.0`, System.Ai 3.13.0 pins `System.Communication-3.40.0` + `System.Bot-3.4.0`. `octo-ckc ValidateVersion -cn LocalFileSystemCatalog` against the published baselines (Bot 3.3.0, Communication 3.39.0, Ai 3.12.0, Identity 2.21.0, Notification 2.3.0, Reporting 2.2.0; Bot 3.4.0 / Communication 3.40.0 added before validating their dependents) reports `VALID` for all six. Phase 3 moved to System.Communication 3.41.0, System.Identity 2.23.0, System.Ai 3.14.0 on the secret branches.
 - **G1-a (recommended):** re-pin with MINOR — System.Bot 3.4.0, System.Notification 2.4.0, System.Reporting 2.3.0, System.UI 2.7.0 (no collision), and System.Communication **3.40.0**, System.Identity **2.22.0**, System.Ai **3.13.0** for the re-pins, which moves phase 3 to **3.41.0 / 2.23.0 / 3.14.0** (the phase-3 branches are local and unpublished; renumber the `modelId` + description lines + any `3.40`/`2.22`/`3.13` references in their docs/tests; AB#5583 `FoldedBefore` then ships as part of 3.41.0 or as its own 3.41.0 with the secret switch at 3.42.0). Amending the re-pin commits is a one-line change per worktree (`modelId`) plus the commit message. Local side effect: the shared `main/.octo/local-catalog` and the 999 feed hold phase-3 content under 3.40.0/2.22.0/3.13.0; after the renumber the PO's next full DebugL build of both lanes overwrites them (local catalog publishes are forced) — build the phase-3 branches last.
 - **G1-b:** keep PATCH and bypass the gate for these PRs. There is no bypass parameter in `validate-ck-versions.yml` (tpl-v0.5.x/0.6.x); it would need a template change or a temporary removal of the step in four repos. Not recommended.
 
@@ -197,7 +199,7 @@ Test CK models inside Stage B repos (engine `System.TestIdentity`/`Test`, engine
 | 4 | Stage B on test-2 | Full order and per-tenant runbook in §9. Merge batch; make sure **all** pods roll (comm-controller, platform, report, refinery-studio included), identity first imports System 2.5.0; re-run `adapter-mesh-test-2-CD` if it failed in "Enumerate tenant universe" (incident 49625); then per tenant `FixAll -w -y` + `ClearCache -tid <t> -y`, check `LibraryStatus` (FixAll/ImportFromCatalog `-w` can report success without installing) |
 | 5 | SchemaProvider | Rebuild/deploy the schema-provider image for the GraphQL schema change (`deploy-octo-mesh-schema-provider.yml`) |
 | 6 | Release | services/helm/catalog trains with `r*` tags (helm-core, helm-pro, ck-libraries strictly sequential — shared Pages repo); catalogs train: `dryRun=true` skips the publish stage and proves nothing; a CK add/remove/major needs `allowCatalogRemovals` only for removals |
-| 7 | dev lane | Next main → `test/0.2-dev` sync must translate System.Communication 3.40 / System.Ai 3.13 onto the 4.x line (dev-lane recipe step 4) |
+| 7 | dev lane | Next main → `test/0.2-dev` sync must translate System.Communication 3.41 / System.Ai 3.14 onto the 4.x line (dev-lane recipe step 4) |
 | 8 | Stage D per cluster | Semaphore: infra playbooks/terraform with `octo_artifacts_enabled=true` (runbooks `docs/runbooks/octo-artifact-storage-*.md`), bot credentials into Vault, k8s Secret `octo-artifact-storage` in the namespace (and `octo-dev` on test-2), **then** merge the cluster's values (18b). Open: Hetzner location placeholder `fsn1`, scratch volume decision, bucket name checks |
 | 9 | Phase 3/4/5 | as in the progress doc: model switches, encrypt sweep per environment, strict mode 14 days after zero plaintext |
 
@@ -215,10 +217,10 @@ PR titles use the WP id; body bullets are proposals.
 | mesh-adapter (6a) | `AB#5536 New: SECRET attribute key ring in the mesh adapter chart` | renders `OCTO_SECRETENCRYPTION__*` only when set · operator supplies it for `ReceivesClusterSecrets` |
 | mesh-adapter (6b) | `AB#5538 New: RevealSecret@1 and SECRET handling in the mesh adapter` | `RevealSecret@1` (refuses identity System) · GetRtEntities/ApplyChanges handle SECRET, strict-mode refusals · mail credentials registered for masking · unknown key id = not set · integration Mongo pinned to 8.0.15 |
 | bot | `AB#5539 New: Secret sweep job, post-restore handling and artifact store` | sweep jobs (serialized per tenant), run history, admin API with platform-role policies · restore without key ring = key-free Verify · artifact store for pre-sweep dumps/tenant dumps/restore staging (opt-in) · pre-sweep restore job, required key ids |
-| controller | `AB#5537 New: Reveal and protect secrets in the communication controller (System.Communication 3.40.0)` | reveal for adapter configuration, decryption oracle closed · System.Communication 3.40.0 credential attributes, `ValueOverride.SecretValue` · deploys refused when a service-account secret is unreadable · redacted debug paths · **split AB#5583 out (see §7)** |
+| controller | `AB#5537 New: Reveal and protect secrets in the communication controller (System.Communication 3.41.0)` | reveal for adapter configuration, decryption oracle closed · System.Communication 3.41.0 credential attributes, `ValueOverride.SecretValue` · deploys refused when a service-account secret is unreadable · redacted debug paths · **split AB#5583 out (see §7)** |
 | asset-repo | `AB#5535 New: SECRET attribute value type in the GraphQL API` | `OctoSecretState {isSet,keyMissing,setAt}`, `clearSecretAttributes`, refusals · admin GraphQL `secrets {inventory, summary, usages}` (AB#5544) · SchemaProvider image rebuild needed |
-| identity | `AB#5540 New: Identity-provider ClientSecret as SECRET (System.Identity 2.22.0)` | ClientSecret as Secret, `clientSecretIsSet/KeyMissing/SetAt` · providers with unreadable secrets skipped · `SecretManagement` role + Bootstrap 1.4.0 + one-time grant (AB#5544) · 503 `SecretEncryptionNotConfigured` |
-| ai | `AB#5541 New: AI model secrets as SECRET value type (System.Ai 3.13.0)` | AI secrets via `RevealOrNull` · enc:v2 text in legacy slots never unwrapped · masked credential tails |
+| identity | `AB#5540 New: Identity-provider ClientSecret as SECRET (System.Identity 2.23.0)` | ClientSecret as Secret, `clientSecretIsSet/KeyMissing/SetAt` · providers with unreadable secrets skipped · `SecretManagement` role + Bootstrap 1.4.0 + one-time grant (AB#5544) · 503 `SecretEncryptionNotConfigured` |
+| ai | `AB#5541 New: AI model secrets as SECRET value type (System.Ai 3.14.0)` | AI secrets via `RevealOrNull` · enc:v2 text in legacy slots never unwrapped · masked credential tails |
 | mcp | `AB#5543 New: Secret-safe MCP tools and secret sweep tools` | `set_entity_secrets`/`create_entity_with_secrets` (high risk) · sweep, status, runs, inventory, restore-dump tools · provider client secrets scrubbed |
 | cli | `AB#5543 New: SecretStatus, ReprotectSecrets and restore-dump commands` | write-only provider secret, `GetIdentityProviders` never prints it · CleanupUnreadable, DeleteSecretSweepDump, restore-dump |
 | docs | `AB#5543 New: Documentation for the SECRET value type and the key ring` | user + operator guide, key-ring guide, restore flow, metrics · versioning rules (EN+DE) · German build has a pre-existing duplicate-label failure |
@@ -243,7 +245,7 @@ PR titles use the WP id; body bullets are proposals.
 | identity | `3b3e090` changes CLAUDE.md, `b127d86` restores it | squash (add+revert pair) |
 | mesh-adapter | `3295807` **net +4 lines in CLAUDE.md** | move the section to README/docs (agent rule 6: CLAUDE.md must not change) |
 | operator | `bd14682` **net +1 table row in CLAUDE.md** | move to README/docs |
-| controller | `fda4ef7`, `4fc499d` (AB#5583, Bug under Epic 3444) | separate PR; note it adds `FoldedBefore` to System.Communication **3.40.0**, so the bug fix is coupled to the phase-3 model version — either ship it as its own 3.40.0 (and the secret switch becomes 3.41.0) or accept that AB#5583 waits for phase 3 |
+| controller | `fda4ef7`, `4fc499d` (AB#5583, Bug under Epic 3444) | separate PR; note it adds `FoldedBefore` to System.Communication **3.41.0**, so the bug fix is coupled to the phase-3 model version — either ship it as its own 3.41.0 (and the secret switch becomes 3.42.0) or accept that AB#5583 waits for phase 3 |
 | controller / identity / ai | model commits `c13f55b`, `3b3e090`, `ab93f44` | consider splitting each branch into a pre-phase-3 code PR (consumers ready for ciphertext) and the model-switch PR; feasibility not verified (later fixes may depend on the generated 3.40/2.22/3.13 types) |
 | helm-core / mesh-adapter / mesh-deployment | key-ring commit shared by two branches | merge the key-ring PR with a merge commit or rebase-merge (not squash), otherwise the follow-up branch shows a duplicate commit |
 | octo-tools | local `feat/gerald/secret-key-ring` (0 ahead) | delete locally after confirmation |
@@ -270,11 +272,11 @@ AB#5544 is the Studio-UI WP but carries the backend admin API in five repos; AB#
 ## 8. Top risks
 
 1. **System 2.5.0 = fleet-wide breaking change** (exact range check + hard model pins). Merging the engine and letting main CD roll piecemeal reproduces the 2026-10-05 test-2 outage. Needs a coordinated Stage B and the tenant update lane; see O1.
-2. **Phase split vs. re-pin**: System.Communication 3.39, System.Identity 2.21, System.Ai 3.12 (plus Bot, Notification, UI, Reporting and all business/app models) pin System 2.4.0; with 3.40/2.22/3.13 held back for phase 3 they need re-pin versions in Stage B, or they go `ResolveFailed`. Re-pins are prepared (§4.2) but **the CI version gate requires MINOR, not PATCH (§4.4, decision G1)** — as committed they fail CI.
+2. **Phase split vs. re-pin**: System.Communication 3.39, System.Identity 2.21, System.Ai 3.12 (plus Bot, Notification, UI, Reporting and all business/app models) pin System 2.4.0; with 3.41/2.23/3.14 held back for phase 3 they need re-pin versions in Stage B, or they go `ResolveFailed`. Re-pins are prepared (§4.2) but **the CI version gate requires MINOR, not PATCH (§4.4, decision G1)** — as committed they fail CI.
 2a. **Catalog order is a build dependency**: re-pin CIs fail (OCTO-CK103 / multi-version conflict) until System 2.5.0 and their upstream re-pins are in PrivateGitHubCatalog (§10).
 3. **Mesh adapters and external adapters** stay on old images if the adapter CD fails in the System-import window, and fail silently (no check rule on execution failures).
 4. **Artifact-storage values before the Secret exists** stop the bot pod on the next deploy of that cluster (18b).
-5. **AB#5583 coupled to System.Communication 3.40.0** — an unrelated bug fix is held by phase 3, or the version numbers must be re-planned.
+5. **AB#5583 coupled to System.Communication 3.41.0** — an unrelated bug fix is held by phase 3, or the version numbers must be re-planned.
 6. CLAUDE.md changes in mesh-adapter and operator, and the non-building sdk commit `23e3da9`, should be fixed before review.
 
 ## 9. Stage B — batch contents, exact order and test-2 runbook

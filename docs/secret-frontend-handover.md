@@ -8,7 +8,7 @@
 
 Phase 2 (Studio documents secret-safe) must ship **before** phase 3 (models switch credential attributes to `valueType: Secret`) in every environment. After phase 3, a document that selects a secret field as a scalar fails GraphQL validation (intended: loud failure instead of a leak). Affected today: the ~36 Studio configuration documents, `getEntitiesByCkType`, `getRuntimeEntityById`, `updateRuntimeEntities` selections, identity-provider form, entity forms (AB#5522).
 
-Attributes that become Secret in phase 3 (System.Communication 3.40): `Password` (Sap, Sftp, EMailSender, EMailReceiver, Loxone, HelmRepository, FinApi), `PrivateKey`, `PrivateKeyPassphrase` (Sftp), `ClientSecret` (FinApi, MicrosoftGraph, ServiceAccount), `ApiKey` (Ai, WeClapp), `BotToken` (Discord), `AdminPassword` (Grafana), new Secret record member `ValueOverride.SecretValue` (record key `Path`; `ValueOverride.Value` stays String, see §5). System.Identity 2.22.0: identity-provider `ClientSecret`. Later (WP11): AI tokens, app models.
+Attributes that become Secret in phase 3 (System.Communication 3.41): `Password` (Sap, Sftp, EMailSender, EMailReceiver, Loxone, HelmRepository, FinApi), `PrivateKey`, `PrivateKeyPassphrase` (Sftp), `ClientSecret` (FinApi, MicrosoftGraph, ServiceAccount), `ApiKey` (Ai, WeClapp), `BotToken` (Discord), `AdminPassword` (Grafana), new Secret record member `ValueOverride.SecretValue` (record key `Path`; `ValueOverride.Value` stays String, see §5). System.Identity 2.22.0: identity-provider `ClientSecret`. Later (WP11): AI tokens, app models.
 
 ## 2. Asset repository GraphQL contract
 
@@ -140,7 +140,7 @@ Schema groups: Entity (ckTypeId, ckTypeIdPath, rtId, rtIdPath), Secret (attribut
 ```
 Palette: entity + secret-attribute picker (attributes with value type SECRET only), no value preview; debug views show the marker / `***`. Type-switch nodes (`ConvertDataType`, `SetPrimitiveValue`, `If`, `Switch`, `ExecuteCSharp`, `DataMapping`) fail with "Secret not supported" on secret values; reading `<path>.isSet` as Boolean works.
 
-### Helm value overrides (System.Communication 3.40)
+### Helm value overrides (System.Communication 3.41)
 `ValueOverride.Value` stays a String (non-secret overrides such as image tags stay readable). Secret overrides go to the new Secret record member **`SecretValue`** (record key `Path`, must be unique among overrides carrying a `SecretValue`). Studio writes plaintext into `SecretValue` and must stop calling the controller's `encrypt-value` endpoint for new values; legacy `IsSecret` + `enc:v1` in `Value` still deploys but is deprecated. `encrypt-value` returns `enc:v1` and refuses `enc:v2` input.
 
 ## 6. Roles (Q3, Q15)

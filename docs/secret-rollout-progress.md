@@ -13,11 +13,11 @@
 | 4 | AB#5534 | octo-sdk | Resolved | e9a570d, ef04919, f6bee03, 2c4d40e, 66b05d5, 0d8edf8 (InstanceSecretCrypto enc:v1 only) | 406 (133+241+4+28) |
 | 5 | AB#5535 | octo-asset-repo-services | Resolved | 0590d0f, ac9007c, 6b1c858 | unit 235, integration 460 (1 known locale failure, 1 skip) |
 | 6 | AB#5536 | helm-core, operator, mesh-adapter chart, octo-tools, mesh-deployment (feat/gerald/secret-key-ring); octo-helm-pro | Resolved | helm-pro ef37529 | helm lint/template |
-| 7 | AB#5537 | octo-communication-controller-services | Resolved | d6a77f1, c13f55b (System.Communication 3.40), b45fb55, f8099e4, 544d88f, 5d22922 | unit 1120, integration 59 |
+| 7 | AB#5537 | octo-communication-controller-services | Resolved | d6a77f1, c13f55b (System.Communication 3.41), b45fb55, f8099e4, 544d88f, 5d22922 | unit 1120, integration 59 |
 | 8 | AB#5538 | octo-communication-sdk; octo-mesh-adapter (branched from feat/gerald/secret-key-ring) | Resolved | comm-sdk 346a2ab, a3802ae, 6549701, f26b6d8, 5f89cf5, 95808d1; mesh-adapter e950337, 620e005, 04f20a7, edaa376, 1755b86, 500a3a5 | comm-sdk 1246+230+5; mesh-adapter 1996, integration 89 (mongo 8.0.15) |
 | 9 | AB#5539 | octo-bot-services | Resolved | ef17ec6, a6f2fec | 254 |
-| 10 | AB#5540 | octo-identity-services (System.Identity 2.22.0) | Resolved | 3b3e090, b127d86, 3f32b22, 5aef611 | 319+14+247, integration 204 (1 skip) |
-| 11 | AB#5541 | octo-ai-services (System.Ai 3.13.0); other repos documented | Resolved | ai ab93f44, 18d1fee, c41c88c; engine doc d19f1c06 | integration 239, unit 7 |
+| 10 | AB#5540 | octo-identity-services (System.Identity 2.23.0) | Resolved | 3b3e090, b127d86, 3f32b22, 5aef611 | 319+14+247, integration 204 (1 skip) |
+| 11 | AB#5541 | octo-ai-services (System.Ai 3.14.0); other repos documented | Resolved | ai ab93f44, 18d1fee, c41c88c; engine doc d19f1c06 | integration 239, unit 7 |
 | 12/14 | AB#5542 / AB#5544 | frontend (other PO) | Handover note delivered | engine f2b15c36, 0bebefb1 | — |
 | 13 | AB#5543 | octo-mcp-service, octo-cli, octo-documentation | Resolved | mcp bb44198, fe566eb; cli 5574867, b3135a8; docs 844658cf, b696e10d, 1973c804 | mcp 945; cli 86+45; docs EN build ok |
 
@@ -101,7 +101,7 @@ Decided by the PO: test-2 artifact bucket in a dedicated Hetzner project; Azure 
 1. **Publishing (human):** engine release with System 2.5.0 + System.StreamData 1.17.0 first (review the `Directory.Build.targets` change in CI: CK compile after project references, local catalog for StreamData); then sdk → engine-mongodb → common-services → communication-sdk → mesh-adapter → bot → controller (System.Communication 3.40) → services; SchemaProvider image rebuild for the schema change; CI of new test projects needs the published engine.
 2. **Key ring everywhere before phase 3:** Vault/ADO values for helm-core and the helm-pro charts (`communicationInstanceSecretKey`), operator `ClusterSecretsOptions`; verify `aiInstanceSecretKey == communicationInstanceSecretKey` per cluster; back up the key in Keeper.
 3. **Preconditions for phase 3:** adapter-hub and operator-hub authorization `Enforce` (AB#5063/AB#5059) — adapter configurations carry revealed secrets; Studio phase-2 work (handover note) shipped; meshmakers-app / energy-community / one-time-ticket / report-services changes per `secret-app-model-changes.md` (incl. GraphQL queries filtering on secret values → IS_NULL/IS_NOT_NULL).
-4. **Phase 3** model switches (System.Communication 3.40, System.Identity 2.22.0, System.Ai 3.13.0, app models with their RevealSecret@1 pipelines in the same blueprint version + DataFlow redeploy).
+4. **Phase 3** model switches (System.Communication 3.41, System.Identity 2.23.0, System.Ai 3.14.0, app models with their RevealSecret@1 pipelines in the same blueprint version + DataFlow redeploy).
 5. **Phase 4** sweep: bot `secret-sweep-encrypt` per environment; persistent volume for `Bot:SecretSweep:BackupStoragePath` first; Dash0 alerts on `octo.secrets.values{form="plaintext"}` and `octo.secrets.strict_mode.violations`.
 6. **Phase 5** strict mode (`SecretEncryption:StrictMode=true`, bot `StrictModeSince`) 14 days after zero plaintext; pre-sweep dumps deleted after 7 days.
 7. §5.4 rotations of previously exposed credentials remain human tasks.

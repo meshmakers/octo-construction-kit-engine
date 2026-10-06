@@ -372,3 +372,7 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
   enc:v2 text in a legacy slot is never decrypted or promoted (engine cce531b3).
 - **octo-adapter-finapi** `FinApiAuthNode` resolves `Password` / `PasswordPath` without `nodeContext.RegisterSecret`; same follow-up as §3 for its owner. It also accepts an
   inline `password`; none of the scanned pipelines use it.
+
+## Version rule after the System 2.5 repins (decided 2026-10-06, G1-a)
+
+Wave 1 repins every model that pinned System 2.4 to `System-[2.5,3.0)` with a **minor** bump (CI `ValidateVersion` rule). Every phase-3 SECRET model change in this document therefore takes the **next minor after the repin version**, e.g. System.Reporting 2.3.0 (repin) → 2.4.0 (Secret `ConnectionString`), Meshmakers.Accounting.Tesla 1.3.0 (repin) → 1.4.0, Demo.Tickets / EnergyCommunity.Registration / Wwc26.Challenge likewise. The repin versions per model are listed in `wave1-push-pr-plan-backend.md` §4.5.

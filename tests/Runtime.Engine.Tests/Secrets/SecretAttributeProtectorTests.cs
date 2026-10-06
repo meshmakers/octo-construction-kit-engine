@@ -310,6 +310,165 @@ public class SecretAttributeProtectorTests
         Assert.Equal("enc:my-password", Create().Unprotect("enc:my-password"));
     }
 
+    private static long CountMeasurements(string instrumentName, string markerAttribute, Action action,
+        List<KeyValuePair<string, object?>>? capturedTags = null)
+    {
+        long count = 0;
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, l) =>
+        {
+            if (instrument.Meter.Name == SecretDiagnostics.MeterName && instrument.Name == instrumentName)
+            {
+                l.EnableMeasurementEvents(instrument);
+            }
+        };
+        listener.SetMeasurementEventCallback<long>((_, measurement, tags, _) =>
+        {
+            var array = tags.ToArray();
+            if (!array.Any(t => t is { Key: "attribute" } && t.Value as string == markerAttribute))
+            {
+                return;
+            }
+
+            Interlocked.Add(ref count, measurement);
+            if (capturedTags != null)
+            {
+                lock (capturedTags)
+                {
+                    capturedTags.AddRange(array);
+                }
+            }
+        });
+        listener.Start();
+        action();
+        return Interlocked.Read(ref count);
+    }
+
+    [Fact]
+    public void StrictMode_DefaultsToOff()
+    {
+        Assert.False(new SecretEncryptionOptions().StrictMode);
+        Assert.False(Create().IsStrictMode);
+        Assert.True(Create(o => o.StrictMode = true).IsStrictMode);
+    }
+
+    [Fact]
+    public void StrictMode_LegacyPlaintextValue_IsRejectedAndCounted()
+    {
+        var protector = Create(o => o.StrictMode = true);
+        var context = new SecretAccessContext("tenantS", "Model/Strict", "StrictAttr1", "svc");
+        var tags = new List<KeyValuePair<string, object?>>();
+        LegacyPlaintextSecretRejectedException? exception = null;
+
+        var rejected = CountMeasurements("octo.secrets.strict_mode.rejected_reads", "StrictAttr1", () =>
+            exception = Assert.Throws<LegacyPlaintextSecretRejectedException>(() =>
+                protector.Unprotect(RtSecretValue.LegacyPlaintext("strict-clear-text"), context)), tags);
+
+        Assert.Equal(1, rejected);
+        Assert.NotNull(exception);
+        Assert.DoesNotContain("strict-clear-text", exception.Message);
+        Assert.Equal("tenantS", exception.TenantId);
+        Assert.Equal("Model/Strict", exception.CkTypeId);
+        Assert.Equal("StrictAttr1", exception.AttributeName);
+        lock (tags)
+        {
+            Assert.Contains(tags, t => t is { Key: "tenant", Value: "tenantS" });
+            Assert.Contains(tags, t => t is { Key: "ckType", Value: "Model/Strict" });
+            Assert.Contains(tags, t => t is { Key: "service", Value: "svc" });
+            Assert.DoesNotContain(tags, t => t.Value as string == "strict-clear-text");
+        }
+    }
+
+    [Theory]
+    [InlineData("strict-clear-text")]
+    [InlineData("enc:my-password")]
+    [InlineData("enc:v2:k1:not-base64!")]
+    public void StrictMode_ClearTextString_IsRejected(string storedValue)
+    {
+        var protector = Create(o => o.StrictMode = true);
+        var context = new SecretAccessContext("tenantS", "Model/Strict", "StrictAttr2");
+
+        var plaintextReads = CountMeasurements("octo.secrets.plaintext_reads", "StrictAttr2", () =>
+            Assert.Throws<LegacyPlaintextSecretRejectedException>(() => protector.Unprotect(storedValue, context)));
+
+        Assert.Equal(0, plaintextReads);
+    }
+
+    [Fact]
+    public void StrictMode_EnvelopesAndPendingValues_StayReadable()
+    {
+        var protector = Create(o => o.StrictMode = true);
+
+        Assert.Equal("hunter2", protector.Unprotect(V2Vector));
+        Assert.Equal("Pässwort-v1!", protector.Unprotect(V1Vector));
+        Assert.Equal("Pässwort-v1!", protector.Unprotect(RtSecretValue.LegacyPlaintext(V1Vector)));
+        Assert.Equal("new", protector.Unprotect(RtSecretValue.Pending("new")));
+        Assert.Equal("round", protector.Unprotect(protector.Protect("round")));
+    }
+
+    [Fact]
+    public void StrictMode_EncV1WithoutLegacyKey_StillThrowsNotConfigured()
+    {
+        var protector = Create(o =>
+        {
+            o.StrictMode = true;
+            o.LegacyV1Key = null;
+        });
+
+        Assert.Throws<SecretEncryptionNotConfiguredException>(() => protector.Unprotect(V1Vector));
+    }
+
+    [Fact]
+    public void StrictMode_Reprotect_ConvertsLegacyPlaintext_CountedAsPlaintextRead()
+    {
+        var protector = Create(o => o.StrictMode = true);
+        var context = new SecretAccessContext("tenantS", "Model/Strict", "StrictAttr3");
+        RtSecretValue? result = null;
+
+        var plaintextReads = CountMeasurements("octo.secrets.plaintext_reads", "StrictAttr3", () =>
+            result = protector.Reprotect(RtSecretValue.LegacyPlaintext("to-convert"), context));
+
+        Assert.Equal(1, plaintextReads);
+        Assert.NotNull(result);
+        Assert.True(result.IsProtected);
+        Assert.Equal("to-convert", protector.Unprotect(result));
+    }
+
+    [Fact]
+    public void NonStrictMode_LegacyPlaintext_IsNotCountedAsRejected()
+    {
+        var protector = Create();
+        var context = new SecretAccessContext("tenantS", "Model/Strict", "StrictAttr4");
+
+        var rejected = CountMeasurements("octo.secrets.strict_mode.rejected_reads", "StrictAttr4", () =>
+            Assert.Equal("clear", protector.Unprotect("clear", context)));
+
+        Assert.Equal(0, rejected);
+    }
+
+    [Fact]
+    public void AddRuntimeEngine_BindsStrictMode()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["SecretEncryption:Keys:k1"] = K1,
+                ["SecretEncryption:ActiveKeyId"] = "k1",
+                ["SecretEncryption:StrictMode"] = "true"
+            })
+            .Build();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddRuntimeEngine();
+        using var provider = services.BuildServiceProvider();
+
+        var protector = provider.GetRequiredService<ISecretAttributeProtector>();
+
+        Assert.True(protector.IsStrictMode);
+        Assert.Throws<LegacyPlaintextSecretRejectedException>(() => protector.Unprotect("clear"));
+    }
+
     [Fact]
     public void AddRuntimeEngine_BindsSecretEncryptionSection()
     {

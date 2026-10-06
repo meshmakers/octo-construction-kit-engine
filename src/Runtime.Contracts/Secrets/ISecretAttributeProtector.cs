@@ -45,6 +45,16 @@ public interface ISecretAttributeProtector
     string? ActiveKeyId { get; }
 
     /// <summary>
+    ///     True when strict mode is on (configuration <c>SecretEncryption:StrictMode</c>, concept
+    ///     decision 10, §5.2 phase 5): legacy clear text is no longer readable through
+    ///     <see cref="Unprotect(RtSecretValue, SecretAccessContext?)" /> /
+    ///     <see cref="Unprotect(string, SecretAccessContext?)" />, which then throw
+    ///     <see cref="LegacyPlaintextSecretRejectedException" />. <see cref="Reprotect" /> still converts it.
+    ///     Implementations without strict mode return <c>false</c>.
+    /// </summary>
+    bool IsStrictMode => false;
+
+    /// <summary>
     ///     True when <paramref name="keyId" /> names a key of the key ring (case-insensitive), i.e. an
     ///     <c>enc:v2</c> envelope with this key id can be decrypted. The sweep (AB#5532) classifies
     ///     values with an unknown key id (decision 5: restored from another environment) with it.
@@ -61,8 +71,9 @@ public interface ISecretAttributeProtector
     /// <summary>
     ///     Returns the plaintext of a secret value: decrypts <c>enc:v2</c> (key ring) and <c>enc:v1</c>
     ///     (legacy key), returns legacy clear text (counted as a plaintext read) and the plaintext of
-    ///     a pending value.
+    ///     a pending value. In strict mode (<see cref="IsStrictMode" />) legacy clear text is rejected.
     /// </summary>
+    /// <exception cref="LegacyPlaintextSecretRejectedException">Strict mode and the value is legacy clear text</exception>
     /// <exception cref="SecretEncryptionNotConfiguredException">The needed key material is not configured</exception>
     /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The value was tampered with or the key is wrong</exception>
@@ -70,8 +81,10 @@ public interface ISecretAttributeProtector
 
     /// <summary>
     ///     Returns the plaintext of a stored string: an <c>enc:v2</c> or <c>enc:v1</c> envelope is
-    ///     decrypted, anything else is treated as legacy clear text (counted as a plaintext read).
+    ///     decrypted, anything else is treated as legacy clear text (counted as a plaintext read; rejected
+    ///     in strict mode, see <see cref="IsStrictMode" />).
     /// </summary>
+    /// <exception cref="LegacyPlaintextSecretRejectedException">Strict mode and the value is clear text</exception>
     /// <exception cref="SecretEncryptionNotConfiguredException">The needed key material is not configured</exception>
     /// <exception cref="UnknownSecretKeyIdException">The envelope's key id is not in the key ring</exception>
     /// <exception cref="System.Security.Cryptography.CryptographicException">The value was tampered with or the key is wrong</exception>
@@ -96,7 +109,9 @@ public interface ISecretAttributeProtector
 
     /// <summary>
     ///     Returns the value protected with the active key; a value that already is, is returned
-    ///     unchanged. Decrypting for the re-encryption is counted like any other decrypt.
+    ///     unchanged. Decrypting for the re-encryption is counted like any other decrypt. Legacy clear
+    ///     text is converted in strict mode as well (the strict check is bypassed and the read is counted
+    ///     as a plaintext read): the encrypt / reprotect sweep must be able to clear the remainder.
     /// </summary>
     RtSecretValue Reprotect(RtSecretValue value, SecretAccessContext? context = null);
 }

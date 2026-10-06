@@ -189,6 +189,26 @@ public class SecretMaintenanceServiceTests
         Assert.Empty(_rewrites);
     }
 
+    [Theory]
+    [InlineData(SecretSweepMode.Encrypt)]
+    [InlineData(SecretSweepMode.Reprotect)]
+    public async Task StrictMode_SweepStillConvertsLegacyPlaintext(SecretSweepMode mode)
+    {
+        var strict = SecretTestModel.CreateProtector(strictMode: true);
+        Assert.Throws<LegacyPlaintextSecretRejectedException>(() =>
+            strict.Unprotect((RtSecretValue)_e4.Attributes["ApiKey"]!));
+
+        var result = await CreateService(strict).SweepTenantAsync(SecretTestModel.TenantId, mode,
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Failures);
+        Assert.Equal("plain-1", strict.Unprotect((RtSecretValue)_e1.Attributes["Password"]!));
+        Assert.Equal("plain-4", strict.Unprotect((RtSecretValue)_e4.Attributes["ApiKey"]!));
+        var credentials = ((IEnumerable<RtRecord>)_e4.Attributes["Credentials"]!).ToList();
+        Assert.Equal("rec-plain", strict.Unprotect((RtSecretValue)credentials[1].Attributes["Value"]!));
+        Assert.Equal(SecretTestModel.V1VectorPlaintext, strict.Unprotect((RtSecretValue)_e2.Attributes["ApiKey"]!));
+    }
+
     [Fact]
     public async Task Encrypt_ProtectsLegacyValues_NormalisesPlaceholders_AndIsIdempotent()
     {

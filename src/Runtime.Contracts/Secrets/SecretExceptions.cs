@@ -18,6 +18,46 @@ public class SecretEncryptionNotConfiguredException : InvalidOperationException
 }
 
 /// <summary>
+///     Thrown in strict mode (configuration <c>SecretEncryption:StrictMode</c>, concept decision 10,
+///     §5.2 phase 5) when a <c>Secret</c> attribute is read that is still stored as legacy clear text.
+///     The message never contains the value; run the encrypt sweep (or re-enter the secret).
+/// </summary>
+public class LegacyPlaintextSecretRejectedException : InvalidOperationException
+{
+    /// <summary>
+    ///     Creates a new instance.
+    /// </summary>
+    /// <param name="tenantId">Tenant of the entity, when known</param>
+    /// <param name="ckTypeId">CK type of the entity, when known</param>
+    /// <param name="attributeName">Name of the Secret attribute, when known</param>
+    public LegacyPlaintextSecretRejectedException(string? tenantId = null, string? ckTypeId = null,
+        string? attributeName = null)
+        : base($"Secret attribute '{attributeName ?? "?"}' of '{ckTypeId ?? "?"}' (tenant '{tenantId ?? "?"}') is " +
+               "still stored as clear text and strict mode (SecretEncryption:StrictMode) rejects legacy plaintext " +
+               "reads. Run the secret encrypt sweep or enter the secret again.")
+    {
+        TenantId = tenantId;
+        CkTypeId = ckTypeId;
+        AttributeName = attributeName;
+    }
+
+    /// <summary>
+    ///     Tenant of the entity, when known.
+    /// </summary>
+    public string? TenantId { get; }
+
+    /// <summary>
+    ///     CK type of the entity, when known.
+    /// </summary>
+    public string? CkTypeId { get; }
+
+    /// <summary>
+    ///     Name of the Secret attribute, when known.
+    /// </summary>
+    public string? AttributeName { get; }
+}
+
+/// <summary>
 ///     Thrown when an <c>enc:v2</c> envelope names a key id that is not in the key ring - typically a
 ///     value restored from another environment (decision 5: such secrets become "not set").
 /// </summary>

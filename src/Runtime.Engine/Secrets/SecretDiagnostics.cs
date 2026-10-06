@@ -39,6 +39,16 @@ public static class SecretDiagnostics
         description: "Count of reads of Secret attribute values that were still stored as clear text.");
 
     /// <summary>
+    ///     Incremented when strict mode (<c>SecretEncryption:StrictMode</c>, concept §5.2 phase 5) rejected
+    ///     a read of a Secret value still stored as clear text. Tags: <c>tenant</c>, <c>ckType</c>,
+    ///     <c>attribute</c>, <c>service</c> (where known). Never carries a value.
+    /// </summary>
+    public static readonly Counter<long> StrictModeRejectedReads = Meter.CreateCounter<long>(
+        "octo.secrets.strict_mode.rejected_reads",
+        unit: "{read}",
+        description: "Count of legacy plaintext Secret reads rejected by strict mode.");
+
+    /// <summary>
     ///     Incremented by the secret sweep for every value it changed (AB#5532). Tags: <c>tenant</c>,
     ///     <c>mode</c> (<c>verify</c>, <c>encrypt</c>, <c>reprotect</c>, <c>clear_unknown_kid</c>,
     ///     <c>decrypt</c>, <c>normalize_placeholders</c>).

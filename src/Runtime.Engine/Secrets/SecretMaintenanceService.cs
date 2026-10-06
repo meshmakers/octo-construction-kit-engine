@@ -458,7 +458,9 @@ internal sealed class SecretMaintenanceService(
                     case SecretValueForm.Placeholder:
                         return (true, null, SlotEffect.PlaceholderNormalized);
                     case SecretValueForm.Plaintext:
-                        return (true, protector.Protect(raw!), SlotEffect.None);
+                        // Through Reprotect: counted as a plaintext read and allowed in strict mode
+                        // (the sweep is what converts the remaining clear text).
+                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
                     case SecretValueForm.EncV1:
                         return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
                     case SecretValueForm.EncV2:

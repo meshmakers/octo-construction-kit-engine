@@ -31,11 +31,13 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     private readonly ILogger<SecretAttributeProtector> _logger;
     private readonly Lazy<KeyRing> _keyRing;
     private readonly ConcurrentDictionary<string, bool> _plaintextWarnings = new(StringComparer.Ordinal);
+    private readonly bool _strictMode;
 
     public SecretAttributeProtector(IOptions<SecretEncryptionOptions> options, ILogger<SecretAttributeProtector> logger)
     {
         _logger = logger;
         var value = options.Value;
+        _strictMode = value.StrictMode;
         _keyRing = new Lazy<KeyRing>(() => KeyRing.Create(value), LazyThreadSafetyMode.ExecutionAndPublication);
     }
 
@@ -44,6 +46,9 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
 
     /// <inheritdoc />
     public string? ActiveKeyId => _keyRing.Value.ActiveKeyId;
+
+    /// <inheritdoc />
+    public bool IsStrictMode => _strictMode;
 
     /// <inheritdoc />
     public bool IsKnownKeyId(string? keyId)
@@ -85,6 +90,17 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
     /// <inheritdoc />
     public string Unprotect(RtSecretValue value, SecretAccessContext? context = null)
     {
+        return Unprotect(value, context, allowPlaintext: false);
+    }
+
+    /// <inheritdoc />
+    public string Unprotect(string storedValue, SecretAccessContext? context = null)
+    {
+        return Unprotect(storedValue, context, allowPlaintext: false);
+    }
+
+    private string Unprotect(RtSecretValue value, SecretAccessContext? context, bool allowPlaintext)
+    {
         ArgumentNullException.ThrowIfNull(value);
         switch (value.State)
         {
@@ -94,12 +110,18 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
                 Count(FormPending, context);
                 return value.RawValue;
             default:
-                return Unprotect(value.RawValue, context);
+                return Unprotect(value.RawValue, context, allowPlaintext);
         }
     }
 
-    /// <inheritdoc />
-    public string Unprotect(string storedValue, SecretAccessContext? context = null)
+    /// <param name="storedValue">Stored string</param>
+    /// <param name="context">Reader</param>
+    /// <param name="allowPlaintext">
+    ///     True only for the re-encryption path (<see cref="Reprotect" />, used by the encrypt / reprotect
+    ///     sweep and the write path): it must convert the remaining clear text even in strict mode. The read
+    ///     is still counted as a plaintext read.
+    /// </param>
+    private string Unprotect(string storedValue, SecretAccessContext? context, bool allowPlaintext)
     {
         ArgumentNullException.ThrowIfNull(storedValue);
         if (SecretEnvelope.IsEnvelope(storedValue))
@@ -107,8 +129,16 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
             return Decrypt(storedValue, context);
         }
 
+        if (_strictMode && !allowPlaintext)
+        {
+            // Strict mode (concept decision 10, §5.2 phase 5): legacy clear text is no longer readable.
+            SecretDiagnostics.StrictModeRejectedReads.Add(1, BuildTags(null, context));
+            throw new LegacyPlaintextSecretRejectedException(context?.TenantId, context?.CkTypeId,
+                context?.AttributeName);
+        }
+
         // Legacy clear text: readable during the transition, counted and warned about (without the
-        // value) so the sweep can be verified. Strict mode (concept §5.2 phase 5) is a follow-up.
+        // value) so the sweep can be verified.
         Count(FormPlaintext, context);
         SecretDiagnostics.PlaintextReads.Add(1, BuildTags(FormPlaintext, context));
         var warningKey = $"{context?.CkTypeId}/{context?.AttributeName}";
@@ -156,7 +186,8 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
             return value;
         }
 
-        return Protect(Unprotect(value, context));
+        // Bypasses the strict-mode check: re-encrypting is how the remaining clear text disappears.
+        return Protect(Unprotect(value, context, allowPlaintext: true));
     }
 
     private string Decrypt(string envelope, SecretAccessContext? context)
@@ -215,9 +246,14 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         SecretDiagnostics.Decrypts.Add(1, BuildTags(form, context));
     }
 
-    private static TagList BuildTags(string form, SecretAccessContext? context)
+    private static TagList BuildTags(string? form, SecretAccessContext? context)
     {
-        var tags = new TagList { { "form", form } };
+        var tags = new TagList();
+        if (form != null)
+        {
+            tags.Add("form", form);
+        }
+
         if (context?.TenantId != null)
         {
             tags.Add("tenant", context.TenantId);

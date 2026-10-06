@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
@@ -16,10 +17,13 @@ namespace Meshmakers.Octo.Runtime.Contracts.Serialization;
 ///     </para>
 ///     <para>
 ///         <b>Read:</b> a string is new input (<see cref="RtSecretValue.Pending" />, not trimmed); <c>null</c>
-///         stays <c>null</c> (clears the secret); the marker - an empty object or an object whose only
-///         property is <c>isSet</c> (case-insensitive) with a boolean value - is <c>Pending("")</c>
-///         ("unchanged"). Anything else (numbers, booleans, arrays, objects with other properties, a
-///         non-boolean <c>isSet</c>) is rejected with an exception whose message never contains the value.
+///         stays <c>null</c> (clears the secret); the marker is <c>Pending("")</c> ("unchanged"). The marker
+///         is an object whose properties are a subset of the read state <c>{ isSet, keyMissing, setAt }</c>
+///         (names case-insensitive): <c>isSet</c> and <c>keyMissing</c> booleans, <c>setAt</c> an ISO-8601
+///         date string or <c>null</c> - so a client echoing the state object it read
+///         (<c>OctoSecretState</c>) leaves the secret unchanged; the empty object is a marker too. Anything
+///         else (numbers, booleans, arrays, objects with other properties, a wrongly typed marker property)
+///         is rejected with an exception whose message never contains the value (AB#5532 round 2).
 ///     </para>
 ///     <para>
 ///         The System.Text.Json, Newtonsoft and YAML converters of the engine and the octo-sdk converters
@@ -33,8 +37,27 @@ public static class RtSecretValueWireFormat
     /// </summary>
     public const string IsSetPropertyName = "isSet";
 
+    /// <summary>
+    ///     Name of the optional <c>keyMissing</c> marker property (boolean; accepted on read, never written).
+    /// </summary>
+    public const string KeyMissingPropertyName = "keyMissing";
+
+    /// <summary>
+    ///     Name of the optional <c>setAt</c> marker property (ISO-8601 date string or null; accepted on read,
+    ///     never written).
+    /// </summary>
+    public const string SetAtPropertyName = "setAt";
+
     private const string ExpectedShape =
-        "A Secret value must be a string (the secret to store), null (clear) or the marker {\"isSet\":true|false} (unchanged)";
+        "A Secret value must be a string (the secret to store), null (clear) or the marker {\"isSet\":true|false} " +
+        "(unchanged; optional \"keyMissing\": boolean and \"setAt\": date string or null)";
+
+    private enum MarkerProperty
+    {
+        None,
+        Boolean,
+        Date
+    }
 
     /// <summary>
     ///     True when the value holds a secret, classified WITHOUT a key ring
@@ -55,11 +78,53 @@ public static class RtSecretValueWireFormat
     }
 
     /// <summary>
-    ///     True when <paramref name="propertyName" /> is the marker property (case-insensitive).
+    ///     True when <paramref name="propertyName" /> is a marker property (case-insensitive):
+    ///     <c>isSet</c>, <c>keyMissing</c> or <c>setAt</c>.
     /// </summary>
     public static bool IsMarkerProperty(string? propertyName)
     {
-        return string.Equals(propertyName, IsSetPropertyName, StringComparison.OrdinalIgnoreCase);
+        return Classify(propertyName) != MarkerProperty.None;
+    }
+
+    /// <summary>
+    ///     True when <paramref name="text" /> is a valid textual value of the marker property
+    ///     <paramref name="propertyName" /> (for formats without typed scalars, e.g. YAML): <c>isSet</c> /
+    ///     <c>keyMissing</c> need <c>true</c> / <c>false</c>; <c>setAt</c> needs a date or <c>null</c>
+    ///     (pass <c>null</c> for a null scalar).
+    /// </summary>
+    public static bool IsValidMarkerText(string? propertyName, string? text)
+    {
+        return Classify(propertyName) switch
+        {
+            MarkerProperty.Boolean => bool.TryParse(text, out _),
+            MarkerProperty.Date => text == null || IsDateText(text),
+            _ => false
+        };
+    }
+
+    private static MarkerProperty Classify(string? propertyName)
+    {
+        if (string.Equals(propertyName, IsSetPropertyName, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(propertyName, KeyMissingPropertyName, StringComparison.OrdinalIgnoreCase))
+        {
+            return MarkerProperty.Boolean;
+        }
+
+        return string.Equals(propertyName, SetAtPropertyName, StringComparison.OrdinalIgnoreCase)
+            ? MarkerProperty.Date
+            : MarkerProperty.None;
+    }
+
+    private static bool IsDateText(string text)
+    {
+        return DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out _);
+    }
+
+    private static string InvalidPropertyMessage(MarkerProperty kind, string tokenType)
+    {
+        return kind == MarkerProperty.Date
+            ? $"The property '{SetAtPropertyName}' of a Secret marker must be a date string or null; got a token of type {tokenType}."
+            : $"The properties '{IsSetPropertyName}' and '{KeyMissingPropertyName}' of a Secret marker must be booleans; got a token of type {tokenType}.";
     }
 
     #region System.Text.Json
@@ -96,15 +161,15 @@ public static class RtSecretValueWireFormat
                 case JsonTokenType.Comment:
                     continue;
                 case JsonTokenType.PropertyName when IsMarkerProperty(reader.GetString()):
+                    var kind = Classify(reader.GetString());
                     if (!reader.Read())
                     {
                         break;
                     }
 
-                    if (reader.TokenType != JsonTokenType.True && reader.TokenType != JsonTokenType.False)
+                    if (!IsValidMarkerValue(kind, ref reader))
                     {
-                        throw new JsonException(
-                            $"The property '{IsSetPropertyName}' of a Secret marker must be a boolean; got a token of type {reader.TokenType}.");
+                        throw new JsonException(InvalidPropertyMessage(kind, reader.TokenType.ToString()));
                     }
 
                     continue;
@@ -114,6 +179,17 @@ public static class RtSecretValueWireFormat
         }
 
         throw new JsonException("Unexpected end of JSON while reading a Secret marker.");
+    }
+
+    private static bool IsValidMarkerValue(MarkerProperty kind, ref Utf8JsonReader reader)
+    {
+        return kind switch
+        {
+            MarkerProperty.Boolean => reader.TokenType is JsonTokenType.True or JsonTokenType.False,
+            MarkerProperty.Date => reader.TokenType == JsonTokenType.Null ||
+                                   (reader.TokenType == JsonTokenType.String && IsDateText(reader.GetString()!)),
+            _ => false
+        };
     }
 
     /// <summary>
@@ -129,7 +205,8 @@ public static class RtSecretValueWireFormat
     }
 
     /// <summary>
-    ///     True when <paramref name="element" /> is the marker (empty object or only a boolean <c>isSet</c>).
+    ///     True when <paramref name="element" /> is the marker (an object with only the marker properties
+    ///     <c>isSet</c> / <c>keyMissing</c> as booleans and <c>setAt</c> as date string or null; may be empty).
     /// </summary>
     public static bool IsMarker(JsonElement element)
     {
@@ -140,14 +217,24 @@ public static class RtSecretValueWireFormat
 
         foreach (var property in element.EnumerateObject())
         {
-            if (!IsMarkerProperty(property.Name) ||
-                (property.Value.ValueKind != JsonValueKind.True && property.Value.ValueKind != JsonValueKind.False))
+            if (!IsValidMarkerValue(Classify(property.Name), property.Value))
             {
                 return false;
             }
         }
 
         return true;
+    }
+
+    private static bool IsValidMarkerValue(MarkerProperty kind, JsonElement value)
+    {
+        return kind switch
+        {
+            MarkerProperty.Boolean => value.ValueKind is JsonValueKind.True or JsonValueKind.False,
+            MarkerProperty.Date => value.ValueKind == JsonValueKind.Null ||
+                                   (value.ValueKind == JsonValueKind.String && IsDateText(value.GetString()!)),
+            _ => false
+        };
     }
 
     #endregion
@@ -200,15 +287,16 @@ public static class RtSecretValueWireFormat
                 case Newtonsoft.Json.JsonToken.Comment:
                     continue;
                 case Newtonsoft.Json.JsonToken.PropertyName when IsMarkerProperty((string?)reader.Value):
+                    var kind = Classify((string?)reader.Value);
                     if (!reader.Read())
                     {
                         break;
                     }
 
-                    if (reader.TokenType != Newtonsoft.Json.JsonToken.Boolean)
+                    if (!IsValidMarkerValue(kind, reader.TokenType, reader.Value))
                     {
                         throw new Newtonsoft.Json.JsonSerializationException(
-                            $"The property '{IsSetPropertyName}' of a Secret marker must be a boolean; got a token of type {reader.TokenType}.");
+                            InvalidPropertyMessage(kind, reader.TokenType.ToString()));
                     }
 
                     continue;
@@ -238,14 +326,39 @@ public static class RtSecretValueWireFormat
         writer.WriteEndObject();
     }
 
+    private static bool IsValidMarkerValue(MarkerProperty kind, Newtonsoft.Json.JsonToken tokenType, object? value)
+    {
+        return kind switch
+        {
+            MarkerProperty.Boolean => tokenType == Newtonsoft.Json.JsonToken.Boolean,
+            // Depending on DateParseHandling a date string arrives as a Date token.
+            MarkerProperty.Date => tokenType is Newtonsoft.Json.JsonToken.Null or Newtonsoft.Json.JsonToken.Undefined
+                                       or Newtonsoft.Json.JsonToken.Date ||
+                                   (tokenType == Newtonsoft.Json.JsonToken.String && value is string text &&
+                                    IsDateText(text)),
+            _ => false
+        };
+    }
+
     /// <summary>
-    ///     True when <paramref name="token" /> is the marker (empty object or only a boolean <c>isSet</c>).
+    ///     True when <paramref name="token" /> is the marker (an object with only the marker properties
+    ///     <c>isSet</c> / <c>keyMissing</c> as booleans and <c>setAt</c> as date (string) or null; may be empty).
     /// </summary>
     public static bool IsMarker(JToken token)
     {
         ArgumentNullException.ThrowIfNull(token);
-        return token is JObject obj &&
-               obj.Properties().All(p => IsMarkerProperty(p.Name) && p.Value.Type == JTokenType.Boolean);
+        return token is JObject obj && obj.Properties().All(p => IsValidMarkerValue(Classify(p.Name), p.Value));
+    }
+
+    private static bool IsValidMarkerValue(MarkerProperty kind, JToken value)
+    {
+        return kind switch
+        {
+            MarkerProperty.Boolean => value.Type == JTokenType.Boolean,
+            MarkerProperty.Date => value.Type is JTokenType.Null or JTokenType.Undefined or JTokenType.Date ||
+                                   (value.Type == JTokenType.String && IsDateText((string)value!)),
+            _ => false
+        };
     }
 
     #endregion
@@ -253,21 +366,23 @@ public static class RtSecretValueWireFormat
     #region Object graphs
 
     /// <summary>
-    ///     True when <paramref name="dictionary" /> is the marker: empty, or only the key <c>isSet</c> with a
-    ///     boolean value (<see cref="bool" />, a JSON boolean element / token). A non-generic dictionary as
-    ///     YAML produces it (<c>Dictionary&lt;object, object&gt;</c> with string scalars) may also hold the
-    ///     text <c>true</c> / <c>false</c>.
+    ///     True when <paramref name="dictionary" /> is the marker: only the keys <c>isSet</c> /
+    ///     <c>keyMissing</c> with a boolean value (<see cref="bool" />, a JSON boolean element / token) and
+    ///     <c>setAt</c> with a date (<see cref="DateTime" />, <see cref="DateTimeOffset" />, a date string or
+    ///     JSON date element / token) or null; may be empty. A non-generic dictionary as YAML produces it
+    ///     (<c>Dictionary&lt;object, object&gt;</c> with string scalars) may also hold the text
+    ///     <c>true</c> / <c>false</c>.
     /// </summary>
     public static bool IsMarkerDictionary(object dictionary)
     {
         switch (dictionary)
         {
             case IEnumerable<KeyValuePair<string, object?>> pairs:
-                return pairs.All(p => IsMarkerProperty(p.Key) && IsBoolean(p.Value, false));
+                return pairs.All(p => IsValidMarkerObject(Classify(p.Key), p.Value, false));
             case IDictionary nonGeneric:
                 foreach (DictionaryEntry entry in nonGeneric)
                 {
-                    if (entry.Key is not string key || !IsMarkerProperty(key) || !IsBoolean(entry.Value, true))
+                    if (entry.Key is not string key || !IsValidMarkerObject(Classify(key), entry.Value, true))
                     {
                         return false;
                     }
@@ -279,14 +394,27 @@ public static class RtSecretValueWireFormat
         }
     }
 
-    private static bool IsBoolean(object? value, bool allowText)
+    private static bool IsValidMarkerObject(MarkerProperty kind, object? value, bool allowText)
     {
-        return value switch
+        return kind switch
         {
-            bool => true,
-            JsonElement { ValueKind: JsonValueKind.True or JsonValueKind.False } => true,
-            JValue { Type: JTokenType.Boolean } => true,
-            string text when allowText => bool.TryParse(text, out _),
+            MarkerProperty.Boolean => value switch
+            {
+                bool => true,
+                JsonElement { ValueKind: JsonValueKind.True or JsonValueKind.False } => true,
+                JValue { Type: JTokenType.Boolean } => true,
+                string text when allowText => bool.TryParse(text, out _),
+                _ => false
+            },
+            MarkerProperty.Date => value switch
+            {
+                null => true,
+                DateTime or DateTimeOffset => true,
+                string text => IsDateText(text),
+                JsonElement element => IsValidMarkerValue(kind, element),
+                JToken token => IsValidMarkerValue(kind, token),
+                _ => false
+            },
             _ => false
         };
     }

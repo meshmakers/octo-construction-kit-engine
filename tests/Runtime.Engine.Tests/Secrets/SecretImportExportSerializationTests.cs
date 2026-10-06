@@ -342,6 +342,12 @@ public class SecretImportExportSerializationTests
     [Theory]
     [InlineData("{\"isSet\":false}")]
     [InlineData("{\"IsSet\":true}")]
+    // AB#5532 round 2: the echoed read state object (OctoSecretState) is the marker as well.
+    [InlineData("{\"isSet\":false,\"keyMissing\":true,\"setAt\":null}")]
+    [InlineData("{\"isSet\":true,\"keyMissing\":false,\"setAt\":\"2026-10-06T12:34:56.789Z\"}")]
+    [InlineData("{\"ISSET\":true,\"KeyMissing\":false,\"SETAT\":\"2026-10-06T12:34:56+02:00\"}")]
+    [InlineData("{\"keyMissing\":true}")]
+    [InlineData("{\"setAt\":\"2026-10-06\"}")]
     public void Json_Read_MarkerVariants_AreUnchanged(string json)
     {
         Assert.Equal(RtSecretValue.Pending(""), System.Text.Json.JsonSerializer.Deserialize<RtSecretValue>(json));
@@ -356,6 +362,14 @@ public class SecretImportExportSerializationTests
     [InlineData("{\"isSet\":true,\"value\":\"hunter2\"}")]
     [InlineData("{\"isSet\":\"hunter2\"}")]
     [InlineData("{\"isSet\":1}")]
+    [InlineData("{\"isSet\":null}")]
+    [InlineData("{\"keyMissing\":\"hunter2\"}")]
+    [InlineData("{\"keyMissing\":null}")]
+    [InlineData("{\"setAt\":\"hunter2\"}")]
+    [InlineData("{\"setAt\":42}")]
+    [InlineData("{\"setAt\":true}")]
+    [InlineData("{\"setAt\":{\"value\":\"hunter2\"}}")]
+    [InlineData("{\"isSet\":true,\"keyMissing\":false,\"setAt\":null,\"value\":\"hunter2\"}")]
     public void Json_Read_AnythingElse_Throws_WithoutEchoingTheValue(string json)
     {
         var stj = Assert.Throws<System.Text.Json.JsonException>(() => System.Text.Json.JsonSerializer.Deserialize<RtSecretValue>(json));
@@ -394,6 +408,10 @@ public class SecretImportExportSerializationTests
     [InlineData("{isSet: true}", "")]
     [InlineData("{isSet: false}", "")]
     [InlineData("{}", "")]
+    [InlineData("{isSet: false, keyMissing: true, setAt: null}", "")]
+    [InlineData("{isSet: true, keyMissing: false, setAt: ~}", "")]
+    [InlineData("{isSet: true, keyMissing: false, setAt: 2026-10-06T12:34:56.789Z}", "")]
+    [InlineData("{IsSet: true, SetAt: '2026-10-06T12:34:56Z'}", "")]
     public void Yaml_Read_ScalarIsInput_MarkerIsUnchanged(string yaml, string expectedPending)
     {
         var deserializer = new DeserializerBuilder().WithTypeConverter(new RtSecretValueYamlConverter()).Build();
@@ -407,6 +425,10 @@ public class SecretImportExportSerializationTests
     [InlineData("{isSet: true, value: hunter2}")]
     [InlineData("{isSet: hunter2}")]
     [InlineData("{isSet: 'true'}")]
+    [InlineData("{keyMissing: hunter2}")]
+    [InlineData("{setAt: hunter2}")]
+    [InlineData("{setAt: [hunter2]}")]
+    [InlineData("{isSet: true, setAt: null, value: hunter2}")]
     public void Yaml_Read_AnythingElse_Throws_WithoutEchoingTheValue(string yaml)
     {
         var deserializer = new DeserializerBuilder().WithTypeConverter(new RtSecretValueYamlConverter()).Build();
@@ -438,6 +460,60 @@ public class SecretImportExportSerializationTests
         Assert.Equal(RtSecretValue.Pending(""), fromElement);
         Assert.Equal(RtSecretValue.Pending(""), fromDictionary);
         Assert.Equal(RtSecretValue.Pending(""), fromJObject);
+    }
+
+    [Fact]
+    public void AttributeValueConverter_EchoedStateObject_MeansUnchanged()
+    {
+        // AB#5532 round 2: a client echoing { isSet, keyMissing, setAt } as read leaves the secret unchanged.
+        const string state = "{\"isSet\":true,\"keyMissing\":false,\"setAt\":\"2026-10-06T12:34:56.789Z\"}";
+        using var document = JsonDocument.Parse(state);
+        object[] echoes =
+        [
+            document.RootElement,
+            // JObject.Parse turns the ISO string into a Date token (default DateParseHandling).
+            Newtonsoft.Json.Linq.JObject.Parse(state),
+            new Dictionary<string, object?>
+            {
+                ["isSet"] = false, ["keyMissing"] = true, ["setAt"] = null
+            },
+            new Dictionary<string, object?>
+            {
+                ["isSet"] = true, ["keyMissing"] = false, ["setAt"] = new DateTime(2026, 10, 6, 0, 0, 0, DateTimeKind.Utc)
+            },
+            new Dictionary<string, object?> { ["isSet"] = true, ["setAt"] = DateTimeOffset.UtcNow },
+            new Dictionary<string, object?> { ["isSet"] = true, ["setAt"] = "2026-10-06T12:34:56Z" },
+            // YAML shape: object keys, text scalars.
+            new Dictionary<object, object?> { ["isSet"] = "true", ["keyMissing"] = "false", ["setAt"] = "2026-10-06T12:34:56Z" }
+        ];
+
+        foreach (var echo in echoes)
+        {
+            Assert.Equal(RtSecretValue.Pending(""),
+                AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, echo));
+        }
+    }
+
+    [Fact]
+    public void AttributeValueConverter_StateObjectWithInvalidOptionalFields_IsRejectedWithoutTheValue()
+    {
+        using var document = JsonDocument.Parse("{\"isSet\":true,\"setAt\":\"hunter2\"}");
+        object[] invalid =
+        [
+            document.RootElement,
+            Newtonsoft.Json.Linq.JObject.Parse("{\"isSet\":true,\"keyMissing\":\"hunter2\"}"),
+            new Dictionary<string, object?> { ["isSet"] = true, ["setAt"] = "hunter2" },
+            new Dictionary<string, object?> { ["isSet"] = true, ["setAt"] = 42 },
+            new Dictionary<string, object?> { ["keyMissing"] = "hunter2" },
+            new Dictionary<object, object?> { ["setAt"] = "hunter2" }
+        ];
+
+        foreach (var value in invalid)
+        {
+            var exception = Assert.Throws<InvalidAttributeValueException>(() =>
+                AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, value));
+            AssertNoValue(exception.Message);
+        }
     }
 
     [Fact]

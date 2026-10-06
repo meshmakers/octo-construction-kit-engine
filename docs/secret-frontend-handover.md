@@ -310,6 +310,7 @@ On a bot without key ring the restore runs a key-free Verify only and still list
 - Bot `{tenantId}/v1/secrets/...` routes (status, sweep-runs, dump delete) accept only the token's own tenant; a parent-tenant administrator switches into the child tenant (Studio links per child tenant, Q16). The sweep trigger and report routes on `{tenantId}/v1/jobs/...` also accept parent-tenant administrators.
 - `setAt` is recorded from now on (new or rotated values); values set earlier and values converted by the Encrypt sweep show `setAt: null`.
 - An inventory entry is only listed for record members whose record element exists (an unset optional record contributes no slot).
+- Deleted (archived) entities are never listed in `inventory` / `summary` (same as `runtimeEntities` and typed queries) and never appear in a sweep report's `unreadable[]` / `cleared[]` / `secretsToReEnter`; the sweeps still process their stored values (concept §6, AB#5532/AB#5544).
 - `usedBy`/`usages` scan the tenant's pipeline definitions once per request, only when selected; they match the exact CK type of the RevealSecret@1 node.
 - Sweep report paths (`unreadable[]`, `cleared[]`, `failures[]`) use the same camelCase notation as `inventory.attributePath`, so report rows link to inventory rows.
 - Sweep `totals` additionally carry `placeholder` and `unknownKeyIdByKeyId`.

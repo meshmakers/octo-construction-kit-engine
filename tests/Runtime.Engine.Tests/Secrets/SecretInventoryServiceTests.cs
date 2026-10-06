@@ -57,7 +57,10 @@ public class SecretInventoryServiceTests
                 var typeId = call.GetArgument<RtCkId<CkTypeId>>(1)!;
                 var skip = call.GetArgument<int?>(3) ?? 0;
                 var take = call.GetArgument<int?>(4) ?? int.MaxValue;
-                var all = _store.TryGetValue(typeId.FullName, out var list) ? list : [];
+                var options = call.GetArgument<RtEntityQueryOptions>(2);
+                var includeArchived = options?.GlobalFilter?.IncludeArchived ?? false;
+                var all = (_store.TryGetValue(typeId.FullName, out var list) ? list : [])
+                    .Where(e => includeArchived || e.RtState != RtState.Archived).ToList();
                 IResultSet<RtEntity> page = new ResultSet<RtEntity>(all.Skip(skip).Take(take).ToList(), all.Count,
                     null, null);
                 return Task.FromResult(page);
@@ -110,6 +113,40 @@ public class SecretInventoryServiceTests
         // RequiredCredentials / Wrappers are null: no slots.
         Assert.DoesNotContain(page.Items, i => i.AttributeName is "RequiredCredentials" or "Wrappers");
         AssertNoValues(page);
+    }
+
+    /// <summary>
+    ///     AB#5532/AB#5544: a deleted entity is archived (rtState = Archived) and keeps its document; the
+    ///     inventory and the summary must not list it - exactly like every public query.
+    /// </summary>
+    [Fact]
+    public async Task ArchivedEntities_AreNeitherListedNorSummarized()
+    {
+        var deleted = _model.NewConfig();
+        deleted.RtState = RtState.Archived;
+        deleted.RtWellKnownName = "deleted-mailbox";
+        deleted.SetAttributeRawValue("Password", "deleted-clear");
+        deleted.SetAttributeRawValue("ApiKey", RtSecretValue.Protected(UnknownKidEnvelope, Earlier));
+        _store[_model.Config.CkTypeId.ToRtCkId().FullName].Add(deleted);
+
+        var page = await ListAsync();
+        Assert.Equal(5, page.TotalCount);
+        Assert.DoesNotContain(page.Items, i => i.RtId == deleted.RtId);
+
+        var reEntry = await ListAsync(new SecretInventoryQuery { NeedsReEntry = true, Take = 100 });
+        Assert.DoesNotContain(reEntry.Items, i => i.RtId == deleted.RtId);
+
+        var summary = await CreateService().SummarizeAsync(SecretTestModel.TenantId,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(5, summary.Total);
+        Assert.Equal(1, summary.KeyMissing);
+        Assert.Equal(2, summary.NeedsReEntry);
+
+        // Every read excludes archived entities through the repository's global filter.
+        A.CallTo(() => _repository.GetRtEntitiesByTypeAsync(A<IOctoSession>._, A<RtCkId<CkTypeId>>._,
+                A<RtEntityQueryOptions>.That.Matches(o => o.GlobalFilter == null || o.GlobalFilter.IncludeArchived),
+                A<int?>._, A<int?>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]

@@ -55,22 +55,33 @@ internal sealed class SecretEntityScanner(
     }
 
     /// <summary>
-    ///     Reads the entities of one CK type page by page (archived included, sorted by rtId, caching
-    ///     disabled). A query of a type may return entities of derived types as well; callers dedupe by rtId.
+    ///     Reads the entities of one CK type page by page (sorted by rtId, caching disabled). A query of a
+    ///     type may return entities of derived types as well; callers dedupe by rtId.
     /// </summary>
+    /// <param name="repository">Tenant repository</param>
+    /// <param name="session">Session</param>
+    /// <param name="type">CK type to read</param>
+    /// <param name="batchSize">Page size</param>
+    /// <param name="includeArchived">
+    ///     <c>true</c> for the sweep: archived (deleted, <c>RtState.Archived</c>) entities still hold stored
+    ///     secrets that must be encrypted / cleaned up at rest. <c>false</c> for the inventory: like every public
+    ///     query (<c>GetRtEntitiesByTypeAsync</c> without a global filter) it must not list deleted entities
+    ///     (AB#5532/AB#5544).
+    /// </param>
+    /// <param name="cancellationToken">Cancellation token</param>
     public async IAsyncEnumerable<IReadOnlyList<RtEntity>> ReadPagesAsync(IRuntimeRepository repository,
-        IOctoSession session, CkTypeGraph type, int batchSize,
+        IOctoSession session, CkTypeGraph type, int batchSize, bool includeArchived,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
     {
         var skip = 0;
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            // Archived entities hold secrets too. Offset paging needs a deterministic order: without a
+            // Offset paging needs a deterministic order: without a
             // sort the backend may return pages in plan order, which is not guaranteed to be stable across
             // the queries of one scan, so an entity could be skipped or seen twice. rtId ("_id") is indexed
             // and never changes on a rewrite (AB#5532 review).
-            var queryOptions = RtEntityQueryOptions.Create().Global(true).WithCachingDisabled()
+            var queryOptions = RtEntityQueryOptions.Create().Global(includeArchived).WithCachingDisabled()
                 .SortOrder(RtIdSortPath, SortOrders.Ascending);
             var page = await repository.GetRtEntitiesByTypeAsync(session, type.CkTypeId.ToRtCkId(),
                 queryOptions, skip, batchSize).ConfigureAwait(false);

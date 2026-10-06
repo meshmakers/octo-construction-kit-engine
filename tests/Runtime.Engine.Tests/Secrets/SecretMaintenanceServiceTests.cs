@@ -67,7 +67,10 @@ public class SecretMaintenanceServiceTests
                 var typeId = call.GetArgument<RtCkId<CkTypeId>>(1)!;
                 var skip = call.GetArgument<int?>(3) ?? 0;
                 var take = call.GetArgument<int?>(4) ?? int.MaxValue;
-                var all = _store.TryGetValue(typeId.FullName, out var list) ? list : [];
+                var options = call.GetArgument<RtEntityQueryOptions>(2);
+                var includeArchived = options?.GlobalFilter?.IncludeArchived ?? false;
+                var all = (_store.TryGetValue(typeId.FullName, out var list) ? list : [])
+                    .Where(e => includeArchived || e.RtState != RtState.Archived).ToList();
                 // Like a real repository, a read hands out copies: the sweep must not see later writes
                 // through the objects it read, and the store must not see the sweep's in-place changes.
                 IResultSet<RtEntity> page = new ResultSet<RtEntity>(all.Skip(skip).Take(take).Select(Copy).ToList(),
@@ -102,7 +105,7 @@ public class SecretMaintenanceServiceTests
 
     private static RtEntity Copy(RtEntity entity)
     {
-        var copy = new RtEntity(entity.CkTypeId!, entity.RtId);
+        var copy = new RtEntity(entity.CkTypeId!, entity.RtId) { RtState = entity.RtState };
         foreach (var (name, value) in entity.Attributes)
         {
             copy.SetAttributeRawValue(name, SecretMaintenanceService.CopyAttributeValue(value));
@@ -340,6 +343,70 @@ public class SecretMaintenanceServiceTests
     public void CleanupUnreadable_KeepsTheNumericValueOfTheFormerClearUnknownKid()
     {
         Assert.Equal(3, (int)SecretSweepMode.CleanupUnreadable);
+    }
+
+    private RtEntity AddArchivedEntity()
+    {
+        var deleted = _model.NewConfig();
+        deleted.RtState = RtState.Archived;
+        deleted.SetAttributeRawValue("Password", "plain-1");
+        deleted.SetAttributeRawValue("ApiKey", RtSecretValue.Protected(UnknownKidEnvelope));
+        _store[_model.Config.CkTypeId.ToRtCkId().FullName].Add(deleted);
+        return deleted;
+    }
+
+    /// <summary>
+    ///     AB#5532/AB#5544 (PO decision): archived (deleted) entities are swept - no clear text stays at rest -
+    ///     but their unreadable values are no re-entry tasks; they are counted separately.
+    /// </summary>
+    [Theory]
+    [InlineData(SecretSweepMode.Verify)]
+    [InlineData(SecretSweepMode.Encrypt)]
+    [InlineData(SecretSweepMode.Reprotect)]
+    public async Task ArchivedEntities_AreProcessed_ButNotListedForReEntry(SecretSweepMode mode)
+    {
+        var deleted = AddArchivedEntity();
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, mode,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(6, result.EntitiesScanned);
+        Assert.Equal(1, result.ArchivedEntitiesScanned);
+        Assert.Equal(1, result.ArchivedUnreadableValues);
+        Assert.DoesNotContain(result.Unreadable, u => u.RtId == deleted.RtId);
+        Assert.Equal(3, result.Totals.UnknownKeyId); // e3, e4 record and the archived entity
+        Assert.Equal(2, result.Unreadable.Count);
+        Assert.Equal(UnknownKidEnvelope, ((RtSecretValue)deleted.Attributes["ApiKey"]!).Envelope); // kept
+
+        if (mode == SecretSweepMode.Verify)
+        {
+            Assert.Equal("plain-1", deleted.Attributes["Password"]);
+        }
+        else
+        {
+            // The clear text of the deleted entity is encrypted at rest as well.
+            var password = Assert.IsType<RtSecretValue>(deleted.Attributes["Password"]);
+            Assert.True(_protector.IsProtectedEnvelope(password.Envelope!));
+            Assert.Contains(_rewrites, r => r.RtId == deleted.RtId && r.Attribute == "Password");
+        }
+
+        AssertResultCarriesNoValue(result);
+    }
+
+    [Fact]
+    public async Task ArchivedEntities_CleanupUnreadable_Deletes_ButDoesNotListAsCleared()
+    {
+        var deleted = AddArchivedEntity();
+
+        var result = await CreateService().SweepTenantAsync(SecretTestModel.TenantId, SecretSweepMode.CleanupUnreadable,
+            new SecretSweepOptions { ConfirmCleanupUnreadable = true }, TestContext.Current.CancellationToken);
+
+        Assert.Null(deleted.Attributes["ApiKey"]);
+        Assert.Equal(1, result.ArchivedUnreadableValues);
+        Assert.Equal(2, result.Cleared.Count);
+        Assert.DoesNotContain(result.Cleared, c => c.RtId == deleted.RtId);
+        Assert.Empty(result.Unreadable);
+        AssertResultCarriesNoValue(result);
     }
 
     [Fact]

@@ -17,7 +17,9 @@ namespace Meshmakers.Octo.Runtime.Contracts.Secrets;
 ///     <para>
 ///         The service walks every concrete CK type of the tenant that has a Secret attribute (top-level
 ///         or inside a record, at any nesting depth), reads the entities in batches through
-///         <c>IRuntimeRepository.GetRtEntitiesByTypeAsync</c> (archived entities included) and rewrites
+///         <c>IRuntimeRepository.GetRtEntitiesByTypeAsync</c> (archived = deleted entities included: their
+///         stored values are processed too, counted in <c>SecretSweepResult.ArchivedEntitiesScanned</c>, but
+///         never listed as re-entry tasks) and rewrites
 ///         changed attributes through <c>IRuntimeRepository.RewriteAttributeValueIfUnchangedForMigrationAsync</c>
 ///         (a record-valued attribute is rewritten as a whole). The rewrite is conditional on the stored
 ///         value still being the one the sweep read; an attribute changed in between is skipped and
@@ -435,6 +437,22 @@ public sealed class SecretSweepResult
     public long EntitiesScanned { get; set; }
 
     /// <summary>
+    ///     Entities among <see cref="EntitiesScanned" /> that are archived (deleted, <c>RtState.Archived</c>;
+    ///     AB#5532/AB#5544). The sweep processes their stored secrets like any other (encrypt, re-protect,
+    ///     cleanup) so no clear text or unreadable leftovers stay at rest, and counts them in
+    ///     <see cref="Totals" /> / <see cref="Slots" />, but never lists them in <see cref="Unreadable" /> or
+    ///     <see cref="Cleared" />: a deleted entity is no re-entry task (see <see cref="ArchivedUnreadableValues" />).
+    /// </summary>
+    public long ArchivedEntitiesScanned { get; set; }
+
+    /// <summary>
+    ///     Values with an unknown key id on archived entities (<see cref="ArchivedEntitiesScanned" />): kept, or
+    ///     deleted by <see cref="SecretSweepMode.CleanupUnreadable" />, but not listed in <see cref="Unreadable" /> /
+    ///     <see cref="Cleared" /> (AB#5532/AB#5544). Counted in <see cref="SecretFormCounts.UnknownKeyId" /> as well.
+    /// </summary>
+    public long ArchivedUnreadableValues { get; set; }
+
+    /// <summary>
     ///     Entities with at least one rewritten attribute.
     /// </summary>
     public long EntitiesRewritten { get; set; }
@@ -457,7 +475,8 @@ public sealed class SecretSweepResult
     /// <summary>
     ///     Values deleted by <see cref="SecretSweepMode.CleanupUnreadable" /> (an <c>enc:v2</c> envelope with an
     ///     unknown key id) - these need re-entry. No other mode clears a value; normalised legacy placeholders
-    ///     are not listed here, they were never set (see <see cref="PlaceholdersNormalized" />).
+    ///     are not listed here, they were never set (see <see cref="PlaceholdersNormalized" />). Values deleted on
+    ///     archived (deleted) entities are not listed either (<see cref="ArchivedUnreadableValues" />).
     /// </summary>
     public List<SecretSweepClearedValue> Cleared { get; } = [];
 
@@ -467,7 +486,8 @@ public sealed class SecretSweepResult
     ///     and lists here only the <c>enc:v1</c> strings of a host without legacy key,
     ///     <see cref="SkippedLegacyV1KeyMissing" />) - the
     ///     re-entry list after a restore from another environment (decisions 2026-10-06, item 2). Counted in
-    ///     <see cref="SecretFormCounts.UnknownKeyId" /> as well.
+    ///     <see cref="SecretFormCounts.UnknownKeyId" /> as well. Archived (deleted) entities are never listed
+    ///     (<see cref="ArchivedUnreadableValues" />).
     /// </summary>
     public List<SecretSweepUnreadableValue> Unreadable { get; } = [];
 

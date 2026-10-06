@@ -107,7 +107,7 @@ internal sealed class SecretMaintenanceService(
             cancellationToken.ThrowIfCancellationRequested();
             result.CkTypesScanned++;
             await foreach (var entities in _scanner.ReadPagesAsync(repository, session, type, batchSize,
-                               cancellationToken).ConfigureAwait(false))
+                               true, cancellationToken).ConfigureAwait(false))
             {
                 foreach (var entity in entities)
                 {
@@ -118,6 +118,14 @@ internal sealed class SecretMaintenanceService(
                     }
 
                     result.EntitiesScanned++;
+                    // AB#5532/AB#5544: archived (deleted) entities are processed so nothing stays in clear
+                    // text or unreadable at rest, but they are no re-entry tasks.
+                    var archived = entity.RtState == RtState.Archived;
+                    if (archived)
+                    {
+                        result.ArchivedEntitiesScanned++;
+                    }
+
                     var entityGraph = _scanner.ResolveEntityGraph(tenantId, entity, type);
                     var model = entityGraph.CkTypeId.ModelId.Name;
                     if (!countsPerModel.TryGetValue(model, out var modelCounts))
@@ -127,7 +135,7 @@ internal sealed class SecretMaintenanceService(
                     }
 
                     var context = new SweepContext(tenantId, mode, normalizePlaceholdersOnly, result, modelCounts,
-                        slotReports, entityGraph.CkTypeId.ToRtCkId().ToString(), entity.RtId);
+                        slotReports, entityGraph.CkTypeId.ToRtCkId().ToString(), entity.RtId, archived);
                     var rewritten = await ProcessEntityAsync(context, repository, session, entityGraph, entity)
                         .ConfigureAwait(false);
                     if (rewritten)
@@ -160,12 +168,14 @@ internal sealed class SecretMaintenanceService(
         }
 
         logger.LogInformation(
-            "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities, {Total} values " +
+            "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities ({Archived} archived, " +
+            "{ArchivedUnreadable} unreadable value(s) of archived entities not listed), {Total} values " +
             "(not set {NotSet}, placeholder {Placeholder}, plaintext {Plaintext}, enc_v1 {EncV1}, enc_v2 {EncV2}, " +
             "unknown kid {UnknownKid}), {Rewritten} rewritten, {Unreadable} unreadable (kept), {Cleared} cleared, " +
             "{SkippedLegacyV1KeyMissing} enc_v1 kept by cleanup (legacy key missing), {PlaceholdersNormalized} placeholder(s) " +
             "normalised, {Skipped} skipped (modified concurrently), {Failed} failed",
-            modeTag, tenantId, result.EntitiesScanned, result.Totals.Total, result.Totals.NotSet,
+            modeTag, tenantId, result.EntitiesScanned, result.ArchivedEntitiesScanned,
+            result.ArchivedUnreadableValues, result.Totals.Total, result.Totals.NotSet,
             result.Totals.Placeholder, result.Totals.Plaintext, result.Totals.EncV1, result.Totals.EncV2,
             result.Totals.UnknownKeyId, result.ValuesRewritten, result.Unreadable.Count, result.Cleared.Count,
             result.SkippedLegacyV1KeyMissing, result.PlaceholdersNormalized,
@@ -373,8 +383,13 @@ internal sealed class SecretMaintenanceService(
         // A legacy enc:v1 string on a host without SecretEncryption:LegacyV1Key is a configuration gap of this
         // host (recoverable by configuring the legacy key), not key loss: even CleanupUnreadable keeps it.
         var legacyV1KeyMissing = form == SecretValueForm.UnknownKeyId && IsLegacyV1WithoutKey(value, keyId);
-        if (form == SecretValueForm.UnknownKeyId &&
-            (context.Mode != SecretSweepMode.CleanupUnreadable || legacyV1KeyMissing))
+        if (form == SecretValueForm.UnknownKeyId && context.IsArchived)
+        {
+            // A deleted entity is no re-entry task: counted only (kept, or deleted by CleanupUnreadable).
+            context.Result.ArchivedUnreadableValues++;
+        }
+        else if (form == SecretValueForm.UnknownKeyId &&
+                 (context.Mode != SecretSweepMode.CleanupUnreadable || legacyV1KeyMissing))
         {
             // Decisions 2026-10-06, item 2: kept as stored and reported as a re-entry task.
             context.Result.Unreadable.Add(new SecretSweepUnreadableValue(context.CkTypeId, context.RtId, elementPath,
@@ -389,8 +404,8 @@ internal sealed class SecretMaintenanceService(
                 context.Result.ValuesRewritten++;
                 switch (effect)
                 {
-                    case SlotEffect.Cleared:
-                        // Only values deleted by CleanupUnreadable belong here.
+                    case SlotEffect.Cleared when !context.IsArchived:
+                        // Only values deleted by CleanupUnreadable belong here (not those of deleted entities).
                         context.Result.Cleared.Add(new SecretSweepClearedValue(context.CkTypeId, context.RtId,
                             elementPath, form.Value, keyId));
                         break;
@@ -661,7 +676,8 @@ internal sealed class SecretMaintenanceService(
         SecretFormCounts ModelCounts,
         Dictionary<string, SecretSlotReport> SlotReports,
         string CkTypeId,
-        OctoObjectId RtId)
+        OctoObjectId RtId,
+        bool IsArchived)
     {
         public SecretSlotReport GetSlot(string attributePath)
         {

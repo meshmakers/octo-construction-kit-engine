@@ -10,7 +10,8 @@ namespace Meshmakers.Octo.Runtime.Contracts.Secrets;
 ///     <c>AddRuntimeEngine()</c>; the asset repository exposes it as GraphQL <c>secrets { inventory summary }</c>.
 /// </summary>
 /// <remarks>
-///     Both calls scan the tenant's entities with Secret slots (archived included); results are live, not
+///     Both calls scan the tenant's entities with Secret slots; archived (deleted, <c>RtState.Archived</c>)
+///     entities are excluded exactly like in the public queries (AB#5532/AB#5544). Results are live, not
 ///     cached. Works without keys: without a key ring every protected value is reported as
 ///     <see cref="SecretStorageForm.KeyMissing" /> (the key id is not in this host's - empty - ring).
 /// </remarks>

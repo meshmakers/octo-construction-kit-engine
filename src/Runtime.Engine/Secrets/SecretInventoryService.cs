@@ -98,7 +98,7 @@ internal sealed class SecretInventoryService(
         foreach (var type in types)
         {
             await foreach (var entities in _scanner.ReadPagesAsync(repository, session, type, BatchSize,
-                               cancellationToken).ConfigureAwait(false))
+                               false, cancellationToken).ConfigureAwait(false))
             {
                 foreach (var entity in entities)
                 {

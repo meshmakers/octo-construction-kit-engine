@@ -245,7 +245,10 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
   "strictMode": false,
   "strictModeSince": null,            // ISO-8601 when strict mode is scheduled/active
   "recurringVerifyCron": "0 3 * * *", // daily Verify (Q6); null when disabled
-  "lastVerifyAt": "2026-10-06T03:00:12Z" // this tenant's last Verify run, null if none
+  "lastVerifyAt": "2026-10-06T03:00:12Z", // this tenant's last Verify run, null if none
+  "warnings": []                      // warning codes (AB#5534): "NoKeyRing" when keyRingConfigured=false,
+                                      // "NoLegacyV1Key" when the tenant's last completed sweep found enc:v1 values but no legacy key is configured;
+                                      // unknown codes: show as a generic warning
 }
 
 // SecretSweepRunDto
@@ -272,11 +275,17 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
   }
 }
 ```
+**No key ring (AB#5534/AB#5539):** when `keyRingConfigured` is `false` (equivalently `warnings` contains `"NoKeyRing"`), Studio shows a **prominent banner** on the secrets overview and on every page with secret inputs ("No key ring configured on this environment — secrets cannot be saved; restored secrets were only classified. Configure the key ring, then run Encrypt."). Secret inputs stay disabled; Encrypt / CleanupUnreadable are not offered (they would be skipped). `NoLegacyV1Key` gets a smaller warning on the secrets overview ("enc:v1 values found but no legacy key configured — they count as key missing").
+
+A restore on a bot **without key ring** still produces the re-entry list: the post-restore run is a key-free Verify only (run `mode: "Verify"`, `trigger: "Restore"`, `outcome: "Succeeded"`, reason "No key ring configured: secrets were classified only; set the key ring and run Encrypt"). Its report lists every value it cannot read without keys in `unreadable[]` / `secretsToReEnter` (all `enc:v2` — key id not in the empty ring — and all `enc:v1` with `keyId: "enc:v1"`); nothing is written. Studio shows these as re-entry tasks like any other unreadable value.
+
 Runs left `Running` by a crash are marked `Failed` with reason "Interrupted (service restart)" shortly after the bot starts. The report and each step also carry `skippedLegacyV1KeyMissing`. MCP offers the same inventory read-only via `get_secret_inventory` (risk low). Dumps are never downloadable (no endpoint). The report (`SecretSweepReport`) gains `unreadable[] { ckTypeId, rtId, attributePath, keyId }` (re-entry list, decision 2026-10-06) and `placeholdersNormalized`; `cleared[]` is only filled by `CleanupUnreadable`. Sweep modes in Studio (Q6): **Verify** (no confirmation), **Encrypt** and **CleanupUnreadable** (confirmation dialog; a pre-sweep dump is taken first; CleanupUnreadable removes values whose key id is unknown — irreversible except via the dump).
 
 ## 10. Restore / unknown key id (decision 2026-10-06)
 
 Restoring a dump from another environment (or a child tenant) keeps secrets **encrypted**: they show `isSet: false`, `keyMissing: true`, form `KEY_MISSING`, and appear as re-entry tasks. Adding the source key id to the environment's key ring makes them readable again automatically (ops step; then `Reprotect` via CLI moves them to the active key). They are removed only by re-entry or the `CleanupUnreadable` sweep. No API decrypts or exports plaintext.
+
+On a bot without key ring the restore runs a key-free Verify only and still lists the re-entry tasks (§9); nothing is encrypted until the key ring is configured and Encrypt runs. A legacy `enc:v1` value on a host without `LegacyV1Key` is treated the same way everywhere: `isSet: false`, `keyMissing: true`, form `KEY_MISSING`, `keyId: "enc:v1"` (not a real key id — show it as "legacy key (enc:v1)"); it becomes readable once the legacy key is configured. `CleanupUnreadable` removes such values too.
 
 ## 11. Debug snapshots (Q12)
 

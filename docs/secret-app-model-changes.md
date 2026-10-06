@@ -343,7 +343,7 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
 - Writes hand the plaintext to the engine; reads use `ISecretAttributeProtector` (enc:v2 and the
   enc:v1 values written before the switch). No second decrypt of ciphertext supplied as text.
 - REST responses never contained the values (status DTOs); the GitHub-PAT / env-secret lists still
-  show a masked tail (last characters) computed server-side — unchanged, open decision.
+  show a masked tail computed server-side, only for values of at least 16 characters (review fix 18d1fee); a stored hint without decrypt is an open decision.
 - Key ring: `AddRuntimeEngine` binds `SecretEncryption:*`; without an explicit ring the service
   derives `k1` + `LegacyV1Key` from `AiEncryption:InstanceSecretKey` (mirrors the chart fallback).
 
@@ -355,7 +355,9 @@ Branch `feat/gerald/secret-attribute-type`, commit `ab93f44`:
   plain `string` in `Attributes`. Writing such an entity back (`CreateUpdate(id, entity)`) makes the
   write path treat it as new input and encrypt the enc:v1 text as plaintext — the value is then lost
   to every reader (the no-double-unwrap rule is correct; the read path is the gap). The query paths
-  (`GetRtEntitiesByTypeAsync<T>` etc.) normalise. octo-ai-services works around it
-  (`AiSecretAttributes.ReinputIfLegacy`); the proper fix is to normalise in the point-read paths too.
+  (`GetRtEntitiesByTypeAsync<T>` etc.) normalise. **Fixed** in engine-mongodb 96e6c9c (all collection
+  reads incl. point reads, upsert and change streams normalise). octo-ai-services additionally keeps
+  raw legacy strings opaque on write-back (`AiSecretAttributes.PrepareLegacySecretForWriteBack`, 18d1fee);
+  enc:v2 text in a legacy slot is never decrypted or promoted (engine cce531b3).
 - **octo-adapter-finapi** `FinApiAuthNode` resolves `Password` / `PasswordPath` without `nodeContext.RegisterSecret`; same follow-up as §3 for its owner. It also accepts an
   inline `password`; none of the scanned pipelines use it.

@@ -133,6 +133,30 @@ public class RtSecretValueTests
         Assert.DoesNotContain("12345", exception.Message);
     }
 
+    public static TheoryData<object> NonMarkerObjects => new()
+    {
+        new Dictionary<string, object?> { ["envelope"] = "hunter2" },
+        new Dictionary<string, object?> { ["isSet"] = true, ["value"] = "hunter2" },
+        new Dictionary<string, object?> { ["isSet"] = "hunter2" },
+        new Dictionary<object, object> { ["isSet"] = "hunter2" },
+        JObject.Parse("{\"isSet\":\"hunter2\"}"),
+        JObject.Parse("{\"envelope\":\"enc:v2:k1:hunter2\"}"),
+        System.Text.Json.JsonDocument.Parse("{\"isSet\":true,\"value\":\"hunter2\"}").RootElement,
+        System.Text.Json.JsonDocument.Parse("{\"isSet\":\"hunter2\"}").RootElement
+    };
+
+    [Theory]
+    [MemberData(nameof(NonMarkerObjects))]
+    public void Converter_RejectsObjectsOtherThanTheMarker_WithoutTheValueInTheMessage(object input)
+    {
+        var exception = Assert.Throws<InvalidAttributeValueException>(() =>
+            AttributeValueConverter.ConvertAttributeValue(AttributeValueTypesDto.Secret, input));
+
+        Assert.Contains("Secret attribute", exception.Message);
+        Assert.DoesNotContain("hunter2", exception.Message);
+        Assert.DoesNotContain("enc:", exception.Message);
+    }
+
     [Fact]
     public void Converter_TreatsTheReadMarkerAsUnchanged()
     {
@@ -143,7 +167,12 @@ public class RtSecretValueTests
             new Dictionary<string, object?> { ["isSet"] = true },
             expando,
             JObject.Parse("{\"isSet\":true}"),
-            System.Text.Json.JsonDocument.Parse("{\"isSet\":true}").RootElement
+            System.Text.Json.JsonDocument.Parse("{\"isSet\":true}").RootElement,
+            // Empty marker, isSet:false, and the YAML shape (object keys, boolean text).
+            new Dictionary<string, object?>(),
+            JObject.Parse("{\"isSet\":false}"),
+            System.Text.Json.JsonDocument.Parse("{}").RootElement,
+            new Dictionary<object, object> { ["isSet"] = "true" }
         ];
 
         foreach (var marker in markers)

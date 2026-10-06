@@ -69,6 +69,14 @@ public class InvalidAttributeValueException : PersistenceException
             $"{{\"isSet\": ...}} (unchanged), but a value of type '{actualType.Name}' was given.");
     }
 
+    internal static Exception InvalidSecretObject()
+    {
+        return new InvalidAttributeValueException(
+            "A Secret attribute value must be a string (the secret to store), null (clear) or the read marker " +
+            "{\"isSet\": true|false} (unchanged), but an object with other properties or a non-boolean " +
+            "'isSet' was given.");
+    }
+
     internal static Exception InvalidDataType(string getLocation, string attributeName, Type actualType, Type expectType)
     {
         return new InvalidAttributeValueException(

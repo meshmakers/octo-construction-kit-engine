@@ -304,6 +304,92 @@ public class SecretImportExportSerializationTests
         Assert.Null(System.Text.Json.JsonSerializer.Deserialize<RtSecretValue>("null"));
     }
 
+    [Theory]
+    [InlineData("{\"isSet\":false}")]
+    [InlineData("{\"IsSet\":true}")]
+    public void Json_Read_MarkerVariants_AreUnchanged(string json)
+    {
+        Assert.Equal(RtSecretValue.Pending(""), System.Text.Json.JsonSerializer.Deserialize<RtSecretValue>(json));
+        Assert.Equal(RtSecretValue.Pending(""), JsonConvert.DeserializeObject<RtSecretValue>(json));
+    }
+
+    [Theory]
+    [InlineData("42")]
+    [InlineData("true")]
+    [InlineData("[\"hunter2\"]")]
+    [InlineData("{\"envelope\":\"enc:v2:k1:hunter2\"}")]
+    [InlineData("{\"isSet\":true,\"value\":\"hunter2\"}")]
+    [InlineData("{\"isSet\":\"hunter2\"}")]
+    [InlineData("{\"isSet\":1}")]
+    public void Json_Read_AnythingElse_Throws_WithoutEchoingTheValue(string json)
+    {
+        var stj = Assert.Throws<System.Text.Json.JsonException>(() => System.Text.Json.JsonSerializer.Deserialize<RtSecretValue>(json));
+        AssertNoValue(stj.Message);
+
+        var newtonsoft = Assert.ThrowsAny<Newtonsoft.Json.JsonException>(() =>
+            JsonConvert.DeserializeObject<RtSecretValue>(json));
+        AssertNoValue(newtonsoft.Message);
+
+        // Also inside a containing object (the converter must leave the reader consistent).
+        var wrapped = "{\"a\":" + json + "}";
+        Assert.Throws<System.Text.Json.JsonException>(() =>
+            System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, RtSecretValue?>>(wrapped));
+        Assert.ThrowsAny<Newtonsoft.Json.JsonException>(() =>
+            JsonConvert.DeserializeObject<Dictionary<string, RtSecretValue?>>(wrapped));
+    }
+
+    [Fact]
+    public void Json_Read_MarkerInsideObject_LeavesTheReaderOnTheNextProperty()
+    {
+        const string json = "{\"a\":{\"isSet\":true},\"b\":\"new\",\"c\":null}";
+
+        var stj = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, RtSecretValue?>>(json)!;
+        var newtonsoft = JsonConvert.DeserializeObject<Dictionary<string, RtSecretValue?>>(json)!;
+
+        foreach (var result in new[] { stj, newtonsoft })
+        {
+            Assert.Equal(RtSecretValue.Pending(""), result["a"]);
+            Assert.Equal(RtSecretValue.Pending("new"), result["b"]);
+            Assert.Null(result["c"]);
+        }
+    }
+
+    [Theory]
+    [InlineData("new-value", "new-value")]
+    [InlineData("{isSet: true}", "")]
+    [InlineData("{isSet: false}", "")]
+    [InlineData("{}", "")]
+    public void Yaml_Read_ScalarIsInput_MarkerIsUnchanged(string yaml, string expectedPending)
+    {
+        var deserializer = new DeserializerBuilder().WithTypeConverter(new RtSecretValueYamlConverter()).Build();
+
+        Assert.Equal(RtSecretValue.Pending(expectedPending), deserializer.Deserialize<RtSecretValue>(yaml));
+    }
+
+    [Theory]
+    [InlineData("[hunter2]")]
+    [InlineData("{envelope: hunter2}")]
+    [InlineData("{isSet: true, value: hunter2}")]
+    [InlineData("{isSet: hunter2}")]
+    [InlineData("{isSet: 'true'}")]
+    public void Yaml_Read_AnythingElse_Throws_WithoutEchoingTheValue(string yaml)
+    {
+        var deserializer = new DeserializerBuilder().WithTypeConverter(new RtSecretValueYamlConverter()).Build();
+
+        var exception = Assert.ThrowsAny<YamlDotNet.Core.YamlException>(() => deserializer.Deserialize<RtSecretValue>(yaml));
+
+        for (Exception? e = exception; e != null; e = e.InnerException)
+        {
+            AssertNoValue(e.Message);
+        }
+    }
+
+    private static void AssertNoValue(string message)
+    {
+        Assert.DoesNotContain("hunter2", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("enc:", message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void AttributeValueConverter_MarkerSentBack_MeansUnchanged()
     {

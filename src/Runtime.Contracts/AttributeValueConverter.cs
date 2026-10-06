@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Newtonsoft.Json.Linq;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -315,8 +316,9 @@ public static class AttributeValueConverter
     ///     pending value means: non-empty is encrypted, <c>""</c> keeps the stored value, a
     ///     <c>&lt;placeholder&gt;</c> is stored as "not set". Read paths that find a string in the
     ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533). The read
-    ///     marker (a JSON object / dictionary such as <c>{"isSet":true}</c>) means "unchanged"; any other
-    ///     non-string input throws <see cref="InvalidAttributeValueException" />.
+    ///     marker (a JSON object / dictionary that is empty or holds only a boolean <c>isSet</c>) means
+    ///     "unchanged"; any other non-string input - including other objects - throws
+    ///     <see cref="InvalidAttributeValueException" /> without the value in the message.
     /// </summary>
     private static object ConvertSecretValue(object value)
     {
@@ -326,13 +328,18 @@ public static class AttributeValueConverter
             string text => RtSecretValue.Pending(text),
             JsonElement { ValueKind: JsonValueKind.String } element => RtSecretValue.Pending(element.GetString() ?? string.Empty),
             JValue { Type: JTokenType.String } token => RtSecretValue.Pending((string?)token ?? string.Empty),
-            // AB#5532: the read marker {"isSet":...} sent back on a write carries no secret - it means
-            // "unchanged", never the text of the object.
-            JsonElement { ValueKind: JsonValueKind.Object } => RtSecretValue.Pending(string.Empty),
-            JObject => RtSecretValue.Pending(string.Empty),
-            IDictionary => RtSecretValue.Pending(string.Empty),
-            IReadOnlyDictionary<string, object?> => RtSecretValue.Pending(string.Empty),
-            IDictionary<string, object?> => RtSecretValue.Pending(string.Empty), // ExpandoObject
+            // AB#5532: the read marker {"isSet":true|false} (or {}) sent back on a write carries no secret -
+            // it means "unchanged". Any other object is rejected (strict wire contract, RtSecretValueWireFormat).
+            JsonElement { ValueKind: JsonValueKind.Object } element => RtSecretValueWireFormat.IsMarker(element)
+                ? RtSecretValue.Pending(string.Empty)
+                : throw InvalidAttributeValueException.InvalidSecretObject(),
+            JObject token => RtSecretValueWireFormat.IsMarker(token)
+                ? RtSecretValue.Pending(string.Empty)
+                : throw InvalidAttributeValueException.InvalidSecretObject(),
+            IDictionary or IReadOnlyDictionary<string, object?> or IDictionary<string, object?> => // ExpandoObject
+                RtSecretValueWireFormat.IsMarkerDictionary(value)
+                    ? RtSecretValue.Pending(string.Empty)
+                    : throw InvalidAttributeValueException.InvalidSecretObject(),
             // Anything else (numbers, booleans, lists, arbitrary objects) is not a secret: encrypting its
             // ToString() would store "System.Collections.Generic.List`1[...]" or a number nobody typed as a
             // credential. The message names the type only, never the value.

@@ -77,6 +77,7 @@ public static class ServiceCollectionExtensions
         // and the sweep service (verify / encrypt / reprotect / clear unknown kid / emergency decrypt).
         services.TryAddSingleton<ISecretWriteNormalizer, SecretWriteNormalizer>();
         services.TryAddTransient<ISecretMaintenanceService, SecretMaintenanceService>();
+        services.TryAddTransient<ISecretInventoryService, SecretInventoryService>();
 
         // Implementation of bulk operations
         services.AddTransient<IBulkRtMutation, BulkRtMutation>();

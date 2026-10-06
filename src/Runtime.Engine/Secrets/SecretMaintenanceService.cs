@@ -31,7 +31,9 @@ internal sealed class SecretMaintenanceService(
     /// <summary>
     ///     Paging cursor of the sweep: the runtime id (resolved to <c>_id</c> by the MongoDB field resolver).
     /// </summary>
-    internal const string RtIdSortPath = "rtId";
+    internal const string RtIdSortPath = SecretEntityScanner.RtIdSortPath;
+
+    private readonly SecretEntityScanner _scanner = new(repositoryProvider, ckCacheService, writeNormalizer);
 
     /// <inheritdoc />
     public Task<SecretSweepResult> SweepTenantAsync(string tenantId, SecretSweepMode mode,
@@ -84,23 +86,14 @@ internal sealed class SecretMaintenanceService(
     private async Task<SecretSweepResult> RunAsync(string tenantId, SecretSweepMode mode, SecretSweepOptions options,
         bool normalizePlaceholdersOnly, CancellationToken cancellationToken)
     {
-        var repository = await repositoryProvider.GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false)
-                         ?? throw new InvalidOperationException($"No runtime repository is available for tenant '{tenantId}'.");
-        if (!ckCacheService.IsTenantLoaded(tenantId))
-        {
-            await repository.LoadCacheForTenantAsync(ckCacheService).ConfigureAwait(false);
-        }
+        var repository = await _scanner.GetRepositoryAsync(tenantId, cancellationToken).ConfigureAwait(false);
 
         var modeTag = normalizePlaceholdersOnly ? NormalizePlaceholdersModeTag : ModeTag(mode);
         var result = new SecretSweepResult(tenantId, mode);
         var countsPerModel = new Dictionary<string, SecretFormCounts>(StringComparer.Ordinal);
         var batchSize = options.BatchSize > 0 ? options.BatchSize : SecretSweepOptions.Default.BatchSize;
 
-        var types = ckCacheService.GetCkTypes(tenantId)
-            .Where(t => !t.IsAbstract && writeNormalizer.HasSecretAttributes(ckCacheService, tenantId, t))
-            .Where(t => options.CkModelName == null || BelongsToModel(tenantId, t, options.CkModelName))
-            .OrderBy(t => t.CkTypeId.FullName, StringComparer.Ordinal)
-            .ToList();
+        var types = _scanner.GetSecretTypes(tenantId, options.CkModelName);
 
         logger.LogInformation("Secret sweep {Mode} of tenant {TenantId}: {TypeCount} CK type(s) with Secret attributes",
             modeTag, tenantId, types.Count);
@@ -113,25 +106,9 @@ internal sealed class SecretMaintenanceService(
         {
             cancellationToken.ThrowIfCancellationRequested();
             result.CkTypesScanned++;
-            var skip = 0;
-            while (true)
+            await foreach (var entities in _scanner.ReadPagesAsync(repository, session, type, batchSize,
+                               cancellationToken).ConfigureAwait(false))
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                // Archived entities hold secrets too. Offset paging needs a deterministic order: without a
-                // sort the backend may return pages in plan order (index or natural order), which is not
-                // guaranteed to be stable across the queries of one sweep, so an entity could be skipped
-                // (left as plaintext) or seen twice. rtId ("_id") is indexed and never changes on a
-                // rewrite - same cursor as the display rule sweep (AB#5532 review).
-                var queryOptions = RtEntityQueryOptions.Create().Global(true).WithCachingDisabled()
-                    .SortOrder(RtIdSortPath, SortOrders.Ascending);
-                var page = await repository.GetRtEntitiesByTypeAsync(session, type.CkTypeId.ToRtCkId(),
-                    queryOptions, skip, batchSize).ConfigureAwait(false);
-                var entities = page.Items.ToList();
-                if (entities.Count == 0)
-                {
-                    break;
-                }
-
                 foreach (var entity in entities)
                 {
                     // A query of a type may return entities of derived types as well; count each once.
@@ -141,10 +118,7 @@ internal sealed class SecretMaintenanceService(
                     }
 
                     result.EntitiesScanned++;
-                    var entityGraph = entity.CkTypeId != null &&
-                                      ckCacheService.TryGetRtCkType(tenantId, entity.CkTypeId, out var actual)
-                        ? actual
-                        : type;
+                    var entityGraph = _scanner.ResolveEntityGraph(tenantId, entity, type);
                     var model = entityGraph.CkTypeId.ModelId.Name;
                     if (!countsPerModel.TryGetValue(model, out var modelCounts))
                     {
@@ -161,13 +135,6 @@ internal sealed class SecretMaintenanceService(
                         result.EntitiesRewritten++;
                     }
                 }
-
-                if (entities.Count < batchSize)
-                {
-                    break;
-                }
-
-                skip += entities.Count;
             }
         }
 
@@ -204,18 +171,6 @@ internal sealed class SecretMaintenanceService(
             result.SkippedConcurrentlyModified, result.Totals.Failed);
 
         return result;
-    }
-
-    private bool BelongsToModel(string tenantId, CkTypeGraph type, string modelName)
-    {
-        if (string.Equals(type.CkTypeId.ModelId.Name, modelName, StringComparison.Ordinal))
-        {
-            return true;
-        }
-
-        return type.AllAttributes.Values.Any(a =>
-            writeNormalizer.AttributeHasSecrets(ckCacheService, tenantId, a) &&
-            string.Equals(a.CkAttributeId.ModelId.Name, modelName, StringComparison.Ordinal));
     }
 
     private async Task<bool> ProcessEntityAsync(SweepContext context, IRuntimeRepository repository,
@@ -323,7 +278,7 @@ internal sealed class SecretMaintenanceService(
         {
             if (element is RtRecord record)
             {
-                var graph = ResolveRecord(context.TenantId, record, attribute);
+                var graph = _scanner.ResolveRecord(context.TenantId, record, attribute);
                 changed |= ProcessRecord(context, attribute, record, reportPath + "[]",
                     SecretWriteNormalizer.BuildElementPath(elementPath, graph?.RecordKey, record, index), graph);
             }
@@ -337,7 +292,7 @@ internal sealed class SecretMaintenanceService(
     private bool ProcessRecord(SweepContext context, CkTypeAttributeGraph attribute, RtRecord record,
         string reportPath, string elementPath, CkRecordGraph? graph = null)
     {
-        graph ??= ResolveRecord(context.TenantId, record, attribute);
+        graph ??= _scanner.ResolveRecord(context.TenantId, record, attribute);
         if (graph == null)
         {
             return false;
@@ -370,20 +325,6 @@ internal sealed class SecretMaintenanceService(
         }
 
         return changed;
-    }
-
-    private CkRecordGraph? ResolveRecord(string tenantId, RtRecord record, CkTypeAttributeGraph attribute)
-    {
-        if (record.CkRecordId is { IsEmpty: false } &&
-            ckCacheService.TryGetRtCkRecord(tenantId, record.CkRecordId, out var graph))
-        {
-            return graph;
-        }
-
-        return attribute.ValueCkRecordId != null &&
-               ckCacheService.TryGetCkRecord(tenantId, attribute.ValueCkRecordId, out var declared)
-            ? declared
-            : null;
     }
 
     /// <summary>

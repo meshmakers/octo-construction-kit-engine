@@ -33,6 +33,71 @@ public enum SecretValueState
 }
 
 /// <summary>
+///     Storage form of a Secret value as administrators see it (secrets overview, handover §7). Never
+///     the value.
+/// </summary>
+public enum SecretStorageForm
+{
+    /// <summary>
+    ///     <c>null</c> / missing, an empty value, or a legacy placeholder still waiting for the migration.
+    /// </summary>
+    NotSet = 0,
+
+    /// <summary>
+    ///     Legacy clear text still stored (before the encrypt sweep). A pending (unsaved input) value is
+    ///     reported as this form as well.
+    /// </summary>
+    Plaintext = 1,
+
+    /// <summary>
+    ///     Legacy <c>enc:v1</c> string (instance key).
+    /// </summary>
+    EncV1 = 2,
+
+    /// <summary>
+    ///     Protected, key id in the key ring.
+    /// </summary>
+    EncV2 = 3,
+
+    /// <summary>
+    ///     Protected, key id NOT in the key ring (kept; reads as not set + key missing).
+    /// </summary>
+    KeyMissing = 4,
+
+    /// <summary>
+    ///     A stored value that can never be read: an <c>enc:v2</c> envelope stored as a legacy string
+    ///     (<see cref="SecretValueStates.IsCorrupt" />). Reads as not set, warning logged.
+    /// </summary>
+    Corrupt = 5
+}
+
+/// <summary>
+///     Everything a reader may learn about a Secret value without decrypting it: the read state, the
+///     storage form, the key id (<see cref="SecretStorageForm.EncV2" /> / <see cref="SecretStorageForm.KeyMissing" />
+///     only) and when it was set (<see cref="RtSecretValue.SetAt" />, protected values only).
+/// </summary>
+/// <param name="State">Read state (<c>isSet = State == Set</c>, <c>keyMissing = State == KeyMissing</c>)</param>
+/// <param name="Form">Storage form</param>
+/// <param name="KeyId">Key id of a protected value; <c>null</c> otherwise</param>
+/// <param name="SetAt">"Set at" (UTC) of a protected value; <c>null</c> for legacy / not set / unknown</param>
+public readonly record struct SecretReadInfo(
+    SecretValueState State,
+    SecretStorageForm Form,
+    string? KeyId,
+    DateTime? SetAt)
+{
+    /// <summary>
+    ///     True when the value reads as set.
+    /// </summary>
+    public bool IsSet => State == SecretValueState.Set;
+
+    /// <summary>
+    ///     True when a value is stored but its key id is not in the key ring.
+    /// </summary>
+    public bool KeyMissing => State == SecretValueState.KeyMissing;
+}
+
+/// <summary>
 ///     Pure classification of Secret values into <see cref="SecretValueState" /> (decisions 2026-10-06,
 ///     item 2). <see cref="ISecretAttributeProtector.GetReadState" /> uses it with the key ring of the
 ///     process; callers without a protector pass the set of known key ids (or no key ring at all, see
@@ -84,6 +149,51 @@ public static class SecretValueStates
                        IsCorrupt(value)
                     ? SecretValueState.NotSet
                     : SecretValueState.Set;
+        }
+    }
+
+    /// <summary>
+    ///     Describes a value - read state, storage form, key id and "set at" - without decrypting it. Same
+    ///     rules and the same <paramref name="isKnownKeyId" /> contract as
+    ///     <see cref="GetReadState(RtSecretValue?, Func{string?, bool}?)" />; without a key ring a protected value
+    ///     is <see cref="SecretStorageForm.EncV2" />.
+    /// </summary>
+    /// <param name="value">The value; <c>null</c> = not set</param>
+    /// <param name="isKnownKeyId">True when a key id is in the key ring; <c>null</c> = no key ring</param>
+    /// <returns>The description</returns>
+    public static SecretReadInfo Describe(RtSecretValue? value, Func<string?, bool>? isKnownKeyId)
+    {
+        var state = GetReadState(value, isKnownKeyId);
+        if (value == null)
+        {
+            return new SecretReadInfo(state, SecretStorageForm.NotSet, null, null);
+        }
+
+        switch (value.State)
+        {
+            case RtSecretValueState.Protected:
+                return new SecretReadInfo(state,
+                    state == SecretValueState.KeyMissing ? SecretStorageForm.KeyMissing : SecretStorageForm.EncV2,
+                    value.KeyId, value.SetAt);
+            case RtSecretValueState.Pending:
+                return new SecretReadInfo(state,
+                    value.RawValue.Length == 0 ? SecretStorageForm.NotSet : SecretStorageForm.Plaintext, null, null);
+            default:
+                if (IsCorrupt(value))
+                {
+                    return new SecretReadInfo(state, SecretStorageForm.Corrupt, null, null);
+                }
+
+                if (state == SecretValueState.NotSet)
+                {
+                    return new SecretReadInfo(state, SecretStorageForm.NotSet, null, null);
+                }
+
+                return new SecretReadInfo(state,
+                    SecretEnvelope.TryParse(value.RawValue, out var info) && info.Version == 1
+                        ? SecretStorageForm.EncV1
+                        : SecretStorageForm.Plaintext,
+                    null, null);
         }
     }
 

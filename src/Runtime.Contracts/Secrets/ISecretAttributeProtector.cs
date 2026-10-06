@@ -63,7 +63,8 @@ public interface ISecretAttributeProtector
 
     /// <summary>
     ///     Encrypts a plaintext with the active key: <c>enc:v2:&lt;kid&gt;:...</c>, AES-256-GCM, random
-    ///     nonce, associated data = the ASCII header.
+    ///     nonce, associated data = the ASCII header. The result's <see cref="RtSecretValue.SetAt" /> is the
+    ///     current UTC time (new input).
     /// </summary>
     /// <exception cref="SecretEncryptionNotConfiguredException">No active key</exception>
     RtSecretValue Protect(string plaintext);
@@ -120,6 +121,19 @@ public interface ISecretAttributeProtector
     SecretValueState GetReadState(RtSecretValue? value, SecretAccessContext? context = null)
     {
         return SecretValueStates.GetReadState(value, IsKnownKeyId);
+    }
+
+    /// <summary>
+    ///     Like <see cref="GetReadState" />, plus storage form, key id and "set at"
+    ///     (<see cref="RtSecretValue.SetAt" />) - the data behind GraphQL <c>isSet</c> / <c>keyMissing</c> /
+    ///     <c>setAt</c> and the secrets overview. Never decrypts.
+    /// </summary>
+    /// <param name="value">The stored value; <c>null</c> = not set</param>
+    /// <param name="context">Where the value comes from (log and counter tags only)</param>
+    /// <returns>The description</returns>
+    SecretReadInfo DescribeSecret(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        return SecretValueStates.Describe(value, IsKnownKeyId);
     }
 
     /// <summary>
@@ -180,7 +194,8 @@ public interface ISecretAttributeProtector
 
     /// <summary>
     ///     Returns the value protected with the active key; a value that already is, is returned
-    ///     unchanged. Decrypting for the re-encryption is counted like any other decrypt. Legacy clear
+    ///     unchanged. <see cref="RtSecretValue.SetAt" /> is kept for a protected value, <c>null</c> for a
+    ///     converted legacy value and the current time for a pending value. Decrypting for the re-encryption is counted like any other decrypt. Legacy clear
     ///     text is converted in strict mode as well (the strict check is bypassed and the read is counted
     ///     as a plaintext read): the encrypt / reprotect sweep must be able to clear the remainder. A legacy
     ///     value whose text is an <c>enc:v2</c> envelope is refused like in

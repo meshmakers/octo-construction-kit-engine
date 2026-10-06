@@ -54,11 +54,25 @@ public sealed class RtSecretValue : IEquatable<RtSecretValue>
 
     private readonly string _value;
 
-    private RtSecretValue(RtSecretValueState state, string value)
+    private RtSecretValue(RtSecretValueState state, string value, DateTime? setAt = null)
     {
         State = state;
         _value = value;
+        SetAt = setAt;
     }
+
+    /// <summary>
+    ///     When the value of a <see cref="RtSecretValueState.Protected" /> secret was set (UTC), i.e. when new
+    ///     input was protected (concept §2.1 / handover §7, "set at"). <c>null</c> for every other state, for
+    ///     values converted from legacy storage (encrypt sweep, write step on a stored legacy string) and for
+    ///     values stored before the timestamp existed. Carry-over, re-protect (key rotation), restore and the
+    ///     sweeps keep it unchanged. Metadata only: it is not part of <see cref="Equals(RtSecretValue?)" /> (the
+    ///     envelope identifies the value) and not part of the serialised marker. Stored by the repository next
+    ///     to the envelope (MongoDB: BSON field <c>t</c>).
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    public DateTime? SetAt { get; }
 
     /// <summary>
     ///     State of the value.
@@ -115,6 +129,19 @@ public sealed class RtSecretValue : IEquatable<RtSecretValue>
     /// <exception cref="ArgumentException">The string is not a structurally valid <c>enc:v2</c> envelope</exception>
     public static RtSecretValue Protected(string envelope)
     {
+        return Protected(envelope, null);
+    }
+
+    /// <summary>
+    ///     Creates a protected value from an <c>enc:v2</c> envelope with its "set at" timestamp
+    ///     (<see cref="SetAt" />, e.g. read from the database).
+    /// </summary>
+    /// <param name="envelope">The envelope</param>
+    /// <param name="setAt">When the value was set; converted to UTC (an unspecified kind is taken as UTC)</param>
+    /// <returns>A protected value</returns>
+    /// <exception cref="ArgumentException">The string is not a structurally valid <c>enc:v2</c> envelope</exception>
+    public static RtSecretValue Protected(string envelope, DateTime? setAt)
+    {
         ArgumentNullException.ThrowIfNull(envelope);
         if (!SecretEnvelope.TryParse(envelope, out var info) || info.Version != SecretEnvelope.CurrentVersion)
         {
@@ -122,7 +149,39 @@ public sealed class RtSecretValue : IEquatable<RtSecretValue>
             throw new ArgumentException("The value is not a valid 'enc:v2' secret envelope.", nameof(envelope));
         }
 
-        return new RtSecretValue(RtSecretValueState.Protected, envelope);
+        return new RtSecretValue(RtSecretValueState.Protected, envelope, ToUtc(setAt));
+    }
+
+    /// <summary>
+    ///     Returns this protected value with another <see cref="SetAt" /> (same envelope).
+    /// </summary>
+    /// <param name="setAt">The timestamp; converted to UTC</param>
+    /// <returns>A protected value</returns>
+    /// <exception cref="InvalidOperationException">The value is not protected</exception>
+    public RtSecretValue WithSetAt(DateTime? setAt)
+    {
+        if (State != RtSecretValueState.Protected)
+        {
+            throw new InvalidOperationException("Only a protected secret value carries a 'set at' timestamp.");
+        }
+
+        var utc = ToUtc(setAt);
+        return utc == SetAt ? this : new RtSecretValue(RtSecretValueState.Protected, _value, utc);
+    }
+
+    private static DateTime? ToUtc(DateTime? value)
+    {
+        if (value == null)
+        {
+            return null;
+        }
+
+        return value.Value.Kind switch
+        {
+            DateTimeKind.Utc => value.Value,
+            DateTimeKind.Local => value.Value.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(value.Value, DateTimeKind.Utc)
+        };
     }
 
     /// <summary>

@@ -87,7 +87,8 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         CryptographicOperations.ZeroMemory(plaintextBytes);
-        return RtSecretValue.Protected(header + Base64Url.EncodeToString(combined));
+        // New input protected now: "set at" = now (a re-protect / legacy conversion overrides it).
+        return RtSecretValue.Protected(header + Base64Url.EncodeToString(combined), DateTime.UtcNow);
     }
 
     /// <inheritdoc />
@@ -184,6 +185,14 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         return state;
+    }
+
+    /// <inheritdoc />
+    public SecretReadInfo DescribeSecret(RtSecretValue? value, SecretAccessContext? context = null)
+    {
+        // GetReadState logs / counts a corrupt value.
+        GetReadState(value, context);
+        return SecretValueStates.Describe(value, IsKnownKeyId);
     }
 
     /// <inheritdoc />
@@ -285,7 +294,15 @@ internal sealed class SecretAttributeProtector : ISecretAttributeProtector
         }
 
         // Bypasses the strict-mode check: re-encrypting is how the remaining clear text disappears.
-        return Protect(Unprotect(value, context, allowPlaintext: true));
+        // "Set at" is kept: a protected value keeps its timestamp, a converted legacy value has none,
+        // a pending value is new input (now).
+        var reprotected = Protect(Unprotect(value, context, allowPlaintext: true));
+        return value.State switch
+        {
+            RtSecretValueState.Protected => reprotected.WithSetAt(value.SetAt),
+            RtSecretValueState.LegacyPlaintext => reprotected.WithSetAt(null),
+            _ => reprotected
+        };
     }
 
     private string Decrypt(string envelope, SecretAccessContext? context)

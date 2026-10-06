@@ -54,4 +54,24 @@ public static class SecretAttributeExtensions
         var ckTypeId = entity is RtEntity rtEntity ? rtEntity.CkTypeId?.ToString() : null;
         return protector.GetReadState(value, new SecretAccessContext(tenantId, ckTypeId, attributeName));
     }
+
+    /// <summary>
+    ///     Describes the Secret attribute <paramref name="attributeName" /> - read state, storage form, key id,
+    ///     "set at" - without decrypting it (<see cref="ISecretAttributeProtector.DescribeSecret" />).
+    /// </summary>
+    /// <param name="entity">Entity or record holding the attribute</param>
+    /// <param name="attributeName">Attribute name in PascalCase</param>
+    /// <param name="protector">The protector</param>
+    /// <param name="tenantId">Tenant id for log and counter tags (optional)</param>
+    /// <returns>The description</returns>
+    public static SecretReadInfo DescribeSecret(this RtTypeWithAttributes entity, string attributeName,
+        ISecretAttributeProtector protector, string? tenantId = null)
+    {
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(protector);
+
+        var value = entity.GetAttributeSecretValueOrDefault(attributeName);
+        var ckTypeId = entity is RtEntity rtEntity ? rtEntity.CkTypeId?.ToString() : null;
+        return protector.DescribeSecret(value, new SecretAccessContext(tenantId, ckTypeId, attributeName));
+    }
 }

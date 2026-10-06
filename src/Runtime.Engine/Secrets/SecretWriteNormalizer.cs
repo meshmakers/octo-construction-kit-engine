@@ -561,7 +561,8 @@ public sealed class SecretWriteNormalizer : ISecretWriteNormalizer
         }
 
         context.Result.ProtectedCount++;
-        return _protector.Protect(legacy.RawValue);
+        // A stored legacy value converted, not new input: no "set at".
+        return _protector.Protect(legacy.RawValue).WithSetAt(null);
     }
 
     #endregion

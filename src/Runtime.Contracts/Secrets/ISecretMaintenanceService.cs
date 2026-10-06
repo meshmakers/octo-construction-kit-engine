@@ -463,6 +463,15 @@ public sealed class SecretSweepResult
     public long ValuesRewritten { get; set; }
 
     /// <summary>
+    ///     Values converted from legacy clear text or <c>enc:v1</c> to <c>enc:v2</c> and written in this run
+    ///     (<see cref="SecretSweepMode.Encrypt" />, <see cref="SecretSweepMode.Reprotect" />; AB#5532). Included in
+    ///     <see cref="ValuesRewritten" />; a conversion whose write did not happen (failure, concurrent
+    ///     modification) is not counted. <see cref="Totals" /> are the forms as FOUND, so they do not change
+    ///     with this count - a follow-up <see cref="SecretSweepMode.Verify" /> describes the state after the run.
+    /// </summary>
+    public long ValuesEncrypted { get; set; }
+
+    /// <summary>
     ///     Counts per form over the whole tenant.
     /// </summary>
     public SecretFormCounts Totals { get; } = new();

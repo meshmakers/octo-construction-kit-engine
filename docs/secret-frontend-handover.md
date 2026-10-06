@@ -263,7 +263,11 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
   "outcome": "Succeeded",             // Succeeded | CompletedWithFailures | Skipped | Failed | Running
   "startedAt": "…", "completedAt": "…",
   "triggeredBy": "user name or null",
-  "totals": { /* SecretFormCounts as in the report: notSet, plaintext, encV1, encV2, encV2ByKeyId, unknownKeyId, failed, total, legacy */ },
+  "totals": { /* BEFORE the run - forms as found: notSet, plaintext, encV1, encV2, encV2ByKeyId, unknownKeyId, failed, total, legacy */ },
+  "totalsAfter": { /* AFTER the run (follow-up Verify; = totals for a Verify run); null while running / skipped / failed before it */ },
+  "valuesRewritten": 12,              // values written by this run (encrypted, re-protected, placeholders normalised, cleared)
+  "encryptedCount": 8,                // plaintext / enc:v1 -> enc:v2 in this run (part of valuesRewritten)
+  "skippedConcurrentlyModified": 0,   // > 0 makes a writing run CompletedWithFailures ("run the sweep again")
   "placeholdersNormalized": 0,        // legacy plaintext placeholders converted once to not set (migration only)
   "skippedLegacyV1KeyMissing": 0,     // enc:v1 values kept by CleanupUnreadable because only the legacy key is missing
   "reason": null,                     // e.g. "Interrupted (service restart)" for runs that never finished, or the no-key-ring hint
@@ -282,6 +286,8 @@ Enums as names, JSON camelCase. SDK: `IBotServicesClient` (methods listed per en
 **No key ring (AB#5534/AB#5539):** when `keyRingConfigured` is `false` (equivalently `warnings` contains `"NoKeyRing"`), Studio shows a **prominent banner** on the secrets overview and on every page with secret inputs ("No key ring configured on this environment — secrets cannot be saved; restored secrets were only classified. Configure the key ring, then run Encrypt."). Secret inputs stay disabled; Encrypt / CleanupUnreadable are not offered (they would be skipped). `NoLegacyV1Key` gets a smaller warning on the secrets overview ("enc:v1 values found but no legacy key configured — they count as key missing").
 
 A restore on a bot **without key ring** still produces the re-entry list: the post-restore run is a key-free Verify only (run `mode: "Verify"`, `trigger: "Restore"`, `outcome: "Succeeded"`, reason "No key ring configured: secrets were classified only; set the key ring and run Encrypt"). Its report lists every value it cannot read without keys in `unreadable[]` / `secretsToReEnter` (all `enc:v2` — key id not in the empty ring — and all `enc:v1` with `keyId: "enc:v1"`); nothing is written. Studio shows these as re-entry tasks like any other unreadable value.
+
+- **Before / after (AB#5532/5533/5539, live defect 2026-10-06):** `totals` of a run are the forms as FOUND, `totalsAfter` the state after it - the "Result" column shows `totalsAfter ?? totals`, plus `encryptedCount` ("8 encrypted"). An Encrypt that converted nothing used to say "Succeeded" with identical counts: the MongoDB rewrite looked for derived-type entities (all `System.Communication/*Configuration`) in a non-existent per-type collection and every value was "modified concurrently"; fixed, and such skips now yield `CompletedWithFailures` with `skippedConcurrentlyModified` > 0. Each report step also carries `encryptedCount`.
 
 Runs left `Running` by a crash are marked `Failed` with reason "Interrupted (service restart)" shortly after the bot starts. The report and each step also carry `skippedLegacyV1KeyMissing`. MCP offers the same inventory read-only via `get_secret_inventory` (risk low). Dumps are never downloadable (no endpoint). The report (`SecretSweepReport`) gains `unreadable[] { ckTypeId, rtId, attributePath, keyId }` (re-entry list, decision 2026-10-06) and `placeholdersNormalized`; `cleared[]` is only filled by `CleanupUnreadable`. Sweep modes in Studio (Q6): **Verify** (no confirmation), **Encrypt** and **CleanupUnreadable** (confirmation dialog; a pre-sweep dump is taken first; CleanupUnreadable removes values whose key id is unknown — irreversible except via the dump; `enc:v1` values that are unreadable only because no legacy key is configured are kept and stay in `unreadable[]`).
 

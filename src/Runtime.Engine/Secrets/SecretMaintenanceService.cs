@@ -171,13 +171,14 @@ internal sealed class SecretMaintenanceService(
             "Secret sweep {Mode} of tenant {TenantId} done: {Entities} entities ({Archived} archived, " +
             "{ArchivedUnreadable} unreadable value(s) of archived entities not listed), {Total} values " +
             "(not set {NotSet}, placeholder {Placeholder}, plaintext {Plaintext}, enc_v1 {EncV1}, enc_v2 {EncV2}, " +
-            "unknown kid {UnknownKid}), {Rewritten} rewritten, {Unreadable} unreadable (kept), {Cleared} cleared, " +
+            "unknown kid {UnknownKid}), {Rewritten} rewritten ({Encrypted} encrypted), {Unreadable} unreadable (kept), {Cleared} cleared, " +
             "{SkippedLegacyV1KeyMissing} enc_v1 kept by cleanup (legacy key missing), {PlaceholdersNormalized} placeholder(s) " +
             "normalised, {Skipped} skipped (modified concurrently), {Failed} failed",
             modeTag, tenantId, result.EntitiesScanned, result.ArchivedEntitiesScanned,
             result.ArchivedUnreadableValues, result.Totals.Total, result.Totals.NotSet,
             result.Totals.Placeholder, result.Totals.Plaintext, result.Totals.EncV1, result.Totals.EncV2,
-            result.Totals.UnknownKeyId, result.ValuesRewritten, result.Unreadable.Count, result.Cleared.Count,
+            result.Totals.UnknownKeyId, result.ValuesRewritten, result.ValuesEncrypted, result.Unreadable.Count,
+            result.Cleared.Count,
             result.SkippedLegacyV1KeyMissing, result.PlaceholdersNormalized,
             result.SkippedConcurrentlyModified, result.Totals.Failed);
 
@@ -398,7 +399,7 @@ internal sealed class SecretMaintenanceService(
 
         try
         {
-            var (changed, newValue, effect) = Decide(context, form.Value, keyId, raw, value);
+            var (changed, newValue, effect) = Decide(context, elementPath, form.Value, keyId, raw, value);
             if (changed)
             {
                 context.Result.ValuesRewritten++;
@@ -411,6 +412,9 @@ internal sealed class SecretMaintenanceService(
                         break;
                     case SlotEffect.PlaceholderNormalized:
                         context.Result.PlaceholdersNormalized++;
+                        break;
+                    case SlotEffect.Encrypted:
+                        context.Result.ValuesEncrypted++;
                         break;
                 }
             }
@@ -431,10 +435,11 @@ internal sealed class SecretMaintenanceService(
         }
     }
 
-    private (bool Changed, object? NewValue, SlotEffect Effect) Decide(SweepContext context, SecretValueForm form,
-        string? keyId, string? raw, object? value)
+    private (bool Changed, object? NewValue, SlotEffect Effect) Decide(SweepContext context, string attributePath,
+        SecretValueForm form, string? keyId, string? raw, object? value)
     {
-        var access = new SecretAccessContext(context.TenantId, context.CkTypeId, null, "secret-sweep");
+        // The attribute path (camelCase, record members included) names the slot in the protector's warnings.
+        var access = new SecretAccessContext(context.TenantId, context.CkTypeId, attributePath, "secret-sweep");
         if (context.NormalizePlaceholdersOnly)
         {
             return form == SecretValueForm.Placeholder
@@ -456,9 +461,11 @@ internal sealed class SecretMaintenanceService(
                     case SecretValueForm.Plaintext:
                         // Through Reprotect: counted as a plaintext read and allowed in strict mode
                         // (the sweep is what converts the remaining clear text).
-                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
+                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access),
+                            SlotEffect.Encrypted);
                     case SecretValueForm.EncV1:
-                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access), SlotEffect.None);
+                        return (true, protector.Reprotect(RtSecretValue.LegacyPlaintext(raw!), access),
+                            SlotEffect.Encrypted);
                     case SecretValueForm.EncV2:
                     {
                         // Only protected values get here: an enc:v2 envelope stored as a legacy string is
@@ -632,7 +639,8 @@ internal sealed class SecretMaintenanceService(
     {
         None,
         Cleared,
-        PlaceholderNormalized
+        PlaceholderNormalized,
+        Encrypted
     }
 
     /// <summary>
@@ -647,10 +655,13 @@ internal sealed class SecretMaintenanceService(
 
         private long PlaceholdersNormalized { get; } = result.PlaceholdersNormalized;
 
+        private long ValuesEncrypted { get; } = result.ValuesEncrypted;
+
         public void Restore(SecretSweepResult target)
         {
             target.ValuesRewritten = ValuesRewritten;
             target.PlaceholdersNormalized = PlaceholdersNormalized;
+            target.ValuesEncrypted = ValuesEncrypted;
             if (target.Cleared.Count > Cleared)
             {
                 // The deletion did not happen: the values are still stored and unreadable.

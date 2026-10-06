@@ -276,6 +276,8 @@ public class SecretMaintenanceServiceTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(6, result.ValuesRewritten);
+        // AB#5532: 4 conversions to enc:v2 (3 plaintext, 1 enc:v1); the other 2 rewrites are placeholders.
+        Assert.Equal(4, result.ValuesEncrypted);
         Assert.Equal(4, result.EntitiesRewritten);
         Assert.Equal("plain-1", _protector.Unprotect((RtSecretValue)_e1.Attributes["Password"]!));
         Assert.Null(_e2.Attributes["Password"]);
@@ -300,6 +302,7 @@ public class SecretMaintenanceServiceTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(0, second.ValuesRewritten);
+        Assert.Equal(0, second.ValuesEncrypted);
         Assert.Empty(_rewrites);
         Assert.Equal(0, second.Totals.Plaintext + second.Totals.EncV1 + second.Totals.Placeholder);
     }
@@ -315,6 +318,7 @@ public class SecretMaintenanceServiceTests
             TestContext.Current.CancellationToken);
 
         Assert.Equal(1, result.ValuesRewritten);
+        Assert.Equal(0, result.ValuesEncrypted); // a key rotation is no conversion of a legacy value
         var password = (RtSecretValue)_e3.Attributes["Password"]!;
         Assert.Equal("k1", password.KeyId);
         Assert.Equal("pw-3", _protector.Unprotect(password));
@@ -603,6 +607,7 @@ public class SecretMaintenanceServiceTests
         Assert.Same(newer, _e1.Attributes["Password"]);
         Assert.Equal(1, result.SkippedConcurrentlyModified);
         Assert.Equal(5, result.ValuesRewritten); // the skipped value is not counted as rewritten
+        Assert.Equal(3, result.ValuesEncrypted); // nor as encrypted
         Assert.True(result.Success);             // and it is not a failure
         Assert.DoesNotContain(_rewrites, r => r.RtId == _e1.RtId && r.Attribute == "Password");
         AssertResultCarriesNoValue(result);
@@ -625,6 +630,7 @@ public class SecretMaintenanceServiceTests
         Assert.Equal("entered-meanwhile", _protector.Unprotect((RtSecretValue)_e2.Attributes["Password"]!));
         Assert.Equal(1, result.PlaceholdersNormalized); // only _e5's placeholder
         Assert.Equal(1, result.SkippedConcurrentlyModified);
+        Assert.Equal(4, result.ValuesEncrypted);
     }
 
     [Fact]
@@ -652,6 +658,7 @@ public class SecretMaintenanceServiceTests
         Assert.Equal("rec-plain", credentials[1].Attributes["Value"]); // the old array was not written back
         Assert.Equal(1, result.SkippedConcurrentlyModified);
         Assert.Equal(5, result.ValuesRewritten);
+        Assert.Equal(3, result.ValuesEncrypted);
     }
 
     [Fact]

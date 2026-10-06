@@ -782,6 +782,11 @@ public interface IRuntimeRepository
     /// <remarks>
     ///     The default implementation throws <see cref="NotSupportedException" />, like the unconditional
     ///     rewrite on repositories without CK-cache-free write support.
+    ///     <paramref name="rtCkTypeId" /> is the entity's own (concrete) type: implementations must find the
+    ///     entity where it is actually stored - an entity of a derived type lives in the storage of its
+    ///     collection root (e.g. every <c>System.Communication/*Configuration</c> in the one of
+    ///     <c>System/Configuration</c>) - and must not answer <c>false</c> merely because they looked in the
+    ///     wrong place (AB#5533: the sweep reported every such value as "modified concurrently").
     /// </remarks>
     Task<bool> RewriteAttributeValueIfUnchangedForMigrationAsync(
         IOctoSession session,

@@ -149,12 +149,14 @@ public class CkModelUpgradeServiceTests
     [Fact]
     public async Task UpgradeModelsAsync_NoMigrationPath_ShouldRecordVersionAndWarn()
     {
-        // Arrange
+        // Arrange — within one major line. (Before AB#4924/G3 this test used 1.0.0 -> 2.0.0; a
+        // missing path across a major is now a failure, see
+        // UpgradeModelsAsync_NoMigrationPathAcrossMajor_ShouldFailAndKeepInstalledVersion.)
         var ct = TestContext.Current.CancellationToken;
         var tenantId = "tenant1";
         var modelIds = new List<CkModelIdVersionRange>
         {
-            new("MyModel", "2.0.0")
+            new("MyModel", "1.1.0")
         };
 
         var repository = SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>
@@ -163,7 +165,7 @@ public class CkModelUpgradeServiceTests
         }, ct);
 
         var fromModel = new CkModelId("MyModel", "1.0.0");
-        var toModel = new CkModelId("MyModel", "2.0.0");
+        var toModel = new CkModelId("MyModel", "1.1.0");
 
         // Setup: no migration path
         A.CallTo(() => _migrationService.FindMigrationPathAsync(fromModel, toModel, ct))
@@ -182,6 +184,94 @@ public class CkModelUpgradeServiceTests
         // Migration should NOT be called
         A.CallTo(() => _migrationService.MigrateAsync(A<string>._, A<CkModelId>._, A<CkModelId>._, A<CkMigrationOptions>._, ct))
             .MustNotHaveHappened();
+    }
+
+    /// <summary>
+    ///     AB#4924 (G3): the migration service refuses to bridge a major without a migration entry
+    ///     (System.Communication 3.40.0 -> 4.5.0 with entries only up to 3.36.0). The upgrade must then
+    ///     FAIL and leave the MigrationHistory at the installed version — recording the target here is
+    ///     exactly what made the skipped Pool -> DeploymentSite rename invisible.
+    /// </summary>
+    [Fact]
+    public async Task UpgradeModelsAsync_NoMigrationPathAcrossMajor_ShouldFailAndKeepInstalledVersion()
+    {
+        // Arrange
+        var ct = TestContext.Current.CancellationToken;
+        var tenantId = "tenant1";
+        var modelIds = new List<CkModelIdVersionRange>
+        {
+            new("System.Communication", "4.5.0")
+        };
+
+        var repository = SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>
+        {
+            ["System.Communication"] = "3.40.0"
+        }, ct);
+
+        var fromModel = new CkModelId("System.Communication", "3.40.0");
+        var toModel = new CkModelId("System.Communication", "4.5.0");
+
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(fromModel, toModel, ct))
+            .Returns((CkMigrationPath?)null);
+
+        // Act
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId, modelIds, null, null, ct);
+
+        // Assert — a failure, not a warning
+        Assert.False(result.Success);
+        Assert.Single(result.FailedModels);
+        Assert.Empty(result.SkippedModels);
+        Assert.Empty(result.UpgradedModels);
+        Assert.Empty(result.Warnings);
+
+        var failed = result.FailedModels[0];
+        Assert.Equal("System.Communication", failed.CkModelName);
+        Assert.Equal("3.40.0", failed.InstalledVersion);
+        Assert.True(failed.UpgradeNeeded);
+        Assert.False(failed.MigrationPathAvailable);
+        Assert.Contains("crosses a major version (3.x -> 4.x)", failed.ErrorMessage);
+        Assert.Contains("add a migration entry for 3.40.0", failed.ErrorMessage);
+        Assert.Contains(result.Errors, e => e == failed.ErrorMessage);
+
+        // The target version is NOT recorded and nothing is migrated
+        A.CallTo(() => repository.CreateTransientRtEntityByRtCkIdAsync(A<RtCkId<CkTypeId>>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => _migrationService.MigrateAsync(A<string>._, A<CkModelId>._, A<CkModelId>._, A<CkMigrationOptions>._, ct))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task UpgradeModelsAsync_NoMigrationPathAcrossMajor_ContinueOnError_ShouldProcessRemainingModels()
+    {
+        // Arrange
+        var ct = TestContext.Current.CancellationToken;
+        var tenantId = "tenant1";
+        var modelIds = new List<CkModelIdVersionRange>
+        {
+            new("ModelA", "2.0.0"),
+            new("ModelB", "1.0.0")
+        };
+
+        SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>
+        {
+            ["ModelA"] = "1.4.0",
+            ["ModelB"] = "1.0.0"
+        }, ct);
+
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(
+                new CkModelId("ModelA", "1.4.0"), new CkModelId("ModelA", "2.0.0"), ct))
+            .Returns((CkMigrationPath?)null);
+
+        // Act
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId, modelIds,
+            new CkMigrationOptions { ContinueOnError = true }, null, ct);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Single(result.FailedModels);
+        Assert.Equal("ModelA", result.FailedModels[0].CkModelName);
+        Assert.Single(result.SkippedModels);
+        Assert.Equal("ModelB", result.SkippedModels[0].CkModelName);
     }
 
     [Fact]

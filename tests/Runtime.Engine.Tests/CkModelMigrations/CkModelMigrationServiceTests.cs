@@ -633,15 +633,18 @@ public class CkModelMigrationServiceTests
     }
 
     [Fact]
-    public async Task FindMigrationPathAsync_AutoBridge_NoEntryPointReachesTarget_ShouldReturnNull()
+    public async Task FindMigrationPathAsync_AutoBridge_NoEntryPointReachesTarget_ShouldReturnPartialPath()
     {
-        // Arrange - migrations exist but none can reach the target (disconnected chains)
+        // Arrange - migrations exist but none reaches the exact target; the chain ends in the
+        // target's major line, so the remaining gap is a legitimate schema-only end gap.
+        // (Before AB#4924/G3 this test used target 5.0.0 — a cross-major end gap, which is now
+        // refused; see FindMigrationPathAsync_AutoBridge_EndGapCrossesMajor_ShouldReturnNull.)
         var fromModel = new CkModelId("TestModel", "1.0.0");
-        var toModel = new CkModelId("TestModel", "5.0.0");
+        var toModel = new CkModelId("TestModel", "3.5.0");
 
         var meta = new CkMigrationMetaDto
         {
-            CkModelId = "TestModel-5.0.0",
+            CkModelId = "TestModel-3.5.0",
             Migrations =
             [
                 new CkMigrationReferenceDto
@@ -650,7 +653,7 @@ public class CkModelMigrationServiceTests
                     ToVersion = "3.1.0",
                     ScriptPath = "3.0.0-to-3.1.0.yaml"
                 }
-                // No migration from 3.1.0 to 5.0.0 — chain ends at 3.1.0
+                // No migration from 3.1.0 to 3.5.0 — chain ends at 3.1.0
             ]
         };
 
@@ -667,7 +670,7 @@ public class CkModelMigrationServiceTests
         // Act
         var result = await _sut.FindMigrationPathAsync(fromModel, toModel, ct);
 
-        // Assert - should use auto-bridge with partial end (bridge 1.0.0→3.0.0, execute 3.0.0→3.1.0, partial to 5.0.0)
+        // Assert - should use auto-bridge with partial end (bridge 1.0.0→3.0.0, execute 3.0.0→3.1.0, partial to 3.5.0)
         Assert.NotNull(result);
         Assert.True(result.IsPartialPath);
         Assert.Equal(2, result.Steps.Count);

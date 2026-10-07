@@ -105,8 +105,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
         if (migrationPath == null)
         {
-            return CkMigrationResult.Failed(fromModel, toModel,
-                $"No migration path found from {fromModel} to {toModel}");
+            return CkMigrationResult.Failed(fromModel, toModel, NoMigrationPathMessage(fromModel, toModel));
         }
 
         var result = CkMigrationResult.Succeeded(fromModel, toModel);
@@ -241,6 +240,17 @@ internal class CkModelMigrationService : ICkModelMigrationService
             SecretValueOrigin.Storage);
     }
 
+    /// <summary>
+    ///     AB#4924 (G3): a missing path across a major version gets the explicit refusal text, so the
+    ///     operator reads why (and what to add) instead of a bare "not found".
+    /// </summary>
+    private static string NoMigrationPathMessage(CkModelId fromModel, CkModelId toModel)
+    {
+        return CkMigrationMajorVersionGuard.CrossesMajor(fromModel.Version, toModel.Version)
+            ? CkMigrationMajorVersionGuard.BuildRefusalMessage(fromModel.Name, fromModel.Version, toModel.Version)
+            : $"No migration path found from {fromModel} to {toModel}";
+    }
+
     /// <inheritdoc />
     public async Task<CkMigrationPath?> FindMigrationPathAsync(
         CkModelId fromModel,
@@ -360,6 +370,16 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
             if (bridgedSteps is { Count: > 0 })
             {
+                // AB#4924 (G3): the schema-only end gap must not cross a major either — a chain that
+                // stops in 3.x cannot stand in for the data migration of a 4.x target.
+                if (isBridgedPartial && bridgedReachedVersion is { } bridgedEnd &&
+                    CkMigrationMajorVersionGuard.CrossesMajor(bridgedEnd, toModel.Version))
+                {
+                    _logger.LogError("{Refusal}", CkMigrationMajorVersionGuard.BuildRefusalMessage(
+                        fromModel.Name, fromModel.Version, toModel.Version, bridgedEnd));
+                    return null;
+                }
+
                 if (isBridgedPartial)
                 {
                     _logger.LogInformation(
@@ -398,6 +418,14 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
             if (partialPath != null)
             {
+                // AB#4924 (G3): same rule as for the bridged end gap above.
+                if (CkMigrationMajorVersionGuard.CrossesMajor(partialPath.ToModel.Version, toModel.Version))
+                {
+                    _logger.LogError("{Refusal}", CkMigrationMajorVersionGuard.BuildRefusalMessage(
+                        fromModel.Name, fromModel.Version, toModel.Version, partialPath.ToModel.Version));
+                    return null;
+                }
+
                 _logger.LogInformation(
                     "Found partial migration path from {FromVersion} to {IntermediateVersion} (target was {ToVersion}). " +
                     "Schema-only changes to {ToVersion} will be applied without data migration.",
@@ -411,6 +439,19 @@ internal class CkModelMigrationService : ICkModelMigrationService
             // tenant. Symmetrical to the no-migrations bridge above: a purely additive bump after
             // the data-migration era ended doesn't need a tombstone migration script. Without this
             // every CK model would have to grow a no-op entry on every patch-level bump.
+            //
+            // 🔴 AB#4924 (G3): only within one major line. A tenant past the last chain entry that is
+            // asked to move to a higher MAJOR is exactly the case the chain was written for — it just
+            // does not list the tenant's version. Treating that as additive lifted System.Communication
+            // 3.40 tenants to 4.x without the Pool -> DeploymentSite rename, silently. Refuse instead:
+            // the caller fails the upgrade and the data stays at the installed version.
+            if (CkMigrationMajorVersionGuard.CrossesMajor(fromModel.Version, toModel.Version))
+            {
+                _logger.LogError("{Refusal}", CkMigrationMajorVersionGuard.BuildRefusalMessage(
+                    fromModel.Name, fromModel.Version, toModel.Version));
+                return null;
+            }
+
             if (fromModel.Version.CompareTo(toModel.Version) < 0)
             {
                 _logger.LogInformation(
@@ -803,8 +844,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
         if (migrationPath == null)
         {
-            return CkMigrationValidationResult.Invalid(
-                $"No migration path found from {fromModel} to {toModel}");
+            return CkMigrationValidationResult.Invalid(NoMigrationPathMessage(fromModel, toModel));
         }
 
         var result = CkMigrationValidationResult.Valid();

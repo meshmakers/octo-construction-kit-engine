@@ -334,16 +334,32 @@ The engine automatically bridges version gaps at **both ends** of the migration 
 
 This eliminates the need to maintain empty migration entries for every version bump. Only create migration scripts for versions that actually transform data.
 
+### No Schema-Only Bridge Across a Major Version (AB#4924)
+
+A schema-only tail is only sound **inside one major line**. A major bump is the one bump that may rename or remove things, so "nothing to migrate" cannot be assumed across it. The engine therefore **refuses**:
+
+- the **post-chain bridge** (tenant is above every entry point of the chain) when it would cross a major, and
+- the **end gap** of an auto-bridged or partial path when the chain stops in a lower major than the target.
+
+A refused path makes `FindMigrationPathAsync` return `null` (logged as an error), `MigrateAsync` / `ValidateAsync` fail with a message that starts with `No migration path found from … : the upgrade crosses a major version`, and `CkModelUpgradeService` reports the model as **failed** instead of recording the target version. The `MigrationHistory` stays at the installed version, so the next import (`RetryPendingMigrationsAsync`) picks the migration up again once a model with the missing entry is deployed.
+
+Unchanged: the start-gap bridge in front of a chain (the chain carries the data across the major), all bridges inside one major line, and the no-migrations bridge (a model without any `migration-meta.yaml` declares it has nothing to migrate).
+
+**Why**: System.Communication 4.0.0 renames `Pool` → `DeploymentSite` with one script, but its migration-meta listed entry points only up to `3.36.0`. Tenants on `3.40.0` fell through to the post-chain bridge and were lifted to 4.x **without** the rename — orphaned `Pool` entities, `Manages` edges no model declares, no error anywhere.
+
+**What to do when an upgrade is refused**: add a migration entry for the installed version to the target model's `migration-meta.yaml`. If the major bump genuinely needs no data migration, point the entry at a script with `steps: []`. For a model that migrates data across a major, list **every** version of the previous major that was ever published at or above the first entry point — and keep adding entries while that major line keeps releasing.
+
 ### Path Resolution Order
 
 The engine resolves migration paths in this order:
 
 1. **Direct migration** — exact `fromVersion → toVersion` match
 2. **Multi-hop path** — BFS through the migration chain to the exact target
-3. **Auto-bridged path** — bridge version gaps at start and/or end of chain
-4. **Partial path** — direct migration to the closest reachable version
+3. **Auto-bridged path** — bridge version gaps at start and/or end of chain (end gap refused across a major)
+4. **Partial path** — direct migration to the closest reachable version (end gap refused across a major)
 5. **No-migrations bridge** — model defines no migration scripts at all; if `toVersion > fromVersion`, returned as a single schema-only no-op step
-6. **No path** — only reached for same-version or downgrade cases without scripts; surfaced as "No migration path found"
+6. **Post-chain bridge** — tenant is above every entry point; schema-only within the same major, **refused across a major**
+7. **No path** — same-version or downgrade cases, and every refused cross-major bridge; surfaced as "No migration path found"
 
 ## Pre-Conditions
 

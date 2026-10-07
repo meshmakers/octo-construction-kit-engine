@@ -457,6 +457,8 @@ Path resolution order: Direct → Multi-Hop → Auto-Bridge → Partial → No-M
 
 Developers only need to create migration scripts for versions that actually transform data.
 
+**No schema-only bridge across a major (AB#4924, G3)**: the post-chain bridge and the end gap of a bridged/partial path are refused when they would cross a major version (`CkMigrationMajorVersionGuard`). `CkModelUpgradeService` then fails the model and leaves the MigrationHistory at the installed version (no "recorded without data migration"). The start-gap bridge and the no-migrations bridge are unaffected. Root cause it closes: System.Communication 3.40 tenants were lifted to 4.x without the Pool -> DeploymentSite rename because the 4.x migration-meta only listed 3.35/3.36.
+
 ## Key Interfaces
 
 | Interface | Namespace | Description |

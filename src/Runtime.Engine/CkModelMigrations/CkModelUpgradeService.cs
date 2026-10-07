@@ -238,6 +238,33 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                     upgradeInfo.MigrationPathAvailable = migrationPath != null;
                     upgradeInfo.HasBreakingChanges = migrationPath?.HasBreakingChanges ?? false;
 
+                    // 🔴 AB#4924 (G3): no path across a MAJOR version is a failure, not a schema-only
+                    // upgrade. Recording the target version here is what made the missing
+                    // System.Communication 3.40 -> 4.x entry invisible: the history said 4.x, the data
+                    // still held Pool entities. Leave the history at the installed version instead, so
+                    // the import reports the failure and RetryPendingMigrationsAsync picks the
+                    // migration up again once a model with the missing entry is deployed.
+                    if (migrationPath == null &&
+                        CkMigrationMajorVersionGuard.CrossesMajor(installedCkVersion, targetVersion))
+                    {
+                        upgradeInfo.ErrorMessage = CkMigrationMajorVersionGuard.BuildRefusalMessage(
+                            modelName, installedCkVersion, targetVersion);
+                        _logger.LogError(
+                            "CK model upgrade refused for tenant {TenantId}: {Refusal}",
+                            tenantId, upgradeInfo.ErrorMessage);
+
+                        result.FailedModels.Add(upgradeInfo);
+                        result.Errors.Add(upgradeInfo.ErrorMessage);
+                        result.Success = false;
+
+                        if (!options.ContinueOnError)
+                        {
+                            break;
+                        }
+
+                        continue;
+                    }
+
                     if (migrationPath == null)
                     {
                         _logger.LogWarning(

@@ -172,6 +172,42 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.DoesNotContain(graph.Models.Keys, m => m.FullName == "System-2.5.0");
     }
 
+    [Theory]
+    [InlineData("System-2.5")]
+    [InlineData("System-[2.0,)")]
+    [InlineData("System-[2.5,3.0]")]
+    [InlineData("System-[2.5,4.0)")]
+    public async Task FlagOn_RangeSpanningSeveralMajors_IsRejected(string range)
+    {
+        await PublishSystemsAsync(_on, "2.5.0");
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(() =>
+            _on.CompileAsync(DependentSource(_on, range)));
+
+        Assert.Contains("more than one major", exception.Message);
+        Assert.Contains(range, exception.Message);
+    }
+
+    [Fact]
+    public async Task FlagOff_RangeSpanningSeveralMajors_StillCompiles()
+    {
+        await PublishSystemsAsync(_off, "2.5.0");
+
+        var compiled = await _off.CompileAsync(DependentSource(_off, "System-[2.0,)"));
+
+        Assert.Equal(["System-2.5.0"], compiled.Dependencies!.Select(d => d.FullName));
+    }
+
+    [Fact]
+    public async Task FlagOn_ExclusiveLowerBound_FloorIsInsideTheRange()
+    {
+        await PublishSystemsAsync(_on, "2.4.0", "2.4.1", "2.5.0");
+
+        var compiled = await _on.CompileAsync(DependentSource(_on, "System-(2.4,3.0)"));
+
+        Assert.Equal("2.4.1", compiled.DependencyRanges!.Single().Floor);
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

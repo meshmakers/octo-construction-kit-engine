@@ -152,8 +152,16 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
         var dependencies = declaredRanges.Select(range => new CkModelDependencyDto
         {
             Range = range,
-            Floor = (range.ModelVersionRange.MinVersion ?? new CkVersion(0, 0, 0)).ToString()
+            Floor = FloorOf(range.ModelVersionRange).ToString()
         }).ToList();
+
+        // H6: references are stored as Name@<major>. A range that admits more than one major (e.g. "Basic"
+        // = >=1.0.0, or [2.0,) ) would let a tenant resolve a major the references cannot bind to.
+        var multiMajor = dependencies.Where(d => !IsWithinOneMajor(d)).Select(d => d.Range).ToList();
+        if (multiMajor.Count > 0)
+        {
+            throw ModelValidationException.RangeSpansSeveralMajors(compiledModel.ModelId, multiMajor);
+        }
 
         await VerifyFloorsAsync(compiledModel, dependencies, modelGraph, sourceIdentifier).ConfigureAwait(false);
 
@@ -168,6 +176,34 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             : null);
         output.DependencyRanges = dependencies;
         return output;
+    }
+
+    /// <summary>
+    ///     The floor of a declared range: its lower bound; for an exclusive lower bound (<c>(2.4,3.0)</c>) the
+    ///     next patch, so the floor itself is inside the range (review L13).
+    /// </summary>
+    internal static CkVersion FloorOf(CkVersionRange range)
+    {
+        var min = range.MinVersion ?? new CkVersion(0, 0, 0);
+        return range.MinInclusive || range.MinVersion == null
+            ? min
+            : new CkVersion(min.Major, min.Minor, min.Revision + 1);
+    }
+
+    /// <summary>
+    ///     True when every version the dependency admits (range ∩ ≥ floor) has the floor's major.
+    /// </summary>
+    internal static bool IsWithinOneMajor(CkModelDependencyDto dependency)
+    {
+        var range = dependency.Range.ModelVersionRange;
+        var nextMajor = new CkVersion(dependency.FloorVersion.Major + 1, 0, 0);
+        if (range.MaxVersion == null)
+        {
+            return false;
+        }
+
+        var comparison = range.MaxVersion.Value.CompareTo(nextMajor);
+        return comparison < 0 || (comparison == 0 && !range.MaxInclusive);
     }
 
     /// <summary>

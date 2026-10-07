@@ -139,6 +139,19 @@ public class ModelValidationException : CkModelException
             "lower bound of the dependency range to the first version that has these elements.");
     }
 
+    /// <summary>
+    ///     Review H6: range retention stores references major-qualified (<c>Basic@2/...</c>), so a dependency
+    ///     range must stay inside one major.
+    /// </summary>
+    internal static Exception RangeSpansSeveralMajors(CkModelId modelId, IEnumerable<CkModelIdVersionRange> ranges)
+    {
+        return new ModelValidationException(
+            $"Model '{modelId}' is compiled with range retention, but the dependency range(s) " +
+            $"{string.Join(", ", ranges.Select(r => $"'{r}'"))} admit more than one major version. References are " +
+            "stored major-qualified (e.g. 'System@2/Entity-1') and cannot bind to another major. Close the range " +
+            "below the next major, e.g. 'System-[2.5,3.0)'.");
+    }
+
     internal static Exception MultipleVersionsOfCkModel(string modelName, IEnumerable<CkModelId> conflictingModelIds, IEnumerable<CkModelId> originModelIds)
     {
         var versions = string.Join(", ", conflictingModelIds.Select(m => m.FullName));

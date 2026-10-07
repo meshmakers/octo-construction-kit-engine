@@ -703,6 +703,13 @@ source-generator cache is unchanged). The **output** is a JSON-round-trip copy
   stay concrete (`Basic-2.4.0/TreeNode-1`);
 - `dependencies` keeps the exact closure (legacy readers, pre-publish check, SemVer diff).
 
+**One major per range (review H6).** References are stored `Name@<major>` of the floor's major, so with range
+retention every declared range must stay inside that major: `System-[2.5,3.0)` is fine, `System-2.5`
+(= `>=2.5.0`), `System-[2.0,)`, `System-[2.5,3.0]` and `System-[2.5,4.0)` are rejected at compile time
+("… admit more than one major version …"). Chosen over storing a per-major binding because it is the simpler
+safe option: a new major is a deliberate cascade anyway (concept §4.3.2). Flag off is unaffected. An exclusive
+lower bound (`(2.4,3.0)`) gets the next patch as floor (`2.4.1`, review L13) so the floor is inside the range.
+
 Floor check ("compile against the floor, verify against the highest"): every element the model
 references in a dependency must exist in the floor version (or, if the floor itself was never
 published, the lowest available version in the range), else `ModelValidationException`

@@ -43,7 +43,7 @@ resources:
       type: github
       name: meshmakers/octo-pipeline-templates
       endpoint: meshmakers-access-token
-      ref: refs/tags/tpl-v0.5.3
+      ref: refs/tags/tpl-v0.6.5
 
 trigger:
   batch: true
@@ -52,6 +52,16 @@ trigger:
       - dev/*
       - test/*
       - main
+  # Docs-only commits must not start CI (AB#5719). Excluded paths are
+  # never consumed by the build; a root README.md change reaches the
+  # packed NuGet readme with the next code commit.
+  paths:
+    exclude:
+      - 'README.md'
+      - 'CLAUDE.md'
+      - 'CHANGELOG.md'
+      - '.claude/'
+      - 'docs/'
   tags:
     exclude:
       - '*'

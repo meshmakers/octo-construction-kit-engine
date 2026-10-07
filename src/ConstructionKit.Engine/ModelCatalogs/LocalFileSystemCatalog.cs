@@ -309,18 +309,23 @@ public class LocalFileSystemCatalog : CachedCatalog
             {
                 try
                 {
-                    MoveIntoPlace(tempFilePath, compiledModelFilePath);
+                    CatalogFileIo.MoveIntoPlace(tempFilePath, compiledModelFilePath);
 
-                    // Update the major version
-                    await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description)
-                        .ConfigureAwait(false);
+                    // Review N3: the three index files are read-modify-write; parallel octo-ckc processes publishing
+                    // sibling models lost each other's entries. Serialize the updates with a cross-process lock.
+                    using (await CatalogFileIo.AcquireLockAsync(IndexLockPath).ConfigureAwait(false))
+                    {
+                        // Update the major version
+                        await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description)
+                            .ConfigureAwait(false);
 
-                    // Update the overall model library catalog
-                    await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId)
-                        .ConfigureAwait(false);
+                        // Update the overall model library catalog
+                        await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId)
+                            .ConfigureAwait(false);
 
-                    // Update the root catalog
-                    await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
+                        // Update the root catalog
+                        await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
+                    }
 
                     // Refresh the in-memory catalog
                     await RefreshCatalogAsync(true).ConfigureAwait(false);
@@ -352,34 +357,17 @@ public class LocalFileSystemCatalog : CachedCatalog
         }
     }
 
-    /// <summary>
-    ///     Atomically replaces (or creates) <paramref name="target" /> with <paramref name="source" /> by a
-    ///     rename on the same file system. A copy (the former <c>File.Copy(..., overwrite)</c>) truncates and
-    ///     rewrites the target, so a parallel reader could see a half-written model.
-    /// </summary>
-    private static void MoveIntoPlace(string source, string target)
+
+
+
+    private static readonly JsonSerializerOptions IndexJsonOptions = new()
     {
-        if (!File.Exists(source))
-        {
-            // Already moved by a previous attempt of the retry loop.
-            return;
-        }
+        WriteIndented = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
-#if NETSTANDARD2_0
-        if (File.Exists(target))
-        {
-            File.Replace(source, target, null);
-        }
-        else
-        {
-            File.Move(source, target);
-        }
-#else
-        File.Move(source, target, overwrite: true);
-#endif
-    }
-
-
+    /// <summary>Lock file serializing index updates of this catalog root across processes (review N3).</summary>
+    private string IndexLockPath => Path.Combine(_options.Value.RootPath, RootPath, ".catalog-index.lock");
 
     private string CreatePath(CkModelId ckModelId)
     {
@@ -554,14 +542,9 @@ public class LocalFileSystemCatalog : CachedCatalog
                 Directory.CreateDirectory(directoryPath);
             }
 
-            using var fileStream = File.Create(catalogPath);
-
-            // Serialize catalog to JSON
-            await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }).ConfigureAwait(false);
+            // Review N3: atomic write (rename into place) — a reader never sees a half-written index.
+            await CatalogFileIo.WriteJsonAtomicallyAsync(catalogPath, catalogData, IndexJsonOptions)
+                .ConfigureAwait(false);
         }
     }
 
@@ -601,12 +584,9 @@ public class LocalFileSystemCatalog : CachedCatalog
                 Directory.CreateDirectory(directoryPath);
             }
 
-            using var fileStream = File.Create(catalogPath);
-            await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }).ConfigureAwait(false);
+            // Review N3: atomic write (rename into place) — a reader never sees a half-written index.
+            await CatalogFileIo.WriteJsonAtomicallyAsync(catalogPath, catalogData, IndexJsonOptions)
+                .ConfigureAwait(false);
         }
     }
 
@@ -643,12 +623,9 @@ public class LocalFileSystemCatalog : CachedCatalog
             catalogData.Models = catalogData.Models.OrderBy(m => m.ModelName).ToList();
             catalogData.UpdatedAt = DateTime.UtcNow;
 
-            using var fileStream = File.Create(catalogPath);
-            await JsonSerializer.SerializeAsync(fileStream, catalogData, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            }).ConfigureAwait(false);
+            // Review N3: atomic write (rename into place) — a reader never sees a half-written index.
+            await CatalogFileIo.WriteJsonAtomicallyAsync(catalogPath, catalogData, IndexJsonOptions)
+                .ConfigureAwait(false);
         }
     }
 }

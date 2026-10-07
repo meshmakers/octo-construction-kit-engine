@@ -292,40 +292,22 @@ public abstract class CachedCatalog(
     /// <returns>A task representing the asynchronous operation.</returns>
     protected async Task WriteCacheAsync(CacheTypes.CacheCatalog cacheCatalog)
     {
-        var tempFileName = Path.GetTempFileName();
-
-#if NETSTANDARD2_0
-        using var streamWriter = File.Create(tempFileName);
-#else
-        await using var streamWriter = File.Create(tempFileName);
-#endif
-        await System.Text.Json.JsonSerializer
-            .SerializeAsync(streamWriter, cacheCatalog,
-                new System.Text.Json.JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                    Converters = { new CkVersionConverter() }
-                }).ConfigureAwait(false);
-        streamWriter.Close();
-
-        if (!Directory.Exists(catalogOptions.CacheDirectory))
-        {
-            Directory.CreateDirectory(catalogOptions.CacheDirectory);
-        }
-
+        // Review N3: write a temp file in the cache directory and rename it into place. The former
+        // File.Copy(overwrite) from a temp file on another volume rewrote the cache in place (a parallel reader
+        // could see a partial file) and leaked the temp file after failed attempts.
         var cachePath = Path.Combine(catalogOptions.CacheDirectory, catalogOptions.CacheFileName);
-
-
-        // Use File.Copy with overwrite instead of Delete+Move to avoid a window
-        // where the cache file does not exist during concurrent parallel builds.
         const int maxRetries = 5;
         for (var attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
             {
-                File.Copy(tempFileName, cachePath, overwrite: true);
-                File.Delete(tempFileName);
-                break; // Success
+                await CatalogFileIo.WriteJsonAtomicallyAsync(cachePath, cacheCatalog,
+                    new System.Text.Json.JsonSerializerOptions
+                    {
+                        PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                        Converters = { new CkVersionConverter() }
+                    }).ConfigureAwait(false);
+                return;
             }
             catch (IOException) when (attempt < maxRetries)
             {

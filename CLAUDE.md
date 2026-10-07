@@ -659,6 +659,15 @@ deleting the temp file in all cases. The former `File.Copy(temp, target, overwri
 a parallel sibling compile could read a half-written model — and a concurrent reader even made the publish fail
 ("being used by another process"). Pinned by `PublishAsync_ForcedRepublish_ReaderNeverSeesAPartialFile_*`.
 
+**Index files are atomic and serialized (review N3).** The three `catalog.json` index files (root, model library,
+major versions) are read-modify-write. `PublishAsync` now updates them under a cross-process lock
+(`ck-models/v2/.catalog-index.lock`, exclusive open = `flock` on Unix, `CatalogFileIo.AcquireLockAsync`) and every
+index write — and the shared cache file (`CachedCatalog.WriteCacheAsync`) — goes through
+`CatalogFileIo.WriteJsonAtomicallyAsync` (temp file in the same directory, renamed into place, temp always
+deleted). Before, parallel publishers of sibling models lost each other's entries (models vanished from
+`ListAsync` / `SearchAsync`) and readers could hit a half-written index. Pinned by
+`PublishAsync_ParallelPublishersOnOneRoot_KeepEveryIndexEntry` (64 parallel publishers; red 3/3 before).
+
 **Fail fast with the visible versions.** When a dependency range cannot be satisfied,
 `CatalogDependencyResolver` lists the versions each readable catalog knows for that model
 (`... 'System-[2.5,3.0)' does not match any visible version of System (LocalFileSystemCatalog: 2.4.0)`)

@@ -273,6 +273,37 @@ public class LocalFileSystemCatalogTests : IDisposable
         Assert.True((await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.0,3.0)"))).Exists);
     }
 
+    // Review N3: parallel octo-ckc processes publishing sibling models must not lose index entries.
+    [Fact]
+    public async Task PublishAsync_ParallelPublishersOnOneRoot_KeepEveryIndexEntry()
+    {
+        // Many versions of few models: every publisher rewrites the same major-version index.
+        var models = Enumerable.Range(0, 64)
+            .Select(i => new CkModelId($"Parallel{i % 2}", $"1.{i / 2}.0"))
+            .ToList();
+
+        // One catalog instance per publisher, like separate processes sharing the catalog root.
+        await Task.WhenAll(models.Select(modelId => Task.Run(async () =>
+        {
+            var serializer = A.Fake<ICkJsonSerializer>();
+            var catalog = new LocalFileSystemCatalog(Options.Create(new LocalFileSystemCatalogOptions
+            {
+                CacheDirectory = Path.Combine(_tempDirectory, $"cache-{Guid.NewGuid():N}"),
+                RootPath = _tempDirectory
+            }), serializer);
+            await catalog.PublishAsync(new CkCompiledModelRoot { ModelId = modelId }, force: true);
+        }, TestContext.Current.CancellationToken)));
+
+        await _repository.RefreshCatalogAsync(forceRefresh: true);
+        var listed = _repository.ListAsync(null)
+            .ToBlockingEnumerable(cancellationToken: TestContext.Current.CancellationToken)
+            .Select(r => r.ModelId)
+            .ToHashSet();
+
+        Assert.All(models, m => Assert.Contains(m, listed));
+        Assert.Empty(Directory.EnumerateFiles(_tempDirectory, "*.tmp", SearchOption.AllDirectories));
+    }
+
     #endregion
 
     #region GetModelAsync Tests

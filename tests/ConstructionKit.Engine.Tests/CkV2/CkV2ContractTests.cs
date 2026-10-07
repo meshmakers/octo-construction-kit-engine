@@ -52,6 +52,9 @@ public class CkV2ContractTests
     [InlineData("NoSlash.Do-1")]
     [InlineData("Model/TypeWithoutMethod")]
     [InlineData("Model/Type.")]
+    // Review L1: an invalid element version used to escape as TargetInvocationException (Activator).
+    [InlineData("Model/Type-x.Do-1")]
+    [InlineData("Model/-1.Do-1")]
     public void CkMethodIds_TryParse_RejectsMalformedValues(string? value)
     {
         Assert.False(CkMethodIds.TryParse(value, out _, out _));

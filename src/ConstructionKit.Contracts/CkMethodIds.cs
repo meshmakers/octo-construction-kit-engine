@@ -61,8 +61,11 @@ public static class CkMethodIds
         {
             declaringCkTypeId = new RtCkId<CkTypeId>(qualifiedMethodId.Substring(0, dot));
         }
-        catch (ArgumentOutOfRangeException)
+        catch (Exception e) when (e is ArgumentException or FormatException or OverflowException
+                                       or System.Reflection.TargetInvocationException)
         {
+            // Review L1: RtCkId builds the element id via Activator.CreateInstance, so a parse failure of the
+            // element arrives wrapped in TargetInvocationException. TryParse must never throw.
             declaringCkTypeId = null!;
             return false;
         }

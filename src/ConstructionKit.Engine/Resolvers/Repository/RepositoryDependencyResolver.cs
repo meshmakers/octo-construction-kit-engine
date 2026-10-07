@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -24,6 +25,17 @@ internal class RepositoryDependencyResolver(
                 operationResult)
             .ConfigureAwait(false);
         logger.LogDebug("Resolving dependencies completed");
+
+        // Review L2: a dependency with an unsupported ckLanguage (message 91) fails a hard resolve explicitly.
+        var languageErrors = operationResult.Messages
+            .Where(m => m.MessageNumber == 91 && m.MessageLevel >= MessageLevel.Error)
+            .Select(m => m.MessageText)
+            .Distinct()
+            .ToList();
+        if (languageErrors.Count > 0)
+        {
+            throw new ModelValidationException(string.Join(" ", languageErrors));
+        }
 
         if (resolveResult.UnresolvedDependencyModelIds.Any())
         {
@@ -145,6 +157,26 @@ internal class RepositoryDependencyResolver(
                     ckDependency));
 
                 throw ModelValidationException.UnknownCkModel(ckDependency);
+            }
+
+            // Review L2: the ckLanguage gate (message 91) applies to dependency models as well, not only to the
+            // model being compiled/imported. An unsupported language is not appended; its dependents are skipped.
+            if (ckDependencyRootModel.CkLanguage is { } ckLanguage &&
+                (ckLanguage < 1 || ckLanguage > CkModelPropertiesDto.MaxSupportedCkLanguage))
+            {
+                operationResult.AddMessage(MessageCodes.CkLanguageNotSupported(
+                    originFileResolver.Resolve(ckDependency), ckDependencyRootModel.ModelId, ckLanguage,
+                    CkModelPropertiesDto.MaxSupportedCkLanguage));
+                foreach (var skipped in ckOriginModelIds.Append(ckDependencyRootModel.ModelId))
+                {
+                    if (!skippedDependencies.Contains(skipped))
+                    {
+                        skippedDependencies.Add(skipped);
+                    }
+                }
+
+                ckResolvedModels.Add(ckDependencyRootModel);
+                continue;
             }
 
             variableResolver.SetVariable(ckDependencyRootModel.ModelId.Name, ckDependencyRootModel.ModelId.FullName);

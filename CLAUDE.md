@@ -760,7 +760,7 @@ without the key compiles byte-identical to the engine before CK v2 — compiled 
 | `interfaces` | new folder `interfaces/*.yaml` (`CompilerStatics.InterfacesFolder`), schema `construction-kit-elements-interface.schema.json` | `CkInterfaceId` (+ STJ/YAML/Newtonsoft converters, `CkIdInterfaceIdConverter`, `RtCkIdInterfaceIdConverter`), `CkInterfaceDto`, `CkInterfaceAttributeDto`, `CkModelRootBase.Interfaces`, `CkElementsRootDto.Interfaces`, `CkInterfaceGraph`, `ICkModelGraph.Interfaces` / `InterfacesByRtCk` / `GetOrCreateInterface`, `CkCacheRoot.Interfaces`, `ICkCacheService.GetRtCkInterface` / `GetRtCkInterfaces` |
 | `implements` | `CkType` / `CkCompiledType` | `CkTypeDto.Implements` (`List<CkId<CkInterfaceId>>`, JSON via `CkIdInterfaceIdListConverter`), `CkTypeGraph.DeclaredImplements` / `AllImplementedInterfaces` |
 | `access` | `CkTypeAttribute` (types, records, association roles) | `CkAttributeAccessDto` (`ReadWrite`/`ReadOnly`/`MethodOnly`/`Hidden`), `AttributeAccess` predicates, `CkTypeAttributeDto.Access` (nullable), `CkTypeAttributeGraph.Access` (effective, init setter like `Ownership`) |
-| `methods` | `CkType` / `CkCompiledType`, schema `construction-kit-elements-method.schema.json` | `CkMethodDto` family (`CkMethodKindDto`, `CkMethodParameterDto`, `CkMethodResultDto`, `CkMethodErrorDto`, `CkMethodAuthorizationDto`, `CkMethodExecutionDto`), `CkTypeDto.Methods`, `CkTypeGraph.DefinedMethods` / `AllMethods` (key = method id), `CkMethodGraph` (`QualifiedMethodId`, `TimeoutSeconds`), `CkMethodIds.Qualify` / `TryParse` (`System.Identity/User.ChangePassword-1`) |
+| `methods` | `CkType` / `CkCompiledType`, schema `construction-kit-elements-method.schema.json` | `CkMethodDto` family (`CkMethodKindDto`, `CkMethodParameterDto`, `CkMethodResultDto`, `CkMethodErrorDto`, `CkMethodAuthorizationDto`, `CkMethodExecutionDto`), `CkTypeDto.Methods`, `CkTypeGraph.DefinedMethods` / `AllMethods` (key = method id), `CkMethodGraph` (`QualifiedMethodId`, `TimeoutSeconds`), `CkMethodIds.Qualify` / `TryParse` (`System.Identity/User.ChangePassword-1`; `TryParse` never throws — an invalid element id wrapped in `TargetInvocationException` by `Activator` returns false, review L1) |
 
 Notes:
 - Interface ids always carry their version on the wire (`Named-1`): the YAML converter writes `FullName`,
@@ -776,7 +776,7 @@ Notes:
 | Code | Key | Where | Rule |
 | ---- | --- | ----- | ---- |
 | 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods` or any `access` (type, record, association-role assignment) without `ckLanguage: 2` |
-| 91 | `CkLanguageNotSupported` | `ElementResolver` | `ckLanguage` outside 1..`MaxSupportedCkLanguage` (also raised when a compiled model is resolved, e.g. on import) |
+| 91 | `CkLanguageNotSupported` | `ElementResolver`, catalog + repository dependency resolvers | `ckLanguage` outside 1..`MaxSupportedCkLanguage` (also raised when a compiled model is resolved, e.g. on import, and — review L2 — for every **dependency** model: it is not appended, its dependents are skipped, and a hard resolve throws with the message) |
 | 92 | `CkInterfaceIdNotUnique` | `ElementResolver` | same interface id twice (`Named-1` and `Named-2` are different contracts) |
 | 93 | `CkInterfaceNameCollidesWithType` | `ElementResolver` | interface name == type name of the same model (I-5, GraphQL type namespace) |
 | 94 | `CkInterfaceAttributeUnknown` | `ReferenceResolver` | member references an unknown attribute; known members are merged into `CkInterfaceGraph.Attributes` |

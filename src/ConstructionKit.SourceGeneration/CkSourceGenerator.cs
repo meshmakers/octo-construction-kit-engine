@@ -212,7 +212,8 @@ public class CkSourceGenerator : IIncrementalGenerator
             
             var generatedCode = CkIdsCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId,
                 ckCompiledModelRoot.Types,
-                ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles, ckCompiledModelRoot.Records, ckCompiledModelRoot.Enums);
+                ckCompiledModelRoot.Attributes, ckCompiledModelRoot.AssociationRoles, ckCompiledModelRoot.Records, ckCompiledModelRoot.Enums,
+                ckCompiledModelRoot.Interfaces);
             context.AddSource($"{ns}.Common.CkIds.g.cs", generatedCode);
 
             generatedCode = CkEmbeddedModelGenerator.Instance.Generate(ns, fileOptions.LocalNamespace,

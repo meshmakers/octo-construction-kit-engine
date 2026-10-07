@@ -411,6 +411,8 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                                 await contentGenerator.GenerateAssociationRolesMarkdownTable(modelGraph, path,
                                     ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString(),
                                     CkLinkPath);
+                                await contentGenerator.GenerateInterfacesMarkdownTable(modelGraph, path,
+                                    ckCompiledModelRoot.ModelId, ckCompiledModelRoot.ModelId.Version.ToString());
                             }
                         }
 

@@ -135,6 +135,12 @@ surface in the dependency diff.
 | Type is no longer a collection root (`isCollectionRoot: true → false`) | Collection semantics break (defensive) |
 | Dependency removed | Consumers may rely on the transitively provided model (defensive) |
 | Dependency switched to a new **major** version | Transitively breaking |
+| CK v2: interface **removed** | Implementing types and interface consumers break |
+| CK v2: interface member added, removed or changed (`id`, `isOptional`) | The contract changed — publish a new interface version (`Named-2`) instead |
+| CK v2: `implements` entry removed from a type | Consumers querying the type through the interface break |
+| CK v2: method **removed** | Callers of the method break |
+| CK v2: method signature changed (kind, parameters, result, errors, authorization, execution) | Callers break — publish a new method version (`ChangePassword-2`) instead |
+| CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
 
 ### Minor (additive)
 
@@ -161,12 +167,17 @@ surface in the dependency diff.
 | New type association referencing a non-mandatory role of the same model (no multiplicity One) | Additive |
 | New dependency | Additive |
 | Dependency version changed without a major switch | Compatible |
+| CK v2: new interface | Purely additive |
+| CK v2: new `implements` entry on a type | Additive |
+| CK v2: new method | Additive |
+| CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 0 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
+| CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it |
 
 ### Patch
 
 | Change | Reasoning |
 | ------ | --------- |
-| `description` (all element kinds, model meta) | Purely documentational |
+| `description` (all element kinds, model meta — including CK v2 interfaces and methods) | Purely documentational |
 | `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
 | `isRuntimeState: true` rewritten as `ownership: RuntimeState` (or `false` as `SeedOwned`) | Same resolved ownership → empty diff → **no bump required**. Both markers are compared on their resolved value, so migrating a declaration to the enum costs nothing; only a genuine change of owner does. |

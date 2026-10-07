@@ -90,7 +90,10 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             Attributes = compileCandidate.Attributes,
             AssociationRoles = compileCandidate.AssociationRoles,
             Records = compileCandidate.Records,
-            Enums = compileCandidate.Enums
+            Enums = compileCandidate.Enums,
+            // CK v2 (AB#5667 / AB#5584)
+            Interfaces = compileCandidate.Interfaces,
+            CkLanguage = compileCandidate.CkLanguage
         };
 
         if (_compilerOptions.Value.RangeRetention && compileCandidate.DependencyRanges is { Count: > 0 } &&
@@ -207,7 +210,8 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
                 .Concat((floorModel.Attributes ?? []).Select(a => ("attribute", a.AttributeId.ToString()!)))
                 .Concat((floorModel.AssociationRoles ?? []).Select(r => ("association role", r.AssociationRoleId.ToString()!)))
                 .Concat((floorModel.Records ?? []).Select(r => ("record", r.RecordId.ToString()!)))
-                .Concat((floorModel.Enums ?? []).Select(e => ("enum", e.EnumId.ToString()!))));
+                .Concat((floorModel.Enums ?? []).Select(e => ("enum", e.EnumId.ToString()!)))
+                .Concat((floorModel.Interfaces ?? []).Select(i => ("interface", i.InterfaceId.ToString()!))));
 
             var missing = referenced
                 .Where(r => !available.Contains((r.Kind, r.ElementId)))

@@ -7,7 +7,9 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 ///     Rewrites the model part of every element reference of a CK model (CK v2 range retention, AB#5664 /
 ///     AB#5665). These are all places where a model refers to elements of another model: attribute
 ///     record/enum value types, type and record base types, type/record/association-role attribute
-///     assignments, association roles, association target types and target attributes.
+///     assignments, association roles, association target types and target attributes, and (CK v2, AB#5667 /
+///     AB#5669) interface member attributes, <c>implements</c> entries and method parameter/result record and enum
+///     references.
 /// </summary>
 internal static class CkReferenceRewriter
 {
@@ -67,10 +69,38 @@ internal static class CkReferenceRewriter
             MapAttributes(record.Attributes);
         }
 
+        foreach (var ckInterface in model.Interfaces ?? [])
+        {
+            foreach (var member in ckInterface.Attributes)
+            {
+                member.CkAttributeId = Map(member.CkAttributeId)!;
+            }
+        }
+
         foreach (var type in model.Types ?? [])
         {
             type.DerivedFromCkTypeId = Map(type.DerivedFromCkTypeId);
             MapAttributes(type.Attributes);
+            if (type.Implements != null)
+            {
+                type.Implements = type.Implements.Select(i => Map(i)!).ToList();
+            }
+
+            foreach (var method in type.Methods ?? [])
+            {
+                foreach (var parameter in method.Parameters ?? [])
+                {
+                    parameter.ValueCkRecordId = Map(parameter.ValueCkRecordId);
+                    parameter.ValueCkEnumId = Map(parameter.ValueCkEnumId);
+                }
+
+                if (method.Result != null)
+                {
+                    method.Result.ValueCkRecordId = Map(method.Result.ValueCkRecordId);
+                    method.Result.ValueCkEnumId = Map(method.Result.ValueCkEnumId);
+                }
+            }
+
             foreach (var association in type.Associations ?? [])
             {
                 association.CkRoleId = Map(association.CkRoleId)!;
@@ -140,10 +170,35 @@ internal static class CkReferenceRewriter
             AddAttributes(record.Attributes);
         }
 
+        foreach (var ckInterface in model.Interfaces ?? [])
+        {
+            foreach (var member in ckInterface.Attributes)
+            {
+                Add("attribute", member.CkAttributeId);
+            }
+        }
+
         foreach (var type in model.Types ?? [])
         {
             Add("type", type.DerivedFromCkTypeId);
             AddAttributes(type.Attributes);
+            foreach (var implemented in type.Implements ?? [])
+            {
+                Add("interface", implemented);
+            }
+
+            foreach (var method in type.Methods ?? [])
+            {
+                foreach (var parameter in method.Parameters ?? [])
+                {
+                    Add("record", parameter.ValueCkRecordId);
+                    Add("enum", parameter.ValueCkEnumId);
+                }
+
+                Add("record", method.Result?.ValueCkRecordId);
+                Add("enum", method.Result?.ValueCkEnumId);
+            }
+
             foreach (var association in type.Associations ?? [])
             {
                 Add("association role", association.CkRoleId);

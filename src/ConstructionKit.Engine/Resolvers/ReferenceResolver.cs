@@ -20,7 +20,83 @@ internal class ReferenceResolver : IReferenceResolver
 
         CheckCkRecords(modelGraph, originFileResolver, operationResult);
 
+        CheckCkInterfaces(modelGraph, originFileResolver, operationResult);
+
         CheckCkTypes(modelGraph, originFileResolver, operationResult);
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): every interface member references an existing attribute (94); the member is merged with
+    ///     the attribute definition into <see cref="CkInterfaceGraph.Attributes" />.
+    /// </summary>
+    private static void CheckCkInterfaces(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        foreach (var ckInterface in modelGraph.Interfaces.Values)
+        {
+            foreach (var member in ckInterface.DefinedAttributes)
+            {
+                if (!modelGraph.Attributes.TryGetValue(member.CkAttributeId, out var attributeGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceAttributeUnknown(
+                        originFileResolver.Resolve(ckInterface.CkInterfaceId), member.AttributeName,
+                        ckInterface.CkInterfaceId, member.CkAttributeId));
+                    continue;
+                }
+
+                ckInterface.TryAddAttribute(new CkTypeAttributeGraph(member.CkAttributeId,
+                    new CkTypeAttributeDto
+                    {
+                        CkAttributeId = member.CkAttributeId, AttributeName = member.AttributeName,
+                        IsOptional = member.IsOptional
+                    }, attributeGraph));
+            }
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667 / AB#5669): <c>implements</c> entries exist (95); record and enum references of method
+    ///     parameters and results exist (101).
+    /// </summary>
+    private static void CheckCkV2TypeReferences(CkModelGraph modelGraph, CkId<CkTypeId> ckId, CkTypeGraph ckTypeGraph,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        foreach (var ckInterfaceId in ckTypeGraph.DeclaredImplements)
+        {
+            if (!modelGraph.Interfaces.ContainsKey(ckInterfaceId))
+            {
+                operationResult.AddMessage(MessageCodes.ImplementsUnknownCkInterface(originFileResolver.Resolve(ckId),
+                    ckId, ckInterfaceId));
+            }
+        }
+
+        foreach (var method in ckTypeGraph.DefinedMethods)
+        {
+            void CheckValue(string what, CkId<CkRecordId>? recordId, CkId<CkEnumId>? enumId)
+            {
+                if (recordId != null && !modelGraph.Records.ContainsKey(recordId))
+                {
+                    operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(originFileResolver.Resolve(ckId),
+                        method.MethodId, ckId, $"{what} references unknown record '{recordId}'"));
+                }
+
+                if (enumId != null && !modelGraph.Enums.ContainsKey(enumId))
+                {
+                    operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(originFileResolver.Resolve(ckId),
+                        method.MethodId, ckId, $"{what} references unknown enum '{enumId}'"));
+                }
+            }
+
+            foreach (var parameter in method.Parameters ?? [])
+            {
+                CheckValue($"parameter '{parameter.Name}'", parameter.ValueCkRecordId, parameter.ValueCkEnumId);
+            }
+
+            if (method.Result != null)
+            {
+                CheckValue("the result", method.Result.ValueCkRecordId, method.Result.ValueCkEnumId);
+            }
+        }
     }
 
     private static void CheckCkAssociationRoles(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
@@ -91,6 +167,8 @@ internal class ReferenceResolver : IReferenceResolver
         {
             var ckId = f.Key;
             var ckTypeGraph = f.Value;
+            CheckCkV2TypeReferences(modelGraph, ckId, ckTypeGraph, originFileResolver, operationResult);
+
             // Check 1.
             foreach (var ckTypeAttribute in ckTypeGraph.DefinedAttributes)
             {

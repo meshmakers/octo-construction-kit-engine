@@ -83,12 +83,224 @@ internal class InheritanceResolver : IInheritanceResolver
         _logger.LogDebug("Resolving dependencies based on inheritance");
         BuildInheritedConfiguration(modelGraph, failedTypeIds, originFileResolver, operationResult);
 
+        _logger.LogDebug("Resolving interfaces and methods");
+        ResolveInterfacesAndMethods(modelGraph, failedTypeIds, originFileResolver, operationResult);
+
         _logger.LogDebug("Validating display rules");
         ValidateDisplayRules(modelGraph, failedTypeIds, originFileResolver, operationResult);
 
         _logger.LogDebug("Resolving inheritance completed");
 
         return modelGraph;
+    }
+
+    private static readonly HashSet<string> ReservedMethodNames =
+        new(StringComparer.OrdinalIgnoreCase) { "Create", "Update", "Delete" };
+
+    /// <summary>
+    ///     CK v2 (AB#5667 / AB#5669): completes <see cref="CkTypeGraph.AllImplementedInterfaces" /> (own ∪ base) and
+    ///     <see cref="CkTypeGraph.AllMethods" /> (base ∪ own) along the whole base-type chain, checks the interface
+    ///     rules I-1..I-4 and the method rules M-1..M-5 at the declaring type, and fills
+    ///     <see cref="CkInterfaceGraph.ImplementingTypes" />. Runs after attribute flattening, so members a type
+    ///     inherits satisfy an interface.
+    /// </summary>
+    private static void ResolveInterfacesAndMethods(CkModelGraph modelGraph, HashSet<CkId<CkTypeId>> failedTypeIds,
+        IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        foreach (var pair in modelGraph.Types)
+        {
+            var ckTypeId = pair.Key;
+            var typeGraph = pair.Value;
+            if (failedTypeIds.Contains(ckTypeId))
+            {
+                continue;
+            }
+
+            var location = originFileResolver.Resolve(ckTypeId);
+            var baseGraphs = typeGraph.BaseTypes
+                .Select(b => modelGraph.Types.TryGetValue(b.BaseCkTypeId, out var g) ? g : null)
+                .Where(g => g != null)
+                .Select(g => g!)
+                .ToList();
+
+            // Inheritance: nearest base first, so the nearest declaration of a method id wins.
+            foreach (var baseGraph in baseGraphs)
+            {
+                typeGraph.InheritInterfaces(baseGraph.DeclaredImplements);
+                typeGraph.InheritMethods(baseGraph.DefinedMethods.Select(m => new CkMethodGraph(baseGraph.CkTypeId, m)));
+            }
+
+            ValidateMethods(typeGraph, baseGraphs, ckTypeId, location, operationResult);
+
+            foreach (var ckInterfaceId in typeGraph.DeclaredImplements)
+            {
+                if (modelGraph.Interfaces.TryGetValue(ckInterfaceId, out var interfaceGraph))
+                {
+                    ValidateImplementation(typeGraph, interfaceGraph, ckTypeId, location, operationResult);
+                }
+            }
+
+            foreach (var ckInterfaceId in typeGraph.AllImplementedInterfaces)
+            {
+                if (modelGraph.Interfaces.TryGetValue(ckInterfaceId, out var interfaceGraph))
+                {
+                    interfaceGraph.AddImplementingType(ckTypeId);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667) rules I-1..I-4 for one declared <c>implements</c> entry.
+    /// </summary>
+    private static void ValidateImplementation(CkTypeGraph typeGraph, CkInterfaceGraph interfaceGraph,
+        CkId<CkTypeId> ckTypeId, string location, OperationResult operationResult)
+    {
+        var ckInterfaceId = interfaceGraph.CkInterfaceId;
+        foreach (var member in interfaceGraph.DefinedAttributes)
+        {
+            if (!typeGraph.AllAttributes.TryGetValue(member.CkAttributeId, out var assignment))
+            {
+                // I-1
+                if (!member.IsOptional)
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceMemberMissing(location, ckTypeId,
+                        ckInterfaceId, member.CkAttributeId, member.AttributeName));
+                }
+
+                continue;
+            }
+
+            // I-2
+            if (!member.IsOptional && assignment.IsOptional)
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceMemberMultiplicityMismatch(location, ckTypeId,
+                    ckInterfaceId, member.CkAttributeId, member.AttributeName));
+            }
+
+            // I-3
+            if (!string.Equals(assignment.AttributeName, member.AttributeName, StringComparison.Ordinal))
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceMemberNameMismatch(location, ckTypeId,
+                    ckInterfaceId, member.CkAttributeId, assignment.AttributeName, member.AttributeName));
+            }
+
+            // I-4
+            if (assignment.Access == CkAttributeAccessDto.Hidden)
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceMemberHidden(location, ckTypeId, ckInterfaceId,
+                    member.CkAttributeId, member.AttributeName));
+            }
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5669) rules M-1..M-5 for the methods declared on a type.
+    /// </summary>
+    private static void ValidateMethods(CkTypeGraph typeGraph, IReadOnlyCollection<CkTypeGraph> baseGraphs,
+        CkId<CkTypeId> ckTypeId, string location, OperationResult operationResult)
+    {
+        // M-1: unique per type, and no re-declaration (override) of an inherited method id.
+        foreach (var duplicate in typeGraph.DefinedMethods.GroupBy(m => m.MethodId).Where(g => g.Count() > 1))
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodIdNotUnique(location, duplicate.Key, ckTypeId,
+                "the method id is declared more than once on the type"));
+        }
+
+        foreach (var method in typeGraph.DefinedMethods)
+        {
+            var declaringBase = baseGraphs.FirstOrDefault(b => b.DefinedMethods.Any(m => m.MethodId == method.MethodId));
+            if (declaringBase != null)
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodIdNotUnique(location, method.MethodId, ckTypeId,
+                    $"it is inherited from '{declaringBase.CkTypeId}'; overriding an inherited method is not supported"));
+            }
+
+            // M-2
+            var methodName = GetMethodName(method.MethodId);
+            if (ReservedMethodNames.Contains(methodName))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodNameReserved(location, method.MethodId, ckTypeId,
+                    methodName));
+            }
+
+            // M-3
+            foreach (var duplicate in (method.Parameters ?? []).GroupBy(p => p.Name).Where(g => g.Count() > 1))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(location, method.MethodId, ckTypeId,
+                    $"parameter name '{duplicate.Key}' is not unique"));
+            }
+
+            foreach (var parameter in method.Parameters ?? [])
+            {
+                ValidateValueType($"parameter '{parameter.Name}'", parameter.ValueType, parameter.ValueCkRecordId,
+                    parameter.ValueCkEnumId, method.MethodId, ckTypeId, location, operationResult);
+            }
+
+            if (method.Result != null)
+            {
+                ValidateValueType("the result", method.Result.ValueType, method.Result.ValueCkRecordId,
+                    method.Result.ValueCkEnumId, method.MethodId, ckTypeId, location, operationResult);
+            }
+
+            // M-4
+            foreach (var duplicate in (method.Errors ?? []).GroupBy(e => e.Code).Where(g => g.Count() > 1))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodErrorCodeInvalid(location, duplicate.Key,
+                    method.MethodId, ckTypeId, "the code is declared more than once"));
+            }
+
+            foreach (var error in (method.Errors ?? []).Where(e =>
+                         e.Code.StartsWith("METHOD_", StringComparison.Ordinal)))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodErrorCodeInvalid(location, error.Code,
+                    method.MethodId, ckTypeId, "the prefix 'METHOD_' is reserved for platform errors"));
+            }
+
+            // M-5
+            if (method.Kind == CkMethodKindDto.Static && method.Authorization?.AllowSelf == true)
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodAuthorizationInvalid(location, method.MethodId,
+                    ckTypeId, "'allowSelf: true' requires an instance method, a static method has no target entity"));
+            }
+        }
+    }
+
+    private static void ValidateValueType(string what, AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId,
+        CkId<CkEnumId>? enumId, string methodId, CkId<CkTypeId> ckTypeId, string location,
+        OperationResult operationResult)
+    {
+        string? reason = null;
+        if (valueType == AttributeValueTypesDto.Record && recordId == null)
+        {
+            reason = $"{what} is of value type Record but declares no 'valueCkRecordId'";
+        }
+        else if (valueType != AttributeValueTypesDto.Record && recordId != null)
+        {
+            reason = $"{what} declares 'valueCkRecordId' but is of value type {valueType}";
+        }
+        else if (valueType == AttributeValueTypesDto.Enum && enumId == null)
+        {
+            reason = $"{what} is of value type Enum but declares no 'valueCkEnumId'";
+        }
+        else if (valueType != AttributeValueTypesDto.Enum && enumId != null)
+        {
+            reason = $"{what} declares 'valueCkEnumId' but is of value type {valueType}";
+        }
+
+        if (reason != null)
+        {
+            operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(location, methodId, ckTypeId, reason));
+        }
+    }
+
+    /// <summary>
+    ///     The method name without the element version: <c>ChangePassword-1</c> → <c>ChangePassword</c>.
+    /// </summary>
+    private static string GetMethodName(string methodId)
+    {
+        var index = methodId.LastIndexOf('-');
+        return index > 0 ? methodId.Substring(0, index) : methodId;
     }
 
     /// <summary>

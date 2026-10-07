@@ -58,6 +58,18 @@ public interface IContentGenerator
         string documentPath, CkModelId ckModelId, string? versionNumber, string linkPathRoot);
 
     /// <summary>
+    /// CK v2 (AB#5667): writes a Markdown file with one table per interface of the model. Writes nothing when the
+    /// model declares no interfaces.
+    /// </summary>
+    /// <param name="modelGraph">The Resolved CK Model Graph</param>
+    /// <param name="documentPath">Path where the Table is Saved</param>
+    /// <param name="ckModelId">Used to determine the Files Position in the File tree</param>
+    /// <param name="versionNumber">Version of the Model used</param>
+    /// <returns></returns>
+    Task GenerateInterfacesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
+        string? versionNumber);
+
+    /// <summary>
     /// Writes a Markdown Table to File that contains all Association Roles present in the modelGraph
     /// </summary>
     /// <param name="modelGraph">The Resolved CK Model Graph</param>

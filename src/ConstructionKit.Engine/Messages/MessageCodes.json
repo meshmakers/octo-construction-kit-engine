@@ -461,6 +461,96 @@
       "number": 77,
       "level": "ERROR",
       "text": "Record key '{recordKey}' of record '{ckRecordId}' is invalid: {reason}"
+    },
+    {
+      "key": "CkLanguageFeatureRequiresV2",
+      "number": 90,
+      "level": "ERROR",
+      "text": "Model '{modelId}' uses the CK v2 feature '{feature}' at '{element}', which requires 'ckLanguage: 2' in ckModel.yaml (declared: {ckLanguage})."
+    },
+    {
+      "key": "CkLanguageNotSupported",
+      "number": 91,
+      "level": "ERROR",
+      "text": "Model '{modelId}' declares ckLanguage {ckLanguage}, but this engine supports ckLanguage 1 to {maxCkLanguage}. Use an engine that supports the model's CK language version."
+    },
+    {
+      "key": "CkInterfaceIdNotUnique",
+      "number": 92,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' is defined more than once."
+    },
+    {
+      "key": "CkInterfaceNameCollidesWithType",
+      "number": 93,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' has the same name as type '{ckTypeId}' of the same model. Interface and type names of a model must differ (they share the GraphQL type namespace)."
+    },
+    {
+      "key": "CkInterfaceAttributeUnknown",
+      "number": 94,
+      "level": "ERROR",
+      "text": "Member '{attributeName}' of interface '{ckInterfaceId}' references unknown attribute '{ckAttributeId}'. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "ImplementsUnknownCkInterface",
+      "number": 95,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements unknown interface '{ckInterfaceId}'. Please check if you have set dependency to the correct construction kit model."
+    },
+    {
+      "key": "CkInterfaceMemberMissing",
+      "number": 96,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements '{ckInterfaceId}' but does not assign required member '{ckAttributeId}' (name '{attributeName}')."
+    },
+    {
+      "key": "CkInterfaceMemberMultiplicityMismatch",
+      "number": 97,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements '{ckInterfaceId}' but assigns required member '{ckAttributeId}' (name '{attributeName}') with 'isOptional: true'. A required interface member must be required on the implementing type."
+    },
+    {
+      "key": "CkInterfaceMemberNameMismatch",
+      "number": 98,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements '{ckInterfaceId}' and assigns member '{ckAttributeId}' under the name '{assignedName}', expected '{attributeName}'."
+    },
+    {
+      "key": "CkInterfaceMemberHidden",
+      "number": 99,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements '{ckInterfaceId}' but assigns member '{ckAttributeId}' (name '{attributeName}') with 'access: Hidden'. Interface members must be visible."
+    },
+    {
+      "key": "CkMethodIdNotUnique",
+      "number": 100,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of type '{ckTypeId}' is not unique: {reason}"
+    },
+    {
+      "key": "CkMethodParameterInvalid",
+      "number": 101,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of type '{ckTypeId}' is invalid: {reason}"
+    },
+    {
+      "key": "CkMethodNameReserved",
+      "number": 102,
+      "level": "ERROR",
+      "text": "Method '{methodId}' of type '{ckTypeId}' uses the reserved name '{methodName}'. The names 'Create', 'Update' and 'Delete' are reserved for the generic mutations (case-insensitive)."
+    },
+    {
+      "key": "CkMethodErrorCodeInvalid",
+      "number": 103,
+      "level": "ERROR",
+      "text": "Error code '{code}' of method '{methodId}' of type '{ckTypeId}' is invalid: {reason}"
+    },
+    {
+      "key": "CkMethodAuthorizationInvalid",
+      "number": 104,
+      "level": "ERROR",
+      "text": "Authorization of method '{methodId}' of type '{ckTypeId}' is invalid: {reason}"
     }
   ]
 }

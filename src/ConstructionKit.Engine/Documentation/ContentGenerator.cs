@@ -290,6 +290,91 @@ internal class ContentGenerator(
             await DrawTypeTables(directoryPath, type, outputFile).ConfigureAwait(false);
 
             await GenerateTypeAssociationsTable(type, outputFile, directoryPath).ConfigureAwait(false);
+
+            await GenerateCkV2TypeSections(type, outputFile).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667 / AB#5669): implemented interfaces and methods of a type. Emitted only when the type has
+    ///     any, so the documentation of a ckLanguage 1 model is unchanged.
+    /// </summary>
+    private static async Task GenerateCkV2TypeSections(CkTypeGraph type, StreamWriter outputFile)
+    {
+        if (type.AllImplementedInterfaces.Count != 0)
+        {
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            await outputFile.WriteLineAsync("Implements: " + string.Join(", ",
+                    type.AllImplementedInterfaces.Select(i => $"`{i.ToRtCkId().FullName}`").OrderBy(i => i)))
+                .ConfigureAwait(false);
+        }
+
+        if (type.AllMethods.Count != 0)
+        {
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| Method | Kind | Parameters | Result | Declared by |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- |")
+                .ConfigureAwait(false);
+            foreach (var method in type.AllMethods.Values.OrderBy(m => m.Definition.MethodId))
+            {
+                var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
+                    $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
+                await outputFile.WriteLineAsync(
+                        $"| {method.Definition.MethodId} | {method.Definition.Kind} | {parameters} | " +
+                        $"{method.Definition.Result?.ValueType.ToString() ?? "-"} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
+                    .ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): one table per interface of the model with its members.
+    /// </summary>
+    public async Task GenerateInterfacesMarkdownTable(CkModelGraph modelGraph, string documentPath, CkModelId ckModelId,
+        string? versionNumber)
+    {
+        var interfaces = modelGraph.Interfaces.Values.Where(i => i.CkInterfaceId.ModelId == ckModelId).ToList();
+        if (interfaces.Count == 0)
+        {
+            logger.LogDebug("No Interfaces to draw for model ID: {ckModelId}", ckModelId);
+            return;
+        }
+
+        directoryTools.BuildDirectory(documentPath, ckModelId);
+#if NETSTANDARD2_0
+        using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Interfaces"));
+#else
+        await using StreamWriter outputFile = new(linkHelpers.GetGeneratedFilePath(documentPath, ckModelId, "Interfaces"));
+#endif
+        await outputFile.WriteLineAsync().ConfigureAwait(false);
+        if (versionNumber != null)
+        {
+            await AddVersionInfo(outputFile, versionNumber).ConfigureAwait(false);
+        }
+
+        foreach (var ckInterface in interfaces.OrderBy(i => i.CkInterfaceId))
+        {
+            await AddTitle(outputFile, null, ckInterface.CkInterfaceId.ElementId.FullName).ConfigureAwait(false);
+            await outputFile.WriteLineAsync(ckInterface.Description ?? "No description available currently.")
+                .ConfigureAwait(false);
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| Member | Is optional | Value type | CK attribute ID |").ConfigureAwait(false);
+            await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- |").ConfigureAwait(false);
+            foreach (var member in ckInterface.Attributes.Values.OrderBy(a => a.AttributeName))
+            {
+                await outputFile.WriteLineAsync(
+                        $"| {member.AttributeName} | {member.IsOptional} | {member.ValueType} | {member.CkAttributeId.ToRtCkId().FullName} |")
+                    .ConfigureAwait(false);
+            }
+
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            if (ckInterface.ImplementingTypes.Count != 0)
+            {
+                await outputFile.WriteLineAsync("Implemented by: " + string.Join(", ",
+                        ckInterface.ImplementingTypes.Select(t => $"`{t.ToRtCkId().SemanticVersionedFullName}`").OrderBy(t => t)))
+                    .ConfigureAwait(false);
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
         }
     }
 

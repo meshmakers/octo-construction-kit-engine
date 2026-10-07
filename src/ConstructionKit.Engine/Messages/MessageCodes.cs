@@ -256,6 +256,51 @@ internal static class MessageCodes
     internal static OperationMessage RecordKeyInvalid(string? location, object ckRecordId, object recordKey, object reason) =>
         GetMessage("RecordKeyInvalid", location, ckRecordId, recordKey, reason);
 
+    internal static OperationMessage CkLanguageFeatureRequiresV2(string? location, object modelId, object feature, object element, object ckLanguage) =>
+        GetMessage("CkLanguageFeatureRequiresV2", location, modelId, feature, element, ckLanguage);
+
+    internal static OperationMessage CkLanguageNotSupported(string? location, object modelId, object ckLanguage, object maxCkLanguage) =>
+        GetMessage("CkLanguageNotSupported", location, modelId, ckLanguage, maxCkLanguage);
+
+    internal static OperationMessage CkInterfaceIdNotUnique(string? location, object ckInterfaceId) =>
+        GetMessage("CkInterfaceIdNotUnique", location, ckInterfaceId);
+
+    internal static OperationMessage CkInterfaceNameCollidesWithType(string? location, object ckInterfaceId, object ckTypeId) =>
+        GetMessage("CkInterfaceNameCollidesWithType", location, ckInterfaceId, ckTypeId);
+
+    internal static OperationMessage CkInterfaceAttributeUnknown(string? location, object attributeName, object ckInterfaceId, object ckAttributeId) =>
+        GetMessage("CkInterfaceAttributeUnknown", location, attributeName, ckInterfaceId, ckAttributeId);
+
+    internal static OperationMessage ImplementsUnknownCkInterface(string? location, object ckTypeId, object ckInterfaceId) =>
+        GetMessage("ImplementsUnknownCkInterface", location, ckTypeId, ckInterfaceId);
+
+    internal static OperationMessage CkInterfaceMemberMissing(string? location, object ckTypeId, object ckInterfaceId, object ckAttributeId, object attributeName) =>
+        GetMessage("CkInterfaceMemberMissing", location, ckTypeId, ckInterfaceId, ckAttributeId, attributeName);
+
+    internal static OperationMessage CkInterfaceMemberMultiplicityMismatch(string? location, object ckTypeId, object ckInterfaceId, object ckAttributeId, object attributeName) =>
+        GetMessage("CkInterfaceMemberMultiplicityMismatch", location, ckTypeId, ckInterfaceId, ckAttributeId, attributeName);
+
+    internal static OperationMessage CkInterfaceMemberNameMismatch(string? location, object ckTypeId, object ckInterfaceId, object ckAttributeId, object assignedName, object attributeName) =>
+        GetMessage("CkInterfaceMemberNameMismatch", location, ckTypeId, ckInterfaceId, ckAttributeId, assignedName, attributeName);
+
+    internal static OperationMessage CkInterfaceMemberHidden(string? location, object ckTypeId, object ckInterfaceId, object ckAttributeId, object attributeName) =>
+        GetMessage("CkInterfaceMemberHidden", location, ckTypeId, ckInterfaceId, ckAttributeId, attributeName);
+
+    internal static OperationMessage CkMethodIdNotUnique(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodIdNotUnique", location, methodId, ckTypeId, reason);
+
+    internal static OperationMessage CkMethodParameterInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodParameterInvalid", location, methodId, ckTypeId, reason);
+
+    internal static OperationMessage CkMethodNameReserved(string? location, object methodId, object ckTypeId, object methodName) =>
+        GetMessage("CkMethodNameReserved", location, methodId, ckTypeId, methodName);
+
+    internal static OperationMessage CkMethodErrorCodeInvalid(string? location, object code, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodErrorCodeInvalid", location, code, methodId, ckTypeId, reason);
+
+    internal static OperationMessage CkMethodAuthorizationInvalid(string? location, object methodId, object ckTypeId, object reason) =>
+        GetMessage("CkMethodAuthorizationInvalid", location, methodId, ckTypeId, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -719,6 +764,96 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  77, "Record key '{recordKey}' of record '{ckRecordId}' is invalid: {reason}",
                  new [] {"ckRecordId", "recordKey", "reason"})
+        },
+        {
+            "CkLanguageFeatureRequiresV2",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 90, "Model '{modelId}' uses the CK v2 feature '{feature}' at '{element}', which requires 'ckLanguage: 2' in ckModel.yaml (declared: {ckLanguage}).",
+                 new [] {"modelId", "feature", "element", "ckLanguage"})
+        },
+        {
+            "CkLanguageNotSupported",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 91, "Model '{modelId}' declares ckLanguage {ckLanguage}, but this engine supports ckLanguage 1 to {maxCkLanguage}. Use an engine that supports the model's CK language version.",
+                 new [] {"modelId", "ckLanguage", "maxCkLanguage"})
+        },
+        {
+            "CkInterfaceIdNotUnique",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 92, "Interface '{ckInterfaceId}' is defined more than once.",
+                 new [] {"ckInterfaceId"})
+        },
+        {
+            "CkInterfaceNameCollidesWithType",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 93, "Interface '{ckInterfaceId}' has the same name as type '{ckTypeId}' of the same model. Interface and type names of a model must differ (they share the GraphQL type namespace).",
+                 new [] {"ckInterfaceId", "ckTypeId"})
+        },
+        {
+            "CkInterfaceAttributeUnknown",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 94, "Member '{attributeName}' of interface '{ckInterfaceId}' references unknown attribute '{ckAttributeId}'. Please check if you have set dependency to the correct construction kit model.",
+                 new [] {"attributeName", "ckInterfaceId", "ckAttributeId"})
+        },
+        {
+            "ImplementsUnknownCkInterface",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 95, "Type '{ckTypeId}' implements unknown interface '{ckInterfaceId}'. Please check if you have set dependency to the correct construction kit model.",
+                 new [] {"ckTypeId", "ckInterfaceId"})
+        },
+        {
+            "CkInterfaceMemberMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 96, "Type '{ckTypeId}' implements '{ckInterfaceId}' but does not assign required member '{ckAttributeId}' (name '{attributeName}').",
+                 new [] {"ckTypeId", "ckInterfaceId", "ckAttributeId", "attributeName"})
+        },
+        {
+            "CkInterfaceMemberMultiplicityMismatch",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 97, "Type '{ckTypeId}' implements '{ckInterfaceId}' but assigns required member '{ckAttributeId}' (name '{attributeName}') with 'isOptional: true'. A required interface member must be required on the implementing type.",
+                 new [] {"ckTypeId", "ckInterfaceId", "ckAttributeId", "attributeName"})
+        },
+        {
+            "CkInterfaceMemberNameMismatch",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 98, "Type '{ckTypeId}' implements '{ckInterfaceId}' and assigns member '{ckAttributeId}' under the name '{assignedName}', expected '{attributeName}'.",
+                 new [] {"ckTypeId", "ckInterfaceId", "ckAttributeId", "assignedName", "attributeName"})
+        },
+        {
+            "CkInterfaceMemberHidden",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 99, "Type '{ckTypeId}' implements '{ckInterfaceId}' but assigns member '{ckAttributeId}' (name '{attributeName}') with 'access: Hidden'. Interface members must be visible.",
+                 new [] {"ckTypeId", "ckInterfaceId", "ckAttributeId", "attributeName"})
+        },
+        {
+            "CkMethodIdNotUnique",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 100, "Method '{methodId}' of type '{ckTypeId}' is not unique: {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkMethodParameterInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 101, "Method '{methodId}' of type '{ckTypeId}' is invalid: {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkMethodNameReserved",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 102, "Method '{methodId}' of type '{ckTypeId}' uses the reserved name '{methodName}'. The names 'Create', 'Update' and 'Delete' are reserved for the generic mutations (case-insensitive).",
+                 new [] {"methodId", "ckTypeId", "methodName"})
+        },
+        {
+            "CkMethodErrorCodeInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 103, "Error code '{code}' of method '{methodId}' of type '{ckTypeId}' is invalid: {reason}",
+                 new [] {"code", "methodId", "ckTypeId", "reason"})
+        },
+        {
+            "CkMethodAuthorizationInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 104, "Authorization of method '{methodId}' of type '{ckTypeId}' is invalid: {reason}",
+                 new [] {"methodId", "ckTypeId", "reason"})
         },
     };
 }

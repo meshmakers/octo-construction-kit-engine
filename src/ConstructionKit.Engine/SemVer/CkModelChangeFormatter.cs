@@ -66,6 +66,10 @@ public static class CkModelChangeFormatter
             CkModelElementKind.RecordAttribute => "Record attribute",
             CkModelElementKind.AssociationRole => "Association role",
             CkModelElementKind.AssociationRoleAttribute => "Association role attribute",
+            CkModelElementKind.Interface => "Interface",
+            CkModelElementKind.InterfaceAttribute => "Interface member",
+            CkModelElementKind.TypeInterface => "Implemented interface",
+            CkModelElementKind.TypeMethod => "Method",
             _ => elementKind.ToString()
         };
     }

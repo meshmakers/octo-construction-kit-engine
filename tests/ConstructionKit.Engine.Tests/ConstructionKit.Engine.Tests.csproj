@@ -143,6 +143,7 @@
              netstandard2.0 Roslyn component whose bundled dependencies clash with this test project, so
              the (dependency-free) emitter source is compiled in directly. -->
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\AttributeCodeGenerator.cs" Link="SourceGeneration\AttributeCodeGenerator.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkIdsCodeGenerator.cs" Link="SourceGeneration\CkIdsCodeGenerator.cs" />
     </ItemGroup>
 
 

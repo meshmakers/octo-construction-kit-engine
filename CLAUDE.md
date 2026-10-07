@@ -23,7 +23,7 @@ The codebase follows a modular architecture with clear separation of concerns:
 Construction Kit models are defined in YAML files following a specific schema:
 - Models have a unique `modelId` (e.g., "System-1.0.1")
 - Models can depend on other models via `dependencies`
-- Model definitions are organized in folders: `types/`, `attributes/`, `enums/`, `records/`, `associations/`
+- Model definitions are organized in folders: `types/`, `attributes/`, `enums/`, `records/`, `associations/`, and (CK v2, `ckLanguage: 2`) `interfaces/`
 - Optional: `migrations/` folder for CK model version migrations
 
 ## Build Commands
@@ -746,6 +746,59 @@ Notes:
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
 - Message codes **90–109** are reserved for CK v2 Phase 0 (78–89 belong to F0.2).
+
+### Compiler rules and message codes
+
+| Code | Key | Where | Rule |
+| ---- | --- | ----- | ---- |
+| 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods` or any `access` (type, record, association-role assignment) without `ckLanguage: 2` |
+| 91 | `CkLanguageNotSupported` | `ElementResolver` | `ckLanguage` outside 1..`MaxSupportedCkLanguage` (also raised when a compiled model is resolved, e.g. on import) |
+| 92 | `CkInterfaceIdNotUnique` | `ElementResolver` | same interface id twice (`Named-1` and `Named-2` are different contracts) |
+| 93 | `CkInterfaceNameCollidesWithType` | `ElementResolver` | interface name == type name of the same model (I-5, GraphQL type namespace) |
+| 94 | `CkInterfaceAttributeUnknown` | `ReferenceResolver` | member references an unknown attribute; known members are merged into `CkInterfaceGraph.Attributes` |
+| 95 | `ImplementsUnknownCkInterface` | `ReferenceResolver` | `implements` entry not in the graph |
+| 96–99 | `CkInterfaceMemberMissing` / `…MultiplicityMismatch` / `…NameMismatch` / `…Hidden` | `InheritanceResolver` | I-1..I-4, checked at the declaring type against `AllAttributes` (inherited attributes satisfy a member) |
+| 100 | `CkMethodIdNotUnique` | `InheritanceResolver` | duplicate method id on a type, or re-declaration of an inherited method id (no overrides) |
+| 101 | `CkMethodParameterInvalid` | `ReferenceResolver` + `InheritanceResolver` | unknown record/enum reference; duplicate parameter name; `Record`/`Enum` without (or non-`Record`/`Enum` with) `valueCkRecordId` / `valueCkEnumId` |
+| 102 | `CkMethodNameReserved` | `InheritanceResolver` | `Create`, `Update`, `Delete` (case-insensitive, without version) |
+| 103 | `CkMethodErrorCodeInvalid` | `InheritanceResolver` | duplicate error code or `METHOD_` prefix |
+| 104 | `CkMethodAuthorizationInvalid` | `InheritanceResolver` | `allowSelf: true` on a `Static` method |
+
+`InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
+type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
+declaring type) and `CkInterfaceGraph.ImplementingTypes`. All new references (`implements`, interface member
+ids, method `valueCkRecordId` / `valueCkEnumId`) go through the `VariableResolver`, and `CkReferenceRewriter`
+(F0.2 range retention) rewrites and floor-checks them like every other reference (`System@2/Named-1`).
+
+Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}InterfaceId`,
+`RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
+`SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
+appended: `UserChangePassword2MethodId`). Typed parameter records are not generated (Phase 0 stretch goal).
+Docs generator: `Interfaces.md` per model plus an "Implements" line and a methods table per type (only when present).
+SemVer rules: `docs/ck-semver-rules.md` (additions Minor, removals and contract/signature changes Major, `access`
+changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor).
+
+### Touch-point checklist (keep for every new CK field — contract §2.7)
+
+| # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` |
+| - | ----------- | ------------ | ------------ | ------------ | -------- | --------- |
+| 1 | Source schema | meta (enum 1/2) | interface schema + elements root | `CkType` | `CkTypeAttribute` | method schema + `CkType` |
+| 2 | Compiled schema | integer ≥ 1 | compiled root | `CkCompiledType` | shared `$ref` | `CkCompiledType` |
+| 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family |
+| 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy |
+| 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` |
+| 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 |
+| 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes |
+| 8 | Source generator | — | yes | — | — | yes |
+| 9 | Docs generator | — | yes | yes | — | yes |
+| 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | |
+| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` (Phase 0) | P1 |
+
+Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/ConstructionKit.Engine.Tests/CkV2`),
+`CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` (one failing and one passing case per code, on the C#
+kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTests` (graph → cache JSON → graph),
+`CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
+end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.
 
 ## Important Notes
 

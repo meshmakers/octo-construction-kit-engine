@@ -95,6 +95,8 @@ internal class GenerateDocsCommand : Command<OctoToolOptions>
                 linkPath);
             await _contentGenerator.GenerateAssociationRolesMarkdownTable(resolvedTypes, outputPath,
                 compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString(), linkPath);
+            await _contentGenerator.GenerateInterfacesMarkdownTable(resolvedTypes, outputPath,
+                compiledModelRoot.ModelId, compiledModelRoot.ModelId.Version.ToString());
         }
         //ASP Net
         else

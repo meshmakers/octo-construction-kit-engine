@@ -136,6 +136,10 @@ public class CkModelDiffService : ICkModelDiffService
         var modelName = current.ModelId.Name;
 
         AddModified(changes, CkModelElementKind.Model, modelName, "description", baseline.Description, current.Description);
+        // CK v2 (AB#5584): compared on the effective value, so an omitted key and 'ckLanguage: 1' are equal.
+        AddModified(changes, CkModelElementKind.Model, modelName, "ckLanguage",
+            baseline.EffectiveCkLanguage.ToString(CultureInfo.InvariantCulture),
+            current.EffectiveCkLanguage.ToString(CultureInfo.InvariantCulture));
 
         DiffDependencies(changes, baseline.Dependencies, current.Dependencies);
         DiffTypes(changes, baseline.Types, current.Types, modelName);
@@ -143,6 +147,7 @@ public class CkModelDiffService : ICkModelDiffService
         DiffEnums(changes, baseline.Enums, current.Enums);
         DiffRecords(changes, baseline.Records, current.Records, modelName);
         DiffAssociationRoles(changes, baseline.AssociationRoles, current.AssociationRoles, modelName);
+        DiffInterfaces(changes, baseline.Interfaces, current.Interfaces, modelName);
 
         return changes;
     }
@@ -210,7 +215,88 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineType.Attributes, currentType.Attributes, modelName);
                 DiffTypeAssociations(typeChanges, id, baselineType.Associations, currentType.Associations, modelName);
                 DiffTypeIndexes(typeChanges, id, baselineType.Indexes, currentType.Indexes);
+                DiffTypeInterfaces(typeChanges, id, baselineType.Implements, currentType.Implements, modelName);
+                DiffTypeMethods(typeChanges, id, baselineType.Methods, currentType.Methods, modelName);
             });
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): interface definitions and their members. Members are keyed by member name.
+    /// </summary>
+    private static void DiffInterfaces(List<CkModelChange> changes, List<CkInterfaceDto>? baseline,
+        List<CkInterfaceDto>? current, string modelName)
+    {
+        DiffElements(changes, CkModelElementKind.Interface, baseline, current, i => i.InterfaceId.FullName,
+            (interfaceChanges, id, baselineInterface, currentInterface) =>
+            {
+                AddModified(interfaceChanges, CkModelElementKind.Interface, id, "description",
+                    baselineInterface.Description, currentInterface.Description);
+                DiffElements(interfaceChanges, CkModelElementKind.InterfaceAttribute, baselineInterface.Attributes,
+                    currentInterface.Attributes, a => $"{id}/{a.AttributeName}",
+                    (memberChanges, memberId, baselineMember, currentMember) =>
+                    {
+                        AddModified(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "id",
+                            FormatReference(baselineMember.CkAttributeId, modelName),
+                            FormatReference(currentMember.CkAttributeId, modelName));
+                        AddModified(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "isOptional",
+                            baselineMember.IsOptional, currentMember.IsOptional);
+                    },
+                    added => FormatReference(added.CkAttributeId, modelName),
+                    removed => FormatReference(removed.CkAttributeId, modelName));
+            });
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): <c>implements</c> entries of a type, compared as a set of references.
+    /// </summary>
+    private static void DiffTypeInterfaces(List<CkModelChange> changes, string typeId,
+        List<CkId<CkInterfaceId>>? baseline, List<CkId<CkInterfaceId>>? current, string modelName)
+    {
+        DiffElements(changes, CkModelElementKind.TypeInterface,
+            baseline?.Select(i => FormatReference(i, modelName)!).Distinct().ToList(),
+            current?.Select(i => FormatReference(i, modelName)!).Distinct().ToList(),
+            reference => $"{typeId}/{reference}", (_, _, _, _) => { });
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5669): methods of a type keyed by method id. The description is compared on its own (patch);
+    ///     every other field is compared through one canonical rendering of the signature.
+    /// </summary>
+    private static void DiffTypeMethods(List<CkModelChange> changes, string typeId, List<CkMethodDto>? baseline,
+        List<CkMethodDto>? current, string modelName)
+    {
+        DiffElements(changes, CkModelElementKind.TypeMethod, baseline, current, m => $"{typeId}/{m.MethodId}",
+            (methodChanges, id, baselineMethod, currentMethod) =>
+            {
+                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "description",
+                    baselineMethod.Description, currentMethod.Description);
+                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "signature",
+                    FormatMethod(baselineMethod, modelName), FormatMethod(currentMethod, modelName));
+            });
+    }
+
+    private static string FormatMethod(CkMethodDto method, string modelName)
+    {
+        string Value(AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId, CkId<CkEnumId>? enumId) =>
+            valueType + (recordId != null ? $"<{FormatReference(recordId, modelName)}>" : "") +
+            (enumId != null ? $"<{FormatReference(enumId, modelName)}>" : "");
+
+        var parameters = string.Join(", ", (method.Parameters ?? []).Select(p =>
+            $"{p.Name}{(p.IsOptional ? "?" : "")}: {Value(p.ValueType, p.ValueCkRecordId, p.ValueCkEnumId)}" +
+            (p.Sensitive ? " sensitive" : "") + (p.Description == null ? "" : $" \"{p.Description}\"")));
+        var result = method.Result == null
+            ? "none"
+            : Value(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId);
+        var errors = string.Join(", ", (method.Errors ?? []).Select(e =>
+            e.Description == null ? e.Code : $"{e.Code} \"{e.Description}\""));
+        var authorization = method.Authorization == null
+            ? "none"
+            : $"roles [{string.Join(", ", method.Authorization.Roles ?? [])}], allowSelf " +
+              $"{FormatBool(method.Authorization.AllowSelf)}, scopes [{string.Join(", ", method.Authorization.Scopes ?? [])}]";
+        var timeout = (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds)
+            .ToString(CultureInfo.InvariantCulture);
+        return $"{method.Kind} ({parameters}) -> {result}; errors [{errors}]; authorization {authorization}; " +
+               $"timeout {timeout}s, idempotent {FormatBool(method.Execution?.Idempotent ?? false)}";
     }
 
     private static void DiffAttributes(List<CkModelChange> changes, List<CkAttributeDto>? baseline,
@@ -335,6 +421,11 @@ public class CkModelDiffService : ICkModelDiffService
                 // definition's ownership change.
                 AddModified(assignmentChanges, elementKind, id, "ownership",
                     baselineAssignment.Ownership?.ToString(), currentAssignment.Ownership?.ToString());
+                // CK v2 (AB#5668): compared on the effective value — an omitted access and 'access: ReadWrite' are
+                // the same declaration.
+                AddModified(assignmentChanges, elementKind, id, "access",
+                    AttributeAccess.Resolve(baselineAssignment.Access).ToString(),
+                    AttributeAccess.Resolve(currentAssignment.Access).ToString());
             },
             added => FormatReference(added.CkAttributeId, modelName),
             removed => FormatReference(removed.CkAttributeId, modelName));

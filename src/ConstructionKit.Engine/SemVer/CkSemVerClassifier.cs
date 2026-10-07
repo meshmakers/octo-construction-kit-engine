@@ -74,6 +74,28 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // ── Dependencies ────────────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change),
 
+            // ── CK v2 Phase 0 (AB#5584) ──────────────────────────────────────────────────────
+            { ElementKind: CkModelElementKind.Model, Property: "ckLanguage" } =>
+                string.CompareOrdinal(change.NewValue, change.OldValue) > 0
+                    ? (CkSemVerLevel.Minor, "CK language version raised; older engines reject the model with a clear error")
+                    : (CkSemVerLevel.Major, "CK language version lowered — CK v2 elements may disappear (defensive)"),
+            { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Added } =>
+                (CkSemVerLevel.Minor, "purely additive interface"),
+            { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "implementing types and interface consumers break"),
+            { ElementKind: CkModelElementKind.InterfaceAttribute } =>
+                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
+            { ElementKind: CkModelElementKind.TypeInterface, ChangeKind: CkModelChangeKind.Added } =>
+                (CkSemVerLevel.Minor, "type implements an additional interface"),
+            { ElementKind: CkModelElementKind.TypeInterface, ChangeKind: CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "consumers querying the type through the interface break"),
+            { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Added } =>
+                (CkSemVerLevel.Minor, "purely additive method"),
+            { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "callers of the removed method break"),
+            { ElementKind: CkModelElementKind.TypeMethod, Property: "signature" } =>
+                (CkSemVerLevel.Major, "method signature changed — publish a new method version instead"),
+
             // ── Element definitions: removal is always breaking, addition is additive ──────
             { ElementKind: CkModelElementKind.Type or CkModelElementKind.Attribute or CkModelElementKind.Enum
                 or CkModelElementKind.Record or CkModelElementKind.AssociationRole,
@@ -254,6 +276,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // ExportRt — same class of change as the definition-level property, so the same level.
             case CkModelChangeKind.Modified when change.Property == "ownership":
                 return (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change for this assignment");
+
+            // CK v2 (AB#5668), Phase 0 rule: an access change is Minor with an "access/security" changelog note.
+            // A stricter access can break generic GraphQL clients (concept §4.3.2); hiding a credential such as
+            // PasswordHash is the documented security exception. Phase 2 refines this classification.
+            case CkModelChangeKind.Modified when change.Property == "access":
+                return (CkSemVerLevel.Minor,
+                    "access/security: GraphQL exposure of this attribute changes — review generic API clients");
 
             default:
                 return (CkSemVerLevel.Major, "no classification rule for this attribute assignment change — defensively classified as major");

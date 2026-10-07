@@ -81,6 +81,18 @@ public static class StringExtensions
     }
 
     /// <summary>
+    /// Makes from a construction kit interface id a valid C# class name (CK v2, AB#5667): the contract version
+    /// is appended when it is greater than 1, like for type ids.
+    /// </summary>
+    /// <param name="ckInterfaceId">The construction kit interface id</param>
+    /// <returns>A valid C# class name</returns>
+    public static string MakeClassName(this CkInterfaceId ckInterfaceId)
+    {
+        var version = ckInterfaceId.Version > 1 ? $"{ckInterfaceId.Version}" : "";
+        return ckInterfaceId.Name.MakeClassName() + version;
+    }
+
+    /// <summary>
     /// Makes from a construction kit record id a valid C# class name
     /// </summary>
     /// <param name="ckRecordId">The construction kit record id</param>

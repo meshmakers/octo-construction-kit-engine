@@ -17,7 +17,16 @@ internal class ElementResolver : IElementResolver
         IOriginFileResolver originFileResolver,
         OperationResult operationResult)
     {
-        ckModelGraph.GetOrCreateModel(modelRootBase.ModelId, modelRootBase.Description);
+        ckModelGraph.GetOrCreateModel(modelRootBase.ModelId, modelRootBase.Description).CkLanguage =
+            modelRootBase.CkLanguage;
+
+        // CK v2 (AB#5584): language version gate (91) and feature gate (90).
+        CheckCkLanguage(modelRootBase, originFileResolver, operationResult);
+
+        if (modelRootBase.Interfaces != null)
+        {
+            ResolveInterfaces(modelRootBase, ckModelGraph, variableResolver, originFileResolver, operationResult);
+        }
 
         if (modelRootBase.Attributes != null)
         {
@@ -198,6 +207,35 @@ internal class ElementResolver : IElementResolver
                     }
                 }
 
+                // CK v2: implements and method value references go through the variable resolver exactly like
+                // derivedFromCkTypeId, so range retention (F0.2) applies to them without a separate path.
+                if (ckType.Implements != null)
+                {
+                    ckType.Implements = ckType.Implements
+                        .Select(i => (CkId<CkInterfaceId>)variableResolver.Resolve(i.FullName,
+                            originFileResolver.Resolve(ckTypeId), operationResult))
+                        .ToList();
+                }
+
+                foreach (var method in ckType.Methods ?? [])
+                {
+                    foreach (var parameter in method.Parameters ?? [])
+                    {
+                        parameter.ValueCkRecordId = ResolveReference(parameter.ValueCkRecordId, variableResolver,
+                            originFileResolver.Resolve(ckTypeId), operationResult);
+                        parameter.ValueCkEnumId = ResolveReference(parameter.ValueCkEnumId, variableResolver,
+                            originFileResolver.Resolve(ckTypeId), operationResult);
+                    }
+
+                    if (method.Result != null)
+                    {
+                        method.Result.ValueCkRecordId = ResolveReference(method.Result.ValueCkRecordId,
+                            variableResolver, originFileResolver.Resolve(ckTypeId), operationResult);
+                        method.Result.ValueCkEnumId = ResolveReference(method.Result.ValueCkEnumId, variableResolver,
+                            originFileResolver.Resolve(ckTypeId), operationResult);
+                    }
+                }
+
                 if (ckType.Associations != null)
                 {
                     foreach (var ckTypeAssociationDto in ckType.Associations)
@@ -212,6 +250,20 @@ internal class ElementResolver : IElementResolver
                 }
 
                 ckModelGraph.GetOrCreateType(ckTypeId, ckType);
+            }
+
+            // CK v2 (AB#5667) rule I-5: interface and type names of a model share the GraphQL type namespace.
+            foreach (var ckInterface in modelRootBase.Interfaces ?? [])
+            {
+                var collidingType = modelRootBase.Types.FirstOrDefault(t =>
+                    t.TypeId.Name == ckInterface.InterfaceId.Name);
+                if (collidingType != null)
+                {
+                    var ckInterfaceId = new CkId<CkInterfaceId>(modelRootBase.ModelId, ckInterface.InterfaceId);
+                    operationResult.AddMessage(MessageCodes.CkInterfaceNameCollidesWithType(
+                        originFileResolver.Resolve(ckInterfaceId), ckInterfaceId,
+                        new CkId<CkTypeId>(modelRootBase.ModelId, collidingType.TypeId)));
+                }
             }
         }
 
@@ -351,5 +403,111 @@ internal class ElementResolver : IElementResolver
                 ckModelGraph.GetOrCreateEnum(ckEnumId, ckEnum);
             }
         }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5584): message 91 for a CK language version this engine does not support, message 90 for
+    ///     every CK v2 feature used by a model that does not declare <c>ckLanguage: 2</c>.
+    /// </summary>
+    private static void CheckCkLanguage(CkModelRootBase model, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        var location = originFileResolver.Resolve(model.ModelId);
+        if (model.CkLanguage is { } declared &&
+            (declared < 1 || declared > CkModelPropertiesDto.MaxSupportedCkLanguage))
+        {
+            operationResult.AddMessage(MessageCodes.CkLanguageNotSupported(location, model.ModelId, declared,
+                CkModelPropertiesDto.MaxSupportedCkLanguage));
+            return;
+        }
+
+        if (model.EffectiveCkLanguage >= 2)
+        {
+            return;
+        }
+
+        var ckLanguage = model.EffectiveCkLanguage;
+
+        void Report(object key, string feature, object element) =>
+            operationResult.AddMessage(MessageCodes.CkLanguageFeatureRequiresV2(originFileResolver.Resolve(key),
+                model.ModelId, feature, element, ckLanguage));
+
+        void CheckAccess(object key, object owner, IEnumerable<CkTypeAttributeDto>? attributes)
+        {
+            foreach (var attribute in (attributes ?? []).Where(a => a.Access != null))
+            {
+                Report(key, "access", $"{owner}/{attribute.AttributeName}");
+            }
+        }
+
+        foreach (var ckInterface in model.Interfaces ?? [])
+        {
+            var key = new CkId<CkInterfaceId>(model.ModelId, ckInterface.InterfaceId);
+            Report(key, "interfaces", key);
+        }
+
+        foreach (var ckType in model.Types ?? [])
+        {
+            var key = new CkId<CkTypeId>(model.ModelId, ckType.TypeId);
+            if (ckType.Implements is { Count: > 0 })
+            {
+                Report(key, "implements", key);
+            }
+
+            if (ckType.Methods is { Count: > 0 })
+            {
+                Report(key, "methods", key);
+            }
+
+            CheckAccess(key, key, ckType.Attributes);
+        }
+
+        foreach (var ckRecord in model.Records ?? [])
+        {
+            var key = new CkId<CkRecordId>(model.ModelId, ckRecord.RecordId);
+            CheckAccess(key, key, ckRecord.Attributes);
+        }
+
+        foreach (var ckRole in model.AssociationRoles ?? [])
+        {
+            var key = new CkId<CkAssociationRoleId>(model.ModelId, ckRole.AssociationRoleId);
+            CheckAccess(key, key, ckRole.Attributes);
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): interface id uniqueness (92; the PascalCase and version rules are enforced by the schema)
+    ///     and variable resolution of the member attribute references.
+    /// </summary>
+    private static void ResolveInterfaces(CkModelRootBase model, CkModelGraph ckModelGraph,
+        IVariableResolver variableResolver, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        foreach (var ckInterface in model.Interfaces!)
+        {
+            var ckInterfaceId = new CkId<CkInterfaceId>(model.ModelId, ckInterface.InterfaceId);
+            var location = originFileResolver.Resolve(ckInterfaceId);
+            if (ckModelGraph.Interfaces.ContainsKey(ckInterfaceId))
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceIdNotUnique(location, ckInterfaceId));
+                continue;
+            }
+
+            foreach (var member in ckInterface.Attributes)
+            {
+                member.CkAttributeId = variableResolver.Resolve(member.CkAttributeId.FullName, location,
+                    operationResult);
+            }
+
+            ckModelGraph.GetOrCreateInterface(ckInterfaceId, ckInterface);
+        }
+    }
+
+    private static CkId<TElementId>? ResolveReference<TElementId>(CkId<TElementId>? reference,
+        IVariableResolver variableResolver, string location, OperationResult operationResult)
+        where TElementId : IComparable<TElementId>, ICkElementId
+    {
+        return reference == null
+            ? null
+            : (CkId<TElementId>)variableResolver.Resolve(reference.FullName, location, operationResult);
     }
 }

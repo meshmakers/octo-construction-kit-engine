@@ -275,6 +275,7 @@ public class CompilerService : ICompilerService
         var associationsDirectory = Path.Combine(rootPath, CompilerStatics.AssociationsDirectoryName);
         var recordsDirectory = Path.Combine(rootPath, CompilerStatics.RecordsDirectoryName);
         var enumsDirectory = Path.Combine(rootPath, CompilerStatics.EnumsDirectoryName);
+        var interfacesDirectory = Path.Combine(rootPath, CompilerStatics.InterfacesFolder);
 
         var ckMetaDto = await GetCkMetaRootDtoAsync(rootPath, originFileResolver, operationResult)
             .ConfigureAwait(false);
@@ -313,7 +314,10 @@ public class CompilerService : ICompilerService
                                 EnableChangeStreamPreAndPostImages = ckTypeDto.EnableChangeStreamPreAndPostImages,
                                 DisplayNameRule = ckTypeDto.DisplayNameRule,
                                 DisplayDescriptionRule = ckTypeDto.DisplayDescriptionRule,
-                                OwnerAttributePath = ckTypeDto.OwnerAttributePath
+                                OwnerAttributePath = ckTypeDto.OwnerAttributePath,
+                                // CK v2 (AB#5667 / AB#5669)
+                                Implements = ckTypeDto.Implements,
+                                Methods = ckTypeDto.Methods
                             };
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))
@@ -486,6 +490,44 @@ public class CompilerService : ICompilerService
             }
         }
 
+        // CK v2 (AB#5667): interfaces/*.yaml, only the 'interfaces' root key is taken.
+        var interfaces = new List<CkInterfaceDto>();
+        if (Directory.Exists(interfacesDirectory))
+        {
+            foreach (var interfaceFile in Directory.EnumerateFiles(interfacesDirectory, "*.yaml"))
+            {
+                try
+                {
+#if NETSTANDARD2_0
+                    using var streamInterface = File.OpenRead(interfaceFile);
+#else
+                    await using var streamInterface = File.OpenRead(interfaceFile);
+#endif
+                    var elementsRootDto = await _ckSerializer
+                        .DeserializeElementsAsync(streamInterface, interfaceFile, operationResult)
+                        .ConfigureAwait(false);
+                    if (elementsRootDto.Interfaces != null)
+                    {
+                        foreach (var ckInterfaceDto in elementsRootDto.Interfaces)
+                        {
+                            originFileResolver.Add(new CkId<CkInterfaceId>(ckMetaDto.ModelId, ckInterfaceDto.InterfaceId),
+                                interfaceFile);
+                        }
+
+                        interfaces.AddRange(elementsRootDto.Interfaces);
+                    }
+                }
+                catch (ModelParseException e)
+                {
+                    operationResult.WriteMessagesToLogger(_logger);
+                    if (operationResult.HasErrors || operationResult.HasFatalErrors)
+                    {
+                        throw CompilerException.ModelParseFailed(interfaceFile, e, operationResult);
+                    }
+                }
+            }
+        }
+
         var compileCandidate = new CkModelCompileCandidate
         {
             ModelId = ckMetaDto.ModelId,
@@ -496,6 +538,9 @@ public class CompilerService : ICompilerService
             AssociationRoles = associationRoles.OrderBy(x => x.AssociationRoleId).ToList(),
             Records = records.OrderBy(x => x.RecordId).ToList(),
             Enums = enums.OrderBy(x => x.EnumId).ToList(),
+            // CK v2: null when absent, so a ckLanguage 1 model serializes exactly as before.
+            Interfaces = interfaces.Count == 0 ? null : interfaces.OrderBy(x => x.InterfaceId).ToList(),
+            CkLanguage = ckMetaDto.CkLanguage
         };
 
         var (ckModelGraph, compiledModelRoot) = await _catalogModelResolver

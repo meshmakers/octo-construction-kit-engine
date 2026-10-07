@@ -12,6 +12,8 @@
              (compile, publish, restore). A single definition keeps all of them on the SAME catalog
              root — one Exec missing it would publish to one directory and resolve from another. -->
         <_OctoLcrArg Condition="'$(OctoLocalCatalogRootPath)' != ''">-lcr &quot;$(OctoLocalCatalogRootPath)&quot;</_OctoLcrArg>
+        <!-- CK v2 range retention spike (AB#5664), default off: -rr is only passed when the property is set. -->
+        <_OctoRrArg Condition="'$(OctoCkRangeRetention)' != ''">-rr $(OctoCkRangeRetention)</_OctoRrArg>
     </PropertyGroup>
     
     <!--Defining all the text files input parameters-->
@@ -68,7 +70,7 @@
         </Exec>
 
         <Message Condition="Exists(%(_ConstructionKitFolder.Identity))" Importance="High" Text="Compiling construction kit library %(_ConstructionKitFolder.Identity)"/>
-        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -lce $(OctoLocalCatalogIsEnabled) $(_OctoLcrArg) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
+        <Exec Condition="Exists(%(_ConstructionKitFolder.Identity))" Command="$(OctoCompilerToolPath) -c compile -p %(_ConstructionKitFolder.Identity) -o $(OctoCkCompileOutputCompilerFolder) -c $(OctoCkCompileCacheCompileFolder) -lce $(OctoLocalCatalogIsEnabled) $(_OctoLcrArg) $(_OctoRrArg) -v none -cr" ConsoleToMSBuild="true" EchoOff="true">
             <Output TaskParameter="ConsoleOutput" ItemName="CompiledModelFiles" />
         </Exec>
         

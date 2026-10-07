@@ -18,6 +18,25 @@
         "pattern": "^[a-zA-Z0-9-.]+$"
       }
     },
+    "dependencyRanges": {
+      "description": "CK v2 range retention (AB#5664): declared range and floor of each direct dependency.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9-.,\\[\\]()]+$"
+          },
+          "floor": {
+            "type": "string",
+            "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
+          }
+        },
+        "additionalProperties": false,
+        "required": ["range", "floor"]
+      }
+    },
     "description": {
       "type": "string"
     },

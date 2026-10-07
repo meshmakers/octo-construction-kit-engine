@@ -32,6 +32,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services)
     {
         services.AddOptions<LocalFileSystemCatalogOptions>();
+        services.AddOptions<CkCompilerOptions>();
         services.AddOptions<PublicGitHubCatalogOptions>();
         services.AddOptions<PrivateGitHubCatalogOptions>();
 

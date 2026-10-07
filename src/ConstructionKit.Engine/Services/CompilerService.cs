@@ -505,6 +505,12 @@ public class CompilerService : ICompilerService
                                                                    && s.Value.IsCollectionRoot))
         {
             types[keyValuePair.Key.ElementId].IsCollectionRoot = keyValuePair.Value.IsCollectionRoot;
+            // AB#5664: with range retention the compiled output is a copy of the candidate's types.
+            var outputType = compiledModelRoot.Types?.FirstOrDefault(t => t.TypeId == keyValuePair.Key.ElementId);
+            if (outputType != null)
+            {
+                outputType.IsCollectionRoot = keyValuePair.Value.IsCollectionRoot;
+            }
         }
 
         if (operationResult.HasErrors || operationResult.HasFatalErrors)

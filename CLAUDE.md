@@ -685,6 +685,44 @@ Other repositories with sibling CK models must follow the same two rules (checke
 without a ProjectReference; `octo-construction-kit-engine-mongodb` test models depend only on
 System).
 
+## CK v2 Range Retention (Phase 0 spike, AB#5664 / AB#5665)
+
+Behind the flag **`OctoCkRangeRetention=true`** (default **off**; MSBuild property, octo-ckc `-rr true`,
+or the environment variable of the same name — MSBuild also picks an exported variable up as property).
+Flag off ⇒ compiled output is byte-identical to before (verified on System.StreamData).
+
+**Compile side (`CatalogModelResolver.CompileAsync` → `ApplyRangeRetentionAsync`).** The model is still
+resolved and validated against the *highest* catalog version (the returned graph stays concrete — the
+source-generator cache is unchanged). The **output** is a JSON-round-trip copy
+(`CkCompiledModelCloner`) in which:
+
+- `dependencyRanges: [{range, floor}]` lists every *declared* dependency; `floor` = declared range lower
+  bound (`System-[2.4,3.0)` → `2.4.0`), never the highest catalog version;
+- every reference into a dependency is **major-qualified and model-version-less**: `System@2/Entity-1`
+  (`CkModelId.IsMajorQualified`, `CkModelId.MajorQualified()`, `ToMajorQualified()`); own references
+  stay concrete (`Basic-2.4.0/TreeNode-1`);
+- `dependencies` keeps the exact closure (legacy readers, pre-publish check, SemVer diff).
+
+Floor check ("compile against the floor, verify against the highest"): every element the model
+references in a dependency must exist in the floor version (or, if the floor itself was never
+published, the lowest available version in the range), else `ModelValidationException`
+"references elements that do not exist at the floor of its dependency range …".
+
+**Resolve side (both catalog and repository resolvers).** `CkCompiledModelRoot.GetResolutionRanges()`
+returns the effective ranges (`CkModelDependencyDto.GetEffectiveRange()`: range with the lower bound
+raised to the floor) for range-retaining models and the exact pins for classic models — classic models
+keep their exact-match semantics. Dependency resolvers expand children through it, load each resolved
+model once (different ranges resolve to the same installed version), and bind major-qualified references
+to the resolved version of the same name and major (`CkReferenceRewriter.BindMajorQualified`) before
+`AppendModel`. Root models (`HardResolveAsync(CkCompiledModelRoot)` / `SoftResolveAsync`) are bound **on a
+copy**, so an import persists the version-less form. A reference whose major is not installed stays
+unbound and fails reference resolution.
+
+The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
+element schemas accept `@` in the model part of a reference; the compiled schema accepts
+`dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema
+validation, floor violation, resolve against a later minor without recompile, two-level chain).
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

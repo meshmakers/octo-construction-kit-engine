@@ -34,6 +34,39 @@ public class CkCompiledModelRoot : CkModelRootBase
     public List<CkModelId>? Dependencies { get; set; }
 
     /// <summary>
+    ///     Range-retaining dependencies (CK v2, AB#5664): the declared range plus floor of every direct
+    ///     dependency. Only written by a compiler running with range retention
+    ///     (<c>OctoCkRangeRetention=true</c>); then references into dependencies are major-qualified
+    ///     (<c>System@2/Entity-1</c>) and a resolver accepts any installed version inside the range and at or
+    ///     above the floor. <c>null</c> for classic exact-pinned models, whose <see cref="Dependencies" /> keep
+    ///     their exact-match semantics. Use <see cref="GetResolutionRanges" /> to resolve either shape.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public List<CkModelDependencyDto>? DependencyRanges { get; set; }
+
+    /// <summary>
+    ///     True when the model was compiled with range retention (<see cref="DependencyRanges" /> is set).
+    /// </summary>
+    [JsonIgnore]
+    [YamlIgnore]
+    public bool IsRangeRetaining => DependencyRanges != null;
+
+    /// <summary>
+    ///     The ranges a resolver must satisfy for this model's dependencies: the effective ranges of
+    ///     <see cref="DependencyRanges" /> for a range-retaining model, otherwise the exact pins of
+    ///     <see cref="Dependencies" />.
+    /// </summary>
+    public IReadOnlyList<CkModelIdVersionRange> GetResolutionRanges()
+    {
+        if (DependencyRanges != null)
+        {
+            return DependencyRanges.Select(d => d.GetEffectiveRange()).ToList();
+        }
+
+        return Dependencies?.Select(d => d.ToVersionRange()).ToList() ?? [];
+    }
+
+    /// <summary>
     ///     Gets or sets the inline migration data for this compiled model.
     ///     When present, allows any service to run CK model migrations without
     ///     needing the CK model NuGet package as a reference.

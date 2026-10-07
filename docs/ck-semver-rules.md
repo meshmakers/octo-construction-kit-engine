@@ -184,6 +184,12 @@ implementation and a classification rule (or a documented, conscious exclusion).
 `ConstructionKit.Engine.Tests` fails when a DTO property is not accounted for, and this page must
 be extended with the new rule.
 
+**Conscious exclusion — range retention (AB#5664, CK v2 Phase 0 spike).**
+`CkCompiledModelRoot.DependencyRanges` (declared range + floor per direct dependency) and the derived
+`IsRangeRetaining` are not diffed yet. Per CK v2 concept §4.3.1 only a *raised floor* or a *changed range*
+will count as a change; that rule is Phase 2 (F2.1). `Dependencies` keeps the exact closure and is still
+diffed as before.
+
 ### Renames
 
 A rename is not structurally detectable and appears as remove+add — which correctly requires a

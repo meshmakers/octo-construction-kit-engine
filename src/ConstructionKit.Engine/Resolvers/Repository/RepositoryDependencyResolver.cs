@@ -3,6 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
@@ -60,6 +61,15 @@ internal class RepositoryDependencyResolver(
         return resolveResult;
     }
 
+    public async Task<DependencyResolveResult> SoftResolveDependenciesAsync(
+        ICollection<CkModelIdVersionRange> dependencyRanges,
+        CkModelGraph ckModelGraph, IVariableResolver variableResolver,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null)
+    {
+        return await Resolve(dependencyRanges, ckModelGraph, variableResolver, originFileResolver, sourceIdentifier,
+            operationResult).ConfigureAwait(false);
+    }
+
     private async Task<DependencyResolveResult> Resolve(ICollection<CkModelIdVersionRange> ckRootDependencies,
         CkModelGraph ckModelGraph,
         IVariableResolver variableResolver,
@@ -103,6 +113,14 @@ internal class RepositoryDependencyResolver(
                 resolvedDependencies.Add(modelExistingResult.ModelId);
             }
 
+            // AB#5665: with range retention different ranges (e.g. System-[2.0,3.0) and System-[2.5,3.0))
+            // resolve to the same installed model; load and expand it only once.
+            if (modelExistingResult is { Exists: true, ModelId: not null } &&
+                ckResolvedModels.Any(m => m.ModelId == modelExistingResult.ModelId))
+            {
+                continue;
+            }
+
             // Dependency not resolved because it does not exist
             if (!modelExistingResult.Exists || modelExistingResult.ModelId == null)
             {
@@ -131,20 +149,20 @@ internal class RepositoryDependencyResolver(
 
             variableResolver.SetVariable(ckDependencyRootModel.ModelId.Name, ckDependencyRootModel.ModelId.FullName);
 
-            if (ckDependencyRootModel.Dependencies != null)
+            // AB#5665: range-retaining models contribute their range + floor, classic models their exact pins.
+            foreach (var childDependencyRange in ckDependencyRootModel.GetResolutionRanges())
             {
-                foreach (var ckChildDependency in ckDependencyRootModel.Dependencies)
+                var childDependencyOrigins =
+                    dependencies.SingleOrDefault(d => d.Item2 == childDependencyRange)?.Item1;
+                if (childDependencyOrigins == null)
                 {
-                    var childDependencyRange = ckChildDependency.ToVersionRange();
-                    var childDependencyOrigins = dependencies.SingleOrDefault(d => d.Item2 == childDependencyRange)?.Item1;
-                    if (childDependencyOrigins == null)
-                    {
-                        dependencies.Add(new Tuple<List<CkModelId>, CkModelIdVersionRange>([ckDependencyRootModel.ModelId], childDependencyRange));
-                    }
-                    else
-                    {
-                        childDependencyOrigins.Add(ckDependencyRootModel.ModelId);
-                    }
+                    dependencies.Add(
+                        new Tuple<List<CkModelId>, CkModelIdVersionRange>([ckDependencyRootModel.ModelId],
+                            childDependencyRange));
+                }
+                else
+                {
+                    childDependencyOrigins.Add(ckDependencyRootModel.ModelId);
                 }
             }
 
@@ -168,6 +186,10 @@ internal class RepositoryDependencyResolver(
             }
         }
 
+        var boundModelIds = ckResolvedModels
+            .Where(m => !skippedDependencies.Contains(m.ModelId))
+            .Select(m => m.ModelId)
+            .ToList();
         foreach (var ckCompiledModelRoot in ckResolvedModels)
         {
             if (skippedDependencies.Contains(ckCompiledModelRoot.ModelId))
@@ -177,6 +199,9 @@ internal class RepositoryDependencyResolver(
 
             logger.LogDebug("Adding resolved dependency '{CkModelId}' to dependency graph",
                 ckCompiledModelRoot.ModelId);
+            // AB#5665: bind major-qualified references (System@2/Entity-1) to the resolved versions. The
+            // instance was freshly loaded for this resolve, so it is bound in place.
+            CkReferenceRewriter.BindMajorQualified(ckCompiledModelRoot, boundModelIds);
             ckModelGraph.AppendModel(ckCompiledModelRoot);
 
             // This is a root dependency and was resolved

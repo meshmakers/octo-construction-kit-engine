@@ -69,6 +69,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     public bool PublishCkModel { get; set; } = true;
 
     /// <summary>
+    /// CK v2 range retention (AB#5664, spike, default off): MSBuild property OctoCkRangeRetention.
+    /// Empty keeps the compiler default (environment variable OctoCkRangeRetention).
+    /// </summary>
+    public string? RangeRetention { get; set; }
+
+    /// <summary>
     /// When true, the compiled construction kit model is generated as .md files
     /// </summary>
     [Required]
@@ -169,6 +175,12 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         });
         services.AddConstructionKit();
         services.AddDocumentationService();
+
+        if (!string.IsNullOrWhiteSpace(RangeRetention))
+        {
+            var rangeRetention = string.Equals(RangeRetention, "true", StringComparison.OrdinalIgnoreCase);
+            services.Configure<CkCompilerOptions>(options => options.RangeRetention = rangeRetention);
+        }
 
         services.Configure<LocalFileSystemCatalogOptions>(options =>
         {

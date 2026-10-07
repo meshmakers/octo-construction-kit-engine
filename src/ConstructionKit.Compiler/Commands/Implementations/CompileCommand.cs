@@ -16,13 +16,16 @@ internal class CompileCommand : CkcCommand
     private readonly IArgument _compileResultArg;
     private readonly IArgument _localCatalogEnabled;
     private readonly IArgument _localCatalogRoot;
+    private readonly IArgument _rangeRetention;
+    private readonly IOptions<CkCompilerOptions> _compilerOptions;
 
     public CompileCommand(ILogger<CompileCommand> logger, IOptions<OctoToolOptions> options, IOptions<LocalFileSystemCatalogOptions> localCatalogOptions,
-        ICompilerService compilerService)
+        ICompilerService compilerService, IOptions<CkCompilerOptions> compilerOptions)
         : base(logger, "Compile", "Validates and creates output files for a construction kit model directory", options)
     {
         _localCatalogOptions = localCatalogOptions;
         _compilerService = compilerService;
+        _compilerOptions = compilerOptions;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
             ["Root path of construction kit model directory"], true, 1);
@@ -45,6 +48,13 @@ internal class CompileCommand : CkcCommand
         _localCatalogRoot = CommandArgumentValue.AddArgument("lcr", "localCatalogRoot",
             ["Root path of the local Construction Kit Library catalog for this invocation only (not persisted)"],
             false, 1);
+
+        _rangeRetention = CommandArgumentValue.AddArgument("rr", "rangeRetention",
+        [
+            "CK v2 range retention (spike, AB#5664): keep the declared dependency range and floor and store " +
+            "major-qualified references (System@2/Entity-1) instead of pinning the highest catalog version. " +
+            "Defaults to the environment variable OctoCkRangeRetention."
+        ], false, 1);
     }
 
     public override async Task Execute()
@@ -75,7 +85,14 @@ internal class CompileCommand : CkcCommand
                 CommandArgumentValue.GetArgumentScalarValue<string>(_localCatalogRoot));
         }
 
+        if (CommandArgumentValue.IsArgumentUsed(_rangeRetention))
+        {
+            _compilerOptions.Value.RangeRetention =
+                CommandArgumentValue.GetArgumentScalarValueOrDefault<bool>(_rangeRetention);
+        }
+
         Logger.LogInformation("Local Construction Kit catalog root: {Path}", _localCatalogOptions.Value.RootPath);
+        Logger.LogInformation("Range retention: {RangeRetention}", _compilerOptions.Value.RangeRetention);
 
         bool writeCompileResult = CommandArgumentValue.IsArgumentUsed(_compileResultArg);
 

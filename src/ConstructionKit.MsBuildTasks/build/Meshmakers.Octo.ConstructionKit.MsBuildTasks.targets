@@ -57,6 +57,7 @@
                    CacheFilePath="$(OctoCkCompileCacheCompileFolder)"
                    Compile="$(OctoCompileCkModel)"
                    PublishCkModel="$(OctoPublishCkModel)"
+                   RangeRetention="$(OctoCkRangeRetention)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"

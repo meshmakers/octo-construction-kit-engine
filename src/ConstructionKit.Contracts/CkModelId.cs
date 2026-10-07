@@ -25,7 +25,16 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
     public CkModelId(string ckModelId)
     {
         var versionIndex = ckModelId.IndexOf("-", StringComparison.Ordinal);
-        if (versionIndex > 0)
+        var majorIndex = ckModelId.IndexOf(MajorQualifierSeparator);
+        if (majorIndex > 0 && versionIndex < 0
+                           && int.TryParse(ckModelId.Substring(majorIndex + 1), out var major) && major >= 0)
+        {
+            // AB#5664: major-qualified, model-version-less reference ("System@2").
+            _modelId = ckModelId.Substring(0, majorIndex);
+            Version = new CkVersion(major, 0, 0);
+            IsMajorQualified = true;
+        }
+        else if (versionIndex > 0)
         {
             _modelId = ckModelId.Substring(0, versionIndex);
             Version = ckModelId.Substring(versionIndex + 1);
@@ -60,6 +69,37 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
     }
 
     /// <summary>
+    ///     Separator of a major-qualified model reference, e.g. <c>System@2</c> (AB#5664).
+    /// </summary>
+    public const char MajorQualifierSeparator = '@';
+
+    /// <summary>
+    ///     Creates a major-qualified, model-version-less model reference (<c>System@2</c>). Compiled models
+    ///     with range retention (CK v2, AB#5664) store references into their dependencies in this form; they
+    ///     are bound to the installed version of that major when the model is resolved.
+    /// </summary>
+    /// <param name="modelName">Name of the model, e.g. "System".</param>
+    /// <param name="major">Major version.</param>
+    public static CkModelId MajorQualified(string modelName, int major)
+    {
+        return new CkModelId($"{modelName}{MajorQualifierSeparator}{major}");
+    }
+
+    /// <summary>
+    ///     True when this id is a major-qualified reference (<c>System@2</c>) instead of a concrete model
+    ///     version. <see cref="Version" /> then carries only the major (<c>2.0.0</c>).
+    /// </summary>
+    public bool IsMajorQualified { get; }
+
+    /// <summary>
+    ///     Returns the major-qualified form of this id (<c>System-2.4.0</c> → <c>System@2</c>).
+    /// </summary>
+    public CkModelId ToMajorQualified()
+    {
+        return IsMajorQualified ? this : MajorQualified(Name, Version.Major);
+    }
+
+    /// <summary>
     ///     Creates a new <see cref="CkModelId" /> from the given <paramref name="value" />.
     /// </summary>
     /// <param name="value"></param>
@@ -83,7 +123,8 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
     ///     Returns the full name of the model, e. g. "System-1.0.0"
     /// </summary>
     // ReSharper disable once MemberCanBePrivate.Global
-    public string FullName => IsEmpty ? "" : Name.StartsWith("$") ? Name : $"{Name}-{Version}";
+    public string FullName => IsEmpty ? "" : Name.StartsWith("$") ? Name
+        : IsMajorQualified ? $"{Name}{MajorQualifierSeparator}{Version.Major}" : $"{Name}-{Version}";
 
     /// <inheritdoc />
     public string SemanticVersionedFullName
@@ -236,13 +277,15 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
             return result;
         }
 
-        return Version.CompareTo(other.Version);
+        result = Version.CompareTo(other.Version);
+        return result != 0 ? result : IsMajorQualified.CompareTo(other.IsMajorQualified);
     }
 
     /// <inheritdoc />
     public bool Equals(CkModelId? other)
     {
-        return other is not null && Name == other.Name && Version == other.Version;
+        return other is not null && Name == other.Name && Version == other.Version
+               && IsMajorQualified == other.IsMajorQualified;
     }
 
     /// <summary>
@@ -271,6 +314,8 @@ public sealed record CkModelId : IComparable<CkModelId>, ICkElementId
     /// <returns></returns>
     public CkModelIdVersionRange ToVersionRange()
     {
-        return new CkModelIdVersionRange(Name, $"[{Version.ToString()}]");
+        return IsMajorQualified
+            ? new CkModelIdVersionRange(Name, $"[{Version.Major}.0,{Version.Major + 1}.0)")
+            : new CkModelIdVersionRange(Name, $"[{Version.ToString()}]");
     }
 }

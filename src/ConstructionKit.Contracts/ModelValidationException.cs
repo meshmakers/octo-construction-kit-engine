@@ -125,6 +125,20 @@ public class ModelValidationException : CkModelException
             "publish the dependency, or check that the dependency range is correct.");
     }
 
+    /// <summary>
+    ///     AB#5664: a range-retaining model references elements of a dependency that do not exist at the floor
+    ///     of the declared range.
+    /// </summary>
+    internal static Exception ReferenceMissingAtFloor(CkModelId modelId, CkModelIdVersionRange range,
+        CkModelId floorModelId, CkModelId resolvedModelId, IEnumerable<string> missingElements)
+    {
+        return new ModelValidationException(
+            $"Model '{modelId}' references elements that do not exist at the floor of its dependency range " +
+            $"'{range}': {string.Join(", ", missingElements)} (present in '{resolvedModelId}', missing in " +
+            $"'{floorModelId}'). A tenant with '{floorModelId}' installed could not resolve the model. Raise the " +
+            "lower bound of the dependency range to the first version that has these elements.");
+    }
+
     internal static Exception MultipleVersionsOfCkModel(string modelName, IEnumerable<CkModelId> conflictingModelIds, IEnumerable<CkModelId> originModelIds)
     {
         var versions = string.Join(", ", conflictingModelIds.Select(m => m.FullName));

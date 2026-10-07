@@ -1,6 +1,8 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 
@@ -10,6 +12,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Repository;
 internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
 {
     private readonly IRepositoryDependencyResolver _repositoryDependencyResolver;
+    private readonly ICkJsonSerializer _ckJsonSerializer;
 
     /// <summary>
     ///     Creates a new instance of <see cref="ModelResolver" />.
@@ -19,14 +22,33 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
     /// <param name="elementResolver"></param>
     /// <param name="referenceResolver"></param>
     /// <param name="variableResolver"></param>
+    /// <param name="ckJsonSerializer">Used to copy a model before binding its references (AB#5665)</param>
     public RepositoryModelResolver(
         IRepositoryDependencyResolver repositoryDependencyResolver,
         IInheritanceResolver inheritanceResolver,
         IElementResolver elementResolver, IReferenceResolver referenceResolver,
-        IVariableResolver variableResolver) : base(inheritanceResolver, elementResolver, referenceResolver,
-        variableResolver)
+        IVariableResolver variableResolver, ICkJsonSerializer ckJsonSerializer) : base(inheritanceResolver,
+        elementResolver, referenceResolver, variableResolver)
     {
         _repositoryDependencyResolver = repositoryDependencyResolver;
+        _ckJsonSerializer = ckJsonSerializer;
+    }
+
+    /// <summary>
+    ///     AB#5665: binds major-qualified references of the model to the resolved versions on a copy, so the
+    ///     caller's instance (e.g. the model about to be persisted by an import) keeps its version-less form.
+    /// </summary>
+    private async Task<CkCompiledModelRoot> BindForResolveAsync(CkCompiledModelRoot compiledModel,
+        CkModelGraph modelGraph)
+    {
+        if (!CkReferenceRewriter.HasMajorQualifiedReferences(compiledModel))
+        {
+            return compiledModel;
+        }
+
+        var copy = await CkCompiledModelCloner.CloneAsync(_ckJsonSerializer, compiledModel).ConfigureAwait(false);
+        CkReferenceRewriter.BindMajorQualified(copy, modelGraph.Models.Keys);
+        return copy;
     }
 
     public async Task<CkModelGraph> HardResolveAsync(ICollection<CkModelId> ckModelIds,
@@ -78,15 +100,17 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
         var modelGraph = new CkModelGraph();
 
         DependencyResolveResult? dependencyResolveResult = null;
-        if (compiledModel.Dependencies != null)
+        var dependencyRanges = compiledModel.GetResolutionRanges();
+        if (dependencyRanges.Count > 0)
         {
             dependencyResolveResult = await _repositoryDependencyResolver.SoftResolveDependenciesAsync(
-                    compiledModel.Dependencies, modelGraph,
+                    dependencyRanges.ToList(), modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
         }
 
+        compiledModel = await BindForResolveAsync(compiledModel, modelGraph).ConfigureAwait(false);
         Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
         return new ModelResolveResult
         {
@@ -103,15 +127,18 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
     {
         var modelGraph = new CkModelGraph();
 
-        if (compiledModel.Dependencies != null)
+        // AB#5665: a range-retaining model resolves its dependencies by range + floor, otherwise by exact pin.
+        var dependencyRanges = compiledModel.GetResolutionRanges();
+        if (dependencyRanges.Count > 0)
         {
             await _repositoryDependencyResolver.HardResolveDependenciesAsync(
-                    compiledModel.Dependencies, modelGraph,
+                    dependencyRanges.ToList(), modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
         }
 
+        compiledModel = await BindForResolveAsync(compiledModel, modelGraph).ConfigureAwait(false);
         Resolve(compiledModel, modelGraph, originFileResolver, operationResult);
 
         return modelGraph;

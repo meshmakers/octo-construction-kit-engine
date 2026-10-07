@@ -61,4 +61,11 @@ internal interface IRepositoryDependencyResolver
     Task<DependencyResolveResult> SoftResolveDependenciesAsync(ICollection<CkModelId> dependencies,
         CkModelGraph ckModelGraph, IVariableResolver variableResolver,
         IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null);
+
+    /// <summary>
+    /// Soft-resolves dependency ranges (AB#5665: range + floor of a range-retaining model).
+    /// </summary>
+    Task<DependencyResolveResult> SoftResolveDependenciesAsync(ICollection<CkModelIdVersionRange> dependencyRanges,
+        CkModelGraph ckModelGraph, IVariableResolver variableResolver,
+        IOriginFileResolver originFileResolver, OperationResult operationResult, object? sourceIdentifier = null);
 }

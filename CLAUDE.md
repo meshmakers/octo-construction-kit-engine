@@ -718,6 +718,14 @@ to the resolved version of the same name and major (`CkReferenceRewriter.BindMaj
 copy**, so an import persists the version-less form. A reference whose major is not installed stays
 unbound and fails reference resolution.
 
+**Range identity in the resolvers (D2).** `CkModelIdVersionRange.Equals` means *overlaps* (not transitive,
+inconsistent with `GetHashCode`). The dependency resolvers therefore match queued ranges structurally
+(`IsSameRange`: same name, identical `CkVersionRange`). With range retention `System-[2.5,3.0)` overlaps
+both exact pins `System-[2.5.0]` and `System-[2.6.0]`; the overlap lookup threw "Sequence contains more than
+one matching element" when a System minor was imported into a tenant holding exact-pinned and
+range-retaining models (or silently merged the range into the wrong exact entry). Pinned by
+`RangeRetentionRepositoryResolverTests`. `Equals` itself is unchanged (other callers rely on it).
+
 The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
 element schemas accept `@` in the model part of a reference; the compiled schema accepts
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema

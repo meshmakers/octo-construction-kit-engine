@@ -162,8 +162,11 @@ internal class CatalogDependencyResolver(
             // AB#5665: range-retaining models contribute their range + floor, classic models their exact pins.
             foreach (var childDependencyRange in ckDependencyRootModel.GetResolutionRanges())
             {
-                var childDependencyOrigins =
-                    dependencies.SingleOrDefault(d => d.Item2 == childDependencyRange)?.Item1;
+                // Structural match (name + identical range), not CkModelIdVersionRange.Equals: that one is
+                // "overlaps" and not transitive — with range retention System-[2.5,3.0) overlaps both the
+                // exact pins System-[2.5.0] and System-[2.6.0], which made SingleOrDefault throw (D2).
+                var childDependencyOrigins = dependencies
+                    .FirstOrDefault(d => IsSameRange(d.Item2, childDependencyRange))?.Item1;
                 if (childDependencyOrigins == null)
                 {
                     dependencies.Add(
@@ -252,5 +255,10 @@ internal class CatalogDependencyResolver(
             SkippedModelIds = skippedDependencies.AsReadOnly(),
             UnresolvedDependencyModelIds = unresolvedDependencies.AsReadOnly()
         };
+    }
+
+    private static bool IsSameRange(CkModelIdVersionRange a, CkModelIdVersionRange b)
+    {
+        return a.Name == b.Name && a.ModelVersionRange.Equals(b.ModelVersionRange);
     }
 }

@@ -123,6 +123,50 @@ public class UnpublishCommandTests
             .MustNotHaveHappened();
     }
 
+    [Fact]
+    public async Task Execute_DryRun_FindsVersionBeyondFormerListWindow()
+    {
+        // AB#5650: the dry run read ListAsync(0, 10000) and filtered client-side, so a version sorted beyond
+        // the first 10000 merged entries was reported as "nothing matches". It must look up the versions of the
+        // requested blueprint unpaged instead.
+        var manager = A.Fake<IBlueprintCatalogManager>();
+        var target = new BlueprintCatalogResultItem
+        {
+            CatalogName = Catalog,
+            BlueprintId = new BlueprintId("ZzLast", "2.0.0"),
+            Description = "d"
+        };
+        A.CallTo(() => manager.ListVersionsAsync("ZzLast", A<object?>._, A<CancellationToken?>._))
+            .Returns(new List<BlueprintCatalogResultItem> { target });
+        var logger = new CapturingLogger<UnpublishCommand>();
+        var cmd = new UnpublishCommand(logger, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "ZzLast", "-r", "2.0.0"]);
+
+        await cmd.Execute();
+
+        Assert.Contains(logger.Messages, m => m.Contains("ZzLast-2.0.0"));
+        A.CallTo(() => manager.ListAsync(A<int>._, A<int>._, A<object?>._, A<CancellationToken?>._))
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Execute_DryRun_IgnoresVersionsFromOtherCatalogs()
+    {
+        var manager = A.Fake<IBlueprintCatalogManager>();
+        A.CallTo(() => manager.ListVersionsAsync("MyBlueprint", A<object?>._, A<CancellationToken?>._))
+            .Returns(new List<BlueprintCatalogResultItem>
+            {
+                new() { CatalogName = "OtherCatalog", BlueprintId = new BlueprintId("MyBlueprint", "1.0.0") }
+            });
+        var logger = new CapturingLogger<UnpublishCommand>();
+        var cmd = new UnpublishCommand(logger, Options.Create(new BpmToolOptions()), manager);
+        cmd.CommandArgumentValue.ParseLayer(["-b", "MyBlueprint", "-r", "1.0.0"]);
+
+        await cmd.Execute();
+
+        Assert.Contains(logger.Messages, m => m.Contains("nothing matches"));
+    }
+
     private static IBlueprintCatalogManager ManagerWith(params (string name, string version)[] items)
     {
         var manager = A.Fake<IBlueprintCatalogManager>();
@@ -136,6 +180,9 @@ public class UnpublishCommandTests
             }).ToList()
         };
         A.CallTo(() => manager.ListAsync(A<int>._, A<int>._, A<object?>._, A<CancellationToken?>._)).Returns(result);
+        A.CallTo(() => manager.ListVersionsAsync(A<string>._, A<object?>._, A<CancellationToken?>._))
+            .ReturnsLazily((string name, object? _, CancellationToken? _) =>
+                (IReadOnlyList<BlueprintCatalogResultItem>)result.Items.Where(i => i.BlueprintId.Name == name).ToList());
         return manager;
     }
 

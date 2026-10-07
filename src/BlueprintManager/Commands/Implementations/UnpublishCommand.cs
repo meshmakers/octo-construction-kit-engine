@@ -87,9 +87,10 @@ internal class UnpublishCommand : CatalogReadCommand
             // Dry run: preview from the catalog listing. GitHub catalogs serve that index from GitHub
             // Pages, which can lag a just-published blueprint by up to a minute — so this preview is
             // best-effort, and the forced path below deliberately does NOT depend on it.
-            var listResult = await CatalogManager.ListAsync(skip: 0, take: 10000);
-            var targets = listResult.Items
-                .Where(i => i.CatalogName == catalogName && i.BlueprintId.Name == blueprintName)
+            // Unpaged per-name lookup (AB#5650): a fixed ListAsync(0, 10000) window could miss versions.
+            var versions = await CatalogManager.ListVersionsAsync(blueprintName);
+            var targets = versions
+                .Where(i => i.CatalogName == catalogName)
                 .Where(i => wholeBlueprint || i.BlueprintId.Version.ToString() == normalizedVersion)
                 .Select(i => i.BlueprintId)
                 .OrderBy(b => b)

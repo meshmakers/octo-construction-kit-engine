@@ -551,6 +551,12 @@
       "number": 104,
       "level": "ERROR",
       "text": "Authorization of method '{methodId}' of type '{ckTypeId}' is invalid: {reason}"
+    },
+    {
+      "key": "RestrictedAttributeInDerivedRule",
+      "number": 105,
+      "level": "ERROR",
+      "text": "{ruleProperty} '{path}' of type '{ckTypeId}' references attribute '{attributeName}' with 'access: {access}'. Display rules, owner attribute paths and text index paths are readable through other fields (rtDisplayName, filters, search) and must not expose it."
     }
   ]
 }

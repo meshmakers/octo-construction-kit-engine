@@ -401,7 +401,104 @@ internal class InheritanceResolver : IInheritanceResolver
             {
                 ValidateOwnerAttribute(modelGraph, ckTypeId, typeGraph, originFileResolver, operationResult);
             }
+
+            ValidateRestrictedAttributeUse(modelGraph, ckTypeId, typeGraph, originFileResolver, operationResult);
         }
+    }
+
+    /// <summary>
+    ///     Review M9 (CK v2): a Hidden attribute must not be reachable through derived or indirect fields —
+    ///     a display rule feeds <c>rtDisplayName</c>/<c>rtDisplayDescription</c> (always readable and
+    ///     filterable), a text index feeds full-text search, an owner path is compared against the caller.
+    ///     Owner paths also reject MethodOnly (ownership must be settable by the generic path that creates the
+    ///     entity). Message 105, reported at the declaring type.
+    /// </summary>
+    private static void ValidateRestrictedAttributeUse(CkModelGraph modelGraph, CkId<CkTypeId> ckTypeId,
+        CkTypeGraph typeGraph, IOriginFileResolver originFileResolver, OperationResult operationResult)
+    {
+        var location = originFileResolver.Resolve(ckTypeId);
+
+        void Check(string ruleProperty, string path, Func<CkAttributeAccessDto, bool> isRestricted)
+        {
+            var restricted = FindRestrictedSegment(modelGraph, typeGraph, path, isRestricted);
+            if (restricted != null)
+            {
+                operationResult.AddMessage(MessageCodes.RestrictedAttributeInDerivedRule(location, ruleProperty,
+                    path, ckTypeId, restricted.Value.Name, restricted.Value.Access));
+            }
+        }
+
+        static bool IsHidden(CkAttributeAccessDto access) => access == CkAttributeAccessDto.Hidden;
+
+        foreach (var (ruleProperty, rule, declared) in new[]
+                 {
+                     ("displayNameRule", typeGraph.DisplayNameRule, typeGraph.DisplayNameRuleDeclared),
+                     ("displayDescriptionRule", typeGraph.DisplayDescriptionRule, typeGraph.DisplayDescriptionRuleDeclared)
+                 })
+        {
+            if (!declared || string.IsNullOrWhiteSpace(rule))
+            {
+                continue;
+            }
+
+            var parseResult = DisplayRuleParser.Parse(rule!);
+            if (!parseResult.IsValid)
+            {
+                continue; // reported by ValidateDisplayRule
+            }
+
+            foreach (var path in parseResult.ReferencedPaths)
+            {
+                Check(ruleProperty, path, IsHidden);
+            }
+        }
+
+        if (typeGraph.OwnerAttributePathDeclared && !string.IsNullOrWhiteSpace(typeGraph.OwnerAttributePath))
+        {
+            Check("ownerAttributePath", typeGraph.OwnerAttributePath!,
+                access => access is CkAttributeAccessDto.Hidden or CkAttributeAccessDto.MethodOnly);
+        }
+
+        foreach (var index in typeGraph.Indexes.Where(i => i.IndexType == IndexTypeDto.Text))
+        {
+            foreach (var path in index.Fields.SelectMany(f => f.AttributePaths ?? []))
+            {
+                Check("text index", path, IsHidden);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Walks an attribute path (record segments allowed) and returns the first segment whose access is
+    ///     restricted, or <c>null</c>. Unknown paths return <c>null</c> (reported elsewhere).
+    /// </summary>
+    private static (string Name, CkAttributeAccessDto Access)? FindRestrictedSegment(CkModelGraph modelGraph,
+        CkTypeWithAttributesGraph scope, string path, Func<CkAttributeAccessDto, bool> isRestricted)
+    {
+        var current = scope;
+        var segments = path.Split('.');
+        for (var i = 0; i < segments.Length; i++)
+        {
+            if (!current.AllAttributesByName.TryGetValue(segments[i], out var attribute))
+            {
+                return null;
+            }
+
+            if (isRestricted(attribute.Access))
+            {
+                return (segments[i], attribute.Access);
+            }
+
+            if (i == segments.Length - 1 || attribute.ValueCkRecordId == null ||
+                !modelGraph.Records.TryGetValue(attribute.ValueCkRecordId, out var recordGraph))
+            {
+                return null;
+            }
+
+            current = recordGraph;
+        }
+
+        return null;
     }
 
     /// <summary>

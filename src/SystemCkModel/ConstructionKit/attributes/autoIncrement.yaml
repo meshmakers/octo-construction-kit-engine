@@ -1,11 +1,20 @@
 "$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
 attributes:
+  # AB#5359 - a counter belongs to the tenant from the first number it hands out. A blueprint
+  # seeds the entity once (start value, format, upper limit) and every re-apply is a full
+  # replace, so a seed-owned counter restarts at the seeded value and issues numbers that are
+  # already in use. All three are TenantOwned rather than RuntimeState although a service
+  # writes CurrentValue: the counter has to travel with an export, or a transferred tenant
+  # would start numbering again.
   - id: AutoIncrement.End
     description: "The upper limit of the auto-increment sequence."
     valueType: Int
+    ownership: TenantOwned
   - id: AutoIncrement.CurrentValue
     description: "The current value of the auto-increment counter."
     valueType: Int
+    ownership: TenantOwned
   - id: AutoIncrement.Format
     description: "Optional format string for generating formatted identifiers (e.g., 'INV-{0:D6}')."
     valueType: String
+    ownership: TenantOwned

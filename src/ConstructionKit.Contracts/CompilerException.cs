@@ -1,3 +1,5 @@
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
+
 namespace Meshmakers.Octo.ConstructionKit.Contracts;
 
 /// <summary>
@@ -44,6 +46,22 @@ public class CompilerException : Exception
     internal static Exception OperationResultWithErrors(OperationResult operationResult)
     {
         return new CompilerException(operationResult);
+    }
+
+    /// <summary>
+    ///     The model could not be resolved, so it was NOT written to the catalog. Carries the resolve
+    ///     messages both in the exception text (so a caller that only logs <see cref="Exception.Message" />
+    ///     stays actionable) and in <see cref="OperationResult" />.
+    /// </summary>
+    internal static Exception PublishFailedWithErrors(string catalogName, CkModelId ckModelId,
+        IEnumerable<OperationMessage> resolveMessages, OperationResult operationResult)
+    {
+        var errors = string.Join("; ", resolveMessages
+            .Where(m => m.MessageLevel is MessageLevel.Error or MessageLevel.FatalError)
+            .Select(m => $"{m.MessageNumber} {m.Location}: {m.MessageText}"));
+        return new CompilerException(
+            $"Construction kit model '{ckModelId.FullName}' was NOT published to catalog '{catalogName}' " +
+            $"because it could not be resolved: {errors}", operationResult);
     }
 
     internal static Exception DirectoryMustBeEmpty(string rootPath, OperationResult operationResult)

@@ -681,6 +681,13 @@ public interface IRuntimeRepository
     /// <param name="session">The session object</param>
     /// <param name="rtCkTypeId">The CK type id of the target collection (may not exist in current CK cache)</param>
     /// <param name="rtEntity">The entity to insert</param>
+    /// <remarks>
+    ///     AB#5532: this path bypasses the Secret write step of the regular mutation path. Callers run the
+    ///     entity through <c>ISecretWriteNormalizer</c> (Runtime.Engine) first - the CK migration service
+    ///     does - so Secret slots hold only <c>null</c> or an <c>RtSecretValue</c> (<c>Protected</c>, or
+    ///     <c>LegacyPlaintext</c> on hosts without keys). Implementations persist those through the Secret
+    ///     serializer (AB#5533) and must refuse <c>RtSecretValueState.Pending</c>.
+    /// </remarks>
     Task InsertOneRtEntityForMigrationAsync(
         IOctoSession session, RtCkId<CkTypeId> rtCkTypeId, RtEntity rtEntity);
 
@@ -748,12 +755,66 @@ public interface IRuntimeRepository
     /// <param name="rtId">The runtime object id of the entity to rewrite</param>
     /// <param name="attributeId">The CK attribute id of the slot to overwrite</param>
     /// <param name="newValue">The new value to assign to the slot</param>
+    /// <remarks>
+    ///     AB#5532: callers normalise Secret values first (<c>ISecretWriteNormalizer.NormalizeAttributeValue</c>);
+    ///     the secret sweep (<c>ISecretMaintenanceService</c>) writes through this method too. The value of a
+    ///     Secret slot is <c>null</c>, an <c>RtSecretValue</c> (<c>Protected</c> → BSON sub-document
+    ///     <c>{ _t: "OctoSecret", e: ... }</c>, <c>LegacyPlaintext</c> → the string unchanged), a plain
+    ///     <see cref="string" /> (only the emergency <c>Decrypt</c> sweep), or a record (array) whose Secret
+    ///     sub-values follow the same rules. Implementations (AB#5533) must refuse
+    ///     <c>RtSecretValueState.Pending</c>.
+    /// </remarks>
     Task RewriteAttributeValueForMigrationAsync(
         IOctoSession session,
         RtCkId<CkTypeId> rtCkTypeId,
         OctoObjectId rtId,
         string attributeId,
         object? newValue);
+
+    /// <summary>
+    ///     Conditional variant of
+    ///     <see cref="RewriteAttributeValueForMigrationAsync(IOctoSession, RtCkId{CkTypeId}, OctoObjectId, string, object?)" />
+    ///     (compare-and-swap, AB#5532): the slot is rewritten only when the value stored right now still
+    ///     equals <paramref name="expectedValue" />, the value the caller read before it computed
+    ///     <paramref name="newValue" />. A caller that reads an entity, transforms an attribute and writes
+    ///     it back (the secret sweep) would otherwise overwrite a value changed in between with a
+    ///     transformation of the old one.
+    /// </summary>
+    /// <param name="session">The session object</param>
+    /// <param name="rtCkTypeId">The CK type id of the entity's collection (may not exist in current CK cache)</param>
+    /// <param name="rtId">The runtime object id of the entity to rewrite</param>
+    /// <param name="attributeId">The CK attribute id of the slot to overwrite</param>
+    /// <param name="expectedValue">
+    ///     The value the caller read; <c>null</c> matches a null or missing slot. Compared with
+    ///     <see cref="Secrets.StoredAttributeValueComparer" />: a protected secret by its envelope, a legacy
+    ///     secret by its text, a record (array) as a whole.
+    /// </param>
+    /// <param name="newValue">The new value to assign to the slot (same rules as the unconditional rewrite)</param>
+    /// <returns>
+    ///     <c>true</c> when the slot was rewritten; <c>false</c> when the stored value no longer equals
+    ///     <paramref name="expectedValue" /> or the entity no longer exists - nothing was written.
+    /// </returns>
+    /// <remarks>
+    ///     The default implementation throws <see cref="NotSupportedException" />, like the unconditional
+    ///     rewrite on repositories without CK-cache-free write support.
+    ///     <paramref name="rtCkTypeId" /> is the entity's own (concrete) type: implementations must find the
+    ///     entity where it is actually stored - an entity of a derived type lives in the storage of its
+    ///     collection root (e.g. every <c>System.Communication/*Configuration</c> in the one of
+    ///     <c>System/Configuration</c>) - and must not answer <c>false</c> merely because they looked in the
+    ///     wrong place (AB#5533: the sweep reported every such value as "modified concurrently").
+    /// </remarks>
+    Task<bool> RewriteAttributeValueIfUnchangedForMigrationAsync(
+        IOctoSession session,
+        RtCkId<CkTypeId> rtCkTypeId,
+        OctoObjectId rtId,
+        string attributeId,
+        object? expectedValue,
+        object? newValue)
+    {
+        throw new NotSupportedException(
+            "RewriteAttributeValueIfUnchangedForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can conditionally mutate a single attribute slot without CK cache validation.");
+    }
 
     #endregion Migration support
 }

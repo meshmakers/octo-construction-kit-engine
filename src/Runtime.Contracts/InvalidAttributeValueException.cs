@@ -54,6 +54,29 @@ public class InvalidAttributeValueException : PersistenceException
             $"Attribute with name '{attributeName}' does not exist for '{location}'");
     }
 
+    internal static Exception SecretNotReadableAsString(string location, string attributeName)
+    {
+        return new InvalidAttributeValueException(
+            $"Attribute '{attributeName}' of '{location}' is a Secret attribute and cannot be read as a string. " +
+            "Use GetAttributeSecretValueOrDefault to check whether it is set; the plaintext is only available " +
+            "server-side through ISecretAttributeProtector.");
+    }
+
+    internal static Exception InvalidSecretValue(Type actualType)
+    {
+        return new InvalidAttributeValueException(
+            $"A Secret attribute value must be a string (the secret to store), null (clear) or the read marker " +
+            $"{{\"isSet\": ...}} (unchanged), but a value of type '{actualType.Name}' was given.");
+    }
+
+    internal static Exception InvalidSecretObject()
+    {
+        return new InvalidAttributeValueException(
+            "A Secret attribute value must be a string (the secret to store), null (clear) or the read marker " +
+            "{\"isSet\": true|false} (unchanged), but an object with other properties or a non-boolean " +
+            "'isSet' was given.");
+    }
+
     internal static Exception InvalidDataType(string getLocation, string attributeName, Type actualType, Type expectType)
     {
         return new InvalidAttributeValueException(

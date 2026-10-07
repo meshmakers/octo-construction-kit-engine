@@ -40,7 +40,19 @@
     </Target>
     
     <!--It is generated a target which is executed before the compilation-->
-    <Target Name="CkCompile" BeforeTargets="BeforeBuild" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
+    <!--
+        CkCompile, CkRestore and CkIncludeFiles run as the first dependency of PrepareResources, i.e. after
+        ResolveProjectReferences has built the projects this one references, and before the embedded
+        resources and the AdditionalFiles of the source generator are consumed. (Hooking
+        AfterTargets="ResolveProjectReferences" instead re-runs the targets in the inner project calls
+        of GeneratePackageOnBuild and publishes every model twice.) A CK model project that depends on another CK model of this
+        repository (System.StreamData on System) references its project; the referenced project
+        publishes its model to the local file system catalog while it builds, so the dependent compile
+        resolves the version built here instead of whatever the remote catalog cache last saw. Running
+        before BeforeBuild (as before AB#5532) compiled the dependent model before its dependency was
+        built - System.StreamData 1.14.0 pinned System 2.3.0 that way.
+    -->
+    <Target Name="CkCompile" Inputs="@(ConstructionKitFolderInputCompileFiles)" Outputs="@(ConstructionKitFolderOutCompileFiles)"
             DependsOnTargets="GatherCompileFiles">
 
         <Message Importance="High" Text="Building construction kit (target framework $(TargetFramework))" />
@@ -78,14 +90,28 @@
         </Exec>
     </Target>
 
-    <Target Name="CkRestore" BeforeTargets="BeforeBuild" 
+    <Target Name="CkRestore"
             DependsOnTargets="GatherImportFiles">      
         <Message Condition="Exists(%(ConstructionKitConfigFile.Identity))" Importance="High" Text="Restoring construction kit model libraries %(ConstructionKitConfigFile.Identity)"/>
         <Exec Condition="Exists(%(ConstructionKitConfigFile.Identity))" Command="$(OctoCompilerToolPath) -c restore -f %(ConstructionKitConfigFile.Identity) -o  $(OctoCkCompileOutputImportFolder) -c $(OctoCkCompileCacheImportFolder) $(_OctoLcrArg)">
         </Exec>
     </Target>
     
-    <Target Name="CkIncludeFiles" AfterTargets="CkRestore;CkCompile" BeforeTargets="BeforeBuild" >
+    <!--
+        CkIncludeFiles must run as the FIRST dependency of PrepareResources, not BeforeTargets="PrepareResources":
+        BeforeTargets fires only after the target's own DependsOnTargets have run, and PrepareResources depends on
+        PrepareResourceNames (AssignTargetPaths, CreateManifestResourceNames), which turns @(EmbeddedResource)
+        into the manifest resources handed to the compiler. An EmbeddedResource added after that is silently
+        dropped. Locally it went unnoticed because the evaluation-time ItemGroups below pick up the yaml of the
+        PREVIOUS build from bin/; a clean CI checkout has none, so 0.1.2610.6005 shipped the System.StreamData
+        assembly without ck-system.streamdata.yaml (CI build 49921). Directory.Build.targets is imported after
+        Microsoft.Common.CurrentVersion.targets, so prepending here keeps the SDK's own dependencies.
+    -->
+    <PropertyGroup>
+        <PrepareResourcesDependsOn>CkIncludeFiles;$(PrepareResourcesDependsOn)</PrepareResourcesDependsOn>
+    </PropertyGroup>
+
+    <Target Name="CkIncludeFiles" DependsOnTargets="CkRestore;CkCompile">
         <ItemGroup>
             <_OctoCompilerResourceFilesNew Include="$(OctoCkCompileOutputCompilerFolder)/*.yaml" Exclude="@(_OctoCompilerResourceFiles)" />
             <EmbeddedResource Include="@(_OctoCompilerResourceFilesNew)">
@@ -111,6 +137,26 @@
         <ItemGroup>
             <AdditionalFiles Include="$(OctoCkCompileCacheImportFolder)/*.json" />
         </ItemGroup>
+    </Target>
+
+    <!--
+        Guard (CI build 49921): every model yaml the CK compiler produced must reach the C# compiler as a
+        manifest resource. An EmbeddedResource that is added too late (after PrepareResourceNames) carries no
+        WithCulture/Type metadata and is silently left out of _CoreCompileResourceInputs, which ships a model
+        package without its model - fail the build instead. Runs before CoreCompile even when that is skipped
+        as up to date, so it checks every build.
+    -->
+    <Target Name="CkVerifyEmbeddedModelResources" BeforeTargets="CoreCompile"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoVerifyEmbeddedCkModel)' != 'false'">
+        <ItemGroup>
+            <_CkExpectedModelResource Include="@(_OctoCompilerResourceFiles->'$(RootNamespace).%(Filename)%(Extension)');@(_OctoCompilerResourceFilesNew->'$(RootNamespace).%(Filename)%(Extension)')" />
+            <_CkActualModelResource Include="@(_CoreCompileResourceInputs->'%(LogicalName)')" />
+            <_CkMissingModelResource Include="@(_CkExpectedModelResource)" Exclude="@(_CkActualModelResource)" />
+        </ItemGroup>
+        <Error Condition="'@(_CkExpectedModelResource)' == ''"
+               Text="Construction kit project $(MSBuildProjectName) compiled no model yaml into '$(OctoCkCompileOutputCompilerFolder)'; the assembly would ship without its CK model." />
+        <Error Condition="'@(_CkMissingModelResource)' != ''"
+               Text="Construction kit model resource(s) @(_CkMissingModelResource, ', ') of $(MSBuildProjectName) are not passed to the compiler as embedded resources; the assembly would ship without its CK model (see CkIncludeFiles in Directory.Build.targets)." />
     </Target>
 
     <ItemGroup>

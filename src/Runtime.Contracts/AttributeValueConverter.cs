@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Newtonsoft.Json.Linq;
 
 namespace Meshmakers.Octo.Runtime.Contracts;
@@ -44,6 +45,8 @@ public static class AttributeValueConverter
                 return typeof(string[]);
             case AttributeValueTypesDto.TimeSpan:
                 return typeof(TimeSpan);
+            case AttributeValueTypesDto.Secret:
+                return typeof(RtSecretValue);
             default:
                 throw new NotSupportedException($"AttributeValueTypesDto '{attributeValueTypes}' is not supported.");
         }
@@ -287,6 +290,8 @@ public static class AttributeValueConverter
                 var rtRecord = (RtRecord)value;
 
                 return new RtRecord(rtRecord.CkRecordId, rtRecord.Attributes);
+            case AttributeValueTypesDto.Secret:
+                return ConvertSecretValue(value);
             case AttributeValueTypesDto.BinaryLinked:
                 if (value is EntityBinaryInfo binaryInfo)
                 {
@@ -301,5 +306,44 @@ public static class AttributeValueConverter
         }
 
         return value;
+    }
+
+    /// <summary>
+    ///     AB#5528: a Secret slot always holds an <see cref="RtSecretValue" />. An existing value is
+    ///     passed through (upsert preservation, restore and sweep hand in protected values); any
+    ///     string-like input is API input and becomes <see cref="RtSecretValueState.Pending" /> -
+    ///     NOT trimmed, whitespace is part of a credential. The write step (AB#5532) decides what a
+    ///     pending value means: non-empty is encrypted (a placeholder-looking text too), <c>""</c> keeps
+    ///     the stored value. Read paths that find a string in the
+    ///     database build <see cref="RtSecretValue.LegacyPlaintext" /> themselves (AB#5533). The read
+    ///     marker (a JSON object / dictionary that is empty or holds only a boolean <c>isSet</c>) means
+    ///     "unchanged"; any other non-string input - including other objects - throws
+    ///     <see cref="InvalidAttributeValueException" /> without the value in the message.
+    /// </summary>
+    private static object ConvertSecretValue(object value)
+    {
+        return value switch
+        {
+            RtSecretValue secretValue => secretValue,
+            string text => RtSecretValue.Pending(text),
+            JsonElement { ValueKind: JsonValueKind.String } element => RtSecretValue.Pending(element.GetString() ?? string.Empty),
+            JValue { Type: JTokenType.String } token => RtSecretValue.Pending((string?)token ?? string.Empty),
+            // AB#5532: the read marker {"isSet":true|false} (or {}) sent back on a write carries no secret -
+            // it means "unchanged". Any other object is rejected (strict wire contract, RtSecretValueWireFormat).
+            JsonElement { ValueKind: JsonValueKind.Object } element => RtSecretValueWireFormat.IsMarker(element)
+                ? RtSecretValue.Pending(string.Empty)
+                : throw InvalidAttributeValueException.InvalidSecretObject(),
+            JObject token => RtSecretValueWireFormat.IsMarker(token)
+                ? RtSecretValue.Pending(string.Empty)
+                : throw InvalidAttributeValueException.InvalidSecretObject(),
+            IDictionary or IReadOnlyDictionary<string, object?> or IDictionary<string, object?> => // ExpandoObject
+                RtSecretValueWireFormat.IsMarkerDictionary(value)
+                    ? RtSecretValue.Pending(string.Empty)
+                    : throw InvalidAttributeValueException.InvalidSecretObject(),
+            // Anything else (numbers, booleans, lists, arbitrary objects) is not a secret: encrypting its
+            // ToString() would store "System.Collections.Generic.List`1[...]" or a number nobody typed as a
+            // credential. The message names the type only, never the value.
+            _ => throw InvalidAttributeValueException.InvalidSecretValue(value.GetType())
+        };
     }
 }

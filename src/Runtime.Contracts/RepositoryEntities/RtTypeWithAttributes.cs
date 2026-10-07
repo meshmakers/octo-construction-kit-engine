@@ -663,6 +663,11 @@ public abstract class RtTypeWithAttributes
             return defaultValue;
         }
 
+        if (value is RtSecretValue)
+        {
+            throw InvalidAttributeValueException.SecretNotReadableAsString(GetLocation(), attributeName);
+        }
+
         return (string?)value;
     }
 
@@ -679,7 +684,40 @@ public abstract class RtTypeWithAttributes
             throw InvalidAttributeValueException.CannotBeNull(GetLocation(), attributeName);
         }
 
+        if (value is RtSecretValue)
+        {
+            throw InvalidAttributeValueException.SecretNotReadableAsString(GetLocation(), attributeName);
+        }
+
         return (string)value;
+    }
+
+    /// <summary>
+    ///     Gets the value of a <c>Secret</c> attribute (AB#5528), or <c>null</c> when it is not set.
+    ///     The value never exposes its plaintext; use <c>ISecretAttributeProtector</c> (or
+    ///     <c>GetSecretPlaintext</c>) server-side where the plaintext is really needed.
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns>The secret value or <c>null</c></returns>
+    /// <remarks>
+    ///     A plain string in the slot is a value stored before the attribute became Secret (or read
+    ///     by a serializer that does not know the type yet) and is returned as
+    ///     <see cref="RtSecretValueState.LegacyPlaintext" />.
+    /// </remarks>
+    public RtSecretValue? GetAttributeSecretValueOrDefault(string attributeName)
+    {
+        if (!Attributes.TryGetValue(attributeName, out var value) || value == null)
+        {
+            return null;
+        }
+
+        return value switch
+        {
+            RtSecretValue secretValue => secretValue,
+            string legacy => RtSecretValue.LegacyPlaintext(legacy),
+            _ => throw InvalidAttributeValueException.InvalidDataType(GetLocation(), attributeName, value.GetType(),
+                typeof(RtSecretValue))
+        };
     }
 
     /// <summary>
@@ -769,5 +807,17 @@ public abstract class RtTypeWithAttributes
     public void SetAttributeRawValue(string attributeName, object? attributeValue)
     {
         _attributes[attributeName] = attributeValue;
+    }
+
+    /// <summary>
+    ///     Removes an attribute from the attribute dictionary, so a write leaves the stored value
+    ///     unchanged (partial update) instead of overwriting it. Used by the Secret write step
+    ///     (AB#5532, concept §3.6: <c>""</c> means "unchanged").
+    /// </summary>
+    /// <param name="attributeName">The name of the property in PascalCase</param>
+    /// <returns>True when the attribute was present</returns>
+    internal bool RemoveAttribute(string attributeName)
+    {
+        return _attributes.Remove(attributeName);
     }
 }

@@ -60,13 +60,40 @@ public class ArchiveLifecycleServiceTests
     }
 
     [Fact]
-    public async Task Activate_AlreadyActivated_IsNoop()
+    public async Task Activate_AlreadyActivated_ReconcilesTheSchemaButDoesNotTransition()
     {
+        // There is no state change to make, but the archive DEFINITION may have gained a column since
+        // the table was provisioned, and provisioning is the only place that reconciles the two.
+        // Skipping it left the declaration and the physical table permanently disagreeing: everything
+        // written to the new column is dropped as unknown, or — once something references it in SQL,
+        // as an opt-in ConflictPrecedence key does — every write to the archive fails. The only way to
+        // adopt such a change was then to drop the table, which for a populated archive means losing
+        // its history. Provisioning is idempotent by contract, so this costs one catalogue query when
+        // there is nothing to do.
         Stub(CkArchiveStatus.Activated);
         await NewSut().ActivateAsync(Rt);
 
-        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<ArchiveSnapshot>._)).MustNotHaveHappened();
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<ArchiveSnapshot>.That.Matches(s => s.RtId == Rt)))
+            .MustHaveHappened();
         A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task Activate_AlreadyActivated_ReconciliationFails_ThrowsButKeepsTheArchiveActivated()
+    {
+        // The table an activated archive writes to is untouched when adding a declared column
+        // fails. Flipping the archive to Failed would stop every write to it over an error that
+        // may well be transient.
+        Stub(CkArchiveStatus.Activated);
+        A.CallTo(() => _repo.EnsureArchiveCreatedAsync(A<ArchiveSnapshot>.That.Matches(s => s.RtId == Rt)))
+            .Throws(new InvalidOperationException("crate boom"));
+
+        await Assert.ThrowsAsync<ArchiveActivationFailedException>(() => NewSut().ActivateAsync(Rt));
+
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+        A.CallTo(() => _audit.RecordTransitionAsync(
+                A<string>._, A<OctoObjectId>._, A<CkArchiveStatus>._, A<CkArchiveStatus>._, A<string>._))
+            .MustNotHaveHappened();
     }
 
     [Fact]

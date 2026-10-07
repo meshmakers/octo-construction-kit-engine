@@ -1,4 +1,5 @@
-﻿using Meshmakers.Octo.ConstructionKit.Contracts;
+﻿using System.Collections.Concurrent;
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
@@ -9,7 +10,9 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Engine.Repositories.Query;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Meshmakers.Octo.Runtime.Engine.Security;
+using Microsoft.Extensions.Logging;
 
 // ReSharper disable MemberCanBePrivate.Global
 
@@ -20,9 +23,22 @@ namespace Meshmakers.Octo.Runtime.Engine.Repositories;
 /// </summary>
 public abstract class RuntimeRepositoryBase : IRuntimeRepository
 {
+    /// <summary>
+    ///     Timestamp of the last CK cache reload triggered by a type lookup miss, per tenant
+    ///     (AB#5415). Process-wide on purpose: a repository instance is created per call, so
+    ///     instance state could never rate-limit anything.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, DateTime> LastStaleCkCacheReloadUtc = new();
+
+    /// <summary>
+    ///     Minimum distance between two stale-cache reloads of the same tenant. Settable for tests.
+    /// </summary>
+    internal static TimeSpan StaleCkCacheReloadCooldown { get; set; } = TimeSpan.FromMinutes(1);
+
     private readonly ICkCacheService _ckCacheService;
     private readonly IDataPermissionResolver? _dataPermissionResolver;
     private readonly IAuditEventSink? _auditEventSink;
+    private readonly ILogger? _logger;
 
     /// <summary>
     ///     Creates a new instance of <see cref="RuntimeRepositoryBase" />
@@ -36,11 +52,15 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     ///     not enforced (backward-compatible)
     /// </param>
     /// <param name="auditEventSink">Optional audit sink for AuditOnly permission violations</param>
+    /// <param name="logger">
+    ///     Optional logger; used to report a stale CK cache that had to be reloaded (AB#5415)
+    /// </param>
     protected RuntimeRepositoryBase(string tenantId, ICkCacheService ckCacheService,
         IRepositoryDataSource repositoryDataSource,
         IBulkRtMutation bulkRtMutation,
         IDataPermissionResolver? dataPermissionResolver = null,
-        IAuditEventSink? auditEventSink = null)
+        IAuditEventSink? auditEventSink = null,
+        ILogger? logger = null)
     {
         BulkRtMutation = bulkRtMutation;
         RepositoryDataSource = repositoryDataSource;
@@ -48,6 +68,7 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         _ckCacheService = ckCacheService;
         _dataPermissionResolver = dataPermissionResolver;
         _auditEventSink = auditEventSink;
+        _logger = logger;
     }
 
     /// <summary>
@@ -638,17 +659,105 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
     /// </summary>
     /// <param name="ckTypeId">The ck type id</param>
     /// <returns></returns>
-    /// <exception cref="RuntimeRepositoryException">CkTypeId does not exist in cache</exception>
+    /// <exception cref="CkCacheException">CkTypeId does not exist in the cache</exception>
     public async Task<CkTypeGraph> GetCkTypeGraphAsync(RtCkId<CkTypeId> ckTypeId)
     {
+        // Read BEFORE the load: a cache this call had to load itself is as fresh as the repository
+        // can make it, so a miss on it is real and reloading again would only repeat it.
+        var wasAlreadyLoaded = _ckCacheService.IsTenantLoaded(TenantId);
+
         var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
-        var ckTypeGraph = cacheService.GetRtCkType(TenantId, ckTypeId);
-        if (ckTypeGraph == null)
+        if (cacheService.TryGetRtCkType(TenantId, ckTypeId, out var ckTypeGraph))
         {
-            throw RuntimeRepositoryException.RtCkTypeIdDoesNotExistInCache(ckTypeId);
+            return ckTypeGraph;
         }
 
-        return ckTypeGraph;
+        // AB#5415: a loaded tenant cache is never re-read on its own. Every path that invalidates
+        // it after a CK model import - the communication controller's CkModelChanged broadcast to
+        // the adapters, the PreUpdateTenant/PosUpdateTenant pair inside the services - is a
+        // best-effort push with no acknowledgement, so a broken hub connection, a controller
+        // restart between the Pre and the Pos message, or an event published before this process
+        // started all lose it silently. The cache then keeps answering from the model that was
+        // current when it was loaded, and every execution fails with the exact error the import
+        // just repaired until someone runs ClearCache by hand. A miss is the one moment the
+        // staleness becomes observable, so reload once here and look again before giving up.
+        if (wasAlreadyLoaded
+            && await TryReloadStaleCkCacheAsync(cacheService, ckTypeId).ConfigureAwait(false)
+            && cacheService.TryGetRtCkType(TenantId, ckTypeId, out ckTypeGraph))
+        {
+            return ckTypeGraph;
+        }
+
+        // Let the cache raise its own miss: several services catch CkCacheException to mean "this
+        // tenant never imported that CK library" (the AI token-lease reader, the adapter's caller
+        // binding, identity group assignment), and throwing anything else here would slip past
+        // every one of them. The former RuntimeRepositoryException branch below the lookup was
+        // dead code for the same reason - GetRtCkType threw before a null could be returned.
+        return cacheService.GetRtCkType(TenantId, ckTypeId);
+    }
+
+    /// <summary>
+    ///     Reloads this tenant's CK model cache after a type lookup missed, at most once per
+    ///     <see cref="StaleCkCacheReloadCooldown" /> (AB#5415). Returns true when this call actually
+    ///     reloaded, i.e. when a second lookup is worth doing.
+    /// </summary>
+    /// <remarks>
+    ///     The cooldown is the whole point of the guard: a pipeline that references a genuinely
+    ///     unknown type misses on every single execution - roughly 100 per second on the adapter that
+    ///     produced AB#5415 - and a reload is a full model resolve against the repository. Without it
+    ///     the self-heal would cost far more than the stale cache it repairs.
+    /// </remarks>
+    private async Task<bool> TryReloadStaleCkCacheAsync(ICkCacheService cacheService, RtCkId<CkTypeId> ckTypeId)
+    {
+        if (!TryEnterStaleCkCacheReload(TenantId, StaleCkCacheReloadCooldown))
+        {
+            return false;
+        }
+
+        _logger?.LogWarning(
+            "Construction Kit type '{RtCkTypeId}' is missing from the loaded CK cache of tenant '{TenantId}'. " +
+            "Reloading the model - the cache was not invalidated after the type was added (AB#5415)",
+            ckTypeId, TenantId);
+
+        // Unload first: the model loader short-circuits on an already loaded tenant, so a refresh
+        // without it is a no-op. A concurrent execution that finds the cache unloaded meanwhile
+        // reloads it through GetCkCacheServiceAsync, which the loader serialises on one load.
+        if (cacheService.IsTenantLoaded(TenantId))
+        {
+            cacheService.Unload(TenantId);
+        }
+
+        await RefreshCkCacheServiceAsync(cacheService).ConfigureAwait(false);
+        return true;
+    }
+
+    /// <summary>
+    ///     Claims the right to reload <paramref name="tenantId" />'s CK cache, or returns false when
+    ///     another miss did so within <paramref name="cooldown" />. The compare-and-swap loop keeps
+    ///     concurrent executions - the normal case on an adapter - down to a single reload.
+    /// </summary>
+    private static bool TryEnterStaleCkCacheReload(string tenantId, TimeSpan cooldown)
+    {
+        var now = DateTime.UtcNow;
+        while (true)
+        {
+            if (LastStaleCkCacheReloadUtc.TryGetValue(tenantId, out var last))
+            {
+                if (now - last < cooldown)
+                {
+                    return false;
+                }
+
+                if (LastStaleCkCacheReloadUtc.TryUpdate(tenantId, now, last))
+                {
+                    return true;
+                }
+            }
+            else if (LastStaleCkCacheReloadUtc.TryAdd(tenantId, now))
+            {
+                return true;
+            }
+        }
     }
 
     /// <summary>
@@ -743,6 +852,20 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
             "This method requires a repository that can mutate a single attribute slot without CK cache validation.");
     }
 
+    /// <inheritdoc />
+    public virtual Task<bool> RewriteAttributeValueIfUnchangedForMigrationAsync(
+        IOctoSession session,
+        RtCkId<CkTypeId> rtCkTypeId,
+        OctoObjectId rtId,
+        string attributeId,
+        object? expectedValue,
+        object? newValue)
+    {
+        throw new NotSupportedException(
+            "RewriteAttributeValueIfUnchangedForMigrationAsync is not supported by this repository implementation. " +
+            "This method requires a repository that can conditionally mutate a single attribute slot without CK cache validation.");
+    }
+
     private TEntity CreateTransientRtEntity<TEntity>(CkTypeGraph ckTypeGraph)
         where TEntity : RtEntity, new()
     {
@@ -759,7 +882,12 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
         foreach (var ckTypeAttributeDto in ckTypeGraph.AllAttributes.Values)
         {
             object? value = null;
-            if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any())
+            // AB#5528/AB#5532: a transient entity never carries a Secret value - Secret attributes take
+            // no default (the compiler forbids them), so nothing reaches a Secret slot here and the
+            // write step has nothing to do. Values assigned later are normalised when the entity is
+            // written (BulkRtMutation, BulkInsertRtEntitiesAsync).
+            if (ckTypeAttributeDto.DefaultValues != null && ckTypeAttributeDto.DefaultValues.Any()
+                && ckTypeAttributeDto.ValueType != AttributeValueTypesDto.Secret)
             {
                 switch (ckTypeAttributeDto.ValueType)
                 {
@@ -977,8 +1105,24 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
 
             var ckTypeGraph = await GetCkTypeGraphAsync(groupedEntities.Key).ConfigureAwait(false);
 
+            // AB#5532: the bulk import bypasses BulkRtMutation, so it runs the Secret write step itself
+            // (insert semantics: "" is not set, plaintext is encrypted, protected
+            // values - e.g. preserved by the import's upsert preservation - pass through). Required
+            // secrets are not enforced here: the import reports missing mandatory attributes itself
+            // (AB#4772, ImportRtModelCommand.FindMissingMandatoryAttributes).
+            var cacheService = await GetCkCacheServiceAsync().ConfigureAwait(false);
+            var entities = groupedEntities.ToList();
+            if (BulkRtMutation.SecretWriteNormalizer.HasSecretAttributes(cacheService, TenantId, ckTypeGraph))
+            {
+                foreach (var entity in entities)
+                {
+                    BulkRtMutation.SecretWriteNormalizer.Normalize(cacheService, TenantId, ckTypeGraph, entity,
+                        SecretWriteOperation.Insert);
+                }
+            }
+
             results.Add(await RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph)
-                .BulkImportAsync(session, groupedEntities, options).ConfigureAwait(false));
+                .BulkImportAsync(session, entities, options).ConfigureAwait(false));
         }
 
         return new AggregatedBulkImportResult(results);

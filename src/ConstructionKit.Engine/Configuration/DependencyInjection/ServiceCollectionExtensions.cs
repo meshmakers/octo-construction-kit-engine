@@ -92,6 +92,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient<IBlueprintCatalog, EmbeddedResourceBlueprintCatalog>();
         services.AddTransient<IBlueprintSerializer, BlueprintYamlSerializer>();
         services.AddTransient<IBlueprintSchemaValidator, BlueprintSchemaValidator>();
+        services.AddTransient<IBlueprintSecretAttributeResolver, CatalogBlueprintSecretAttributeResolver>();
         services.AddTransient<IBlueprintCompilerService, BlueprintCompilerService>();
 
         return services;

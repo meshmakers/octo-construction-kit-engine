@@ -37,6 +37,19 @@ public interface IEntityUpdateInfo<out TEntity> where TEntity : RtEntity
     public AttributeNewerThanGuard? UpdateGuard { get; }
 
     /// <summary>
+    ///     Names (PascalCase, as in <see cref="RtTypeWithAttributes.Attributes" />) of top-level
+    ///     <c>Secret</c> attributes to clear explicitly (AB#5532, concept §4.3 <c>clearSecretAttributes</c>).
+    ///     Clearing is the only way to remove a stored secret through an update: an omitted, <c>""</c>
+    ///     or (at the API) <c>null</c> secret means "unchanged". Applies to
+    ///     <see cref="EntityModOptions.Update" /> and <see cref="EntityModOptions.Replace" />; on
+    ///     <see cref="EntityModOptions.Insert" /> a listed attribute is simply not set. The rule engine
+    ///     rejects a name that is not a Secret attribute of the type, a required secret, and a
+    ///     non-empty value for the same attribute in the same operation.
+    ///     <c>null</c> or empty = nothing to clear.
+    /// </summary>
+    public IReadOnlyCollection<string>? ClearSecretAttributes => null;
+
+    /// <summary>
     /// Gets the runtime entity identifier.
     /// </summary>
     /// <returns></returns>

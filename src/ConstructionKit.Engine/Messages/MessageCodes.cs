@@ -232,6 +232,30 @@ internal static class MessageCodes
     internal static OperationMessage MultipleVersionsOfCkModelResolved(string? location, object modelName, object versions, object origins) =>
         GetMessage("MultipleVersionsOfCkModelResolved", location, modelName, versions, origins);
 
+    internal static OperationMessage SecretAttributeHasDefaultValues(string? location, object ckAttributeId) =>
+        GetMessage("SecretAttributeHasDefaultValues", location, ckAttributeId);
+
+    internal static OperationMessage SecretAttributeAssignmentInvalid(string? location, object ckElementId, object attributeName, object ckAttributeId, object reason) =>
+        GetMessage("SecretAttributeAssignmentInvalid", location, ckElementId, attributeName, ckAttributeId, reason);
+
+    internal static OperationMessage SecretAttributeOwnershipNotSecret(string? location, object ckElementId, object attributeName, object ownership) =>
+        GetMessage("SecretAttributeOwnershipNotSecret", location, ckElementId, attributeName, ownership);
+
+    internal static OperationMessage SecretAttributeIndexed(string? location, object ckTypeId, object attributePath) =>
+        GetMessage("SecretAttributeIndexed", location, ckTypeId, attributePath);
+
+    internal static OperationMessage SecretAttributeReferencedByDisplayRule(string? location, object ruleProperty, object ckTypeId, object attributePath) =>
+        GetMessage("SecretAttributeReferencedByDisplayRule", location, ruleProperty, ckTypeId, attributePath);
+
+    internal static OperationMessage SecretAttributeRequiresSystemDependency(string? location, object modelId, object minimumVersion, object declaredDependency) =>
+        GetMessage("SecretAttributeRequiresSystemDependency", location, modelId, minimumVersion, declaredDependency);
+
+    internal static OperationMessage RecordWithSecretRequiresRecordKey(string? location, object ckRecordId, object secretAttributes) =>
+        GetMessage("RecordWithSecretRequiresRecordKey", location, ckRecordId, secretAttributes);
+
+    internal static OperationMessage RecordKeyInvalid(string? location, object ckRecordId, object recordKey, object reason) =>
+        GetMessage("RecordKeyInvalid", location, ckRecordId, recordKey, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -647,6 +671,54 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  69, "Owner attribute '{ownerAttributePath}' of type '{ckTypeId}' is invalid: {reason}",
                  new [] {"ckTypeId", "ownerAttributePath", "reason"})
+        },
+        {
+            "SecretAttributeHasDefaultValues",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 70, "Secret attribute '{ckAttributeId}' declares defaultValues. A Secret attribute cannot have default values - a credential must never ship with the model; set it after installation.",
+                 new [] {"ckAttributeId"})
+        },
+        {
+            "SecretAttributeAssignmentInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 71, "Secret attribute '{attributeName}' ('{ckAttributeId}') of '{ckElementId}' is invalid: {reason}",
+                 new [] {"ckElementId", "attributeName", "ckAttributeId", "reason"})
+        },
+        {
+            "SecretAttributeOwnershipNotSecret",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 72, "Secret attribute '{attributeName}' of '{ckElementId}' declares ownership '{ownership}'. The effective ownership of a Secret attribute is always 'Secret'; remove the override or declare 'ownership: Secret'.",
+                 new [] {"ckElementId", "attributeName", "ownership"})
+        },
+        {
+            "SecretAttributeIndexed",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 73, "Index of type '{ckTypeId}' references Secret attribute path '{attributePath}'. Secret attributes cannot be indexed - the stored value is ciphertext.",
+                 new [] {"ckTypeId", "attributePath"})
+        },
+        {
+            "SecretAttributeReferencedByDisplayRule",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 74, "Display rule '{ruleProperty}' of type '{ckTypeId}' references Secret attribute path '{attributePath}'. Display rules cannot reveal Secret attributes.",
+                 new [] {"ruleProperty", "ckTypeId", "attributePath"})
+        },
+        {
+            "SecretAttributeRequiresSystemDependency",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 75, "Construction kit model '{modelId}' uses Secret attributes and must depend on System >= {minimumVersion} (declared: {declaredDependency}). Declare the dependency as 'System-[{minimumVersion},3.0)' so engines that do not know the Secret value type fail with a dependency error.",
+                 new [] {"modelId", "minimumVersion", "declaredDependency"})
+        },
+        {
+            "RecordWithSecretRequiresRecordKey",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 76, "Record '{ckRecordId}' contains Secret attribute(s) {secretAttributes} but declares no 'recordKey'. A record with Secret sub-attributes must name the sub-attribute that identifies an element, so a secret left empty on a record array replace can be carried over from the stored element with the same key.",
+                 new [] {"ckRecordId", "secretAttributes"})
+        },
+        {
+            "RecordKeyInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 77, "Record key '{recordKey}' of record '{ckRecordId}' is invalid: {reason}",
+                 new [] {"ckRecordId", "recordKey", "reason"})
         },
     };
 }

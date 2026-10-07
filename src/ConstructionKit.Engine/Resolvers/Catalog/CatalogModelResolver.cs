@@ -63,6 +63,12 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
 
         Resolve(compileCandidate, modelGraph, originFileResolver, operationResult);
 
+        // AB#5528: Secret value type rules apply to the model being compiled (dependency models
+        // were validated when they were compiled). Also normalises Secret ownership in the DTOs
+        // before they are written to the compiled model below.
+        SecretAttributeValidator.Validate(compileCandidate, compileCandidate.DependencyRanges, modelGraph,
+            originFileResolver, operationResult);
+
         var compiledModel = new CkCompiledModelRoot
         {
             ModelId = compileCandidate.ModelId,

@@ -90,6 +90,18 @@ internal static class MessageCodes
     internal static OperationMessage RtEntityNeedsToBeDefinedAtInsert(string? location, object tenantId, object rtEntityCkTypeId) =>
         GetMessage("RtEntityNeedsToBeDefinedAtInsert", location, tenantId, rtEntityCkTypeId);
 
+    internal static OperationMessage SecretClearAttributeNotSecret(string? location, object tenantId, object attributeName, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("SecretClearAttributeNotSecret", location, tenantId, attributeName, rtEntityCkTypeId, rtId);
+
+    internal static OperationMessage SecretClearRequiredAttribute(string? location, object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("SecretClearRequiredAttribute", location, tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
+
+    internal static OperationMessage SecretSetAndCleared(string? location, object tenantId, object attributeCkAttributeId, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("SecretSetAndCleared", location, tenantId, attributeCkAttributeId, rtEntityCkTypeId, rtId);
+
+    internal static OperationMessage MandatorySecretMissing(string? location, object tenantId, object attributePath, object rtEntityCkTypeId, object rtId) =>
+        GetMessage("MandatorySecretMissing", location, tenantId, attributePath, rtEntityCkTypeId, rtId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -211,6 +223,30 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.FatalError,
                  20, "{tenantId}: RtEntity of CkTypeId '{rtEntityCkTypeId}' needs to be defined at insert.",
                  ["tenantId", "rtEntityCkTypeId"])
+        },
+        {
+            "SecretClearAttributeNotSecret",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 21, "{tenantId}: Attribute '{attributeName}' of entity '{rtEntityCkTypeId}@{rtId}' cannot be cleared: it is not a Secret attribute of the type.",
+                 ["tenantId", "attributeName", "rtEntityCkTypeId", "rtId"])
+        },
+        {
+            "SecretClearRequiredAttribute",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 22, "{tenantId}: Secret attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is required and cannot be cleared.",
+                 ["tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"])
+        },
+        {
+            "SecretSetAndCleared",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 23, "{tenantId}: Secret attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is set and cleared in the same operation.",
+                 ["tenantId", "attributeCkAttributeId", "rtEntityCkTypeId", "rtId"])
+        },
+        {
+            "MandatorySecretMissing",
+             new OperationMessageTemplate(MessageLevel.FatalError,
+                 24, "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values count as not set).",
+                 ["tenantId", "attributePath", "rtEntityCkTypeId", "rtId"])
         },
     };
 }

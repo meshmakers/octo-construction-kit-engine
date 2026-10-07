@@ -1,8 +1,13 @@
 # Concept: Time-Range-Based Stream Data Archives
 
-Status: **Draft** — concept agreed in chat on 2026-05-12, implementation pending.
+Status: **Implemented** — phases 1-10 of §12 have shipped and are in productive use;
+phase 11 (deprecating `Basic/TimeRange`) is still open. Written 2026-05-12; the §12
+phase list is the authoritative record of what landed.
 See also: [concept-rollup-archives.md](./concept-rollup-archives.md) for the existing
-derived-rollup design that this concept extends.
+derived-rollup design that this concept extends, and
+`octo-construction-kit-engine-mongodb/docs/streamdata-archive-concept.md` for the storage
+side — including `Archive.ConflictPrecedence`, which decides which of two competing
+deliveries for the same window survives.
 
 ## §1 Overview
 
@@ -215,6 +220,38 @@ ExtractFromEdaApi@1            // pulls quarter-hour reports
 ```
 
 The existing `SaveStreamDataInArchive@1` continues to work unchanged for raw archives.
+
+#### `SaveTimeRangeSeriesInArchive@1` — whole series, one anchor (AB#5248)
+
+The node above takes rows that already carry an `rtid`, which means the pipeline in front of it has
+to produce a runtime entity per window. For a measurement **series** that is the wrong shape: the
+runtime model only needs one entity per series (`metering point × OBIS code`), not one per quarter
+hour. Measured on a real EDA replay: 316,268 windows cost 4,530 s — 78 rows/s, 12.8 ms per window —
+with the database nowhere near the bottleneck, because each window went through a full
+`CreateUpdateInfo@1` → `UpdateRtEntityIfNewer@1` → `ApplyChanges@2` round trip.
+
+`SaveTimeRangeSeriesInArchive@1` takes the series document instead and does both halves itself:
+
+```
+{ series: [ { <key fields>, values: [ { from, to, <value fields> }, … ] }, … ] }
+   → resolve every series' anchor by well-known name (ONE query for the whole batch)
+   → insert the missing anchors + their parent associations, advance the existing ones
+   → bulk-insert every value as one archive row
+```
+
+Same corpus: 16 anchors instead of 316,268 candidates, 0.79 ms per row — a factor of 16.
+
+**No orphan rows, by construction rather than by check.** The anchor resolution runs first and is the
+only place an `rtid` is produced: it is either read from the runtime store or written and confirmed,
+and a failed anchor write throws instead of continuing. That is stronger than the post-hoc existence
+guard in `SaveTimeRangeStreamDataInArchive@1`, which can only refuse a batch after the mapping was
+already built — and which does not apply here, since this node calls `InsertTimeRangeAsync` directly.
+
+**Ordering is not this node's business.** Which of two deliveries for the same window survives is
+decided by the archive's `Archive.ConflictPrecedence` (see the storage concept in
+`octo-construction-kit-engine-mongodb/docs/streamdata-archive-concept.md`). The node's job is to map
+the ranking columns — a quality code, the source document's own date — into the archive alongside the
+values.
 
 ## §4 Storage Layout
 

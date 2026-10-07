@@ -69,14 +69,20 @@ internal class PublishCommand : CkcCommand
         {
             var ckCompiledModelRoot =
                 await _ckSerializer.DeserializeCompiledModelRootAsync(streamReader, filePath, operationResult);
-            if (operationResult.HasErrors)
+            if (operationResult.HasErrors || operationResult.HasFatalErrors)
             {
+                // AB#5453: this used to return, which left the process exit code at 0 — an error line
+                // followed by a zero exit is indistinguishable from success for any caller that does
+                // not scrape the log (and nlog.config here renders '${message}' without a level prefix).
                 Logger.LogError("Error loading model \'{FilePath}\'", filePath);
-                operationResult.WriteMessagesToLogger(Logger);
-                return;
+                throw new CompilerException(
+                    $"Compiled construction kit model file '{filePath}' could not be loaded.", operationResult);
             }
 
-            await _catalogService.PublishAsync(catalogName, ckCompiledModelRoot, originFileResolver, isForced);
+            // Throws CompilerException when the model could not be resolved; the success line below is
+            // therefore only reached when the model really is in the catalog.
+            await _catalogService.PublishAsync(catalogName, ckCompiledModelRoot, originFileResolver, isForced,
+                operationResult);
 
             Logger.LogInformation("Construction kit model published");
         }

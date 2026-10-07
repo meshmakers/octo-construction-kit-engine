@@ -78,6 +78,39 @@ variables:
   # variables by the shared update-build-number.yml template (tpl-v0.3.1). The local
   # catalog this repo needs for its interdependent CK models is therefore isolated
   # per run instead of shared via ~/.octo on the agent.
+  #
+  # Publish routing truth table for this repo's CK models (System, System.StreamData,
+  # and the test models Test / System.TestIdentity). Two variables are in play, and
+  # only ONE of them is the routing decision:
+  #
+  #   OctoPublishCatalog       "where would a GitHub publish go" — PrivateGitHubCatalog
+  #                            on every branch, PublicGitHubCatalog on r* tags. The
+  #                            agent exports it as an ENV VAR, so MSBuild picks it up
+  #                            as a global property on any step that does not override
+  #                            it. It is NOT the gate.
+  #   effectivePublishCatalog  the gate. main / r* -> OctoPublishCatalog;
+  #                            everything else -> LocalFileSystemCatalog.
+  #
+  #   refs/heads/main          -> PrivateGitHubCatalog  (meshmakers/construction-kit-libraries-build)
+  #   refs/tags/r<X.Y.Z>       -> PublicGitHubCatalog   (the public catalog)
+  #   refs/heads/test/0.2-dev  -> LocalFileSystemCatalog on this branch line; the lane
+  #                               catalog (meshmakers/octo-catalog-dev) requires the
+  #                               publishCkModelsToLaneCatalog opt-in of tpl-v0.6.x,
+  #                               which this branch deliberately does NOT set
+  #   refs/heads/dev/*         -> LocalFileSystemCatalog (per-run, Agent.TempDirectory)
+  #
+  # THEREFORE: every MSBuild step that can reach the CkCompile publish path must pass
+  # /p:OctoPublishCatalog="$(effectivePublishCatalog)" explicitly. All three do below.
+  #
+  # Anti-regression note (2026-09-30): "System 2.3.0 is missing from
+  # PrivateGitHubCatalog" was investigated and REFUTED. Builds 48269 and 48297 (both
+  # main, both green) published System 2.3.0 and System.StreamData 1.11.0/1.12.0 into
+  # construction-kit-libraries-build; the commits and ck-models/v2/s/System/2/catalog.json
+  # (latestVersion 2.3.0, publishedAt 2026-09-30T05:10:17Z) prove it, and gh-pages
+  # serves them. A model that is visible in EmbeddedResourceCatalog but not in
+  # PrivateGitHubCatalog is a READ problem (gh-pages deploy serialization, AB#4872, or a
+  # stale ~/.octo/ck-catalog/cache/private-github-catalog-cache*.json), not this pipeline.
+  # Check the catalog repo's git log before touching anything here.
 
 stages:
   - stage: Build
@@ -141,11 +174,20 @@ stages:
           # the agent exports every pipeline variable, and update-build-number emits
           # OctoPublishCatalog = PrivateGitHubCatalog on every branch (it is the
           # "where would a publish go" value, gated by effectivePublishCatalog).
-          # Result on the lane: System, System.TestIdentity and Test were force
-          # published into the MAIN-lane catalog construction-kit-libraries-build,
-          # twice on 2026-09-29 alone. No damage yet only because the versions were
-          # content-identical, so the writes produced zero-diff commits; a lane change
-          # without a version bump would have overwritten main's model in place.
+          # On main and on r-tags the two values are identical, so pinning changes
+          # nothing there. It matters on every OTHER branch this pipeline triggers on
+          # (dev/*, test/* without a lane opt-in): effectivePublishCatalog is
+          # LocalFileSystemCatalog while the exported OctoPublishCatalog still says
+          # PrivateGitHubCatalog, so an unpinned step force published System,
+          # System.TestIdentity and Test straight into the MAIN-lane catalog
+          # construction-kit-libraries-build. Observed twice on 2026-09-29 from the
+          # 0.2-dev lane (builds 48061 and 48096), proven by "Publishing construction
+          # kit library .../SystemCkModel/out/ck-system-2.yaml to catalog
+          # PrivateGitHubCatalog" inside the step that starts as `Starting: Test`.
+          # No damage yet only because the versions were content-identical, so the
+          # writes produced zero-diff commits; a branch change without a version bump
+          # would have overwritten main's model in place, and ImportCkModelAsync
+          # short-circuits on equal versions, so no tenant would ever see a correction.
           #
           # Note this is specific to THIS repo's Exec-based publish. The packaged
           # targets used everywhere else do not re-enter the publish path in a test

@@ -30,6 +30,7 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
         IsFinal = ckRecordDto.IsFinal;
         DerivedFromCkRecordId = ckRecordDto.DerivedFromCkRecordId;
         Description = ckRecordDto.Description;
+        RecordKey = string.IsNullOrWhiteSpace(ckRecordDto.RecordKey) ? null : ckRecordDto.RecordKey;
         _baseRecords = [];
         _derivedRecords = [];
         BaseRecords = new ReadOnlyCollection<CkGraphRecordInheritance>(_baseRecords);
@@ -105,10 +106,36 @@ public class CkRecordGraph : CkTypeWithAttributesGraph
     public string? Description { get; set; }
 
     /// <summary>
+    ///     Effective record key (AB#5528, concept §4.6): the name of the sub-attribute that
+    ///     identifies an element of this record inside a record array - declared on this record or
+    ///     inherited from the nearest base record that declares one. <c>null</c> when no record in
+    ///     the chain declares a key. Used to carry secret sub-values over per element when a record
+    ///     array is replaced (write path, AB#5532).
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately a settable property instead of a constructor parameter: a CK cache written
+    ///     by an older engine has no <c>recordKey</c> and keeps <c>null</c>; System.Text.Json applies
+    ///     the setter after the <see cref="JsonConstructorAttribute" /> constructor.
+    /// </remarks>
+    public string? RecordKey { get; set; }
+
+    /// <summary>
     ///     Returns a string that describes the inheritance chain
     /// </summary>
     [JsonIgnore]
     public string Path => CkRecordId + ": " + string.Join("->", BaseRecords.Select(x => x.BaseCkRecordId));
+
+    /// <summary>
+    ///     Fills an empty record key from a base record. Nearest-wins: a key already set (declared on
+    ///     this record or inherited from a nearer base) is never overwritten.
+    /// </summary>
+    internal void InheritRecordKey(string? baseRecordKey)
+    {
+        if (string.IsNullOrWhiteSpace(RecordKey) && !string.IsNullOrWhiteSpace(baseRecordKey))
+        {
+            RecordKey = baseRecordKey;
+        }
+    }
 
     /// <summary>
     ///     Adds a list of base records of the current record

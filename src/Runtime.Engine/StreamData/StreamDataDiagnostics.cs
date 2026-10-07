@@ -30,8 +30,20 @@ public static class StreamDataDiagnostics
 
     /// <summary>
     /// Counter incremented on each successful archive status transition. Tags:
-    /// <c>tenant</c> (when available), <c>archive</c>, <c>from</c>, <c>to</c>.
+    /// <c>archive</c>, <c>from</c>, <c>to</c>.
     /// </summary>
+    /// <remarks>
+    ///     This used to claim a <c>tenant</c> tag "(when available)". No call site in
+    ///     <c>ArchiveLifecycleService</c> ever set one, so the claim was wrong and would have sent
+    ///     someone looking for a dimension that does not exist (AB#5478 §2.2).
+    ///     <para>
+    ///         Where this runs inside an adapter the tenant is nonetheless present: the adapter pod
+    ///         carries <c>octo.tenant.id</c> as a resource attribute from its chart, which attaches
+    ///         to every metric the process emits. Only a process serving several tenants at once
+    ///         needs the tag on the instrument itself — if that becomes necessary, the key is
+    ///         <c>octo.tenant.id</c> and nothing else.
+    ///     </para>
+    /// </remarks>
     public static readonly Counter<long> StatusTransitions =
         Meter.CreateCounter<long>(
             "streamdata.archive.status_transitions",

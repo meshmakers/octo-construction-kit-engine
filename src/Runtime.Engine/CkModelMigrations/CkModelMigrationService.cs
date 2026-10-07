@@ -10,6 +10,8 @@ using Meshmakers.Octo.Runtime.Contracts.CkModelMigrations;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
+using Meshmakers.Octo.Runtime.Contracts.Secrets;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Microsoft.Extensions.Logging;
 
 namespace Meshmakers.Octo.Runtime.Engine.CkModelMigrations;
@@ -25,6 +27,9 @@ internal class CkModelMigrationService : ICkModelMigrationService
     private readonly ICatalogService _catalogService;
     private readonly ICkModelImportAuditTrail _auditTrail;
     private readonly ILogger<CkModelMigrationService> _logger;
+    private readonly ICkCacheService? _ckCacheService;
+    private readonly ISecretWriteNormalizer? _secretWriteNormalizer;
+    private readonly ISecretMaintenanceService? _secretMaintenanceService;
 
     /// <summary>
     /// Well-known attribute names for CK model migration (must match CK model schema - PascalCase)
@@ -52,8 +57,18 @@ internal class CkModelMigrationService : ICkModelMigrationService
         IRuntimeRepositoryProvider repositoryProvider,
         ICatalogService catalogService,
         ICkModelImportAuditTrail auditTrail,
-        ILogger<CkModelMigrationService> logger)
+        ILogger<CkModelMigrationService> logger,
+        ICkCacheService? ckCacheService = null,
+        ISecretWriteNormalizer? secretWriteNormalizer = null,
+        ISecretMaintenanceService? secretMaintenanceService = null)
     {
+        // AB#5532: the CK cache and the Secret write step normalise Secret values on the migration
+        // writes that bypass BulkRtMutation; the maintenance service turns stored legacy placeholders into
+        // "not set" after a model switched attributes from String to Secret. Optional so hosts and tests
+        // without them keep working (then no Secret handling happens on these paths).
+        _ckCacheService = ckCacheService;
+        _secretWriteNormalizer = secretWriteNormalizer;
+        _secretMaintenanceService = secretMaintenanceService;
         _migrationParser = migrationParser;
         _contentProvider = contentProvider;
         _repositoryProvider = repositoryProvider;
@@ -133,6 +148,8 @@ internal class CkModelMigrationService : ICkModelMigrationService
             // Record migration in history if successful and not dry run
             if (result.Success && !options.DryRun)
             {
+                await NormalizeSecretPlaceholdersAsync(tenantId, toModel, result, cancellationToken)
+                    .ConfigureAwait(false);
                 await RecordMigrationHistoryAsync(tenantId, result, stopwatch.ElapsedMilliseconds, cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -152,6 +169,76 @@ internal class CkModelMigrationService : ICkModelMigrationService
             result.Success, result.EntitiesAdded, result.EntitiesUpdated, result.EntitiesDeleted, result.DurationMs);
 
         return result;
+    }
+
+    /// <summary>
+    ///     AB#5532 (concept §5.2 phase 3): after a model version is migrated, stored legacy strings in its
+    ///     Secret slots that are exactly a placeholder (<c>SecretAttributeConventions.IsLegacyPlaceholder</c>) or
+    ///     empty become <c>null</c> ("not set"), once - the only data change a String →
+    ///     Secret switch needs. Idempotent and cheap on models without Secret attributes. A failure is a
+    ///     warning: the encrypt sweep normalises the same values later.
+    /// </summary>
+    private async Task NormalizeSecretPlaceholdersAsync(string tenantId, CkModelId toModel, CkMigrationResult result,
+        CancellationToken cancellationToken)
+    {
+        if (_secretMaintenanceService == null)
+        {
+            return;
+        }
+
+        try
+        {
+            var normalised = await _secretMaintenanceService
+                .NormalizePlaceholdersAsync(tenantId, toModel.Name, cancellationToken).ConfigureAwait(false);
+            if (normalised.ValuesRewritten > 0)
+            {
+                result.EntitiesUpdated += (int)normalised.EntitiesRewritten;
+                _logger.LogInformation(
+                    "CK migration to {ToModel}: {Count} Secret placeholder value(s) in tenant {TenantId} set to 'not set'",
+                    toModel, normalised.ValuesRewritten, tenantId);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "CK migration to {ToModel}: normalising Secret placeholders of tenant {TenantId} failed; the encrypt sweep will do it",
+                toModel, tenantId);
+            result.Warnings.Add($"Secret placeholder normalisation failed: {ex.GetType().Name}");
+        }
+    }
+
+    /// <summary>
+    ///     AB#5532: Secret write step for an entity written through the CK-cache-free migration insert.
+    ///     The values were read from storage (strings are legacy values). Without the target type in the
+    ///     cache there is no attribute metadata and the entity is written as read.
+    /// </summary>
+    private void NormalizeSecretsForMigrationInsert(string tenantId, RtCkId<CkTypeId> targetCkTypeId, RtEntity entity)
+    {
+        if (_ckCacheService == null || _secretWriteNormalizer == null ||
+            !_ckCacheService.TryGetRtCkType(tenantId, targetCkTypeId, out var targetGraph))
+        {
+            return;
+        }
+
+        _secretWriteNormalizer.Normalize(_ckCacheService, tenantId, targetGraph, entity, SecretWriteOperation.Insert,
+            null, SecretValueOrigin.Storage);
+    }
+
+    /// <summary>
+    ///     AB#5532: Secret write step for a single-slot migration rewrite.
+    /// </summary>
+    private object? NormalizeSecretForMigrationRewrite(string tenantId, RtCkId<CkTypeId> ckTypeId,
+        string attributeName, object? value)
+    {
+        if (_ckCacheService == null || _secretWriteNormalizer == null ||
+            !_ckCacheService.TryGetRtCkType(tenantId, ckTypeId, out var graph) ||
+            !graph.AllAttributesByName.TryGetValue(attributeName, out var attribute))
+        {
+            return value;
+        }
+
+        return _secretWriteNormalizer.NormalizeAttributeValue(_ckCacheService, tenantId, attribute, value,
+            SecretValueOrigin.Storage);
     }
 
     /// <inheritdoc />
@@ -1224,6 +1311,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
                         // 4. Insert into target collection (CkCache-free, target type may also not be
                         // loaded yet since cache was invalidated during import)
+                        NormalizeSecretsForMigrationInsert(tenantId, targetCkTypeId, entity);
                         await repository.InsertOneRtEntityForMigrationAsync(session, targetCkTypeId, entity)
                             .ConfigureAwait(false);
                     }
@@ -1447,6 +1535,7 @@ internal class CkModelMigrationService : ICkModelMigrationService
                 var newValue = AttributeValueConverter.ConvertAttributeValue(
                     AttributeValueTypesDto.RecordArray, rewrittenList.ToArray());
 
+                newValue = NormalizeSecretForMigrationRewrite(tenantId, sourceCkTypeId, sourceAttribute!, newValue);
                 await repository.RewriteAttributeValueForMigrationAsync(
                         session, sourceCkTypeId, entity.RtId, sourceAttribute!, newValue)
                     .ConfigureAwait(false);

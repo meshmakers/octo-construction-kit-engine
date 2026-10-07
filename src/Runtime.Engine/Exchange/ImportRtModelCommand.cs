@@ -11,6 +11,7 @@ using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
 using Meshmakers.Octo.Runtime.Contracts.RepositoryEntities;
 using Meshmakers.Octo.Runtime.Contracts.Serialization;
 using Meshmakers.Octo.Runtime.Contracts.TransportContainer.DTOs;
+using Meshmakers.Octo.Runtime.Engine.Secrets;
 using Microsoft.Extensions.Logging;
 using YamlDotNet.Core;
 
@@ -267,7 +268,9 @@ internal class ImportRtModelCommand(
                 continue;
             }
 
-            if (rtType.Attributes.TryGetValue(attribute.AttributeName, out var value) && value != null)
+            if (rtType.Attributes.TryGetValue(attribute.AttributeName, out var value) && value != null &&
+                // AB#5532: "" in a Secret slot is stored as "not set".
+                !(attribute.ValueType == AttributeValueTypesDto.Secret && SecretWriteNormalizer.IsNotSetValue(value)))
             {
                 continue;
             }
@@ -863,7 +866,18 @@ internal class ImportRtModelCommand(
             // Materialize the preserved-attribute set once per type.
             var flaggedAttributes = SelectPreservedAttributes(ckTypeGraph!);
 
-            if (flaggedAttributes.Count == 0)
+            // AB#5532: seed-owned record attributes whose records hold Secret members. The seed record
+            // replaces the stored one, but a seed only carries empty values for secrets (decision 9) -
+            // the stored secret of the element with the same record key is kept.
+            var resolveRecord = ResolveRecordFunc(runtimeRepository.TenantId);
+            var secretRecordAttributes = ckTypeGraph!.AllAttributes.Values
+                .Where(a => !a.Ownership.IsPreservedOnUpsert() &&
+                            a.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
+                            a.ValueCkRecordId != null &&
+                            RecordHasSecretMembers(resolveRecord(a.ValueCkRecordId.ToRtCkId()), resolveRecord, []))
+                .ToList();
+
+            if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0)
             {
                 // Cheap fast path: this type has no runtime-state attrs, nothing to preserve.
                 continue;
@@ -900,6 +914,8 @@ internal class ImportRtModelCommand(
 
                 var preservedForEntity = PreserveAttributesForEntity(modelEntity, existing, flaggedAttributes,
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));
+                preservedForEntity += PreserveSecretRecordMembers(modelEntity, existing, secretRecordAttributes,
+                    resolveRecord);
                 if (preservedForEntity > 0)
                 {
                     totalPreserved += preservedForEntity;
@@ -968,11 +984,191 @@ internal class ImportRtModelCommand(
             dto.Attributes.Add(new RtAttributeTcDto
             {
                 Id = attributeGraph.CkAttributeId.ToRtCkId(),
-                Value = ToTransportValue(cacheService, tenantId, value)
+                Value = attributeGraph.ValueType == AttributeValueTypesDto.Secret
+                    ? AsStoredSecret(value)
+                    : ToTransportValue(cacheService, tenantId, value)
             });
         }
 
         return dto;
+    }
+
+    private Func<RtCkId<CkRecordId>, CkRecordGraph?> ResolveRecordFunc(string tenantId)
+    {
+        return id => cacheService.TryGetRtCkRecord(tenantId, id, out var graph) ? graph : null;
+    }
+
+    /// <summary>
+    /// AB#5532: true when the record (or a nested record attribute of it) declares a Secret member.
+    /// </summary>
+    internal static bool RecordHasSecretMembers(CkRecordGraph? recordGraph,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord, HashSet<string> visiting)
+    {
+        if (recordGraph == null || !visiting.Add(recordGraph.CkRecordId.ToString()))
+        {
+            return false;
+        }
+
+        foreach (var member in recordGraph.AllAttributes.Values)
+        {
+            if (member.ValueType == AttributeValueTypesDto.Secret)
+            {
+                return true;
+            }
+
+            if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
+                member.ValueCkRecordId != null &&
+                RecordHasSecretMembers(resolveRecord(member.ValueCkRecordId.ToRtCkId()), resolveRecord, visiting))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// AB#5532 (concept §4.6, §6): blueprint re-apply must keep stored secrets inside seed-owned records.
+    /// For every Secret member of a seed record whose value is not set (<c>null</c>, <c>""</c>), the
+    /// stored value of the element with the same record key (record arrays) or of
+    /// the stored record (single record, by position) is carried into the import model, typed as
+    /// stored (<see cref="AsStoredSecret" />). Nested records are walked the same way. Returns the
+    /// number of carried values. Pure apart from the injected resolver.
+    /// </summary>
+    internal static int PreserveSecretRecordMembers(RtEntityTcDto modelEntity, RtEntity existing,
+        IReadOnlyList<CkTypeAttributeGraph> secretRecordAttributes,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+    {
+        var preserved = 0;
+        foreach (var attribute in secretRecordAttributes)
+        {
+            var modelAttribute = modelEntity.Attributes.FirstOrDefault(a => a.Id.Equals(attribute.CkAttributeId));
+            if (modelAttribute?.Value == null ||
+                !existing.Attributes.TryGetValue(attribute.AttributeName, out var storedValue) || storedValue == null)
+            {
+                continue;
+            }
+
+            preserved += PreserveSecretMembersInValue(modelAttribute.Value, storedValue, attribute.ValueType,
+                resolveRecord);
+        }
+
+        return preserved;
+    }
+
+    private static int PreserveSecretMembersInValue(object seedValue, object storedValue,
+        AttributeValueTypesDto valueType, Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+    {
+        if (valueType == AttributeValueTypesDto.Record)
+        {
+            return seedValue is RtRecordTcDto seedRecord && storedValue is RtRecord storedRecord
+                ? PreserveSecretMembersInRecord(seedRecord, storedRecord, resolveRecord)
+                : 0;
+        }
+
+        if (seedValue is not IEnumerable seedElements || seedValue is string ||
+            storedValue is not IEnumerable storedEnumerable || storedValue is string)
+        {
+            return 0;
+        }
+
+        var storedElements = storedEnumerable.OfType<RtRecord>().ToList();
+        var preserved = 0;
+        foreach (var element in seedElements)
+        {
+            if (element is not RtRecordTcDto seedRecord)
+            {
+                continue;
+            }
+
+            var graph = seedRecord.CkRecordId == null ? null : resolveRecord(seedRecord.CkRecordId);
+            if (graph?.RecordKey == null)
+            {
+                continue;
+            }
+
+            var keyMember = graph.AllAttributesByName.GetValueOrDefault(graph.RecordKey);
+            var seedKey = keyMember == null
+                ? null
+                : seedRecord.Attributes.FirstOrDefault(a => a.Id.Equals(keyMember.CkAttributeId))?.Value;
+            if (seedKey == null)
+            {
+                continue;
+            }
+
+            var counterpart = storedElements.FirstOrDefault(stored =>
+                stored.Attributes.TryGetValue(graph.RecordKey, out var storedKey) && storedKey != null &&
+                SecretWriteNormalizer.RecordKeyEquals(seedKey, storedKey));
+            if (counterpart != null)
+            {
+                preserved += PreserveSecretMembersInRecord(seedRecord, counterpart, resolveRecord);
+            }
+        }
+
+        return preserved;
+    }
+
+    private static int PreserveSecretMembersInRecord(RtRecordTcDto seedRecord, RtRecord storedRecord,
+        Func<RtCkId<CkRecordId>, CkRecordGraph?> resolveRecord)
+    {
+        var graph = seedRecord.CkRecordId == null ? null : resolveRecord(seedRecord.CkRecordId);
+        if (graph == null)
+        {
+            return 0;
+        }
+
+        var preserved = 0;
+        foreach (var member in graph.AllAttributes.Values)
+        {
+            if (!storedRecord.Attributes.TryGetValue(member.AttributeName, out var storedMember) ||
+                storedMember == null)
+            {
+                continue;
+            }
+
+            var seedMember = seedRecord.Attributes.FirstOrDefault(a => a.Id.Equals(member.CkAttributeId));
+            if (member.ValueType == AttributeValueTypesDto.Secret)
+            {
+                if (seedMember != null && !SecretWriteNormalizer.IsNotSetValue(seedMember.Value))
+                {
+                    continue;
+                }
+
+                if (seedMember == null)
+                {
+                    seedRecord.Attributes.Add(new RtAttributeTcDto
+                    {
+                        Id = member.CkAttributeId.ToRtCkId(),
+                        Value = AsStoredSecret(storedMember)
+                    });
+                }
+                else
+                {
+                    seedMember.Value = AsStoredSecret(storedMember);
+                }
+
+                preserved++;
+                continue;
+            }
+
+            if (member.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray &&
+                seedMember?.Value != null)
+            {
+                preserved += PreserveSecretMembersInValue(seedMember.Value, storedMember, member.ValueType,
+                    resolveRecord);
+            }
+        }
+
+        return preserved;
+    }
+
+    /// <summary>
+    /// AB#5532: a value read from a Secret slot, typed as stored - <see cref="RtSecretValue" /> passes
+    /// through, a plain string becomes <see cref="RtSecretValue.LegacyPlaintext" />.
+    /// </summary>
+    internal static object? AsStoredSecret(object? storedValue)
+    {
+        return storedValue is string legacy ? RtSecretValue.LegacyPlaintext(legacy) : storedValue;
     }
 
     /// <summary>
@@ -1033,6 +1229,14 @@ internal class ImportRtModelCommand(
                 // in this CK bump on a pre-existing entity); fall through to the imported value so the
                 // new attr lands with its imported default (when the model declares one).
                 continue;
+            }
+
+            if (flaggedAttr.ValueType == AttributeValueTypesDto.Secret)
+            {
+                // AB#5532: a stored secret is carried over as what it is. A plain string read from a
+                // Secret slot is a LEGACY value (clear text or enc:v1) - handing it on as a string would
+                // make the import treat it as new input and encrypt an enc:v1 envelope a second time.
+                existingValue = AsStoredSecret(existingValue);
             }
 
             var modelAttr = modelEntity.Attributes.FirstOrDefault(a =>

@@ -12,6 +12,8 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 [DebuggerDisplay("Name = {" + nameof(AttributeName) + "}, CkAttributeId = {" + nameof(CkAttributeId) + "}")]
 public class CkTypeAttributeGraph
 {
+    private AttributeOwnershipDto _ownership;
+
     /// <summary>
     ///     Creates a new instance of <see cref="CkTypeAttributeGraph" />.
     /// </summary>
@@ -130,7 +132,18 @@ public class CkTypeAttributeGraph
     ///     consumers read — upsert preservation and <c>ExportRt</c> exclusion — each through its
     ///     own predicate.
     /// </summary>
-    public AttributeOwnershipDto Ownership { get; set; }
+    /// <remarks>
+    ///     A <see cref="AttributeValueTypesDto.Secret" /> attribute is always
+    ///     <see cref="AttributeOwnershipDto.Secret" /> (AB#5528): the setter coerces any other value,
+    ///     so neither an unset ownership nor a stale cache entry can turn a credential into a
+    ///     seed-owned, exported value. The compiler reports a declared non-Secret ownership on a
+    ///     Secret attribute as an error.
+    /// </remarks>
+    public AttributeOwnershipDto Ownership
+    {
+        get => _ownership;
+        set => _ownership = AttributeOwnership.ResolveForValueType(ValueType, value);
+    }
 
     /// <summary>
     ///     DEPRECATED mirror of <see cref="Ownership"/> meaning "preserved on Upsert". Kept for

@@ -48,6 +48,7 @@ internal class RtYamlSerializer : IRtYamlSerializer
             .WithTypeConverter(new RtCkIdEnumIdConverter())
             .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
             .WithTypeConverter(new OctoObjectIdConverter())
+            .WithTypeConverter(new RtSecretValueYamlConverter())
             .WithEventEmitter(next => new MultilineScalarStyleEmitter(next))
             .Build();
         _deserializer = new DeserializerBuilder()

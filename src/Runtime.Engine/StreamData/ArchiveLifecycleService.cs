@@ -85,7 +85,18 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         switch (snapshot.Status)
         {
             case CkArchiveStatus.Activated:
-                return; // idempotent
+                // Nothing to transition — but the archive DEFINITION may have gained a column since
+                // the table was provisioned, and provisioning is the only place that reconciles the
+                // two. Returning here left the declaration and the physical table permanently
+                // disagreeing: everything written to the new column is dropped as unknown, or, once
+                // something references it in SQL, every write to the archive fails. The only way to
+                // adopt such a change was to drop the table, which for a populated archive means
+                // losing its history. Provisioning is idempotent by contract (CREATE TABLE IF NOT
+                // EXISTS plus an add-only column reconciliation), so running it costs one
+                // information_schema query when there is nothing to do. A failure here surfaces
+                // to the caller but leaves the archive Activated (see EnsureCrateProvisionedAsync).
+                await EnsureCrateProvisionedAsync(snapshot);
+                return;
             case CkArchiveStatus.Created:
             case CkArchiveStatus.Disabled:
             case CkArchiveStatus.Failed:
@@ -522,6 +533,15 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
             _logger.LogError(ex,
                 "Failed to provision Crate table for archive {ArchiveRtId} (was {FromStatus})",
                 snapshot.RtId, snapshot.Status);
+
+            // An archive that is already Activated keeps its status: the table it writes to exists
+            // and is unchanged, only the reconciliation of a newly declared column failed. Flipping
+            // it to Failed would turn a transient catalogue or DDL error into an outage, because a
+            // non-activated archive refuses every write. The caller still gets the exception.
+            if (snapshot.Status == CkArchiveStatus.Activated)
+            {
+                throw new ArchiveActivationFailedException(snapshot.RtId, ex);
+            }
 
             // Best-effort flip to Failed so the studio reflects reality. If this also fails the
             // outer exception still surfaces; the next reconciliation pass (T23) closes the loop.

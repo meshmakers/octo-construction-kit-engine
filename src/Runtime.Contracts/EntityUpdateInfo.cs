@@ -12,12 +12,14 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
 {
     [Newtonsoft.Json.JsonConstructor]
     [System.Text.Json.Serialization.JsonConstructor]
-    private EntityUpdateInfo(OctoObjectId? rtId, RtCkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption)
+    private EntityUpdateInfo(OctoObjectId? rtId, RtCkId<CkTypeId> ckTypeId, TEntity? rtEntity, EntityModOptions modOption,
+        IReadOnlyCollection<string>? clearSecretAttributes = null)
     {
         RtId = rtId;
         CkTypeId = ckTypeId;
         ModOption = modOption;
         RtEntity = rtEntity;
+        ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption)
@@ -27,11 +29,12 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     }
 
     private EntityUpdateInfo(RtEntityId rtEntityId, TEntity rtEntity, EntityModOptions modOption,
-        AttributeNewerThanGuard updateGuard)
+        AttributeNewerThanGuard? updateGuard, IEnumerable<string>? clearSecretAttributes)
         : this(rtEntityId, modOption)
     {
         RtEntity = rtEntity;
         UpdateGuard = updateGuard;
+        ClearSecretAttributes = NormaliseClearList(clearSecretAttributes);
     }
 
     private EntityUpdateInfo(RtCkId<CkTypeId> ckTypeId, TEntity rtEntity, EntityModOptions modOption)
@@ -72,6 +75,15 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     [Newtonsoft.Json.JsonIgnore]
     [System.Text.Json.Serialization.JsonIgnore]
     public AttributeNewerThanGuard? UpdateGuard { get; }
+
+    /// <inheritdoc />
+    /// <remarks>
+    ///     Serialized (both Newtonsoft and System.Text.Json) so the clear list survives a hop between
+    ///     processes; omitted from the wire when not set.
+    /// </remarks>
+    [Newtonsoft.Json.JsonProperty(NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyCollection<string>? ClearSecretAttributes { get; }
 
     /// <inheritdoc />
     public RtEntityId GetRtEntityId()
@@ -141,7 +153,21 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     public static EntityUpdateInfo<TEntity> CreateConditionalUpdate(RtEntityId rtEntityId, TEntity rtEntity,
         AttributeNewerThanGuard updateGuard)
     {
-        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, updateGuard);
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, updateGuard, null);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for update that also clears
+    ///     the listed <c>Secret</c> attributes (AB#5532, see <see cref="ClearSecretAttributes" />).
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity to update (may carry no attributes when only clearing)</param>
+    /// <param name="clearSecretAttributes">Names (PascalCase) of the Secret attributes to clear</param>
+    public static EntityUpdateInfo<TEntity> CreateUpdate(RtEntityId rtEntityId, TEntity rtEntity,
+        IEnumerable<string>? clearSecretAttributes)
+    {
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Update, null,
+            clearSecretAttributes);
     }
 
     /// <summary>
@@ -153,5 +179,35 @@ public class EntityUpdateInfo<TEntity> : IEntityUpdateInfo<TEntity>
     public static EntityUpdateInfo<TEntity> CreateReplace(RtEntityId rtEntityId, TEntity rtEntity)
     {
         return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Replace);
+    }
+
+    /// <summary>
+    ///     Creates a new instance of <see cref="EntityUpdateInfo{TEntity}" /> for replace that also clears
+    ///     the listed <c>Secret</c> attributes (AB#5532). Without a clear entry a replace keeps a stored
+    ///     secret the incoming entity omits or sends as <c>""</c>.
+    /// </summary>
+    /// <param name="rtEntityId">Runtime entity identifier for runtime id and construction kit type</param>
+    /// <param name="rtEntity">Runtime entity to replace</param>
+    /// <param name="clearSecretAttributes">Names (PascalCase) of the Secret attributes to clear</param>
+    public static EntityUpdateInfo<TEntity> CreateReplace(RtEntityId rtEntityId, TEntity rtEntity,
+        IEnumerable<string>? clearSecretAttributes)
+    {
+        return new EntityUpdateInfo<TEntity>(rtEntityId, rtEntity, EntityModOptions.Replace, null,
+            clearSecretAttributes);
+    }
+
+    private static IReadOnlyCollection<string>? NormaliseClearList(IEnumerable<string>? clearSecretAttributes)
+    {
+        if (clearSecretAttributes == null)
+        {
+            return null;
+        }
+
+        var list = clearSecretAttributes
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        return list.Count == 0 ? null : list.AsReadOnly();
     }
 }

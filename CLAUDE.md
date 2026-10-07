@@ -218,7 +218,8 @@ the root `System/Entity` type allocated >60 GB and killed the asset-repo service
   /SystemCkModel        # Base system models
 /tests                  # Test projects
 /samples                # Example implementations
-/devops-build          # CI/CD pipeline definitions
+azure-pipelines.yml     # CI/CD pipeline definition (the legacy /devops-build folder is gone)
+/scripts                # createDocumentation.ps1 and other CI helper scripts
 ```
 
 ## Blueprints and Migrations
@@ -536,9 +537,61 @@ interfaces are added later.
 for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
 `TenantContext` when no DI is wired) but are no longer the registered defaults.
 
+## CK Model Publishing Lanes (CI)
+
+This repo publishes its CK models (`System`, `System.StreamData`, and the test models
+`Test` / `System.TestIdentity`) from **inside the build**, not from a dedicated publish
+step: `Directory.Build.targets`' `CkCompile` target runs `octo-ckc -c publish -c
+$(OctoPublishCatalog) -r` for every project that sets `OctoPublishCkModel=true`. This repo
+is special — it cannot consume its own `Meshmakers.Octo.ConstructionKit.MsBuildTasks`
+package, so it bootstraps through its own `Exec`-based targets. Every other CK-owning repo
+(e.g. octo-identity-services, octo-communication-controller-services) uses the packaged
+targets, which do not re-enter the publish path from a test step.
+
+Two pipeline variables are in play and only one of them is the routing decision. Both come
+from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-templates`
+(pinned here at `tpl-v0.5.3`):
+
+| Variable | Meaning |
+| -------- | ------- |
+| `OctoPublishCatalog` | "where would a GitHub publish go": `PrivateGitHubCatalog` on every branch, `PublicGitHubCatalog` on `r*` tags. The agent exports it as an **environment variable**, so MSBuild picks it up as a global property on any step that does not override it. **Not** the gate. |
+| `effectivePublishCatalog` | The gate. `main` / `refs/tags/r*` → `$(OctoPublishCatalog)`; every other branch → `LocalFileSystemCatalog`. |
+
+Resulting truth table:
+
+| Branch / ref | Catalog that receives System, System.StreamData, Test, System.TestIdentity |
+| ------------ | -------------------------------------------------------------------------- |
+| `refs/heads/main` | `PrivateGitHubCatalog` → `meshmakers/construction-kit-libraries-build` |
+| `refs/tags/r<X.Y.Z>` | `PublicGitHubCatalog` |
+| `refs/heads/test/0.2-dev` | `LocalFileSystemCatalog` (per-run, `Agent.TempDirectory`). The lane catalog `meshmakers/octo-catalog-dev` needs the `publishCkModelsToLaneCatalog` opt-in introduced in `tpl-v0.6.x`; this branch line deliberately does not set it. |
+| `refs/heads/dev/*`, feature branches | `LocalFileSystemCatalog` (per-run) |
+
+**Therefore every MSBuild step that can reach `CkCompile` must pass
+`/p:OctoPublishCatalog="$(effectivePublishCatalog)"` explicitly** — `Build src`,
+`Build samples` and `Test` all do. Omitting it on any one of them lets MSBuild read
+`OctoPublishCatalog` from the environment, which says `PrivateGitHubCatalog` on *every*
+branch, so a non-main build force-publishes into the main-lane catalog (AB#5413).
+
+**Debugging "my model is missing from PrivateGitHubCatalog".** Check the *publish* and the
+*read* halves separately; they fail for completely different reasons:
+
+1. Publish: `git log` in `meshmakers/construction-kit-libraries-build` and
+   `ck-models/v2/<letter>/<Model>/<major>/catalog.json` (`latestVersion`, `publishedAt`).
+   Correlate the timestamp with the CI build. If the commit is there, the pipeline did its
+   job and nothing in this repo is at fault.
+2. Read: the catalog is served over GitHub Pages, whose deploy workflow serializes a burst
+   of publishes and only deploys the final push, so the live tree can lag a cascade by
+   many minutes (AB#4872). On top of that, readers keep a cache at
+   `~/.octo/ck-catalog/cache/private-github-catalog-cache*.json` (60 s max age;
+   repository-scoped file name only on engines carrying the AB#5412 fix).
+3. Which repository is the private slot bound to? `octo-cli -c ListCatalogs` prints the
+   coordinates in the description (AB#5139) — the main installations read
+   `construction-kit-libraries-build`, the 0.2-dev instance reads `octo-catalog-dev`,
+   where `System` still tops out at 2.2.2.
+
 ## Important Notes
 
-- The solution uses Azure Pipelines for CI/CD (devops-build/azure-pipelines.yml)
+- The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)
 - NuGet packages can be published to either public or private feeds depending on configuration
 - Local development uses the DebugL configuration with local package sources
 - Migration YAML files in `ConstructionKit/migrations/` are automatically embedded as resources

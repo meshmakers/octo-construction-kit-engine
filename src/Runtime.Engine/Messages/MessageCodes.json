@@ -119,6 +119,30 @@
       "number": 20,
       "level": "FATALERROR",
       "text": "{tenantId}: RtEntity of CkTypeId '{rtEntityCkTypeId}' needs to be defined at insert."
+    },
+    {
+      "key": "SecretClearAttributeNotSecret",
+      "number": 21,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Attribute '{attributeName}' of entity '{rtEntityCkTypeId}@{rtId}' cannot be cleared: it is not a Secret attribute of the type."
+    },
+    {
+      "key": "SecretClearRequiredAttribute",
+      "number": 22,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Secret attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is required and cannot be cleared."
+    },
+    {
+      "key": "SecretSetAndCleared",
+      "number": 23,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Secret attribute '{attributeCkAttributeId}' of entity '{rtEntityCkTypeId}@{rtId}' is set and cleared in the same operation."
+    },
+    {
+      "key": "MandatorySecretMissing",
+      "number": 24,
+      "level": "FATALERROR",
+      "text": "{tenantId}: Mandatory Secret attribute '{attributePath}' of entity '{rtEntityCkTypeId}@{rtId}' has no value (empty values and placeholders count as not set)."
     }
   ]
 }

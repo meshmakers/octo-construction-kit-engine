@@ -66,9 +66,11 @@ public class RestoreCommand : Command<OctoToolOptions>
                 operationResult);
             if (operationResult.HasErrors || operationResult.HasFatalErrors)
             {
+                // AB#5453 (same failure mode as Publish): returning here left the exit code at 0, so a
+                // restore that produced nothing looked like a successful restore.
                 Logger.LogError("Error loading model configuration \'{FilePath}\'", filePath);
-                operationResult.WriteMessagesToLogger(Logger);
-                return;
+                throw new CompilerException(
+                    $"Construction kit model configuration '{filePath}' could not be restored.", operationResult);
             }
         }
         catch (Exception)

@@ -212,6 +212,17 @@ public CkTypeGraph? GetAndUpdateTypeGraph(
 - No duplicate attribute names through inheritance
 - No conflicting association definitions from base types
 
+#### Secret value type rules (AB#5528)
+
+**File**: `src/ConstructionKit.Engine/Resolvers/SecretAttributeValidator.cs`, called by
+`CatalogModelResolver.CompileAsync` after inheritance resolution, for the model being compiled only.
+A Secret attribute has no `defaultValues` (70), no `autoCompleteValues` / `autoIncrementReference`
+and is no association role attribute (71); its ownership is always `Secret` (72 for a declared
+override, an unset ownership becomes `Secret`); it is not indexed (73) or referenced by display rules
+(74) or owner attribute paths (69); a model using Secret depends on `System >= 2.5` (75); a record
+containing a Secret sub-attribute declares a valid `recordKey` (76, 77). Query columns never include
+Secret attributes (`CkTypeQueryColumnCollector`).
+
 ### Phase 6: Dependency Resolution
 
 **File**: `src/ConstructionKit.Engine/Resolvers/Catalog/CatalogDependencyResolver.cs`

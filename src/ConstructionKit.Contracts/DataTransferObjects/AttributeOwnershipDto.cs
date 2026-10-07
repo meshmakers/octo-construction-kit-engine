@@ -132,6 +132,21 @@ public static class AttributeOwnership
     }
 
     /// <summary>
+    ///     Applies the value-type rule on top of a resolved ownership (AB#5528): a
+    ///     <see cref="AttributeValueTypesDto.Secret" /> attribute is always
+    ///     <see cref="AttributeOwnershipDto.Secret" />, whatever was declared or defaulted. Every other
+    ///     value type keeps <paramref name="resolvedOwnership" />.
+    /// </summary>
+    /// <param name="valueType">The attribute's value type</param>
+    /// <param name="resolvedOwnership">The ownership resolved from the declaration</param>
+    /// <returns>The effective ownership</returns>
+    public static AttributeOwnershipDto ResolveForValueType(AttributeValueTypesDto valueType,
+        AttributeOwnershipDto resolvedOwnership)
+    {
+        return valueType == AttributeValueTypesDto.Secret ? AttributeOwnershipDto.Secret : resolvedOwnership;
+    }
+
+    /// <summary>
     ///     True when the value must not be carried in an exported runtime model
     ///     (<c>ExportRt</c>) — <see cref="AttributeOwnershipDto.RuntimeState" /> because a
     ///     re-import would overwrite live state with stale values (Bug #1458), and

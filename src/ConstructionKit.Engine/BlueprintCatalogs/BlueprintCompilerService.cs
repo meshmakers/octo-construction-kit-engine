@@ -19,16 +19,25 @@ public class BlueprintCompilerService : IBlueprintCompilerService
 
     private readonly IBlueprintSerializer _blueprintSerializer;
     private readonly ILogger<BlueprintCompilerService> _logger;
+    private readonly IBlueprintSecretAttributeResolver? _secretAttributeResolver;
 
     /// <summary>
     /// Creates a new instance of <see cref="BlueprintCompilerService"/>.
     /// </summary>
+    /// <param name="blueprintSerializer">Blueprint serializer</param>
+    /// <param name="logger">Logger</param>
+    /// <param name="secretAttributeResolver">
+    /// Resolves the Secret attributes of the blueprint's CK models for the seed lint (AB#5528,
+    /// decision 9). Without it the lint is skipped.
+    /// </param>
     public BlueprintCompilerService(
         IBlueprintSerializer blueprintSerializer,
-        ILogger<BlueprintCompilerService> logger)
+        ILogger<BlueprintCompilerService> logger,
+        IBlueprintSecretAttributeResolver? secretAttributeResolver = null)
     {
         _blueprintSerializer = blueprintSerializer;
         _logger = logger;
+        _secretAttributeResolver = secretAttributeResolver;
     }
 
     /// <inheritdoc />
@@ -134,6 +143,10 @@ public class BlueprintCompilerService : IBlueprintCompilerService
         // twice across them.
         ValidateSeedData(path, blueprintMeta, blueprintMetaPath, operationResult);
 
+        // Seeds may only leave Secret attributes empty (AB#5528, decisions 2026-10-06 item 1).
+        await LintSecretSeedValuesAsync(path, blueprintMeta, blueprintMetaPath, operationResult, cancellationToken)
+            .ConfigureAwait(false);
+
         // Validate CK model dependencies format
         if (blueprintMeta.CkModelDependencies != null)
         {
@@ -208,6 +221,73 @@ public class BlueprintCompilerService : IBlueprintCompilerService
         }
 
         WarnAboutUnreferencedSeedFiles(blueprintPath, seedDataPaths, blueprintMetaPath, operationResult);
+    }
+
+    /// <summary>
+    /// Runs <see cref="BlueprintSeedSecretLint" /> over every declared seed file. The Secret
+    /// attributes come from the blueprint's <c>ckModelDependencies</c> plus each seed file's own
+    /// <c>dependencies</c>, resolved through the CK catalogs. A model that cannot be resolved is
+    /// reported as a warning - the lint cannot decide for its attributes - never as an error.
+    /// </summary>
+    private async Task LintSecretSeedValuesAsync(string blueprintPath, BlueprintMetaRootDto blueprintMeta,
+        string blueprintMetaPath, OperationResult operationResult, CancellationToken cancellationToken)
+    {
+        if (_secretAttributeResolver == null)
+        {
+            return;
+        }
+
+        var seeds = new List<(string SeedDataPath, YamlStream Yaml)>();
+        foreach (var seedDataPath in BlueprintSeedData.ResolvePaths(blueprintMeta))
+        {
+            var seedDataFullPath = Path.Combine(blueprintPath, seedDataPath.Replace('/', Path.DirectorySeparatorChar));
+            if (!File.Exists(seedDataFullPath))
+            {
+                continue;
+            }
+
+            var yaml = new YamlStream();
+            try
+            {
+                using var reader = new StreamReader(seedDataFullPath);
+                yaml.Load(reader);
+            }
+            catch (YamlDotNet.Core.YamlException)
+            {
+                // Reported by CollectSeedRtIds.
+                continue;
+            }
+
+            seeds.Add((seedDataPath, yaml));
+        }
+
+        if (seeds.Count == 0)
+        {
+            return;
+        }
+
+        var dependencies = new List<CkModelIdVersionRange>(blueprintMeta.CkModelDependencies ?? []);
+        foreach (var seed in seeds)
+        {
+            dependencies.AddRange(BlueprintSeedSecretLint.ReadDependencies(seed.Yaml));
+        }
+
+        var resolution = await _secretAttributeResolver.ResolveAsync(dependencies, cancellationToken)
+            .ConfigureAwait(false);
+        foreach (var unresolved in resolution.UnresolvedModels.Distinct(StringComparer.Ordinal))
+        {
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Warning,
+                blueprintMetaPath,
+                BlueprintSeedSecretLint.UnresolvedModelMessageNumber,
+                $"Secret seed lint: CK model '{unresolved}' could not be resolved from any catalog; seed values "
+                + "of its attributes are not checked."));
+        }
+
+        foreach (var seed in seeds)
+        {
+            BlueprintSeedSecretLint.Lint(seed.Yaml, seed.SeedDataPath, resolution.SecretAttributeIds, operationResult);
+        }
     }
 
     /// <summary>

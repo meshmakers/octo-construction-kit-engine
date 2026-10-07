@@ -228,6 +228,51 @@ public class LocalFileSystemCatalogTests : IDisposable
         Assert.Equal("System-2.4.0", result.ModelId?.FullName);
     }
 
+    // Review M10: lookups trust file existence, so a reader must never see a half-written model file.
+    [Fact]
+    public async Task PublishAsync_ForcedRepublish_ReaderNeverSeesAPartialFile_AndNoTempFilesRemain()
+    {
+        var modelId = new CkModelId("System", "2.5.0");
+        var payload = "{\"start\":true," + new string('x', 2_000_000) + "\"end\":true}";
+        A.CallTo(() => _mockJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
+            .ReturnsLazily((StreamWriter writer, CkCompiledModelRoot _) => writer.WriteAsync(payload));
+        var target = Path.Combine(_tempDirectory, "ck-models", "v2", "s", "System", "2", "ck-system-2.5.0.json");
+
+        await _repository.PublishAsync(new CkCompiledModelRoot { ModelId = modelId }, force: true);
+        using var cts = new CancellationTokenSource();
+        var partialReads = 0;
+        var reader = Task.Run(async () =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    var text = await File.ReadAllTextAsync(target, CancellationToken.None);
+                    if (text.Length != payload.Length)
+                    {
+                        Interlocked.Increment(ref partialReads);
+                    }
+                }
+                catch (IOException)
+                {
+                    // a locked file on Windows is not a partial read
+                }
+            }
+        }, CancellationToken.None);
+
+        for (var i = 0; i < 15; i++)
+        {
+            await _repository.PublishAsync(new CkCompiledModelRoot { ModelId = modelId }, force: true);
+        }
+
+        await cts.CancelAsync();
+        await reader;
+
+        Assert.Equal(0, partialReads);
+        Assert.Empty(Directory.EnumerateFiles(Path.GetDirectoryName(target)!, "*.tmp"));
+        Assert.True((await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.0,3.0)"))).Exists);
+    }
+
     #endregion
 
     #region GetModelAsync Tests

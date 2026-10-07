@@ -282,56 +282,104 @@ public class LocalFileSystemCatalog : CachedCatalog
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
         Directory.CreateDirectory(path);
 
-        var tempFilePath = Path.GetTempFileName();
-
+        // Review M10: lookups trust file existence (AB#5661), so the model file must never be visible half
+        // written. Write next to the target (same file system) and rename it into place; a temp name that does
+        // not match "ck-*.json" is never picked up by EnumerateVersionsOnDisk.
+        var tempFilePath = Path.Combine(path, $".{Path.GetFileName(compiledModelFilePath)}.{Guid.NewGuid():N}.tmp");
         try
-        {
-#if NETSTANDARD2_0
-            using var streamWriter = new StreamWriter(tempFilePath);
-#else
-            await using var streamWriter = new StreamWriter(tempFilePath);
-#endif
-            await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
-            streamWriter.Close();
-        }
-        catch (Exception e)
-        {
-            throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
-        }
-
-        Exception? lastException = null;
-        var i = 0;
-        while (i++ < 20)
         {
             try
             {
-                File.Copy(tempFilePath, compiledModelFilePath, true);
-
-                // Update the major version
-                await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description)
-                    .ConfigureAwait(false);
-
-                // Update the overall model library catalog
-                await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId)
-                    .ConfigureAwait(false);
-
-                // Update the root catalog
-                await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
-
-                // Refresh the in-memory catalog
-                await RefreshCatalogAsync(true).ConfigureAwait(false);
-
-                return;
+#if NETSTANDARD2_0
+                using var streamWriter = new StreamWriter(tempFilePath);
+#else
+                await using var streamWriter = new StreamWriter(tempFilePath);
+#endif
+                await _ckJsonSerializer.SerializeAsync(streamWriter, ckCompiledModel).ConfigureAwait(false);
+                streamWriter.Close();
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                await Task.Delay(100).ConfigureAwait(false);
-                lastException = ex;
+                throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
+            }
+
+            Exception? lastException = null;
+            var i = 0;
+            while (i++ < 20)
+            {
+                try
+                {
+                    MoveIntoPlace(tempFilePath, compiledModelFilePath);
+
+                    // Update the major version
+                    await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description)
+                        .ConfigureAwait(false);
+
+                    // Update the overall model library catalog
+                    await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId)
+                        .ConfigureAwait(false);
+
+                    // Update the root catalog
+                    await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
+
+                    // Refresh the in-memory catalog
+                    await RefreshCatalogAsync(true).ConfigureAwait(false);
+
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    await Task.Delay(100).ConfigureAwait(false);
+                    lastException = ex;
+                }
+            }
+
+            throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, lastException!);
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempFilePath))
+                {
+                    File.Delete(tempFilePath);
+                }
+            }
+            catch (IOException)
+            {
+                // best effort; the name never matches a model file
             }
         }
-
-        throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, lastException!);
     }
+
+    /// <summary>
+    ///     Atomically replaces (or creates) <paramref name="target" /> with <paramref name="source" /> by a
+    ///     rename on the same file system. A copy (the former <c>File.Copy(..., overwrite)</c>) truncates and
+    ///     rewrites the target, so a parallel reader could see a half-written model.
+    /// </summary>
+    private static void MoveIntoPlace(string source, string target)
+    {
+        if (!File.Exists(source))
+        {
+            // Already moved by a previous attempt of the retry loop.
+            return;
+        }
+
+#if NETSTANDARD2_0
+        if (File.Exists(target))
+        {
+            File.Replace(source, target, null);
+        }
+        else
+        {
+            File.Move(source, target);
+        }
+#else
+        File.Move(source, target, overwrite: true);
+#endif
+    }
+
+
 
     private string CreatePath(CkModelId ckModelId)
     {

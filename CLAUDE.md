@@ -652,6 +652,13 @@ although the manifest was on disk (2026-10-06), or resolved a wide range to an o
 stale-pin class of AB#5432 / AB#5359). `ListAsync` / `SearchAsync` still use the cache (listing only).
 Pinned by `LocalFileSystemCatalogTests.IsExistingAsync_WithVersionRange_StaleCache_*`.
 
+**Publish is atomic (review M10).** Because lookups trust file existence, `PublishAsync` writes the model to a
+temp file *in the target directory* (`.ck-<name>-<ver>.json.<guid>.tmp`, never matched by the `ck-*.json`
+enumeration) and renames it into place (`File.Move(..., overwrite: true)`; `File.Replace` on netstandard2.0),
+deleting the temp file in all cases. The former `File.Copy(temp, target, overwrite)` rewrote the target in place, so
+a parallel sibling compile could read a half-written model — and a concurrent reader even made the publish fail
+("being used by another process"). Pinned by `PublishAsync_ForcedRepublish_ReaderNeverSeesAPartialFile_*`.
+
 **Fail fast with the visible versions.** When a dependency range cannot be satisfied,
 `CatalogDependencyResolver` lists the versions each readable catalog knows for that model
 (`... 'System-[2.5,3.0)' does not match any visible version of System (LocalFileSystemCatalog: 2.4.0)`)

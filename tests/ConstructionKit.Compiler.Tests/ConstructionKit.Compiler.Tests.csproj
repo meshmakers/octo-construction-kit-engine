@@ -34,4 +34,13 @@
         <ProjectReference Include="..\..\src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+        <!-- D1: the generator project is a netstandard2.0 Roslyn component; its dependency-free emitters are
+             compiled in directly (same approach as ConstructionKit.Engine.Tests). -->
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkGenerationModelBinder.cs" Link="SourceGeneration\CkGenerationModelBinder.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkTypeCodeGenerator.cs" Link="SourceGeneration\CkTypeCodeGenerator.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\ICkTypeCodeGenerator.cs" Link="SourceGeneration\ICkTypeCodeGenerator.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\AttributeCodeGenerator.cs" Link="SourceGeneration\AttributeCodeGenerator.cs" />
+    </ItemGroup>
+
 </Project>

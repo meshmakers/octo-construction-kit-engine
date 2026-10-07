@@ -718,6 +718,15 @@ to the resolved version of the same name and major (`CkReferenceRewriter.BindMaj
 copy**, so an import persists the version-less form. A reference whose major is not installed stays
 unbound and fails reference resolution.
 
+**Source generation (D1).** The compiled yaml of a range-retaining model holds `System@2/...`, the compile
+cache the generator restores (`obj/octo-ck-cache/*.json`) holds the concrete versions the model was resolved
+against. `CkSourceGenerator` binds the references to the cache's model ids (`CkGenerationModelBinder`, using the
+now public `CkReferenceRewriter`) before any per-element generator looks them up; without it every service model
+that assigns a dependency attribute failed with `OM1003 CkAttributeId 'System@2/Enabled-1' not found in CkCache`
+(first System.Bot). Pinned by `RangeRetentionSourceGenerationTests` (Compiler.Tests links the dependency-free
+generator files). Service repos pick the fix up only with a new `Meshmakers.Octo.ConstructionKit.SourceGeneration`
+package.
+
 **Range identity in the resolvers (D2).** `CkModelIdVersionRange.Equals` means *overlaps* (not transitive,
 inconsistent with `GetHashCode`). The dependency resolvers therefore match queued ranges structurally
 (`IsSameRange`: same name, identical `CkVersionRange`). With range retention `System-[2.5,3.0)` overlaps

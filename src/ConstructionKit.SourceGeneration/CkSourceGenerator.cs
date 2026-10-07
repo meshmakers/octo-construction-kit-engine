@@ -150,6 +150,13 @@ public class CkSourceGenerator : IIncrementalGenerator
                 return;
             }
 
+            // D1: bind System@2/... references of a range-retaining model to the versions of the compile cache.
+            var bound = CkGenerationModelBinder.BindToCache(ckCompiledModelRoot, ckCacheService, tenantId);
+            if (bound > 0)
+            {
+                LogDiagnostic(DiagnosticSeverity.Info, $"Bound {bound} major-qualified reference(s) to the compile cache");
+            }
+
             var ns =
                 $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.Name}.v{ckCompiledModelRoot.ModelId.Version.Major.ToString()}";
 

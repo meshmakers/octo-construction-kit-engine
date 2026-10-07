@@ -11,7 +11,7 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 ///     AB#5669) interface member attributes, <c>implements</c> entries and method parameter/result record and enum
 ///     references.
 /// </summary>
-internal static class CkReferenceRewriter
+public static class CkReferenceRewriter
 {
     /// <summary>
     ///     Applies <paramref name="map" /> to the model id of every element reference in place.

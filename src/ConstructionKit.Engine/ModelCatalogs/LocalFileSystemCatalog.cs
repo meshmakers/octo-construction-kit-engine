@@ -140,6 +140,100 @@ public class LocalFileSystemCatalog : CachedCatalog
     }
 
     /// <inheritdoc />
+    /// <remarks>
+    ///     AB#5661: answered from the compiled model files on disk, not from the cache file. The cache is
+    ///     shared by every <c>octo-ckc</c> process of a parallel build; a concurrent publish of a sibling
+    ///     model could overwrite it with a snapshot taken before another model was published, after which
+    ///     a dependent compile reported "Dependencies 'System-[2.4,3.0)' are unknown" while the manifest
+    ///     was already on disk (or resolved a range to an older version). Enumerating one model's directory
+    ///     is cheap and cannot be stale.
+    /// </remarks>
+    public override Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange modelIdVersionRange,
+        object? sourceIdentifier = null)
+    {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
+        var candidate = EnumerateVersionsOnDisk(modelIdVersionRange.Name)
+            .Where(v => modelIdVersionRange.ModelVersionRange.IsSatisfiedBy(v))
+            .OrderBy(v => v)
+            .Select(v => (CkVersion?)v)
+            .LastOrDefault();
+
+        return Task.FromResult(new ModelExistingResult
+        {
+            Exists = candidate != null,
+            ModelId = candidate != null ? new CkModelId(modelIdVersionRange.Name, candidate.Value) : null,
+            CatalogName = CatalogName,
+            // Answered live from the files on disk, so the "cache" it was answered from is current.
+            CacheUpdatedAt = DateTime.UtcNow
+        });
+    }
+
+    /// <inheritdoc />
+    /// <remarks>AB#5661: answered from the file system — see <see cref="IsExistingAsync(CkModelIdVersionRange, object?)" />.</remarks>
+    public override Task<bool> IsExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
+    {
+        if (!CanRead)
+        {
+            throw ModelCatalogException.CatalogNotEnabledToRead(CatalogName);
+        }
+
+        return Task.FromResult(TryGetExistingModelPath(modelId, out _));
+    }
+
+    /// <summary>
+    ///     Enumerates the versions of a model whose compiled file exists on disk
+    ///     (<c>ck-models/v2/&lt;letter&gt;/&lt;Name&gt;/&lt;major&gt;/ck-&lt;name&gt;-&lt;version&gt;.json</c>, the
+    ///     layout written by <see cref="PublishAsync" />).
+    /// </summary>
+    private IEnumerable<CkVersion> EnumerateVersionsOnDisk(string modelName)
+    {
+        if (string.IsNullOrEmpty(modelName))
+        {
+            yield break;
+        }
+
+        var modelPath = Path.Combine(_options.Value.RootPath, RootPath, modelName[0].ToString().ToLower(), modelName);
+        if (!Directory.Exists(modelPath))
+        {
+            yield break;
+        }
+
+        var prefix = $"ck-{modelName.ToLower()}-";
+        foreach (var majorDirectory in Directory.EnumerateDirectories(modelPath))
+        {
+            if (!int.TryParse(Path.GetFileName(majorDirectory), out _))
+            {
+                continue;
+            }
+
+            foreach (var file in Directory.EnumerateFiles(majorDirectory, "ck-*.json"))
+            {
+                var fileName = Path.GetFileNameWithoutExtension(file);
+                if (!fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                CkVersion version;
+                try
+                {
+                    version = new CkVersion(fileName.Substring(prefix.Length));
+                }
+                catch (Exception e) when (e is ArgumentException or FormatException or OverflowException)
+                {
+                    continue;
+                }
+
+                yield return version;
+            }
+        }
+    }
+
+    /// <inheritdoc />
     public override async Task<CkCompiledModelRoot> GetAsync(CkModelId modelId, OperationResult operationResult,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {

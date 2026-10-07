@@ -31,7 +31,9 @@ internal class CatalogDependencyResolver(
                 operationResult.AddMessage(MessageCodes.UnknownCkModel(originFileResolver.Resolve(ckDependency),
                     ckDependency));
             }
-            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds);
+            throw ModelValidationException.UnknownCkModels(resolveResult.UnresolvedDependencyModelIds,
+                await DescribeVisibleVersionsAsync(resolveResult.UnresolvedDependencyModelIds, sourceIdentifier)
+                    .ConfigureAwait(false));
         }
 
         // Return all resolved dependencies including transitive ones so that the
@@ -46,6 +48,34 @@ internal class CatalogDependencyResolver(
     {
         return HardResolveDependenciesAsync(dependencies.Select(x => x.ToVersionRange()).ToList(), ckModelGraph,
             variableResolver, originFileResolver, operationResult, sourceIdentifier);
+    }
+
+    /// <summary>
+    ///     AB#5661: lists the versions the catalogs know for each unresolved dependency, for the fail-fast
+    ///     message. Best effort — a catalog that cannot be listed is left out rather than masking the
+    ///     original error.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> DescribeVisibleVersionsAsync(
+        IEnumerable<CkModelIdVersionRange> unresolved, object? sourceIdentifier)
+    {
+        var result = new Dictionary<string, string>();
+        foreach (var name in unresolved.Select(u => u.Name).Distinct())
+        {
+            try
+            {
+                var versions = await catalogManager.Value.ListVersionsAsync(name, sourceIdentifier)
+                    .ConfigureAwait(false);
+                result[name] = string.Join(", ", versions
+                    .GroupBy(v => v.CatalogName)
+                    .Select(g => $"{g.Key}: {string.Join(", ", g.Select(v => v.ModelId.Version))}"));
+            }
+            catch (Exception e)
+            {
+                logger.LogDebug(e, "Could not list catalog versions of {CkModelName}", name);
+            }
+        }
+
+        return result;
     }
 
     private async Task<DependencyResolveResult> Resolve(ICollection<CkModelIdVersionRange> ckRootDependencies,

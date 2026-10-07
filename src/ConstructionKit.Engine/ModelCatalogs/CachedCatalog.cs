@@ -53,7 +53,12 @@ public abstract class CachedCatalog(
     public abstract bool IsSupportingSourceIdentifier(object? sourceIdentifier = null);
 
     /// <inheritdoc />
-    public async Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange modelIdVersionRange,
+    /// <remarks>
+    ///     Answered from the cache file. Virtual so that a catalog whose source is cheap to read directly
+    ///     (<see cref="LocalFileSystemCatalog" />) can answer from the source of truth instead — the cache
+    ///     can be stale when another process publishes concurrently (AB#5661).
+    /// </remarks>
+    public virtual async Task<ModelExistingResult> IsExistingAsync(CkModelIdVersionRange modelIdVersionRange,
         object? sourceIdentifier = null)
     {
         if (!CanRead)
@@ -103,7 +108,8 @@ public abstract class CachedCatalog(
     }
 
     /// <inheritdoc />
-    public async Task<bool> IsExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
+    /// <remarks>Virtual — see <see cref="IsExistingAsync(CkModelIdVersionRange, object?)" />.</remarks>
+    public virtual async Task<bool> IsExistingAsync(CkModelId modelId, object? sourceIdentifier = null)
     {
         if (!CanRead)
         {

@@ -181,6 +181,53 @@ public class LocalFileSystemCatalogTests : IDisposable
         Assert.Equal("1.2.0", result.ModelId?.Version.ToString());
     }
 
+    // AB#5661: a parallel build shares the cache file; a concurrent publish can overwrite it with a
+    // snapshot taken before a sibling model was published. Lookups must answer from disk, not the cache.
+    [Fact]
+    public async Task IsExistingAsync_WithVersionRange_StaleCache_ResolvesVersionPublishedOnDisk()
+    {
+        await PublishModel(new CkModelId("System", "2.4.0"), null);
+        // Cache file is fresh and only knows 2.4.0; 2.5.0 lands on disk without refreshing it.
+        WriteCompiledModelFileOnly(new CkModelId("System", "2.5.0"));
+
+        var floorAtNewMinor = await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.5,3.0)"));
+        var wideRange = await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.0,3.0)"));
+        var exact = await _repository.IsExistingAsync(new CkModelId("System", "2.5.0"));
+
+        Assert.True(floorAtNewMinor.Exists);
+        Assert.Equal("System-2.5.0", floorAtNewMinor.ModelId?.FullName);
+        Assert.Equal("System-2.5.0", wideRange.ModelId?.FullName);
+        Assert.True(exact);
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_WithVersionRange_StaleCacheListsDeletedVersion_DoesNotResolveIt()
+    {
+        await PublishModel(new CkModelId("System", "2.4.0"), null);
+        await PublishModel(new CkModelId("System", "2.5.0"), null);
+        File.Delete(Path.Combine(_tempDirectory, "ck-models", "v2", "s", "System", "2", "ck-system-2.5.0.json"));
+
+        var result = await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.0,3.0)"));
+
+        Assert.Equal("System-2.4.0", result.ModelId?.FullName);
+        Assert.False(await _repository.IsExistingAsync(new CkModelId("System", "2.5.0")));
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_WithVersionRange_IgnoresForeignAndMalformedFiles()
+    {
+        WriteCompiledModelFileOnly(new CkModelId("System", "2.4.0"));
+        var majorDir = Path.Combine(_tempDirectory, "ck-models", "v2", "s", "System", "2");
+        await File.WriteAllTextAsync(Path.Combine(majorDir, "ck-system-not.a.version.json"), "{}",
+            TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(majorDir, "ck-other-9.9.9.json"), "{}",
+            TestContext.Current.CancellationToken);
+
+        var result = await _repository.IsExistingAsync(new CkModelIdVersionRange("System", "[2.0,10.0)"));
+
+        Assert.Equal("System-2.4.0", result.ModelId?.FullName);
+    }
+
     #endregion
 
     #region GetModelAsync Tests
@@ -574,6 +621,15 @@ public class LocalFileSystemCatalogTests : IDisposable
         File.WriteAllText(compiledModelFilePath, "{}");
     }
 
+
+    /// <summary>Writes a compiled model file in the published layout without touching any index or the cache.</summary>
+    private void WriteCompiledModelFileOnly(CkModelId modelId)
+    {
+        var majorDir = Path.Combine(_tempDirectory, "ck-models", "v2", modelId.Name[0].ToString().ToLower(),
+            modelId.Name, modelId.Version.Major.ToString());
+        Directory.CreateDirectory(majorDir);
+        File.WriteAllText(Path.Combine(majorDir, $"ck-{modelId.Name.ToLower()}-{modelId.Version}.json"), "{}");
+    }
 
     private async Task PublishModel(CkModelId modelId, string? description)
     {

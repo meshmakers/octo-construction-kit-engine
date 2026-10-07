@@ -628,6 +628,40 @@ assembly.
    `construction-kit-libraries-build`, the 0.2-dev instance reads `octo-catalog-dev`,
    where `System` still tops out at 2.2.2.
 
+## Sibling CK Models and the Local Catalog (AB#5661)
+
+A CK model project that depends on another CK model **built in the same repository / build**
+(System.StreamData → System) must follow two rules, or a parallel build can compile the dependent
+against a stale or missing version of its sibling:
+
+1. **Ordering — ProjectReference.** The dependent project references the dependency's project
+   (`StreamDataCkModel.csproj` → `SystemCkModel.csproj`). `CkCompile` runs as the first dependency of
+   `PrepareResources`, i.e. after `ResolveProjectReferences` built (and, with `OctoPublishCkModel=true`,
+   published to the `LocalFileSystemCatalog`) the referenced model. Without the reference MSBuild may
+   build both in parallel.
+2. **Visibility — local catalog enabled.** The dependent sets `OctoLocalCatalogIsEnabled=true`, otherwise
+   octo-ckc only sees the remote catalog caches, which know only already-published versions (AB#5532).
+
+**The local catalog answers lookups from disk, not from its cache file.** `LocalFileSystemCatalog`
+overrides both `IsExistingAsync` overloads to enumerate the compiled files
+(`ck-models/v2/<letter>/<Name>/<major>/ck-<name>-<version>.json`) instead of reading
+`<root>/cache/local-catalog-cache.json`. That cache file is shared by every octo-ckc process of a
+parallel build, and a concurrent publish could overwrite it with a snapshot taken before a sibling model
+was published; the dependent compile then failed with `Dependencies 'System-[2.4,3.0)' are unknown`
+although the manifest was on disk (2026-10-06), or resolved a wide range to an older version (the
+stale-pin class of AB#5432 / AB#5359). `ListAsync` / `SearchAsync` still use the cache (listing only).
+Pinned by `LocalFileSystemCatalogTests.IsExistingAsync_WithVersionRange_StaleCache_*`.
+
+**Fail fast with the visible versions.** When a dependency range cannot be satisfied,
+`CatalogDependencyResolver` lists the versions each readable catalog knows for that model
+(`... 'System-[2.5,3.0)' does not match any visible version of System (LocalFileSystemCatalog: 2.4.0)`)
+and names the ProjectReference rule (`DependencyResolutionMessageTests`).
+
+Other repositories with sibling CK models must follow the same two rules (checked 2026-10-07:
+`octo-construction-kit` — `Basic.Energy` and `EnergyCommunity` depend on `Basic` / `Basic.Energy`
+without a ProjectReference; `octo-construction-kit-engine-mongodb` test models depend only on
+System).
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

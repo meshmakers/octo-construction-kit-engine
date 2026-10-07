@@ -105,6 +105,26 @@ public class ModelValidationException : CkModelException
             $"Dependencies '{modelIds}' are unknown construction kit model libraries. This may happen because dependencies to other construction kit models are missing.");
     }
 
+    /// <summary>
+    ///     AB#5661: unknown dependencies with the versions the readable catalogs do know, so a stale or
+    ///     out-of-order build is diagnosable from the message alone.
+    /// </summary>
+    internal static Exception UnknownCkModels(IReadOnlyCollection<CkModelIdVersionRange> unresolvedDependencies,
+        IReadOnlyDictionary<string, string> visibleVersionsByModel)
+    {
+        var modelIds = string.Join(", ",
+            unresolvedDependencies.Select(d => d.ToString(CultureInfo.InvariantCulture)));
+        var details = string.Join("; ", unresolvedDependencies.Select(d =>
+            visibleVersionsByModel.TryGetValue(d.Name, out var versions) && !string.IsNullOrEmpty(versions)
+                ? $"'{d}' does not match any visible version of {d.Name} ({versions})"
+                : $"no catalog knows any version of {d.Name}"));
+        return new ModelValidationException(
+            $"Dependencies '{modelIds}' are unknown construction kit model libraries: {details}. " +
+            "If the dependency is built in the same repository or build, the dependent project must reference it " +
+            "(ProjectReference) so it is compiled and published to the LocalFileSystemCatalog first; otherwise " +
+            "publish the dependency, or check that the dependency range is correct.");
+    }
+
     internal static Exception MultipleVersionsOfCkModel(string modelName, IEnumerable<CkModelId> conflictingModelIds, IEnumerable<CkModelId> originModelIds)
     {
         var versions = string.Join(", ", conflictingModelIds.Select(m => m.FullName));

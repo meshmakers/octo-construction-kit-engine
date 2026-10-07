@@ -1,0 +1,10 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: Serial
+    valueType: String
+  - id: Window
+    valueType: Record
+    valueCkRecordId: ${System}/TimeRange
+  - id: Mode
+    valueType: Enum
+    valueCkEnumId: ${this}/DeviceMode

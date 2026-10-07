@@ -1,0 +1,50 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json
+dependencies:
+- System-2.5.0
+types:
+- isCollectionRoot: true
+  typeId: Device
+  derivedFromCkTypeId: System-2.5.0/Entity-1
+  associations:
+  - id: System-2.5.0/ParentChild-1
+    targetCkTypeId: System-2.5.0/Entity-1
+  displayNameRule: ${Name} (${Serial})
+  attributes:
+  - id: System-2.5.0/Name-1
+    name: Name
+  - id: GoldenDependent-1.0.0/Serial-1
+    name: Serial
+  - id: GoldenDependent-1.0.0/Window-1
+    name: Window
+    isOptional: true
+  - id: GoldenDependent-1.0.0/Mode-1
+    name: Mode
+- typeId: DeviceSettings
+  derivedFromCkTypeId: System-2.5.0/Configuration-1
+associationRoles: []
+attributes:
+- id: Mode
+  valueType: Enum
+  valueCkEnumId: GoldenDependent-1.0.0/DeviceMode-1
+- id: Serial
+  valueType: String
+- id: Window
+  valueType: Record
+  valueCkRecordId: System-2.5.0/TimeRange-1
+records:
+- recordId: Reading
+  attributes:
+  - id: GoldenDependent-1.0.0/Serial-1
+    name: Serial
+  - id: System-2.5.0/Name-1
+    name: Name
+    isOptional: true
+enums:
+- enumId: DeviceMode
+  values:
+  - key: 0
+    name: Off
+  - key: 1
+    name: On
+modelId: GoldenDependent-1.0.0
+description: 'CK v1 golden fixture with a dependency (review L18): derives from, assigns attributes of, associates with and uses a record of System.'

@@ -1,0 +1,113 @@
+{
+  "$schema": "https://schemas.meshmakers.cloud/construction-kit-compiled.schema.json",
+  "dependencies": [
+    "System-2.5.0"
+  ],
+  "types": [
+    {
+      "isCollectionRoot": true,
+      "typeId": "Device-1",
+      "derivedFromCkTypeId": "System-2.5.0/Entity-1",
+      "isFinal": false,
+      "isAbstract": false,
+      "associations": [
+        {
+          "id": "System-2.5.0/ParentChild-1",
+          "targetCkTypeId": "System-2.5.0/Entity-1"
+        }
+      ],
+      "enableChangeStreamPreAndPostImages": false,
+      "displayNameRule": "${Name} (${Serial})",
+      "attributes": [
+        {
+          "id": "System-2.5.0/Name-1",
+          "name": "Name",
+          "isOptional": false
+        },
+        {
+          "id": "GoldenDependent-1.0.0/Serial-1",
+          "name": "Serial",
+          "isOptional": false
+        },
+        {
+          "id": "GoldenDependent-1.0.0/Window-1",
+          "name": "Window",
+          "isOptional": true
+        },
+        {
+          "id": "GoldenDependent-1.0.0/Mode-1",
+          "name": "Mode",
+          "isOptional": false
+        }
+      ]
+    },
+    {
+      "isCollectionRoot": false,
+      "typeId": "DeviceSettings-1",
+      "derivedFromCkTypeId": "System-2.5.0/Configuration-1",
+      "isFinal": false,
+      "isAbstract": false,
+      "enableChangeStreamPreAndPostImages": false
+    }
+  ],
+  "associationRoles": [],
+  "attributes": [
+    {
+      "id": "Mode-1",
+      "valueType": "Enum",
+      "valueCkEnumId": "GoldenDependent-1.0.0/DeviceMode-1",
+      "isRuntimeState": false
+    },
+    {
+      "id": "Serial-1",
+      "valueType": "String",
+      "isRuntimeState": false
+    },
+    {
+      "id": "Window-1",
+      "valueType": "Record",
+      "valueCkRecordId": "System-2.5.0/TimeRange-1",
+      "isRuntimeState": false
+    }
+  ],
+  "records": [
+    {
+      "recordId": "Reading-1",
+      "isFinal": false,
+      "isAbstract": false,
+      "attributes": [
+        {
+          "id": "GoldenDependent-1.0.0/Serial-1",
+          "name": "Serial",
+          "isOptional": false
+        },
+        {
+          "id": "System-2.5.0/Name-1",
+          "name": "Name",
+          "isOptional": true
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "enumId": "DeviceMode-1",
+      "useFlags": false,
+      "isExtensible": false,
+      "values": [
+        {
+          "key": 0,
+          "name": "Off",
+          "isExtension": false
+        },
+        {
+          "key": 1,
+          "name": "On",
+          "isExtension": false
+        }
+      ]
+    }
+  ],
+  "modelId": "GoldenDependent-1.0.0",
+  "description": "CK v1 golden fixture with a dependency (review L18): derives from, assigns attributes of, associates with and uses a record of System."
+}

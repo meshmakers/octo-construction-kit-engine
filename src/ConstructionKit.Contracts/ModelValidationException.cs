@@ -161,6 +161,9 @@ public class ModelValidationException : CkModelException
             $"Conflicting versions are referenced by: {origins}. " +
             "This typically happens when different catalogs (LocalFileSystem, public/private GitHub) hold dependents that pin different versions of the same model. " +
             "Resolutions: rebuild the conflicting dependents against a single common version, narrow the dependency range in the consumer's ckModel.yaml, " +
-            "or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled).");
+            "or disable catalogs that hold stale entries (MSBuild properties OctoPublicGitHubCatalogIsEnabled / OctoPrivateGitHubCatalogIsEnabled). " +
+            "With range retention (OctoCkRangeRetention=true) this also happens when an exact-pinned (classic) dependency and a range " +
+            "on the same model resolve to different versions: the catalog resolver resolves every range on its own (highest in range) " +
+            "and does not search for one version satisfying all of them — rebuild the exact-pinned dependency with range retention.");
     }
 }

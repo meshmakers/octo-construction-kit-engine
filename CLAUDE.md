@@ -742,6 +742,16 @@ one matching element" when a System minor was imported into a tenant holding exa
 range-retaining models (or silently merged the range into the wrong exact entry). Pinned by
 `RangeRetentionRepositoryResolverTests`. `Equals` itself is unchanged (other callers rely on it).
 
+**Known limitation — mixed pins in the catalog (review N4).** The catalog resolver resolves every queued range on
+its own (highest catalog version in range). When a range-retaining compile pulls in a classic exact pin
+(`System-[2.5.0]` via an exact-pinned dependency) and a range (`System-[2.5,3.0)`) and the catalog already holds
+a newer minor, the two resolve to different versions and the compile fails with error 66 (`Multiple versions of
+construction kit model 'System'`), even though 2.5.0 satisfies both. Chosen over a per-name solver as the smaller
+safe option: the error is deterministic and names the fix (rebuild the exact-pinned dependency with range
+retention — the planned one-time re-pin). The repository side is not affected: a tenant has exactly one installed
+version, so the exact pin fails on its own (`ResolveFailed`) and the range resolves. Pinned by
+`RangeRetentionCompileTests.FlagOn_ClassicExactPinAndRangeOnSameModel_FailWithMultipleVersions`.
+
 The CK SemVer diff does not classify `DependencyRanges` yet (documented exclusion, Phase 2 F2.1). The
 element schemas accept `@` in the model part of a reference; the compiled schema accepts
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema

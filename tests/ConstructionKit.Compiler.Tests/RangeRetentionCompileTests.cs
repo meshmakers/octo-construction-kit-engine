@@ -208,6 +208,37 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Equal("2.4.1", compiled.DependencyRanges!.Single().Floor);
     }
 
+    // Review N4 (documented limitation): a classic exact pin and a range on the same model are resolved
+    // independently in the catalog; when they pick different versions the compile fails with error 66, even if
+    // one version would satisfy both.
+    [Fact]
+    public async Task FlagOn_ClassicExactPinAndRangeOnSameModel_FailWithMultipleVersions()
+    {
+        await PublishSystemsAsync(_on, "2.5.0");
+        await PublishSystemsAsync(_off, "2.5.0");
+        var classic = await _off.CompileAsync(_off.WriteSource("bot", "Bot-1.0.0", ["System-[2.5,3.0)"],
+            new Dictionary<string, string>
+            {
+                ["types/b.yaml"] = "types:\n  - typeId: BotThing\n    derivedFromCkTypeId: ${System}/Entity\n"
+            }));
+        Assert.Equal(["System-2.5.0"], classic.Dependencies!.Select(d => d.FullName));
+        await _on.Services.GetRequiredService<ICatalogService>().PublishAsync(
+            Engine.ModelCatalogs.LocalFileSystemCatalog.Name, classic, new OriginFileResolver("bot"), true);
+        await PublishSystemsAsync(_on, "2.6.0");
+
+        var source = _on.WriteSource("mixed", "Mixed-1.0.0", ["System-[2.5,3.0)", "Bot-[1.0,2.0)"],
+            new Dictionary<string, string>
+            {
+                ["types/m.yaml"] = "types:\n  - typeId: Mixed\n    derivedFromCkTypeId: ${Bot}/BotThing\n"
+            });
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(() => _on.CompileAsync(source));
+
+        Assert.Contains("Multiple versions of construction kit model 'System'", exception.Message);
+        Assert.Contains("System-2.5.0", exception.Message);
+        Assert.Contains("System-2.6.0", exception.Message);
+        Assert.Contains("rebuild the exact-pinned dependency with range retention", exception.Message);
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

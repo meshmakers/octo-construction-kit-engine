@@ -253,6 +253,17 @@ internal class CkModelUpgradeService : ICkModelUpgradeService
                             "CK model upgrade refused for tenant {TenantId}: {Refusal}",
                             tenantId, upgradeInfo.ErrorMessage);
 
+                        // When the installed version came from the schema alone (no history row),
+                        // pin it now. Otherwise the retry on the next start (which reads the history
+                        // only) would see "no entry" and record the TARGET as a first installation —
+                        // the silent skip again, one restart later.
+                        if (!hasHistoryEntry.Contains(modelName))
+                        {
+                            await RecordInstalledVersionAsync(tenantId,
+                                    new CkModelId(modelName, installedVersion), cancellationToken)
+                                .ConfigureAwait(false);
+                        }
+
                         result.FailedModels.Add(upgradeInfo);
                         result.Errors.Add(upgradeInfo.ErrorMessage);
                         result.Success = false;

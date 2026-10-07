@@ -240,6 +240,45 @@ public class CkModelUpgradeServiceTests
             .MustNotHaveHappened();
     }
 
+    /// <summary>
+    ///     AB#4924 (G3): when the installed version is only known from the schema (no history row),
+    ///     the refusal pins it in the MigrationHistory. Otherwise the next start's retry, which reads
+    ///     the history only, would find no entry and record the TARGET as a first installation.
+    /// </summary>
+    [Fact]
+    public async Task UpgradeModelsAsync_NoMigrationPathAcrossMajor_WithoutHistory_ShouldPinInstalledVersion()
+    {
+        // Arrange
+        var ct = TestContext.Current.CancellationToken;
+        var tenantId = "tenant1";
+        var modelIds = new List<CkModelIdVersionRange>
+        {
+            new("System.Communication", "4.5.0")
+        };
+
+        var repository = SetupRepositoryWithHistory(tenantId, new Dictionary<string, string>(), ct);
+        var recorded = new RtEntity();
+        A.CallTo(() => repository.CreateTransientRtEntityByRtCkIdAsync(A<RtCkId<CkTypeId>>._))
+            .Returns(Task.FromResult(recorded));
+
+        A.CallTo(() => _migrationService.FindMigrationPathAsync(
+                new CkModelId("System.Communication", "3.40.0"), new CkModelId("System.Communication", "4.5.0"), ct))
+            .Returns((CkMigrationPath?)null);
+
+        var schemaVersions = new Dictionary<string, string> { ["System.Communication"] = "3.40.0" };
+
+        // Act
+        var result = await _upgradeService.UpgradeModelsAsync(tenantId, modelIds, null, schemaVersions, ct);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.Single(result.FailedModels);
+        A.CallTo(() => repository.CreateTransientRtEntityByRtCkIdAsync(A<RtCkId<CkTypeId>>._))
+            .MustHaveHappenedOnceExactly();
+        Assert.Equal("3.40.0", recorded.GetAttributeStringValueOrDefault("ToVersion"));
+        Assert.Equal("System.Communication", recorded.GetAttributeStringValueOrDefault("CkModelName"));
+    }
+
     [Fact]
     public async Task UpgradeModelsAsync_NoMigrationPathAcrossMajor_ContinueOnError_ShouldProcessRemainingModels()
     {

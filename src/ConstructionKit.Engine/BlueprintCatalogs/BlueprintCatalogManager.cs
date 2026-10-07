@@ -30,23 +30,8 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     public async Task<BlueprintSearchResult> SearchAsync(string searchTerm, int skip, int take,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
-        var allItems = new List<BlueprintCatalogResultItem>();
-
-        foreach (var catalog in _catalogs.OrderBy(c => c.Order))
-        {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
-            {
-                continue;
-            }
-
-            await foreach (var item in catalog.SearchAsync(searchTerm, sourceIdentifier))
-            {
-                if (!allItems.Any(i => i.BlueprintId.Equals(item.BlueprintId)))
-                {
-                    allItems.Add(item);
-                }
-            }
-        }
+        var allItems = await CollectMergedAsync(catalog => catalog.SearchAsync(searchTerm, sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 
         return new BlueprintSearchResult
         {
@@ -59,7 +44,47 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     public async Task<BlueprintListResult> ListAsync(int skip, int take,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
+        var allItems = await CollectMergedAsync(catalog => catalog.ListAsync(sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+
+        return new BlueprintListResult
+        {
+            Items = allItems.Skip(skip).Take(take).ToList(),
+            TotalCount = allItems.Count
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<BlueprintCatalogResultItem>> ListVersionsAsync(string blueprintName,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        if (string.IsNullOrWhiteSpace(blueprintName))
+        {
+            throw new ArgumentException("Blueprint name must not be empty.", nameof(blueprintName));
+        }
+
+        var allItems = await CollectMergedAsync(catalog => catalog.ListAsync(sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+
+        // Already ordered by name, then semantic version.
+        return allItems
+            .Where(item => string.Equals(item.BlueprintId.Name, blueprintName, StringComparison.Ordinal))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Merges the entries of all readable catalogs into one list. A blueprint id present in several
+    /// catalogs is taken from the catalog with the lowest <c>Order</c>. The merged list is sorted
+    /// stably by blueprint name (ordinal), then semantic version, so skip/take pages are stable and
+    /// independent of which catalog serves an entry (AB#5650: appending catalog by catalog pushed
+    /// the private catalog's newer versions behind the first page).
+    /// </summary>
+    private async Task<List<BlueprintCatalogResultItem>> CollectMergedAsync(
+        Func<IBlueprintCatalog, IAsyncEnumerable<BlueprintCatalogResultItem>> enumerate,
+        object? sourceIdentifier, CancellationToken cancellationToken)
+    {
         var allItems = new List<BlueprintCatalogResultItem>();
+        var seenIds = new HashSet<BlueprintId>();
 
         foreach (var catalog in _catalogs.OrderBy(c => c.Order))
         {
@@ -68,20 +93,19 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
                 continue;
             }
 
-            await foreach (var item in catalog.ListAsync(sourceIdentifier))
+            await foreach (var item in enumerate(catalog).WithCancellation(cancellationToken).ConfigureAwait(false))
             {
-                if (!allItems.Any(i => i.BlueprintId.Equals(item.BlueprintId)))
+                if (seenIds.Add(item.BlueprintId))
                 {
                     allItems.Add(item);
                 }
             }
         }
 
-        return new BlueprintListResult
-        {
-            Items = allItems.Skip(skip).Take(take).ToList(),
-            TotalCount = allItems.Count
-        };
+        return allItems
+            .OrderBy(item => item.BlueprintId.Name, StringComparer.Ordinal)
+            .ThenBy(item => item.BlueprintId.Version)
+            .ToList();
     }
 
     /// <inheritdoc />

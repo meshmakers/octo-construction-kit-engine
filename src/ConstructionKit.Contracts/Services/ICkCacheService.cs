@@ -227,6 +227,22 @@ public interface ICkCacheService
     CkRecordGraph GetRtCkRecord(string tenantId, RtCkId<CkRecordId> rtCkRecordId);
 
     /// <summary>
+    ///     CK v2 (AB#5667): returns a <see cref="CkInterfaceGraph" /> from the cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <param name="rtCkInterfaceId">Runtime Construction Kit interface id, e.g. <c>System.Identity/Named-1</c>.</param>
+    /// <returns></returns>
+    /// <exception cref="CkCacheException">The tenant cache or the interface does not exist.</exception>
+    CkInterfaceGraph GetRtCkInterface(string tenantId, RtCkId<CkInterfaceId> rtCkInterfaceId);
+
+    /// <summary>
+    ///     CK v2 (AB#5667): returns all <see cref="CkInterfaceGraph" /> of the tenant cache.
+    /// </summary>
+    /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>
+    /// <returns></returns>
+    IReadOnlyCollection<CkInterfaceGraph> GetRtCkInterfaces(string tenantId);
+
+    /// <summary>
     ///     Returns all available <see cref="CkEnumGraph" /> from the cache.
     /// </summary>
     /// <param name="tenantId">Unique name of the tenant within Octo Instance.</param>

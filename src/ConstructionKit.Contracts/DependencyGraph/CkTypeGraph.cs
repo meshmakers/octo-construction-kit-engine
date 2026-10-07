@@ -46,6 +46,12 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         Associations = new CkGraphDirectedAssociations(ckTypeDto.Associations ?? []);
         _indexes = new List<CkTypeIndexDto>(ckTypeDto.Indexes ?? []);
         Indexes = new ReadOnlyCollection<CkTypeIndexDto>(_indexes);
+        // CK v2 (AB#5667 / AB#5669): declared members; the All* views are completed by the inheritance resolver.
+        DeclaredImplements = ckTypeDto.Implements?.ToList() ?? [];
+        AllImplementedInterfaces = DeclaredImplements;
+        DefinedMethods = ckTypeDto.Methods?.ToList() ?? [];
+        AllMethods = DefinedMethods.GroupBy(m => m.MethodId)
+            .ToDictionary(g => g.Key, g => new CkMethodGraph(ckTypeId, g.First()));
     }
 
     /// <summary>
@@ -68,6 +74,10 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// <param name="displayNameRule"></param>
     /// <param name="displayDescriptionRule"></param>
     /// <param name="ownerAttributePath"></param>
+    /// <param name="declaredImplements">CK v2: interfaces declared on this type</param>
+    /// <param name="allImplementedInterfaces">CK v2: interfaces including inherited ones</param>
+    /// <param name="definedMethods">CK v2: methods declared on this type</param>
+    /// <param name="allMethods">CK v2: methods including inherited ones, keyed by method id</param>
     [JsonConstructor]
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, bool isAbstract, bool isFinal, bool isCollectionRoot,
         IReadOnlyCollection<CkGraphTypeInheritance> baseTypes,
@@ -78,9 +88,18 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         IReadOnlyDictionary<CkId<CkAttributeId>, CkTypeAttributeGraph> allAttributes,
         IReadOnlyCollection<CkTypeIndexDto> indexes, CkGraphDirectedAssociations associations, string description,
         bool enableChangeStreamPreAndPostImages, string? displayNameRule = null, string? displayDescriptionRule = null,
-        string? ownerAttributePath = null)
+        string? ownerAttributePath = null,
+        IReadOnlyCollection<CkId<CkInterfaceId>>? declaredImplements = null,
+        IReadOnlyCollection<CkId<CkInterfaceId>>? allImplementedInterfaces = null,
+        IReadOnlyCollection<CkMethodDto>? definedMethods = null,
+        IReadOnlyDictionary<string, CkMethodGraph>? allMethods = null)
         : base(definedAttributes, allAttributes)
     {
+        // CK v2: trailing + defaulted, STJ binds by name; a cache written before CK v2 has none of these keys.
+        DeclaredImplements = declaredImplements?.ToList() ?? [];
+        AllImplementedInterfaces = allImplementedInterfaces?.ToList() ?? [];
+        DefinedMethods = definedMethods?.ToList() ?? [];
+        AllMethods = allMethods?.ToDictionary(k => k.Key, v => v.Value) ?? new Dictionary<string, CkMethodGraph>();
         DisplayNameRule = displayNameRule;
         DisplayDescriptionRule = displayDescriptionRule;
         OwnerAttributePath = ownerAttributePath;
@@ -208,6 +227,28 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     /// </summary>
     [JsonIgnore]
     public bool OwnerAttributePathDeclared { get; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): the interfaces declared on this type (<c>implements</c>), without inherited ones.
+    /// </summary>
+    public IReadOnlyCollection<CkId<CkInterfaceId>> DeclaredImplements { get; private set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): the interfaces this type implements, including those declared on base types. Completed
+    ///     by the inheritance resolver (see <see cref="InheritInterfaces" />).
+    /// </summary>
+    public IReadOnlyCollection<CkId<CkInterfaceId>> AllImplementedInterfaces { get; private set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5669): the methods declared on this type, without inherited ones.
+    /// </summary>
+    public IReadOnlyCollection<CkMethodDto> DefinedMethods { get; private set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5669): the methods of this type including inherited ones, keyed by method id
+    ///     (e.g. <c>ChangePassword-1</c>). Completed by the inheritance resolver (see <see cref="InheritMethods" />).
+    /// </summary>
+    public IReadOnlyDictionary<string, CkMethodGraph> AllMethods { get; private set; }
     
     /// <summary>
     ///     Returns a string that describes the inheritance chain
@@ -265,6 +306,45 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
         {
             OwnerAttributePath = baseOwnerAttributePath;
         }
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): adds the interfaces of a base type to <see cref="AllImplementedInterfaces" />
+    ///     (set union, own declarations first). Idempotent.
+    /// </summary>
+    /// <param name="fromBase">The base type's declared interfaces</param>
+    internal void InheritInterfaces(IEnumerable<CkId<CkInterfaceId>> fromBase)
+    {
+        var all = AllImplementedInterfaces.ToList();
+        foreach (var ckInterfaceId in fromBase)
+        {
+            if (!all.Contains(ckInterfaceId))
+            {
+                all.Add(ckInterfaceId);
+            }
+        }
+
+        AllImplementedInterfaces = all;
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5669): adds the methods of a base type to <see cref="AllMethods" />. A method id that is already
+    ///     present (declared on this type or inherited from a nearer base) is kept — re-declaring an inherited method
+    ///     is reported by the inheritance resolver (message 100). Idempotent.
+    /// </summary>
+    /// <param name="fromBase">The base type's declared methods</param>
+    internal void InheritMethods(IEnumerable<CkMethodGraph> fromBase)
+    {
+        var all = AllMethods.ToDictionary(k => k.Key, v => v.Value);
+        foreach (var method in fromBase)
+        {
+            if (!all.ContainsKey(method.Definition.MethodId))
+            {
+                all.Add(method.Definition.MethodId, method);
+            }
+        }
+
+        AllMethods = all;
     }
 
     /// <summary>

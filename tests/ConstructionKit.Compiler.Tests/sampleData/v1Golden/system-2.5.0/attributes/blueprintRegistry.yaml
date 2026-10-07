@@ -1,0 +1,67 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: BlueprintInstallation.BlueprintName
+    description: "Name of the installed blueprint (without version)."
+    valueType: String
+  - id: BlueprintInstallation.BlueprintVersion
+    description: "Semantic version of the installed blueprint."
+    valueType: String
+  - id: BlueprintInstallation.InstalledAt
+    description: "Timestamp when the blueprint was first installed in this tenant."
+    valueType: DateTime
+  - id: BlueprintInstallation.LastUpdatedAt
+    description: "Timestamp of the most recent apply (install, update, re-apply, or rollback)."
+    valueType: DateTime
+  - id: BlueprintInstallation.SeedDataChecksum
+    description: "Checksum of the seed-data files applied at the most recent apply, used to detect drift on re-apply."
+    valueType: String
+  - id: BlueprintInstallation.IsDependency
+    description: "True when this blueprint was installed transitively to satisfy another blueprint's dependency, false when it was requested explicitly."
+    valueType: Boolean
+  - id: BlueprintInstallation.ResolvedDependencies
+    description: "Full blueprint identifiers (Name-Version) of dependencies that were resolved and installed alongside this blueprint."
+    valueType: StringArray
+
+  - id: BlueprintHistory.BlueprintName
+    description: "Name of the blueprint involved in this history entry."
+    valueType: String
+  - id: BlueprintHistory.BlueprintVersion
+    description: "Version of the blueprint involved in this history entry."
+    valueType: String
+  - id: BlueprintHistory.AppliedAt
+    description: "Timestamp when the apply operation completed."
+    valueType: DateTime
+  - id: BlueprintHistory.ApplicationMode
+    description: "How the blueprint was applied: Install, Update, Rollback, or Reapply."
+    valueType: String
+  - id: BlueprintHistory.PreviousBlueprintName
+    description: "Name of the previously installed blueprint version, if this entry represents an update or rollback."
+    valueType: String
+  - id: BlueprintHistory.PreviousVersion
+    description: "Previously installed version, if this entry represents an update or rollback."
+    valueType: String
+  - id: BlueprintHistory.EntitiesCreated
+    description: "Number of seed entities created by this apply."
+    valueType: Int
+  - id: BlueprintHistory.EntitiesUpdated
+    description: "Number of seed entities updated by this apply."
+    valueType: Int
+  - id: BlueprintHistory.EntitiesDeleted
+    description: "Number of seed entities deleted by this apply."
+    valueType: Int
+  - id: BlueprintHistory.SeedDataChecksum
+    description: "Checksum of the seed-data files applied in this operation."
+    valueType: String
+
+  - id: BlueprintBackup.BlueprintName
+    description: "Name of the blueprint whose pre-apply state this backup captures."
+    valueType: String
+  - id: BlueprintBackup.BlueprintVersion
+    description: "Version of the blueprint at the time the backup was taken."
+    valueType: String
+  - id: BlueprintBackup.CreatedAt
+    description: "Timestamp when this backup was created (before the corresponding apply)."
+    valueType: DateTime
+  - id: BlueprintBackup.SnapshotJson
+    description: "Serialized snapshot of seed entities (and their attributes) that existed before the apply, used to support rollback."
+    valueType: String

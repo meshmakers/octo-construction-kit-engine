@@ -1,0 +1,32 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Configuration
+    description: "Base type for all configuration types"
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: false
+    isAbstract: true
+  - typeId: TenantConfiguration
+    description: "Configuration for a tenant regarding data version of schema or identity data"
+    derivedFromCkTypeId: ${this}/Configuration
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/ConfigurationValue
+        name: ConfigurationValue
+        isOptional: true
+  - typeId: TenantModeConfiguration
+    description: "Configuration for a tenant if the tenant is in a specific mode, e.g. test mode or maintenance mode"
+    derivedFromCkTypeId: ${this}/Configuration
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/EnvironmentMode
+        name: EnvironmentMode
+      - id: ${this}/MaintenanceLevel
+        name: MaintenanceLevel
+      - id: ${this}/PublishCkModelObservability
+        name: PublishCkModelObservability
+        isOptional: true
+      - id: ${this}/PublishWorkloadObservability
+        name: PublishWorkloadObservability
+        isOptional: true

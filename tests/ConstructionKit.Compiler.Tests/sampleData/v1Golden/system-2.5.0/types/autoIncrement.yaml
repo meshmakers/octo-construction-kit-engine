@@ -1,0 +1,14 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: AutoIncrement
+    description: "Manages auto-incrementing sequences for generating unique identifiers with configurable format and range."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    attributes:
+      - id: ${this}/AutoIncrement.End
+        name: End
+      - id: ${this}/AutoIncrement.Format
+        name: Format
+        isOptional: true
+      - id: ${this}/AutoIncrement.CurrentValue
+        name: CurrentValue

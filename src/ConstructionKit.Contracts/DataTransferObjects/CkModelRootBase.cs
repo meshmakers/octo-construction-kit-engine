@@ -41,4 +41,11 @@ public abstract class CkModelRootBase : CkModelPropertiesDto
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkEnumDto>? Enums { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): returns the interfaces of the model. <c>null</c> when the model declares none.
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkInterfaceDto>? Interfaces { get; set; }
 }

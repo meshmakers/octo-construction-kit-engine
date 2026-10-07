@@ -723,6 +723,30 @@ element schemas accept `@` in the model part of a reference; the compiled schema
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema
 validation, floor violation, resolve against a later minor without recompile, two-level chain).
 
+## CK v2 Phase 0: interfaces, attribute access, methods (AB#5667 / AB#5668 / AB#5669)
+
+Gated by **`ckLanguage: 2`** in `ckModel.yaml` (`CkModelPropertiesDto.CkLanguage`, `null` = 1). A model
+without the key compiles byte-identical to the engine before CK v2 — compiled YAML **and** CK cache JSON
+(`CkV1CompileOutputUnchangedTests` against the frozen golden in
+`tests/ConstructionKit.Compiler.Tests/sampleData/v1Golden`, produced by the pre-CK-v2 engine).
+
+| Key | Where | Contracts |
+| --- | ----- | --------- |
+| `ckLanguage` | `ckModel.yaml` (enum 1/2), compiled model (integer ≥ 1, so a higher version reaches message 91 instead of a schema error) | `CkModelPropertiesDto.CkLanguage`, `EffectiveCkLanguage`, `MaxSupportedCkLanguage` |
+| `interfaces` | new folder `interfaces/*.yaml` (`CompilerStatics.InterfacesFolder`), schema `construction-kit-elements-interface.schema.json` | `CkInterfaceId` (+ STJ/YAML/Newtonsoft converters, `CkIdInterfaceIdConverter`, `RtCkIdInterfaceIdConverter`), `CkInterfaceDto`, `CkInterfaceAttributeDto`, `CkModelRootBase.Interfaces`, `CkElementsRootDto.Interfaces`, `CkInterfaceGraph`, `ICkModelGraph.Interfaces` / `InterfacesByRtCk` / `GetOrCreateInterface`, `CkCacheRoot.Interfaces`, `ICkCacheService.GetRtCkInterface` / `GetRtCkInterfaces` |
+| `implements` | `CkType` / `CkCompiledType` | `CkTypeDto.Implements` (`List<CkId<CkInterfaceId>>`, JSON via `CkIdInterfaceIdListConverter`), `CkTypeGraph.DeclaredImplements` / `AllImplementedInterfaces` |
+| `access` | `CkTypeAttribute` (types, records, association roles) | `CkAttributeAccessDto` (`ReadWrite`/`ReadOnly`/`MethodOnly`/`Hidden`), `AttributeAccess` predicates, `CkTypeAttributeDto.Access` (nullable), `CkTypeAttributeGraph.Access` (effective, init setter like `Ownership`) |
+| `methods` | `CkType` / `CkCompiledType`, schema `construction-kit-elements-method.schema.json` | `CkMethodDto` family (`CkMethodKindDto`, `CkMethodParameterDto`, `CkMethodResultDto`, `CkMethodErrorDto`, `CkMethodAuthorizationDto`, `CkMethodExecutionDto`), `CkTypeDto.Methods`, `CkTypeGraph.DefinedMethods` / `AllMethods` (key = method id), `CkMethodGraph` (`QualifiedMethodId`, `TimeoutSeconds`), `CkMethodIds.Qualify` / `TryParse` (`System.Identity/User.ChangePassword-1`) |
+
+Notes:
+- Interface ids always carry their version on the wire (`Named-1`): the YAML converter writes `FullName`,
+  unlike type ids, because the version is the contract version and the schema requires it.
+- The CK cache JSON omits the CK v2 members while they hold their default (empty collections, access
+  `ReadWrite`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
+  byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
+  `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
+- Message codes **90–109** are reserved for CK v2 Phase 0 (78–89 belong to F0.2).
+
 ## Important Notes
 
 - The solution uses Azure Pipelines for CI/CD (`azure-pipelines.yml` in the repo root)

@@ -125,6 +125,22 @@
         },
         "enableChangeStreamPreAndPostImages": {
           "type": "boolean"
+        },
+        "implements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+          },
+          "description": "CK v2 (AB#5667): interfaces this type implements, e.g. '${System.Identity}/Named-1'. Inherited by derived types. Requires ckLanguage: 2."
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-method.schema.json#/definitions/CkMethod"
+          },
+          "description": "CK v2 (AB#5669): methods of this type. Inherited by derived types. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false,
@@ -258,6 +274,22 @@
         },
         "isCollectionRoot": {
           "type": "boolean"
+        },
+        "implements": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+          },
+          "description": "CK v2 (AB#5667): interfaces this type implements, e.g. '${System.Identity}/Named-1'. Inherited by derived types. Requires ckLanguage: 2."
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-method.schema.json#/definitions/CkMethod"
+          },
+          "description": "CK v2 (AB#5669): methods of this type. Inherited by derived types. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false

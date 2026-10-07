@@ -1,0 +1,14 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+  - enumId: MaintenanceLevels
+    description: This enum defines the maintenance level of a tenant.
+    values:
+      - key: 0
+        name: Off
+        description: The maintenance mode is off, the tenant is fully operational
+      - key: 1
+        name: UserApps
+        description: The user apps are in maintenance mode, the tenant is operational but user apps are not available
+      - key: 2
+        name: FullSystem
+        description: The full system is in maintenance mode, the tenant is not operational

@@ -1,0 +1,14 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: SortOrders
+  description: The sort order of a field.
+  values:
+  - key: 0
+    name: Default
+    description: Default sorting based on data source type
+  - key: 1
+    name: Ascending
+    description: Ascending order
+  - key: 2
+    name: Descending
+    description: Descending order

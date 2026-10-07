@@ -40,6 +40,11 @@
     "description": {
       "type": "string"
     },
+    "ckLanguage": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "CK language version (CK v2, AB#5584). Omitted = 1. Version 2 enables 'interfaces', 'implements', attribute 'access' and 'methods'. Deliberately unbounded here: an engine that reads a compiled model with a higher version than it supports rejects it with message 91 (CkLanguageNotSupported) instead of a schema error."
+    },
     "attributes": {
       "type": "array",
       "items": {
@@ -73,6 +78,13 @@
       "items": {
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-enum.schema.json#/definitions/CkEnum"
+      }
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-interface.schema.json#/definitions/CkInterface"
       }
     },
     "migrations": {

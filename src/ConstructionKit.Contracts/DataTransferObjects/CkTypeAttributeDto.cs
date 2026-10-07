@@ -69,4 +69,13 @@ public class CkTypeAttributeDto
     [JsonConverter(typeof(JsonStringEnumConverter))]
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public AttributeOwnershipDto? Ownership { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5668): how the generic GraphQL CRUD path may touch this assignment. <c>null</c> (omitted) means
+    ///     <see cref="CkAttributeAccessDto.ReadWrite" />. Legal on type, record and association-role assignments;
+    ///     requires <c>ckLanguage: 2</c>. See <see cref="AttributeAccess" />.
+    /// </summary>
+    [YamlMember(Alias = "access", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public CkAttributeAccessDto? Access { get; set; }
 }

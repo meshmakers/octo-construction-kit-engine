@@ -41,6 +41,11 @@ internal static class CompilerStatics
     public const string TypesDirectoryName = "types";
     public const string RecordsDirectoryName = "records";
     public const string EnumsDirectoryName = "enums";
+
+    /// <summary>
+    ///     CK v2 (AB#5667): folder of the interface definitions (<c>interfaces/*.yaml</c>).
+    /// </summary>
+    public const string InterfacesFolder = "interfaces";
     public const string MetadataFile = "ckModel.yaml";
     public const string Sample1Entity = "sampleType1.yaml";
     public const string Sample1Record = "sampleRecord1.yaml";

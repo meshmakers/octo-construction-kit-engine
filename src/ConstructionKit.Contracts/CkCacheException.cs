@@ -91,4 +91,10 @@ public class CkCacheException : CkModelException
     {
         return new CkCacheException($"RtCkEnumId '{rtCkEnumId}' not found in CkCache for tenant '{tenantId}'.");
     }
+
+    internal static Exception RtCkInterfaceNotFound(string tenantId, RtCkId<CkInterfaceId> rtCkInterfaceId)
+    {
+        return new CkCacheException(
+            $"RtCkInterfaceId '{rtCkInterfaceId}' not found in CkCache for tenant '{tenantId}'.");
+    }
 }

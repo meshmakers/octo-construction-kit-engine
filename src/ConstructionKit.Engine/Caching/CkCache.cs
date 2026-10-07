@@ -1,8 +1,10 @@
+using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
@@ -260,16 +262,47 @@ internal class CkCache : IDisposable
         var options = new JsonSerializerOptions
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            TypeInfoResolver = new DefaultJsonTypeInfoResolver { Modifiers = { OmitCkV2Defaults } }
         };
         options.Converters.Add(new CkIdAttributeIdConverter());
         options.Converters.Add(new CkIdAssociationRoleIdConverter());
         options.Converters.Add(new CkIdTypeIdConverter());
         options.Converters.Add(new CkIdRecordIdConverter());
         options.Converters.Add(new CkIdEnumIdConverter());
+        options.Converters.Add(new CkIdInterfaceIdConverter());
 
         options.Converters.Add(new CkModelIdConverter());
         return options;
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#5584): the members added for interfaces, methods and attribute access are omitted from the cache
+    ///     JSON while they hold their default (empty / <see cref="CkAttributeAccessDto.ReadWrite" />), so the cache of a
+    ///     <c>ckLanguage: 1</c> model stays byte-identical to the one written before CK v2. Reading tolerates the
+    ///     missing keys (defaulted constructor parameters / init setters).
+    /// </summary>
+    private static void OmitCkV2Defaults(JsonTypeInfo typeInfo)
+    {
+        if (typeInfo.Kind != JsonTypeInfoKind.Object)
+        {
+            return;
+        }
+
+        foreach (var property in typeInfo.Properties)
+        {
+            if (typeInfo.Type == typeof(CkTypeGraph) && property.Name is "declaredImplements"
+                    or "allImplementedInterfaces" or "definedMethods" or "allMethods" ||
+                typeInfo.Type == typeof(CkCacheRoot) && property.Name == "interfaces")
+            {
+                property.ShouldSerialize = (_, value) => value is IEnumerable enumerable && enumerable.GetEnumerator().MoveNext();
+            }
+            else if (typeInfo.Type == typeof(CkTypeAttributeGraph) && property.Name == "access")
+            {
+                property.ShouldSerialize = (_, value) => value is CkAttributeAccessDto access &&
+                                                         access != CkAttributeAccessDto.ReadWrite;
+            }
+        }
     }
 
     public ICollection<CkModelId> GetCkModelIds()
@@ -459,6 +492,31 @@ internal class CkCache : IDisposable
         }
 
         return ckRecordGraph;
+    }
+
+    public CkInterfaceGraph GetRtCkInterface(RtCkId<CkInterfaceId> rtCkInterfaceId)
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        if (!_modelGraph.InterfacesByRtCk.TryGetValue(rtCkInterfaceId, out var ckInterfaceGraph))
+        {
+            throw CkCacheException.RtCkInterfaceNotFound(TenantId, rtCkInterfaceId);
+        }
+
+        return ckInterfaceGraph;
+    }
+
+    public IReadOnlyCollection<CkInterfaceGraph> GetCkInterfaces()
+    {
+        if (_modelGraph == null)
+        {
+            throw CkCacheException.CacheUnloaded(TenantId);
+        }
+
+        return _modelGraph.Interfaces.Values.ToList();
     }
 
     public CkEnumGraph GetRtCkEnum(RtCkId<CkEnumId> rtCkEnumId)

@@ -1,0 +1,199 @@
+{
+  "$id": "https://schemas.meshmakers.cloud/construction-kit-elements-method.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "definitions": {
+    "CkMethod": {
+      "type": "object",
+      "title": "CkMethod",
+      "description": "A method of a CK type (CK v2, AB#5669; minimal Phase 0 subset). Requires ckLanguage: 2.",
+      "properties": {
+        "methodId": {
+          "type": "string",
+          "pattern": "^[A-Z][a-zA-Z0-9]*-\\d+$",
+          "description": "Element-versioned method id, e.g. 'ChangePassword-1'."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "Instance",
+            "Static"
+          ],
+          "description": "Omitted = Instance. Phase 0 GraphQL generates Instance methods only."
+        },
+        "description": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CkMethodParameter"
+          }
+        },
+        "result": {
+          "$ref": "#/definitions/CkMethodResult"
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/CkMethodError"
+          }
+        },
+        "authorization": {
+          "$ref": "#/definitions/CkMethodAuthorization"
+        },
+        "execution": {
+          "$ref": "#/definitions/CkMethodExecution"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "methodId"
+      ]
+    },
+    "CkMethodParameter": {
+      "type": "object",
+      "title": "CkMethodParameter",
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-zA-Z0-9]*$"
+        },
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "String",
+            "Boolean",
+            "DateTime",
+            "DateTimeOffset",
+            "TimeSpan",
+            "Int",
+            "Int64",
+            "Double",
+            "StringArray",
+            "IntArray",
+            "Enum",
+            "Record"
+          ]
+        },
+        "valueCkRecordId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+        },
+        "valueCkEnumId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+        },
+        "isOptional": {
+          "type": "boolean"
+        },
+        "sensitive": {
+          "type": "boolean",
+          "description": "Never logged, never in audit or traces."
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "valueType"
+      ]
+    },
+    "CkMethodResult": {
+      "type": "object",
+      "title": "CkMethodResult",
+      "description": "Omit 'result' for methods without a result (concept: 'result: none').",
+      "properties": {
+        "valueType": {
+          "type": "string",
+          "enum": [
+            "String",
+            "Boolean",
+            "DateTime",
+            "DateTimeOffset",
+            "TimeSpan",
+            "Int",
+            "Int64",
+            "Double",
+            "StringArray",
+            "IntArray",
+            "Enum",
+            "Record"
+          ]
+        },
+        "valueCkRecordId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+        },
+        "valueCkEnumId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "valueType"
+      ]
+    },
+    "CkMethodError": {
+      "type": "object",
+      "title": "CkMethodError",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "description": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "code"
+      ]
+    },
+    "CkMethodAuthorization": {
+      "type": "object",
+      "title": "CkMethodAuthorization",
+      "properties": {
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Any-of role names (role claim)."
+        },
+        "allowSelf": {
+          "type": "boolean",
+          "description": "Caller 'sub' == target rtId may invoke (instance methods only)."
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Additional required scopes. 'octo_api' is always required."
+        }
+      },
+      "additionalProperties": false
+    },
+    "CkMethodExecution": {
+      "type": "object",
+      "title": "CkMethodExecution",
+      "properties": {
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 300,
+          "description": "Omitted = 15."
+        },
+        "idempotent": {
+          "type": "boolean",
+          "description": "Omitted = false."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

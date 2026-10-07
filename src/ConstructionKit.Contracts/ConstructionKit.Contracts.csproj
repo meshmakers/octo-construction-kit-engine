@@ -45,6 +45,12 @@
         <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-type.schema.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-interface.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
+        <EmbeddedResource Include="Serialization\Schema\construction-kit-elements-method.schema.json">
+          <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </EmbeddedResource>
         <EmbeddedResource Include="Serialization\Schema\construction-kit-elements.schema.json">
           <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </EmbeddedResource>

@@ -28,6 +28,11 @@ public class NewtonCkRecordIdConverter : NewtonCkIdConverter<CkRecordId>;
 public class NewtonCkAssociationRoleIdConverter : NewtonCkIdConverter<CkAssociationRoleId>;
 
 /// <summary>
+/// Converter for <see cref="CkId{CkInterfaceId}"/> to JSON using Newtonsoft.Json (CK v2, AB#5667)
+/// </summary>
+public class NewtonCkInterfaceIdConverter : NewtonCkIdConverter<CkInterfaceId>;
+
+/// <summary>
 ///     Converter for <see cref="CkId{TKey}"/> to JSON using Newtonsoft.Json
 /// </summary>
 public class NewtonCkIdConverter<TKey> : JsonConverter where TKey : IComparable<TKey>, ICkElementId

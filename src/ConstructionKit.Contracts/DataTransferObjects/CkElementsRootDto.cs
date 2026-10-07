@@ -57,4 +57,11 @@ public class CkElementsRootDto
     // ReSharper disable once CollectionNeverUpdated.Global
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkEnumDto>? Enums { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): returns the interfaces of the model. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkInterfaceDto>? Interfaces { get; set; }
 }

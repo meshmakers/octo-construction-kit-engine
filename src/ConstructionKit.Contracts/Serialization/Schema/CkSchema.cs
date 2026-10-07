@@ -22,6 +22,8 @@ public static class CkSchema
     private static readonly Lazy<JsonSchema> AssociationRoleSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-associationRole.schema")));
     private static readonly Lazy<JsonSchema> RecordSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-record.schema")));
     private static readonly Lazy<JsonSchema> EnumSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-enum.schema")));
+    private static readonly Lazy<JsonSchema> InterfaceSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-interface.schema")));
+    private static readonly Lazy<JsonSchema> MethodSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "construction-kit-elements-method.schema")));
     private static readonly Lazy<JsonSchema> MigrationMetaSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "ck-migration-meta.schema")));
     private static readonly Lazy<JsonSchema> MigrationScriptSchemaLazy = new(() => GetSchema(string.Format(SchemaPath, "ck-migration.schema")));
 
@@ -37,6 +39,8 @@ public static class CkSchema
         _ = AssociationRoleSchemaLazy.Value;
         _ = RecordSchemaLazy.Value;
         _ = EnumSchemaLazy.Value;
+        _ = InterfaceSchemaLazy.Value;
+        _ = MethodSchemaLazy.Value;
         _ = MigrationMetaSchemaLazy.Value;
         _ = MigrationScriptSchemaLazy.Value;
     }

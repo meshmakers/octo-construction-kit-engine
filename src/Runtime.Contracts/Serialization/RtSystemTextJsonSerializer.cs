@@ -68,11 +68,13 @@ public static class RtSystemTextJsonSerializer
             new CkRecordIdConverter(),
             new CkAttributeIdConverter(),
             new CkAssociationRoleIdConverter(),
+            new CkInterfaceIdConverter(),
             new RtCkIdTypeIdConverter(),
             new RtCkIdEnumIdConverter(),
             new RtCkIdRecordIdConverter(),
             new RtCkIdAttributeIdConverter(),
             new RtCkIdAssociationRoleIdConverter(),
+            new RtCkIdInterfaceIdConverter(),
             new RtAttributesConverter()
         }
     };

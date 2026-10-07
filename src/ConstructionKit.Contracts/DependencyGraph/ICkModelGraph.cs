@@ -32,6 +32,11 @@ public interface ICkModelGraph
     /// </summary>
     IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums { get; }
 
+    /// <summary>
+    ///     CK v2 (AB#5667): returns the interfaces of the graph.
+    /// </summary>
+    IReadOnlyDictionary<CkId<CkInterfaceId>, CkInterfaceGraph> Interfaces { get; }
+
 
     /// <summary>
     ///     Returns the types of the graph indexed by their runtime construction kit ids.
@@ -57,6 +62,11 @@ public interface ICkModelGraph
     ///     Returns the enums of the graph indexed by their runtime construction kit ids.
     /// </summary>
     IReadOnlyDictionary<RtCkId<CkEnumId>, CkEnumGraph> EnumsByRtCk { get; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): returns the interfaces of the graph indexed by their runtime construction kit ids.
+    /// </summary>
+    IReadOnlyDictionary<RtCkId<CkInterfaceId>, CkInterfaceGraph> InterfacesByRtCk { get; }
 
 
     /// <summary>
@@ -115,6 +125,14 @@ public interface ICkModelGraph
     /// <param name="ckEnumDto"></param>
     /// <returns></returns>
     CkEnumGraph GetOrCreateEnum(CkId<CkEnumId> ckEnumId, CkEnumDto ckEnumDto);
+
+    /// <summary>
+    ///     CK v2 (AB#5667): gets or creates a new interface.
+    /// </summary>
+    /// <param name="ckInterfaceId"></param>
+    /// <param name="ckInterfaceDto"></param>
+    /// <returns></returns>
+    CkInterfaceGraph GetOrCreateInterface(CkId<CkInterfaceId> ckInterfaceId, CkInterfaceDto ckInterfaceDto);
 
     /// <summary>
     /// Gets or creates a new model.

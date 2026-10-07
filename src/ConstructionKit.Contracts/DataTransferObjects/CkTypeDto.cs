@@ -92,4 +92,18 @@ public class CkTypeDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? OwnerAttributePath { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5667): the interfaces this type implements, e.g. <c>${System.Identity}/Named-1</c>. Inherited by
+    ///     derived types. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "implements", DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    [JsonConverter(typeof(CkIdInterfaceIdListConverter))]
+    public List<CkId<CkInterfaceId>>? Implements { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#5669): the methods this type declares. Inherited by derived types. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "methods", DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
+    public List<CkMethodDto>? Methods { get; set; }
 }

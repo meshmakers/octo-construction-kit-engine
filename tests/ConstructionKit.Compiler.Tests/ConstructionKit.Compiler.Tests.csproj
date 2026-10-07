@@ -25,6 +25,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <None Include="sampleData\**">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.Compiler\ConstructionKit.Compiler.csproj" />
     </ItemGroup>
 

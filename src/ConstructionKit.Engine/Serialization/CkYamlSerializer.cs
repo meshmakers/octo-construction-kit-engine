@@ -40,18 +40,21 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationRoleIdConverter())
+            .WithTypeConverter(new CkInterfaceIdConverter())
 
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
+            .WithTypeConverter(new CkIdInterfaceIdConverter())
 
             .WithTypeConverter(new RtCkIdAttributeIdConverter())
             .WithTypeConverter(new RtCkIdTypeIdConverter())
             .WithTypeConverter(new RtCkIdRecordIdConverter())
             .WithTypeConverter(new RtCkIdEnumIdConverter())
             .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
+            .WithTypeConverter(new RtCkIdInterfaceIdConverter())
             .WithEventEmitter(next => new MultilineScalarStyleEmitter(next))
             .Build();
         _deserializer = new DeserializerBuilder()
@@ -63,18 +66,21 @@ internal class CkYamlSerializer : ICkYamlSerializer
             .WithTypeConverter(new CkEnumIdConverter())
             .WithTypeConverter(new CkAttributeIdConverter())
             .WithTypeConverter(new CkAssociationRoleIdConverter())
+            .WithTypeConverter(new CkInterfaceIdConverter())
 
             .WithTypeConverter(new CkIdAttributeIdConverter())
             .WithTypeConverter(new CkIdTypeIdConverter())
             .WithTypeConverter(new CkIdRecordIdConverter())
             .WithTypeConverter(new CkIdEnumIdConverter())
             .WithTypeConverter(new CkIdAssociationRoleIdConverter())
+            .WithTypeConverter(new CkIdInterfaceIdConverter())
 
             .WithTypeConverter(new RtCkIdAttributeIdConverter())
             .WithTypeConverter(new RtCkIdTypeIdConverter())
             .WithTypeConverter(new RtCkIdRecordIdConverter())
             .WithTypeConverter(new RtCkIdEnumIdConverter())
             .WithTypeConverter(new RtCkIdAssociationRoleIdConverter())
+            .WithTypeConverter(new RtCkIdInterfaceIdConverter())
             .IgnoreUnmatchedProperties() // set because $schema is not in the model and we don't want to fail on it
             .Build();
     }

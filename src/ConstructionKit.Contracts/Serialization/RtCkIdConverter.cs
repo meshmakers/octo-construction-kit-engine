@@ -32,6 +32,11 @@ public class RtCkIdRecordIdConverter : RtCkIdConverter<CkRecordId>;
 public class RtCkIdEnumIdConverter : RtCkIdConverter<CkEnumId>;
 
 /// <summary>
+///     Converter for System.Text.Json and YamlDotNet for <see cref="RtCkId{CkInterfaceId}" /> (CK v2, AB#5667)
+/// </summary>
+public class RtCkIdInterfaceIdConverter : RtCkIdConverter<CkInterfaceId>;
+
+/// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="RtCkId{TKey}" />
 /// </summary>
 /// <typeparam name="TKey"></typeparam>

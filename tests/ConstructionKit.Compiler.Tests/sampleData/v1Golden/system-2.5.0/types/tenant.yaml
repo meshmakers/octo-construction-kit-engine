@@ -1,0 +1,20 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+types:
+  - typeId: Tenant
+    description: "Represents a tenant in the multi-tenant system with its unique identifier, parent relationship, and database mapping."
+    derivedFromCkTypeId: ${this}/Entity
+    isFinal: true
+    isAbstract: false
+    attributes:
+      - id: ${this}/TenantId
+        name: TenantId
+      - id: ${this}/ParentTenantId
+        name: ParentTenantId
+        isOptional: true
+      - id: ${this}/DatabaseName
+        name: DatabaseName
+    indexes:
+      - indexType: Ascending
+        fields:
+          - attributePaths:
+              - TenantId

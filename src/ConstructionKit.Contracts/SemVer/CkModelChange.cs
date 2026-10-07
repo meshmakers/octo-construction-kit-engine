@@ -89,7 +89,27 @@ public enum CkModelElementKind
     /// <summary>
     ///     An attribute assignment on an association role.
     /// </summary>
-    AssociationRoleAttribute
+    AssociationRoleAttribute,
+
+    /// <summary>
+    ///     CK v2 (AB#5667): a construction kit interface definition.
+    /// </summary>
+    Interface,
+
+    /// <summary>
+    ///     CK v2 (AB#5667): an attribute member of a construction kit interface.
+    /// </summary>
+    InterfaceAttribute,
+
+    /// <summary>
+    ///     CK v2 (AB#5667): an <c>implements</c> entry of a type.
+    /// </summary>
+    TypeInterface,
+
+    /// <summary>
+    ///     CK v2 (AB#5669): a method of a type.
+    /// </summary>
+    TypeMethod
 }
 
 /// <summary>

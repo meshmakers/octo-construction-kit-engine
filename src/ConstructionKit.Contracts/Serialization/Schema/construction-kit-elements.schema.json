@@ -41,6 +41,13 @@
         "type": "object",
         "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-enum.schema.json#/definitions/CkEnum"
       }
+    },
+    "interfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-interface.schema.json#/definitions/CkInterface"
+      }
     }
   },
   "additionalProperties": false

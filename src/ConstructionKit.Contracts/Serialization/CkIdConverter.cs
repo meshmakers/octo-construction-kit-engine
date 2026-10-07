@@ -32,6 +32,11 @@ public class CkIdRecordIdConverter : CkIdConverter<CkRecordId>;
 public class CkIdEnumIdConverter : CkIdConverter<CkEnumId>;
 
 /// <summary>
+///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{CkInterfaceId}" /> (CK v2, AB#5667)
+/// </summary>
+public class CkIdInterfaceIdConverter : CkIdConverter<CkInterfaceId>;
+
+/// <summary>
 ///     Converter for System.Text.Json and YamlDotNet for <see cref="CkId{TKey}" />
 /// </summary>
 /// <typeparam name="TKey"></typeparam>
@@ -92,5 +97,51 @@ public class CkIdConverter<TKey> : JsonConverter<CkId<TKey>>, IYamlTypeConverter
     public override void Write(Utf8JsonWriter writer, CkId<TKey> value, JsonSerializerOptions options)
     {
         writer.WriteStringValue(value.FullName);
+    }
+}
+
+/// <summary>
+///     System.Text.Json converter for a list of <see cref="CkId{CkInterfaceId}" /> (CK v2 <c>implements</c>, AB#5667).
+///     A <see cref="JsonConverterAttribute" /> on a list property applies to the list, not to its elements, so the
+///     element converter is applied here.
+/// </summary>
+public class CkIdInterfaceIdListConverter : CkIdListConverter<CkInterfaceId>;
+
+/// <summary>
+///     System.Text.Json converter for a list of <see cref="CkId{TKey}" /> that serializes every element as its
+///     full-name string (same shape as <see cref="CkIdConverter{TKey}" />).
+/// </summary>
+/// <typeparam name="TKey"></typeparam>
+public class CkIdListConverter<TKey> : JsonConverter<List<CkId<TKey>>> where TKey : IComparable<TKey>, ICkElementId
+{
+    private readonly CkIdConverter<TKey> _elementConverter = new();
+
+    /// <inheritdoc />
+    public override List<CkId<TKey>> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        if (reader.TokenType != JsonTokenType.StartArray)
+        {
+            throw ModelParseException.UnexpectedToken(typeof(TKey).Name, reader.TokenType, nameof(JsonTokenType.StartArray));
+        }
+
+        var result = new List<CkId<TKey>>();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
+        {
+            result.Add(_elementConverter.Read(ref reader, typeof(CkId<TKey>), options));
+        }
+
+        return result;
+    }
+
+    /// <inheritdoc />
+    public override void Write(Utf8JsonWriter writer, List<CkId<TKey>> value, JsonSerializerOptions options)
+    {
+        writer.WriteStartArray();
+        foreach (var element in value)
+        {
+            _elementConverter.Write(writer, element, options);
+        }
+
+        writer.WriteEndArray();
     }
 }

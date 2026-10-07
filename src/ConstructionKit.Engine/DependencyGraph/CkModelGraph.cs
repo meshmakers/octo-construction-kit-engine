@@ -18,12 +18,14 @@ public class CkModelGraph : ICkModelGraph
     private readonly Dictionary<CkId<CkEnumId>, CkEnumGraph> _enums;
     private readonly Dictionary<CkId<CkRecordId>, CkRecordGraph> _records;
     private readonly Dictionary<CkId<CkTypeId>, CkTypeGraph> _types;
+    private readonly Dictionary<CkId<CkInterfaceId>, CkInterfaceGraph> _interfaces;
 
     private readonly Dictionary<RtCkId<CkTypeId>, CkTypeGraph> _typesByRtCk;
     private readonly Dictionary<RtCkId<CkAttributeId>, CkAttributeGraph> _attributesByRtCk;
     private readonly Dictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph> _associationRolesByRtCk;
     private readonly Dictionary<RtCkId<CkRecordId>, CkRecordGraph> _recordsByRtCk;
     private readonly Dictionary<RtCkId<CkEnumId>, CkEnumGraph> _enumsByRtCk;
+    private readonly Dictionary<RtCkId<CkInterfaceId>, CkInterfaceGraph> _interfacesByRtCk;
 
     /// <summary>
     ///     Creates a new instance of <see cref="CkModelGraph" />.
@@ -35,6 +37,7 @@ public class CkModelGraph : ICkModelGraph
         _associationRoles = new Dictionary<CkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
         _records = new Dictionary<CkId<CkRecordId>, CkRecordGraph>();
         _enums = new Dictionary<CkId<CkEnumId>, CkEnumGraph>();
+        _interfaces = new Dictionary<CkId<CkInterfaceId>, CkInterfaceGraph>();
         _dependencies = new Dictionary<CkModelId, ICollection<CkModelId>>();
         _models = new Dictionary<CkModelId, CkModelPropertiesDto>();
 
@@ -43,6 +46,7 @@ public class CkModelGraph : ICkModelGraph
         _associationRolesByRtCk = new Dictionary<RtCkId<CkAssociationRoleId>, CkAssociationRoleGraph>();
         _recordsByRtCk = new Dictionary<RtCkId<CkRecordId>, CkRecordGraph>();
         _enumsByRtCk = new Dictionary<RtCkId<CkEnumId>, CkEnumGraph>();
+        _interfacesByRtCk = new Dictionary<RtCkId<CkInterfaceId>, CkInterfaceGraph>();
     }
 
     /// <summary>
@@ -56,6 +60,9 @@ public class CkModelGraph : ICkModelGraph
         _associationRoles = ckCacheRoot.AssociationRoles.ToDictionary(k => k.CkRoleId, v => v);
         _records = ckCacheRoot.Records.ToDictionary(k => k.CkRecordId, v => v);
         _enums = ckCacheRoot.Enums.ToDictionary(k => k.CkEnumId, v => v);
+        // CK v2 (AB#5667): a cache written before CK v2 has no interfaces.
+        // ReSharper disable once ConstantNullCoalescingCondition
+        _interfaces = (ckCacheRoot.Interfaces ?? []).ToDictionary(k => k.CkInterfaceId, v => v);
         _dependencies = ckCacheRoot.Dependencies.ToDictionary(k => k.Key, v => v.Value);
         _models = ckCacheRoot.Models.ToDictionary(k => k.ModelId, v => v);
 
@@ -74,6 +81,7 @@ public class CkModelGraph : ICkModelGraph
         _enumsByRtCk =
             new Dictionary<RtCkId<CkEnumId>, CkEnumGraph>(
                 _enums.Values.ToDictionary(k => k.CkEnumId.ToRtCkId(), v => v));
+        _interfacesByRtCk = _interfaces.Values.ToDictionary(k => k.CkInterfaceId.ToRtCkId(), v => v);
     }
 
     /// <summary>
@@ -101,6 +109,12 @@ public class CkModelGraph : ICkModelGraph
     ///     Returns the enums of the model.
     /// </summary>
     public IReadOnlyDictionary<CkId<CkEnumId>, CkEnumGraph> Enums => _enums;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<CkId<CkInterfaceId>, CkInterfaceGraph> Interfaces => _interfaces;
+
+    /// <inheritdoc />
+    public IReadOnlyDictionary<RtCkId<CkInterfaceId>, CkInterfaceGraph> InterfacesByRtCk => _interfacesByRtCk;
 
     /// <inheritdoc />
     public IReadOnlyDictionary<RtCkId<CkTypeId>, CkTypeGraph> TypesByRtCk => _typesByRtCk;
@@ -143,7 +157,8 @@ public class CkModelGraph : ICkModelGraph
             Attributes = _attributes.Values.OrderBy(x => x.CkAttributeId).ToList(),
             AssociationRoles = _associationRoles.Values.OrderBy(x => x.CkRoleId).ToList(),
             Records = _records.Values.OrderBy(x => x.CkRecordId).ToList(),
-            Enums = _enums.Values.OrderBy(x => x.CkEnumId).ToList()
+            Enums = _enums.Values.OrderBy(x => x.CkEnumId).ToList(),
+            Interfaces = _interfaces.Values.OrderBy(x => x.CkInterfaceId).ToList()
         };
     }
 
@@ -245,6 +260,25 @@ public class CkModelGraph : ICkModelGraph
     }
 
     /// <summary>
+    ///     CK v2 (AB#5667): gets or creates a new interface.
+    /// </summary>
+    /// <param name="ckInterfaceId"></param>
+    /// <param name="ckInterfaceDto"></param>
+    /// <returns></returns>
+    public CkInterfaceGraph GetOrCreateInterface(CkId<CkInterfaceId> ckInterfaceId, CkInterfaceDto ckInterfaceDto)
+    {
+        if (_interfaces.TryGetValue(ckInterfaceId, out var ckInterfaceGraph))
+        {
+            return ckInterfaceGraph;
+        }
+
+        ckInterfaceGraph = new CkInterfaceGraph(ckInterfaceId, ckInterfaceDto);
+        _interfaces.Add(ckInterfaceId, ckInterfaceGraph);
+        _interfacesByRtCk.Add(ckInterfaceId.ToRtCkId(), ckInterfaceGraph);
+        return ckInterfaceGraph;
+    }
+
+    /// <summary>
     /// Gets or creates a new model.
     /// </summary>
     /// <param name="ckModelId"></param>
@@ -273,7 +307,8 @@ public class CkModelGraph : ICkModelGraph
     public void AppendModel(CkCompiledModelRoot ckCompiledModelRoot)
     {
         _dependencies.Add(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Dependencies ?? []);
-        GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description);
+        GetOrCreateModel(ckCompiledModelRoot.ModelId, ckCompiledModelRoot.Description).CkLanguage =
+            ckCompiledModelRoot.CkLanguage;
 
         if (ckCompiledModelRoot.Attributes != null)
         {
@@ -315,6 +350,15 @@ public class CkModelGraph : ICkModelGraph
             foreach (var ckEnumDto in ckCompiledModelRoot.Enums)
             {
                 GetOrCreateEnum(new CkId<CkEnumId>(ckCompiledModelRoot.ModelId, ckEnumDto.EnumId), ckEnumDto);
+            }
+        }
+
+        if (ckCompiledModelRoot.Interfaces != null)
+        {
+            foreach (var ckInterfaceDto in ckCompiledModelRoot.Interfaces)
+            {
+                GetOrCreateInterface(new CkId<CkInterfaceId>(ckCompiledModelRoot.ModelId, ckInterfaceDto.InterfaceId),
+                    ckInterfaceDto);
             }
         }
     }

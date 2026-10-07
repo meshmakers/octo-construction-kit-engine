@@ -41,6 +41,13 @@ public class CkCacheRoot
     public List<CkEnumGraph> Enums { get; set; } = [];
 
     /// <summary>
+    ///     CK v2 (AB#5667): returns the interfaces of the graph. A cache written before CK v2 has no
+    ///     <c>interfaces</c> key and deserializes to an empty list.
+    /// </summary>
+    // ReSharper disable once CollectionNeverUpdated.Global
+    public List<CkInterfaceGraph> Interfaces { get; set; } = [];
+
+    /// <summary>
     ///     Returns a list of model dependencies of the graph
     /// </summary>
     // ReSharper disable once CollectionNeverUpdated.Global

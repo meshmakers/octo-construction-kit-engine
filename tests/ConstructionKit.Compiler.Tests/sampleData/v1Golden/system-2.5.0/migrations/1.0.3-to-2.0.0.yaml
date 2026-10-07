@@ -1,0 +1,72 @@
+$schema: https://schemas.meshmakers.cloud/ck-migration.schema.json
+sourceVersion: "1.0.3"
+targetVersion: "2.0.0"
+description: |
+  Migration from System 1.0.3 to 2.0.0.
+
+  This migration transforms all legacy Query entities to the new SimpleRtQuery type.
+  The new query hierarchy introduces:
+  - PersistentQuery: Abstract base type for all queries
+  - SimpleRtQuery: For row/tuple queries with filtering, sorting, and column selection
+  - AggregationRtQuery: For aggregation queries (Count, Min, Max, Avg, Sum)
+  - GroupingAggregationRtQuery: For grouped aggregation queries with GROUP BY
+
+preConditions:
+  - type: EntityExists
+    target:
+      ckTypeId: System/Query
+
+steps:
+  # Step 1: Transform all Query entities to SimpleRtQuery
+  # The legacy Query type maps directly to SimpleRtQuery as both support:
+  # - QueryCkTypeId
+  # - Columns
+  # - Sorting
+  # - FieldFilter
+  # - TextSearchFilter
+  # - AttributeSearchFilter
+  # - Name
+  - stepId: migrate-query-to-simple-rt-query
+    description: "Change CkTypeId from Query to SimpleRtQuery for all existing Query entities"
+    action: Transform
+    target:
+      ckTypeId: System/Query
+      blueprintSourceOnly: false
+    transform:
+      type: ChangeCkType
+      newCkTypeId: System/SimpleRtQuery
+    onConflict: Skip
+    continueOnError: false
+
+  # Step 2: Ensure Description attribute exists (new in PersistentQuery)
+  # SimpleRtQuery inherits from PersistentQuery which has Description as optional
+  # Legacy Query didn't have Description, so we set it to null/empty for migrated entities
+  - stepId: add-description-attribute
+    description: "Add empty Description attribute to migrated queries"
+    action: Update
+    target:
+      ckTypeId: System/SimpleRtQuery
+      filter:
+        attribute: Description
+        operator: NotExists
+    data:
+      Description: null
+    onConflict: Skip
+    continueOnError: true
+
+postValidations:
+  # Verify no legacy Query entities remain
+  - validationId: no-legacy-queries-remain
+    description: "Ensure no entities with legacy Query type exist after migration"
+    type: NoEntitiesOfType
+    target:
+      ckTypeId: System/Query
+    severity: Warning
+
+  # Verify SimpleRtQuery entities exist
+  - validationId: simple-rt-queries-exist
+    description: "Verify that SimpleRtQuery entities were created"
+    type: EntityExists
+    target:
+      ckTypeId: System/SimpleRtQuery
+    severity: Warning

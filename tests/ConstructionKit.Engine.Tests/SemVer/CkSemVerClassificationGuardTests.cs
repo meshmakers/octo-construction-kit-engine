@@ -29,7 +29,16 @@ public class CkSemVerClassificationGuardTests
         typeof(CkTypeAssociationDto),
         typeof(CkTypeIndexDto),
         typeof(CkIndexFieldsDto),
-        typeof(CkAttributeMetaDataDto)
+        typeof(CkAttributeMetaDataDto),
+        // CK v2 (AB#5667 / AB#5669)
+        typeof(CkInterfaceDto),
+        typeof(CkInterfaceAttributeDto),
+        typeof(CkMethodDto),
+        typeof(CkMethodParameterDto),
+        typeof(CkMethodResultDto),
+        typeof(CkMethodErrorDto),
+        typeof(CkMethodAuthorizationDto),
+        typeof(CkMethodExecutionDto)
     ];
 
     public static TheoryData<Type> ElementDtoTypes()

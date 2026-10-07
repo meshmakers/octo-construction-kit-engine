@@ -301,6 +301,28 @@ public class CkCacheService : ICkCacheService
     }
 
     /// <inheritdoc />
+    public CkInterfaceGraph GetRtCkInterface(string tenantId, RtCkId<CkInterfaceId> rtCkInterfaceId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetRtCkInterface(rtCkInterfaceId);
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<CkInterfaceGraph> GetRtCkInterfaces(string tenantId)
+    {
+        if (!_ckCaches.TryGetValue(tenantId, out var ckCache))
+        {
+            throw CkCacheException.CkCacheNotFound(tenantId);
+        }
+
+        return ckCache.GetCkInterfaces();
+    }
+
+    /// <inheritdoc />
     public IEnumerable<CkEnumGraph> GetCkEnums(string tenantId)
     {
         if (!_ckCaches.TryGetValue(tenantId, out var ckCache))

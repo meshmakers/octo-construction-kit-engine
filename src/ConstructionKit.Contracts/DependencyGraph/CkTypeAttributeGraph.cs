@@ -35,6 +35,8 @@ public class CkTypeAttributeGraph
         IsOptional = ckTypeAttributeDto.IsOptional;
         Description = ckAttributeGraph.Description;
         MetaData = ckAttributeGraph.MetaData;
+        // CK v2 (AB#5668): effective access of the assignment, ReadWrite when not declared.
+        Access = AttributeAccess.Resolve(ckTypeAttributeDto.Access);
     }
 
     /// <summary>
@@ -153,6 +155,19 @@ public class CkTypeAttributeGraph
     ///     <see cref="AttributeOwnership.IsExcludedFromExport"/> for that question.
     /// </summary>
     public bool IsRuntimeState => Ownership.IsPreservedOnUpsert();
+
+    /// <summary>
+    ///     CK v2 (AB#5668): EFFECTIVE access of this assignment — the declared
+    ///     <see cref="CkTypeAttributeDto.Access" />, otherwise <see cref="CkAttributeAccessDto.ReadWrite" />.
+    ///     Use the <see cref="AttributeAccess" /> predicates to evaluate it.
+    /// </summary>
+    /// <remarks>
+    ///     Like <see cref="Ownership" />, <c>access</c> is not a <c>[JsonConstructor]</c> parameter: it is
+    ///     deserialized through this init setter, which STJ applies after the constructor. A cache written by an
+    ///     engine that pre-dates CK v2 has no <c>access</c> key and keeps the default
+    ///     <see cref="CkAttributeAccessDto.ReadWrite" />.
+    /// </remarks>
+    public CkAttributeAccessDto Access { get; init; }
 
     /// <summary>
     ///     If true, the attribute is optional, that means it can be null

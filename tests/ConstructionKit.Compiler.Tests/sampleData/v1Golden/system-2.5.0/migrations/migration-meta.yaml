@@ -1,0 +1,8 @@
+$schema: https://schemas.meshmakers.cloud/ck-migration-meta.schema.json
+ckModelId: System-2.0.0
+migrations:
+  - fromVersion: "1.0.3"
+    toVersion: "2.0.0"
+    scriptPath: 1.0.3-to-2.0.0.yaml
+    description: "Migrate legacy Query type to new query hierarchy (SimpleRtQuery, AggregationRtQuery, GroupingAggregationRtQuery)"
+    breaking: true

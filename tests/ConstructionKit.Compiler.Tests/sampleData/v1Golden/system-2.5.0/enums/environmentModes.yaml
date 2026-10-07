@@ -1,0 +1,17 @@
+$schema: https://schemas.meshmakers.cloud/construction-kit-elements.schema.json
+enums:
+- enumId: EnvironmentModes
+  description: This enum defines the different modes a tenant can operate in.
+  values:
+  - key: 0
+    name: Development
+    description: The tenant is in development mode, used for development and testing
+  - key: 1
+    name: Testing
+    description: The tenant is in testing mode, used for quality assurance
+  - key: 2
+    name: Staging
+    description: The tenant is in staging mode, used for pre-production testing
+  - key: 3
+    name: Production
+    description: The tenant is in production mode, used for live operations

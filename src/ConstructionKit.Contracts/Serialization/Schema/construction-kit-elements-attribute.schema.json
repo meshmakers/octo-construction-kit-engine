@@ -38,6 +38,16 @@
             "Secret"
           ],
           "description": "Optional per-assignment override of the attribute definition's 'ownership' (AB#5187). Omit to inherit from the definition. Use it when one shared attribute definition needs a different owner on this type or record - e.g. a shared 'ClientId' that is Secret on FinApiConfiguration but SeedOwned on ServiceAccountConfiguration."
+        },
+        "access": {
+          "type": "string",
+          "enum": [
+            "ReadWrite",
+            "ReadOnly",
+            "MethodOnly",
+            "Hidden"
+          ],
+          "description": "CK v2 (AB#5668): how the generic GraphQL CRUD path may touch this attribute assignment. Omitted = ReadWrite. Hidden = never exposed in GraphQL output or input. Phase 0 enforces Hidden only; ReadOnly/MethodOnly are parsed and persisted. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false,

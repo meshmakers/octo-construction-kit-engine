@@ -38,9 +38,11 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkModelRootBase)] =
             [
                 nameof(CkModelRootBase.Types), nameof(CkModelRootBase.AssociationRoles), nameof(CkModelRootBase.Attributes),
-                nameof(CkModelRootBase.Records), nameof(CkModelRootBase.Enums)
+                nameof(CkModelRootBase.Records), nameof(CkModelRootBase.Enums), nameof(CkModelRootBase.Interfaces)
             ],
-            [typeof(CkModelPropertiesDto)] = [nameof(CkModelPropertiesDto.ModelId), nameof(CkModelPropertiesDto.Description)],
+            // EffectiveCkLanguage is a computed view of CkLanguage (not serialized).
+            [typeof(CkModelPropertiesDto)] = [nameof(CkModelPropertiesDto.ModelId), nameof(CkModelPropertiesDto.Description),
+                nameof(CkModelPropertiesDto.CkLanguage), nameof(CkModelPropertiesDto.EffectiveCkLanguage)],
             [typeof(CkCompiledTypeDto)] = [nameof(CkCompiledTypeDto.IsCollectionRoot)],
             [typeof(CkTypeDto)] =
             [
@@ -48,7 +50,7 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkTypeDto.IsAbstract), nameof(CkTypeDto.Indexes), nameof(CkTypeDto.Associations),
                 nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description),
                 nameof(CkTypeDto.DisplayNameRule), nameof(CkTypeDto.DisplayDescriptionRule),
-                nameof(CkTypeDto.OwnerAttributePath)
+                nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods)
             ],
             [typeof(CkTypeWithAttributesDto)] = [nameof(CkTypeWithAttributesDto.Attributes)],
             [typeof(CkAttributeDto)] =
@@ -83,7 +85,7 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkTypeAttributeDto.CkAttributeId), nameof(CkTypeAttributeDto.AttributeName),
                 nameof(CkTypeAttributeDto.AutoCompleteValues), nameof(CkTypeAttributeDto.AutoIncrementReference),
-                nameof(CkTypeAttributeDto.IsOptional), nameof(CkTypeAttributeDto.Ownership)
+                nameof(CkTypeAttributeDto.IsOptional), nameof(CkTypeAttributeDto.Ownership), nameof(CkTypeAttributeDto.Access)
             ],
             [typeof(CkTypeAssociationDto)] =
             [
@@ -92,7 +94,39 @@ public class CkModelDiffService : ICkModelDiffService
             ],
             [typeof(CkTypeIndexDto)] = [nameof(CkTypeIndexDto.IndexType), nameof(CkTypeIndexDto.Language), nameof(CkTypeIndexDto.Fields)],
             [typeof(CkIndexFieldsDto)] = [nameof(CkIndexFieldsDto.Weight), nameof(CkIndexFieldsDto.AttributePaths)],
-            [typeof(CkAttributeMetaDataDto)] = [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)]
+            [typeof(CkAttributeMetaDataDto)] = [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)],
+            // CK v2 (AB#5667 / AB#5669)
+            [typeof(CkInterfaceDto)] = [nameof(CkInterfaceDto.InterfaceId), nameof(CkInterfaceDto.Description), nameof(CkInterfaceDto.Attributes)],
+            [typeof(CkInterfaceAttributeDto)] =
+            [
+                nameof(CkInterfaceAttributeDto.CkAttributeId), nameof(CkInterfaceAttributeDto.AttributeName),
+                nameof(CkInterfaceAttributeDto.IsOptional)
+            ],
+            [typeof(CkMethodDto)] =
+            [
+                nameof(CkMethodDto.MethodId), nameof(CkMethodDto.Kind), nameof(CkMethodDto.Description),
+                nameof(CkMethodDto.Parameters), nameof(CkMethodDto.Result), nameof(CkMethodDto.Errors),
+                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution)
+            ],
+            [typeof(CkMethodParameterDto)] =
+            [
+                nameof(CkMethodParameterDto.Name), nameof(CkMethodParameterDto.ValueType),
+                nameof(CkMethodParameterDto.ValueCkRecordId), nameof(CkMethodParameterDto.ValueCkEnumId),
+                nameof(CkMethodParameterDto.IsOptional), nameof(CkMethodParameterDto.Sensitive),
+                nameof(CkMethodParameterDto.Description)
+            ],
+            [typeof(CkMethodResultDto)] =
+            [
+                nameof(CkMethodResultDto.ValueType), nameof(CkMethodResultDto.ValueCkRecordId),
+                nameof(CkMethodResultDto.ValueCkEnumId)
+            ],
+            [typeof(CkMethodErrorDto)] = [nameof(CkMethodErrorDto.Code), nameof(CkMethodErrorDto.Description)],
+            [typeof(CkMethodAuthorizationDto)] =
+            [
+                nameof(CkMethodAuthorizationDto.Roles), nameof(CkMethodAuthorizationDto.AllowSelf),
+                nameof(CkMethodAuthorizationDto.Scopes)
+            ],
+            [typeof(CkMethodExecutionDto)] = [nameof(CkMethodExecutionDto.TimeoutSeconds), nameof(CkMethodExecutionDto.Idempotent)]
         };
 
     /// <inheritdoc />

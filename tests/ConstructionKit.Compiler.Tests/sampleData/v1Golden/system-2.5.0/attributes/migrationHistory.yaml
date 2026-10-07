@@ -1,0 +1,41 @@
+"$schema": "https://schemas.meshmakers.cloud/construction-kit-elements.schema.json"
+attributes:
+  - id: MigrationHistory.CkModelName
+    description: "Name of the CK model that was migrated (e.g., 'System')."
+    valueType: String
+  - id: MigrationHistory.FromVersion
+    description: "Source version of the CK model before migration."
+    valueType: String
+  - id: MigrationHistory.ToVersion
+    description: "Target version of the CK model after migration."
+    valueType: String
+  - id: MigrationHistory.ExecutedAt
+    description: "Timestamp when the migration was executed."
+    valueType: DateTime
+  - id: MigrationHistory.Success
+    description: "Indicates whether the migration completed successfully."
+    valueType: Boolean
+  - id: MigrationHistory.EntitiesAffected
+    description: "Total number of entities affected by the migration."
+    valueType: Int
+  - id: MigrationHistory.EntitiesAdded
+    description: "Number of entities added during migration."
+    valueType: Int
+  - id: MigrationHistory.EntitiesUpdated
+    description: "Number of entities updated during migration."
+    valueType: Int
+  - id: MigrationHistory.EntitiesDeleted
+    description: "Number of entities deleted during migration."
+    valueType: Int
+  - id: MigrationHistory.DurationMs
+    description: "Duration of the migration in milliseconds."
+    valueType: Int
+  - id: MigrationHistory.Errors
+    description: "List of error messages if migration failed or had issues."
+    valueType: StringArray
+  - id: MigrationHistory.Warnings
+    description: "List of warning messages generated during migration."
+    valueType: StringArray
+  - id: MigrationHistory.BackupId
+    description: "Identifier of the backup created before migration, if any."
+    valueType: String

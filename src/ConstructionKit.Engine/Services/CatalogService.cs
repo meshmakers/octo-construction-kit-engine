@@ -74,6 +74,12 @@ internal class CatalogService : ICatalogService
             cancellationToken);
     }
 
+    public Task<IReadOnlyList<CatalogResultItem>> ListVersionsAsync(string ckModelName,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        return _catalogManager.ListVersionsAsync(ckModelName, sourceIdentifier, cancellationToken);
+    }
+
     public async Task<CkCompiledModelRoot?> GetAsync(CkModelId ckModelId, OperationResult operationResult,
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)

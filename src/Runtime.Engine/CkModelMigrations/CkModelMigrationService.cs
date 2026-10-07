@@ -2010,11 +2010,12 @@ internal class CkModelMigrationService : ICkModelMigrationService
 
         try
         {
-            var listResult = await _catalogService.ListAsync(0, 1000, cancellationToken: cancellationToken)
+            // Unpaged per-name lookup (AB#5650): a fixed ListAsync(0, 1000) window missed every model
+            // version beyond the first 1000 catalog entries.
+            var versions = await _catalogService.ListVersionsAsync(ckModelName, cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
-            var latestModel = listResult.ModelResultItems
-                .Where(m => m.ModelId.Name.Equals(ckModelName, StringComparison.OrdinalIgnoreCase))
+            var latestModel = versions
                 .OrderByDescending(m => m.ModelId.Version)
                 .FirstOrDefault();
 

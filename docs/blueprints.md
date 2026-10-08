@@ -653,6 +653,15 @@ services.Configure<PrivateGitHubBlueprintCatalogOptions>(o =>
 });
 ```
 
+Both GitHub blueprint catalogs have an `IsEnabled` switch (default `true`, AB#6112). A disabled
+catalog is neither read nor written: it does not appear in `ListBlueprints`, is ignored by dependency
+resolution and installs, and `RefreshBlueprintCatalogs` reports it as skipped. Production installations
+disable the private (main-lane) catalog so that only released blueprints are offered; in the services
+this is `OCTO_PrivateOctoGitHubBlueprints__IsEnabled=false` (helm: `assetRepository.blueprintCatalog.privateGitHubEnabled`).
+Blueprints already installed from a now-disabled catalog keep working; update checks only offer
+versions from the remaining catalogs. Uninstalling such a version fails ("blueprint not found"),
+because uninstall re-reads the installed version's seed data from the catalogs to find its entities.
+
 > The private GitHub catalog reads via HTTP against the Pages URI and writes via Octokit. If GitHub Pages is disabled on the source repository, reads will 404 and the catalog is effectively write-only until Pages is enabled.
 
 ## Embedding Blueprints in a Service NuGet

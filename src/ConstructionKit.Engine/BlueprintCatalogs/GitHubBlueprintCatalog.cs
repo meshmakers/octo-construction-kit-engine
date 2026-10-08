@@ -64,7 +64,8 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         GitHubBlueprintCatalogOptions gitHubOptions,
         int order,
         string catalogName,
-        string description) : base(order, catalogName, description, true, true, gitHubOptions)
+        string description) : base(order, catalogName, description, gitHubOptions.IsEnabled, gitHubOptions.IsEnabled,
+        gitHubOptions)
     {
         _blueprintSerializer = blueprintSerializer;
         _httpClientFactory = httpClientFactory;

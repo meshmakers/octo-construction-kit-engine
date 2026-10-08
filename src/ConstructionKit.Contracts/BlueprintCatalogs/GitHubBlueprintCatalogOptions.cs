@@ -42,6 +42,19 @@ public class PrivateGitHubBlueprintCatalogOptions : GitHubBlueprintCatalogOption
 public abstract class GitHubBlueprintCatalogOptions(string cacheFileName) : BlueprintCatalogOptions(cacheFileName), IGitHubOptions
 {
     /// <summary>
+    /// When false, the catalog is neither read nor written: it contributes nothing to listings,
+    /// dependency resolution or installs, and a refresh reports it as skipped (AB#6112). Mirrors
+    /// <c>GitHubCatalogOptions.IsEnabled</c> on the CK side; bound from the same configuration
+    /// sections as the repository coordinates (e.g. <c>PrivateOctoGitHubBlueprints:IsEnabled</c>).
+    /// </summary>
+    /// <remarks>
+    /// Defaults to <c>true</c>, which is the behaviour every installation had before the switch
+    /// existed: a host that does not set it keeps reading both GitHub blueprint catalogs. Production
+    /// installations opt out of the private (main-lane) catalog explicitly via configuration.
+    /// </remarks>
+    public bool IsEnabled { get; set; } = true;
+
+    /// <summary>
     /// API Token for GitHub (optional - only needed for write operations)
     /// </summary>
     public string? GitHubApiToken { get; set; }

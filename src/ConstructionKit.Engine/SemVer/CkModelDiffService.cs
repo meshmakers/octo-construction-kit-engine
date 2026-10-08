@@ -272,7 +272,20 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineMethod.Description, currentMethod.Description);
                 AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "signature",
                     FormatMethod(baselineMethod, modelName), FormatMethod(currentMethod, modelName));
+                // Review L16: parameter and error descriptions are documentation, not part of the signature.
+                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "documentation",
+                    FormatMethodDocumentation(baselineMethod), FormatMethodDocumentation(currentMethod));
             });
+    }
+
+    /// <summary>Parameter and error descriptions of a method (documentation only, review L16).</summary>
+    private static string FormatMethodDocumentation(CkMethodDto method)
+    {
+        var parameters = string.Join(", ", (method.Parameters ?? [])
+            .Where(p => p.Description != null).Select(p => $"{p.Name} \"{p.Description}\""));
+        var errors = string.Join(", ", (method.Errors ?? [])
+            .Where(e => e.Description != null).Select(e => $"{e.Code} \"{e.Description}\""));
+        return $"parameters [{parameters}]; errors [{errors}]";
     }
 
     private static string FormatMethod(CkMethodDto method, string modelName)
@@ -283,12 +296,11 @@ public class CkModelDiffService : ICkModelDiffService
 
         var parameters = string.Join(", ", (method.Parameters ?? []).Select(p =>
             $"{p.Name}{(p.IsOptional ? "?" : "")}: {Value(p.ValueType, p.ValueCkRecordId, p.ValueCkEnumId)}" +
-            (p.Sensitive ? " sensitive" : "") + (p.Description == null ? "" : $" \"{p.Description}\"")));
+            (p.Sensitive ? " sensitive" : "")));
         var result = method.Result == null
             ? "none"
             : Value(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId);
-        var errors = string.Join(", ", (method.Errors ?? []).Select(e =>
-            e.Description == null ? e.Code : $"{e.Code} \"{e.Description}\""));
+        var errors = string.Join(", ", (method.Errors ?? []).Select(e => e.Code));
         var authorization = method.Authorization == null
             ? "none"
             : $"roles [{string.Join(", ", method.Authorization.Roles ?? [])}], allowSelf " +

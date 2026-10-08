@@ -557,6 +557,12 @@
       "number": 105,
       "level": "ERROR",
       "text": "{ruleProperty} '{path}' of type '{ckTypeId}' references attribute '{attributeName}' with 'access: {access}'. Display rules, owner attribute paths and text index paths are readable through other fields (rtDisplayName, filters, search) and must not expose it."
+    },
+    {
+      "key": "CkInterfaceMemberNotUnique",
+      "number": 127,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' declares the member {what} '{value}' more than once. Each attribute and each member name may appear only once in an interface."
     }
   ]
 }

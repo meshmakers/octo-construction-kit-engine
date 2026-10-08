@@ -63,12 +63,16 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     ///     The central rule table. Rules are grouped by element kind; unmatched changes fall
     ///     through to the defensive default (major).
     /// </summary>
+    private static int ParseCkLanguage(string? value) =>
+        int.TryParse(value, System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture, out var language) ? language : 1;
+
     private static CkClassifiedModelChange ClassifyChange(CkModelChange change, CkCompiledModelRoot current)
     {
         var result = change switch
         {
             // ── Documentational changes (all element kinds, model meta) ─────────────────────
-            { ChangeKind: CkModelChangeKind.Modified, Property: "description" } =>
+            { ChangeKind: CkModelChangeKind.Modified, Property: "description" or "documentation" } =>
                 (CkSemVerLevel.Patch, "purely documentational change"),
 
             // ── Dependencies ────────────────────────────────────────────────────────────────
@@ -76,7 +80,8 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
             // ── CK v2 Phase 0 (AB#5584) ──────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "ckLanguage" } =>
-                string.CompareOrdinal(change.NewValue, change.OldValue) > 0
+                // Review L16: compared numerically ("10" > "2"), not ordinally.
+                ParseCkLanguage(change.NewValue) > ParseCkLanguage(change.OldValue)
                     ? (CkSemVerLevel.Minor, "CK language version raised; older engines reject the model with a clear error")
                     : (CkSemVerLevel.Major, "CK language version lowered — CK v2 elements may disappear (defensive)"),
             { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Added } =>

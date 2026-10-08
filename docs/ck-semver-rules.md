@@ -177,7 +177,7 @@ surface in the dependency diff.
 
 | Change | Reasoning |
 | ------ | --------- |
-| `description` (all element kinds, model meta — including CK v2 interfaces and methods) | Purely documentational |
+| `description` (all element kinds, model meta — including CK v2 interfaces and methods) and method `documentation` (parameter and error descriptions; not part of the method signature, review L16) | Purely documentational |
 | `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
 | `isRuntimeState: true` rewritten as `ownership: RuntimeState` (or `false` as `SeedOwned`) | Same resolved ownership → empty diff → **no bump required**. Both markers are compared on their resolved value, so migrating a declaration to the enum costs nothing; only a genuine change of owner does. |

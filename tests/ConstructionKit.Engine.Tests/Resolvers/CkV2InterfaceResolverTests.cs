@@ -167,6 +167,30 @@ public class CkV2InterfaceResolverTests(ITestOutputHelper output) : CkV2Resolver
         Assert.Contains("DoesNotExist", message.MessageText);
     }
 
+    // Review L17: duplicate interface members are reported (code 127), not silently dropped.
+    [Fact]
+    public void Code127_SameAttributeTwiceUnderAnotherName()
+    {
+        var model = Model();
+        model.Interfaces!.Single(i => i.InterfaceId.Name == "Serialized").Attributes
+            .Add(new() { CkAttributeId = $"{M}/Serial", AttributeName = "SerialAgain", IsOptional = true });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 127));
+        Assert.Contains("attribute", message.MessageText);
+        Assert.Contains("Serial", message.MessageText);
+    }
+
+    [Fact]
+    public void Code127_TwoMembersWithTheSameName()
+    {
+        var model = Model();
+        model.Interfaces!.Single(i => i.InterfaceId.Name == "Named").Attributes
+            .Add(new() { CkAttributeId = $"{M}/Serial", AttributeName = "name", IsOptional = true });
+
+        var message = Assert.Single(ResolveExpectingOnly(model, 127));
+        Assert.Contains("name 'name'", message.MessageText);
+    }
+
     [Fact]
     public void Code95_ImplementsUnknownInterface()
     {

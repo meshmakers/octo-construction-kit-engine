@@ -185,6 +185,41 @@ public class CkV2SemVerTests
         Assert.Equal(CkSemVerLevel.Major, change.Level);
     }
 
+    // Review L16: documentation of parameters and errors is not part of the signature.
+    [Theory]
+    [InlineData("parameter")]
+    [InlineData("error")]
+    public void MethodParameterOrErrorDescriptionChanged_IsPatch(string what)
+    {
+        var current = CkV2TestModels.CreateModel();
+        var method = SemVerTestModels.GetMachine(current).Methods![0];
+        if (what == "parameter")
+        {
+            method.Parameters![0].Description = "Reworded";
+        }
+        else
+        {
+            method.Errors![0].Description = "Reworded";
+        }
+
+        var change = Assert.Single(Classify(CkV2TestModels.CreateModel(), current));
+        Assert.Equal("documentation", change.Change.Property);
+        Assert.Equal(CkSemVerLevel.Patch, change.Level);
+    }
+
+    // Review L16: ckLanguage is compared numerically; ordinally "10" < "2".
+    [Fact]
+    public void CkLanguage_IsComparedNumerically()
+    {
+        var two = SemVerTestModels.CreateModel();
+        two.CkLanguage = 2;
+        var ten = SemVerTestModels.CreateModel();
+        ten.CkLanguage = 10;
+
+        Assert.Equal(CkSemVerLevel.Minor, Level(two, ten));
+        Assert.Equal(CkSemVerLevel.Major, Level(ten, two));
+    }
+
     [Fact]
     public void MethodDescriptionChanged_IsPatch()
     {

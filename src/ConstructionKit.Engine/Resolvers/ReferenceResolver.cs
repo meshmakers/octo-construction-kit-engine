@@ -34,8 +34,18 @@ internal class ReferenceResolver : IReferenceResolver
     {
         foreach (var ckInterface in modelGraph.Interfaces.Values)
         {
+            // Review L17: a duplicate member (same attribute or same name) is reported, not silently dropped.
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var member in ckInterface.DefinedAttributes)
             {
+                if (!names.Add(member.AttributeName))
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceMemberNotUnique(
+                        originFileResolver.Resolve(ckInterface.CkInterfaceId), ckInterface.CkInterfaceId, "name",
+                        member.AttributeName));
+                    continue;
+                }
+
                 if (!modelGraph.Attributes.TryGetValue(member.CkAttributeId, out var attributeGraph))
                 {
                     operationResult.AddMessage(MessageCodes.CkInterfaceAttributeUnknown(
@@ -44,12 +54,17 @@ internal class ReferenceResolver : IReferenceResolver
                     continue;
                 }
 
-                ckInterface.TryAddAttribute(new CkTypeAttributeGraph(member.CkAttributeId,
-                    new CkTypeAttributeDto
-                    {
-                        CkAttributeId = member.CkAttributeId, AttributeName = member.AttributeName,
-                        IsOptional = member.IsOptional
-                    }, attributeGraph));
+                if (!ckInterface.TryAddAttribute(new CkTypeAttributeGraph(member.CkAttributeId,
+                        new CkTypeAttributeDto
+                        {
+                            CkAttributeId = member.CkAttributeId, AttributeName = member.AttributeName,
+                            IsOptional = member.IsOptional
+                        }, attributeGraph)))
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceMemberNotUnique(
+                        originFileResolver.Resolve(ckInterface.CkInterfaceId), ckInterface.CkInterfaceId, "attribute",
+                        member.CkAttributeId));
+                }
             }
         }
     }

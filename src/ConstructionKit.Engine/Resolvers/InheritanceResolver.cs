@@ -157,7 +157,9 @@ internal class InheritanceResolver : IInheritanceResolver
         CkId<CkTypeId> ckTypeId, string location, OperationResult operationResult)
     {
         var ckInterfaceId = interfaceGraph.CkInterfaceId;
-        foreach (var member in interfaceGraph.DefinedAttributes)
+        // The merged members (ReferenceResolver): unknown (94) and duplicate (127) members are already reported
+        // there and must not produce follow-up implementation errors.
+        foreach (var member in interfaceGraph.Attributes.Values)
         {
             if (!typeGraph.AllAttributes.TryGetValue(member.CkAttributeId, out var assignment))
             {

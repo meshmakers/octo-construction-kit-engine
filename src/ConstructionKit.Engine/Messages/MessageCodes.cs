@@ -301,6 +301,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodAuthorizationInvalid(string? location, object methodId, object ckTypeId, object reason) =>
         GetMessage("CkMethodAuthorizationInvalid", location, methodId, ckTypeId, reason);
 
+    internal static OperationMessage CkInterfaceMemberNotUnique(string? location, object ckInterfaceId, object what, object value) =>
+        GetMessage("CkInterfaceMemberNotUnique", location, ckInterfaceId, what, value);
+
     internal static OperationMessage RestrictedAttributeInDerivedRule(string? location, object ruleProperty, object path, object ckTypeId, object attributeName, object access) =>
         GetMessage("RestrictedAttributeInDerivedRule", location, ruleProperty, path, ckTypeId, attributeName, access);
 
@@ -863,6 +866,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  105, "{ruleProperty} '{path}' of type '{ckTypeId}' references attribute '{attributeName}' with 'access: {access}'. Display rules, owner attribute paths and text index paths are readable through other fields (rtDisplayName, filters, search) and must not expose it.",
                  new [] {"ruleProperty", "path", "ckTypeId", "attributeName", "access"})
+        },
+        {
+            "CkInterfaceMemberNotUnique",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 127, "Interface '{ckInterfaceId}' declares the member {what} '{value}' more than once. Each attribute and each member name may appear only once in an interface.",
+                 new [] {"ckInterfaceId", "what", "value"})
         },
     };
 }

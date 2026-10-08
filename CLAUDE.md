@@ -800,7 +800,7 @@ Notes:
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
 - Message codes: 78–89 F0.2 (range retention), 90–105 CK v2 rules (in use), **106–129 reserved for Phase 1**
-  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, spare 127–129).
+  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, F1.2-S1 L17 127, spare 128–129).
   `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
   `MessageCodesSyncTests` fails when the two tables differ in key, number, level or text, or a number repeats.
 
@@ -821,6 +821,7 @@ Notes:
 | 103 | `CkMethodErrorCodeInvalid` | `InheritanceResolver` | duplicate error code or `METHOD_` prefix |
 | 104 | `CkMethodAuthorizationInvalid` | `InheritanceResolver` | `allowSelf: true` on a `Static` method |
 | 105 | `RestrictedAttributeInDerivedRule` | `InheritanceResolver.ValidateRestrictedAttributeUse` | review M9: a `displayNameRule` / `displayDescriptionRule` path or a `Text` index path reaches a `Hidden` attribute (incl. record segments), or `ownerAttributePath` reaches a `Hidden` or `MethodOnly` one — those fields are readable/filterable/searchable and would leak it. Not covered (outside the engine compiler): asset-repo computed columns, association `targetCkAttributeIds` |
+| 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the

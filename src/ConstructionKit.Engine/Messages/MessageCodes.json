@@ -563,6 +563,12 @@
       "number": 127,
       "level": "ERROR",
       "text": "Interface '{ckInterfaceId}' declares the member {what} '{value}' more than once. Each attribute and each member name may appear only once in an interface."
+    },
+    {
+      "key": "CkModelRequiresNewerEngine",
+      "number": 126,
+      "level": "ERROR",
+      "text": "Model '{modelId}' requires construction kit engine version {minEngineVersion} or later (minEngineVersion); this engine is version {engineVersion}. Update the service before importing the model."
     }
   ]
 }

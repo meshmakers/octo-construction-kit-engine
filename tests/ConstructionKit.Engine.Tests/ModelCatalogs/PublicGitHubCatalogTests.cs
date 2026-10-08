@@ -53,6 +53,10 @@ public abstract class PublicGitHubCatalogTestsBase
         A.CallTo(() => GitHubClientFactory.CreateClient(A<GitHubCatalogOptions>.Ignored))
             .Returns(GitHubClientWrapper);
 
+        // F1.1-S6: by default the optional ck-models/v3 root does not exist (tests stub it where they need it).
+        A.CallTo(() => HttpClientWrapper.GetAsync(A<string>.That.StartsWith("ck-models/v3/"), A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.NotFound));
+
         var gitHubOptions = Options.Create(CatalogOptions);
         Catalog = new PublicGitHubCatalog(CkJsonSerializer, HttpClientFactory, GitHubClientFactory, gitHubOptions);
     }
@@ -193,6 +197,11 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
         var modelId = CreateTestModelId();
         var operationResult = new OperationResult();
 
+        // F1.1-S6: without a cache entry the v3 root is probed first, then v2.
+        A.CallTo(() =>
+                HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json",
+                    A<CancellationToken>.Ignored))
+            .Returns(new HttpResponseMessage(HttpStatusCode.NotFound));
         A.CallTo(() =>
                 HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
                     A<CancellationToken>.Ignored))
@@ -438,6 +447,89 @@ public class PublicGitHubCatalogWithoutTokenTests : PublicGitHubCatalogTestsBase
 /// <summary>
 /// Tests for PublicGitHubCatalog WITH token (uses GitHub Client)
 /// </summary>
+/// <summary>
+///     F1.1-S6 (AB#5909): ckLanguage 2 / range-retaining models live under <c>ck-models/v3/</c>; the catalog reads
+///     both roots.
+/// </summary>
+public class PublicGitHubCatalogV3RootTests() : PublicGitHubCatalogTestsBase(withToken: false)
+{
+    private const string V3RootCatalog =
+        "{\"version\": \"1.0\", \"updatedAt\": \"2026-10-08T10:00:00Z\", \"models\": [ { \"modelName\": \"TestModel\", \"catalogPath\": \"ck-models/v3/t/TestModel/catalog.json\" } ] }";
+
+    private const string V3LibraryCatalog =
+        "{\"modelId\": \"TestModel\", \"majorVersions\": [ { \"majorVersion\": 1, \"catalogPath\": \"ck-models/v3/t/TestModel/1/catalog.json\" } ], \"updatedAt\": \"2026-10-08T10:00:00Z\"}";
+
+    private const string V3VersionsCatalog =
+        "{\"modelId\": \"TestModel\", \"majorVersion\": 1, \"latestVersion\": \"1.1.0\", \"versions\": [ { \"version\": \"1.1.0\", \"fileName\": \"ck-testmodel-1.1.0.json\", \"filePath\": \"ck-models/v3/t/TestModel/1/ck-testmodel-1.1.0.json\", \"publishedAt\": \"2026-10-08T10:00:00Z\" } ], \"updatedAt\": \"2026-10-08T10:00:00Z\"}";
+
+    private void StubBothRoots()
+    {
+        StubRootCatalog(Data.RootCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/catalog.json"))
+            .Returns(Data.TestModelModelCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v2/t/TestModel/1/catalog.json"))
+            .Returns(Data.TestModelVersionsCatalog1);
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/catalog.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(V3RootCatalog) });
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v3/t/TestModel/catalog.json"))
+            .Returns(V3LibraryCatalog);
+        A.CallTo(() => HttpClientWrapper.GetStringAsync("ck-models/v3/t/TestModel/1/catalog.json"))
+            .Returns(V3VersionsCatalog);
+    }
+
+    [Fact]
+    public async Task Refresh_MergesTheVersionsOfBothRoots()
+    {
+        StubBothRoots();
+
+        await Catalog.RefreshCatalogAsync(forceRefresh: true);
+        var result = Catalog.ListAsync(null)
+            .ToBlockingEnumerable(cancellationToken: TestContext.Current.CancellationToken).ToList();
+
+        Assert.Equal(["TestModel-1.0.0", "TestModel-1.1.0"], result.Select(r => r.ModelId.ToString()).OrderBy(m => m));
+    }
+
+    [Fact]
+    public async Task GetAsync_UsesTheRootKnownFromTheCache()
+    {
+        StubBothRoots();
+        await Catalog.RefreshCatalogAsync(forceRefresh: true);
+        A.CallTo(() => HttpClientWrapper.GetAsync(A<string>.That.Matches(p => p.Contains("/ck-test")),
+                A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
+            .ReturnsLazily(() => CreateTestCompiledModel());
+
+        await Catalog.GetAsync(CreateTestModelId(version: "1.0.0"), new OperationResult());
+        await Catalog.GetAsync(CreateTestModelId(version: "1.1.0"), new OperationResult());
+
+        // The cached file paths decide the root: no probe of the other root.
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+            .MustNotHaveHappened();
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/s/TestModel/1/ck-test-model-1.0.0.json", A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.1.0.json", A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task GetAsync_WithoutCache_ProbesV3ThenV2()
+    {
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
+            .ReturnsLazily(() => CreateTestCompiledModel());
+
+        var model = await Catalog.GetAsync(CreateTestModelId(), new OperationResult());
+
+        Assert.NotNull(model);
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+            .MustHaveHappenedOnceExactly()
+            .Then(A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+                .MustHaveHappenedOnceExactly());
+    }
+}
+
 public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
 {
     public PublicGitHubCatalogWithTokenTests() : base(withToken: true)
@@ -489,6 +581,11 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
         var modelId = CreateTestModelId();
         var operationResult = new OperationResult();
 
+        // F1.1-S6: without a cache entry the v3 root is probed first, then v2.
+        A.CallTo(() =>
+                HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json",
+                    A<CancellationToken>.Ignored))
+            .Returns(new HttpResponseMessage(HttpStatusCode.NotFound));
         A.CallTo(() =>
                 HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
                     A<CancellationToken>.Ignored))

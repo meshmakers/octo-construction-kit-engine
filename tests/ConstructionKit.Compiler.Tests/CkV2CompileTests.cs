@@ -1,8 +1,10 @@
 using System.Text;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -377,6 +379,47 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("Extends: `KitchenSink/Named-1`", interfaces);
         Assert.Contains("| KitchenSink/Owns-1 | KitchenSink/Serialized-1 | any | True | KitchenSink/Labeled-1 |", interfaces);
         Assert.Contains("| Relabel-1 | Instance | mode: Enum | - | KitchenSink/Labeled-1 |", interfaces);
+    }
+
+    [Fact]
+    public async Task Compile_ckv2_sets_minEngineVersion_and_publishes_under_v3()
+    {
+        // F1.1-S6 (AB#5909)
+        await PublishSystemAsync(_fixture);
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+
+        Assert.Equal(Engine.Versioning.CkEngineVersion.CkV2MinEngineVersion, compiled.MinEngineVersion);
+        Assert.True(File.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v3/k/KitchenSink/1/ck-kitchensink-1.0.0.json")));
+        Assert.True(File.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v2/s/System/2/ck-system-2.5.0.json")));
+        Assert.False(Directory.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v2/k")));
+        Assert.Contains("minEngineVersion: 3.4.0", await ToYamlAsync(_fixture, compiled));
+    }
+
+    [Fact]
+    public async Task Dependency_requiring_a_newer_engine_fails_with_126()
+    {
+        await PublishSystemAsync(_fixture);
+        var system = await _fixture.CompileAsync(_fixture.WriteSource("system26", "System-2.6.0", null,
+            new Dictionary<string, string>
+            {
+                ["attributes/attributes.yaml"] = "attributes:\n  - id: Name\n    valueType: String\n",
+                ["types/entity.yaml"] = "types:\n  - typeId: Entity\n    isAbstract: true\n"
+            }));
+        system.MinEngineVersion = "1000.0.0"; // DebugL engines are 999.0.0
+        // The catalog service resolves before it publishes and would refuse the model (126); write it directly.
+        await _fixture.Services.GetServices<ICatalog>().OfType<LocalFileSystemCatalog>().Single()
+            .PublishAsync(system, force: true);
+
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("dependent", "Dependent-1.0.0", ["System-[2.6,3.0)"],
+                new Dictionary<string, string>
+                {
+                    ["types/thing.yaml"] = "types:\n  - typeId: Thing\n    derivedFromCkTypeId: ${System}/Entity\n"
+                }), operationResult));
+
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 126 && m.MessageText.Contains("1000.0.0"));
     }
 
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)

@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Versioning;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 using Microsoft.Extensions.Logging;
 
@@ -161,12 +162,20 @@ internal class RepositoryDependencyResolver(
 
             // Review L2: the ckLanguage gate (message 91) applies to dependency models as well, not only to the
             // model being compiled/imported. An unsupported language is not appended; its dependents are skipped.
-            if (ckDependencyRootModel.CkLanguage is { } ckLanguage &&
-                (ckLanguage < 1 || ckLanguage > CkModelPropertiesDto.MaxSupportedCkLanguage))
+            // F1.1-S6: the same for a dependency that requires a newer engine (message 126).
+            var unsupportedLanguage = ckDependencyRootModel.CkLanguage is { } ckLanguage &&
+                                      (ckLanguage < 1 || ckLanguage > CkModelPropertiesDto.MaxSupportedCkLanguage);
+            if (unsupportedLanguage)
             {
                 operationResult.AddMessage(MessageCodes.CkLanguageNotSupported(
-                    originFileResolver.Resolve(ckDependency), ckDependencyRootModel.ModelId, ckLanguage,
+                    originFileResolver.Resolve(ckDependency), ckDependencyRootModel.ModelId,
+                    ckDependencyRootModel.CkLanguage.GetValueOrDefault(),
                     CkModelPropertiesDto.MaxSupportedCkLanguage));
+            }
+
+            if (unsupportedLanguage || !CkEngineVersion.CheckModel(ckDependencyRootModel,
+                    originFileResolver.Resolve(ckDependency), operationResult))
+            {
                 foreach (var skipped in ckOriginModelIds.Append(ckDependencyRootModel.ModelId))
                 {
                     if (!skippedDependencies.Contains(skipped))

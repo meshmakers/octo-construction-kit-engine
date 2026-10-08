@@ -3,6 +3,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Engine.Versioning;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 using Microsoft.Extensions.Logging;
@@ -102,6 +103,9 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             compiledModel = await ApplyRangeRetentionAsync(compileCandidate.DependencyRanges, compiledModel,
                 modelGraph, sourceIdentifier).ConfigureAwait(false);
         }
+
+        // F1.1-S6: ckLanguage 2 and range-retaining output name the lowest engine that can read them.
+        compiledModel.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(compiledModel);
 
         return (modelGraph, compiledModel);
     }

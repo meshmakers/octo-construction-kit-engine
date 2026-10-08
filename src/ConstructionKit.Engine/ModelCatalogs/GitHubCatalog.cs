@@ -79,7 +79,6 @@ internal static class GitHubCatalogDescription
 /// </summary>
 public abstract class GitHubCatalog : CachedCatalog
 {
-    private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
     private const int MaxCacheFileAgeSeconds = 60;
 
@@ -129,7 +128,55 @@ public abstract class GitHubCatalog : CachedCatalog
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
-        var pagesUrl = CreatePath(modelId);
+        // F1.1-S6: the model lives under ck-models/v3 or ck-models/v2. The refreshed cache knows which; without a
+        // cache entry the v3 root is tried first (a missing file there falls through to v2).
+        foreach (var candidate in await GetCandidatePathsAsync(modelId).ConfigureAwait(false))
+        {
+            var model = await GetFromPathAsync(modelId, candidate, operationResult, cancellationToken)
+                .ConfigureAwait(false);
+            if (model != null)
+            {
+                return model;
+            }
+        }
+
+        throw ModelCatalogException.ModelNotFound(modelId, CatalogName);
+    }
+
+    private async Task<IReadOnlyList<string>> GetCandidatePathsAsync(CkModelId modelId)
+    {
+        var candidates = new List<string>();
+        try
+        {
+            var cache = await ReadCacheAsync(false).ConfigureAwait(false);
+            if (cache.Models.TryGetValue(modelId.Name, out var entry) &&
+                entry.Versions.TryGetValue(modelId.Version.ToString(), out var version) &&
+                CkCatalogLayout.ReadRoots.Any(r => version.FilePath.StartsWith(r, StringComparison.Ordinal)))
+            {
+                candidates.Add(version.FilePath);
+            }
+        }
+        catch (Exception e) when (e is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
+        {
+            // no usable cache — fall back to probing the roots
+        }
+
+        foreach (var root in CkCatalogLayout.ReadRoots)
+        {
+            var path = CreatePath(root, modelId);
+            if (!candidates.Contains(path))
+            {
+                candidates.Add(path);
+            }
+        }
+
+        return candidates;
+    }
+
+    /// <summary>Loads the model from one path; <c>null</c> when the file does not exist there.</summary>
+    private async Task<CkCompiledModelRoot?> GetFromPathAsync(CkModelId modelId, string pagesUrl,
+        OperationResult operationResult, CancellationToken? cancellationToken)
+    {
 
         if (IsPagesUriConfigured)
         {
@@ -158,7 +205,7 @@ public abstract class GitHubCatalog : CachedCatalog
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    throw ModelCatalogException.ModelNotFound(modelId, CatalogName);
+                    return null;
                 }
 
                 throw ModelCatalogException.InvalidGitHubRepository(CatalogName,
@@ -180,7 +227,7 @@ public abstract class GitHubCatalog : CachedCatalog
         var r = await gitHubClient.GetFileAsync(pagesUrl).ConfigureAwait(false);
         if (r == null)
         {
-            throw ModelCatalogException.ModelNotFound(modelId, CatalogName);
+            return null;
         }
 
         var ckCompiledModelRoot2 = await _ckJsonSerializer
@@ -199,7 +246,9 @@ public abstract class GitHubCatalog : CachedCatalog
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
     {
         var gitHubClient = CreateGitHubClient();
-        string filePath = CreatePath(ckCompiledModel.ModelId);
+        // F1.1-S6: ckLanguage 2 / range-retaining models are published under ck-models/v3.
+        var root = CkCatalogLayout.GetPublishRoot(ckCompiledModel);
+        string filePath = CreatePath(root, ckCompiledModel.ModelId);
 
         cancellationToken?.ThrowIfCancellationRequested();
 
@@ -228,17 +277,18 @@ public abstract class GitHubCatalog : CachedCatalog
             cancellationToken?.ThrowIfCancellationRequested();
 
             // Update the major version
-            await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description, gitHubClient)
+            await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId, ckCompiledModel.Description,
+                    gitHubClient)
                 .ConfigureAwait(false);
 
             cancellationToken?.ThrowIfCancellationRequested();
 
             // Update the overall model library catalog
-            await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId, gitHubClient)
+            await UpdateModelLibraryCatalogAsync(root, ckCompiledModel.ModelId, gitHubClient)
                 .ConfigureAwait(false);
 
             // Update the root catalog
-            await UpdateRootCatalogAsync(ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
+            await UpdateRootCatalogAsync(root, ckCompiledModel.ModelId, gitHubClient).ConfigureAwait(false);
 
             cancellationToken?.ThrowIfCancellationRequested();
         }
@@ -290,14 +340,7 @@ public abstract class GitHubCatalog : CachedCatalog
         return _gitHubClientFactory.CreateClient(_gitHubOptions);
     }
 
-    private string CreatePath(CkModelId ckModelId)
-    {
-        return RootPath
-               + ckModelId.Name[0].ToString().ToLower() + "/"
-               + ckModelId.Name + "/"
-               + ckModelId.Version.Major
-               + "/ck-" + ckModelId.Name.ToLower() + "-" + ckModelId.Version + ".json";
-    }
+    private static string CreatePath(string root, CkModelId ckModelId) => CkCatalogLayout.ModelFilePath(root, ckModelId);
 
     private IHttpClientWrapper CreateHttpClient()
     {
@@ -315,13 +358,14 @@ public abstract class GitHubCatalog : CachedCatalog
     /// <summary>
     /// Gets the catalog for a specific major version of a model
     /// </summary>
+    /// <param name="root">The catalog root (F1.1-S6: <c>ck-models/v2/</c> or <c>ck-models/v3/</c>)</param>
     /// <param name="modelName">The model ID (without version)</param>
     /// <param name="majorVersion">The major version number</param>
     /// <returns>The major version catalog content or null if not found</returns>
     private async Task<SharedCatalogTypes.ModelLibraryVersionsCatalog?> GetModelLibraryVersionsCatalogAsync(
-        string modelName, int majorVersion)
+        string root, string modelName, int majorVersion)
     {
-        var catalogPath = $"{RootPath}{modelName[0].ToString().ToLower()}/{modelName}/{majorVersion}/{CatalogFileName}";
+        var catalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelName)}{majorVersion}/{CatalogFileName}";
 
         string? response;
         if (IsPagesUriConfigured)
@@ -373,20 +417,21 @@ public abstract class GitHubCatalog : CachedCatalog
     // publish already makes. The 5000/h-per-user REST-quota incident that moved reads to
     // gh-pages (commit b364570, octo-construction-kit-CI 33317) was caused by the
     // O(models × majors) refresh walk, which deliberately stays on gh-pages.
-    private static async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description,
+    private static async Task UpdateModelVersionsCatalogAsync(string root, CkModelId modelId, string? description,
         IGitHubClientWrapper gitHubClient)
     {
         // Catalog file path for this major version
         var catalogPath =
-            $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{CatalogFileName}";
+            $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{modelId.Version.Major}/{CatalogFileName}";
 
         await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
                 $"Update catalog for {modelId.Name} v{modelId.Version.Major}",
-                existingJson => MergeModelVersionsCatalog(existingJson, modelId, description))
+                existingJson => MergeModelVersionsCatalog(existingJson, modelId, description, root))
             .ConfigureAwait(false);
     }
 
-    internal static string? MergeModelVersionsCatalog(string? existingJson, CkModelId modelId, string? description)
+    internal static string? MergeModelVersionsCatalog(string? existingJson, CkModelId modelId, string? description,
+        string root = CkCatalogLayout.V2Root)
     {
         var catalogData = DeserializeCatalog<SharedCatalogTypes.ModelLibraryVersionsCatalog>(existingJson);
         var isModified = false;
@@ -412,8 +457,7 @@ public abstract class GitHubCatalog : CachedCatalog
         {
             // Add the new version only if it doesn't exist
             var fileName = $"ck-{modelId.Name.ToLower()}-{currentVersionString}.json";
-            var filePath =
-                $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{fileName}";
+            var filePath = CkCatalogLayout.ModelFilePath(root, modelId);
 
             versionDict[currentVersionString] = new SharedCatalogTypes.ModelLibraryVersionsCatalogEntry
             {
@@ -500,7 +544,8 @@ public abstract class GitHubCatalog : CachedCatalog
             return result;
         }
 
-        var (catalog, sourceUnreachable) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
+        var (catalog, sourceUnreachable) =
+            await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root).ConfigureAwait(false);
         while (catalog == null && !sourceUnreachable && notFoundRetryBudget > 0)
         {
             // A missing root index is either a genuinely empty catalog or the deploy swap —
@@ -511,7 +556,24 @@ public abstract class GitHubCatalog : CachedCatalog
                 await Task.Delay(notFoundRetryDelay).ConfigureAwait(false);
             }
 
-            (catalog, sourceUnreachable) = await GetRootCatalogWithReachabilityAsync().ConfigureAwait(false);
+            (catalog, sourceUnreachable) =
+                await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V2Root).ConfigureAwait(false);
+        }
+
+        // F1.1-S6: the ck-models/v3 root (ckLanguage 2 / range-retaining models) is optional — a catalog without
+        // such models has no index there, so a 404 is not retried (it would spend the retry budget on every refresh).
+        var (v3Catalog, v3Unreachable) =
+            await GetRootCatalogWithReachabilityAsync(CkCatalogLayout.V3Root).ConfigureAwait(false);
+        sourceUnreachable |= v3Unreachable;
+        var catalogs = new List<(string Root, SharedCatalogTypes.RootCatalog Catalog)>();
+        if (v3Catalog != null)
+        {
+            catalogs.Add((CkCatalogLayout.V3Root, v3Catalog));
+        }
+
+        if (catalog != null)
+        {
+            catalogs.Add((CkCatalogLayout.V2Root, catalog));
         }
 
         CacheTypes.CacheCatalog cacheCatalog = new()
@@ -520,9 +582,9 @@ public abstract class GitHubCatalog : CachedCatalog
             SourceUnreachable = sourceUnreachable
         };
 
-        if (catalog != null)
+        foreach (var (root, rootCatalog) in catalogs)
         {
-            foreach (var rootCatalogEntry in catalog.Models)
+            foreach (var rootCatalogEntry in rootCatalog.Models)
             {
                 var modelLibraryCatalog = await ReadWithNotFoundRetryAsync(() =>
                     GetModelLibraryCatalogAsync(rootCatalogEntry.CatalogPath)).ConfigureAwait(false);
@@ -532,17 +594,21 @@ public abstract class GitHubCatalog : CachedCatalog
                     continue;
                 }
 
-                var modelEntry = new CacheTypes.CacheModelEntry
+                // A model may have versions under both roots.
+                if (!cacheCatalog.Models.TryGetValue(rootCatalogEntry.ModelName, out var modelEntry))
                 {
-                    ModelId = modelLibraryCatalog.ModelId,
-                    Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
-                };
-                cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+                    modelEntry = new CacheTypes.CacheModelEntry
+                    {
+                        ModelId = modelLibraryCatalog.ModelId,
+                        Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
+                    };
+                    cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+                }
 
                 foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
                 {
                     var versionsCatalog = await ReadWithNotFoundRetryAsync(() =>
-                        GetModelLibraryVersionsCatalogAsync(
+                        GetModelLibraryVersionsCatalogAsync(root,
                             rootCatalogEntry.ModelName,
                             modelLibraryCatalogEntry.MajorVersion)).ConfigureAwait(false);
 
@@ -573,9 +639,9 @@ public abstract class GitHubCatalog : CachedCatalog
 
 
     private async Task<(SharedCatalogTypes.RootCatalog? Catalog, bool SourceUnreachable)>
-        GetRootCatalogWithReachabilityAsync()
+        GetRootCatalogWithReachabilityAsync(string root)
     {
-        var catalogPath = $"{RootPath}{CatalogFileName}";
+        var catalogPath = $"{root}{CatalogFileName}";
 
         string? response;
         if (IsPagesUriConfigured)
@@ -682,17 +748,19 @@ public abstract class GitHubCatalog : CachedCatalog
     }
 
     // See the API-vs-gh-pages note on UpdateModelVersionsCatalogAsync.
-    private static async Task UpdateRootCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
+    private static async Task UpdateRootCatalogAsync(string root, CkModelId modelId,
+        IGitHubClientWrapper gitHubClient)
     {
-        var catalogPath = $"{RootPath}{CatalogFileName}";
+        var catalogPath = $"{root}{CatalogFileName}";
 
         await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
                 $"Update model catalog for {modelId.Name}",
-                existingJson => MergeRootCatalog(existingJson, modelId))
+                existingJson => MergeRootCatalog(existingJson, modelId, root))
             .ConfigureAwait(false);
     }
 
-    internal static string? MergeRootCatalog(string? existingJson, CkModelId modelId)
+    internal static string? MergeRootCatalog(string? existingJson, CkModelId modelId,
+        string root = CkCatalogLayout.V2Root)
     {
         var catalogData = DeserializeCatalog<SharedCatalogTypes.RootCatalog>(existingJson);
 
@@ -712,7 +780,7 @@ public abstract class GitHubCatalog : CachedCatalog
         catalogData.Models.Add(new SharedCatalogTypes.RootCatalogEntry
         {
             ModelName = modelId.Name,
-            CatalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}"
+            CatalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{CatalogFileName}"
         });
 
         // Sort models alphabetically
@@ -723,18 +791,20 @@ public abstract class GitHubCatalog : CachedCatalog
     }
 
     // See the API-vs-gh-pages note on UpdateModelVersionsCatalogAsync.
-    private static async Task UpdateModelLibraryCatalogAsync(CkModelId modelId, IGitHubClientWrapper gitHubClient)
+    private static async Task UpdateModelLibraryCatalogAsync(string root, CkModelId modelId,
+        IGitHubClientWrapper gitHubClient)
     {
         // Catalog file path for the model
-        var catalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}";
+        var catalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{CatalogFileName}";
 
         await gitHubClient.UpsertFileWithMergeAsync(catalogPath,
                 $"Update model catalog for {modelId.Name}",
-                existingJson => MergeModelLibraryCatalog(existingJson, modelId))
+                existingJson => MergeModelLibraryCatalog(existingJson, modelId, root))
             .ConfigureAwait(false);
     }
 
-    internal static string? MergeModelLibraryCatalog(string? existingJson, CkModelId modelId)
+    internal static string? MergeModelLibraryCatalog(string? existingJson, CkModelId modelId,
+        string root = CkCatalogLayout.V2Root)
     {
         var catalogData = DeserializeCatalog<SharedCatalogTypes.ModelLibraryCatalog>(existingJson);
 
@@ -754,8 +824,7 @@ public abstract class GitHubCatalog : CachedCatalog
         catalogData.MajorVersions.Add(new SharedCatalogTypes.ModelLibraryCatalogEntry
         {
             MajorVersion = currentMajor,
-            CatalogPath =
-                $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{currentMajor}/{CatalogFileName}"
+            CatalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{currentMajor}/{CatalogFileName}"
         });
 
         catalogData.UpdatedAt = DateTime.UtcNow;

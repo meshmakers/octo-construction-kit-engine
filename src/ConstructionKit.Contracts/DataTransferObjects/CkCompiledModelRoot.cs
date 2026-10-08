@@ -45,6 +45,16 @@ public class CkCompiledModelRoot : CkModelRootBase
     public List<CkModelDependencyDto>? DependencyRanges { get; set; }
 
     /// <summary>
+    ///     CK v2 (F1.1-S6, AB#5909): the lowest construction kit engine version that can read this model. Written by
+    ///     the compiler for <c>ckLanguage: 2</c> and range-retaining output (<c>null</c> = any engine, so v1 output
+    ///     is unchanged). An engine refuses to import a model whose value is above its own version (message 126).
+    ///     Engines before CK v2 ignore the key; they never see such models because those are published under the
+    ///     <c>ck-models/v3/</c> catalog path.
+    /// </summary>
+    [YamlMember(Alias = "minEngineVersion", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public string? MinEngineVersion { get; set; }
+
+    /// <summary>
     ///     True when the model was compiled with range retention (<see cref="DependencyRanges" /> is set).
     /// </summary>
     [JsonIgnore]

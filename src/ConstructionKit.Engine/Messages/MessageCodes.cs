@@ -307,6 +307,9 @@ internal static class MessageCodes
     internal static OperationMessage RestrictedAttributeInDerivedRule(string? location, object ruleProperty, object path, object ckTypeId, object attributeName, object access) =>
         GetMessage("RestrictedAttributeInDerivedRule", location, ruleProperty, path, ckTypeId, attributeName, access);
 
+    internal static OperationMessage CkModelRequiresNewerEngine(string? location, object modelId, object minEngineVersion, object engineVersion) =>
+        GetMessage("CkModelRequiresNewerEngine", location, modelId, minEngineVersion, engineVersion);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -872,6 +875,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  127, "Interface '{ckInterfaceId}' declares the member {what} '{value}' more than once. Each attribute and each member name may appear only once in an interface.",
                  new [] {"ckInterfaceId", "what", "value"})
+        },
+        {
+            "CkModelRequiresNewerEngine",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 126, "Model '{modelId}' requires construction kit engine version {minEngineVersion} or later (minEngineVersion); this engine is version {engineVersion}. Update the service before importing the model.",
+                 new [] {"modelId", "minEngineVersion", "engineVersion"})
         },
     };
 }

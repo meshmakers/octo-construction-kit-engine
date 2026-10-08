@@ -17,7 +17,6 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// </summary>
     public const string Name = "LocalFileSystemCatalog";
 
-    private const string RootPath = "ck-models/v2/";
     private const string CatalogFileName = "catalog.json";
     private const int MaxCacheFileAgeSeconds = 60;
 
@@ -71,8 +70,19 @@ public class LocalFileSystemCatalog : CachedCatalog
         }
 
         var cache = await ReadCacheAsync(false).ConfigureAwait(false);
-        var catalog = await GetRootCatalogAsync().ConfigureAwait(false);
-        if (catalog != null && cache.UpdatedAt != null && cache.UpdatedAt.Value == catalog.UpdatedAt)
+        // F1.1-S6: one index tree per catalog root (ck-models/v3 first, then ck-models/v2).
+        var catalogs = new List<(string Root, SharedCatalogTypes.RootCatalog Catalog)>();
+        foreach (var root in CkCatalogLayout.ReadRoots)
+        {
+            var rootCatalog = await GetRootCatalogAsync(root).ConfigureAwait(false);
+            if (rootCatalog != null)
+            {
+                catalogs.Add((root, rootCatalog));
+            }
+        }
+
+        if (catalogs.Count != 0 && cache.UpdatedAt != null &&
+            cache.UpdatedAt.Value == catalogs.Max(c => c.Catalog.UpdatedAt))
         {
             // No changes in the catalog so we can skip the refresh
             return;
@@ -83,7 +93,7 @@ public class LocalFileSystemCatalog : CachedCatalog
             UpdatedAt = DateTime.UtcNow
         };
 
-        if (catalog != null)
+        foreach (var (root, catalog) in catalogs)
         {
             foreach (var rootCatalogEntry in catalog.Models)
             {
@@ -95,16 +105,20 @@ public class LocalFileSystemCatalog : CachedCatalog
                     continue;
                 }
 
-                var modelEntry = new CacheTypes.CacheModelEntry
+                // A model may have versions under both roots (v1 versions in v2, v2 versions in v3).
+                if (!cacheCatalog.Models.TryGetValue(rootCatalogEntry.ModelName, out var modelEntry))
                 {
-                    ModelId = modelLibraryCatalog.ModelId,
-                    Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
-                };
-                cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+                    modelEntry = new CacheTypes.CacheModelEntry
+                    {
+                        ModelId = modelLibraryCatalog.ModelId,
+                        Versions = new Dictionary<string, CacheTypes.CacheModelVersionEntry>()
+                    };
+                    cacheCatalog.Models.Add(rootCatalogEntry.ModelName, modelEntry);
+                }
 
                 foreach (var modelLibraryCatalogEntry in modelLibraryCatalog.MajorVersions)
                 {
-                    var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(
+                    var versionsCatalog = await GetModelLibraryVersionsCatalogAsync(root,
                         rootCatalogEntry.ModelName,
                         modelLibraryCatalogEntry.MajorVersion).ConfigureAwait(false);
 
@@ -186,8 +200,8 @@ public class LocalFileSystemCatalog : CachedCatalog
 
     /// <summary>
     ///     Enumerates the versions of a model whose compiled file exists on disk
-    ///     (<c>ck-models/v2/&lt;letter&gt;/&lt;Name&gt;/&lt;major&gt;/ck-&lt;name&gt;-&lt;version&gt;.json</c>, the
-    ///     layout written by <see cref="PublishAsync" />).
+    ///     (<c>ck-models/{v3,v2}/&lt;letter&gt;/&lt;Name&gt;/&lt;major&gt;/ck-&lt;name&gt;-&lt;version&gt;.json</c>,
+    ///     the layout written by <see cref="PublishAsync" />, F1.1-S6).
     /// </summary>
     private IEnumerable<CkVersion> EnumerateVersionsOnDisk(string modelName)
     {
@@ -196,39 +210,46 @@ public class LocalFileSystemCatalog : CachedCatalog
             yield break;
         }
 
-        var modelPath = Path.Combine(_options.Value.RootPath, RootPath, modelName[0].ToString().ToLower(), modelName);
-        if (!Directory.Exists(modelPath))
-        {
-            yield break;
-        }
-
         var prefix = $"ck-{modelName.ToLower()}-";
-        foreach (var majorDirectory in Directory.EnumerateDirectories(modelPath))
+        var seen = new HashSet<CkVersion>();
+        foreach (var root in CkCatalogLayout.ReadRoots)
         {
-            if (!int.TryParse(Path.GetFileName(majorDirectory), out _))
+            var modelPath = Path.Combine(_options.Value.RootPath, CkCatalogLayout.ModelDirectory(root, modelName));
+            if (!Directory.Exists(modelPath))
             {
                 continue;
             }
 
-            foreach (var file in Directory.EnumerateFiles(majorDirectory, "ck-*.json"))
+            foreach (var majorDirectory in Directory.EnumerateDirectories(modelPath))
             {
-                var fileName = Path.GetFileNameWithoutExtension(file);
-                if (!fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                if (!int.TryParse(Path.GetFileName(majorDirectory), out _))
                 {
                     continue;
                 }
 
-                CkVersion version;
-                try
+                foreach (var file in Directory.EnumerateFiles(majorDirectory, "ck-*.json"))
                 {
-                    version = new CkVersion(fileName.Substring(prefix.Length));
-                }
-                catch (Exception e) when (e is ArgumentException or FormatException or OverflowException)
-                {
-                    continue;
-                }
+                    var fileName = Path.GetFileNameWithoutExtension(file);
+                    if (!fileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
 
-                yield return version;
+                    CkVersion version;
+                    try
+                    {
+                        version = new CkVersion(fileName.Substring(prefix.Length));
+                    }
+                    catch (Exception e) when (e is ArgumentException or FormatException or OverflowException)
+                    {
+                        continue;
+                    }
+
+                    if (seen.Add(version))
+                    {
+                        yield return version;
+                    }
+                }
             }
         }
     }
@@ -273,10 +294,20 @@ public class LocalFileSystemCatalog : CachedCatalog
             throw ModelCatalogException.CatalogNotEnabledToWrite(Name);
         }
 
-        var compiledModelFilePath = CreatePath(ckCompiledModel.ModelId);
-        if (File.Exists(compiledModelFilePath) && !force)
+        // F1.1-S6: ckLanguage 2 / range-retaining models go to ck-models/v3, classic ones to ck-models/v2. A model
+        // version exists under one root only: a forced re-publish into the other root removes the old file.
+        var root = CkCatalogLayout.GetPublishRoot(ckCompiledModel);
+        var compiledModelFilePath = CreatePath(root, ckCompiledModel.ModelId);
+        var existsElsewhere = TryGetExistingModelPath(ckCompiledModel.ModelId, out var existingPath) &&
+                              existingPath != compiledModelFilePath;
+        if ((File.Exists(compiledModelFilePath) || existsElsewhere) && !force)
         {
             throw ModelCatalogException.ModelAlreadyExists(ckCompiledModel.ModelId, CatalogName);
+        }
+
+        if (existsElsewhere && existingPath != null)
+        {
+            File.Delete(existingPath);
         }
 
         var path = Path.GetDirectoryName(compiledModelFilePath)!;
@@ -313,18 +344,19 @@ public class LocalFileSystemCatalog : CachedCatalog
 
                     // Review N3: the three index files are read-modify-write; parallel octo-ckc processes publishing
                     // sibling models lost each other's entries. Serialize the updates with a cross-process lock.
-                    using (await CatalogFileIo.AcquireLockAsync(IndexLockPath).ConfigureAwait(false))
+                    using (await CatalogFileIo.AcquireLockAsync(IndexLockPath(root)).ConfigureAwait(false))
                     {
                         // Update the major version
-                        await UpdateModelVersionsCatalogAsync(ckCompiledModel.ModelId, ckCompiledModel.Description)
+                        await UpdateModelVersionsCatalogAsync(root, ckCompiledModel.ModelId,
+                                ckCompiledModel.Description)
                             .ConfigureAwait(false);
 
                         // Update the overall model library catalog
-                        await UpdateModelLibraryCatalogAsync(ckCompiledModel.ModelId)
+                        await UpdateModelLibraryCatalogAsync(root, ckCompiledModel.ModelId)
                             .ConfigureAwait(false);
 
                         // Update the root catalog
-                        await UpdateRootCatalogAsync(ckCompiledModel.ModelId).ConfigureAwait(false);
+                        await UpdateRootCatalogAsync(root, ckCompiledModel.ModelId).ConfigureAwait(false);
                     }
 
                     // Refresh the in-memory catalog
@@ -367,33 +399,30 @@ public class LocalFileSystemCatalog : CachedCatalog
     };
 
     /// <summary>Lock file serializing index updates of this catalog root across processes (review N3).</summary>
-    private string IndexLockPath => Path.Combine(_options.Value.RootPath, RootPath, ".catalog-index.lock");
+    private string IndexLockPath(string root) => Path.Combine(_options.Value.RootPath, root, ".catalog-index.lock");
 
-    private string CreatePath(CkModelId ckModelId)
-    {
-        var modelPath = Path.Combine(_options.Value.RootPath, RootPath, ckModelId.Name[0].ToString().ToLower(),
-            ckModelId.Name);
-        var modelVersionPath = Path.Combine(modelPath, ckModelId.Version.Major.ToString());
-        var compiledModelFile = $"ck-{ckModelId.Name.ToLower()}-{ckModelId.Version}.json";
-        var compiledModelFilePath = Path.Combine(modelVersionPath, compiledModelFile);
-        return compiledModelFilePath;
-    }
+    private string CreatePath(string root, CkModelId ckModelId) =>
+        Path.Combine(_options.Value.RootPath, CkCatalogLayout.ModelFilePath(root, ckModelId));
 
+    /// <summary>F1.1-S6: the model file under the first read root that has it (v3, then v2).</summary>
     private bool TryGetExistingModelPath(CkModelId ckModelId, out string? compiledModelFilePath)
     {
-        compiledModelFilePath = CreatePath(ckModelId);
-        if (!File.Exists(compiledModelFilePath))
+        foreach (var root in CkCatalogLayout.ReadRoots)
         {
-            compiledModelFilePath = null;
-            return false;
+            compiledModelFilePath = CreatePath(root, ckModelId);
+            if (File.Exists(compiledModelFilePath))
+            {
+                return true;
+            }
         }
 
-        return true;
+        compiledModelFilePath = null;
+        return false;
     }
 
-    private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync()
+    private async Task<SharedCatalogTypes.RootCatalog?> GetRootCatalogAsync(string root)
     {
-        var catalogPath = Path.Combine(_options.Value.RootPath, $"{RootPath}{CatalogFileName}");
+        var catalogPath = Path.Combine(_options.Value.RootPath, $"{root}{CatalogFileName}");
 
         try
         {
@@ -445,13 +474,14 @@ public class LocalFileSystemCatalog : CachedCatalog
     /// <summary>
     /// Gets the catalog for a specific major version of a model
     /// </summary>
+    /// <param name="root">The catalog root (F1.1-S6: <c>ck-models/v2/</c> or <c>ck-models/v3/</c>)</param>
     /// <param name="modelName">The model ID (without version)</param>
     /// <param name="majorVersion">The major version number</param>
     /// <returns>The major version catalog content or null if not found</returns>
     private async Task<SharedCatalogTypes.ModelLibraryVersionsCatalog?> GetModelLibraryVersionsCatalogAsync(
-        string modelName, int majorVersion)
+        string root, string modelName, int majorVersion)
     {
-        var catalogPath = $"{RootPath}{modelName[0].ToString().ToLower()}/{modelName}/{majorVersion}/{CatalogFileName}";
+        var catalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelName)}{majorVersion}/{CatalogFileName}";
         catalogPath = Path.Combine(_options.Value.RootPath, catalogPath);
 
         try
@@ -477,15 +507,15 @@ public class LocalFileSystemCatalog : CachedCatalog
         }
     }
 
-    private async Task UpdateModelVersionsCatalogAsync(CkModelId modelId, string? description)
+    private async Task UpdateModelVersionsCatalogAsync(string root, CkModelId modelId, string? description)
     {
         // Create catalog file path for this major version
         var catalogPath =
-            $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{CatalogFileName}";
+            $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{modelId.Version.Major}/{CatalogFileName}";
         catalogPath = Path.Combine(_options.Value.RootPath, catalogPath);
 
         // Try to load existing catalog first
-        var catalogData = await GetModelLibraryVersionsCatalogAsync(modelId.Name, modelId.Version.Major)
+        var catalogData = await GetModelLibraryVersionsCatalogAsync(root, modelId.Name, modelId.Version.Major)
             .ConfigureAwait(false);
         bool isModified = false;
 
@@ -510,8 +540,7 @@ public class LocalFileSystemCatalog : CachedCatalog
         {
             // Add the new version only if it doesn't exist
             var fileName = $"ck-{modelId.Name.ToLower()}-{currentVersionString}.json";
-            var filePath =
-                $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{modelId.Version.Major}/{fileName}";
+            var filePath = CkCatalogLayout.ModelFilePath(root, modelId);
 
             versionDict[currentVersionString] = new SharedCatalogTypes.ModelLibraryVersionsCatalogEntry
             {
@@ -548,10 +577,10 @@ public class LocalFileSystemCatalog : CachedCatalog
         }
     }
 
-    private async Task UpdateModelLibraryCatalogAsync(CkModelId modelId)
+    private async Task UpdateModelLibraryCatalogAsync(string root, CkModelId modelId)
     {
         // Create catalog file path for the model
-        var catalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}";
+        var catalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{CatalogFileName}";
         catalogPath = Path.Combine(_options.Value.RootPath, catalogPath);
 
         // Try to load existing catalog first
@@ -572,8 +601,7 @@ public class LocalFileSystemCatalog : CachedCatalog
             catalogData.MajorVersions.Add(new SharedCatalogTypes.ModelLibraryCatalogEntry
             {
                 MajorVersion = currentMajor,
-                CatalogPath =
-                    $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{currentMajor}/{CatalogFileName}"
+                CatalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{currentMajor}/{CatalogFileName}"
             });
 
             catalogData.UpdatedAt = DateTime.UtcNow;
@@ -590,13 +618,13 @@ public class LocalFileSystemCatalog : CachedCatalog
         }
     }
 
-    private async Task UpdateRootCatalogAsync(CkModelId modelId)
+    private async Task UpdateRootCatalogAsync(string root, CkModelId modelId)
     {
-        var catalogPath = $"{RootPath}{CatalogFileName}";
+        var catalogPath = $"{root}{CatalogFileName}";
         catalogPath = Path.Combine(_options.Value.RootPath, catalogPath);
 
         // Get or create catalog
-        var catalogData = await GetRootCatalogAsync().ConfigureAwait(false);
+        var catalogData = await GetRootCatalogAsync(root).ConfigureAwait(false);
 
         catalogData ??= new SharedCatalogTypes.RootCatalog
         {
@@ -615,7 +643,7 @@ public class LocalFileSystemCatalog : CachedCatalog
             var newEntry = new SharedCatalogTypes.RootCatalogEntry
             {
                 ModelName = modelId.Name,
-                CatalogPath = $"{RootPath}{modelId.Name[0].ToString().ToLower()}/{modelId.Name}/{CatalogFileName}"
+                CatalogPath = $"{CkCatalogLayout.ModelDirectory(root, modelId.Name)}{CatalogFileName}"
             };
             catalogData.Models.Add(newEntry);
 

@@ -675,6 +675,27 @@ publisher that already opened it. It is safe to delete while no build is running
 leading dot keeps it out of the `ck-*.json` / `catalog.json` lookups. Temp files of an interrupted write
 (`.<name>.<guid>.tmp` next to the target) are never read either and can be deleted at any time.
 
+**Two catalog roots: `ck-models/v2/` and `ck-models/v3/` (F1.1-S6, AB#5909).** `CkCatalogLayout` decides where a
+model is published: classic models (`ckLanguage` 1, exact pins) go to `ck-models/v2/`, `ckLanguage: 2` and
+range-retaining models (and anything carrying `minEngineVersion`) to `ck-models/v3/`. Engines before CK v2 read
+only `v2` and tolerate unknown JSON properties, so the separate root is what keeps them from misreading a v2
+model. Engines from CK v2 on read both (`ReadRoots` = v3, then v2): `LocalFileSystemCatalog` lookups enumerate
+both directories, the refresh merges both index trees (a model may have versions in both), and `GitHubCatalog`
+takes the root from the cached `filePath` or probes v3 then v2 (a missing v3 root index is normal and is not
+retried, so it does not spend the AB#4872 404-retry budget). Each root has its own `catalog.json` tree and its
+own `.catalog-index.lock`. A version lives in one root only: publishing it into the other root needs `force`
+and (local catalog) deletes the old file. The catalog CI side (Pages deploy of `ck-models/v3/`) is F2.3.
+
+**`minEngineVersion` (F1.1-S6).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
+`CkEngineVersion.CkV2MinEngineVersion` (`3.4.0`, a deterministic constant — not the compiling engine's own
+version, so DebugL and release builds produce the same output) for `ckLanguage: 2` and range-retaining models;
+`null` otherwise (v1 output unchanged). `ElementResolver` and both dependency resolvers refuse a model above the
+running engine's version with **message 126** (`CkModelRequiresNewerEngine`; a dependency is skipped like a 91).
+The running version is the `ConstructionKit.Engine` assembly version; DebugL is `999.0.0` (accepts everything),
+and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. Raise the constant when a later
+engine writes features this engine line cannot read. `CatalogService.PublishAsync` resolves before it publishes, so
+it refuses such a model, too.
+
 **Fail fast with the visible versions.** When a dependency range cannot be satisfied,
 `CatalogDependencyResolver` lists the versions each readable catalog knows for that model
 (`... 'System-[2.5,3.0)' does not match any visible version of System (LocalFileSystemCatalog: 2.4.0)`)
@@ -786,6 +807,7 @@ that is Phase 3.
 
 | Key | Where | Contracts |
 | --- | ----- | --------- |
+| `minEngineVersion` (F1.1-S6) | compiled model only (`major.minor.patch`) | `CkCompiledModelRoot.MinEngineVersion`, `CkEngineVersion` (`CkV2MinEngineVersion`, `GetRequiredMinEngineVersion`, `IsSatisfiedBy`, `CheckModel`), `CkCatalogLayout` |
 | `ckLanguage` | `ckModel.yaml` (enum 1/2), compiled model (integer ≥ 1, so a higher version reaches message 91 instead of a schema error) | `CkModelPropertiesDto.CkLanguage`, `EffectiveCkLanguage`, `MaxSupportedCkLanguage` |
 | `interfaces` | new folder `interfaces/*.yaml` (`CompilerStatics.InterfacesFolder`), schema `construction-kit-elements-interface.schema.json` | `CkInterfaceId` (+ STJ/YAML/Newtonsoft converters, `CkIdInterfaceIdConverter`, `RtCkIdInterfaceIdConverter`), `CkInterfaceDto`, `CkInterfaceAttributeDto`, `CkModelRootBase.Interfaces`, `CkElementsRootDto.Interfaces`, `CkInterfaceGraph`, `ICkModelGraph.Interfaces` / `InterfacesByRtCk` / `GetOrCreateInterface`, `CkCacheRoot.Interfaces`, `ICkCacheService.GetRtCkInterface` / `GetRtCkInterfaces` |
 | `implements` | `CkType` / `CkCompiledType` | `CkTypeDto.Implements` (`List<CkId<CkInterfaceId>>`, JSON via `CkIdInterfaceIdListConverter`), `CkTypeGraph.DeclaredImplements` / `AllImplementedInterfaces` |
@@ -833,6 +855,7 @@ Notes:
 | 103 | `CkMethodErrorCodeInvalid` | `InheritanceResolver` | duplicate error code or `METHOD_` prefix |
 | 104 | `CkMethodAuthorizationInvalid` | `InheritanceResolver` | `allowSelf: true` on a `Static` method |
 | 105 | `RestrictedAttributeInDerivedRule` | `InheritanceResolver.ValidateRestrictedAttributeUse` | review M9: a `displayNameRule` / `displayDescriptionRule` path or a `Text` index path reaches a `Hidden` attribute (incl. record segments), or `ownerAttributePath` reaches a `Hidden` or `MethodOnly` one — those fields are readable/filterable/searchable and would leak it. Not covered (outside the engine compiler): asset-repo computed columns, association `targetCkAttributeIds` |
+| 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base

@@ -34,7 +34,9 @@ public class CkModelDiffService : ICkModelDiffService
             // Phase 0 spike — the classification of range/floor changes (only a raised floor or a changed range
             // counts) is Phase 2 (F2.1). Dependencies keeps carrying the exact closure and is still diffed.
             [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.SchemaUri), nameof(CkCompiledModelRoot.Dependencies), nameof(CkCompiledModelRoot.Migrations),
-                nameof(CkCompiledModelRoot.DependencyRanges), nameof(CkCompiledModelRoot.IsRangeRetaining)],
+                nameof(CkCompiledModelRoot.DependencyRanges), nameof(CkCompiledModelRoot.IsRangeRetaining),
+                // F1.1-S6: derived from ckLanguage / range retention by the compiler, not diffed on its own.
+                nameof(CkCompiledModelRoot.MinEngineVersion)],
             [typeof(CkModelRootBase)] =
             [
                 nameof(CkModelRootBase.Types), nameof(CkModelRootBase.AssociationRoles), nameof(CkModelRootBase.Attributes),

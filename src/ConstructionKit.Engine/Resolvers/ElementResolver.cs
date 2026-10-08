@@ -4,6 +4,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Versioning;
 
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
@@ -403,6 +404,12 @@ internal class ElementResolver : IElementResolver
         OperationResult operationResult)
     {
         var location = originFileResolver.Resolve(model.ModelId);
+        // F1.1-S6: a compiled model may require a newer engine (message 126).
+        if (!CkEngineVersion.CheckModel(model, location, operationResult))
+        {
+            return;
+        }
+
         if (model.CkLanguage is { } declared &&
             (declared < 1 || declared > CkModelPropertiesDto.MaxSupportedCkLanguage))
         {

@@ -1180,15 +1180,8 @@ public class CkModelMigrationServiceTests
         A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
             .Returns((IRuntimeRepository?)null);
 
-        var catalogResult = new ModelListResult
-        {
-            TotalCount = 0,
-            SkippedCount = 0,
-            TakeCount = 1000,
-            ModelResultItems = []
-        };
-        A.CallTo(() => _catalogService.ListAsync(0, 1000, A<string>._, A<CancellationToken>._))
-            .Returns(catalogResult);
+        A.CallTo(() => _catalogService.ListVersionsAsync("TestModel", A<object?>._, A<CancellationToken?>._))
+            .Returns(Array.Empty<CatalogResultItem>());
 
         var ct = TestContext.Current.CancellationToken;
 
@@ -1199,6 +1192,35 @@ public class CkModelMigrationServiceTests
         Assert.NotNull(result);
         Assert.Equal("TestModel", result.CkModelName);
         Assert.Null(result.InstalledVersion);
+    }
+
+    [Fact]
+    public async Task GetStatusAsync_LatestVersionBeyondFirst1000CatalogEntries_IsFound()
+    {
+        // AB#5650: the latest version used to be looked up in ListAsync(0, 1000); with more than 1000
+        // catalog entries the newest version of a model fell outside that window.
+        A.CallTo(() => _repositoryProvider.GetRepositoryAsync("tenant1", A<CancellationToken>._))
+            .Returns((IRuntimeRepository?)null);
+
+        var allEntries = Enumerable.Range(0, 1500)
+            .Select(i => new CatalogResultItem { ModelId = new CkModelId($"Filler{i:D4}-1.0.0"), CatalogName = "Public" })
+            .Append(new CatalogResultItem { ModelId = new CkModelId("TestModel-1.0.0"), CatalogName = "Public" })
+            .Append(new CatalogResultItem { ModelId = new CkModelId("TestModel-2.3.0"), CatalogName = "Private" })
+            .ToList();
+        A.CallTo(() => _catalogService.ListAsync(A<int>._, A<int>._, A<object?>._, A<CancellationToken?>._))
+            .ReturnsLazily((int skip, int take, object? _, CancellationToken? _) => new ModelListResult
+            {
+                TotalCount = allEntries.Count,
+                SkippedCount = skip,
+                TakeCount = take,
+                ModelResultItems = allEntries.Skip(skip).Take(take).ToList()
+            });
+        A.CallTo(() => _catalogService.ListVersionsAsync("TestModel", A<object?>._, A<CancellationToken?>._))
+            .Returns(allEntries.Where(e => e.ModelId.Name == "TestModel").ToList());
+
+        var result = await _sut.GetStatusAsync("tenant1", "TestModel", TestContext.Current.CancellationToken);
+
+        Assert.Equal("2.3.0", result.LatestAvailableVersion);
     }
 
     #endregion

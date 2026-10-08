@@ -10,7 +10,9 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.BlueprintCatalogs;
 public interface IBlueprintCatalogManager
 {
     /// <summary>
-    /// Searches for blueprints in all known catalogs
+    /// Searches for blueprints in all known catalogs. The merged result is sorted by blueprint name
+    /// (ordinal), then semantic version, before <paramref name="skip" />/<paramref name="take" /> apply;
+    /// a blueprint id found in several catalogs is taken from the catalog with the lowest order.
     /// </summary>
     /// <param name="searchTerm">Search term</param>
     /// <param name="skip">Amount of blueprints to skip</param>
@@ -22,7 +24,9 @@ public interface IBlueprintCatalogManager
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>
-    /// Lists blueprints in all known catalogs.
+    /// Lists blueprints in all known catalogs. The merged result is sorted by blueprint name
+    /// (ordinal), then semantic version, before <paramref name="skip" />/<paramref name="take" /> apply;
+    /// a blueprint id found in several catalogs is taken from the catalog with the lowest order.
     /// </summary>
     /// <param name="skip">Amount of blueprints to skip</param>
     /// <param name="take">Amount of blueprints to take</param>
@@ -30,6 +34,17 @@ public interface IBlueprintCatalogManager
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>A list result containing the blueprints found</returns>
     Task<BlueprintListResult> ListAsync(int skip, int take,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
+    /// <summary>
+    /// Lists every version of a single blueprint across all known catalogs, without paging. Uses the
+    /// same merge rule as <see cref="ListAsync" /> (lowest catalog order wins per blueprint id).
+    /// </summary>
+    /// <param name="blueprintName">Blueprint name without version, e.g. "InfrastructureStarter" (ordinal match)</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>All catalog entries of that blueprint, ordered by ascending semantic version</returns>
+    Task<IReadOnlyList<BlueprintCatalogResultItem>> ListVersionsAsync(string blueprintName,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
     /// <summary>

@@ -663,11 +663,14 @@ internal class BlueprintService : IBlueprintService
 
         // 2. Find available versions in catalog
         var resolvedName = currentInfo.BlueprintId.Name;
-        var listResult = await _blueprintCatalogManager.ListAsync(0, 1000).ConfigureAwait(false);
+        //    Unpaged per-name lookup (AB#5650): a fixed ListAsync(0, 1000) window silently dropped
+        //    versions beyond it once the merged catalogs grew.
+        var catalogVersions = await _blueprintCatalogManager
+            .ListVersionsAsync(resolvedName, cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
 
-        var availableVersions = listResult.Items
-            .Where(item => item.BlueprintId.Name == resolvedName &&
-                           item.BlueprintId.Version.CompareTo(currentInfo.BlueprintId.Version) > 0)
+        var availableVersions = catalogVersions
+            .Where(item => item.BlueprintId.Version.CompareTo(currentInfo.BlueprintId.Version) > 0)
             .Select(item => item.BlueprintId)
             .OrderBy(id => id.Version)
             .ToList();

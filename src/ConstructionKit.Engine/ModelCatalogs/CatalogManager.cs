@@ -30,34 +30,16 @@ internal class CatalogManager : ICatalogManager
     {
         _logger.LogInformation("Searching CK models in catalogs with term {SearchTerm}", searchTerm);
 
-        Dictionary<CkModelId, CatalogResultItem> allModelResultItems = new();
-
-        foreach (var catalog in _catalogs.OrderBy(x => x.Order))
-        {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
-            {
-                continue;
-            }
-
-            _logger.LogInformation("Checking catalog {CatalogName} for models",
-                catalog.CatalogName);
-
-            await foreach (var modelResultItem in catalog.SearchAsync(searchTerm, sourceIdentifier).ConfigureAwait(false))
-            {
-                if (!allModelResultItems.ContainsKey(modelResultItem.ModelId))
-                {
-                    allModelResultItems[modelResultItem.ModelId] = modelResultItem;
-                }
-            }
-        }
+        var allItems = await CollectMergedAsync(catalog => catalog.SearchAsync(searchTerm, sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 
         return new ModelSearchResult
         {
             SearchTerm = searchTerm,
             SkippedCount = skip,
             TakeCount = take,
-            TotalCount = allModelResultItems.Count,
-            ModelResultItems = allModelResultItems.Values.Skip(skip).Take(take).ToList()
+            TotalCount = allItems.Count,
+            ModelResultItems = allItems.Skip(skip).Take(take).ToList()
         };
     }
 
@@ -66,38 +48,18 @@ internal class CatalogManager : ICatalogManager
     {
         _logger.LogInformation("Searching CK models in catalog {CatalogName} with term {SearchTerm}", catalogName, searchTerm);
 
-        var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
-            catalogName, StringComparison.OrdinalIgnoreCase) == 0);
-        if (catalog == null)
-        {
-            throw ModelCatalogException.ModelCatalogNotFound(catalogName);
-        }
+        var catalog = GetCatalogOrThrow(catalogName);
 
-        int count = 0;
-        int taken = 0;
-        List<CatalogResultItem> modelResultItems = new List<CatalogResultItem>();
-        await foreach (var modelResultItem in catalog.SearchAsync(searchTerm, sourceIdentifier).ConfigureAwait(false))
-        {
-            if (count++ < skip)
-            {
-                continue;
-            }
-
-            if (taken++ >= take)
-            {
-                break;
-            }
-
-            modelResultItems.Add(modelResultItem);
-        }
+        var allItems = await CollectAsync(catalog.SearchAsync(searchTerm, sourceIdentifier),
+            cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 
         return new ModelSearchResult
         {
             SearchTerm = searchTerm,
             SkippedCount = skip,
             TakeCount = take,
-            TotalCount = modelResultItems.Count,
-            ModelResultItems = modelResultItems.Skip(skip).Take(take).ToList()
+            TotalCount = allItems.Count,
+            ModelResultItems = allItems.Skip(skip).Take(take).ToList()
         };
     }
 
@@ -106,51 +68,15 @@ internal class CatalogManager : ICatalogManager
     {
         _logger.LogInformation("Listing CK models in catalogs");
 
-        Dictionary<CkModelId, CatalogResultItem> allModelResultItems = new();
-
-        int count = 0;
-        int taken = 0;
-        foreach (var catalog in _catalogs.OrderBy(x => x.Order))
-        {
-            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
-            {
-                continue;
-            }
-
-            _logger.LogInformation("Checking catalog {CatalogName} for models",
-                catalog.CatalogName);
-
-            List<CatalogResultItem> modelResultItems = new List<CatalogResultItem>();
-            await foreach (var modelResultItem in catalog.ListAsync(sourceIdentifier).ConfigureAwait(false))
-            {
-                if (count++ < skip)
-                {
-                    continue;
-                }
-
-                if (taken++ >= take)
-                {
-                    break;
-                }
-
-                modelResultItems.Add(modelResultItem);
-            }
-
-            foreach (var modelResultItem in modelResultItems)
-            {
-                if (!allModelResultItems.ContainsKey(modelResultItem.ModelId))
-                {
-                    allModelResultItems[modelResultItem.ModelId] = modelResultItem;
-                }
-            }
-        }
+        var allItems = await CollectMergedAsync(catalog => catalog.ListAsync(sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
 
         return new ModelListResult
         {
             SkippedCount = skip,
             TakeCount = take,
-            TotalCount = allModelResultItems.Count,
-            ModelResultItems = allModelResultItems.Values.Skip(skip).Take(take).ToList()
+            TotalCount = allItems.Count,
+            ModelResultItems = allItems.Skip(skip).Take(take).ToList()
         };
     }
 
@@ -159,6 +85,42 @@ internal class CatalogManager : ICatalogManager
     {
         _logger.LogInformation("Listing CK models in catalog {CatalogName}", catalogName);
 
+        var catalog = GetCatalogOrThrow(catalogName);
+
+        var allItems = await CollectAsync(catalog.ListAsync(sourceIdentifier),
+            cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+
+        return new ModelListResult
+        {
+            SkippedCount = skip,
+            TakeCount = take,
+            TotalCount = allItems.Count,
+            ModelResultItems = allItems.Skip(skip).Take(take).ToList()
+        };
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<CatalogResultItem>> ListVersionsAsync(string ckModelName,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null)
+    {
+        if (string.IsNullOrWhiteSpace(ckModelName))
+        {
+            throw new ArgumentException("CK model name must not be empty.", nameof(ckModelName));
+        }
+
+        _logger.LogDebug("Listing versions of CK model {CkModelName} in catalogs", ckModelName);
+
+        var allItems = await CollectMergedAsync(catalog => catalog.ListAsync(sourceIdentifier),
+            sourceIdentifier, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
+
+        return allItems
+            .Where(item => string.Equals(item.ModelId.Name, ckModelName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(item => item.ModelId.Version)
+            .ToList();
+    }
+
+    private ICatalog GetCatalogOrThrow(string catalogName)
+    {
         var catalog = _catalogs.FirstOrDefault(x => string.Compare(x.CatalogName,
             catalogName, StringComparison.OrdinalIgnoreCase) == 0);
         if (catalog == null)
@@ -166,31 +128,53 @@ internal class CatalogManager : ICatalogManager
             throw ModelCatalogException.ModelCatalogNotFound(catalogName);
         }
 
-        int count = 0;
-        int taken = 0;
-        List<CatalogResultItem> modelResultItems = new List<CatalogResultItem>();
-        await foreach (var modelResultItem in catalog.ListAsync(sourceIdentifier).ConfigureAwait(false))
+        return catalog;
+    }
+
+    /// <summary>
+    /// Merges the entries of all readable catalogs into one list, in catalog order. A model id present in
+    /// several catalogs is taken from the catalog with the lowest <c>Order</c>. Skip/take is applied by the
+    /// callers on the complete, deduplicated list (AB#5650: the old loop counted skip/take per raw entry
+    /// across catalogs, counted duplicates against the window and then applied skip a second time).
+    /// </summary>
+    private async Task<List<CatalogResultItem>> CollectMergedAsync(
+        Func<ICatalog, IAsyncEnumerable<CatalogResultItem>> enumerate,
+        object? sourceIdentifier, CancellationToken cancellationToken)
+    {
+        var allItems = new List<CatalogResultItem>();
+        var seenIds = new HashSet<CkModelId>();
+
+        foreach (var catalog in _catalogs.OrderBy(x => x.Order))
         {
-            if (count++ < skip)
+            if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
             {
                 continue;
             }
 
-            if (taken++ >= take)
-            {
-                break;
-            }
+            _logger.LogInformation("Checking catalog {CatalogName} for models", catalog.CatalogName);
 
-            modelResultItems.Add(modelResultItem);
+            await foreach (var item in enumerate(catalog).WithCancellation(cancellationToken).ConfigureAwait(false))
+            {
+                if (seenIds.Add(item.ModelId))
+                {
+                    allItems.Add(item);
+                }
+            }
         }
 
-        return new ModelListResult
+        return allItems;
+    }
+
+    private static async Task<List<CatalogResultItem>> CollectAsync(IAsyncEnumerable<CatalogResultItem> items,
+        CancellationToken cancellationToken)
+    {
+        var result = new List<CatalogResultItem>();
+        await foreach (var item in items.WithCancellation(cancellationToken).ConfigureAwait(false))
         {
-            SkippedCount = skip,
-            TakeCount = take,
-            TotalCount = modelResultItems.Count,
-            ModelResultItems = modelResultItems.Skip(skip).Take(take).ToList()
-        };
+            result.Add(item);
+        }
+
+        return result;
     }
 
     /// <inheritdoc />

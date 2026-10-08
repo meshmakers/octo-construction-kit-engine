@@ -69,6 +69,21 @@ internal interface ICatalogManager
     Task<ModelListResult> ListAsync(string catalogName, int skip, int take,
         object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
 
+    /// <summary>
+    /// Returns all versions of a construction kit model across all known catalogs, unpaged and ordered by
+    /// ascending semantic version. The model name is matched case-insensitively. A model id present in
+    /// several catalogs is taken from the catalog with the lowest <c>Order</c> (same dedupe rule as
+    /// <see cref="ListAsync(int, int, object?, CancellationToken?)" />).
+    /// </summary>
+    /// <param name="ckModelName">Name of the construction kit model (without version)</param>
+    /// <param name="sourceIdentifier">An object
+    /// that describes the source
+    /// which the catalog should search set it to null to use default</param>
+    /// <param name="cancellationToken">A cancellation token that can be used to cancel the operation</param>
+    /// <returns>All catalog entries of the model, ordered by version</returns>
+    Task<IReadOnlyList<CatalogResultItem>> ListVersionsAsync(string ckModelName,
+        object? sourceIdentifier = null, CancellationToken? cancellationToken = null);
+
 
     /// <summary>
     ///     Tries to look up a model by its id in all known catalogs

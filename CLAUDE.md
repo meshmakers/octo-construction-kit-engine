@@ -552,7 +552,7 @@ targets, which do not re-enter the publish path from a test step.
 
 Two pipeline variables are in play and only one of them is the routing decision. Both come
 from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-templates`
-(pinned here at `tpl-v0.5.3`):
+(pinned here at `tpl-v0.6.5`):
 
 | Variable | Meaning |
 | -------- | ------- |

@@ -41,6 +41,41 @@ public class CkSemVerClassificationGuardTests
         typeof(CkMethodExecutionDto)
     ];
 
+    /// <summary>
+    ///     DTO types that are not part of a compiled model's public surface and therefore not diffed:
+    ///     source/input roots, the cache root, the model-config file, the range-retention dependency entry
+    ///     (diffed with DependencyRanges in Phase 2) and an internal tuple.
+    /// </summary>
+    private static readonly Type[] NotDiffedDtoTypes =
+    [
+        typeof(CkCacheRoot),
+        typeof(CkElementsRootDto),
+        typeof(CkMetaRootDto),
+        typeof(CkModelCompileCandidate),
+        typeof(CkModelConfigDto),
+        typeof(CkModelDependencyDto),
+        typeof(CkTypeAssociationTuple)
+    ];
+
+    /// <summary>
+    ///     F1.1-S1 (AB#5904): a NEW DTO type (not just a new property) must not slip past the diff either — every
+    ///     public class/record in the DataTransferObjects namespace is either checked above or consciously excluded.
+    /// </summary>
+    [Fact]
+    public void EveryDtoType_IsKnownOrConsciouslyExcluded()
+    {
+        var unclassified = typeof(CkCompiledModelRoot).Assembly.GetTypes()
+            .Where(t => t.IsPublic && t.IsClass && t.Namespace == typeof(CkCompiledModelRoot).Namespace &&
+                        !t.IsSubclassOf(typeof(Attribute)) && !(t.IsAbstract && t.IsSealed))
+            .Where(t => !KnownDtoTypes.Contains(t) && !NotDiffedDtoTypes.Contains(t))
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(unclassified.Count == 0,
+            "DTO types neither registered in KnownDtoTypes/CkModelDiffService.AccountedProperties nor excluded: " +
+            string.Join(", ", unclassified));
+    }
+
     public static TheoryData<Type> ElementDtoTypes()
     {
         var data = new TheoryData<Type>();

@@ -12,6 +12,8 @@ Fixtures (frozen sources, `ckLanguage: 1`):
 under `expected/catalog/` the catalog JSON written by `octo-ckc -c publish -c LocalFileSystemCatalog`.
 **All files were regenerated on 2026-10-07 with octo-ckc built from `main` (6189ef1d, engine before
 CK v2)** — not from a feature commit. The System files were byte-identical to the earlier goldens.
+Re-verified on 2026-10-08 against octo-ckc built from `origin/main` 01fb187 (Phase 1 base): all six files
+byte-identical, no regeneration needed.
 
 Regenerate (only if `main` itself changes the v1 output on purpose):
 

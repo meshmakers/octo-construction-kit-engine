@@ -11,7 +11,7 @@ public class CkCompilerOptions
     public const string RangeRetentionPropertyName = "OctoCkRangeRetention";
 
     /// <summary>
-    ///     CK v2 range retention (AB#5664, Phase 0 spike, default off). When true the compiler writes
+    ///     CK v2 range retention (AB#5664 / AB#5905, default off). When true the compiler writes
     ///     <see cref="DataTransferObjects.CkCompiledModelRoot.DependencyRanges" /> (declared range + floor per
     ///     direct dependency) and stores references into dependencies major-qualified and model-version-less
     ///     (<c>System@2/Entity-1</c>) instead of pinning the highest catalog version

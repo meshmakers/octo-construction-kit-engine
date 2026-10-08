@@ -51,7 +51,7 @@ internal class CompileCommand : CkcCommand
 
         _rangeRetention = CommandArgumentValue.AddArgument("rr", "rangeRetention",
         [
-            "CK v2 range retention (spike, AB#5664): keep the declared dependency range and floor and store " +
+            "CK v2 range retention (AB#5664, default off): keep the declared dependency range and floor and store " +
             "major-qualified references (System@2/Entity-1) instead of pinning the highest catalog version. " +
             "Defaults to the environment variable OctoCkRangeRetention."
         ], false, 1);

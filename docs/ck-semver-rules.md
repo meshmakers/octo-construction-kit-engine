@@ -170,7 +170,7 @@ surface in the dependency diff.
 | CK v2: new interface | Purely additive |
 | CK v2: new `implements` entry on a type | Additive |
 | CK v2: new method | Additive |
-| CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 0 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
+| CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 1 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
 | CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it |
 
 ### Patch
@@ -195,7 +195,7 @@ implementation and a classification rule (or a documented, conscious exclusion).
 `ConstructionKit.Engine.Tests` fails when a DTO property is not accounted for, and this page must
 be extended with the new rule.
 
-**Conscious exclusion — range retention (AB#5664, CK v2 Phase 0 spike).**
+**Conscious exclusion — range retention (AB#5664 / AB#5905, behind `OctoCkRangeRetention`, default off).**
 `CkCompiledModelRoot.DependencyRanges` (declared range + floor per direct dependency) and the derived
 `IsRangeRetaining` are not diffed yet. Per CK v2 concept §4.3.1 only a *raised floor* or a *changed range*
 will count as a change; that rule is Phase 2 (F2.1). `Dependencies` keeps the exact closure and is still

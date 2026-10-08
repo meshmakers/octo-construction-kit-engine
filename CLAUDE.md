@@ -685,7 +685,7 @@ Other repositories with sibling CK models must follow the same two rules (checke
 without a ProjectReference; `octo-construction-kit-engine-mongodb` test models depend only on
 System).
 
-## CK v2 Range Retention (Phase 0 spike, AB#5664 / AB#5665)
+## CK v2 Range Retention (AB#5664 / AB#5665, Phase 1 F1.1-S2 AB#5905 — behind a flag, default off)
 
 Behind the flag **`OctoCkRangeRetention=true`** (default **off**; MSBuild property, octo-ckc `-rr true`,
 or the environment variable of the same name — MSBuild also picks an exported variable up as property).
@@ -757,12 +757,18 @@ element schemas accept `@` in the model part of a reference; the compiled schema
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema
 validation, floor violation, resolve against a later minor without recompile, two-level chain).
 
-## CK v2 Phase 0: interfaces, attribute access, methods (AB#5667 / AB#5668 / AB#5669)
+## CK v2: interfaces, attribute access, method definitions (AB#5667 / AB#5668 / AB#5669; Phase 1 F1.1-S1 AB#5904, F1.2-S1 AB#5910)
 
 Gated by **`ckLanguage: 2`** in `ckModel.yaml` (`CkModelPropertiesDto.CkLanguage`, `null` = 1). A model
 without the key compiles byte-identical to the engine before CK v2 — compiled YAML **and** CK cache JSON
 (`CkV1CompileOutputUnchangedTests` against the frozen golden in
-`tests/ConstructionKit.Compiler.Tests/sampleData/v1Golden`, produced by the pre-CK-v2 engine).
+`tests/ConstructionKit.Compiler.Tests/sampleData/v1Golden`, produced by octo-ckc built from `main` — 6189ef1d,
+re-verified byte-identical against `origin/main` 01fb187 on 2026-10-08; the comparison covers the compiled YAML, the
+cache JSON and the catalog JSON of a model without and one with a dependency).
+
+**Methods are definitions only.** Phase 1 ships the method meta-model (schema, DTOs, graphs, cache, compiler rules,
+`CkMethodIds`, generated method-id constants). There is no invocation, dispatch or handler runtime in the engine;
+that is Phase 3.
 
 | Key | Where | Contracts |
 | --- | ----- | --------- |
@@ -779,7 +785,10 @@ Notes:
   `ReadWrite`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes **90–109** are reserved for CK v2 Phase 0 (78–89 belong to F0.2).
+- Message codes: 78–89 F0.2 (range retention), 90–105 CK v2 rules (in use), **106–129 reserved for Phase 1**
+  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, spare 127–129).
+  `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
+  `MessageCodesSyncTests` fails when the two tables differ in key, number, level or text, or a number repeats.
 
 ### Compiler rules and message codes
 
@@ -808,7 +817,7 @@ ids, method `valueCkRecordId` / `valueCkEnumId`) go through the `VariableResolve
 Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}InterfaceId`,
 `RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
 `SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
-appended: `UserChangePassword2MethodId`). Typed parameter records are not generated (Phase 0 stretch goal).
+appended: `UserChangePassword2MethodId`). Typed parameter records are not generated yet (F1.4-S2).
 Docs generator: `Interfaces.md` per model plus an "Implements" line and a methods table per type (only when present).
 SemVer rules: `docs/ck-semver-rules.md` (additions Minor, removals and contract/signature changes Major, `access`
 changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor).
@@ -827,7 +836,7 @@ changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor).
 | 8 | Source generator | — | yes | — | — | yes |
 | 9 | Docs generator | — | yes | yes | — | yes |
 | 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | |
-| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` (Phase 0) | P1 |
+| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 |
 
 Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/ConstructionKit.Engine.Tests/CkV2`),
 `CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` (one failing and one passing case per code, on the C#

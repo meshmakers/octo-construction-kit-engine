@@ -23,4 +23,32 @@ internal static class CkGenerationModelBinder
             ? CkReferenceRewriter.BindMajorQualified(compiledModel, cacheService.GetCkModelIds(tenantId))
             : 0;
     }
+
+    /// <summary>
+    ///     F1.1-S2 (D1 diagnostic): the major-qualified references that are still unbound after
+    ///     <see cref="BindToCache" />, as <c>kind Model@N/Element</c>.
+    /// </summary>
+    public static IReadOnlyList<string> FindUnbound(CkCompiledModelRoot compiledModel)
+    {
+        return CkReferenceRewriter.CollectReferences(compiledModel)
+            .Where(r => r.ModelId.IsMajorQualified)
+            .Select(r => $"{r.Kind} {r.ModelId.FullName}/{r.ElementId}")
+            .Distinct()
+            .OrderBy(r => r, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    ///     Message of the OM1004 diagnostic: names the unbound references and the versions the compile cache holds,
+    ///     instead of the opaque "not found in CkCache" exception of the per-element generators.
+    /// </summary>
+    public static string DescribeUnbound(CkCompiledModelRoot compiledModel, IReadOnlyList<string> unbound,
+        IEnumerable<Contracts.CkModelId> cachedModels)
+    {
+        var cached = string.Join(", ", cachedModels.Select(m => m.FullName).OrderBy(m => m, StringComparer.Ordinal));
+        return $"Model '{compiledModel.ModelId}' references {string.Join(", ", unbound)}, but the compile cache " +
+               $"holds no version of that model and major (cache: {(cached.Length == 0 ? "empty" : cached)}). The " +
+               "dependency was resolved in another major or is missing from the compile cache; check the dependency " +
+               "range in ckModel.yaml and rebuild the model.";
+    }
 }

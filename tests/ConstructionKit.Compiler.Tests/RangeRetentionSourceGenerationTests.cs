@@ -1,6 +1,7 @@
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 using Meshmakers.Octo.ConstructionKit.SourceGeneration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -61,5 +62,41 @@ public sealed class RangeRetentionSourceGenerationTests : IDisposable
 
         Assert.Contains("public partial class RtThing", code);
         Assert.Contains("Label", code);
+    }
+
+    // F1.1-S2 (D1 diagnostic): a reference that stays unbound gets a dedicated OM1004 message naming it and the
+    // cache content, instead of the opaque "not found in CkCache" OM1003.
+    [Fact]
+    public async Task UnboundReference_IsReportedWithReferenceAndCacheContent()
+    {
+        await _fixture.CompileAndPublishAsync(_fixture.WriteSystemModel("2.5.0", withExtraAttribute: true));
+        var source = _fixture.WriteSource("dep", "Dep-1.0.0", ["System-[2.5,3.0)"], new Dictionary<string, string>
+        {
+            ["types/thing.yaml"] = "types:\n  - typeId: Thing\n    derivedFromCkTypeId: ${System}/Entity\n"
+        });
+        var outputDir = Path.Combine(_fixture.Root, "out");
+        var cacheDir = Path.Combine(_fixture.Root, "cache");
+        Directory.CreateDirectory(outputDir);
+        Directory.CreateDirectory(cacheDir);
+        var result = await _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileAsync(source, outputDir, cacheDir);
+        var compiled = _fixture.Services.GetRequiredService<ICkYamlSerializer>().DeserializeCompiledModelRoot(
+            await File.ReadAllTextAsync(result.CompiledModelFile, TestContext.Current.CancellationToken),
+            result.CompiledModelFile, new OperationResult());
+        var cacheService = _fixture.Services.GetRequiredService<ICkCacheService>();
+        cacheService.CreateTenant("unbound");
+        cacheService.RestoreCache("unbound",
+            await File.ReadAllTextAsync(result.CompiledModelCacheFilePath!, TestContext.Current.CancellationToken));
+
+        // The reference names a major the compile cache does not hold (cache: System-2.5.0).
+        CkReferenceRewriter.Rewrite(compiled, id => id.IsMajorQualified ? CkModelId.MajorQualified(id.Name, 3) : null);
+        CkGenerationModelBinder.BindToCache(compiled, cacheService, "unbound");
+        var unbound = CkGenerationModelBinder.FindUnbound(compiled);
+        var message = CkGenerationModelBinder.DescribeUnbound(compiled, unbound, cacheService.GetCkModelIds("unbound"));
+
+        Assert.Equal(["type System@3/Entity-1"], unbound);
+        Assert.Contains("Dep-1.0.0", message);
+        Assert.Contains("System@3/Entity-1", message);
+        Assert.Contains("System-2.5.0", message);
     }
 }

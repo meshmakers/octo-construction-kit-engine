@@ -734,6 +734,20 @@ that assigns a dependency attribute failed with `OM1003 CkAttributeId 'System@2/
 generator files). Service repos pick the fix up only with a new `Meshmakers.Octo.ConstructionKit.SourceGeneration`
 package.
 
+**Transitive references are floor-checked (review L14).** A model may reference a model it does not declare
+(`Industry.Energy` uses `${Basic}` but declares only `Industry.Basic`). Its references are still rewritten to
+`Basic@2/...`, and `CatalogModelResolver.CollectTransitiveDependenciesAsync` derives the guarantee for them from the
+resolved intermediate models — their range-retaining dependency, or their exact pin as `[v]` with floor `v`; the
+highest floor wins. The same floor check as for declared dependencies runs against it; a miss says the dependency is
+transitive, names the intermediate and asks to declare the model in `ckModel.yaml`. No `dependencyRanges` entry is
+written for transitive models (declared ranges stay verbatim). Pinned by
+`FlagOn_TransitiveReference_IsFloorCheckedAgainstTheIntermediateRange`.
+
+**Unbound references in source generation (D1 diagnostic, OM1004).** When a major-qualified reference is still
+unbound after `CkGenerationModelBinder.BindToCache` (the compile cache holds no version of that model and major), the
+generator reports `OM1004 Unbound major-qualified CK reference` naming the references and the cached model versions,
+instead of the opaque `OM1003 … not found in CkCache`. Pinned by `UnboundReference_IsReportedWithReferenceAndCacheContent`.
+
 **Range identity in the resolvers (D2).** `CkModelIdVersionRange.Equals` means *overlaps* (not transitive,
 inconsistent with `GetHashCode`). The dependency resolvers therefore match queued ranges structurally
 (`IsSameRange`: same name, identical `CkVersionRange`). With range retention `System-[2.5,3.0)` overlaps

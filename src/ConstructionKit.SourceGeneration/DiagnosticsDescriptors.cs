@@ -35,4 +35,16 @@ internal static class DiagnosticsDescriptors
             "Construction Kit", // category
             DiagnosticSeverity.Error,
             true);
+
+    /// <summary>
+    ///     F1.1-S2 (D1 diagnostic): a major-qualified reference (<c>System@2/Enabled-1</c>) of a range-retaining
+    ///     model has no matching version in the compile cache, so code generation cannot resolve it.
+    /// </summary>
+    public static readonly DiagnosticDescriptor UnboundMajorQualifiedReference
+        = new("OM1004", // id
+            "Unbound major-qualified CK reference", // title
+            "{0}", // message
+            "Construction Kit", // category
+            DiagnosticSeverity.Error,
+            true);
 }

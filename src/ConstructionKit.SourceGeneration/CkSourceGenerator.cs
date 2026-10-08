@@ -157,6 +157,15 @@ public class CkSourceGenerator : IIncrementalGenerator
                 LogDiagnostic(DiagnosticSeverity.Info, $"Bound {bound} major-qualified reference(s) to the compile cache");
             }
 
+            var unbound = CkGenerationModelBinder.FindUnbound(ckCompiledModelRoot);
+            if (unbound.Count > 0)
+            {
+                context.ReportDiagnostic(Diagnostic.Create(DiagnosticsDescriptors.UnboundMajorQualifiedReference, null,
+                    CkGenerationModelBinder.DescribeUnbound(ckCompiledModelRoot, unbound,
+                        ckCacheService.GetCkModelIds(tenantId))));
+                return;
+            }
+
             var ns =
                 $"{fileOptions.LocalNamespace}.Generated.{ckCompiledModelRoot.ModelId.Name}.v{ckCompiledModelRoot.ModelId.Version.Major.ToString()}";
 

@@ -239,6 +239,42 @@ public sealed class RangeRetentionCompileTests : IDisposable
         Assert.Contains("rebuild the exact-pinned dependency with range retention", exception.Message);
     }
 
+    // Review L14: references into a TRANSITIVE dependency are floor-checked against the floor the intermediate
+    // model guarantees (Mid declares System-[2.4,3.0), Top declares only Mid but uses System elements).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FlagOn_TransitiveReference_IsFloorCheckedAgainstTheIntermediateRange(bool useExtra)
+    {
+        await PublishSystemsAsync(_on, "2.4.0", "2.5.0");
+        await _on.CompileAndPublishAsync(_on.WriteSource("mid", "Mid-1.0.0", ["System-[2.4,3.0)"],
+            new Dictionary<string, string>
+            {
+                ["types/m.yaml"] = "types:\n  - typeId: MidThing\n    derivedFromCkTypeId: ${System}/Entity\n"
+            }));
+        var top = _on.WriteSource("top", "Top-1.0.0", ["Mid-[1.0,2.0)"], new Dictionary<string, string>
+        {
+            ["types/t.yaml"] = "types:\n  - typeId: TopThing\n    derivedFromCkTypeId: ${Mid}/MidThing\n" +
+                               (useExtra
+                                   ? "    attributes:\n      - id: ${System}/Extra\n        name: Extra\n        isOptional: true\n"
+                                   : "")
+        });
+
+        if (useExtra)
+        {
+            var exception = await Assert.ThrowsAsync<ModelValidationException>(() => _on.CompileAsync(top));
+            Assert.Contains("attribute System/Extra-1", exception.Message);
+            Assert.Contains("missing in 'System-2.4.0'", exception.Message);
+            Assert.Contains("transitive", exception.Message);
+            Assert.Contains("Mid-1.0.0", exception.Message);
+        }
+        else
+        {
+            var compiled = await _on.CompileAsync(top);
+            Assert.Equal("Mid-[1.0,2.0)", compiled.DependencyRanges!.Single().Range.FullName);
+        }
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

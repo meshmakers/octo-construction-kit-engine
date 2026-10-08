@@ -163,7 +163,13 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             throw ModelValidationException.RangeSpansSeveralMajors(compiledModel.ModelId, multiMajor);
         }
 
-        await VerifyFloorsAsync(compiledModel, dependencies, modelGraph, sourceIdentifier).ConfigureAwait(false);
+        await VerifyFloorsAsync(compiledModel, dependencies, modelGraph, sourceIdentifier, null).ConfigureAwait(false);
+
+        // Review L14: references into TRANSITIVE dependencies (e.g. Industry.Energy uses ${Basic} but declares only
+        // Industry.Basic) are floor-checked too, against the floor the intermediate model guarantees.
+        var (transitive, via) = await CollectTransitiveDependenciesAsync(compiledModel, dependencies, modelGraph,
+            sourceIdentifier).ConfigureAwait(false);
+        await VerifyFloorsAsync(compiledModel, transitive, modelGraph, sourceIdentifier, via).ConfigureAwait(false);
 
         var dependencyNames = new HashSet<string>(modelGraph.Models.Keys
             .Where(m => m.Name != ownName)
@@ -213,7 +219,8 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
     ///     it cannot resolve.
     /// </summary>
     private async Task VerifyFloorsAsync(CkCompiledModelRoot compiledModel,
-        IReadOnlyCollection<CkModelDependencyDto> dependencies, CkModelGraph modelGraph, object? sourceIdentifier)
+        IReadOnlyCollection<CkModelDependencyDto> dependencies, CkModelGraph modelGraph, object? sourceIdentifier,
+        IReadOnlyDictionary<string, CkModelId>? transitiveVia)
     {
         var references = CkReferenceRewriter.CollectReferences(compiledModel);
         foreach (var dependency in dependencies)
@@ -257,9 +264,77 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             if (missing.Count > 0)
             {
                 throw ModelValidationException.ReferenceMissingAtFloor(compiledModel.ModelId, dependency.Range,
-                    floorModel.ModelId, resolved, missing);
+                    floorModel.ModelId, resolved, missing,
+                    transitiveVia != null && transitiveVia.TryGetValue(name, out var viaModel) ? viaModel : null);
             }
         }
+    }
+
+    /// <summary>
+    ///     Review L14: for every model the compiled model references but does not declare, the range + floor the
+    ///     resolved intermediate models guarantee (their range-retaining dependency, or their exact pin as
+    ///     <c>[v]</c> with floor v). The highest floor wins — it is the oldest version a tenant can hold while the
+    ///     intermediate is installed.
+    /// </summary>
+    private async Task<(IReadOnlyCollection<CkModelDependencyDto> Dependencies, IReadOnlyDictionary<string, CkModelId> Via)>
+        CollectTransitiveDependenciesAsync(CkCompiledModelRoot compiledModel,
+            IReadOnlyCollection<CkModelDependencyDto> declared, CkModelGraph modelGraph, object? sourceIdentifier)
+    {
+        var ownName = compiledModel.ModelId.Name;
+        var declaredNames = new HashSet<string>(declared.Select(d => d.Range.Name));
+        var undeclared = CkReferenceRewriter.CollectReferences(compiledModel)
+            .Select(r => r.ModelId.Name)
+            .Where(n => n != ownName && !declaredNames.Contains(n))
+            .Distinct()
+            .ToList();
+        var result = new List<CkModelDependencyDto>();
+        var via = new Dictionary<string, CkModelId>();
+        if (undeclared.Count == 0)
+        {
+            return (result, via);
+        }
+
+        var intermediates = new List<CkCompiledModelRoot>();
+        foreach (var modelId in modelGraph.Models.Keys.Where(m => m.Name != ownName))
+        {
+            var model = await _catalogManager.Value.TryGetAsync(modelId, new OperationResult(), sourceIdentifier)
+                .ConfigureAwait(false);
+            if (model != null)
+            {
+                intermediates.Add(model);
+            }
+        }
+
+        foreach (var name in undeclared)
+        {
+            CkModelDependencyDto? best = null;
+            CkModelId? bestVia = null;
+            foreach (var intermediate in intermediates.Where(m => m.ModelId.Name != name))
+            {
+                var candidate = intermediate.DependencyRanges?.FirstOrDefault(d => d.Range.Name == name);
+                if (candidate == null && intermediate.Dependencies?.FirstOrDefault(d => d.Name == name) is { } pin)
+                {
+                    candidate = new CkModelDependencyDto
+                    {
+                        Range = new CkModelIdVersionRange(name, $"[{pin.Version}]"), Floor = pin.Version.ToString()
+                    };
+                }
+
+                if (candidate != null && (best == null || candidate.FloorVersion.CompareTo(best.FloorVersion) > 0))
+                {
+                    best = candidate;
+                    bestVia = intermediate.ModelId;
+                }
+            }
+
+            if (best != null)
+            {
+                result.Add(best);
+                via[name] = bestVia!;
+            }
+        }
+
+        return (result, via);
     }
 
     private async Task<CkCompiledModelRoot?> TryGetFloorModelAsync(CkModelDependencyDto dependency,

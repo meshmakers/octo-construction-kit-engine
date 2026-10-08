@@ -130,13 +130,17 @@ public class ModelValidationException : CkModelException
     ///     of the declared range.
     /// </summary>
     internal static Exception ReferenceMissingAtFloor(CkModelId modelId, CkModelIdVersionRange range,
-        CkModelId floorModelId, CkModelId resolvedModelId, IEnumerable<string> missingElements)
+        CkModelId floorModelId, CkModelId resolvedModelId, IEnumerable<string> missingElements,
+        CkModelId? transitiveVia = null)
     {
+        var fix = transitiveVia == null
+            ? "Raise the lower bound of the dependency range to the first version that has these elements."
+            : $"The dependency is transitive (its range comes from '{transitiveVia}'); declare '{range.Name}' in " +
+              "ckModel.yaml with a lower bound that has these elements.";
         return new ModelValidationException(
             $"Model '{modelId}' references elements that do not exist at the floor of its dependency range " +
             $"'{range}': {string.Join(", ", missingElements)} (present in '{resolvedModelId}', missing in " +
-            $"'{floorModelId}'). A tenant with '{floorModelId}' installed could not resolve the model. Raise the " +
-            "lower bound of the dependency range to the first version that has these elements.");
+            $"'{floorModelId}'). A tenant with '{floorModelId}' installed could not resolve the model. {fix}");
     }
 
     /// <summary>

@@ -86,6 +86,7 @@ The project uses:
 Key MSBuild properties (from Directory.Build.props):
 - `OctoCompileCkModel`: Controls CK model compilation (default: true)
 - `OctoPublishCkModel`: Controls CK model publishing (default: false)
+- `OctoPublishCkModelToRemoteCatalog`: repo-internal opt-out (this repo's `Directory.Build.targets` only). `false` keeps the LocalFileSystemCatalog publish but skips `$(OctoPublishCatalog)`; set by `tests/TestCkModel` so the test-only models never reach the GitHub catalogs (AB#6114)
 - `OctoGenerateCkModelServiceClass`: Generate service classes (default: true)
 
 ## Code Quality
@@ -541,14 +542,20 @@ for backwards-compatible direct instantiation (e.g. the manual fallback in Mongo
 
 ## CK Model Publishing Lanes (CI)
 
-This repo publishes its CK models (`System`, `System.StreamData`, and the test models
-`Test` / `System.TestIdentity`) from **inside the build**, not from a dedicated publish
+This repo publishes its CK models (`System`, `System.StreamData`) from **inside the build**, not from a dedicated publish
 step: `Directory.Build.targets`' `CkCompile` target runs `octo-ckc -c publish -c
 $(OctoPublishCatalog) -r` for every project that sets `OctoPublishCkModel=true`. This repo
 is special — it cannot consume its own `Meshmakers.Octo.ConstructionKit.MsBuildTasks`
 package, so it bootstraps through its own `Exec`-based targets. Every other CK-owning repo
 (e.g. octo-identity-services, octo-communication-controller-services) uses the packaged
 targets, which do not re-enter the publish path from a test step.
+
+**Test-only models are never published to a GitHub catalog (AB#6114).** `tests/TestCkModel`
+(`Test`, `System.TestIdentity`) sets `OctoPublishCkModelToRemoteCatalog=false`, so its
+`CkCompile` publishes to the `LocalFileSystemCatalog` only. The tests consume both models
+embedded in `TestCkModel.dll`; nothing resolves them from a GitHub catalog. Both models were
+removed from `construction-kit-libraries-build` and `meshmakers.github.io` on 2026-10-08. A new
+test-only CK model project must set the same property.
 
 Two pipeline variables are in play and only one of them is the routing decision. Both come
 from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-templates`
@@ -561,7 +568,7 @@ from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-temp
 
 Resulting truth table:
 
-| Branch / ref | Catalog that receives System, System.StreamData, Test, System.TestIdentity |
+| Branch / ref | Catalog that receives System, System.StreamData (Test / System.TestIdentity: LocalFileSystemCatalog only, always) |
 | ------------ | -------------------------------------------------------------------------- |
 | `refs/heads/main` | `PrivateGitHubCatalog` → `meshmakers/construction-kit-libraries-build` |
 | `refs/tags/r<X.Y.Z>` | `PublicGitHubCatalog` |
@@ -581,7 +588,7 @@ branch, so a non-main build force-publishes into the main-lane catalog (AB#5413)
    System.StreamData.
 2. `Build samples`.
 3. `Build test CK model` — `tests/TestCkModel` with `/p:BuildProjectReferences=false`;
-   publishes Test and System.TestIdentity. It runs before the test projects because
+   publishes Test and System.TestIdentity to the LocalFileSystemCatalog only (AB#6114). It runs before the test projects because
    `Runtime.Engine.Tests` references `TestCkModel.dll` and the DotNetCoreCLI glob order is
    not guaranteed.
 4. `Build tests` — `tests/**/*Tests.csproj` except `*SystemTests`, also with

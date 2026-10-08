@@ -6,6 +6,10 @@
         <Configurations>Debug;Release;DebugL</Configurations>
         <Platforms>AnyCPU</Platforms>
         <OctoPublishCkModel Condition="'$(TargetFramework)' == 'net10.0'">true</OctoPublishCkModel>
+        <!-- AB#6114: Test and System.TestIdentity are test-only models. Publish them to the
+             LocalFileSystemCatalog only (the tests consume them embedded in TestCkModel.dll);
+             never push them to the shared GitHub catalogs. See Directory.Build.targets. -->
+        <OctoPublishCkModelToRemoteCatalog>false</OctoPublishCkModelToRemoteCatalog>
     </PropertyGroup>
 
     <!-- Import the ConstructionKit props and targets only because the package is not used as nuget package -->

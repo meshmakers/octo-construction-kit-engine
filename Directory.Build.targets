@@ -76,12 +76,17 @@
             <!-- Define a temporary item group to iterate through -->
             <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
         </ItemGroup>
-        <Message Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey) -ge true" />
-        <!-- Publish to both LocalFileSystemCatalog and the specified catalog, so that the build can continue for this repo -->
+        <Message Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
+        <Message Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' == 'false' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to LocalFileSystemCatalog only (OctoPublishCkModelToRemoteCatalog=false)"/>
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey) -ge true" />
+        <!-- Publish to both LocalFileSystemCatalog and the specified catalog, so that the build can continue for this repo.
+             OctoPublishCkModelToRemoteCatalog=false (set by test-only CK model projects such as tests/TestCkModel,
+             AB#6114) keeps the LocalFileSystemCatalog publish but skips $(OctoPublishCatalog): test-only models
+             (Test, System.TestIdentity) must never reach the shared GitHub catalogs. It is a project property, not
+             passed on the command line, so the pipeline's /p:OctoPublishCatalog pin cannot override it. -->
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c LocalFileSystemCatalog -r $(_OctoLcrArg)" />
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r $(_OctoLcrArg)" />
+        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r $(_OctoLcrArg)" />
 
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
                  Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>

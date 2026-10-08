@@ -392,6 +392,7 @@ Defined in `Directory.Build.props`:
 |----------|---------|-------------|
 | `OctoCompileCkModel` | true | Enable CK model compilation |
 | `OctoPublishCkModel` | false | Publish compiled model to output |
+| `OctoPublishCkModelToRemoteCatalog` | true | This repo only (`Directory.Build.targets`): `false` publishes to the LocalFileSystemCatalog only and skips `$(OctoPublishCatalog)`. Set by `tests/TestCkModel` so the test-only models `Test` / `System.TestIdentity` never reach the GitHub catalogs (AB#6114) |
 | `OctoGenerateCkModelServiceClass` | true | Generate service registration classes |
 | `OctoEmbedCkMigrations` | true | Embed migration scripts as resources |
 

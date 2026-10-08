@@ -89,8 +89,9 @@ variables:
   # catalog this repo needs for its interdependent CK models is therefore isolated
   # per run instead of shared via ~/.octo on the agent.
   #
-  # Publish routing truth table for this repo's CK models (System, System.StreamData,
-  # and the test models Test / System.TestIdentity). Two variables are in play, and
+  # Publish routing truth table for this repo's CK models (System, System.StreamData).
+  # The test-only models Test / System.TestIdentity (tests/TestCkModel) are never
+  # published to a GitHub catalog (OctoPublishCkModelToRemoteCatalog=false, AB#6114). Two variables are in play, and
   # only ONE of them is the routing decision:
   #
   #   OctoPublishCatalog       "where would a GitHub publish go" — PrivateGitHubCatalog
@@ -187,9 +188,13 @@ stages:
           # src/ and is not a *Tests project, so it gets its own step first (the
           # DotNetCoreCLI glob order is not guaranteed, and Runtime.Engine.Tests
           # needs TestCkModel.dll to exist when it resolves its references).
-          # The /p:OctoPublishCatalog pin below is mandatory for the same reason as
-          # explained on the Test step (AB#5413): TestCkModel publishes the Test
-          # and System.TestIdentity models from inside its build.
+          # TestCkModel publishes the test-only Test and System.TestIdentity models
+          # to the LocalFileSystemCatalog ONLY: its csproj sets
+          # OctoPublishCkModelToRemoteCatalog=false (AB#6114), so they never reach
+          # the shared GitHub catalogs (saved ~45-150 s per main run and kept the
+          # catalogs free of test models). The /p:OctoPublishCatalog pin below stays
+          # as defence in depth for the same reason as explained on the Test step
+          # (AB#5413).
           - task: DotNetCoreCLI@2
             retryCountOnTaskFailure: 2
             displayName: 'Build test CK model'

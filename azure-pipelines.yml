@@ -175,8 +175,42 @@ stages:
               # owns a CK model today, so this changes nothing now — it keeps a future
               # one from reintroducing the leak silently.
               arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
-          # 🔴 /p:OctoPublishCatalog is NOT optional here, even though this step only
-          # runs tests (AB#5413). This repo cannot consume its own MsBuildTasks
+          # Test projects are built ONCE here, so the Test step can run with
+          # --no-build --no-restore (AB#6093). Before, `dotnet test` rebuilt every
+          # test project together with its whole reference graph — including a
+          # full re-run of CkCompile (which deliberately re-runs on every build, see
+          # Directory.Build.targets) and a re-publish of System / System.StreamData
+          # — which made up ~6 of the ~8.5 min Test step.
+          # /p:BuildProjectReferences=false: every src project was already built in
+          # Release by 'Build src' above into the same output folders, so only the
+          # test-side projects themselves compile here. TestCkModel is not under
+          # src/ and is not a *Tests project, so it gets its own step first (the
+          # DotNetCoreCLI glob order is not guaranteed, and Runtime.Engine.Tests
+          # needs TestCkModel.dll to exist when it resolves its references).
+          # The /p:OctoPublishCatalog pin below is mandatory for the same reason as
+          # explained on the Test step (AB#5413): TestCkModel publishes the Test
+          # and System.TestIdentity models from inside its build.
+          - task: DotNetCoreCLI@2
+            retryCountOnTaskFailure: 2
+            displayName: 'Build test CK model'
+            inputs:
+              command: 'build'
+              projects: 'tests/TestCkModel/TestCkModel.csproj'
+              arguments: '--configuration $(buildConfiguration) /p:BuildProjectReferences=false /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+          - task: DotNetCoreCLI@2
+            retryCountOnTaskFailure: 2
+            displayName: 'Build tests'
+            inputs:
+              command: 'build'
+              projects: |
+                tests/**/*Tests.csproj
+                !tests/**/*SystemTests.csproj
+              arguments: '--configuration $(buildConfiguration) /p:BuildProjectReferences=false /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+          # 🔴 /p:OctoPublishCatalog is NOT optional on any step that can BUILD a
+          # CK-model project (AB#5413) — today that is 'Build test CK model' above;
+          # the Test step itself no longer builds (--no-build since AB#6093) but
+          # keeps the pin so that dropping --no-build can never reintroduce the leak.
+          # This repo cannot consume its own MsBuildTasks
           # package, so it bootstraps through its own Directory.Build.targets, which
           # publishes with `octo-ckc -c publish -c $(OctoPublishCatalog) -r` on every
           # build of a CK-model project — and the test projects reference those. With
@@ -208,7 +242,10 @@ stages:
             displayName: 'Test'
             inputs:
               command: 'test'
-              arguments: '--configuration $(buildConfiguration) /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
+              # One `dotnet test` per project, sequentially (DotNetCoreCLI's default
+              # for a multi-project glob) — keep it that way: parallel test runs risk
+              # the Testcontainers memory budget of the DinD sidecar (14 Gi).
+              arguments: '--configuration $(buildConfiguration) --no-build --no-restore /p:OctoNugetPrivateServer=$(nugetPrivateServer) /p:OctoLocalCatalogIsEnabled=true /p:OctoPublishCatalog="$(effectivePublishCatalog)"'
               projects: |
                 **/*Tests.csproj
                 !**/*SystemTests.csproj

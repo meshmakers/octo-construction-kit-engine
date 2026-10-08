@@ -552,7 +552,7 @@ targets, which do not re-enter the publish path from a test step.
 
 Two pipeline variables are in play and only one of them is the routing decision. Both come
 from `templates/steps/update-build-number.yml` in `meshmakers/octo-pipeline-templates`
-(pinned here at `tpl-v0.6.5`):
+(pinned by the `ref:` of the `pipelineTemplates` resource in `azure-pipelines.yml`):
 
 | Variable | Meaning |
 | -------- | ------- |
@@ -570,9 +570,32 @@ Resulting truth table:
 
 **Therefore every MSBuild step that can reach `CkCompile` must pass
 `/p:OctoPublishCatalog="$(effectivePublishCatalog)"` explicitly** — `Build src`,
-`Build samples` and `Test` all do. Omitting it on any one of them lets MSBuild read
+`Build samples`, `Build test CK model`, `Build tests` and `Test` all do. Omitting it on any one of them lets MSBuild read
 `OctoPublishCatalog` from the environment, which says `PrivateGitHubCatalog` on *every*
 branch, so a non-main build force-publishes into the main-lane catalog (AB#5413).
+
+**CI build/test layout (AB#6093).** The job builds every project exactly once and the
+`Test` step runs with `--no-build --no-restore`:
+
+1. `Build src` — each `src/**/*.csproj` (Release); compiles and publishes System and
+   System.StreamData.
+2. `Build samples`.
+3. `Build test CK model` — `tests/TestCkModel` with `/p:BuildProjectReferences=false`;
+   publishes Test and System.TestIdentity. It runs before the test projects because
+   `Runtime.Engine.Tests` references `TestCkModel.dll` and the DotNetCoreCLI glob order is
+   not guaranteed.
+4. `Build tests` — `tests/**/*Tests.csproj` except `*SystemTests`, also with
+   `/p:BuildProjectReferences=false`: the src projects are already built into the same
+   output folders, so only the test assemblies compile.
+5. `Test` — one `dotnet test --no-build --no-restore` per project, sequentially (keep it
+   that way: Testcontainers run inside the agent's DinD sidecar with a 14 Gi limit).
+
+Before this, `dotnet test` rebuilt each test project with its full reference graph,
+including a second `CkCompile` + publish of System / System.StreamData (CkCompile re-runs
+on every build by design, see `Directory.Build.targets`); that was ~6 of the ~8.5 min
+`Test` step. If you add a test project that references a new non-src project, add that
+project to a build step before `Build tests`, or `--no-build` fails with a missing
+assembly.
 
 **Debugging "my model is missing from PrivateGitHubCatalog".** Check the *publish* and the
 *read* halves separately; they fail for completely different reasons:

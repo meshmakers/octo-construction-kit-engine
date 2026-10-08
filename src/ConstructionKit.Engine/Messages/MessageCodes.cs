@@ -322,6 +322,12 @@ internal static class MessageCodes
     internal static OperationMessage UnknownIndexAttributePath(string? location, object indexType, object ckTypeId, object attributePath, object segment) =>
         GetMessage("UnknownIndexAttributePath", location, indexType, ckTypeId, attributePath, segment);
 
+    internal static OperationMessage CkReferenceToInternalElement(string? location, object element, object kind, object referencedElement) =>
+        GetMessage("CkReferenceToInternalElement", location, element, kind, referencedElement);
+
+    internal static OperationMessage CkElementNotDerivable(string? location, object kind, object element, object baseElement) =>
+        GetMessage("CkElementNotDerivable", location, kind, element, baseElement);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -917,6 +923,18 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  109, "Index ({indexType}) of type '{ckTypeId}' references the unknown attribute path '{attributePath}' (segment '{segment}'). Index paths are resolved case-insensitively by the database; in a ckLanguage 2 model every segment must name an attribute of the type or of the record it traverses.",
                  new [] {"indexType", "ckTypeId", "attributePath", "segment"})
+        },
+        {
+            "CkReferenceToInternalElement",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 112, "'{element}' references the internal {kind} '{referencedElement}' of another model. Internal elements (visibility: Internal) can only be referenced inside their own model.",
+                 new [] {"element", "kind", "referencedElement"})
+        },
+        {
+            "CkElementNotDerivable",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 113, "{kind} '{element}' derives from '{baseElement}' of another model, which only its own model may derive from (derivable: Model). The base model must declare 'derivable: Any' to allow it.",
+                 new [] {"kind", "element", "baseElement"})
         },
     };
 }

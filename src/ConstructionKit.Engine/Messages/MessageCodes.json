@@ -593,6 +593,18 @@
       "number": 109,
       "level": "ERROR",
       "text": "Index ({indexType}) of type '{ckTypeId}' references the unknown attribute path '{attributePath}' (segment '{segment}'). Index paths are resolved case-insensitively by the database; in a ckLanguage 2 model every segment must name an attribute of the type or of the record it traverses."
+    },
+    {
+      "key": "CkReferenceToInternalElement",
+      "number": 112,
+      "level": "ERROR",
+      "text": "'{element}' references the internal {kind} '{referencedElement}' of another model. Internal elements (visibility: Internal) can only be referenced inside their own model."
+    },
+    {
+      "key": "CkElementNotDerivable",
+      "number": 113,
+      "level": "ERROR",
+      "text": "{kind} '{element}' derives from '{baseElement}' of another model, which only its own model may derive from (derivable: Model). The base model must declare 'derivable: Any' to allow it."
     }
   ]
 }

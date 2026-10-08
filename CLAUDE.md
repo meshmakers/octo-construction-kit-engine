@@ -821,6 +821,10 @@ that is Phase 3.
 Notes:
 - Interface ids always carry their version on the wire (`Named-1`): the YAML converter writes `FullName`,
   unlike type ids, because the version is the contract version and the schema requires it.
+- F1.2-S3 visibility/derivable enforcement runs in `ReferenceResolver`, which compile **and** every import
+  (`CatalogModelResolver` / `RepositoryModelResolver.HardResolveAsync`) execute, so a forged or old-compiler model
+  is refused on import (pinned by `CkV2VisibilityCompileTests.ForgedBase_IsRefusedWhenTheDependentIsResolved`).
+  It runs over the whole graph, so an installed dependent of a base that became internal fails to resolve with 112.
 - F1.2-S2 Hidden parity (review N5/N6/M12): index and derived-rule paths are resolved **case-insensitively**
   (`InheritanceResolver.WalkAttributePath`; `passwordHash` reaches `PasswordHash`, as in Mongo). **Hidden on archived
   types (M12)** cannot be a compile rule: archives are runtime entities (`System.StreamData` `Archive` with
@@ -867,6 +871,8 @@ Notes:
 | 107 | `HiddenAttributeAutoCompleteValues` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): a Hidden type/record assignment declares `autoCompleteValues` (published in the model; Secret equivalent: 71) |
 | 108 | `HiddenAttributeOnAssociationRole` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): association-role attributes cannot be Hidden (no access guard on association attributes). `ReadOnly` / `MethodOnly` stay allowed |
 | 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
+| 112 | `CkReferenceToInternalElement` | `CkVisibilityValidator` (end of `ReferenceResolver`) | F1.2-S3: a reference from another model to a `visibility: Internal` element — base type/record, attribute assignment (type, record, role, interface member), attribute `valueCkRecordId`/`valueCkEnumId`, `implements`, interface `extends`, type/interface association role and targets, method parameter/result records and enums. Models compared by name |
+| 113 | `CkElementNotDerivable` | `CkVisibilityValidator` | F1.2-S3: a type or record derives from a type/record of another model whose effective `derivable` is `Model` (a v2 base without `derivable: Any`) |
 | 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 

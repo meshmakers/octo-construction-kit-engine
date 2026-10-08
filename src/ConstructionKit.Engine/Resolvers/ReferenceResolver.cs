@@ -23,6 +23,9 @@ internal class ReferenceResolver : IReferenceResolver
         CheckCkInterfaces(modelGraph, originFileResolver, operationResult);
 
         CheckCkTypes(modelGraph, originFileResolver, operationResult);
+
+        // F1.2-S3: visibility (112) and derivable (113) across models.
+        CkVisibilityValidator.Validate(modelGraph, originFileResolver, operationResult);
     }
 
     /// <summary>

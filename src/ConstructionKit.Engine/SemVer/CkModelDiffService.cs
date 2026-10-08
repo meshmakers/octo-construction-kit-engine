@@ -50,21 +50,18 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkTypeDto.IsAbstract), nameof(CkTypeDto.Indexes), nameof(CkTypeDto.Associations),
                 nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description),
                 nameof(CkTypeDto.DisplayNameRule), nameof(CkTypeDto.DisplayDescriptionRule),
-                nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods)
-            ],
+                nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods), nameof(CkTypeDto.Visibility), nameof(CkTypeDto.Derivable)],
             [typeof(CkTypeWithAttributesDto)] = [nameof(CkTypeWithAttributesDto.Attributes)],
             [typeof(CkAttributeDto)] =
             [
                 nameof(CkAttributeDto.AttributeId), nameof(CkAttributeDto.ValueType), nameof(CkAttributeDto.ValueCkRecordId),
                 nameof(CkAttributeDto.ValueCkEnumId), nameof(CkAttributeDto.DefaultValues), nameof(CkAttributeDto.IsRuntimeState),
                 nameof(CkAttributeDto.Ownership),
-                nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData)
-            ],
+                nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData), nameof(CkAttributeDto.Visibility)],
             [typeof(CkEnumDto)] =
             [
                 nameof(CkEnumDto.EnumId), nameof(CkEnumDto.UseFlags), nameof(CkEnumDto.IsExtensible),
-                nameof(CkEnumDto.Values), nameof(CkEnumDto.Description)
-            ],
+                nameof(CkEnumDto.Values), nameof(CkEnumDto.Description), nameof(CkEnumDto.Visibility)],
             [typeof(CkEnumValueDto)] =
             [
                 nameof(CkEnumValueDto.Key), nameof(CkEnumValueDto.Name), nameof(CkEnumValueDto.Description),
@@ -73,14 +70,12 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkRecordDto)] =
             [
                 nameof(CkRecordDto.RecordId), nameof(CkRecordDto.DerivedFromCkRecordId), nameof(CkRecordDto.IsFinal),
-                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description), nameof(CkRecordDto.RecordKey)
-            ],
+                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description), nameof(CkRecordDto.RecordKey), nameof(CkRecordDto.Visibility), nameof(CkRecordDto.Derivable)],
             [typeof(CkAssociationRoleDto)] =
             [
                 nameof(CkAssociationRoleDto.AssociationRoleId), nameof(CkAssociationRoleDto.InboundName),
                 nameof(CkAssociationRoleDto.OutboundName), nameof(CkAssociationRoleDto.InboundMultiplicity),
-                nameof(CkAssociationRoleDto.OutboundMultiplicity), nameof(CkAssociationRoleDto.Description)
-            ],
+                nameof(CkAssociationRoleDto.OutboundMultiplicity), nameof(CkAssociationRoleDto.Description), nameof(CkAssociationRoleDto.Visibility)],
             [typeof(CkTypeAttributeDto)] =
             [
                 nameof(CkTypeAttributeDto.CkAttributeId), nameof(CkTypeAttributeDto.AttributeName),
@@ -96,7 +91,7 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkIndexFieldsDto)] = [nameof(CkIndexFieldsDto.Weight), nameof(CkIndexFieldsDto.AttributePaths)],
             [typeof(CkAttributeMetaDataDto)] = [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)],
             // CK v2 (AB#5667 / AB#5669)
-            [typeof(CkInterfaceDto)] = [nameof(CkInterfaceDto.InterfaceId), nameof(CkInterfaceDto.Description), nameof(CkInterfaceDto.Attributes)],
+            [typeof(CkInterfaceDto)] = [nameof(CkInterfaceDto.InterfaceId), nameof(CkInterfaceDto.Description), nameof(CkInterfaceDto.Attributes), nameof(CkInterfaceDto.Visibility)],
             [typeof(CkInterfaceAttributeDto)] =
             [
                 nameof(CkInterfaceAttributeDto.CkAttributeId), nameof(CkInterfaceAttributeDto.AttributeName),
@@ -106,8 +101,7 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkMethodDto.MethodId), nameof(CkMethodDto.Kind), nameof(CkMethodDto.Description),
                 nameof(CkMethodDto.Parameters), nameof(CkMethodDto.Result), nameof(CkMethodDto.Errors),
-                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution)
-            ],
+                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution), nameof(CkMethodDto.Visibility)],
             [typeof(CkMethodParameterDto)] =
             [
                 nameof(CkMethodParameterDto.Name), nameof(CkMethodParameterDto.ValueType),
@@ -148,8 +142,60 @@ public class CkModelDiffService : ICkModelDiffService
         DiffRecords(changes, baseline.Records, current.Records, modelName);
         DiffAssociationRoles(changes, baseline.AssociationRoles, current.AssociationRoles, modelName);
         DiffInterfaces(changes, baseline.Interfaces, current.Interfaces, modelName);
+        DiffModifiers(changes, baseline, current);
 
         return changes;
+    }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): effective <c>visibility</c> / <c>derivable</c> of elements present in both versions. The
+    ///     derivable default depends on the model's CK language (v1 Any, v2 Model), so adopting <c>ckLanguage: 2</c>
+    ///     without declaring <c>derivable: Any</c> shows up as a derivable change.
+    /// </summary>
+    private static void DiffModifiers(List<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        var baselineLanguage = baseline.EffectiveCkLanguage;
+        var currentLanguage = current.EffectiveCkLanguage;
+
+        void Compare<T>(CkModelElementKind kind, IEnumerable<T>? b, IEnumerable<T>? c, Func<T, string> id,
+            Func<T, CkVisibilityDto?> visibility, Func<T, CkDerivableDto?>? derivable = null)
+        {
+            var before = (b ?? []).ToDictionary(id);
+            foreach (var element in c ?? [])
+            {
+                if (!before.TryGetValue(id(element), out var old))
+                {
+                    continue;
+                }
+
+                AddModified(changes, kind, id(element), "visibility",
+                    CkModifiers.ResolveVisibility(visibility(old)).ToString(),
+                    CkModifiers.ResolveVisibility(visibility(element)).ToString());
+                if (derivable != null)
+                {
+                    AddModified(changes, kind, id(element), "derivable",
+                        CkModifiers.ResolveDerivable(derivable(old), baselineLanguage).ToString(),
+                        CkModifiers.ResolveDerivable(derivable(element), currentLanguage).ToString());
+                }
+            }
+        }
+
+        Compare(CkModelElementKind.Type, baseline.Types, current.Types, t => t.TypeId.FullName, t => t.Visibility,
+            t => t.Derivable);
+        Compare(CkModelElementKind.Record, baseline.Records, current.Records, r => r.RecordId.FullName,
+            r => r.Visibility, r => r.Derivable);
+        Compare(CkModelElementKind.Enum, baseline.Enums, current.Enums, e => e.EnumId.FullName, e => e.Visibility);
+        Compare(CkModelElementKind.Attribute, baseline.Attributes, current.Attributes, a => a.AttributeId.FullName,
+            a => a.Visibility);
+        Compare(CkModelElementKind.AssociationRole, baseline.AssociationRoles, current.AssociationRoles,
+            r => r.AssociationRoleId.FullName, r => r.Visibility);
+        Compare(CkModelElementKind.Interface, baseline.Interfaces, current.Interfaces, i => i.InterfaceId.FullName,
+            i => i.Visibility);
+        Compare(CkModelElementKind.TypeMethod,
+            (baseline.Types ?? []).SelectMany(t => (t.Methods ?? []).Select(m => (Type: t, Method: m))),
+            (current.Types ?? []).SelectMany(t => (t.Methods ?? []).Select(m => (Type: t, Method: m))),
+            x => $"{x.Type.TypeId.FullName}/{x.Method.MethodId}", x => x.Method.Visibility);
     }
 
     private static void DiffDependencies(List<CkModelChange> changes, List<CkModelId>? baseline, List<CkModelId>? current)

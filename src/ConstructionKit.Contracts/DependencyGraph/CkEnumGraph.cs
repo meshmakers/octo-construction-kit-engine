@@ -20,6 +20,7 @@ public class CkEnumGraph
     /// <param name="enumDto"></param>
     public CkEnumGraph(CkId<CkEnumId> ckEnumId, CkEnumDto enumDto)
     {
+        Visibility = CkModifiers.ResolveVisibility(enumDto.Visibility);
         CkEnumId = ckEnumId;
         UseFlags = enumDto.UseFlags;
         IsExtensible = enumDto.IsExtensible;
@@ -68,4 +69,10 @@ public class CkEnumGraph
     ///     An optional description of the enum
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective visibility (declared value, otherwise <see cref="CkVisibilityDto.Public" />).
+    ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
+    /// </summary>
+    public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
 }

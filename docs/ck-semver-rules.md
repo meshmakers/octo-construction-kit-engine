@@ -141,6 +141,9 @@ surface in the dependency diff.
 | CK v2: method **removed** | Callers of the method break |
 | CK v2: method signature changed (kind, parameters, result, errors, authorization, execution) | Callers break — publish a new method version (`ChangePassword-2`) instead |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
+| CK v2: `visibility` `Public → Internal` (type, record, enum, attribute, association role, interface, method; resolved value, omitted = `Public`) | Other models referencing the element break |
+| CK v2: `derivable` `Any → Model` (type, record; resolved value) | Other models deriving from the element break |
+| CK v2: `ckLanguage` raised (`1 → 2`) without declaring `derivable: Any` on every type/record | The `derivable` default flips from `Any` to `Model`; reported as a `derivable` change per element |
 
 ### Minor (additive)
 
@@ -171,7 +174,9 @@ surface in the dependency diff.
 | CK v2: new `implements` entry on a type | Additive |
 | CK v2: new method | Additive |
 | CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 1 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
-| CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it |
+| CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it. Major instead when it flips a `derivable` default (see Major) |
+| CK v2: `visibility` `Internal → Public` | Relaxation |
+| CK v2: `derivable` `Model → Any` | Relaxation |
 
 ### Patch
 

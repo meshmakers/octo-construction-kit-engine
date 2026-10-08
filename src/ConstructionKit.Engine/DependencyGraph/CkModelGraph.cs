@@ -301,6 +301,67 @@ public class CkModelGraph : ICkModelGraph
     }
 
     /// <summary>
+    ///     CK v2 (F1.1-S4): sets the effective <c>visibility</c> / <c>derivable</c> of the graph elements declared by
+    ///     <paramref name="model" />. The derivable default depends on the model's CK language (v2: <c>Model</c>,
+    ///     v1: <c>Any</c>), which the element graphs cannot know on their own. Called for dependency models
+    ///     (<see cref="AppendModel" />) and by the element resolver for the model being resolved.
+    /// </summary>
+    public void ApplyCkV2Modifiers(CkModelRootBase model)
+    {
+        var language = model.EffectiveCkLanguage;
+        foreach (var dto in model.Types ?? [])
+        {
+            if (_types.TryGetValue(new CkId<CkTypeId>(model.ModelId, dto.TypeId), out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+                graph.Derivable = CkModifiers.ResolveDerivable(dto.Derivable, language);
+            }
+        }
+
+        foreach (var dto in model.Records ?? [])
+        {
+            if (_records.TryGetValue(new CkId<CkRecordId>(model.ModelId, dto.RecordId), out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+                graph.Derivable = CkModifiers.ResolveDerivable(dto.Derivable, language);
+            }
+        }
+
+        foreach (var dto in model.Enums ?? [])
+        {
+            if (_enums.TryGetValue(new CkId<CkEnumId>(model.ModelId, dto.EnumId), out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+            }
+        }
+
+        foreach (var dto in model.Attributes ?? [])
+        {
+            if (_attributes.TryGetValue(new CkId<CkAttributeId>(model.ModelId, dto.AttributeId), out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+            }
+        }
+
+        foreach (var dto in model.AssociationRoles ?? [])
+        {
+            if (_associationRoles.TryGetValue(new CkId<CkAssociationRoleId>(model.ModelId, dto.AssociationRoleId),
+                    out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+            }
+        }
+
+        foreach (var dto in model.Interfaces ?? [])
+        {
+            if (_interfaces.TryGetValue(new CkId<CkInterfaceId>(model.ModelId, dto.InterfaceId), out var graph))
+            {
+                graph.Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
+            }
+        }
+    }
+
+    /// <summary>
     ///     Appends the model elements of the given <paramref name="ckCompiledModelRoot" /> to this instance.
     /// </summary>
     /// <param name="ckCompiledModelRoot">The compiled model root to append</param>
@@ -361,6 +422,8 @@ public class CkModelGraph : ICkModelGraph
                     ckInterfaceDto);
             }
         }
+
+        ApplyCkV2Modifiers(ckCompiledModelRoot);
     }
 
     /// <summary>

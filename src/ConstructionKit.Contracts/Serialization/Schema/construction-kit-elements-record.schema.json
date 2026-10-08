@@ -40,6 +40,22 @@
         },
         "description": {
           "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "Public",
+            "Internal"
+          ],
+          "description": "CK v2 (F1.1-S4): Internal = may only be referenced inside the declaring model. Omitted = Public. Requires ckLanguage: 2."
+        },
+        "derivable": {
+          "type": "string",
+          "enum": [
+            "Model",
+            "Any"
+          ],
+          "description": "CK v2 (F1.1-S4): Model = only the declaring model may derive from this element. Omitted = Model in a ckLanguage: 2 model, Any in a v1 model. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false,

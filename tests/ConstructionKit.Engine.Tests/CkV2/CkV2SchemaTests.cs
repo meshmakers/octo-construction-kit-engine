@@ -194,6 +194,133 @@ public class CkV2SchemaTests
         Assert.True(operationResult.HasErrors, reason);
     }
 
+    private const string ModifiersElementsYaml = ElementsHeader + """
+        attributes:
+          - id: Secret
+            valueType: String
+            visibility: Internal
+          - id: Label
+            valueType: String
+            visibility: Public
+        enums:
+          - enumId: Mode
+            visibility: Internal
+            values:
+              - { key: 0, name: Active }
+        interfaces:
+          - interfaceId: Named-1
+            visibility: Internal
+            attributes:
+              - id: ${System}/Name
+                name: Name
+        types:
+          - typeId: Sealed
+            derivedFromCkTypeId: ${System}/Entity
+            visibility: Internal
+            derivable: Model
+            methods:
+              - methodId: Do-1
+                visibility: Internal
+          - typeId: Open
+            derivedFromCkTypeId: ${System}/Entity
+            derivable: Any
+        records:
+          - recordId: Address
+            visibility: Internal
+            derivable: Any
+        associationRoles:
+          - id: Owns
+            inboundName: OwnedBy
+            outboundName: Owns
+            inboundMultiplicity: N
+            outboundMultiplicity: N
+            visibility: Internal
+        """;
+
+    [Fact]
+    public async Task Elements_VisibilityAndDerivable_ParseOnEveryElementKind()
+    {
+        // F1.1-S4 (AB#5907)
+        Assert.True(ValidateElements(ModifiersElementsYaml, out var validation),
+            string.Join("; ", validation.Messages));
+        var operationResult = new OperationResult();
+        var elements = await new CkYamlSerializer(new CkSchemaValidator())
+            .DeserializeElementsAsync(ToStream(ModifiersElementsYaml), "inline.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+
+        Assert.Equal([CkVisibilityDto.Internal, CkVisibilityDto.Public], elements.Attributes!.Select(a => a.Visibility));
+        Assert.Equal(CkVisibilityDto.Internal, elements.Enums!.Single().Visibility);
+        Assert.Equal(CkVisibilityDto.Internal, elements.Interfaces!.Single().Visibility);
+        var sealedType = elements.Types!.Single(t => t.TypeId.Name == "Sealed");
+        Assert.Equal(CkVisibilityDto.Internal, sealedType.Visibility);
+        Assert.Equal(CkDerivableDto.Model, sealedType.Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, sealedType.Methods!.Single().Visibility);
+        var openType = elements.Types!.Single(t => t.TypeId.Name == "Open");
+        Assert.Null(openType.Visibility);
+        Assert.Equal(CkDerivableDto.Any, openType.Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, elements.Records!.Single().Visibility);
+        Assert.Equal(CkDerivableDto.Any, elements.Records!.Single().Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, elements.AssociationRoles!.Single().Visibility);
+    }
+
+    [Theory]
+    [InlineData("types:\n  - typeId: A\n    visibility: Private\n", "unknown type visibility")]
+    [InlineData("types:\n  - typeId: A\n    visibility: internal\n", "visibility is PascalCase")]
+    [InlineData("types:\n  - typeId: A\n    derivable: None\n", "unknown derivable value")]
+    [InlineData("enums:\n  - enumId: E\n    derivable: Any\n", "derivable is not an enum key")]
+    [InlineData("attributes:\n  - id: X\n    valueType: String\n    derivable: Any\n", "derivable is not an attribute key")]
+    [InlineData("types:\n  - typeId: A\n    attributes:\n      - id: ${this}/X\n        name: X\n        visibility: Internal\n", "visibility is not an attribute-assignment key")]
+    [InlineData("records:\n  - recordId: R\n    visibility: Protected\n", "unknown record visibility")]
+    public void Elements_InvalidModifiers_FailSchemaValidation(string body, string reason)
+    {
+        var isValid = ValidateElements(ElementsHeader + body, out var operationResult);
+
+        Assert.False(isValid, reason);
+        Assert.True(operationResult.HasErrors, reason);
+    }
+
+    [Fact]
+    public async Task CompiledModel_Modifiers_RoundTripThroughYamlAndJson()
+    {
+        var model = CkV2TestModels.CreateModel();
+        var type = model.Types![0];
+        type.Visibility = CkVisibilityDto.Internal;
+        type.Derivable = CkDerivableDto.Model;
+        model.Records![0].Visibility = CkVisibilityDto.Internal;
+        model.Enums![0].Visibility = CkVisibilityDto.Internal;
+        model.Attributes![0].Visibility = CkVisibilityDto.Internal;
+        model.AssociationRoles![0].Visibility = CkVisibilityDto.Internal;
+        model.Interfaces![0].Visibility = CkVisibilityDto.Internal;
+
+        var yaml = await SerializeYamlAsync(model);
+        var validation = new OperationResult();
+        Assert.True(new CkSchemaValidator().ValidateCompiledModelInYaml(ToStream(yaml), "inline.yaml", validation),
+            string.Join("; ", validation.Messages) + "\n" + yaml);
+        var json = await SerializeJsonAsync(model);
+        Assert.Contains("\"visibility\": \"Internal\"", json);
+        Assert.Contains("\"derivable\": \"Model\"", json);
+
+        var operationResult = new OperationResult();
+        foreach (var roundTripped in new[]
+                 {
+                     new CkYamlSerializer(new CkSchemaValidator()).DeserializeCompiledModelRoot(yaml, "inline.yaml", operationResult),
+                     new CkJsonSerializer().DeserializeCompiledModelRoot(json, "inline.json", operationResult)
+                 })
+        {
+            Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.Types![0].Visibility);
+            Assert.Equal(CkDerivableDto.Model, roundTripped.Types![0].Derivable);
+            Assert.Equal(model.Types!.Skip(1).Select(t => t.Derivable), roundTripped.Types!.Skip(1).Select(t => t.Derivable));
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.Records![0].Visibility);
+            Assert.Equal(model.Records![0].Derivable, roundTripped.Records![0].Derivable);
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.Enums![0].Visibility);
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.Attributes![0].Visibility);
+            Assert.Null(roundTripped.Attributes![1].Visibility);
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.AssociationRoles![0].Visibility);
+            Assert.Equal(CkVisibilityDto.Internal, roundTripped.Interfaces![0].Visibility);
+        }
+    }
+
     [Fact]
     public void Elements_KitchenSink_PassesSchemaValidation()
     {
@@ -314,7 +441,7 @@ public class CkV2SchemaTests
         var yaml = await SerializeYamlAsync(model);
         var json = await SerializeJsonAsync(model);
 
-        foreach (var key in new[] { "ckLanguage", "interfaces", "implements", "methods", "access" })
+        foreach (var key in new[] { "ckLanguage", "interfaces", "implements", "methods", "access", "visibility", "derivable" })
         {
             Assert.DoesNotContain(key, yaml);
             Assert.DoesNotContain($"\"{key}\"", json);

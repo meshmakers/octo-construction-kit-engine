@@ -20,6 +20,7 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
     public CkAssociationRoleGraph(CkId<CkAssociationRoleId> ckAssociationCkRoleId, CkAssociationRoleDto associationRoleDto)
         : base(associationRoleDto)
     {
+        Visibility = CkModifiers.ResolveVisibility(associationRoleDto.Visibility);
         CkRoleId = ckAssociationCkRoleId;
         InboundName = associationRoleDto.InboundName;
         OutboundName = associationRoleDto.OutboundName;
@@ -83,4 +84,10 @@ public class CkAssociationRoleGraph : CkTypeWithAttributesGraph
     ///     An optional description of the association role
     /// </summary>
     public string? Description { get; set; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective visibility (declared value, otherwise <see cref="CkVisibilityDto.Public" />).
+    ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
+    /// </summary>
+    public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
 }

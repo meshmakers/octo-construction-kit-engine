@@ -81,6 +81,24 @@ internal static class CkV2TestModels
         machine.Methods = [CreateFullMethod(), new CkMethodDto { MethodId = "Reset-1" }];
         machine.Attributes!.Single(a => a.AttributeName == "State").Access = CkAttributeAccessDto.Hidden;
         SemVerTestModels.GetRecord(model).Attributes!.Single().Access = CkAttributeAccessDto.ReadOnly;
+        KeepDerivableAny(model);
         return model;
+    }
+
+    /// <summary>
+    ///     F1.1-S4: adopting ckLanguage 2 changes the derivable default of existing types/records from Any to Model
+    ///     (Major). A model that adopts v2 within a major declares <c>derivable: Any</c> on its existing elements.
+    /// </summary>
+    public static void KeepDerivableAny(CkCompiledModelRoot model)
+    {
+        foreach (var type in model.Types ?? [])
+        {
+            type.Derivable = CkDerivableDto.Any;
+        }
+
+        foreach (var record in model.Records ?? [])
+        {
+            record.Derivable = CkDerivableDto.Any;
+        }
     }
 }

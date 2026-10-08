@@ -26,6 +26,8 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     public CkTypeGraph(CkId<CkTypeId> ckTypeId, CkCompiledTypeDto ckTypeDto)
         : base(ckTypeDto)
     {
+        Visibility = CkModifiers.ResolveVisibility(ckTypeDto.Visibility);
+        Derivable = CkModifiers.ResolveDerivable(ckTypeDto.Derivable, 1);
         CkTypeId = ckTypeId;
         IsAbstract = ckTypeDto.IsAbstract;
         IsFinal = ckTypeDto.IsFinal;
@@ -436,4 +438,17 @@ public class CkTypeGraph : CkTypeWithAttributesGraph
     {
         return CkTypeId.ToString();
     }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective visibility (declared value, otherwise <see cref="CkVisibilityDto.Public" />).
+    ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
+    /// </summary>
+    public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective derivability — the declared value, otherwise <c>Model</c> in a
+    ///     <c>ckLanguage: 2</c> model and <c>Any</c> in a v1 model. The CK-language default is applied by the model
+    ///     graph (<c>CkModelGraph.ApplyCkV2Modifiers</c>) because the element alone does not know its model's language.
+    /// </summary>
+    public CkDerivableDto Derivable { get; set; } = CkDerivableDto.Any;
 }

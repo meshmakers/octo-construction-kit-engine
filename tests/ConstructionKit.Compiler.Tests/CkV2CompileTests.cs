@@ -248,6 +248,68 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("| ChangePassword-1 | Instance | newPassword: String, mode: Enum | Record | KitchenSink/Principal |", types);
     }
 
+    private static Dictionary<string, string> KitchenSinkWithModifiers()
+    {
+        // F1.1-S4 (AB#5907): visibility / derivable on every element kind that carries them.
+        var files = KitchenSinkFiles();
+        files["attributes/attributes.yaml"] = files["attributes/attributes.yaml"]
+            .Replace("  - id: PasswordHash\n    valueType: String", "  - id: PasswordHash\n    valueType: String\n    visibility: Internal");
+        files["records/address.yaml"] = files["records/address.yaml"]
+            .Replace("  - recordId: Address", "  - recordId: Address\n    derivable: Any");
+        files["enums/mode.yaml"] = files["enums/mode.yaml"]
+            .Replace("  - enumId: Mode", "  - enumId: Mode\n    visibility: Internal");
+        files["interfaces/named.yaml"] = files["interfaces/named.yaml"]
+            .Replace("  - interfaceId: Serialized-1", "  - interfaceId: Serialized-1\n    visibility: Internal");
+        files["types/types.yaml"] = files["types/types.yaml"]
+            .Replace("  - typeId: Principal", "  - typeId: Principal\n    derivable: Any")
+            .Replace("  - typeId: Account", "  - typeId: Account\n    visibility: Internal")
+            .Replace("      - methodId: Unlock-1", "      - methodId: Unlock-1\n        visibility: Internal");
+        files["associations/roles.yaml"] = """
+            associationRoles:
+              - id: Owns
+                inboundName: OwnedBy
+                outboundName: Owns
+                inboundMultiplicity: N
+                outboundMultiplicity: N
+                visibility: Internal
+            """;
+        return files;
+    }
+
+    [Fact]
+    public async Task Compile_ckv2_modifiers_reach_compiled_output_graph_and_docs()
+    {
+        await PublishSystemAsync(_fixture);
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkWithModifiers(), ckLanguage: 2));
+
+        Assert.Equal(CkDerivableDto.Any, compiled.Types!.Single(t => t.TypeId.Name == "Principal").Derivable);
+        var account = compiled.Types!.Single(t => t.TypeId.Name == "Account");
+        Assert.Equal(CkVisibilityDto.Internal, account.Visibility);
+        Assert.Null(account.Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, account.Methods!.Single().Visibility);
+        Assert.Equal(CkVisibilityDto.Internal, compiled.Attributes!.Single(a => a.AttributeId.Name == "PasswordHash").Visibility);
+        Assert.Equal(CkDerivableDto.Any, compiled.Records!.Single().Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, compiled.Enums!.Single().Visibility);
+        Assert.Equal(CkVisibilityDto.Internal, compiled.Interfaces!.Single(i => i.InterfaceId.FullName == "Serialized-1").Visibility);
+        Assert.Equal(CkVisibilityDto.Internal, compiled.AssociationRoles!.Single().Visibility);
+
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        Assert.Equal(CkDerivableDto.Model, graph.Types["KitchenSink/Account"].Derivable);
+        Assert.Equal(CkDerivableDto.Any, graph.Types["KitchenSink/Principal"].Derivable);
+
+        var docs = Path.Combine(_fixture.Root, "docs-modifiers");
+        var generator = _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>();
+        await generator.GenerateTypesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var types = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Types.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("Visibility: `Internal`", types);
+        Assert.Contains("Derivable: `Model`", types);
+        Assert.Contains("| Unlock-1 (internal) |", types);
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

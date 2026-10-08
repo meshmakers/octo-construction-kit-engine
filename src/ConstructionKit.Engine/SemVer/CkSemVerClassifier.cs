@@ -84,6 +84,15 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 ParseCkLanguage(change.NewValue) > ParseCkLanguage(change.OldValue)
                     ? (CkSemVerLevel.Minor, "CK language version raised; older engines reject the model with a clear error")
                     : (CkSemVerLevel.Major, "CK language version lowered — CK v2 elements may disappear (defensive)"),
+            // ── CK v2 modifiers (F1.1-S4, concept §4.3.2) ───────────────────────────────────────
+            { ChangeKind: CkModelChangeKind.Modified, Property: "visibility" } =>
+                change.NewValue == nameof(CkVisibilityDto.Internal)
+                    ? (CkSemVerLevel.Major, "element made internal — other models can no longer reference it")
+                    : (CkSemVerLevel.Minor, "element made public"),
+            { ChangeKind: CkModelChangeKind.Modified, Property: "derivable" } =>
+                change.NewValue == nameof(CkDerivableDto.Model)
+                    ? (CkSemVerLevel.Major, "derivation restricted to the declaring model — derived types in other models break")
+                    : (CkSemVerLevel.Minor, "derivation opened to other models"),
             { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Added } =>
                 (CkSemVerLevel.Minor, "purely additive interface"),
             { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Removed } =>

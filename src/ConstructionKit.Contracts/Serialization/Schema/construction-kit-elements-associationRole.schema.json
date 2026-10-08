@@ -45,6 +45,14 @@
         },
         "description": {
           "type": "string"
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "Public",
+            "Internal"
+          ],
+          "description": "CK v2 (F1.1-S4): Internal = may only be referenced inside the declaring model. Omitted = Public. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false,

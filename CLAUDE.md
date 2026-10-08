@@ -771,7 +771,7 @@ element schemas accept `@` in the model part of a reference; the compiled schema
 `dependencyRanges`. Tests: `RangeRetentionCompileTests` (flag on/off, YAML round trip with schema
 validation, floor violation, resolve against a later minor without recompile, two-level chain).
 
-## CK v2: interfaces, attribute access, method definitions (AB#5667 / AB#5668 / AB#5669; Phase 1 F1.1-S1 AB#5904, F1.2-S1 AB#5910)
+## CK v2: interfaces, attribute access, method definitions, visibility/derivable (AB#5667 / AB#5668 / AB#5669; Phase 1 F1.1-S1 AB#5904, F1.2-S1 AB#5910, F1.1-S4 AB#5907)
 
 Gated by **`ckLanguage: 2`** in `ckModel.yaml` (`CkModelPropertiesDto.CkLanguage`, `null` = 1). A model
 without the key compiles byte-identical to the engine before CK v2 — compiled YAML **and** CK cache JSON
@@ -790,13 +790,18 @@ that is Phase 3.
 | `interfaces` | new folder `interfaces/*.yaml` (`CompilerStatics.InterfacesFolder`), schema `construction-kit-elements-interface.schema.json` | `CkInterfaceId` (+ STJ/YAML/Newtonsoft converters, `CkIdInterfaceIdConverter`, `RtCkIdInterfaceIdConverter`), `CkInterfaceDto`, `CkInterfaceAttributeDto`, `CkModelRootBase.Interfaces`, `CkElementsRootDto.Interfaces`, `CkInterfaceGraph`, `ICkModelGraph.Interfaces` / `InterfacesByRtCk` / `GetOrCreateInterface`, `CkCacheRoot.Interfaces`, `ICkCacheService.GetRtCkInterface` / `GetRtCkInterfaces` |
 | `implements` | `CkType` / `CkCompiledType` | `CkTypeDto.Implements` (`List<CkId<CkInterfaceId>>`, JSON via `CkIdInterfaceIdListConverter`), `CkTypeGraph.DeclaredImplements` / `AllImplementedInterfaces` |
 | `access` | `CkTypeAttribute` (types, records, association roles) | `CkAttributeAccessDto` (`ReadWrite`/`ReadOnly`/`MethodOnly`/`Hidden`), `AttributeAccess` predicates, `CkTypeAttributeDto.Access` (nullable), `CkTypeAttributeGraph.Access` (effective, init setter like `Ownership`) |
+| `visibility` | `CkType`/`CkCompiledType`, `CkRecord`, `CkEnum`, `CkAttribute`, `CkAssociationRole`, `CkInterface`, `CkMethod` (enum `Public`/`Internal`) | `CkVisibilityDto`, nullable `Visibility` on `CkTypeDto`, `CkRecordDto`, `CkEnumDto`, `CkAttributeDto`, `CkAssociationRoleDto`, `CkInterfaceDto`, `CkMethodDto`; effective (non-null) `Visibility` on `CkTypeGraph`, `CkRecordGraph`, `CkEnumGraph`, `CkAttributeGraph`, `CkAssociationRoleGraph`, `CkInterfaceGraph`, computed on `CkMethodGraph`; `CkModifiers.ResolveVisibility` (omitted = `Public`) |
+| `derivable` | `CkType`/`CkCompiledType`, `CkRecord` (enum `Model`/`Any`) | `CkDerivableDto`, nullable `Derivable` on `CkTypeDto` / `CkRecordDto`, effective `Derivable` on `CkTypeGraph` / `CkRecordGraph`; `CkModifiers.ResolveDerivable` — **omitted = `Any` in a v1 model, `Model` in a `ckLanguage: 2` model**, resolved per declaring model by `CkModelGraph.ApplyCkV2Modifiers` (called by `AppendModel` and `ElementResolver.Resolve`) |
 | `methods` | `CkType` / `CkCompiledType`, schema `construction-kit-elements-method.schema.json` | `CkMethodDto` family (`CkMethodKindDto`, `CkMethodParameterDto`, `CkMethodResultDto`, `CkMethodErrorDto`, `CkMethodAuthorizationDto`, `CkMethodExecutionDto`), `CkTypeDto.Methods`, `CkTypeGraph.DefinedMethods` / `AllMethods` (key = method id), `CkMethodGraph` (`QualifiedMethodId`, `TimeoutSeconds`), `CkMethodIds.Qualify` / `TryParse` (`System.Identity/User.ChangePassword-1`; `TryParse` never throws — an invalid element id wrapped in `TargetInvocationException` by `Activator` returns false, review L1) |
 
 Notes:
 - Interface ids always carry their version on the wire (`Named-1`): the YAML converter writes `FullName`,
   unlike type ids, because the version is the contract version and the schema requires it.
+- `visibility` / `derivable` values are PascalCase (`Public`/`Internal`, `Model`/`Any`), consistent with `access`;
+  lowercase is a schema error. F1.1-S4 only carries the values — enforcement (cross-model references to
+  `Internal` elements, deriving from a `Model`-derivable type) is F1.2-S3.
 - The CK cache JSON omits the CK v2 members while they hold their default (empty collections, access
-  `ReadWrite`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
+  `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
 - Message codes: 78–89 F0.2 (range retention), 90–105 CK v2 rules (in use), **106–129 reserved for Phase 1**
@@ -808,7 +813,7 @@ Notes:
 
 | Code | Key | Where | Rule |
 | ---- | --- | ----- | ---- |
-| 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods` or any `access` (type, record, association-role assignment) without `ckLanguage: 2` |
+| 90 | `CkLanguageFeatureRequiresV2` | `ElementResolver` | `interfaces`, `implements`, `methods`, any `access` (type, record, association-role assignment), or any `visibility` / `derivable` (type, method, record, enum, attribute, association role) without `ckLanguage: 2` |
 | 91 | `CkLanguageNotSupported` | `ElementResolver`, catalog + repository dependency resolvers | `ckLanguage` outside 1..`MaxSupportedCkLanguage` (also raised when a compiled model is resolved, e.g. on import, and — review L2 — for every **dependency** model: it is not appended, its dependents are skipped, and a hard resolve throws with the message) |
 | 92 | `CkInterfaceIdNotUnique` | `ElementResolver` | same interface id twice (`Named-1` and `Named-2` are different contracts) |
 | 93 | `CkInterfaceNameCollidesWithType` | `ElementResolver` | interface name == type name of the same model (I-5, GraphQL type namespace) |
@@ -833,28 +838,31 @@ Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}Int
 `RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
 `SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
 appended: `UserChangePassword2MethodId`). Typed parameter records are not generated yet (F1.4-S2).
-Docs generator: `Interfaces.md` per model plus an "Implements" line and a methods table per type (only when present).
+Docs generator: `Interfaces.md` per model plus an "Implements" line and a methods table per type (only when present);
+"Visibility: `Internal`" / "Derivable: `Model`" lines per element and an "(internal)" method marker, written only
+when the value differs from the v1 default, so v1 docs are unchanged.
 SemVer rules: `docs/ck-semver-rules.md` (additions Minor, removals and contract/signature changes Major, `access`
-changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor).
+changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor unless it flips the `derivable` default,
+`visibility` Public→Internal and `derivable` Any→Model Major, the reverse Minor).
 
 ### Touch-point checklist (keep for every new CK field — contract §2.7)
 
-| # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` |
-| - | ----------- | ------------ | ------------ | ------------ | -------- | --------- |
-| 1 | Source schema | meta (enum 1/2) | interface schema + elements root | `CkType` | `CkTypeAttribute` | method schema + `CkType` |
-| 2 | Compiled schema | integer ≥ 1 | compiled root | `CkCompiledType` | shared `$ref` | `CkCompiledType` |
-| 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family |
-| 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy |
-| 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` |
-| 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 |
-| 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes |
-| 8 | Source generator | — | yes | — | — | yes |
-| 9 | Docs generator | — | yes | yes | — | yes |
-| 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | |
-| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 |
+| # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` | `visibility` / `derivable` |
+| - | ----------- | ------------ | ------------ | ------------ | -------- | --------- | -------------------------- |
+| 1 | Source schema | meta (enum 1/2) | interface schema + elements root | `CkType` | `CkTypeAttribute` | method schema + `CkType` | type, record, enum, attribute, association-role, interface, method schemas |
+| 2 | Compiled schema | integer ≥ 1 | compiled root | `CkCompiledType` | shared `$ref` | `CkCompiledType` | `CkCompiledType` (rest via shared `$ref`) |
+| 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs |
+| 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) |
+| 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` |
+| 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 | 90 (F1.2-S3: 112–117) |
+| 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) |
+| 8 | Source generator | — | yes | — | — | yes | — (F1.4) |
+| 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) |
+| 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) |
+| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 | P1 |
 
 Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/ConstructionKit.Engine.Tests/CkV2`),
-`CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` (one failing and one passing case per code, on the C#
+`CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` / `CkV2ModifierResolverTests` (one failing and one passing case per code, on the C#
 kitchen sink `sampleData/ckv2KitchenSink/Builder.cs`), `CkV2GraphJsonRoundTripTests` (graph → cache JSON → graph),
 `CkIdsCodeGeneratorCkV2Tests`, and in `ConstructionKit.Compiler.Tests` `CkV2CompileTests` (YAML kitchen sink end to
 end incl. `interfaces/` folder, gate, docs and range retention of `implements`) and `CkV1CompileOutputUnchangedTests`.

@@ -24,6 +24,7 @@ public sealed class CkInterfaceGraph
     /// <param name="dto">The interface definition</param>
     public CkInterfaceGraph(CkId<CkInterfaceId> ckInterfaceId, CkInterfaceDto dto)
     {
+        Visibility = CkModifiers.ResolveVisibility(dto.Visibility);
         CkInterfaceId = ckInterfaceId;
         Description = dto.Description;
         DefinedAttributes = dto.Attributes;
@@ -114,4 +115,10 @@ public sealed class CkInterfaceGraph
     {
         return CkInterfaceId.ToString();
     }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective visibility (declared value, otherwise <see cref="CkVisibilityDto.Public" />).
+    ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
+    /// </summary>
+    public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
 }

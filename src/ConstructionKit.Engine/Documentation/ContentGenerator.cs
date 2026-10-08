@@ -61,6 +61,7 @@ internal class ContentGenerator(
 
             await AddTitle(outputFile, null, attribute.CkAttributeId.ElementId.SemanticVersionedFullName)
                 .ConfigureAwait(false);
+            await WriteCkV2Modifiers(outputFile, attribute.Visibility).ConfigureAwait(false);
 
             if (attribute.Description != null)
             {
@@ -159,6 +160,7 @@ internal class ContentGenerator(
         {
             if (!MatchesModelId(@enum, ckModelId)) continue;
             await AddTitle(outputFile, null, @enum.CkEnumId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
+            await WriteCkV2Modifiers(outputFile, @enum.Visibility).ConfigureAwait(false);
 
             if (@enum.Description != null)
             {
@@ -214,6 +216,7 @@ internal class ContentGenerator(
             if (!MatchesModelId(record, ckModelId)) continue;
 
             await AddTitle(outputFile, null, record.CkRecordId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
+            await WriteCkV2Modifiers(outputFile, record.Visibility, record.Derivable).ConfigureAwait(false);
 
             await _inheritanceHelpers.AddRecordHierarchy(outputFile, record, directoryPath).ConfigureAwait(false);
 
@@ -277,6 +280,7 @@ internal class ContentGenerator(
             }
 
             await AddTitle(outputFile, null, type.CkTypeId.ElementId.SemanticVersionedFullName).ConfigureAwait(false);
+            await WriteCkV2Modifiers(outputFile, type.Visibility, type.Derivable).ConfigureAwait(false);
             await _inheritanceHelpers.AddHierarchy(outputFile, type, directoryPath).ConfigureAwait(false);
             if (type.Description != null)
             {
@@ -292,6 +296,27 @@ internal class ContentGenerator(
             await GenerateTypeAssociationsTable(type, outputFile, directoryPath).ConfigureAwait(false);
 
             await GenerateCkV2TypeSections(type, outputFile).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4, AB#5907): writes the effective <c>visibility</c> / <c>derivable</c> of an element, only
+    ///     when they differ from the v1 defaults (<c>Public</c> / <c>Any</c>), so ckLanguage 1 documentation is
+    ///     unchanged.
+    /// </summary>
+    private static async Task WriteCkV2Modifiers(StreamWriter outputFile, CkVisibilityDto visibility,
+        CkDerivableDto derivable = CkDerivableDto.Any)
+    {
+        if (visibility != CkVisibilityDto.Public)
+        {
+            await outputFile.WriteLineAsync($"Visibility: `{visibility}`").ConfigureAwait(false);
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
+        }
+
+        if (derivable != CkDerivableDto.Any)
+        {
+            await outputFile.WriteLineAsync($"Derivable: `{derivable}`").ConfigureAwait(false);
+            await outputFile.WriteLineAsync().ConfigureAwait(false);
         }
     }
 
@@ -320,7 +345,7 @@ internal class ContentGenerator(
                 var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
                     $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
                 await outputFile.WriteLineAsync(
-                        $"| {method.Definition.MethodId} | {method.Definition.Kind} | {parameters} | " +
+                        $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")} | {method.Definition.Kind} | {parameters} | " +
                         $"{method.Definition.Result?.ValueType.ToString() ?? "-"} | {method.DeclaringCkTypeId.ToRtCkId().SemanticVersionedFullName} |")
                     .ConfigureAwait(false);
             }
@@ -355,6 +380,7 @@ internal class ContentGenerator(
         foreach (var ckInterface in interfaces.OrderBy(i => i.CkInterfaceId))
         {
             await AddTitle(outputFile, null, ckInterface.CkInterfaceId.ElementId.FullName).ConfigureAwait(false);
+            await WriteCkV2Modifiers(outputFile, ckInterface.Visibility).ConfigureAwait(false);
             await outputFile.WriteLineAsync(ckInterface.Description ?? "No description available currently.")
                 .ConfigureAwait(false);
             await outputFile.WriteLineAsync().ConfigureAwait(false);
@@ -484,6 +510,7 @@ internal class ContentGenerator(
             {
                 await AddTitle(outputFile, null, associationRole.CkRoleId.ElementId.SemanticVersionedFullName)
                     .ConfigureAwait(false);
+                await WriteCkV2Modifiers(outputFile, associationRole.Visibility).ConfigureAwait(false);
 
                 if (associationRole.Description != null)
                 {

@@ -52,8 +52,76 @@ public class CkV2SemVerTests
 
         var two = SemVerTestModels.CreateModel();
         two.CkLanguage = 2;
+        CkV2TestModels.KeepDerivableAny(two);
         Assert.Equal(CkSemVerLevel.Minor, Level(one, two));
         Assert.Equal(CkSemVerLevel.Major, Level(two, one));
+    }
+
+    // F1.1-S4: without derivable: Any, adopting ckLanguage 2 closes every existing type/record (default Model) —
+    // Major, as tightening derivable is breaking (concept §4.3.2).
+    [Fact]
+    public void AdoptingCkV2_WithoutDerivableAny_IsMajor()
+    {
+        var two = SemVerTestModels.CreateModel();
+        two.CkLanguage = 2;
+
+        var classified = Classify(SemVerTestModels.CreateModel(), two);
+
+        Assert.Contains(classified, c => c.Change is { Property: "derivable", OldValue: "Any", NewValue: "Model" } &&
+                                         c.Level == CkSemVerLevel.Major);
+    }
+
+    [Theory]
+    [InlineData("Public", "Internal", CkSemVerLevel.Major)]
+    [InlineData("Internal", "Public", CkSemVerLevel.Minor)]
+    public void VisibilityChanged_OnEveryElementKind(string before, string after, CkSemVerLevel expected)
+    {
+        CkCompiledModelRoot Build(CkVisibilityDto visibility)
+        {
+            var model = CkV2TestModels.CreateModel();
+            model.Types!.ForEach(t => t.Visibility = visibility);
+            model.Records!.ForEach(r => r.Visibility = visibility);
+            model.Enums!.ForEach(e => e.Visibility = visibility);
+            model.Attributes!.ForEach(a => a.Visibility = visibility);
+            model.AssociationRoles!.ForEach(r => r.Visibility = visibility);
+            model.Interfaces!.ForEach(i => i.Visibility = visibility);
+            SemVerTestModels.GetMachine(model).Methods!.ForEach(m => m.Visibility = visibility);
+            return model;
+        }
+
+        var classified = Classify(Build(Enum.Parse<CkVisibilityDto>(before)), Build(Enum.Parse<CkVisibilityDto>(after)));
+
+        foreach (var kind in new[]
+                 {
+                     CkModelElementKind.Type, CkModelElementKind.Record, CkModelElementKind.Enum,
+                     CkModelElementKind.Attribute, CkModelElementKind.AssociationRole, CkModelElementKind.Interface,
+                     CkModelElementKind.TypeMethod
+                 })
+        {
+            Assert.Contains(classified, c => c.Change.ElementKind == kind && c.Change.Property == "visibility");
+        }
+
+        Assert.All(classified, c => Assert.Equal(expected, c.Level));
+    }
+
+    [Theory]
+    [InlineData(CkDerivableDto.Any, CkDerivableDto.Model, CkSemVerLevel.Major)]
+    [InlineData(CkDerivableDto.Model, CkDerivableDto.Any, CkSemVerLevel.Minor)]
+    public void DerivableChanged_OnTypesAndRecords(CkDerivableDto before, CkDerivableDto after, CkSemVerLevel expected)
+    {
+        CkCompiledModelRoot Build(CkDerivableDto derivable)
+        {
+            var model = CkV2TestModels.CreateModel();
+            model.Types!.ForEach(t => t.Derivable = derivable);
+            model.Records!.ForEach(r => r.Derivable = derivable);
+            return model;
+        }
+
+        var classified = Classify(Build(before), Build(after));
+
+        Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.Type, Property: "derivable" });
+        Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.Record, Property: "derivable" });
+        Assert.All(classified, c => Assert.Equal(expected, c.Level));
     }
 
     [Fact]

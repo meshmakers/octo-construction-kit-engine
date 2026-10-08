@@ -49,4 +49,12 @@ public class CkEnumDto
     /// </summary>
     [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public string? Description { get; set; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): <c>Internal</c> elements may only be referenced inside the declaring model. <c>null</c>
+    ///     (omitted) means <see cref="CkVisibilityDto.Public" />. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "visibility", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public CkVisibilityDto? Visibility { get; set; }
 }

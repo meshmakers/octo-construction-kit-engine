@@ -106,4 +106,21 @@ public class CkTypeDto : CkTypeWithAttributesDto
     /// </summary>
     [YamlMember(Alias = "methods", DefaultValuesHandling = DefaultValuesHandling.OmitDefaults)]
     public List<CkMethodDto>? Methods { get; set; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): <c>Internal</c> elements may only be referenced inside the declaring model. <c>null</c>
+    ///     (omitted) means <see cref="CkVisibilityDto.Public" />. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "visibility", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public CkVisibilityDto? Visibility { get; set; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): <c>Model</c> = only the declaring model may derive from this element. <c>null</c> (omitted)
+    ///     means <c>Model</c> in a <c>ckLanguage: 2</c> model and <c>Any</c> in a v1 model
+    ///     (<see cref="CkModifiers.ResolveDerivable" />). Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "derivable", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public CkDerivableDto? Derivable { get; set; }
 }

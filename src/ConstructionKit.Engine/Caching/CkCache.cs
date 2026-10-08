@@ -302,6 +302,17 @@ internal class CkCache : IDisposable
                 property.ShouldSerialize = (_, value) => value is CkAttributeAccessDto access &&
                                                          access != CkAttributeAccessDto.ReadWrite;
             }
+            // F1.1-S4: effective visibility / derivable of the graphs are written only when not the v1 value.
+            else if (property.PropertyType == typeof(CkVisibilityDto))
+            {
+                property.ShouldSerialize = (_, value) => value is CkVisibilityDto visibility &&
+                                                         visibility != CkVisibilityDto.Public;
+            }
+            else if (property.PropertyType == typeof(CkDerivableDto))
+            {
+                property.ShouldSerialize = (_, value) => value is CkDerivableDto derivable &&
+                                                         derivable != CkDerivableDto.Any;
+            }
         }
     }
 

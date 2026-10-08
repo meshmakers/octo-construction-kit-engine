@@ -403,6 +403,9 @@ internal class ElementResolver : IElementResolver
                 ckModelGraph.GetOrCreateEnum(ckEnumId, ckEnum);
             }
         }
+
+        // F1.1-S4: effective visibility / derivable (derivable default depends on the CK language).
+        ckModelGraph.ApplyCkV2Modifiers(modelRootBase);
     }
 
     /// <summary>
@@ -444,6 +447,51 @@ internal class ElementResolver : IElementResolver
         {
             var key = new CkId<CkInterfaceId>(model.ModelId, ckInterface.InterfaceId);
             Report(key, "interfaces", key);
+        }
+
+        // F1.1-S4: visibility / derivable are CK v2 keys.
+        void CheckModifiers(object key, CkVisibilityDto? visibility, CkDerivableDto? derivable = null)
+        {
+            if (visibility != null)
+            {
+                Report(key, "visibility", key);
+            }
+
+            if (derivable != null)
+            {
+                Report(key, "derivable", key);
+            }
+        }
+
+        foreach (var ckType in model.Types ?? [])
+        {
+            CheckModifiers(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), ckType.Visibility, ckType.Derivable);
+            foreach (var method in (ckType.Methods ?? []).Where(m => m.Visibility != null))
+            {
+                Report(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), "visibility",
+                    $"{new CkId<CkTypeId>(model.ModelId, ckType.TypeId)}.{method.MethodId}");
+            }
+        }
+
+        foreach (var ckRecord in model.Records ?? [])
+        {
+            CheckModifiers(new CkId<CkRecordId>(model.ModelId, ckRecord.RecordId), ckRecord.Visibility,
+                ckRecord.Derivable);
+        }
+
+        foreach (var ckEnum in model.Enums ?? [])
+        {
+            CheckModifiers(new CkId<CkEnumId>(model.ModelId, ckEnum.EnumId), ckEnum.Visibility);
+        }
+
+        foreach (var ckAttribute in model.Attributes ?? [])
+        {
+            CheckModifiers(new CkId<CkAttributeId>(model.ModelId, ckAttribute.AttributeId), ckAttribute.Visibility);
+        }
+
+        foreach (var ckRole in model.AssociationRoles ?? [])
+        {
+            CheckModifiers(new CkId<CkAssociationRoleId>(model.ModelId, ckRole.AssociationRoleId), ckRole.Visibility);
         }
 
         foreach (var ckType in model.Types ?? [])

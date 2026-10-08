@@ -21,6 +21,7 @@ public class CkAttributeGraph
     /// <param name="attributeDto"></param>
     public CkAttributeGraph(CkId<CkAttributeId> ckAttributeId, CkAttributeDto attributeDto)
     {
+        Visibility = CkModifiers.ResolveVisibility(attributeDto.Visibility);
         CkAttributeId = ckAttributeId;
         ValueType = attributeDto.ValueType;
         ValueCkRecordId = attributeDto.ValueCkRecordId;
@@ -136,4 +137,10 @@ public class CkAttributeGraph
     ///     Optional meta data of the attribute
     /// </summary>
     public ICollection<CkAttributeMetaDataDto>? MetaData { get; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S4): the effective visibility (declared value, otherwise <see cref="CkVisibilityDto.Public" />).
+    ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
+    /// </summary>
+    public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
 }

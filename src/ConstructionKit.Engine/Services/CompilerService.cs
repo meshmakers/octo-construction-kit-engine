@@ -317,7 +317,10 @@ public class CompilerService : ICompilerService
                                 OwnerAttributePath = ckTypeDto.OwnerAttributePath,
                                 // CK v2 (AB#5667 / AB#5669)
                                 Implements = ckTypeDto.Implements,
-                                Methods = ckTypeDto.Methods
+                                Methods = ckTypeDto.Methods,
+                                // F1.1-S4
+                                Visibility = ckTypeDto.Visibility,
+                                Derivable = ckTypeDto.Derivable
                             };
 
                             if (types.ContainsKey(ckCompiledTypeDto.TypeId))

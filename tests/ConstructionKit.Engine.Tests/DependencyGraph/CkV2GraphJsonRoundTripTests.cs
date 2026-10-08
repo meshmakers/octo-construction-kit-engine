@@ -94,7 +94,7 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         var json = Encoding.UTF8.GetString(stream.ToArray());
 
         foreach (var key in new[] { "\"interfaces\"", "\"declaredImplements\"", "\"allImplementedInterfaces\"",
-                     "\"definedMethods\"", "\"allMethods\"", "\"access\"", "\"ckLanguage\"" })
+                     "\"definedMethods\"", "\"allMethods\"", "\"access\"", "\"ckLanguage\"", "\"visibility\"", "\"derivable\"" })
         {
             Assert.DoesNotContain(key, json);
         }
@@ -105,5 +105,61 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         Assert.Empty(demo3.AllMethods);
         Assert.All(demo3.AllAttributes.Values, a => Assert.Equal(CkAttributeAccessDto.ReadWrite, a.Access));
         Assert.Empty(cache.GetRtCkInterfaces("target"));
+        Assert.Equal(CkVisibilityDto.Public, demo3.Visibility);
+        Assert.Equal(CkDerivableDto.Any, demo3.Derivable);
+    }
+
+    [Fact]
+    public async Task V2Modifiers_SurviveTheCacheJson()
+    {
+        // F1.1-S4 (AB#5907): effective visibility / derivable, including the v2 derivable default (Model).
+        var model = Model();
+        Type(model, "Tag").Visibility = CkVisibilityDto.Internal;
+        Type(model, "Tag").Derivable = CkDerivableDto.Any;
+        model.Records!.Single().Visibility = CkVisibilityDto.Internal;
+        model.Enums!.Single().Visibility = CkVisibilityDto.Internal;
+        model.Attributes!.Single(a => a.AttributeId == "PasswordHash").Visibility = CkVisibilityDto.Internal;
+        model.Interfaces!.Single(i => i.InterfaceId == "Named-1").Visibility = CkVisibilityDto.Internal;
+        var method = Type(model, "Account").Methods![0];
+        method.Visibility = CkVisibilityDto.Internal;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var tag = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Tag"));
+        Assert.Equal(CkVisibilityDto.Internal, tag.Visibility);
+        Assert.Equal(CkDerivableDto.Any, tag.Derivable);
+        var account = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account"));
+        Assert.Equal(CkVisibilityDto.Public, account.Visibility);
+        Assert.Equal(CkDerivableDto.Model, account.Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, account.AllMethods[method.MethodId.ToString()].Visibility);
+        var address = cache.GetRtCkRecord("target", new RtCkId<CkRecordId>($"{M}/Address"));
+        Assert.Equal(CkVisibilityDto.Internal, address.Visibility);
+        Assert.Equal(CkDerivableDto.Model, address.Derivable);
+        Assert.Equal(CkVisibilityDto.Internal, cache.GetRtCkEnum("target", new RtCkId<CkEnumId>($"{M}/Mode")).Visibility);
+        Assert.Equal(CkVisibilityDto.Internal,
+            cache.GetRtCkAttribute("target", new RtCkId<CkAttributeId>($"{M}/PasswordHash")).Visibility);
+        Assert.Equal(CkVisibilityDto.Public,
+            cache.GetRtCkAttribute("target", new RtCkId<CkAttributeId>($"{M}/Name")).Visibility);
+        Assert.Equal(CkVisibilityDto.Internal,
+            cache.GetRtCkInterface("target", new RtCkId<CkInterfaceId>($"{M}/Named-1")).Visibility);
+    }
+
+    [Fact]
+    public async Task V2AssociationRoleVisibility_SurvivesTheCacheJson()
+    {
+        var model = sampleData.sample1.Builder.Build();
+        model.CkLanguage = 2;
+        model.AssociationRoles!.Single().Visibility = CkVisibilityDto.Internal;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        Assert.Equal(CkVisibilityDto.Internal,
+            cache.GetRtCkAssociationRole("target", new RtCkId<CkAssociationRoleId>("sample1/Related")).Visibility);
     }
 }

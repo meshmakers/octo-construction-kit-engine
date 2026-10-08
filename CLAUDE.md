@@ -668,6 +668,13 @@ deleted). Before, parallel publishers of sibling models lost each other's entrie
 `ListAsync` / `SearchAsync`) and readers could hit a half-written index. Pinned by
 `PublishAsync_ParallelPublishersOnOneRoot_KeepEveryIndexEntry` (64 parallel publishers; red 3/3 before).
 
+**The empty `ck-models/v2/.catalog-index.lock` file is expected.** It is created on the first publish and left in
+place on purpose: the lock is the exclusive *open* of the file (released when the handle closes, also when a process
+dies), not its existence, so a leftover file never blocks anyone. Deleting it after use would race with a waiting
+publisher that already opened it. It is safe to delete while no build is running; nothing reads its content. The
+leading dot keeps it out of the `ck-*.json` / `catalog.json` lookups. Temp files of an interrupted write
+(`.<name>.<guid>.tmp` next to the target) are never read either and can be deleted at any time.
+
 **Fail fast with the visible versions.** When a dependency range cannot be satisfied,
 `CatalogDependencyResolver` lists the versions each readable catalog knows for that model
 (`... 'System-[2.5,3.0)' does not match any visible version of System (LocalFileSystemCatalog: 2.4.0)`)

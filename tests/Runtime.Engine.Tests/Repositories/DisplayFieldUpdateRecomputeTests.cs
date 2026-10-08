@@ -109,4 +109,30 @@ public class DisplayFieldUpdateRecomputeTests
         Assert.Equal("Neuer Name", partial.RtDisplayName);
         Assert.Equal("Neuer Name", partial.RtDisplayDescription);
     }
+    [Fact]
+    public void ComputeForFullDocuments_EvaluatesRulesPerEntity_AndOverwritesStaleValues()
+    {
+        // AB#5945: full documents written by the bulk import get their display fields from the rules.
+        var typeGraph = new Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph.CkTypeGraph(
+            new CkId<CkTypeId>("Test-1.0.0/Space"), false, false, true, [], null, null, [], [],
+            new Dictionary<CkId<CkAttributeId>, Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph.CkTypeAttributeGraph>(),
+            [], new Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph.CkGraphDirectedAssociations([]), "Space",
+            false, "${RoomNumber} - ${Name}", "${Thermal.SpaceTemperature} C");
+        var full = CreateEntity(new()
+        {
+            ["RoomNumber"] = "EG01", ["Name"] = "Lobby",
+            ["Thermal"] = new RtRecord(new RtCkId<CkRecordId>("Test/Req"),
+                new Dictionary<string, object?> { ["SpaceTemperature"] = 21 })
+        });
+        full.RtDisplayName = "stale";
+        var empty = CreateEntity(new());
+        empty.RtDisplayName = "stale";
+
+        DisplayFieldUpdateRecompute.ComputeForFullDocuments(typeGraph, [full, empty]);
+
+        Assert.Equal("EG01 - Lobby", full.RtDisplayName);
+        Assert.Equal("21 C", full.RtDisplayDescription);
+        Assert.Null(empty.RtDisplayName);
+        Assert.Null(empty.RtDisplayDescription);
+    }
 }

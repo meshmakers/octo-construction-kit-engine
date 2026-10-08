@@ -12,6 +12,7 @@
 
     <ItemGroup>
         <PackageReference Include="FakeItEasy" Version="9.0.1" />
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.3.0" />
         <PackageReference Include="MartinCostello.Logging.XUnit.v3" Version="0.7.1" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
         <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
@@ -134,6 +135,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\ConstructionKit.Engine\ConstructionKit.Engine.csproj" />
+        <ProjectReference Include="..\..\src\Runtime.Contracts\Runtime.Contracts.csproj" />
         <ProjectReference Include="..\..\src\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
                           SetTargetFramework="TargetFramework=net10.0" />
     </ItemGroup>
@@ -144,6 +146,10 @@
              the (dependency-free) emitter source is compiled in directly. -->
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\AttributeCodeGenerator.cs" Link="SourceGeneration\AttributeCodeGenerator.cs" />
         <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkIdsCodeGenerator.cs" Link="SourceGeneration\CkIdsCodeGenerator.cs" />
+        <!-- F1.4-S1: interface / type emitters, compiled with Roslyn against Runtime.Contracts in the tests. -->
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkInterfaceCodeGenerator.cs" Link="SourceGeneration\CkInterfaceCodeGenerator.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\CkTypeCodeGenerator.cs" Link="SourceGeneration\CkTypeCodeGenerator.cs" />
+        <Compile Include="..\..\src\ConstructionKit.SourceGeneration\ICkTypeCodeGenerator.cs" Link="SourceGeneration\ICkTypeCodeGenerator.cs" />
     </ItemGroup>
 
 

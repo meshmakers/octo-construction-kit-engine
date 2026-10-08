@@ -894,6 +894,18 @@ Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}Int
 `RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
 `SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
 appended: `UserChangePassword2MethodId`). Typed parameter records are not generated yet (F1.4-S2).
+**C# interfaces (F1.4-S1, AB#5918).** `CkInterfaceCodeGenerator` emits `public partial interface IRt<Name>` per CK
+interface (`Named-1` → `IRtNamed`, `Named-2` → `IRtNamed2`) in the model's generated namespace (the same one as
+the Rt classes — deviation from the concept's `.Contracts` sub-namespace, so cross-model references resolve like
+base classes do). Attribute members are **get-only** properties with exactly the CLR type of the Rt property (taken
+from `AttributeCodeGenerator`; nullable when the member is optional); `extends` becomes C# interface inheritance and
+an inherited member is not repeated (CS0108). A generated Rt class lists its declared `implements` and implements
+every member of those interfaces and their parents **explicitly** (`string IRtNamed.Name => Name;`; an optional
+member the type does not assign returns `default`), so a required assignment of an optional member still conforms
+and re-implementing an interface a base class already implements is legal. Association members are not emitted
+(the Rt classes have no generated navigations yet); methods neither (definitions only). v1 models: nothing emitted,
+type output unchanged. Pinned by `CkInterfaceCodeGeneratorTests` (Roslyn-compiles the generated code against
+`Runtime.Contracts` with a consumer that assigns `RtAccount` to `IRtNamed`).
 Docs generator: `Interfaces.md` per model (members incl. inherited ones, "Extends" line, association and method
 tables, "Deprecated" marker) plus an "Implements" line and a methods table per type (only when present);
 "Visibility: `Internal`" / "Derivable: `Model`" lines per element and an "(internal)" method marker, written only
@@ -915,7 +927,7 @@ changed Major and cleared Minor).
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
 | 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 | 90 (F1.2-S3: 112–117) | 90 (F1.2-S4: 118–124) |
 | 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
-| 8 | Source generator | — | yes | — | — | yes | — (F1.4) | — (F1.4-S1) |
+| 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes | — (F1.4) | — (F1.4-S1) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 | P1 | P1 |

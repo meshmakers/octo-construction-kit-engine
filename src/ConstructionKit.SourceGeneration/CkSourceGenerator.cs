@@ -193,6 +193,16 @@ public class CkSourceGenerator : IIncrementalGenerator
                 }
             }
 
+            // CK v2 (F1.4-S1): one C# interface per CK interface (nothing for v1 models).
+            foreach (var ckInterfaceDto in ckCompiledModelRoot.Interfaces ?? [])
+            {
+                var code = CkInterfaceCodeGenerator.Generate(ns, ckCompiledModelRoot.ModelId, ckInterfaceDto, tenantId,
+                    ckCacheService);
+                context.AddSource($"{ns}.Interface.{ckInterfaceDto.InterfaceId.Name}.{ckInterfaceDto.InterfaceId.Version}.g.cs",
+                    code);
+                LogDiagnostic(DiagnosticSeverity.Info, $"Generated interface: {ckInterfaceDto.InterfaceId.FullName}");
+            }
+
             if (ckCompiledModelRoot.Records != null)
             {
                 LogDiagnostic(DiagnosticSeverity.Info, $"Generating {ckCompiledModelRoot.Records.Count()} record(s)");

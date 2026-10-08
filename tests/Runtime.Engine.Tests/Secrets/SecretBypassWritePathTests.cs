@@ -309,7 +309,7 @@ public class SecretBypassWritePathTests
     ///     Only <see cref="RuntimeRepositoryBase.BulkInsertRtEntitiesAsync" /> is exercised; everything the
     ///     base needs from a concrete repository beyond the data source is unsupported.
     /// </summary>
-    private sealed class StubRepository(ICkCacheService cache, IRepositoryDataSource dataSource, IBulkRtMutation mutation)
+    internal sealed class StubRepository(ICkCacheService cache, IRepositoryDataSource dataSource, IBulkRtMutation mutation)
         : RuntimeRepositoryBase(SecretTestModel.TenantId, cache, dataSource, mutation)
     {
         protected override Task RefreshCkCacheServiceAsync(ICkCacheService ckCacheService) => Task.CompletedTask;

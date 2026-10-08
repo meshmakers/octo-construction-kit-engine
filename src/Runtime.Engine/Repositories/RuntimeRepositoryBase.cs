@@ -1121,6 +1121,13 @@ public abstract class RuntimeRepositoryBase : IRuntimeRepository
                 }
             }
 
+            // AB#5945: the bulk import bypasses the pre-document modifications as well, so the
+            // engine-computed display fields are evaluated here. Without it every seeded entity
+            // (blueprint install, UpdateBlueprint Safe/Merge/Full, ImportRt) is written without
+            // rtDisplayName, and an upsert (full replace) wipes the value a previous save computed.
+            // The AutoIncrement modifier stays deliberately excluded: imports carry their numbers.
+            DisplayFieldUpdateRecompute.ComputeForFullDocuments(ckTypeGraph, entities);
+
             results.Add(await RepositoryDataSource.GetRtCollection<RtEntity>(ckTypeGraph)
                 .BulkImportAsync(session, entities, options).ConfigureAwait(false));
         }

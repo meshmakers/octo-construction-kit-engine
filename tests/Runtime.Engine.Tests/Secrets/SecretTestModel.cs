@@ -57,11 +57,16 @@ internal sealed class SecretTestModel
         Plain = BuildType("Plain",
             Attr("Name", AttributeValueTypesDto.String),
             Attr("Settings", AttributeValueTypesDto.Record, recordId: Settings.CkRecordId));
+        // AB#5945: a type with display rules (one referencing a record path) for the bulk-import tests.
+        Named = BuildType("Named", "${Name} (${Year})", "Timeout ${Settings.Timeout}",
+            Attr("Name", AttributeValueTypesDto.String),
+            Attr("Year", AttributeValueTypesDto.Int),
+            Attr("Settings", AttributeValueTypesDto.Record, recordId: Settings.CkRecordId));
 
         Cache = A.Fake<ICkCacheService>();
         A.CallTo(() => Cache.IsTenantLoaded(TenantId)).Returns(true);
-        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Config, OptionalOnly, Plain]);
-        foreach (var type in new[] { Config, OptionalOnly, Plain })
+        A.CallTo(() => Cache.GetCkTypes(TenantId)).Returns([Config, OptionalOnly, Plain, Named]);
+        foreach (var type in new[] { Config, OptionalOnly, Plain, Named })
         {
             RegisterType(type);
         }
@@ -79,6 +84,8 @@ internal sealed class SecretTestModel
     public CkTypeGraph OptionalOnly { get; }
 
     public CkTypeGraph Plain { get; }
+
+    public CkTypeGraph Named { get; }
 
     public CkRecordGraph Credential { get; }
 
@@ -291,7 +298,14 @@ internal sealed class SecretTestModel
 
     private static CkTypeGraph BuildType(string name, params CkTypeAttributeGraph[] attributes)
     {
+        return BuildType(name, null, null, attributes);
+    }
+
+    private static CkTypeGraph BuildType(string name, string? displayNameRule, string? displayDescriptionRule,
+        params CkTypeAttributeGraph[] attributes)
+    {
         return new CkTypeGraph(new CkId<CkTypeId>($"{ModelId}/{name}"), false, false, true, [], null, null, [], [],
-            attributes.ToDictionary(a => a.CkAttributeId, a => a), [], new CkGraphDirectedAssociations([]), name, false);
+            attributes.ToDictionary(a => a.CkAttributeId, a => a), [], new CkGraphDirectedAssociations([]), name, false,
+            displayNameRule, displayDescriptionRule);
     }
 }

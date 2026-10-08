@@ -54,6 +54,31 @@ internal static class DisplayFieldUpdateRecompute
     }
 
     /// <summary>
+    ///     Computes the display fields of full documents written outside <see cref="BulkRtMutation" />
+    ///     — the bulk import behind ImportRt and every blueprint install/update (AB#5945). Mirrors the
+    ///     save-path modifier (DisplayNameModifier in the Mongo engine): the fields are engine-computed,
+    ///     never caller-supplied, so they are always overwritten; a type without rules (or a rule whose
+    ///     referenced attributes are all empty) yields null. The documents replace the stored ones
+    ///     completely (insert or replace-upsert), so null here means "no display name" and an
+    ///     upsert no longer wipes a previously computed value without recomputing it.
+    /// </summary>
+    /// <param name="ckTypeGraph">The CK type graph shared by all <paramref name="rtEntities" /></param>
+    /// <param name="rtEntities">Full documents of exactly that type</param>
+    internal static void ComputeForFullDocuments(CkTypeGraph ckTypeGraph, IEnumerable<RtEntity> rtEntities)
+    {
+        var nameParseResult = GetValidParseResult(ckTypeGraph.DisplayNameRule);
+        var descriptionParseResult = GetValidParseResult(ckTypeGraph.DisplayDescriptionRule);
+
+        foreach (var rtEntity in rtEntities)
+        {
+            rtEntity.RtDisplayName =
+                nameParseResult?.Evaluate(path => RtDisplayRuleEvaluator.ResolveAttributePath(rtEntity, path));
+            rtEntity.RtDisplayDescription =
+                descriptionParseResult?.Evaluate(path => RtDisplayRuleEvaluator.ResolveAttributePath(rtEntity, path));
+        }
+    }
+
+    /// <summary>
     ///     Re-evaluates the display rules against stored + updated attributes and stamps the
     ///     result onto the partial update document (empty string = clear sentinel).
     /// </summary>

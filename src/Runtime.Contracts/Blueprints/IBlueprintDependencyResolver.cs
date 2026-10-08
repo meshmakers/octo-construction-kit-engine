@@ -55,6 +55,15 @@ public class BlueprintResolutionResult
 
     /// <summary>Non-blocking advisories surfaced during resolution.</summary>
     public List<string> Warnings { get; init; } = [];
+
+    /// <summary>
+    /// Every version range declared on a dependency, keyed by blueprint name. A dependency that
+    /// is already installed on the tenant in a version satisfying all of its ranges is kept, even
+    /// when <see cref="InstallOrder"/> carries a different (e.g. lower) catalog version — a range
+    /// floor is a minimum, never a target. Empty for the root and for dependency-free plans.
+    /// </summary>
+    public Dictionary<string, List<BlueprintIdVersionRange>> DependencyRanges { get; init; } =
+        new(StringComparer.Ordinal);
 }
 
 /// <summary>

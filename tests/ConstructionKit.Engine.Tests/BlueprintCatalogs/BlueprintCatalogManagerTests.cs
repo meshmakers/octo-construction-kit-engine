@@ -227,4 +227,28 @@ public class BlueprintCatalogManagerTests
         Assert.Equal(BlueprintCatalogRefreshStatus.Failed, result.Status);
         Assert.Equal("remote unreachable", result.Message);
     }
+
+    [Fact]
+    public async Task IsExistingAsync_Range_ReturnsHighestVersionAcrossCatalogs_NotFirstCatalogMatch()
+    {
+        // test-2: public (order 20) tops out at Base-2.10.0, private (order 21) carries Base-2.11.1.
+        var publicCatalog = FakeCatalog("Public");
+        A.CallTo(() => publicCatalog.Order).Returns(20);
+        A.CallTo(() => publicCatalog.IsExistingAsync(A<BlueprintIdVersionRange>._, A<object?>._))
+            .Returns(new BlueprintExistingResult { Exists = true, BlueprintId = new BlueprintId("EnergyCommunity.Base-2.10.0") });
+        var privateCatalog = FakeCatalog("Private");
+        A.CallTo(() => privateCatalog.Order).Returns(21);
+        A.CallTo(() => privateCatalog.IsExistingAsync(A<BlueprintIdVersionRange>._, A<object?>._))
+            .Returns(new BlueprintExistingResult { Exists = true, BlueprintId = new BlueprintId("EnergyCommunity.Base-2.11.1") });
+        var emptyCatalog = FakeCatalog("Embedded");
+        A.CallTo(() => emptyCatalog.Order).Returns(0);
+        A.CallTo(() => emptyCatalog.IsExistingAsync(A<BlueprintIdVersionRange>._, A<object?>._))
+            .Returns(new BlueprintExistingResult { Exists = false });
+
+        var result = await Manager(publicCatalog, privateCatalog, emptyCatalog)
+            .IsExistingAsync(new BlueprintIdVersionRange("EnergyCommunity.Base-[2.10,3.0)"));
+
+        Assert.True(result.Exists);
+        Assert.Equal("EnergyCommunity.Base-2.11.1", result.BlueprintId?.FullName);
+    }
 }

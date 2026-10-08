@@ -314,6 +314,12 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     public async Task<BlueprintExistingResult> IsExistingAsync(BlueprintIdVersionRange blueprintIdVersionRange,
         object? sourceIdentifier = null)
     {
+        // Highest satisfying version across ALL readable catalogs, not the first catalog that has any
+        // match. Catalog order only breaks ties (same version in two catalogs). First-catalog-wins made
+        // the resolver pick e.g. Base-2.10.0 from the public catalog (order 20) although the private
+        // catalog (order 21) carries Base-2.11.x — and the install then downgraded a tenant that already
+        // ran 2.11. Mirrors CatalogManager.IsExistingAsync for CK model ranges.
+        BlueprintExistingResult? best = null;
         foreach (var catalog in _catalogs.OrderBy(c => c.Order))
         {
             if (!catalog.IsSupportingSourceIdentifier(sourceIdentifier) || !catalog.CanRead)
@@ -322,10 +328,16 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
             }
 
             var result = await catalog.IsExistingAsync(blueprintIdVersionRange, sourceIdentifier).ConfigureAwait(false);
-            if (result.Exists)
+            if (result.Exists && result.BlueprintId != null
+                && (best?.BlueprintId == null || result.BlueprintId.CompareTo(best.BlueprintId) > 0))
             {
-                return result;
+                best = result;
             }
+        }
+
+        if (best != null)
+        {
+            return best;
         }
 
         return new BlueprintExistingResult

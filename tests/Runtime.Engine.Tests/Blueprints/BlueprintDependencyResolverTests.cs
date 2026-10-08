@@ -66,6 +66,20 @@ public class BlueprintDependencyResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_RecordsDeclaredRangesPerDependency()
+    {
+        _catalog.AddBlueprint("BaseBp", "1.2.0");
+        _catalog.AddBlueprint("AppBp", "1.0.0", depends: [("BaseBp", "[1.1,2.0)")]);
+
+        var result = await _resolver.ResolveAsync(new BlueprintId("AppBp", "1.0.0"), TestContext.Current.CancellationToken);
+
+        Assert.True(result.Success);
+        var ranges = Assert.Single(result.DependencyRanges);
+        Assert.Equal("BaseBp", ranges.Key);
+        Assert.Equal("BaseBp-[1.1,2.0)", Assert.Single(ranges.Value).FullName);
+    }
+
+    [Fact]
     public async Task ResolveAsync_TransitiveDependencies_TopoSorted()
     {
         // C is a leaf; B depends on C; A depends on B.

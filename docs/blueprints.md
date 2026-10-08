@@ -222,12 +222,22 @@ Both `ckModelDependencies` and `blueprintDependencies` use the same range syntax
 | `(1.0.0,2.0.0]` | Version > 1.0.0 and <= 2.0.0 |
 | `[1.5.0]`       | Exactly version 1.5.0        |
 
+A `blueprintDependencies` range resolves to the **highest catalog version that satisfies it across
+all readable catalogs** (catalog order only breaks ties). On apply, the range floor is a minimum,
+never a target: a dependency the tenant already runs in a newer version that still satisfies every
+declared range is kept untouched (no seed re-import, no installation-row change, also with
+`--force`, which only applies to the root). A newer installed version outside a declared range fails
+the apply instead of downgrading it.
+
 ## Application Flow
 
 ```
 ApplyBlueprintAsync(tenantId, blueprintId, force)
 │
 ├── 1. Resolve transitive blueprint dependency closure (topo-sorted)
+│
+├── 1c. Keep dependencies already installed in a newer in-range version
+│       (newer but out of range → fail, never downgrade)
 │
 ├── 1b. Resolve variable context via IBlueprintVariableProvider
 │       Evaluate root blueprint's `requires:` against the context

@@ -44,7 +44,8 @@ internal sealed class BlueprintDependencyResolver : IBlueprintDependencyResolver
             Success = success,
             InstallOrder = success ? state.InstallOrder : [],
             Conflicts = state.Conflicts,
-            Warnings = state.Warnings
+            Warnings = state.Warnings,
+            DependencyRanges = state.DependencyRanges
         };
     }
 
@@ -132,6 +133,13 @@ internal sealed class BlueprintDependencyResolver : IBlueprintDependencyResolver
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (!state.DependencyRanges.TryGetValue(depRange.Name, out var ranges))
+            {
+                ranges = [];
+                state.DependencyRanges[depRange.Name] = ranges;
+            }
+            ranges.Add(depRange);
+
             var existing = await _catalogManager.IsExistingAsync(depRange).ConfigureAwait(false);
             if (!existing.Exists || existing.BlueprintId == null)
             {
@@ -179,5 +187,8 @@ internal sealed class BlueprintDependencyResolver : IBlueprintDependencyResolver
         public List<BlueprintMetaRootDto> InstallOrder { get; } = [];
         public List<BlueprintResolutionConflict> Conflicts { get; } = [];
         public List<string> Warnings { get; } = [];
+
+        /// <summary>Declared ranges per dependency name (see <see cref="BlueprintResolutionResult.DependencyRanges"/>).</summary>
+        public Dictionary<string, List<BlueprintIdVersionRange>> DependencyRanges { get; } = new(StringComparer.Ordinal);
     }
 }

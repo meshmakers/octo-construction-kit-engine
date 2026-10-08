@@ -167,7 +167,8 @@ public interface IBlueprintCatalogManager
     /// </summary>
     /// <param name="blueprintIdVersionRange">The blueprint id with version range</param>
     /// <param name="sourceIdentifier">Source identifier, null for default</param>
-    /// <returns>Result indicating if blueprint exists</returns>
+    /// <returns>Result indicating if blueprint exists; <see cref="BlueprintExistingResult.BlueprintId"/> is the
+    /// highest version satisfying the range across all readable catalogs (catalog order only breaks ties)</returns>
     Task<BlueprintExistingResult> IsExistingAsync(BlueprintIdVersionRange blueprintIdVersionRange,
         object? sourceIdentifier = null);
 

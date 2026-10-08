@@ -270,8 +270,26 @@ internal class BlueprintService : IBlueprintService
                 }
             }
 
+            // 1c. A dependency range floor is a MINIMUM, never a target. When the tenant already
+            //     runs a dependency in a newer version than the catalog resolution picked, keep it
+            //     as long as it satisfies every declared range: no seed re-import of the older
+            //     version, no installation-row rewrite, no CK floors from the older manifest.
+            //     Without this, (force-)installing e.g. Simulation-2.8.1 (Base-[2.10,3.0)) on a
+            //     tenant with Base-2.11.0 re-applied Base-2.10.0 and recorded it as installed.
+            //     A newer installed version OUTSIDE a declared range is a conflict — fail instead
+            //     of silently downgrading.
+            var keptDependencies = await FindNewerInstalledDependenciesAsync(
+                    tenantId, blueprintId, resolution, operationResult, cancellationToken)
+                .ConfigureAwait(false);
+            if (operationResult.HasErrors)
+            {
+                await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
+                return BlueprintApplicationResult.Failed(operationResult);
+            }
+
             // 2. Aggregate all CK model dependencies across the install order.
             var aggregatedCkDeps = resolution.InstallOrder
+                .Where(bp => !keptDependencies.ContainsKey(bp.BlueprintId.Name))
                 .SelectMany(bp => bp.CkModelDependencies ?? [])
                 .GroupBy(d => d.Name, StringComparer.Ordinal)
                 .Select(g => g.First())
@@ -385,6 +403,12 @@ internal class BlueprintService : IBlueprintService
 
                 var isRoot = blueprint.BlueprintId.Equals(blueprintId);
 
+                if (!isRoot && keptDependencies.TryGetValue(blueprint.BlueprintId.Name, out var keptId))
+                {
+                    rootDependencyIds.Add(keptId);
+                    continue;
+                }
+
                 var existing = await _installations
                     .GetByBlueprintNameAsync(tenantId, blueprint.BlueprintId.Name, cancellationToken)
                     .ConfigureAwait(false);
@@ -497,6 +521,65 @@ internal class BlueprintService : IBlueprintService
             await NotifyApplyFailedAsync(tenantId, blueprintId, operationResult, correlationId).ConfigureAwait(false);
             return BlueprintApplicationResult.Failed(operationResult);
         }
+    }
+
+    /// <summary>
+    /// Finds dependencies (never the root) the tenant already runs in a version newer than the one
+    /// <paramref name="resolution"/> picked. In-range ones are returned (name -> installed id) and
+    /// must be kept; an out-of-range one adds an error to <paramref name="operationResult"/>.
+    /// </summary>
+    private async Task<Dictionary<string, BlueprintId>> FindNewerInstalledDependenciesAsync(
+        string tenantId,
+        BlueprintId rootBlueprintId,
+        BlueprintResolutionResult resolution,
+        OperationResult operationResult,
+        CancellationToken cancellationToken)
+    {
+        var kept = new Dictionary<string, BlueprintId>(StringComparer.Ordinal);
+
+        foreach (var blueprint in resolution.InstallOrder)
+        {
+            var resolvedId = blueprint.BlueprintId;
+            if (resolvedId.Equals(rootBlueprintId))
+            {
+                continue;
+            }
+
+            var installed = await _installations
+                .GetByBlueprintNameAsync(tenantId, resolvedId.Name, cancellationToken)
+                .ConfigureAwait(false);
+            if (installed == null || installed.BlueprintId.CompareTo(resolvedId) <= 0)
+            {
+                continue;
+            }
+
+            var ranges = resolution.DependencyRanges.TryGetValue(resolvedId.Name, out var declared)
+                ? declared
+                : [];
+            var violated = ranges.FirstOrDefault(r =>
+                !r.BlueprintVersionRange.IsSatisfiedBy(installed.BlueprintId.Version));
+            if (violated != null)
+            {
+                operationResult.AddMessage(new OperationMessage(
+                    MessageLevel.Error, null, 52,
+                    $"Blueprint '{rootBlueprintId.FullName}' requires '{violated.FullName}', but tenant " +
+                    $"'{tenantId}' runs '{installed.BlueprintId.FullName}'. Refusing to downgrade an " +
+                    "installed dependency; update or uninstall it explicitly."));
+                continue;
+            }
+
+            kept[resolvedId.Name] = installed.BlueprintId;
+            operationResult.AddMessage(new OperationMessage(
+                MessageLevel.Info, null, 29,
+                $"Dependency '{installed.BlueprintId.FullName}' is already installed and satisfies " +
+                $"{string.Join(", ", ranges.Select(r => $"'{r.FullName}'"))}; keeping it " +
+                $"(catalog resolution picked '{resolvedId.FullName}')."));
+            _logger.LogInformation(
+                "Keeping newer installed dependency {InstalledId} on tenant {TenantId} (resolved {ResolvedId})",
+                installed.BlueprintId, tenantId, resolvedId);
+        }
+
+        return kept;
     }
 
     private async Task NotifyApplyFailedAsync(

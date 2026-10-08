@@ -8,6 +8,30 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts;
 public static class CkMethodIds
 {
     /// <summary>
+    ///     F1.4-S2 (review L15): the generated C# name of a type method — type class name plus method name, the
+    ///     method version appended when above 1 (<c>User</c> + <c>ChangePassword-2</c> → <c>UserChangePassword2</c>).
+    ///     Used for the <c>{Name}MethodId</c> constant and the <c>{Name}Parameters</c> / <c>{Name}Result</c>
+    ///     records; the compiler rejects two methods of a model with the same name (message 125).
+    /// </summary>
+    public static string GeneratedName(CkTypeId ckTypeId, string methodId) =>
+        ckTypeId.MakeClassName() + MethodClassName(methodId);
+
+    /// <summary>
+    ///     <c>ChangePassword-1</c> → <c>ChangePassword</c>, <c>ChangePassword-2</c> → <c>ChangePassword2</c>.
+    /// </summary>
+    public static string MethodClassName(string methodId)
+    {
+        var index = methodId.LastIndexOf('-');
+        if (index <= 0 || !uint.TryParse(methodId.Substring(index + 1), out var version))
+        {
+            return methodId.MakeClassName();
+        }
+
+        var name = methodId.Substring(0, index).MakeClassName();
+        return version > 1 ? $"{name}{version}" : name;
+    }
+
+    /// <summary>
     ///     Returns the qualified method id of <paramref name="methodId" /> declared on <paramref name="declaringCkTypeId" />.
     /// </summary>
     /// <param name="declaringCkTypeId">The runtime id of the CK type that declares the method</param>

@@ -352,6 +352,9 @@ internal static class MessageCodes
     internal static OperationMessage UnknownTargetCkInterfaceOfAssociation(string? location, object ckRoleId, object ckTypeId, object ckInterfaceId) =>
         GetMessage("UnknownTargetCkInterfaceOfAssociation", location, ckRoleId, ckTypeId, ckInterfaceId);
 
+    internal static OperationMessage CkMethodGeneratedNameCollision(string? location, object first, object second, object modelId, object generatedName) =>
+        GetMessage("CkMethodGeneratedNameCollision", location, first, second, modelId, generatedName);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1007,6 +1010,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  128, "Association '{ckRoleId}' of type '{ckTypeId}' narrows its target to the unknown interface '{ckInterfaceId}' (targetCkInterfaceId).",
                  new [] {"ckRoleId", "ckTypeId", "ckInterfaceId"})
+        },
+        {
+            "CkMethodGeneratedNameCollision",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 125, "Methods '{first}' and '{second}' of model '{modelId}' produce the same generated name '{generatedName}' (constant '{generatedName}MethodId', record '{generatedName}Parameters'). Rename one of the types or methods.",
+                 new [] {"first", "second", "modelId", "generatedName"})
         },
     };
 }

@@ -23,6 +23,15 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
 
     /// <inheritdoc />
     public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId, ICkCacheService cacheService)
+        => Generate(ns, modelId, ckType, cacheTenantId, cacheService, 1);
+
+    /// <summary>
+    ///     Generates the Rt class of a type. F1.4-S2: for a <c>ckLanguage: 2</c> model the class is <c>abstract</c>
+    ///     for <c>isAbstract</c>, and <c>sealed</c> for <c>isFinal</c> or for <c>derivable: Model</c> without a
+    ///     subtype in its own model; v1 output is unchanged.
+    /// </summary>
+    public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId,
+        ICkCacheService cacheService, int ckLanguage)
     {
         string ckBaseType;
         if (ckType.DerivedFromCkTypeId != null)
@@ -59,7 +68,7 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine("/// </summary>");
         sb.AppendLine(
             $"[RtCkId({modelId.Name.MakeClassName()}CkIds.RtCk{ckType.TypeId.MakeClassName()}TypeIdString)]");
-        sb.AppendLine($"public partial class Rt{ckType.TypeId.MakeClassName()}{ckBaseType}");
+        sb.AppendLine($"public {ClassModifier(modelId, ckType, cacheTenantId, cacheService, ckLanguage)}partial class Rt{ckType.TypeId.MakeClassName()}{ckBaseType}");
         sb.AppendLine("{");
         if (ckType.Attributes != null)
         {
@@ -102,6 +111,29 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         sb.AppendLine("}");
 
         return sb.ToString();
+    }
+
+    private static string ClassModifier(CkModelId modelId, CkTypeDto ckType, string cacheTenantId,
+        ICkCacheService cacheService, int ckLanguage)
+    {
+        if (ckLanguage < 2)
+        {
+            return "";
+        }
+
+        if (ckType.IsAbstract)
+        {
+            return "abstract ";
+        }
+
+        if (ckType.IsFinal)
+        {
+            return "sealed ";
+        }
+
+        var typeGraph = cacheService.GetRtCkType(cacheTenantId, new RtCkId<CkTypeId>(modelId.Name, ckType.TypeId));
+        var hasInModelSubtype = typeGraph.GetAllDerivedTypes(false).Any(d => d.ModelId.Name == modelId.Name);
+        return typeGraph.Derivable == CkDerivableDto.Model && !hasInModelSubtype ? "sealed " : "";
     }
 
     /// <inheritdoc />

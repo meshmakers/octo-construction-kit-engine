@@ -653,6 +653,12 @@
       "number": 128,
       "level": "ERROR",
       "text": "Association '{ckRoleId}' of type '{ckTypeId}' narrows its target to the unknown interface '{ckInterfaceId}' (targetCkInterfaceId)."
+    },
+    {
+      "key": "CkMethodGeneratedNameCollision",
+      "number": 125,
+      "level": "ERROR",
+      "text": "Methods '{first}' and '{second}' of model '{modelId}' produce the same generated name '{generatedName}' (constant '{generatedName}MethodId', record '{generatedName}Parameters'). Rename one of the types or methods."
     }
   ]
 }

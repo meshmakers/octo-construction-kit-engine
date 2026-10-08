@@ -183,7 +183,7 @@ public class CkSourceGenerator : IIncrementalGenerator
                     }
 
                     var code = CkTypeCodeGenerator.Instance.Generate(ns, ckCompiledModelRoot.ModelId, ckTypeDto, tenantId,
-                        ckCacheService);
+                        ckCacheService, ckCompiledModelRoot.EffectiveCkLanguage);
                     if (!string.IsNullOrWhiteSpace(code))
                     {
                         var fileName = $"{ns}.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version}.g.cs";
@@ -201,6 +201,13 @@ public class CkSourceGenerator : IIncrementalGenerator
                 context.AddSource($"{ns}.Interface.{ckInterfaceDto.InterfaceId.Name}.{ckInterfaceDto.InterfaceId.Version}.g.cs",
                     code);
                 LogDiagnostic(DiagnosticSeverity.Info, $"Generated interface: {ckInterfaceDto.InterfaceId.FullName}");
+            }
+
+            // F1.4-S2: parameter / result records of the methods declared by the model's types.
+            foreach (var ckTypeDto in (ckCompiledModelRoot.Types ?? []).Where(t => t.Methods is { Count: > 0 }))
+            {
+                context.AddSource($"{ns}.Methods.{ckTypeDto.TypeId.Name}.{ckTypeDto.TypeId.Version}.g.cs",
+                    CkMethodCodeGenerator.Generate(ns, ckTypeDto));
             }
 
             if (ckCompiledModelRoot.Records != null)

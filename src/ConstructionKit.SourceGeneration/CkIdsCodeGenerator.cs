@@ -9,17 +9,7 @@ internal class CkIdsCodeGenerator
     /// <summary>
     ///     <c>ChangePassword-1</c> → <c>ChangePassword</c>, <c>ChangePassword-2</c> → <c>ChangePassword2</c>.
     /// </summary>
-    internal static string MakeMethodClassName(string methodId)
-    {
-        var index = methodId.LastIndexOf('-');
-        if (index <= 0 || !uint.TryParse(methodId.Substring(index + 1), out var version))
-        {
-            return methodId.MakeClassName();
-        }
-
-        var name = methodId.Substring(0, index).MakeClassName();
-        return version > 1 ? $"{name}{version}" : name;
-    }
+    internal static string MakeMethodClassName(string methodId) => CkMethodIds.MethodClassName(methodId);
 
     /// <summary>
     ///     Returns the singleton instance of <see cref="CkIdsCodeGenerator" />

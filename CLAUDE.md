@@ -881,6 +881,7 @@ Notes:
 | 123 | `CkInterfaceHasNoMembers` | `ReferenceResolver` | F1.2-S4: no attribute, association or method member and no `extends` (replaces the former schema `minItems`) |
 | 124 | `CkInterfaceDeprecated` | `ReferenceResolver` | F1.2-S4: **warning** for `implements`, `extends`, interface association targets and type association `targetCkInterfaceId` that reference a `deprecated: true` interface |
 | 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
+| 125 | `CkMethodGeneratedNameCollision` | `ElementResolver.CheckGeneratedMethodNames` | F1.4-S2 (review L15): two type methods of a model produce the same generated name `{Type}{Method}` (constant / parameter record) |
 | 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 
@@ -894,6 +895,19 @@ Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}Int
 `RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
 `SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
 appended: `UserChangePassword2MethodId`). Typed parameter records are not generated yet (F1.4-S2).
+**v2 class modifiers and method contracts (F1.4-S2, AB#5919).** For a `ckLanguage: 2` model (the source generator
+passes `EffectiveCkLanguage` to `CkTypeCodeGenerator`) the Rt class is `abstract` for `isAbstract`, `sealed` for
+`isFinal` or for an effective `derivable: Model` without a subtype in its own model; v1 output is unchanged.
+`CkMethodCodeGenerator` emits per declared type method `{Type}{Method}Parameters` (`required` for required
+parameters, nullable for optional ones, camelCase → PascalCase; CLR types: string/bool/DateTime/DateTimeOffset/
+TimeSpan/int/long/double, `IReadOnlyList<string|long>`, `Rt{Enum}Enum`, `Rt{Record}Record`) with a `ToString()` that
+redacts `sensitive` parameters as `***`, and `{Type}{Method}Result { Value }` when the method has a result
+(definitions only, no dispatch). Interface methods get no records. **Review L15:** the generated name
+(`CkMethodIds.GeneratedName`, shared with the `{Name}MethodId` constants) is checked per model by the compiler —
+**message 125** `CkMethodGeneratedNameCollision` (`User`+`ChangePassword` vs `UserChange`+`Password`); the existing
+constant names stay unchanged (no separator). Pinned by `CkV2GeneratedContractsTests` (Roslyn compile + emitted
+`ToString`).
+
 **C# interfaces (F1.4-S1, AB#5918).** `CkInterfaceCodeGenerator` emits `public partial interface IRt<Name>` per CK
 interface (`Named-1` → `IRtNamed`, `Named-2` → `IRtNamed2`) in the model's generated namespace (the same one as
 the Rt classes — deviation from the concept's `.Contracts` sub-namespace, so cross-model references resolve like
@@ -927,7 +941,7 @@ changed Major and cleared Minor).
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
 | 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 | 90 (F1.2-S3: 112–117) | 90 (F1.2-S4: 118–124) |
 | 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
-| 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes | — (F1.4) | — (F1.4-S1) |
+| 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `abstract`/`sealed` (v2) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 | P1 | P1 |

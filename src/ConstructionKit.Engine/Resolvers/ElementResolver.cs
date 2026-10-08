@@ -27,6 +27,9 @@ internal class ElementResolver : IElementResolver
         // F1.2-S2 (review N5): Hidden assignments that leak through other constructs.
         CheckHiddenAssignments(modelRootBase, originFileResolver, operationResult);
 
+        // F1.4-S2 (review L15): generated method names must be unique per model.
+        CheckGeneratedMethodNames(modelRootBase, originFileResolver, operationResult);
+
         if (modelRootBase.Interfaces != null)
         {
             ResolveInterfaces(modelRootBase, ckModelGraph, variableResolver, originFileResolver, operationResult);
@@ -609,6 +612,32 @@ internal class ElementResolver : IElementResolver
             {
                 operationResult.AddMessage(MessageCodes.HiddenAttributeOnAssociationRole(
                     originFileResolver.Resolve(ckRoleId), ckRoleId, assignment.AttributeName));
+            }
+        }
+    }
+
+    private static void CheckGeneratedMethodNames(CkModelRootBase model, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        var seen = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var ckType in model.Types ?? [])
+        {
+            foreach (var method in ckType.Methods ?? [])
+            {
+                var name = CkMethodIds.GeneratedName(ckType.TypeId, method.MethodId);
+                var qualified = $"{ckType.TypeId.FullName}.{method.MethodId}";
+                if (seen.TryGetValue(name, out var first))
+                {
+                    if (first != qualified)
+                    {
+                        operationResult.AddMessage(MessageCodes.CkMethodGeneratedNameCollision(
+                            originFileResolver.Resolve(model.ModelId), first, qualified, model.ModelId, name));
+                    }
+
+                    continue;
+                }
+
+                seen.Add(name, qualified);
             }
         }
     }

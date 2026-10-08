@@ -310,6 +310,18 @@ internal static class MessageCodes
     internal static OperationMessage CkModelRequiresNewerEngine(string? location, object modelId, object minEngineVersion, object engineVersion) =>
         GetMessage("CkModelRequiresNewerEngine", location, modelId, minEngineVersion, engineVersion);
 
+    internal static OperationMessage HiddenAttributeIndexed(string? location, object indexType, object ckTypeId, object attributeName, object attributePath) =>
+        GetMessage("HiddenAttributeIndexed", location, indexType, ckTypeId, attributeName, attributePath);
+
+    internal static OperationMessage HiddenAttributeAutoCompleteValues(string? location, object attributeName, object ckElementId) =>
+        GetMessage("HiddenAttributeAutoCompleteValues", location, attributeName, ckElementId);
+
+    internal static OperationMessage HiddenAttributeOnAssociationRole(string? location, object ckRoleId, object attributeName) =>
+        GetMessage("HiddenAttributeOnAssociationRole", location, ckRoleId, attributeName);
+
+    internal static OperationMessage UnknownIndexAttributePath(string? location, object indexType, object ckTypeId, object attributePath, object segment) =>
+        GetMessage("UnknownIndexAttributePath", location, indexType, ckTypeId, attributePath, segment);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -881,6 +893,30 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  126, "Model '{modelId}' requires construction kit engine version {minEngineVersion} or later (minEngineVersion); this engine is version {engineVersion}. Update the service before importing the model.",
                  new [] {"modelId", "minEngineVersion", "engineVersion"})
+        },
+        {
+            "HiddenAttributeIndexed",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 106, "Index ({indexType}) of type '{ckTypeId}' references the Hidden attribute '{attributeName}' through path '{attributePath}'. Hidden attributes cannot be indexed: a unique index reveals values through duplicate-key errors.",
+                 new [] {"indexType", "ckTypeId", "attributeName", "attributePath"})
+        },
+        {
+            "HiddenAttributeAutoCompleteValues",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 107, "Attribute '{attributeName}' of '{ckElementId}' is Hidden and declares 'autoCompleteValues', which publish candidate values in the construction kit model. Remove the values or the Hidden access.",
+                 new [] {"attributeName", "ckElementId"})
+        },
+        {
+            "HiddenAttributeOnAssociationRole",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 108, "Association role '{ckRoleId}' assigns attribute '{attributeName}' with access Hidden. Association attributes have no access guard; Hidden is not supported on association roles.",
+                 new [] {"ckRoleId", "attributeName"})
+        },
+        {
+            "UnknownIndexAttributePath",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 109, "Index ({indexType}) of type '{ckTypeId}' references the unknown attribute path '{attributePath}' (segment '{segment}'). Index paths are resolved case-insensitively by the database; in a ckLanguage 2 model every segment must name an attribute of the type or of the record it traverses.",
+                 new [] {"indexType", "ckTypeId", "attributePath", "segment"})
         },
     };
 }

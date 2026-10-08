@@ -4,6 +4,9 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
+using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
+using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts.Formulas;
 using Meshmakers.Octo.Runtime.Contracts.StreamData;
 using Microsoft.Extensions.Logging;
@@ -41,6 +44,7 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     private readonly ILogger<ArchiveLifecycleService> _logger;
     private readonly Func<DateTime> _clock;
     private readonly IArchiveCoverageInvalidator? _coverageInvalidator;
+    private readonly ICkCacheService? _ckCacheService;
 
     /// <summary>
     /// Constructs the lifecycle service. The store and stream-data repository must be
@@ -63,7 +67,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         IArchiveRecomputeStateStore? recomputeStateStore = null,
         IRecomputeJobStore? recomputeJobStore = null,
         Func<DateTime>? clock = null,
-        IArchiveCoverageInvalidator? coverageInvalidator = null)
+        IArchiveCoverageInvalidator? coverageInvalidator = null,
+        ICkCacheService? ckCacheService = null)
     {
         _tenantId = tenantId;
         _store = store;
@@ -75,12 +80,16 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         _logger = logger;
         _clock = clock ?? (() => DateTime.UtcNow);
         _coverageInvalidator = coverageInvalidator;
+        _ckCacheService = ckCacheService;
     }
 
     /// <inheritdoc />
     public async Task ActivateAsync(OctoObjectId archiveRtId)
     {
         var snapshot = await LoadAsync(archiveRtId);
+        // F1.2-S2 (review M12): checked on every activation, also the re-provisioning of an active archive,
+        // so a column added to the definition later cannot reach a Hidden attribute either.
+        EnsureNoHiddenColumns(snapshot);
 
         switch (snapshot.Status)
         {
@@ -110,6 +119,68 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         await EnsureRollupWatermarkInitialisedAsync(archiveRtId);
         await EnsureRollupColumnsPersistedAsync(archiveRtId);
         await TransitionAsync(snapshot, CkArchiveStatus.Activated);
+    }
+
+    /// <summary>
+    ///     CK v2 (F1.2-S2, review M12): refuses an archive whose ingested column paths reach an attribute with
+    ///     <c>access: Hidden</c> (segments matched case-insensitively, array projections <c>[*]</c> ignored).
+    ///     Stream-data queries have no access guard. Rollup columns are derived from source archives, which are
+    ///     checked themselves. Without a CK cache (optional constructor argument) the check is skipped.
+    /// </summary>
+    private void EnsureNoHiddenColumns(ArchiveSnapshot snapshot)
+    {
+        if (_ckCacheService == null || snapshot.RollupAggregations is not null)
+        {
+            return;
+        }
+
+        CkTypeWithAttributesGraph scope;
+        try
+        {
+            scope = _ckCacheService.GetRtCkType(_tenantId, snapshot.TargetCkTypeId);
+        }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            return; // an unknown target type is reported by provisioning
+        }
+
+        foreach (var column in snapshot.Columns.Where(c => !c.IsComputed && !string.IsNullOrWhiteSpace(c.Path)))
+        {
+            CkTypeWithAttributesGraph? current = scope;
+            foreach (var segment in column.Path.Split('.').Select(s => s.Replace("[*]", "")))
+            {
+                if (current == null)
+                {
+                    break;
+                }
+
+                var attribute = current.AllAttributesByName
+                    .FirstOrDefault(a => string.Equals(a.Key, segment, StringComparison.OrdinalIgnoreCase)).Value;
+                if (attribute == null)
+                {
+                    break;
+                }
+
+                if (attribute.Access == CkAttributeAccessDto.Hidden)
+                {
+                    throw new HiddenAttributeInArchiveException(snapshot.RtId, snapshot.TargetCkTypeId, column.Path,
+                        attribute.AttributeName);
+                }
+
+                current = null;
+                if (attribute.ValueCkRecordId != null)
+                {
+                    try
+                    {
+                        current = _ckCacheService.GetRtCkRecord(_tenantId, attribute.ValueCkRecordId.ToRtCkId());
+                    }
+                    catch (Exception e) when (e is not OutOfMemoryException)
+                    {
+                        current = null;
+                    }
+                }
+            }
+        }
     }
 
     /// <inheritdoc />
@@ -143,6 +214,8 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
         {
             throw new InvalidArchiveStateTransitionException(archiveRtId, snapshot.Status, "retry activation of");
         }
+
+        EnsureNoHiddenColumns(snapshot);
 
         await ValidateRollupForActivationAsync(archiveRtId);
         await EnsureCrateProvisionedAsync(snapshot);

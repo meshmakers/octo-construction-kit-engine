@@ -500,21 +500,61 @@ internal class InheritanceResolver : IInheritanceResolver
                 access => access is CkAttributeAccessDto.Hidden or CkAttributeAccessDto.MethodOnly);
         }
 
-        foreach (var index in typeGraph.Indexes.Where(i => i.IndexType == IndexTypeDto.Text))
+        // F1.2-S2 (review N5/N6): every index type, case-insensitive (Mongo resolves index paths that way), and in a
+        // ckLanguage 2 model unknown paths are rejected instead of silently skipped.
+        var rejectUnknownPaths = modelGraph.Models.TryGetValue(ckTypeId.ModelId, out var modelProperties) &&
+                                 modelProperties.EffectiveCkLanguage >= 2;
+        foreach (var index in typeGraph.Indexes)
         {
             foreach (var path in index.Fields.SelectMany(f => f.AttributePaths ?? []))
             {
-                Check("text index", path, IsHidden);
+                var walk = WalkAttributePath(modelGraph, typeGraph, path, IsHidden);
+                if (walk.Restricted is { } restricted)
+                {
+                    operationResult.AddMessage(index.IndexType == IndexTypeDto.Text
+                        ? MessageCodes.RestrictedAttributeInDerivedRule(location, "text index", path, ckTypeId,
+                            restricted.Name, restricted.Access)
+                        : MessageCodes.HiddenAttributeIndexed(location, index.IndexType, ckTypeId, restricted.Name,
+                            path));
+                }
+                else if (walk.UnknownSegment is { } unknown && rejectUnknownPaths && !IsSystemIndexPath(path) &&
+                         // A collection root also carries the text/ascending indexes merged from its derived types
+                         // (CkTypeGraph.MergeTextIndexes); such a path is checked at the derived type itself.
+                         !typeGraph.GetAllDerivedTypes(false).Any(d =>
+                             modelGraph.Types.TryGetValue(d, out var derived) &&
+                             WalkAttributePath(modelGraph, derived, path, IsHidden).UnknownSegment == null))
+                {
+                    operationResult.AddMessage(MessageCodes.UnknownIndexAttributePath(location, index.IndexType,
+                        ckTypeId, path, unknown));
+                }
             }
         }
     }
+
+    /// <summary>
+    ///     Index paths on entity system fields (<c>RtWellKnownName</c>, <c>RtBlueprintSource</c>, <c>CkTypeId</c>, ...)
+    ///     are not attributes.
+    /// </summary>
+    private static bool IsSystemIndexPath(string path) =>
+        path.StartsWith("Rt", StringComparison.OrdinalIgnoreCase) ||
+        path.StartsWith("CkTypeId", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     ///     Walks an attribute path (record segments allowed) and returns the first segment whose access is
     ///     restricted, or <c>null</c>. Unknown paths return <c>null</c> (reported elsewhere).
     /// </summary>
     private static (string Name, CkAttributeAccessDto Access)? FindRestrictedSegment(CkModelGraph modelGraph,
-        CkTypeWithAttributesGraph scope, string path, Func<CkAttributeAccessDto, bool> isRestricted)
+        CkTypeWithAttributesGraph scope, string path, Func<CkAttributeAccessDto, bool> isRestricted) =>
+        WalkAttributePath(modelGraph, scope, path, isRestricted).Restricted;
+
+    /// <summary>
+    ///     Walks an attribute path (record segments allowed). Segments are matched case-insensitively (review N6:
+    ///     Mongo resolves attribute paths with <c>OrdinalIgnoreCase</c>, so <c>passwordHash</c> reaches
+    ///     <c>PasswordHash</c>). Returns the first restricted segment, or the first segment that names no attribute.
+    /// </summary>
+    private static ((string Name, CkAttributeAccessDto Access)? Restricted, string? UnknownSegment) WalkAttributePath(
+        CkModelGraph modelGraph, CkTypeWithAttributesGraph scope, string path,
+        Func<CkAttributeAccessDto, bool> isRestricted)
     {
         var current = scope;
         var segments = path.Split('.');
@@ -522,24 +562,35 @@ internal class InheritanceResolver : IInheritanceResolver
         {
             if (!current.AllAttributesByName.TryGetValue(segments[i], out var attribute))
             {
-                return null;
+                attribute = current.AllAttributesByName
+                    .FirstOrDefault(a => string.Equals(a.Key, segments[i], StringComparison.OrdinalIgnoreCase)).Value;
+                if (attribute == null)
+                {
+                    return (null, segments[i]);
+                }
             }
 
             if (isRestricted(attribute.Access))
             {
-                return (segments[i], attribute.Access);
+                return ((attribute.AttributeName, attribute.Access), null);
             }
 
-            if (i == segments.Length - 1 || attribute.ValueCkRecordId == null ||
+            if (i == segments.Length - 1)
+            {
+                return (null, null);
+            }
+
+            if (attribute.ValueCkRecordId == null ||
                 !modelGraph.Records.TryGetValue(attribute.ValueCkRecordId, out var recordGraph))
             {
-                return null;
+                // A further segment below a non-record attribute names nothing.
+                return (null, segments[i + 1]);
             }
 
             current = recordGraph;
         }
 
-        return null;
+        return (null, null);
     }
 
     /// <summary>

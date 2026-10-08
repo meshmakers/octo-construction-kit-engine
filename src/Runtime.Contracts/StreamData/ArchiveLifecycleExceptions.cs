@@ -124,3 +124,25 @@ public sealed class ComputedColumnInvalidException : StreamDataException
         ColumnName = columnName;
     }
 }
+
+/// <summary>
+/// CK v2 (F1.2-S2, review M12): an ingested archive column reaches an attribute with
+/// <c>access: Hidden</c>. Stream-data queries (CrateDB) do not enforce attribute access, so a
+/// Hidden attribute would become readable through the archive; activation is refused.
+/// </summary>
+public sealed class HiddenAttributeInArchiveException : StreamDataException
+{
+    public string ColumnPath { get; }
+
+    public string AttributeName { get; }
+
+    public HiddenAttributeInArchiveException(OctoObjectId archiveRtId, RtCkId<CkTypeId> targetCkTypeId,
+        string columnPath, string attributeName)
+        : base($"Archive {Describe(archiveRtId)} on type '{targetCkTypeId}' captures column '{columnPath}', which reaches " +
+               $"the Hidden attribute '{attributeName}'. Stream-data queries do not enforce attribute access, so Hidden " +
+               "attributes cannot be archived.", archiveRtId)
+    {
+        ColumnPath = columnPath;
+        AttributeName = attributeName;
+    }
+}

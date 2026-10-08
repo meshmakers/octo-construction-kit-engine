@@ -87,7 +87,7 @@ public class CkV2InterfaceResolverTests(ITestOutputHelper output) : CkV2Resolver
     public void Code90_AccessOnAssociationRoleAttribute()
     {
         var model = sampleData.sample1.Builder.Build();
-        model.AssociationRoles!.Single().Attributes![0].Access = CkAttributeAccessDto.Hidden;
+        model.AssociationRoles!.Single().Attributes![0].Access = CkAttributeAccessDto.ReadOnly;
 
         var messages = ResolveExpectingOnly(model, 90);
 

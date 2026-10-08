@@ -569,6 +569,30 @@
       "number": 126,
       "level": "ERROR",
       "text": "Model '{modelId}' requires construction kit engine version {minEngineVersion} or later (minEngineVersion); this engine is version {engineVersion}. Update the service before importing the model."
+    },
+    {
+      "key": "HiddenAttributeIndexed",
+      "number": 106,
+      "level": "ERROR",
+      "text": "Index ({indexType}) of type '{ckTypeId}' references the Hidden attribute '{attributeName}' through path '{attributePath}'. Hidden attributes cannot be indexed: a unique index reveals values through duplicate-key errors."
+    },
+    {
+      "key": "HiddenAttributeAutoCompleteValues",
+      "number": 107,
+      "level": "ERROR",
+      "text": "Attribute '{attributeName}' of '{ckElementId}' is Hidden and declares 'autoCompleteValues', which publish candidate values in the construction kit model. Remove the values or the Hidden access."
+    },
+    {
+      "key": "HiddenAttributeOnAssociationRole",
+      "number": 108,
+      "level": "ERROR",
+      "text": "Association role '{ckRoleId}' assigns attribute '{attributeName}' with access Hidden. Association attributes have no access guard; Hidden is not supported on association roles."
+    },
+    {
+      "key": "UnknownIndexAttributePath",
+      "number": 109,
+      "level": "ERROR",
+      "text": "Index ({indexType}) of type '{ckTypeId}' references the unknown attribute path '{attributePath}' (segment '{segment}'). Index paths are resolved case-insensitively by the database; in a ckLanguage 2 model every segment must name an attribute of the type or of the record it traverses."
     }
   ]
 }

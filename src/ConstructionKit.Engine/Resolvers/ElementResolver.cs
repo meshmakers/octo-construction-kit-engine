@@ -24,6 +24,9 @@ internal class ElementResolver : IElementResolver
         // CK v2 (AB#5584): language version gate (91) and feature gate (90).
         CheckCkLanguage(modelRootBase, originFileResolver, operationResult);
 
+        // F1.2-S2 (review N5): Hidden assignments that leak through other constructs.
+        CheckHiddenAssignments(modelRootBase, originFileResolver, operationResult);
+
         if (modelRootBase.Interfaces != null)
         {
             ResolveInterfaces(modelRootBase, ckModelGraph, variableResolver, originFileResolver, operationResult);
@@ -568,6 +571,45 @@ internal class ElementResolver : IElementResolver
             ResolveMethodReferences(ckInterface.Methods, variableResolver, location, operationResult);
 
             ckModelGraph.GetOrCreateInterface(ckInterfaceId, ckInterface);
+        }
+    }
+
+    /// <summary>
+    ///     F1.2-S2 (review N5), mirroring the Secret rules 71: a Hidden assignment must not declare
+    ///     <c>autoCompleteValues</c> (107 — the values are published in the model), and association-role attributes
+    ///     cannot be Hidden (108 — association attributes have no access guard).
+    /// </summary>
+    private static void CheckHiddenAssignments(CkModelRootBase model, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        void CheckAutoComplete(object ckElementId, IEnumerable<CkTypeAttributeDto>? assignments)
+        {
+            foreach (var assignment in (assignments ?? []).Where(a =>
+                         a.Access == CkAttributeAccessDto.Hidden && a.AutoCompleteValues is { Count: > 0 }))
+            {
+                operationResult.AddMessage(MessageCodes.HiddenAttributeAutoCompleteValues(
+                    originFileResolver.Resolve(model.ModelId), assignment.AttributeName, ckElementId));
+            }
+        }
+
+        foreach (var ckType in model.Types ?? [])
+        {
+            CheckAutoComplete(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), ckType.Attributes);
+        }
+
+        foreach (var ckRecord in model.Records ?? [])
+        {
+            CheckAutoComplete(new CkId<CkRecordId>(model.ModelId, ckRecord.RecordId), ckRecord.Attributes);
+        }
+
+        foreach (var ckRole in model.AssociationRoles ?? [])
+        {
+            var ckRoleId = new CkId<CkAssociationRoleId>(model.ModelId, ckRole.AssociationRoleId);
+            foreach (var assignment in (ckRole.Attributes ?? []).Where(a => a.Access == CkAttributeAccessDto.Hidden))
+            {
+                operationResult.AddMessage(MessageCodes.HiddenAttributeOnAssociationRole(
+                    originFileResolver.Resolve(ckRoleId), ckRoleId, assignment.AttributeName));
+            }
         }
     }
 

@@ -385,7 +385,7 @@ public class CkModelDiffService : ICkModelDiffService
         return $"parameters [{parameters}]; errors [{errors}]";
     }
 
-    private static string FormatMethod(CkMethodDto method, string modelName)
+    internal static string FormatMethod(CkMethodDto method, string modelName)
     {
         string Value(AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId, CkId<CkEnumId>? enumId) =>
             valueType + (recordId != null ? $"<{FormatReference(recordId, modelName)}>" : "") +

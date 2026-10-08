@@ -72,7 +72,8 @@ public class CkV2InterfaceCompletionResolverTests(ITestOutputHelper output) : Ck
 
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);
-        Assert.Empty(operationResult.Messages);
+        // Tagged-1 is deprecated: only the F1.2-S4 deprecation warning (124).
+        Assert.All(operationResult.Messages, m => Assert.Equal(124, m.MessageNumber));
 
         var tag = graph.Types[$"{M}/Tag"];
         Assert.Equal(["Labeled-1", "Named-1", "Tagged-1"],
@@ -131,8 +132,10 @@ public class CkV2InterfaceCompletionResolverTests(ITestOutputHelper output) : Ck
         var model = sampleData.sample1.Builder.Build();
         model.Types!.Single(t => t.TypeId == "Demo3").Associations![0].TargetCkInterfaceId = "sample1/Named-1";
 
-        var message = Assert.Single(ResolveExpectingOnly(model, 90));
-        Assert.Contains("'targetCkInterfaceId'", message.MessageText);
+        var operationResult = new OperationResult();
+        Resolve(model, operationResult);
+
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("'targetCkInterfaceId'"));
     }
 
     [Fact]

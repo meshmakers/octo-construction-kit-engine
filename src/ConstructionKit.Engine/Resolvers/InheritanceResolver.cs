@@ -108,6 +108,7 @@ internal class InheritanceResolver : IInheritanceResolver
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
         ResolveInterfaceHierarchy(modelGraph);
+        ValidateInterfaces(modelGraph, originFileResolver, operationResult);
 
         foreach (var pair in modelGraph.Types)
         {
@@ -144,8 +145,12 @@ internal class InheritanceResolver : IInheritanceResolver
                 if (modelGraph.Interfaces.TryGetValue(ckInterfaceId, out var interfaceGraph))
                 {
                     ValidateImplementation(typeGraph, interfaceGraph, ckTypeId, location, operationResult);
+                    ValidateAssociationMembers(modelGraph, typeGraph, interfaceGraph, ckTypeId, location,
+                        operationResult);
                 }
             }
+
+            InheritInterfaceMethods(modelGraph, typeGraph, baseGraphs, ckTypeId, location, operationResult);
 
             foreach (var ckInterfaceId in typeGraph.AllImplementedInterfaces)
             {
@@ -185,6 +190,180 @@ internal class InheritanceResolver : IInheritanceResolver
 
             Visit(interfaceGraph.DeclaredExtends);
             interfaceGraph.SetInheritedMembers(all, all.Select(i => modelGraph.Interfaces[i]));
+        }
+    }
+
+    /// <summary>
+    ///     F1.2-S4 (AB#5913): <c>extends</c> cycles (118), conflicting members across the interface and its parents
+    ///     (119: one name for two attributes, or one attribute under two names), and the method rules for interface
+    ///     methods (M-1 duplicate id, M-2..M-5 as for types).
+    /// </summary>
+    private static void ValidateInterfaces(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        foreach (var interfaceGraph in modelGraph.Interfaces.Values)
+        {
+            var id = interfaceGraph.CkInterfaceId;
+            var location = originFileResolver.Resolve(id);
+
+            // Cycle: an interface reachable from its own extends.
+            var reachable = new HashSet<CkId<CkInterfaceId>>();
+            var stack = new Stack<CkId<CkInterfaceId>>(interfaceGraph.DeclaredExtends.Where(e => e != id));
+            while (stack.Count > 0)
+            {
+                var next = stack.Pop();
+                if (!reachable.Add(next) || !modelGraph.Interfaces.TryGetValue(next, out var nextGraph))
+                {
+                    continue;
+                }
+
+                foreach (var extended in nextGraph.DeclaredExtends)
+                {
+                    stack.Push(extended);
+                }
+            }
+
+            if (reachable.Contains(id))
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceExtendsInvalid(location, id,
+                    string.Join(", ", interfaceGraph.DeclaredExtends), "the extends chain leads back to the interface (cycle)"));
+            }
+
+            // Member conflicts (own members win in AllAttributes, so compare the declared members of every level).
+            var levels = new[] { interfaceGraph }
+                .Concat(interfaceGraph.AllExtendedInterfaces.Select(e => modelGraph.Interfaces[e])).ToList();
+            var members = levels.SelectMany(l => l.Attributes.Values.Select(a => (Interface: l.CkInterfaceId, Member: a)))
+                .ToList();
+            foreach (var group in members.GroupBy(m => m.Member.AttributeName, StringComparer.OrdinalIgnoreCase)
+                         .Where(g => g.Select(m => m.Member.CkAttributeId).Distinct().Count() > 1))
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceMemberConflict(location, id,
+                    $"the name '{group.Key}' stands for " + string.Join(" and ",
+                        group.Select(m => $"'{m.Member.CkAttributeId}' ({m.Interface})").Distinct())));
+            }
+
+            foreach (var group in members.GroupBy(m => m.Member.CkAttributeId)
+                         .Where(g => g.Select(m => m.Member.AttributeName).Distinct(StringComparer.Ordinal).Count() > 1))
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceMemberConflict(location, id,
+                    $"attribute '{group.Key}' is a member under the names " + string.Join(" and ",
+                        group.Select(m => $"'{m.Member.AttributeName}' ({m.Interface})").Distinct())));
+            }
+
+            foreach (var duplicate in interfaceGraph.DefinedMethods.GroupBy(m => m.MethodId).Where(g => g.Count() > 1))
+            {
+                operationResult.AddMessage(MessageCodes.CkMethodIdNotUnique(location, duplicate.Key, id,
+                    "the method id is declared more than once on the interface"));
+            }
+
+            foreach (var method in interfaceGraph.DefinedMethods)
+            {
+                ValidateMethodDefinition(method, id, location, operationResult);
+            }
+        }
+    }
+
+    /// <summary>
+    ///     F1.2-S4: every required association member of an implemented interface (and its parents) is provided by
+    ///     an outbound association of the type (own or inherited) with the same role, a compatible target and a
+    ///     multiplicity at least as strict as the member's (121).
+    /// </summary>
+    private static void ValidateAssociationMembers(CkModelGraph modelGraph, CkTypeGraph typeGraph,
+        CkInterfaceGraph interfaceGraph, CkId<CkTypeId> ckTypeId, string location, OperationResult operationResult)
+    {
+        var outbound = typeGraph.Associations.Out.Owned.Concat(typeGraph.Associations.Out.Inherited).ToList();
+        foreach (var member in interfaceGraph.AllAssociations.Select(a => a.Definition).Where(m => !m.IsOptional))
+        {
+            if (!modelGraph.AssociationRoles.ContainsKey(member.CkRoleId))
+            {
+                continue; // 120
+            }
+
+            var satisfied = outbound.Any(a =>
+                a.CkRoleId == member.CkRoleId &&
+                IsCompatibleTarget(modelGraph, a, member) &&
+                (member.Multiplicity == null || Permissiveness(a.Multiplicity) <= Permissiveness(member.Multiplicity.Value)));
+            if (!satisfied)
+            {
+                var target = member.TargetCkTypeId != null
+                    ? $"type '{member.TargetCkTypeId}'"
+                    : $"an implementor of '{member.TargetCkInterfaceId}'";
+                operationResult.AddMessage(MessageCodes.CkInterfaceAssociationMissing(location, ckTypeId,
+                    interfaceGraph.CkInterfaceId, member.CkRoleId, target,
+                    member.Multiplicity == null ? "" : $" with multiplicity {member.Multiplicity}"));
+            }
+        }
+    }
+
+    private static int Permissiveness(MultiplicitiesDto multiplicity) => multiplicity switch
+    {
+        MultiplicitiesDto.One => 0,
+        MultiplicitiesDto.ZeroOrOne => 1,
+        _ => 2
+    };
+
+    private static bool IsCompatibleTarget(CkModelGraph modelGraph, CkTypeAssociationGraph association,
+        CkInterfaceAssociationDto member)
+    {
+        if (!modelGraph.Types.TryGetValue(association.TargetCkTypeId, out var targetType))
+        {
+            return false;
+        }
+
+        if (member.TargetCkTypeId != null)
+        {
+            return association.TargetCkTypeId == member.TargetCkTypeId ||
+                   targetType.BaseTypes.Any(b => b.BaseCkTypeId == member.TargetCkTypeId);
+        }
+
+        var required = member.TargetCkInterfaceId!;
+        if (association.TargetCkInterfaceId is { } narrowed &&
+            (narrowed == required || modelGraph.Interfaces.TryGetValue(narrowed, out var narrowedGraph) &&
+                narrowedGraph.AllExtendedInterfaces.Contains(required)))
+        {
+            return true;
+        }
+
+        return targetType.AllImplementedInterfaces.Contains(required);
+    }
+
+    /// <summary>
+    ///     F1.2-S4: a type inherits the methods of the interfaces it implements (definitions only; the declaring
+    ///     type is the highest type in the chain that implements the interface). Redeclaring an interface method id
+    ///     with another signature is 122.
+    /// </summary>
+    private static void InheritInterfaceMethods(CkModelGraph modelGraph, CkTypeGraph typeGraph,
+        IReadOnlyList<CkTypeGraph> baseGraphs, CkId<CkTypeId> ckTypeId, string location,
+        OperationResult operationResult)
+    {
+        foreach (var interfaceId in typeGraph.AllImplementedInterfaces)
+        {
+            if (!modelGraph.Interfaces.TryGetValue(interfaceId, out var interfaceGraph))
+            {
+                continue;
+            }
+
+            foreach (var method in interfaceGraph.AllMethods.Values)
+            {
+                if (typeGraph.AllMethods.TryGetValue(method.Definition.MethodId, out var existing))
+                {
+                    if (existing.DeclaringCkTypeId == ckTypeId &&
+                        typeGraph.DefinedMethods.Contains(existing.Definition) &&
+                        SemVer.CkModelDiffService.FormatMethod(existing.Definition, "") !=
+                        SemVer.CkModelDiffService.FormatMethod(method.Definition, ""))
+                    {
+                        operationResult.AddMessage(MessageCodes.CkInterfaceMethodConflict(location, ckTypeId,
+                            method.Definition.MethodId, method.DeclaringCkInterfaceId));
+                    }
+
+                    continue;
+                }
+
+                // The highest type of the chain that implements the interface declares the inherited method.
+                var declaring = baseGraphs.AsEnumerable().Reverse()
+                    .FirstOrDefault(b => b.AllImplementedInterfaces.Contains(interfaceId))?.CkTypeId ?? ckTypeId;
+                typeGraph.InheritMethods([new CkMethodGraph(declaring, method.Definition)]);
+            }
         }
     }
 
@@ -257,6 +436,17 @@ internal class InheritanceResolver : IInheritanceResolver
                     $"it is inherited from '{declaringBase.CkTypeId}'; overriding an inherited method is not supported"));
             }
 
+            ValidateMethodDefinition(method, ckTypeId, location, operationResult);
+        }
+    }
+
+    /// <summary>
+    ///     Method rules M-2..M-5 for one definition — of a type or (F1.2-S4) of an interface.
+    /// </summary>
+    private static void ValidateMethodDefinition(CkMethodDto method, object ckTypeId, string location,
+        OperationResult operationResult)
+    {
+        {
             // M-2
             var methodName = GetMethodName(method.MethodId);
             if (ReservedMethodNames.Contains(methodName))
@@ -308,7 +498,7 @@ internal class InheritanceResolver : IInheritanceResolver
     }
 
     private static void ValidateValueType(string what, AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId,
-        CkId<CkEnumId>? enumId, string methodId, CkId<CkTypeId> ckTypeId, string location,
+        CkId<CkEnumId>? enumId, string methodId, object ckTypeId, string location,
         OperationResult operationResult)
     {
         string? reason = null;

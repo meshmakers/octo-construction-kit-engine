@@ -182,7 +182,7 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
             [new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "System/Entity", TargetCkInterfaceId = $"{M}/Named-1" }];
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);
-        Assert.Empty(operationResult.Messages);
+        Assert.All(operationResult.Messages, m => Assert.Equal(124, m.MessageNumber)); // Labeled-1 is deprecated
 
         var cache = await RoundTripAsync(graph);
 

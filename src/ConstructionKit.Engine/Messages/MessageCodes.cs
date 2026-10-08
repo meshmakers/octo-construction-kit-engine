@@ -328,6 +328,30 @@ internal static class MessageCodes
     internal static OperationMessage CkElementNotDerivable(string? location, object kind, object element, object baseElement) =>
         GetMessage("CkElementNotDerivable", location, kind, element, baseElement);
 
+    internal static OperationMessage CkInterfaceExtendsInvalid(string? location, object ckInterfaceId, object extendedInterfaceId, object reason) =>
+        GetMessage("CkInterfaceExtendsInvalid", location, ckInterfaceId, extendedInterfaceId, reason);
+
+    internal static OperationMessage CkInterfaceMemberConflict(string? location, object ckInterfaceId, object reason) =>
+        GetMessage("CkInterfaceMemberConflict", location, ckInterfaceId, reason);
+
+    internal static OperationMessage CkInterfaceAssociationInvalid(string? location, object ckRoleId, object ckInterfaceId, object reason) =>
+        GetMessage("CkInterfaceAssociationInvalid", location, ckRoleId, ckInterfaceId, reason);
+
+    internal static OperationMessage CkInterfaceAssociationMissing(string? location, object ckTypeId, object ckInterfaceId, object ckRoleId, object target, object multiplicity) =>
+        GetMessage("CkInterfaceAssociationMissing", location, ckTypeId, ckInterfaceId, ckRoleId, target, multiplicity);
+
+    internal static OperationMessage CkInterfaceMethodConflict(string? location, object ckTypeId, object methodId, object ckInterfaceId) =>
+        GetMessage("CkInterfaceMethodConflict", location, ckTypeId, methodId, ckInterfaceId);
+
+    internal static OperationMessage CkInterfaceHasNoMembers(string? location, object ckInterfaceId) =>
+        GetMessage("CkInterfaceHasNoMembers", location, ckInterfaceId);
+
+    internal static OperationMessage CkInterfaceDeprecated(string? location, object element, object ckInterfaceId) =>
+        GetMessage("CkInterfaceDeprecated", location, element, ckInterfaceId);
+
+    internal static OperationMessage UnknownTargetCkInterfaceOfAssociation(string? location, object ckRoleId, object ckTypeId, object ckInterfaceId) =>
+        GetMessage("UnknownTargetCkInterfaceOfAssociation", location, ckRoleId, ckTypeId, ckInterfaceId);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -935,6 +959,54 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  113, "{kind} '{element}' derives from '{baseElement}' of another model, which only its own model may derive from (derivable: Model). The base model must declare 'derivable: Any' to allow it.",
                  new [] {"kind", "element", "baseElement"})
+        },
+        {
+            "CkInterfaceExtendsInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 118, "Interface '{ckInterfaceId}' extends '{extendedInterfaceId}': {reason}.",
+                 new [] {"ckInterfaceId", "extendedInterfaceId", "reason"})
+        },
+        {
+            "CkInterfaceMemberConflict",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 119, "Interface '{ckInterfaceId}' has conflicting members: {reason}. Members inherited through 'extends' and own members must agree on name and attribute.",
+                 new [] {"ckInterfaceId", "reason"})
+        },
+        {
+            "CkInterfaceAssociationInvalid",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 120, "Association member '{ckRoleId}' of interface '{ckInterfaceId}' is invalid: {reason}.",
+                 new [] {"ckRoleId", "ckInterfaceId", "reason"})
+        },
+        {
+            "CkInterfaceAssociationMissing",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 121, "Type '{ckTypeId}' implements interface '{ckInterfaceId}' but has no outbound association '{ckRoleId}' to {target}{multiplicity}. Required association members must be provided by the type or its base types.",
+                 new [] {"ckTypeId", "ckInterfaceId", "ckRoleId", "target", "multiplicity"})
+        },
+        {
+            "CkInterfaceMethodConflict",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 122, "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different signature. A type may not redeclare an interface method with another signature.",
+                 new [] {"ckTypeId", "methodId", "ckInterfaceId"})
+        },
+        {
+            "CkInterfaceHasNoMembers",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 123, "Interface '{ckInterfaceId}' declares no attribute, association or method member and extends no interface.",
+                 new [] {"ckInterfaceId"})
+        },
+        {
+            "CkInterfaceDeprecated",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 124, "'{element}' references the deprecated interface '{ckInterfaceId}'. It is removed in the next major version of its model; migrate to its successor.",
+                 new [] {"element", "ckInterfaceId"})
+        },
+        {
+            "UnknownTargetCkInterfaceOfAssociation",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 128, "Association '{ckRoleId}' of type '{ckTypeId}' narrows its target to the unknown interface '{ckInterfaceId}' (targetCkInterfaceId).",
+                 new [] {"ckRoleId", "ckTypeId", "ckInterfaceId"})
         },
     };
 }

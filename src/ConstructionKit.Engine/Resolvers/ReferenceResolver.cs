@@ -21,6 +21,7 @@ internal class ReferenceResolver : IReferenceResolver
         CheckCkRecords(modelGraph, originFileResolver, operationResult);
 
         CheckCkInterfaces(modelGraph, originFileResolver, operationResult);
+        CheckCkInterfaceCompletion(modelGraph, originFileResolver, operationResult);
 
         CheckCkTypes(modelGraph, originFileResolver, operationResult);
 
@@ -73,6 +74,119 @@ internal class ReferenceResolver : IReferenceResolver
     }
 
     /// <summary>
+    ///     F1.2-S4 (AB#5913): <c>extends</c> entries exist (118), association members name a known role and exactly
+    ///     one known target (120), an interface has at least one member or extends another (123), method value
+    ///     references exist (101), and references to deprecated interfaces warn (124).
+    /// </summary>
+    private static void CheckCkInterfaceCompletion(CkModelGraph modelGraph, IOriginFileResolver originFileResolver,
+        OperationResult operationResult)
+    {
+        foreach (var ckInterface in modelGraph.Interfaces.Values)
+        {
+            var id = ckInterface.CkInterfaceId;
+            var location = originFileResolver.Resolve(id);
+
+            if (ckInterface.DefinedAttributes.Count == 0 && ckInterface.DeclaredExtends.Count == 0 &&
+                ckInterface.DefinedAssociations.Count == 0 && ckInterface.DefinedMethods.Count == 0)
+            {
+                operationResult.AddMessage(MessageCodes.CkInterfaceHasNoMembers(location, id));
+            }
+
+            foreach (var extended in ckInterface.DeclaredExtends)
+            {
+                if (extended == id)
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceExtendsInvalid(location, id, extended,
+                        "an interface cannot extend itself"));
+                }
+                else if (!modelGraph.Interfaces.TryGetValue(extended, out var extendedGraph))
+                {
+                    operationResult.AddMessage(MessageCodes.CkInterfaceExtendsInvalid(location, id, extended,
+                        "the interface is unknown"));
+                }
+                else
+                {
+                    WarnIfDeprecated(extendedGraph, id, location, operationResult);
+                }
+            }
+
+            foreach (var association in ckInterface.DefinedAssociations.Select(a => a.Definition))
+            {
+                void Invalid(string reason) => operationResult.AddMessage(
+                    MessageCodes.CkInterfaceAssociationInvalid(location, association.CkRoleId, id, reason));
+
+                if (!modelGraph.AssociationRoles.ContainsKey(association.CkRoleId))
+                {
+                    Invalid("the association role is unknown");
+                }
+
+                if ((association.TargetCkTypeId == null) == (association.TargetCkInterfaceId == null))
+                {
+                    Invalid("exactly one of 'targetCkTypeId' and 'targetCkInterfaceId' must be set");
+                }
+                else if (association.TargetCkTypeId != null && !modelGraph.Types.ContainsKey(association.TargetCkTypeId))
+                {
+                    Invalid($"the target type '{association.TargetCkTypeId}' is unknown");
+                }
+                else if (association.TargetCkInterfaceId != null)
+                {
+                    if (!modelGraph.Interfaces.TryGetValue(association.TargetCkInterfaceId, out var target))
+                    {
+                        Invalid($"the target interface '{association.TargetCkInterfaceId}' is unknown");
+                    }
+                    else
+                    {
+                        WarnIfDeprecated(target, id, location, operationResult);
+                    }
+                }
+            }
+
+            CheckMethodValueReferences(modelGraph, id, ckInterface.DefinedMethods, location, operationResult);
+        }
+    }
+
+    private static void WarnIfDeprecated(CkInterfaceGraph referenced, object element, string location,
+        OperationResult operationResult)
+    {
+        if (referenced.Deprecated)
+        {
+            operationResult.AddMessage(MessageCodes.CkInterfaceDeprecated(location, element, referenced.CkInterfaceId));
+        }
+    }
+
+    private static void CheckMethodValueReferences(CkModelGraph modelGraph, object ownerId,
+        IEnumerable<CkMethodDto> methods, string location, OperationResult operationResult)
+    {
+        foreach (var method in methods)
+        {
+            void CheckValue(string what, CkId<CkRecordId>? recordId, CkId<CkEnumId>? enumId)
+            {
+                if (recordId != null && !modelGraph.Records.ContainsKey(recordId))
+                {
+                    operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(location, method.MethodId, ownerId,
+                        $"{what} references unknown record '{recordId}'"));
+                }
+
+                if (enumId != null && !modelGraph.Enums.ContainsKey(enumId))
+                {
+                    operationResult.AddMessage(MessageCodes.CkMethodParameterInvalid(location, method.MethodId, ownerId,
+                        $"{what} references unknown enum '{enumId}'"));
+                }
+            }
+
+            foreach (var parameter in method.Parameters ?? [])
+            {
+                CheckValue($"parameter '{parameter.Name}'", parameter.ValueCkRecordId, parameter.ValueCkEnumId);
+            }
+
+            if (method.Result != null)
+            {
+                CheckValue("the result", method.Result.ValueCkRecordId, method.Result.ValueCkEnumId);
+            }
+        }
+    }
+
+    /// <summary>
     ///     CK v2 (AB#5667 / AB#5669): <c>implements</c> entries exist (95); record and enum references of method
     ///     parameters and results exist (101).
     /// </summary>
@@ -81,10 +195,28 @@ internal class ReferenceResolver : IReferenceResolver
     {
         foreach (var ckInterfaceId in ckTypeGraph.DeclaredImplements)
         {
-            if (!modelGraph.Interfaces.ContainsKey(ckInterfaceId))
+            if (!modelGraph.Interfaces.TryGetValue(ckInterfaceId, out var implemented))
             {
                 operationResult.AddMessage(MessageCodes.ImplementsUnknownCkInterface(originFileResolver.Resolve(ckId),
                     ckId, ckInterfaceId));
+            }
+            else
+            {
+                WarnIfDeprecated(implemented, ckId, originFileResolver.Resolve(ckId), operationResult);
+            }
+        }
+
+        // F1.1-S5 / F1.2-S4: an association narrowed to an interface.
+        foreach (var association in ckTypeGraph.Associations.DefinedAssociations.Where(a => a.TargetCkInterfaceId != null))
+        {
+            if (!modelGraph.Interfaces.TryGetValue(association.TargetCkInterfaceId!, out var target))
+            {
+                operationResult.AddMessage(MessageCodes.UnknownTargetCkInterfaceOfAssociation(
+                    originFileResolver.Resolve(ckId), association.CkRoleId, ckId, association.TargetCkInterfaceId!));
+            }
+            else
+            {
+                WarnIfDeprecated(target, ckId, originFileResolver.Resolve(ckId), operationResult);
             }
         }
 

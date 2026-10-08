@@ -605,6 +605,54 @@
       "number": 113,
       "level": "ERROR",
       "text": "{kind} '{element}' derives from '{baseElement}' of another model, which only its own model may derive from (derivable: Model). The base model must declare 'derivable: Any' to allow it."
+    },
+    {
+      "key": "CkInterfaceExtendsInvalid",
+      "number": 118,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' extends '{extendedInterfaceId}': {reason}."
+    },
+    {
+      "key": "CkInterfaceMemberConflict",
+      "number": 119,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' has conflicting members: {reason}. Members inherited through 'extends' and own members must agree on name and attribute."
+    },
+    {
+      "key": "CkInterfaceAssociationInvalid",
+      "number": 120,
+      "level": "ERROR",
+      "text": "Association member '{ckRoleId}' of interface '{ckInterfaceId}' is invalid: {reason}."
+    },
+    {
+      "key": "CkInterfaceAssociationMissing",
+      "number": 121,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' implements interface '{ckInterfaceId}' but has no outbound association '{ckRoleId}' to {target}{multiplicity}. Required association members must be provided by the type or its base types."
+    },
+    {
+      "key": "CkInterfaceMethodConflict",
+      "number": 122,
+      "level": "ERROR",
+      "text": "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different signature. A type may not redeclare an interface method with another signature."
+    },
+    {
+      "key": "CkInterfaceHasNoMembers",
+      "number": 123,
+      "level": "ERROR",
+      "text": "Interface '{ckInterfaceId}' declares no attribute, association or method member and extends no interface."
+    },
+    {
+      "key": "CkInterfaceDeprecated",
+      "number": 124,
+      "level": "WARNING",
+      "text": "'{element}' references the deprecated interface '{ckInterfaceId}'. It is removed in the next major version of its model; migrate to its successor."
+    },
+    {
+      "key": "UnknownTargetCkInterfaceOfAssociation",
+      "number": 128,
+      "level": "ERROR",
+      "text": "Association '{ckRoleId}' of type '{ckTypeId}' narrows its target to the unknown interface '{ckInterfaceId}' (targetCkInterfaceId)."
     }
   ]
 }

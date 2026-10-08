@@ -846,7 +846,7 @@ Notes:
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
 - Message codes: 78–89 F0.2 (range retention), 90–105 CK v2 rules (in use), **106–129 reserved for Phase 1**
-  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, F1.2-S1 L17 127, spare 128–129).
+  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, F1.2-S1 L17 127, F1.2-S4 128, spare 129).
   `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
   `MessageCodesSyncTests` fails when the two tables differ in key, number, level or text, or a number repeats.
 
@@ -873,6 +873,14 @@ Notes:
 | 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
 | 112 | `CkReferenceToInternalElement` | `CkVisibilityValidator` (end of `ReferenceResolver`) | F1.2-S3: a reference from another model to a `visibility: Internal` element — base type/record, attribute assignment (type, record, role, interface member), attribute `valueCkRecordId`/`valueCkEnumId`, `implements`, interface `extends`, type/interface association role and targets, method parameter/result records and enums. Models compared by name |
 | 113 | `CkElementNotDerivable` | `CkVisibilityValidator` | F1.2-S3: a type or record derives from a type/record of another model whose effective `derivable` is `Model` (a v2 base without `derivable: Any`) |
+| 118 | `CkInterfaceExtendsInvalid` | `ReferenceResolver` (unknown, self) + `InheritanceResolver.ValidateInterfaces` (cycle) | F1.2-S4: an `extends` entry is unknown, the interface itself, or the chain leads back (cycle; reported at every interface on it) |
+| 119 | `CkInterfaceMemberConflict` | `InheritanceResolver.ValidateInterfaces` | F1.2-S4: across an interface and its parents one name stands for two attributes, or one attribute appears under two names. Repeating an inherited member identically is allowed |
+| 120 | `CkInterfaceAssociationInvalid` | `ReferenceResolver` | F1.2-S4: association member with an unknown role, unknown target, or not exactly one of `targetCkTypeId` / `targetCkInterfaceId` |
+| 121 | `CkInterfaceAssociationMissing` | `InheritanceResolver.ValidateAssociationMembers` | F1.2-S4: a type implementing the interface (incl. parents' members) lacks an outbound association (own or inherited) with the role, a compatible target (the type or a subtype; for an interface target an implementor, or an association narrowed to that interface or one extending it) and a multiplicity at least as strict as the member's (One < ZeroOrOne < N). Optional members are skipped |
+| 122 | `CkInterfaceMethodConflict` | `InheritanceResolver.InheritInterfaceMethods` | F1.2-S4: a type redeclares an interface method id with another signature (`CkModelDiffService.FormatMethod`). Interface methods are inherited into `CkTypeGraph.AllMethods` (declaring type = highest type of the chain that implements the interface); interface methods follow 100 (duplicate id) and 101-104 |
+| 123 | `CkInterfaceHasNoMembers` | `ReferenceResolver` | F1.2-S4: no attribute, association or method member and no `extends` (replaces the former schema `minItems`) |
+| 124 | `CkInterfaceDeprecated` | `ReferenceResolver` | F1.2-S4: **warning** for `implements`, `extends`, interface association targets and type association `targetCkInterfaceId` that reference a `deprecated: true` interface |
+| 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
 | 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 

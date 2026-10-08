@@ -69,24 +69,9 @@ public static class CkReferenceRewriter
             MapAttributes(record.Attributes);
         }
 
-        foreach (var ckInterface in model.Interfaces ?? [])
+        void MapMethods(List<CkMethodDto>? methods)
         {
-            foreach (var member in ckInterface.Attributes)
-            {
-                member.CkAttributeId = Map(member.CkAttributeId)!;
-            }
-        }
-
-        foreach (var type in model.Types ?? [])
-        {
-            type.DerivedFromCkTypeId = Map(type.DerivedFromCkTypeId);
-            MapAttributes(type.Attributes);
-            if (type.Implements != null)
-            {
-                type.Implements = type.Implements.Select(i => Map(i)!).ToList();
-            }
-
-            foreach (var method in type.Methods ?? [])
+            foreach (var method in methods ?? [])
             {
                 foreach (var parameter in method.Parameters ?? [])
                 {
@@ -100,11 +85,47 @@ public static class CkReferenceRewriter
                     method.Result.ValueCkEnumId = Map(method.Result.ValueCkEnumId);
                 }
             }
+        }
+
+        foreach (var ckInterface in model.Interfaces ?? [])
+        {
+            foreach (var member in ckInterface.Attributes)
+            {
+                member.CkAttributeId = Map(member.CkAttributeId)!;
+            }
+
+            // F1.1-S5
+            if (ckInterface.Extends != null)
+            {
+                ckInterface.Extends = ckInterface.Extends.Select(i => Map(i)!).ToList();
+            }
+
+            foreach (var association in ckInterface.Associations ?? [])
+            {
+                association.CkRoleId = Map(association.CkRoleId)!;
+                association.TargetCkTypeId = Map(association.TargetCkTypeId);
+                association.TargetCkInterfaceId = Map(association.TargetCkInterfaceId);
+            }
+
+            MapMethods(ckInterface.Methods);
+        }
+
+        foreach (var type in model.Types ?? [])
+        {
+            type.DerivedFromCkTypeId = Map(type.DerivedFromCkTypeId);
+            MapAttributes(type.Attributes);
+            if (type.Implements != null)
+            {
+                type.Implements = type.Implements.Select(i => Map(i)!).ToList();
+            }
+
+            MapMethods(type.Methods);
 
             foreach (var association in type.Associations ?? [])
             {
                 association.CkRoleId = Map(association.CkRoleId)!;
                 association.TargetCkTypeId = Map(association.TargetCkTypeId)!;
+                association.TargetCkInterfaceId = Map(association.TargetCkInterfaceId);
                 if (association.TargetCkAttributeIds != null)
                 {
                     association.TargetCkAttributeIds = association.TargetCkAttributeIds.Select(a => Map(a)!).ToList();
@@ -170,12 +191,42 @@ public static class CkReferenceRewriter
             AddAttributes(record.Attributes);
         }
 
+        void AddMethods(List<CkMethodDto>? methods)
+        {
+            foreach (var method in methods ?? [])
+            {
+                foreach (var parameter in method.Parameters ?? [])
+                {
+                    Add("record", parameter.ValueCkRecordId);
+                    Add("enum", parameter.ValueCkEnumId);
+                }
+
+                Add("record", method.Result?.ValueCkRecordId);
+                Add("enum", method.Result?.ValueCkEnumId);
+            }
+        }
+
         foreach (var ckInterface in model.Interfaces ?? [])
         {
             foreach (var member in ckInterface.Attributes)
             {
                 Add("attribute", member.CkAttributeId);
             }
+
+            // F1.1-S5
+            foreach (var extended in ckInterface.Extends ?? [])
+            {
+                Add("interface", extended);
+            }
+
+            foreach (var association in ckInterface.Associations ?? [])
+            {
+                Add("association role", association.CkRoleId);
+                Add("type", association.TargetCkTypeId);
+                Add("interface", association.TargetCkInterfaceId);
+            }
+
+            AddMethods(ckInterface.Methods);
         }
 
         foreach (var type in model.Types ?? [])
@@ -187,22 +238,13 @@ public static class CkReferenceRewriter
                 Add("interface", implemented);
             }
 
-            foreach (var method in type.Methods ?? [])
-            {
-                foreach (var parameter in method.Parameters ?? [])
-                {
-                    Add("record", parameter.ValueCkRecordId);
-                    Add("enum", parameter.ValueCkEnumId);
-                }
-
-                Add("record", method.Result?.ValueCkRecordId);
-                Add("enum", method.Result?.ValueCkEnumId);
-            }
+            AddMethods(type.Methods);
 
             foreach (var association in type.Associations ?? [])
             {
                 Add("association role", association.CkRoleId);
                 Add("type", association.TargetCkTypeId);
+                Add("interface", association.TargetCkInterfaceId);
                 foreach (var target in association.TargetCkAttributeIds ?? [])
                 {
                     Add("attribute", target);

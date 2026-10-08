@@ -138,6 +138,10 @@ surface in the dependency diff.
 | CK v2: interface **removed** | Implementing types and interface consumers break |
 | CK v2: interface member added, removed or changed (`id`, `isOptional`) | The contract changed — publish a new interface version (`Named-2`) instead |
 | CK v2: `implements` entry removed from a type | Consumers querying the type through the interface break |
+| CK v2: interface `extends` entry added or removed | The inherited members change the contract — publish a new interface version instead |
+| CK v2: interface association member added, removed or changed (`multiplicity`, `isOptional`) | The contract changed — publish a new interface version instead |
+| CK v2: interface method added, removed or its signature changed | The contract changed — publish a new interface version instead |
+| CK v2: type association `targetCkInterfaceId` set or changed | The allowed targets narrow — existing associations may become invalid |
 | CK v2: method **removed** | Callers of the method break |
 | CK v2: method signature changed (kind, parameters, result, errors, authorization, execution) | Callers break — publish a new method version (`ChangePassword-2`) instead |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
@@ -176,13 +180,15 @@ surface in the dependency diff.
 | CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 1 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
 | CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it. Major instead when it flips a `derivable` default (see Major) |
 | CK v2: `visibility` `Internal → Public` | Relaxation |
+| CK v2: interface `deprecated` set or cleared | Dependents get (or lose) a compile warning; nothing breaks |
+| CK v2: type association `targetCkInterfaceId` cleared | Relaxation |
 | CK v2: `derivable` `Model → Any` | Relaxation |
 
 ### Patch
 
 | Change | Reasoning |
 | ------ | --------- |
-| `description` (all element kinds, model meta — including CK v2 interfaces and methods) and method `documentation` (parameter and error descriptions; not part of the method signature, review L16) | Purely documentational |
+| `description` (all element kinds, model meta — including CK v2 interfaces and type/interface methods) and method `documentation` (parameter and error descriptions; not part of the method signature, review L16) | Purely documentational |
 | `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
 | `isRuntimeState: true` rewritten as `ownership: RuntimeState` (or `false` as `SeedOwned`) | Same resolved ownership → empty diff → **no bump required**. Both markers are compared on their resolved value, so migrating a declaration to the enum costs nothing; only a genuine change of owner does. |

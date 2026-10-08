@@ -381,19 +381,78 @@ internal class ContentGenerator(
         {
             await AddTitle(outputFile, null, ckInterface.CkInterfaceId.ElementId.FullName).ConfigureAwait(false);
             await WriteCkV2Modifiers(outputFile, ckInterface.Visibility).ConfigureAwait(false);
+            if (ckInterface.Deprecated)
+            {
+                await outputFile.WriteLineAsync("**Deprecated.**").ConfigureAwait(false);
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
+
             await outputFile.WriteLineAsync(ckInterface.Description ?? "No description available currently.")
                 .ConfigureAwait(false);
             await outputFile.WriteLineAsync().ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| Member | Is optional | Value type | CK attribute ID |").ConfigureAwait(false);
-            await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- |").ConfigureAwait(false);
-            foreach (var member in ckInterface.Attributes.Values.OrderBy(a => a.AttributeName))
+            if (ckInterface.DeclaredExtends.Count != 0)
             {
-                await outputFile.WriteLineAsync(
-                        $"| {member.AttributeName} | {member.IsOptional} | {member.ValueType} | {member.CkAttributeId.ToRtCkId().FullName} |")
+                await outputFile.WriteLineAsync("Extends: " + string.Join(", ",
+                        ckInterface.DeclaredExtends.Select(i => $"`{i.ToRtCkId().FullName}`")))
                     .ConfigureAwait(false);
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
             }
 
-            await outputFile.WriteLineAsync().ConfigureAwait(false);
+            // F1.1-S5: AllAttributes includes the members inherited through extends.
+            if (ckInterface.AllAttributes.Count != 0)
+            {
+                await outputFile.WriteLineAsync("| Member | Is optional | Value type | CK attribute ID |").ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- |").ConfigureAwait(false);
+                foreach (var member in ckInterface.AllAttributes.Values.OrderBy(a => a.AttributeName))
+                {
+                    await outputFile.WriteLineAsync(
+                            $"| {member.AttributeName} | {member.IsOptional} | {member.ValueType} | {member.CkAttributeId.ToRtCkId().FullName} |")
+                        .ConfigureAwait(false);
+                }
+
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
+
+            if (ckInterface.AllAssociations.Count != 0)
+            {
+                await outputFile.WriteLineAsync("| Association | Target | Multiplicity | Is optional | Declared by |")
+                    .ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- |")
+                    .ConfigureAwait(false);
+                foreach (var association in ckInterface.AllAssociations)
+                {
+                    var definition = association.Definition;
+                    var target = definition.TargetCkTypeId?.ToRtCkId().FullName ??
+                                 definition.TargetCkInterfaceId?.ToRtCkId().FullName;
+                    await outputFile.WriteLineAsync(
+                            $"| {definition.CkRoleId.ToRtCkId().FullName} | {target} | " +
+                            $"{definition.Multiplicity?.ToString() ?? "any"} | {definition.IsOptional} | " +
+                            $"{association.DeclaringCkInterfaceId.ToRtCkId().FullName} |")
+                        .ConfigureAwait(false);
+                }
+
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
+
+            if (ckInterface.AllMethods.Count != 0)
+            {
+                await outputFile.WriteLineAsync("| Method | Kind | Parameters | Result | Declared by |").ConfigureAwait(false);
+                await outputFile.WriteLineAsync("| ----------- | ----------- | ----------- | ----------- | ----------- |")
+                    .ConfigureAwait(false);
+                foreach (var method in ckInterface.AllMethods.Values.OrderBy(m => m.Definition.MethodId))
+                {
+                    var parameters = string.Join(", ", (method.Definition.Parameters ?? []).Select(p =>
+                        $"{p.Name}{(p.IsOptional ? "?" : "")}: {p.ValueType}"));
+                    await outputFile.WriteLineAsync(
+                            $"| {method.Definition.MethodId}{(method.Visibility == CkVisibilityDto.Internal ? " (internal)" : "")} | " +
+                            $"{method.Definition.Kind} | {parameters} | {method.Definition.Result?.ValueType.ToString() ?? "-"} | " +
+                            $"{method.DeclaringCkInterfaceId.ToRtCkId().FullName} |")
+                        .ConfigureAwait(false);
+                }
+
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
+
             if (ckInterface.ImplementingTypes.Count != 0)
             {
                 await outputFile.WriteLineAsync("Implemented by: " + string.Join(", ",

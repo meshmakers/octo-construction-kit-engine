@@ -99,6 +99,21 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Major, "implementing types and interface consumers break"),
             { ElementKind: CkModelElementKind.InterfaceAttribute } =>
                 (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
+            // ── CK v2 interface completion (F1.1-S5) ────────────────────────────────────────────
+            { ElementKind: CkModelElementKind.Interface, Property: "deprecated" } =>
+                change.NewValue == "true"
+                    ? (CkSemVerLevel.Minor, "interface deprecated — dependents get a compile warning, nothing breaks")
+                    : (CkSemVerLevel.Minor, "interface deprecation withdrawn"),
+            { ElementKind: CkModelElementKind.InterfaceExtends or CkModelElementKind.InterfaceAssociation } =>
+                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
+            { ElementKind: CkModelElementKind.InterfaceMethod, ChangeKind: CkModelChangeKind.Added or CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
+            { ElementKind: CkModelElementKind.InterfaceMethod, Property: "signature" } =>
+                (CkSemVerLevel.Major, "interface method signature changed — publish a new interface version instead"),
+            { ElementKind: CkModelElementKind.TypeAssociation, Property: "targetCkInterfaceId" } =>
+                change.NewValue == null
+                    ? (CkSemVerLevel.Minor, "association target no longer narrowed to an interface")
+                    : (CkSemVerLevel.Major, "association target narrowed to interface implementors — existing associations may become invalid"),
             { ElementKind: CkModelElementKind.TypeInterface, ChangeKind: CkModelChangeKind.Added } =>
                 (CkSemVerLevel.Minor, "type implements an additional interface"),
             { ElementKind: CkModelElementKind.TypeInterface, ChangeKind: CkModelChangeKind.Removed } =>

@@ -85,13 +85,25 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkTypeAssociationDto)] =
             [
                 nameof(CkTypeAssociationDto.CkRoleId), nameof(CkTypeAssociationDto.TargetCkTypeId),
-                nameof(CkTypeAssociationDto.TargetCkAttributeIds)
+                nameof(CkTypeAssociationDto.TargetCkAttributeIds), nameof(CkTypeAssociationDto.TargetCkInterfaceId)
             ],
             [typeof(CkTypeIndexDto)] = [nameof(CkTypeIndexDto.IndexType), nameof(CkTypeIndexDto.Language), nameof(CkTypeIndexDto.Fields)],
             [typeof(CkIndexFieldsDto)] = [nameof(CkIndexFieldsDto.Weight), nameof(CkIndexFieldsDto.AttributePaths)],
             [typeof(CkAttributeMetaDataDto)] = [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)],
             // CK v2 (AB#5667 / AB#5669)
-            [typeof(CkInterfaceDto)] = [nameof(CkInterfaceDto.InterfaceId), nameof(CkInterfaceDto.Description), nameof(CkInterfaceDto.Attributes), nameof(CkInterfaceDto.Visibility)],
+            [typeof(CkInterfaceDto)] =
+            [
+                nameof(CkInterfaceDto.InterfaceId), nameof(CkInterfaceDto.Description), nameof(CkInterfaceDto.Attributes),
+                nameof(CkInterfaceDto.Visibility), nameof(CkInterfaceDto.Extends), nameof(CkInterfaceDto.Associations),
+                nameof(CkInterfaceDto.Methods), nameof(CkInterfaceDto.Deprecated)
+            ],
+            // CK v2 (F1.1-S5)
+            [typeof(CkInterfaceAssociationDto)] =
+            [
+                nameof(CkInterfaceAssociationDto.CkRoleId), nameof(CkInterfaceAssociationDto.TargetCkTypeId),
+                nameof(CkInterfaceAssociationDto.TargetCkInterfaceId), nameof(CkInterfaceAssociationDto.Multiplicity),
+                nameof(CkInterfaceAssociationDto.IsOptional)
+            ],
             [typeof(CkInterfaceAttributeDto)] =
             [
                 nameof(CkInterfaceAttributeDto.CkAttributeId), nameof(CkInterfaceAttributeDto.AttributeName),
@@ -196,6 +208,10 @@ public class CkModelDiffService : ICkModelDiffService
             (baseline.Types ?? []).SelectMany(t => (t.Methods ?? []).Select(m => (Type: t, Method: m))),
             (current.Types ?? []).SelectMany(t => (t.Methods ?? []).Select(m => (Type: t, Method: m))),
             x => $"{x.Type.TypeId.FullName}/{x.Method.MethodId}", x => x.Method.Visibility);
+        Compare(CkModelElementKind.InterfaceMethod,
+            (baseline.Interfaces ?? []).SelectMany(i => (i.Methods ?? []).Select(m => (Interface: i, Method: m))),
+            (current.Interfaces ?? []).SelectMany(i => (i.Methods ?? []).Select(m => (Interface: i, Method: m))),
+            x => $"{x.Interface.InterfaceId.FullName}/{x.Method.MethodId}", x => x.Method.Visibility);
     }
 
     private static void DiffDependencies(List<CkModelChange> changes, List<CkModelId>? baseline, List<CkModelId>? current)
@@ -289,6 +305,32 @@ public class CkModelDiffService : ICkModelDiffService
                     },
                     added => FormatReference(added.CkAttributeId, modelName),
                     removed => FormatReference(removed.CkAttributeId, modelName));
+
+                // F1.1-S5: deprecated flag, extends, association and method members.
+                AddModified(interfaceChanges, CkModelElementKind.Interface, id, "deprecated",
+                    baselineInterface.Deprecated ?? false, currentInterface.Deprecated ?? false);
+                DiffElements(interfaceChanges, CkModelElementKind.InterfaceExtends,
+                    baselineInterface.Extends?.Select(i => FormatReference(i, modelName)!).Distinct().ToList(),
+                    currentInterface.Extends?.Select(i => FormatReference(i, modelName)!).Distinct().ToList(),
+                    reference => $"{id}/{reference}", (_, _, _, _) => { });
+
+                string AssociationKey(CkInterfaceAssociationDto a) =>
+                    $"{id}/{FormatReference(a.CkRoleId, modelName)} -> " +
+                    (FormatReference(a.TargetCkTypeId, modelName) ?? FormatReference(a.TargetCkInterfaceId, modelName));
+
+                DiffElements(interfaceChanges, CkModelElementKind.InterfaceAssociation, baselineInterface.Associations,
+                    currentInterface.Associations, AssociationKey,
+                    (memberChanges, memberId, baselineMember, currentMember) =>
+                    {
+                        AddModified(memberChanges, CkModelElementKind.InterfaceAssociation, memberId, "multiplicity",
+                            baselineMember.Multiplicity?.ToString(), currentMember.Multiplicity?.ToString());
+                        AddModified(memberChanges, CkModelElementKind.InterfaceAssociation, memberId, "isOptional",
+                            baselineMember.IsOptional, currentMember.IsOptional);
+                    },
+                    added => FormatBool(added.IsOptional),
+                    removed => FormatBool(removed.IsOptional));
+                DiffMethods(interfaceChanges, CkModelElementKind.InterfaceMethod, id, baselineInterface.Methods,
+                    currentInterface.Methods, modelName);
             });
     }
 
@@ -309,17 +351,24 @@ public class CkModelDiffService : ICkModelDiffService
     ///     every other field is compared through one canonical rendering of the signature.
     /// </summary>
     private static void DiffTypeMethods(List<CkModelChange> changes, string typeId, List<CkMethodDto>? baseline,
-        List<CkMethodDto>? current, string modelName)
+        List<CkMethodDto>? current, string modelName) =>
+        DiffMethods(changes, CkModelElementKind.TypeMethod, typeId, baseline, current, modelName);
+
+    /// <summary>
+    ///     Methods of a type or (F1.1-S5) an interface, keyed by method id.
+    /// </summary>
+    private static void DiffMethods(List<CkModelChange> changes, CkModelElementKind kind, string ownerId,
+        List<CkMethodDto>? baseline, List<CkMethodDto>? current, string modelName)
     {
-        DiffElements(changes, CkModelElementKind.TypeMethod, baseline, current, m => $"{typeId}/{m.MethodId}",
+        DiffElements(changes, kind, baseline, current, m => $"{ownerId}/{m.MethodId}",
             (methodChanges, id, baselineMethod, currentMethod) =>
             {
-                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "description",
+                AddModified(methodChanges, kind, id, "description",
                     baselineMethod.Description, currentMethod.Description);
-                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "signature",
+                AddModified(methodChanges, kind, id, "signature",
                     FormatMethod(baselineMethod, modelName), FormatMethod(currentMethod, modelName));
                 // Review L16: parameter and error descriptions are documentation, not part of the signature.
-                AddModified(methodChanges, CkModelElementKind.TypeMethod, id, "documentation",
+                AddModified(methodChanges, kind, id, "documentation",
                     FormatMethodDocumentation(baselineMethod), FormatMethodDocumentation(currentMethod));
             });
     }
@@ -502,6 +551,10 @@ public class CkModelDiffService : ICkModelDiffService
                 AddModified(associationChanges, CkModelElementKind.TypeAssociation, id, "targetCkAttributeIds",
                     FormatReferenceList(baselineAssociation.TargetCkAttributeIds, modelName),
                     FormatReferenceList(currentAssociation.TargetCkAttributeIds, modelName));
+                // F1.1-S5
+                AddModified(associationChanges, CkModelElementKind.TypeAssociation, id, "targetCkInterfaceId",
+                    FormatReference(baselineAssociation.TargetCkInterfaceId, modelName),
+                    FormatReference(currentAssociation.TargetCkInterfaceId, modelName));
             });
     }
 

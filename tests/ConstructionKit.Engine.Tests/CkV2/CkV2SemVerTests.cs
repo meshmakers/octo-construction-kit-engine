@@ -333,4 +333,163 @@ public class CkV2SemVerTests
 
         Assert.Equal("Method 'Machine-1/Calibrate-1' added", line);
     }
+
+    // ── F1.1-S5 (AB#5908): interface completion ─────────────────────────────────────────────
+
+    private static CkInterfaceDto Serialized(CkCompiledModelRoot model) =>
+        model.Interfaces!.Single(i => i.InterfaceId.FullName == "Serialized-1");
+
+    private static CkCompiledModelRoot WithCompletedInterface()
+    {
+        var model = CkV2TestModels.CreateModel();
+        model.Interfaces!.Add(new CkInterfaceDto
+        {
+            InterfaceId = "Base-1",
+            Attributes = [new CkInterfaceAttributeDto { CkAttributeId = $"{CkV2TestModels.ModelName}/SerialNumber", AttributeName = "SerialNumber" }]
+        });
+        var serialized = model.Interfaces!.Single(i => i.InterfaceId.FullName == "Serialized-1");
+        serialized.Associations =
+        [
+            new CkInterfaceAssociationDto
+            {
+                CkRoleId = $"{CkV2TestModels.ModelName}/Parent", TargetCkTypeId = $"{CkV2TestModels.ModelName}/Machine",
+                Multiplicity = MultiplicitiesDto.ZeroOrOne
+            }
+        ];
+        serialized.Methods = [new CkMethodDto { MethodId = "Calibrate-1" }];
+        return model;
+    }
+
+    [Theory]
+    [InlineData("extends added")]
+    [InlineData("association added")]
+    [InlineData("association removed")]
+    [InlineData("association multiplicity")]
+    [InlineData("association isOptional")]
+    [InlineData("method added")]
+    [InlineData("method removed")]
+    [InlineData("method signature")]
+    public void InterfaceCompletion_ContractChanges_AreMajor(string modification)
+    {
+        var current = WithCompletedInterface();
+        var serialized = current.Interfaces!.Single(i => i.InterfaceId.FullName == "Serialized-1");
+        switch (modification)
+        {
+            case "extends added":
+                serialized.Extends = [$"{CkV2TestModels.ModelName}/Base-1"];
+                break;
+            case "association added":
+                serialized.Associations!.Add(new CkInterfaceAssociationDto
+                {
+                    CkRoleId = $"{CkV2TestModels.ModelName}/Parent", TargetCkInterfaceId = $"{CkV2TestModels.ModelName}/Base-1",
+                    IsOptional = true
+                });
+                break;
+            case "association removed":
+                serialized.Associations = null;
+                break;
+            case "association multiplicity":
+                serialized.Associations![0].Multiplicity = MultiplicitiesDto.N;
+                break;
+            case "association isOptional":
+                serialized.Associations![0].IsOptional = true;
+                break;
+            case "method added":
+                serialized.Methods!.Add(new CkMethodDto { MethodId = "Reset-1" });
+                break;
+            case "method removed":
+                serialized.Methods = null;
+                break;
+            default:
+                serialized.Methods![0].Kind = CkMethodKindDto.Static;
+                break;
+        }
+
+        var classified = Classify(WithCompletedInterface(), current);
+
+        Assert.NotEmpty(classified);
+        Assert.All(classified, c => Assert.Equal(CkSemVerLevel.Major, c.Level));
+        Assert.All(classified, c => Assert.Contains(c.Change.ElementKind,
+            new[] { CkModelElementKind.InterfaceExtends, CkModelElementKind.InterfaceAssociation, CkModelElementKind.InterfaceMethod }));
+    }
+
+    [Fact]
+    public void InterfaceExtendsRemoved_IsMajor()
+    {
+        var baseline = WithCompletedInterface();
+        baseline.Interfaces!.Single(i => i.InterfaceId.FullName == "Serialized-1").Extends = [$"{CkV2TestModels.ModelName}/Base-1"];
+
+        var change = Assert.Single(Classify(baseline, WithCompletedInterface()));
+
+        Assert.Equal(CkModelElementKind.InterfaceExtends, change.Change.ElementKind);
+        Assert.Equal(CkModelChangeKind.Removed, change.Change.ChangeKind);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+    }
+
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(true, false)]
+    [InlineData(true, null)]
+    public void InterfaceDeprecated_IsMinor(bool? before, bool? after)
+    {
+        var baseline = WithCompletedInterface();
+        Serialized(baseline).Deprecated = before;
+        var current = WithCompletedInterface();
+        Serialized(current).Deprecated = after;
+
+        var classified = Classify(baseline, current);
+
+        if ((before ?? false) == (after ?? false))
+        {
+            Assert.Empty(classified);
+            return;
+        }
+
+        var change = Assert.Single(classified);
+        Assert.Equal("deprecated", change.Change.Property);
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+    }
+
+    [Fact]
+    public void InterfaceMethodDescriptionChanged_IsPatch_VisibilityInternal_IsMajor()
+    {
+        var current = WithCompletedInterface();
+        Serialized(current).Methods![0].Description = "Calibrates";
+        Assert.Equal(CkSemVerLevel.Patch, Assert.Single(Classify(WithCompletedInterface(), current)).Level);
+
+        Serialized(current).Methods![0].Description = null;
+        Serialized(current).Methods![0].Visibility = CkVisibilityDto.Internal;
+        var change = Assert.Single(Classify(WithCompletedInterface(), current));
+        Assert.Equal(CkModelElementKind.InterfaceMethod, change.Change.ElementKind);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+    }
+
+    [Theory]
+    [InlineData(null, "Serialized-1", CkSemVerLevel.Major)]
+    [InlineData("Serialized-1", null, CkSemVerLevel.Minor)]
+    public void TypeAssociationTargetInterface_SetIsMajor_ClearedIsMinor(string? before, string? after, CkSemVerLevel expected)
+    {
+        CkCompiledModelRoot Build(string? target)
+        {
+            var model = CkV2TestModels.CreateModel();
+            SemVerTestModels.GetMachine(model).Associations![0].TargetCkInterfaceId =
+                target == null ? null : new CkId<CkInterfaceId>($"{CkV2TestModels.ModelName}/{target}");
+            return model;
+        }
+
+        var change = Assert.Single(Classify(Build(before), Build(after)));
+
+        Assert.Equal("targetCkInterfaceId", change.Change.Property);
+        Assert.Equal(expected, change.Level);
+    }
+
+    [Fact]
+    public void ChangelogFormatter_LabelsInterfaceCompletionKinds()
+    {
+        Assert.Equal("Interface method 'Serialized-1/Calibrate-1' added", CkModelChangeFormatter.Format(new CkModelChange
+        {
+            ChangeKind = CkModelChangeKind.Added, ElementKind = CkModelElementKind.InterfaceMethod,
+            ElementId = "Serialized-1/Calibrate-1"
+        }));
+    }
 }

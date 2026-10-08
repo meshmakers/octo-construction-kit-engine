@@ -182,8 +182,13 @@ public class CkV2SchemaTests
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 0 }\n", "timeout below minimum")]
     [InlineData("types:\n  - typeId: A\n    methods:\n      - methodId: Do-1\n        execution: { timeoutSeconds: 301 }\n", "timeout above maximum")]
     [InlineData("interfaces:\n  - interfaceId: Named\n    attributes:\n      - id: ${System}/Name\n        name: Name\n", "interface id without version")]
-    [InlineData("interfaces:\n  - interfaceId: Named-1\n    attributes: []\n", "interface without members")]
-    [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends:\n      - ${this}/Base-1\n    attributes:\n      - id: ${System}/Name\n        name: Name\n", "interface extends is out of Phase 0")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends: []\n", "empty extends")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    extends:\n      - Base-1\n", "extends without model part")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    associations:\n      - id: ${System}/ParentChild\n        targetCkTypeId: ${System}/Entity\n        multiplicity: Many\n", "unknown interface association multiplicity")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    associations:\n      - id: ${System}/ParentChild\n        targetCkTypeId: ${System}/Entity\n        inboundName: Parent\n", "unknown interface association key")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    associations:\n      - targetCkTypeId: ${System}/Entity\n", "interface association without role")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    methods:\n      - methodId: Do\n", "interface method id without version")]
+    [InlineData("interfaces:\n  - interfaceId: Named-1\n    deprecated: yes please\n", "deprecated is a boolean")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    attributes:\n      - id: ${System}/Name\n        name: Name\n        access: Hidden\n", "unknown interface member key")]
     [InlineData("interfaces:\n  - interfaceId: Named-1\n    attributes:\n      - id: ${System}/Name\n", "interface member without name")]
     public void Elements_InvalidCkV2Keys_FailSchemaValidation(string body, string reason)
@@ -261,6 +266,114 @@ public class CkV2SchemaTests
         Assert.Equal(CkVisibilityDto.Internal, elements.Records!.Single().Visibility);
         Assert.Equal(CkDerivableDto.Any, elements.Records!.Single().Derivable);
         Assert.Equal(CkVisibilityDto.Internal, elements.AssociationRoles!.Single().Visibility);
+    }
+
+    private const string InterfaceCompletionElementsYaml = ElementsHeader + """
+        interfaces:
+          - interfaceId: Named-1
+            attributes:
+              - id: ${System}/Name
+                name: Name
+          - interfaceId: Hierarchical-1
+            extends:
+              - ${this}/Named-1
+            deprecated: true
+            associations:
+              - id: ${System}/ParentChild
+                targetCkInterfaceId: ${this}/Hierarchical-1
+                multiplicity: ZeroOrOne
+                isOptional: true
+              - id: ${System}/Related
+                targetCkTypeId: ${System}/Entity
+            methods:
+              - methodId: Move-1
+                parameters:
+                  - { name: target, valueType: String }
+        types:
+          - typeId: Node
+            derivedFromCkTypeId: ${System}/Entity
+            associations:
+              - id: ${System}/ParentChild
+                targetCkTypeId: ${System}/Entity
+                targetCkInterfaceId: ${this}/Hierarchical-1
+        """;
+
+    [Fact]
+    public async Task Elements_InterfaceCompletion_Parses()
+    {
+        // F1.1-S5 (AB#5908)
+        Assert.True(ValidateElements(InterfaceCompletionElementsYaml, out var validation),
+            string.Join("; ", validation.Messages));
+        var operationResult = new OperationResult();
+        var elements = await new CkYamlSerializer(new CkSchemaValidator())
+            .DeserializeElementsAsync(ToStream(InterfaceCompletionElementsYaml), "inline.yaml", operationResult);
+        Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+
+        var hierarchical = elements.Interfaces!.Single(i => i.InterfaceId.Name == "Hierarchical");
+        Assert.Empty(hierarchical.Attributes);
+        Assert.Equal("Named-1", Assert.Single(hierarchical.Extends!).ElementId.FullName);
+        Assert.True(hierarchical.Deprecated);
+        Assert.Equal(2, hierarchical.Associations!.Count);
+        Assert.Equal("Hierarchical-1", hierarchical.Associations[0].TargetCkInterfaceId!.ElementId.FullName);
+        Assert.Null(hierarchical.Associations[0].TargetCkTypeId);
+        Assert.Equal(MultiplicitiesDto.ZeroOrOne, hierarchical.Associations[0].Multiplicity);
+        Assert.True(hierarchical.Associations[0].IsOptional);
+        Assert.NotNull(hierarchical.Associations[1].TargetCkTypeId);
+        Assert.Null(hierarchical.Associations[1].Multiplicity);
+        Assert.Equal("Move-1", Assert.Single(hierarchical.Methods!).MethodId);
+        Assert.Null(elements.Interfaces!.Single(i => i.InterfaceId.Name == "Named").Deprecated);
+        Assert.Equal("Hierarchical-1",
+            elements.Types!.Single().Associations!.Single().TargetCkInterfaceId!.ElementId.FullName);
+    }
+
+    [Fact]
+    public async Task CompiledModel_InterfaceCompletion_RoundTripsThroughYamlAndJson()
+    {
+        var model = CkV2TestModels.CreateModel();
+        var serialized = model.Interfaces!.Single();
+        model.Interfaces!.Add(new CkInterfaceDto
+        {
+            InterfaceId = "Extended-1", Extends = [$"{CkV2TestModels.ModelName}/Serialized-1"], Deprecated = true,
+            Associations =
+            [
+                new CkInterfaceAssociationDto
+                {
+                    CkRoleId = $"{CkV2TestModels.ModelName}/Parent", TargetCkInterfaceId = $"{CkV2TestModels.ModelName}/Serialized-1",
+                    Multiplicity = MultiplicitiesDto.N
+                }
+            ],
+            Methods = [new CkMethodDto { MethodId = "Ping-1" }]
+        });
+        SemVerTestModels.GetMachine(model).Associations![0].TargetCkInterfaceId = $"{CkV2TestModels.ModelName}/Serialized-1";
+
+        var yaml = await SerializeYamlAsync(model);
+        var validation = new OperationResult();
+        Assert.True(new CkSchemaValidator().ValidateCompiledModelInYaml(ToStream(yaml), "inline.yaml", validation),
+            string.Join("; ", validation.Messages) + "\n" + yaml);
+        var json = await SerializeJsonAsync(model);
+        Assert.Contains("\"deprecated\": true", json);
+        Assert.Contains("\"targetCkInterfaceId\"", json);
+        Assert.DoesNotContain("\"deprecated\": null", json);
+
+        var operationResult = new OperationResult();
+        foreach (var roundTripped in new[]
+                 {
+                     new CkYamlSerializer(new CkSchemaValidator()).DeserializeCompiledModelRoot(yaml, "inline.yaml", operationResult),
+                     new CkJsonSerializer().DeserializeCompiledModelRoot(json, "inline.json", operationResult)
+                 })
+        {
+            Assert.False(operationResult.HasErrors, string.Join("; ", operationResult.Messages));
+            var extended = roundTripped.Interfaces!.Single(i => i.InterfaceId.FullName == "Extended-1");
+            Assert.Empty(extended.Attributes);
+            Assert.Equal("Serialized-1", Assert.Single(extended.Extends!).ElementId.FullName);
+            Assert.True(extended.Deprecated);
+            Assert.Equal(MultiplicitiesDto.N, Assert.Single(extended.Associations!).Multiplicity);
+            Assert.Equal("Serialized-1", extended.Associations![0].TargetCkInterfaceId!.ElementId.FullName);
+            Assert.Equal("Ping-1", Assert.Single(extended.Methods!).MethodId);
+            Assert.Null(roundTripped.Interfaces!.Single(i => i.InterfaceId.FullName == serialized.InterfaceId.FullName).Extends);
+            Assert.Equal("Serialized-1",
+                SemVerTestModels.GetMachine(roundTripped).Associations![0].TargetCkInterfaceId!.ElementId.FullName);
+        }
     }
 
     [Theory]
@@ -441,7 +554,8 @@ public class CkV2SchemaTests
         var yaml = await SerializeYamlAsync(model);
         var json = await SerializeJsonAsync(model);
 
-        foreach (var key in new[] { "ckLanguage", "interfaces", "implements", "methods", "access", "visibility", "derivable" })
+        foreach (var key in new[] { "ckLanguage", "interfaces", "implements", "methods", "access", "visibility", "derivable",
+                     "extends", "deprecated", "targetCkInterfaceId" })
         {
             Assert.DoesNotContain(key, yaml);
             Assert.DoesNotContain($"\"{key}\"", json);

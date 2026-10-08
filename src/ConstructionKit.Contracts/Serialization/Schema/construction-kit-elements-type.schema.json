@@ -108,6 +108,11 @@
                 "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
                 "description": "Target type reference in Pascal Case"
               },
+              "targetCkInterfaceId": {
+                "type": "string",
+                "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+                "description": "CK v2 (F1.1-S5): the target must also implement this interface (e.g. '${System}/Named-1'); targetCkTypeId stays required (use '${System}/Entity' for any implementor). Requires ckLanguage: 2."
+              },
               "targetAttributes": {
                 "type": "array",
                 "items": {
@@ -269,6 +274,11 @@
                 "type": "string",
                 "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
                 "description": "Target type reference in Pascal Case"
+              },
+              "targetCkInterfaceId": {
+                "type": "string",
+                "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+                "description": "CK v2 (F1.1-S5): the target must also implement this interface (e.g. '${System}/Named-1'); targetCkTypeId stays required (use '${System}/Entity' for any implementor). Requires ckLanguage: 2."
               },
               "targetAttributes": {
                 "type": "array",

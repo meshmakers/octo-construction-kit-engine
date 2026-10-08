@@ -33,6 +33,7 @@ public class CkSemVerClassificationGuardTests
         // CK v2 (AB#5667 / AB#5669)
         typeof(CkInterfaceDto),
         typeof(CkInterfaceAttributeDto),
+        typeof(CkInterfaceAssociationDto),
         typeof(CkMethodDto),
         typeof(CkMethodParameterDto),
         typeof(CkMethodResultDto),

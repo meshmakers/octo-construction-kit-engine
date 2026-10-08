@@ -107,6 +107,8 @@ internal class InheritanceResolver : IInheritanceResolver
     private static void ResolveInterfacesAndMethods(CkModelGraph modelGraph, HashSet<CkId<CkTypeId>> failedTypeIds,
         IOriginFileResolver originFileResolver, OperationResult operationResult)
     {
+        ResolveInterfaceHierarchy(modelGraph);
+
         foreach (var pair in modelGraph.Types)
         {
             var ckTypeId = pair.Key;
@@ -132,6 +134,11 @@ internal class InheritanceResolver : IInheritanceResolver
 
             ValidateMethods(typeGraph, baseGraphs, ckTypeId, location, operationResult);
 
+            // F1.1-S5: implementing an interface implements every interface it extends.
+            typeGraph.InheritInterfaces(typeGraph.AllImplementedInterfaces
+                .SelectMany(i => modelGraph.Interfaces.TryGetValue(i, out var g) ? g.AllExtendedInterfaces : [])
+                .ToList());
+
             foreach (var ckInterfaceId in typeGraph.DeclaredImplements)
             {
                 if (modelGraph.Interfaces.TryGetValue(ckInterfaceId, out var interfaceGraph))
@@ -151,6 +158,37 @@ internal class InheritanceResolver : IInheritanceResolver
     }
 
     /// <summary>
+    ///     CK v2 (F1.1-S5): computes <see cref="CkInterfaceGraph.AllExtendedInterfaces" /> (transitive, in
+    ///     declaration order, depth first) and the inherited members of every interface. Unknown entries and cycles
+    ///     are skipped here; the compiler rules report them (F1.2-S4).
+    /// </summary>
+    private static void ResolveInterfaceHierarchy(CkModelGraph modelGraph)
+    {
+        foreach (var interfaceGraph in modelGraph.Interfaces.Values)
+        {
+            var all = new List<CkId<CkInterfaceId>>();
+            var visited = new HashSet<CkId<CkInterfaceId>> { interfaceGraph.CkInterfaceId };
+
+            void Visit(IEnumerable<CkId<CkInterfaceId>> extends)
+            {
+                foreach (var extended in extends)
+                {
+                    if (!visited.Add(extended) || !modelGraph.Interfaces.TryGetValue(extended, out var extendedGraph))
+                    {
+                        continue;
+                    }
+
+                    all.Add(extended);
+                    Visit(extendedGraph.DeclaredExtends);
+                }
+            }
+
+            Visit(interfaceGraph.DeclaredExtends);
+            interfaceGraph.SetInheritedMembers(all, all.Select(i => modelGraph.Interfaces[i]));
+        }
+    }
+
+    /// <summary>
     ///     CK v2 (AB#5667) rules I-1..I-4 for one declared <c>implements</c> entry.
     /// </summary>
     private static void ValidateImplementation(CkTypeGraph typeGraph, CkInterfaceGraph interfaceGraph,
@@ -159,7 +197,8 @@ internal class InheritanceResolver : IInheritanceResolver
         var ckInterfaceId = interfaceGraph.CkInterfaceId;
         // The merged members (ReferenceResolver): unknown (94) and duplicate (127) members are already reported
         // there and must not produce follow-up implementation errors.
-        foreach (var member in interfaceGraph.Attributes.Values)
+        // F1.1-S5: inherited members (extends) are part of the contract.
+        foreach (var member in interfaceGraph.AllAttributes.Values)
         {
             if (!typeGraph.AllAttributes.TryGetValue(member.CkAttributeId, out var assignment))
             {

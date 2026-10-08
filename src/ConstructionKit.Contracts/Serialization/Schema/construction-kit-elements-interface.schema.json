@@ -5,7 +5,7 @@
     "CkInterface": {
       "type": "object",
       "title": "CkInterface",
-      "description": "A versioned contract (CK v2, AB#5667). Phase 0: attribute members only. Requires ckLanguage: 2.",
+      "description": "A versioned contract (CK v2, AB#5667). Members: attributes, associations and methods (definitions only); an interface may extend other interfaces (F1.1-S5). Requires ckLanguage: 2.",
       "properties": {
         "interfaceId": {
           "type": "string",
@@ -17,10 +17,40 @@
         },
         "attributes": {
           "type": "array",
-          "minItems": 1,
           "items": {
             "$ref": "#/definitions/CkInterfaceAttribute"
-          }
+          },
+          "description": "Attribute members. May be empty when the interface declares other members or extends another interface; an interface without any member is a compiler error (F1.2-S4)."
+        },
+        "extends": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$"
+          },
+          "description": "CK v2 (F1.1-S5): interfaces this interface extends (members are inherited), e.g. '${this}/Named-1'."
+        },
+        "associations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/CkInterfaceAssociation"
+          },
+          "description": "CK v2 (F1.1-S5): association members."
+        },
+        "methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "https://schemas.meshmakers.cloud/construction-kit-elements-method.schema.json#/definitions/CkMethod"
+          },
+          "description": "CK v2 (F1.1-S5): method members (definitions only), same schema as type methods."
+        },
+        "deprecated": {
+          "type": "boolean",
+          "description": "CK v2 (F1.1-S5): dependents get a compile warning; removed only in the next model major."
         },
         "visibility": {
           "type": "string",
@@ -33,9 +63,47 @@
       },
       "additionalProperties": false,
       "required": [
-        "interfaceId",
-        "attributes"
+        "interfaceId"
       ]
+    },
+    "CkInterfaceAssociation": {
+      "type": "object",
+      "title": "CkInterfaceAssociation",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Association role reference, e.g. '${System}/ParentChild'."
+        },
+        "targetCkTypeId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Target type (exclusive with targetCkInterfaceId)."
+        },
+        "targetCkInterfaceId": {
+          "type": "string",
+          "pattern": "^(?:[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*|[a-zA-Z][a-zA-Z0-9._@-]*|\\$\\{[a-zA-Z0-9_.]+\\})/[A-Z][a-zA-Z0-9_]*(?:\\.[A-Z][a-zA-Z0-9_]*)*(?:-\\d+)?$",
+          "description": "Target interface (exclusive with targetCkTypeId)."
+        },
+        "multiplicity": {
+          "type": "string",
+          "enum": [
+            "One",
+            "ZeroOrOne",
+            "N"
+          ],
+          "description": "Required outbound multiplicity of the implementing association; omitted = any."
+        },
+        "isOptional": {
+          "type": "boolean",
+          "description": "Optional members need not be provided by implementing types."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "description": "Exactly one of targetCkTypeId / targetCkInterfaceId is set (compiler rule, F1.2-S4)."
     },
     "CkInterfaceAttribute": {
       "type": "object",

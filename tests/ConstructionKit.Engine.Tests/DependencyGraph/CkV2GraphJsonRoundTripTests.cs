@@ -162,4 +162,68 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         Assert.Equal(CkVisibilityDto.Internal,
             cache.GetRtCkAssociationRole("target", new RtCkId<CkAssociationRoleId>("sample1/Related")).Visibility);
     }
+
+    [Fact]
+    public async Task InterfaceCompletion_SurvivesTheCacheJson()
+    {
+        // F1.1-S5 (AB#5908)
+        var model = Model();
+        model.Interfaces!.Add(new CkInterfaceDto
+        {
+            InterfaceId = "Labeled-1", Extends = [$"{M}/Named-1"], Deprecated = true,
+            Associations =
+            [
+                new() { CkRoleId = "System/ParentChild", TargetCkInterfaceId = $"{M}/Named-1", Multiplicity = MultiplicitiesDto.N, IsOptional = true }
+            ],
+            Methods = [new() { MethodId = "Relabel-1", Kind = CkMethodKindDto.Static }]
+        });
+        Type(model, "Tag").Implements = [$"{M}/Labeled-1"];
+        Type(model, "Tag").Associations =
+            [new() { CkRoleId = "System/ParentChild", TargetCkTypeId = "System/Entity", TargetCkInterfaceId = $"{M}/Named-1" }];
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        var labeled = cache.GetRtCkInterface("target", new RtCkId<CkInterfaceId>($"{M}/Labeled-1"));
+        var original = graph.Interfaces[$"{M}/Labeled-1"];
+        Assert.True(labeled.Deprecated);
+        Assert.Equal(original.DeclaredExtends, labeled.DeclaredExtends);
+        Assert.Equal(original.AllExtendedInterfaces, labeled.AllExtendedInterfaces);
+        Assert.Equal(original.AllAttributes.Keys.OrderBy(k => k), labeled.AllAttributes.Keys.OrderBy(k => k));
+        Assert.Empty(labeled.Attributes);
+        var association = Assert.Single(labeled.AllAssociations);
+        Assert.Equal(original.AllAssociations[0].DeclaringCkInterfaceId, association.DeclaringCkInterfaceId);
+        Assert.Equal(MultiplicitiesDto.N, association.Definition.Multiplicity);
+        Assert.True(association.Definition.IsOptional);
+        Assert.Equal(original.AllAssociations[0].Definition.TargetCkInterfaceId, association.Definition.TargetCkInterfaceId);
+        Assert.Equal(CkMethodKindDto.Static, labeled.AllMethods["Relabel-1"].Definition.Kind);
+        Assert.Equal(labeled.CkInterfaceId, labeled.AllMethods["Relabel-1"].DeclaringCkInterfaceId);
+        Assert.Single(labeled.DefinedMethods);
+
+        var tag = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Tag"));
+        Assert.Contains(tag.AllImplementedInterfaces, i => i.ElementId.FullName == "Named-1");
+        var outbound = tag.Associations.Out.Owned.Single(a => a.TargetCkInterfaceId != null);
+        Assert.Equal(graph.Types[$"{M}/Tag"].Associations.Out.Owned.Single(a => a.TargetCkInterfaceId != null).TargetCkInterfaceId,
+            outbound.TargetCkInterfaceId);
+        Assert.Contains(cache.GetRtCkInterface("target", new RtCkId<CkInterfaceId>($"{M}/Named-1")).ImplementingTypes,
+            t => t == tag.CkTypeId);
+    }
+
+    [Fact]
+    public async Task V1Graph_CacheJsonHasNoTargetCkInterfaceId()
+    {
+        var operationResult = new OperationResult();
+        var graph = Resolve(sampleData.sample1.Builder.Build(), operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var source = new CkCacheService(NullLogger<CkCacheService>.Instance);
+        source.CreateTenant("source");
+        source.LoadCkModelGraph("source", graph);
+        using var stream = new MemoryStream();
+        await source.SaveCacheAsync("source", stream);
+
+        Assert.DoesNotContain("targetCkInterfaceId", Encoding.UTF8.GetString(stream.ToArray()));
+    }
 }

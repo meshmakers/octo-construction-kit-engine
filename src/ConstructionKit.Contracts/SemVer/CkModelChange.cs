@@ -109,7 +109,22 @@ public enum CkModelElementKind
     /// <summary>
     ///     CK v2 (AB#5669): a method of a type.
     /// </summary>
-    TypeMethod
+    TypeMethod,
+
+    /// <summary>
+    ///     CK v2 (F1.1-S5): an <c>extends</c> entry of an interface.
+    /// </summary>
+    InterfaceExtends,
+
+    /// <summary>
+    ///     CK v2 (F1.1-S5): an association member of an interface.
+    /// </summary>
+    InterfaceAssociation,
+
+    /// <summary>
+    ///     CK v2 (F1.1-S5): a method of an interface.
+    /// </summary>
+    InterfaceMethod
 }
 
 /// <summary>

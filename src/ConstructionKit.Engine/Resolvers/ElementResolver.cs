@@ -217,24 +217,8 @@ internal class ElementResolver : IElementResolver
                         .ToList();
                 }
 
-                foreach (var method in ckType.Methods ?? [])
-                {
-                    foreach (var parameter in method.Parameters ?? [])
-                    {
-                        parameter.ValueCkRecordId = ResolveReference(parameter.ValueCkRecordId, variableResolver,
-                            originFileResolver.Resolve(ckTypeId), operationResult);
-                        parameter.ValueCkEnumId = ResolveReference(parameter.ValueCkEnumId, variableResolver,
-                            originFileResolver.Resolve(ckTypeId), operationResult);
-                    }
-
-                    if (method.Result != null)
-                    {
-                        method.Result.ValueCkRecordId = ResolveReference(method.Result.ValueCkRecordId,
-                            variableResolver, originFileResolver.Resolve(ckTypeId), operationResult);
-                        method.Result.ValueCkEnumId = ResolveReference(method.Result.ValueCkEnumId, variableResolver,
-                            originFileResolver.Resolve(ckTypeId), operationResult);
-                    }
-                }
+                ResolveMethodReferences(ckType.Methods, variableResolver, originFileResolver.Resolve(ckTypeId),
+                    operationResult);
 
                 if (ckType.Associations != null)
                 {
@@ -246,6 +230,9 @@ internal class ElementResolver : IElementResolver
                         ckTypeAssociationDto.TargetCkTypeId =
                             variableResolver.Resolve(ckTypeAssociationDto.TargetCkTypeId.FullName,
                                 originFileResolver.Resolve(ckTypeId), operationResult);
+                        ckTypeAssociationDto.TargetCkInterfaceId = ResolveReference(
+                            ckTypeAssociationDto.TargetCkInterfaceId, variableResolver,
+                            originFileResolver.Resolve(ckTypeId), operationResult);
                     }
                 }
 
@@ -466,6 +453,13 @@ internal class ElementResolver : IElementResolver
         foreach (var ckType in model.Types ?? [])
         {
             CheckModifiers(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), ckType.Visibility, ckType.Derivable);
+            // F1.1-S5: an interface as association target.
+            foreach (var association in (ckType.Associations ?? []).Where(a => a.TargetCkInterfaceId != null))
+            {
+                Report(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), "targetCkInterfaceId",
+                    $"{new CkId<CkTypeId>(model.ModelId, ckType.TypeId)}/{association.CkRoleId}");
+            }
+
             foreach (var method in (ckType.Methods ?? []).Where(m => m.Visibility != null))
             {
                 Report(new CkId<CkTypeId>(model.ModelId, ckType.TypeId), "visibility",
@@ -546,7 +540,50 @@ internal class ElementResolver : IElementResolver
                     operationResult);
             }
 
+            // F1.1-S5: extends, association members and method value references.
+            if (ckInterface.Extends != null)
+            {
+                ckInterface.Extends = ckInterface.Extends
+                    .Select(i => (CkId<CkInterfaceId>)variableResolver.Resolve(i.FullName, location, operationResult))
+                    .ToList();
+            }
+
+            foreach (var association in ckInterface.Associations ?? [])
+            {
+                association.CkRoleId = variableResolver.Resolve(association.CkRoleId.FullName, location,
+                    operationResult);
+                association.TargetCkTypeId = ResolveReference(association.TargetCkTypeId, variableResolver, location,
+                    operationResult);
+                association.TargetCkInterfaceId = ResolveReference(association.TargetCkInterfaceId, variableResolver,
+                    location, operationResult);
+            }
+
+            ResolveMethodReferences(ckInterface.Methods, variableResolver, location, operationResult);
+
             ckModelGraph.GetOrCreateInterface(ckInterfaceId, ckInterface);
+        }
+    }
+
+    private static void ResolveMethodReferences(List<CkMethodDto>? methods, IVariableResolver variableResolver,
+        string location, OperationResult operationResult)
+    {
+        foreach (var method in methods ?? [])
+        {
+            foreach (var parameter in method.Parameters ?? [])
+            {
+                parameter.ValueCkRecordId = ResolveReference(parameter.ValueCkRecordId, variableResolver, location,
+                    operationResult);
+                parameter.ValueCkEnumId = ResolveReference(parameter.ValueCkEnumId, variableResolver, location,
+                    operationResult);
+            }
+
+            if (method.Result != null)
+            {
+                method.Result.ValueCkRecordId = ResolveReference(method.Result.ValueCkRecordId, variableResolver,
+                    location, operationResult);
+                method.Result.ValueCkEnumId = ResolveReference(method.Result.ValueCkEnumId, variableResolver,
+                    location, operationResult);
+            }
         }
     }
 

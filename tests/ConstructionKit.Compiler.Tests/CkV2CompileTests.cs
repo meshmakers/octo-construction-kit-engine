@@ -310,6 +310,75 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains("| Unlock-1 (internal) |", types);
     }
 
+    [Fact]
+    public async Task Compile_ckv2_interface_completion_reaches_graph_and_docs()
+    {
+        // F1.1-S5 (AB#5908)
+        await PublishSystemAsync(_fixture);
+        var files = KitchenSinkFiles();
+        files["associations/roles.yaml"] = """
+            associationRoles:
+              - id: Owns
+                inboundName: OwnedBy
+                outboundName: Owns
+                inboundMultiplicity: N
+                outboundMultiplicity: N
+            """;
+        files["interfaces/labeled.yaml"] = """
+            interfaces:
+              - interfaceId: Labeled-1
+                deprecated: true
+                extends:
+                  - ${this}/Named-1
+                associations:
+                  - id: ${this}/Owns
+                    targetCkInterfaceId: ${this}/Serialized-1
+                    isOptional: true
+                methods:
+                  - methodId: Relabel-1
+                    parameters:
+                      - name: mode
+                        valueType: Enum
+                        valueCkEnumId: ${this}/Mode
+            """;
+        files["types/types.yaml"] = files["types/types.yaml"].Replace("""
+                implements:
+                  - ${this}/Serialized-1
+            """, """
+                implements:
+                  - ${this}/Serialized-1
+                  - ${this}/Labeled-1
+                associations:
+                  - id: ${this}/Owns
+                    targetCkTypeId: ${System}/Entity
+                    targetCkInterfaceId: ${this}/Serialized-1
+            """);
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], files, ckLanguage: 2));
+
+        var labeled = compiled.Interfaces!.Single(i => i.InterfaceId.FullName == "Labeled-1");
+        Assert.Equal("KitchenSink-1.0.0/Named-1", labeled.Extends!.Single().FullName);
+        Assert.Equal("KitchenSink-1.0.0/Mode-1", labeled.Methods!.Single().Parameters![0].ValueCkEnumId!.FullName);
+        Assert.Equal("KitchenSink-1.0.0/Serialized-1",
+            compiled.Types!.Single(t => t.TypeId.Name == "Account").Associations!.Single().TargetCkInterfaceId!.FullName);
+
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        Assert.Contains(graph.Types["KitchenSink/Account"].AllImplementedInterfaces, i => i.ElementId.FullName == "Named-1");
+        Assert.Equal(["Name"], graph.Interfaces["KitchenSink/Labeled-1"].AllAttributes.Values.Select(a => a.AttributeName));
+
+        var docs = Path.Combine(_fixture.Root, "docs-interfaces");
+        var generator = _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>();
+        await generator.GenerateInterfacesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0");
+        var interfaces = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Interfaces.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("**Deprecated.**", interfaces);
+        Assert.Contains("Extends: `KitchenSink/Named-1`", interfaces);
+        Assert.Contains("| KitchenSink/Owns-1 | KitchenSink/Serialized-1 | any | True | KitchenSink/Labeled-1 |", interfaces);
+        Assert.Contains("| Relabel-1 | Instance | mode: Enum | - | KitchenSink/Labeled-1 |", interfaces);
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

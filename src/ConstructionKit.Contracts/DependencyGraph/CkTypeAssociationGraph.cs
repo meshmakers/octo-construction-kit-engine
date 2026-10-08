@@ -30,6 +30,7 @@ public class CkTypeAssociationGraph
         CkRoleId = ckTypeAssociationDto.CkRoleId;
         OriginCkTypeId = originCkTypeId;
         TargetCkTypeId = ckTypeAssociationDto.TargetCkTypeId;
+        TargetCkInterfaceId = ckTypeAssociationDto.TargetCkInterfaceId;
         TargetAttributes = ckTypeAssociationDto.TargetCkAttributeIds;
     }
 
@@ -79,6 +80,13 @@ public class CkTypeAssociationGraph
     ///     Gets or sets the target CK type id.
     /// </summary>
     public CkId<CkTypeId> TargetCkTypeId { get; }
+
+    /// <summary>
+    ///     CK v2 (F1.1-S5): the interface the target must implement in addition to deriving from
+    ///     <see cref="TargetCkTypeId" />; <c>null</c> when not narrowed. Settable so a cache written before CK v2
+    ///     (no key) reads <c>null</c>.
+    /// </summary>
+    public CkId<CkInterfaceId>? TargetCkInterfaceId { get; set; }
 
     /// <summary>
     ///     Gets or sets a list of attributes of the target ck type id, that are referential integrity attributes

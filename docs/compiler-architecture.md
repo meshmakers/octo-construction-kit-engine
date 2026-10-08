@@ -396,6 +396,8 @@ Defined in `Directory.Build.props`:
 | `OctoGenerateCkModelServiceClass` | true | Generate service registration classes |
 | `OctoEmbedCkMigrations` | true | Embed migration scripts as resources |
 
+**Remote publish once per content (AB#6119).** In this repo's `Directory.Build.targets`, the `$(OctoPublishCatalog)` leg of `CkCompile` writes a stamp to `obj/<cfg>/<tfm>/octo-ck-remote-publish/<Project>/<catalog>-<model>-<sha256>.stamp` after a successful publish and skips the publish (and the `octo-ckc -c config` token calls) when a stamp for the same catalog and the same compiled-yaml hash already exists. `CkCompile` re-runs on every build by design, and the CI `Build src` step runs one `dotnet build` per project, so without the stamp `System` was pushed to the GitHub catalog twice per run (once via StreamDataCkModel's ProjectReference, once by its own invocation). The LocalFileSystemCatalog publish is not guarded. Changed content gets a new hash and is published; delete `obj/` to force a re-publish of unchanged content.
+
 ### Incremental Build and Clean
 
 The `CkCompile` and `CkRestore` targets (in `ConstructionKit.MsBuildTasks/build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets`) use MSBuild `Inputs`/`Outputs` for incremental builds. The compiler assembly (`$(OctoCkCompileTasksAssembly)`) is part of the input set, so when the engine package is updated, the timestamp change forces a full recompile of every consuming CK project. Without this, schema changes in the engine would leave stale compiled YAMLs in `bin/.../octo-ck-libraries/` that the source generator then rejects against the new schema.

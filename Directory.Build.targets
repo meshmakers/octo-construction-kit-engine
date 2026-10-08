@@ -76,17 +76,51 @@
             <!-- Define a temporary item group to iterate through -->
             <_CompiledModelFiles Include="@(CompiledModelFiles)"/>
         </ItemGroup>
-        <Message Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to catalog $(OctoPublishCatalog)"/>
+        <!--
+            Remote publish runs at most ONCE per compiled model content and catalog (AB#6119).
+            CkCompile deliberately re-runs on every build (see GatherCompileFiles), and the CI 'Build src'
+            step runs one `dotnet build` per src/**/*.csproj: StreamDataCkModel's invocation builds its
+            ProjectReference SystemCkModel, then SystemCkModel's own invocation builds it again - so System
+            was pushed to the GitHub catalog twice per run (~60 s each, CI build 50758). After a successful
+            remote publish a stamp keyed by catalog, model file name and SHA-256 of the compiled yaml is
+            written to obj/; a later build of the SAME content to the SAME catalog skips the remote publish
+            (it would be a zero-diff commit anyway). Changed content (new version or edit) has a new hash and
+            is published. The LocalFileSystemCatalog publish below is NOT guarded and runs on every build.
+            Delete obj/ (or `dotnet clean`) to force a re-publish of unchanged content.
+        -->
+        <PropertyGroup>
+            <_OctoRemotePublishActive>false</_OctoRemotePublishActive>
+            <_OctoRemotePublishActive Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false'">true</_OctoRemotePublishActive>
+            <_OctoRemotePublishStampFolder>$(IntermediateOutputPath)octo-ck-remote-publish/$(ProjectName)</_OctoRemotePublishStampFolder>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(_OctoRemotePublishActive)' == 'true'">
+            <_CkRemotePublishCandidate Include="@(_CompiledModelFiles)" Condition="Exists('%(Identity)')" />
+        </ItemGroup>
+        <GetFileHash Condition="'@(_CkRemotePublishCandidate)' != ''" Files="@(_CkRemotePublishCandidate)" Algorithm="SHA256" HashEncoding="hex">
+            <Output TaskParameter="Items" ItemName="_CkRemotePublishHashed" />
+        </GetFileHash>
+        <ItemGroup>
+            <_CkRemotePublishModel Include="@(_CkRemotePublishHashed)">
+                <Stamp>$(_OctoRemotePublishStampFolder)/$(OctoPublishCatalog)-%(Filename)-%(FileHash).stamp</Stamp>
+            </_CkRemotePublishModel>
+            <_CkRemotePublishPending Include="@(_CkRemotePublishModel)" Condition="!Exists('%(Stamp)')" />
+            <_CkRemotePublishSkipped Include="@(_CkRemotePublishModel)" Condition="Exists('%(Stamp)')" />
+        </ItemGroup>
+
+        <Message Condition="'%(_CkRemotePublishPending.Identity)' != ''" Importance="High" Text="Publishing construction kit library %(_CkRemotePublishPending.Identity) to catalog $(OctoPublishCatalog)"/>
+        <Message Condition="'%(_CkRemotePublishSkipped.Identity)' != ''" Importance="High" Text="Skipping publish of construction kit library %(_CkRemotePublishSkipped.Identity) to catalog $(OctoPublishCatalog): identical content already published by this build output (stamp %(_CkRemotePublishSkipped.Stamp))"/>
         <Message Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' == 'false' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" Text="Publishing construction kit library %(_CompiledModelFiles.Identity) to LocalFileSystemCatalog only (OctoPublishCkModelToRemoteCatalog=false)"/>
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity)) And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey) -ge true" />
+        <Exec Condition="'@(_CkRemotePublishPending)' != '' And $(OctoPublicGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -pgt $(OctoPublicGitHubApiKey)" />
+        <Exec Condition="'@(_CkRemotePublishPending)' != '' And $(OctoPrivateGitHubApiKey) != ''" Command="$(OctoCompilerToolPath) -c config -gt $(OctoPrivateGitHubApiKey) -ge true" />
         <!-- Publish to both LocalFileSystemCatalog and the specified catalog, so that the build can continue for this repo.
              OctoPublishCkModelToRemoteCatalog=false (set by test-only CK model projects such as tests/TestCkModel,
              AB#6114) keeps the LocalFileSystemCatalog publish but skips $(OctoPublishCatalog): test-only models
              (Test, System.TestIdentity) must never reach the shared GitHub catalogs. It is a project property, not
              passed on the command line, so the pipeline's /p:OctoPublishCatalog pin cannot override it. -->
         <Exec Condition="'$(OctoPublishCkModel)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c LocalFileSystemCatalog -r $(_OctoLcrArg)" />
-        <Exec Condition="'$(OctoPublishCkModel)' == 'true' And '$(OctoPublishCkModelToRemoteCatalog)' != 'false' And Exists(%(_CompiledModelFiles.Identity))" Command="$(OctoCompilerToolPath) -c publish -f %(_CompiledModelFiles.Identity) -c $(OctoPublishCatalog) -r $(_OctoLcrArg)" />
+        <Exec Condition="'%(_CkRemotePublishPending.Identity)' != ''" Command="$(OctoCompilerToolPath) -c publish -f %(_CkRemotePublishPending.Identity) -c $(OctoPublishCatalog) -r $(_OctoLcrArg)" />
+        <MakeDir Condition="'@(_CkRemotePublishPending)' != ''" Directories="$(_OctoRemotePublishStampFolder)" />
+        <Touch Condition="'@(_CkRemotePublishPending)' != ''" Files="@(_CkRemotePublishPending->'%(Stamp)')" AlwaysCreate="true" />
 
         <Message Condition="'$(OctoGenerateCkDocumentation)' == 'true' And Exists(%(_CompiledModelFiles.Identity))" Importance="High" 
                  Text="Generating Documentation at $(OctoCkCompileOutputCompilerFolder)"/>

@@ -87,6 +87,7 @@ Key MSBuild properties (from Directory.Build.props):
 - `OctoCompileCkModel`: Controls CK model compilation (default: true)
 - `OctoPublishCkModel`: Controls CK model publishing (default: false)
 - `OctoPublishCkModelToRemoteCatalog`: repo-internal opt-out (this repo's `Directory.Build.targets` only). `false` keeps the LocalFileSystemCatalog publish but skips `$(OctoPublishCatalog)`; set by `tests/TestCkModel` so the test-only models never reach the GitHub catalogs (AB#6114)
+  - The remote publish runs at most once per compiled content and catalog: a stamp in `obj/.../octo-ck-remote-publish/` (catalog + model + SHA-256 of the compiled yaml) skips repeated pushes of identical content (AB#6119)
 - `OctoGenerateCkModelServiceClass`: Generate service classes (default: true)
 
 ## Code Quality
@@ -585,7 +586,13 @@ branch, so a non-main build force-publishes into the main-lane catalog (AB#5413)
 `Test` step runs with `--no-build --no-restore`:
 
 1. `Build src` — each `src/**/*.csproj` (Release); compiles and publishes System and
-   System.StreamData.
+   System.StreamData. DotNetCoreCLI runs one `dotnet build` per project, so SystemCkModel is
+   built twice (via StreamDataCkModel's ProjectReference and by its own invocation). The
+   remote-catalog leg of `CkCompile` is therefore stamped in `obj/.../octo-ck-remote-publish/`
+   by catalog + SHA-256 of the compiled yaml and skipped when the identical content was already
+   published from this output (AB#6119; before: System pushed twice, ~60 s, build 50758). The
+   LocalFileSystemCatalog publish still runs on every build. Look for `Skipping publish of
+   construction kit library ...` in the log.
 2. `Build samples`.
 3. `Build test CK model` — `tests/TestCkModel` with `/p:BuildProjectReferences=false`;
    publishes Test and System.TestIdentity to the LocalFileSystemCatalog only (AB#6114). It runs before the test projects because

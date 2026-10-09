@@ -26,9 +26,10 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
         => Generate(ns, modelId, ckType, cacheTenantId, cacheService, 1);
 
     /// <summary>
-    ///     Generates the Rt class of a type. F1.4-S2: for a <c>ckLanguage: 2</c> model the class is <c>abstract</c>
-    ///     for <c>isAbstract</c>, and <c>sealed</c> for <c>isFinal</c> or for <c>derivable: Model</c> without a
-    ///     subtype in its own model; v1 output is unchanged.
+    ///     Generates the Rt class of a type. F1.4-S2: for a <c>ckLanguage: 2</c> model the class is <c>sealed</c> for
+    ///     <c>isFinal</c> or for <c>derivable: Model</c> without a subtype in its own model; v1 output is unchanged.
+    ///     <c>isAbstract</c> does not emit <c>abstract</c> (repository generics need <c>new()</c>; review G3 E-M3,
+    ///     revisit in Phase 4).
     /// </summary>
     public string Generate(string ns, CkModelId modelId, CkTypeDto ckType, string cacheTenantId,
         ICkCacheService cacheService, int ckLanguage)
@@ -121,9 +122,12 @@ public class CkTypeCodeGenerator : ICkTypeCodeGenerator
             return "";
         }
 
+        // Review G3 E-M3 (platform-owner decision): isAbstract does NOT emit `abstract` — the repository generics
+        // require `new()` (GetRtEntitiesByTypeAsync<TEntity> etc.), so an abstract Rt class could not be queried.
+        // Revisit in Phase 4. An abstract type is never sealed either.
         if (ckType.IsAbstract)
         {
-            return "abstract ";
+            return "";
         }
 
         if (ckType.IsFinal)

@@ -40,11 +40,22 @@ public class CkV2GeneratedContractsTests(ITestOutputHelper output) : CkV2Resolve
     {
         var (model, cache) = Prepare(m => Type(m, "Tag").Derivable = CkDerivableDto.Any);
 
-        Assert.Contains("public abstract partial class RtPrincipal", Type(model, cache, "Principal", 2));
+        // Review G3 E-M3: isAbstract stays a plain class (repository generics need new()), and is not sealed.
+        Assert.Contains("public partial class RtPrincipal", Type(model, cache, "Principal", 2));
         // derivable: Model (v2 default) without a subtype in the model
         Assert.Contains("public sealed partial class RtAccount", Type(model, cache, "Account", 2));
         // derivable: Any stays open
         Assert.Contains("public partial class RtTag", Type(model, cache, "Tag", 2));
+    }
+
+    [Fact]
+    public void AbstractV2Type_SatisfiesTheNewConstraint()
+    {
+        var (model, cache) = Prepare(m => Type(m, "Principal").Derivable = CkDerivableDto.Model);
+        var code = Type(model, cache, "Principal", 2);
+
+        Assert.DoesNotContain("abstract", code);
+        Assert.DoesNotContain("sealed", code); // isAbstract wins over the derivable rule
     }
 
     [Fact]
@@ -108,8 +119,12 @@ public class CkV2GeneratedContractsTests(ITestOutputHelper output) : CkV2Resolve
             namespace {{Ns}};
             public static class Consumer
             {
+                // Review G3 E-M3: the repository generics' constraint must accept the abstract v2 type.
+                private static T Make<T>() where T : Meshmakers.Octo.Runtime.Contracts.RepositoryEntities.RtEntity, new() => new T();
+
                 public static string Use()
                 {
+                    _ = Make<RtPrincipal>();
                     IRtNamed named = new RtAccount();
                     var parameters = new PrincipalChangePasswordParameters
                     {

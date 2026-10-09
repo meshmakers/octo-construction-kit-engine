@@ -913,8 +913,11 @@ Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}Int
 appended: `UserChangePassword2MethodId`). Typed parameter/result records: see "v2 class modifiers and method contracts"
 below.
 **v2 class modifiers and method contracts (F1.4-S2, AB#5919).** For a `ckLanguage: 2` model (the source generator
-passes `EffectiveCkLanguage` to `CkTypeCodeGenerator`) the Rt class is `abstract` for `isAbstract`, `sealed` for
-`isFinal` or for an effective `derivable: Model` without a subtype in its own model; v1 output is unchanged.
+passes `EffectiveCkLanguage` to `CkTypeCodeGenerator`) the Rt class is `sealed` for `isFinal` or for an effective
+`derivable: Model` without a subtype in its own model; v1 output is unchanged. **`isAbstract` does not emit
+`abstract`** (platform-owner decision, review G3 E-M3): `IRuntimeRepository` / `IRepositoryDataSource` generics
+require `where TEntity : RtEntity, new()`, so an abstract Rt class could not be queried polymorphically. Revisit in
+Phase 4 (System → ckLanguage 2) together with a non-`new()` query path.
 `CkMethodCodeGenerator` emits per declared type method `{Type}{Method}Parameters` (`required` for required
 parameters, nullable for optional ones, camelCase → PascalCase; CLR types: string/bool/DateTime/DateTimeOffset/
 TimeSpan/int/long/double, `IReadOnlyList<string|long>`, `Rt{Enum}Enum`, `Rt{Record}Record`) with a `ToString()` that
@@ -963,7 +966,7 @@ back (the isRuntimeState class of bug, AB#4589) fails there. Row 10 below is not
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
 | 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113 | 90, 118–124, 128 |
 | 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
-| 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `abstract`/`sealed` (v2) | `IRt<Name>` (extends = interface inheritance) |
+| 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back (gate: `CkModelReflectionComparer`, mandatory) | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |

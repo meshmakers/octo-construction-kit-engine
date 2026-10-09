@@ -29,24 +29,28 @@ Construction Kit models are defined in YAML files following a specific schema:
 ## Build Commands
 
 ```bash
-# Build the entire solution
-dotnet build --configuration Release
-
-# Build in debug mode with local packages
+# Build in debug mode with local packages - the default for local work
 dotnet build --configuration DebugL
+
+# Build in Release mode against a published release (version must be passed explicitly)
+dotnet build --configuration Release -p:OctoVersion=3.5.1
 
 # Build specific project
 dotnet build src/ConstructionKit.Compiler/ConstructionKit.Compiler.csproj
 ```
 
+Versions come only from the pipeline (AB#6291): `Directory.Build.props` has no release fallback, so a
+Debug/Release build without `-p:OctoVersion=X.Y.Z` (or `-p:OctoNugetPrivateServer=<feed>` for the main
+line `0.1.*`) fails fast with MSBuild error `OCTO0001`. Use `-c DebugL` locally.
+
 ## Test Commands
 
 ```bash
 # Run all tests except system tests
-dotnet test --configuration Release --filter "FullyQualifiedName!~SystemTests"
+dotnet test --configuration DebugL --filter "FullyQualifiedName!~SystemTests"
 
 # Run all tests including system tests
-dotnet test --configuration Release
+dotnet test --configuration DebugL
 
 # Run tests for specific project
 dotnet test tests/ConstructionKit.Engine.Tests/ConstructionKit.Engine.Tests.csproj

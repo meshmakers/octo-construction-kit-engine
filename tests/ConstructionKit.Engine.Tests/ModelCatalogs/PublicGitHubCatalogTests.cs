@@ -513,8 +513,9 @@ public class PublicGitHubCatalogV3RootTests() : PublicGitHubCatalogTestsBase(wit
     }
 
     [Fact]
-    public async Task GetAsync_WithoutCache_ProbesV3ThenV2()
+    public async Task GetAsync_WithoutAnyV3Model_ProbesOnlyV2()
     {
+        // Review G3 E-L4: no v3 models in the catalog — a v1 lookup costs no extra 404.
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
             .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
         A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
@@ -524,9 +525,20 @@ public class PublicGitHubCatalogV3RootTests() : PublicGitHubCatalogTestsBase(wit
 
         Assert.NotNull(model);
         A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
-            .MustHaveHappenedOnceExactly()
-            .Then(A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
-                .MustHaveHappenedOnceExactly());
+            .MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task GetAsync_V3ModelNotInTheCache_FallsBackToV3()
+    {
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{}") });
+        A.CallTo(() => HttpClientWrapper.GetAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json", A<CancellationToken>._))
+            .ReturnsLazily(() => new HttpResponseMessage(HttpStatusCode.NotFound));
+        A.CallTo(() => CkJsonSerializer.DeserializeCompiledModelRootAsync(A<Stream>._, A<string>._, A<OperationResult>._, A<bool>._))
+            .ReturnsLazily(() => CreateTestCompiledModel());
+
+        Assert.NotNull(await Catalog.GetAsync(CreateTestModelId(), new OperationResult()));
     }
 }
 
@@ -736,6 +748,28 @@ public class PublicGitHubCatalogWithTokenTests : PublicGitHubCatalogTestsBase
 
         A.CallTo(() => GitHubClientWrapper.UpdateFileAsync(A<string>._, A<string>._, A<string>._, A<string>._))
             .MustHaveHappened();
+    }
+
+    [Fact]
+    public async Task PublishAsync_SameVersionInTheOtherRoot_RequiresForce_AndIsMoved()
+    {
+        // Review G3 E-M5: a version lives under one root only (v2 classic, v3 ckLanguage 2 / range-retaining).
+        var model = CreateTestCompiledModel();
+        model.CkLanguage = 2;
+        A.CallTo(() => CkJsonSerializer.SerializeAsync(A<StreamWriter>._, A<CkCompiledModelRoot>._))
+            .Returns(Task.CompletedTask);
+        A.CallTo(() => GitHubClientWrapper.GetFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json"))
+            .Returns(("old-v1-content", "sha-v2"));
+
+        await Assert.ThrowsAsync<ModelCatalogException>(() => Catalog.PublishAsync(model));
+        A.CallTo(() => GitHubClientWrapper.CreateFileAsync(A<string>._, A<string>._, A<string>._)).MustNotHaveHappened();
+
+        await Catalog.PublishAsync(model, force: true);
+
+        A.CallTo(() => GitHubClientWrapper.DeleteFileAsync("ck-models/v2/t/TestModel/1/ck-testmodel-1.0.0.json",
+            A<string>._, "sha-v2")).MustHaveHappenedOnceExactly();
+        A.CallTo(() => GitHubClientWrapper.CreateFileAsync("ck-models/v3/t/TestModel/1/ck-testmodel-1.0.0.json",
+            A<string>._, A<string>._)).MustHaveHappenedOnceExactly();
     }
 
     [Fact]

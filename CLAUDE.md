@@ -681,10 +681,12 @@ range-retaining models (and anything carrying `minEngineVersion`) to `ck-models/
 only `v2` and tolerate unknown JSON properties, so the separate root is what keeps them from misreading a v2
 model. Engines from CK v2 on read both (`ReadRoots` = v3, then v2): `LocalFileSystemCatalog` lookups enumerate
 both directories, the refresh merges both index trees (a model may have versions in both), and `GitHubCatalog`
-takes the root from the cached `filePath` or probes v3 then v2 (a missing v3 root index is normal and is not
-retried, so it does not spend the AB#4872 404-retry budget). Each root has its own `catalog.json` tree and its
-own `.catalog-index.lock`. A version lives in one root only: publishing it into the other root needs `force`
-and (local catalog) deletes the old file. The catalog CI side (Pages deploy of `ck-models/v3/`) is F2.3.
+takes the root from the cached `filePath`, otherwise probes v2 then v3 — v3 first only when the cache holds v3 models
+(review G3 E-L4: no extra 404 per v1 model). A missing v3 root index is normal and is not retried, so it does not
+spend the AB#4872 404-retry budget. Each root has its own `catalog.json` tree and its own `.catalog-index.lock`.
+A version lives in one root only: publishing it into the other root needs `force` and deletes the old file — in the
+local **and** the GitHub catalog (review G3 E-M5). Known limitation (E-L3): the old root's `catalog.json` keeps a
+stale listing entry for a moved version (listing only; lookups use the files). The catalog CI side (Pages deploy of `ck-models/v3/`) is F2.3.
 
 **`minEngineVersion` (F1.1-S6).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
 `CkEngineVersion.CkV2MinEngineVersion` (`3.4.0`, a deterministic constant — not the compiling engine's own

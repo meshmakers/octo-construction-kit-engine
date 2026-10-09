@@ -129,7 +129,7 @@ public abstract class GitHubCatalog : CachedCatalog
         CancellationToken? cancellationToken = null)
     {
         // F1.1-S6: the model lives under ck-models/v3 or ck-models/v2. The refreshed cache knows which; without a
-        // cache entry the v3 root is tried first (a missing file there falls through to v2).
+        // cache entry the roots are probed (v3 first only when the catalog has v3 models, review G3 E-L4).
         foreach (var candidate in await GetCandidatePathsAsync(modelId).ConfigureAwait(false))
         {
             var model = await GetFromPathAsync(modelId, candidate, operationResult, cancellationToken)
@@ -146,6 +146,9 @@ public abstract class GitHubCatalog : CachedCatalog
     private async Task<IReadOnlyList<string>> GetCandidatePathsAsync(CkModelId modelId)
     {
         var candidates = new List<string>();
+        // Review G3 E-L4: probe v3 first only when the catalog has v3 models at all; otherwise every v1 model
+        // lookup without a cache entry would cost an extra 404 (and REST call on the Octokit path).
+        IReadOnlyList<string> probeOrder = [CkCatalogLayout.V2Root, CkCatalogLayout.V3Root];
         try
         {
             var cache = await ReadCacheAsync(false).ConfigureAwait(false);
@@ -155,13 +158,19 @@ public abstract class GitHubCatalog : CachedCatalog
             {
                 candidates.Add(version.FilePath);
             }
+
+            if (cache.Models.Values.Any(m => m.Versions.Values.Any(v =>
+                    v.FilePath.StartsWith(CkCatalogLayout.V3Root, StringComparison.Ordinal))))
+            {
+                probeOrder = CkCatalogLayout.ReadRoots;
+            }
         }
         catch (Exception e) when (e is IOException or System.Text.Json.JsonException or UnauthorizedAccessException)
         {
             // no usable cache — fall back to probing the roots
         }
 
-        foreach (var root in CkCatalogLayout.ReadRoots)
+        foreach (var root in probeOrder)
         {
             var path = CreatePath(root, modelId);
             if (!candidates.Contains(path))
@@ -255,6 +264,24 @@ public abstract class GitHubCatalog : CachedCatalog
         try
         {
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
+
+            // Review G3 E-M5: a version lives under one root only, as in the local catalog — the same version in v2
+            // and v3 with different content would let old engines (v2) and new engines (v3 first) read different
+            // models. Without force the other root's file is a conflict; with force it is removed.
+            var otherRoot = root == CkCatalogLayout.V3Root ? CkCatalogLayout.V2Root : CkCatalogLayout.V3Root;
+            var otherPath = CreatePath(otherRoot, ckCompiledModel.ModelId);
+            var existingElsewhere = await gitHubClient.GetFileAsync(otherPath).ConfigureAwait(false);
+            if (existingElsewhere.HasValue)
+            {
+                if (!force)
+                {
+                    throw ModelCatalogException.ModelAlreadyExists(ckCompiledModel.ModelId, CatalogName);
+                }
+
+                await gitHubClient.DeleteFileAsync(otherPath,
+                        $"Move {ckCompiledModel.ModelId.FullName} to {root}", existingElsewhere.Value.Item2)
+                    .ConfigureAwait(false);
+            }
 
             var existing = await gitHubClient.GetFileAsync(filePath).ConfigureAwait(false);
             if (existing.HasValue)

@@ -978,6 +978,18 @@ changed Major and cleared Minor).
 public property of the compiled model after import → Mongo → read-back, so a field that is not written or not read
 back (the isRuntimeState class of bug, AB#4589) fails there. Row 10 below is not done until that gate is green.
 
+**Mandatory classification gate (AB#6272):** every new meta-model field also needs a diff **and** a classifier rule.
+`tests/ConstructionKit.Engine.Tests/SemVer/CkSemVerClassificationGuardTests.cs` fails, naming the item, when a public
+element-DTO property is neither in `CkModelDiffService.ComparedProperties` nor in `ExcludedProperties` (with a written
+reason), when a compared property has no probe in the guard's `PropertyProbes` or its probe yields no diff change,
+when a change shape is missing in `CkModelDiffService.EmittableChanges`, when any shape reaches the defensive default
+of `CkSemVerClassifier` ("no classification rule …"), when a `CkModelElementKind` value has no rule, and when the
+rule rows of `docs/ck-semver-rules.md` (N*, I*, M*, T*, E*, R*, A*, B*, D*) and the tests named after them
+(`N1_…`) drift apart. To satisfy it: diff the field, list its shape, add a probe, add the classifier rule, add the
+docs row and its row test (`docs/ck-semver-rules.md`, "Classification guard"). Open items live only in the guard's
+`KnownGaps` list (each with its story); it must be empty when F2.1 closes (AB#6273). Row 7 below is not done until
+that gate is green.
+
 | # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` | `visibility` / `derivable` | interface completion (S5) |
 | - | ----------- | ------------ | ------------ | ------------ | -------- | --------- | -------------------------- | ------------------------- |
 | 1 | Source schema | meta (enum 1/2) | interface schema + elements root | `CkType` | `CkTypeAttribute` | method schema + `CkType` | type, record, enum, attribute, association-role, interface, method schemas | interface schema (`extends`, `associations`, `methods`, `deprecated`), type schema `targetCkInterfaceId` |
@@ -986,7 +998,7 @@ back (the isRuntimeState class of bug, AB#4589) fails there. Row 10 below is not
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
 | 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113 | 90, 118–124, 128 |
-| 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
+| 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back (gate: `CkModelReflectionComparer`, mandatory) | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |

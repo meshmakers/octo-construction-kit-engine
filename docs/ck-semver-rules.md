@@ -199,18 +199,42 @@ A change without an explicit rule is classified as **Major**. Since only a minim
 enforced, an overly strict classification is annoying for the developer but never wrong — an
 overly lax one, however, is dangerous.
 
-**Convention for new schema fields:** every new public property on the element DTOs
-(`CkTypeDto`, `CkAttributeDto`, `CkEnumDto`, `CkRecordDto`, `CkAssociationRoleDto` and their
-nested DTOs) must be registered in `CkModelDiffService.AccountedProperties` together with a diff
-implementation and a classification rule (or a documented, conscious exclusion). A guard test in
-`ConstructionKit.Engine.Tests` fails when a DTO property is not accounted for, and this page must
-be extended with the new rule.
+### Classification guard (AB#6272)
+
+A meta-model field cannot reach main unless it has a diff **and** a classifier rule. The guard is
+`tests/ConstructionKit.Engine.Tests/SemVer/CkSemVerClassificationGuardTests.cs`; it fails, naming the item, when
+
+1. a public property of an element DTO (`CkTypeDto`, `CkAttributeDto`, `CkEnumDto`, `CkRecordDto`,
+   `CkAssociationRoleDto`, the CK v2 interface and method DTOs and their nested DTOs) is neither in
+   `CkModelDiffService.ComparedProperties` nor in `CkModelDiffService.ExcludedProperties` — or a new DTO type is
+   neither diffed nor excluded with a reason;
+2. a compared property has no probe in the guard test, or its probe produces no diff change, or a change of a
+   shape that is missing in `CkModelDiffService.EmittableChanges`;
+3. a change emitted by a probe, or a synthetic change of any shape in `EmittableChanges` (element kind, change
+   kind, property), reaches the defensive default of `CkSemVerClassifier` (`ClassifyChange`,
+   `ClassifyDependencyChange`, `ClassifyAttributeAssignmentChange`);
+4. a `CkModelElementKind` value has no rule (no shape, or every shape reaches the default);
+5. an exclusion has no written reason (`ExcludedProperties` maps each property to its reason);
+6. the rule rows of this page and the tests drift apart: a table row whose first cell is a row id
+   (`N1`, `I3`, `M12`, `T7`, `E1`, `R2`, `A1`, `B4`, `D5`, …) needs a test whose name starts with that id and an
+   underscore (`N1_InternalElementRemoved_IsMinor`), and a test named like that needs the row.
+
+**How to add a meta-model field:** compare it in `CkModelDiffService` (diff code, `ComparedProperties`, and the
+emitted shape in `EmittableChanges`), add a probe for it to `PropertyProbes` in the guard test, add the classifier
+rule to `CkSemVerClassifier`, and add the rule row to this page with a row test. If the field is deliberately not
+part of the compatibility surface, add it to `ExcludedProperties` with the reason instead.
+
+**Known gaps.** Open items live in one place, `KnownGaps` in the guard test, each with the story that closes it:
+the CK v2 rule rows N1–N5 (AB#6266), I1–I11 (AB#6267), M1–M14 (AB#6268), T1–T7, E1–E2, R1–R2, A1–A2 (AB#6269),
+B1–B4 (AB#6270), D1–D7 (AB#6271), and the range-retention exclusions `DependencyRanges`, `IsRangeRetaining` and
+the DTO `CkModelDependencyDto` (AB#6271). The list only shrinks — an entry that is no longer a gap fails the guard
+— and it must be empty when F2.1 closes (AB#6273).
 
 **Conscious exclusion — range retention (AB#5664 / AB#5905, behind `OctoCkRangeRetention`, default off).**
 `CkCompiledModelRoot.DependencyRanges` (declared range + floor per direct dependency) and the derived
 `IsRangeRetaining` are not diffed yet. Per CK v2 concept §4.3.1 only a *raised floor* or a *changed range*
-will count as a change; that rule is Phase 2 (F2.1). `Dependencies` keeps the exact closure and is still
-diffed as before.
+will count as a change; that rule is Phase 2 (F2.1, AB#6271) and the exclusion is a known gap of the
+classification guard. `Dependencies` keeps the exact closure and is still diffed as before.
 
 ### Renames
 

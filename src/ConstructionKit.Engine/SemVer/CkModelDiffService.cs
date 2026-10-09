@@ -19,32 +19,23 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 public class CkModelDiffService : ICkModelDiffService
 {
     /// <summary>
-    ///     Registry of all DTO properties this diff accounts for (either compared or knowingly
-    ///     excluded from comparison). The classification guard test asserts that every public
-    ///     property of the element DTOs appears here, so a new schema field cannot be added
-    ///     without a conscious diff and classification decision.
+    ///     DTO properties this diff compares, per DTO type. Together with <see cref="ExcludedProperties" /> it
+    ///     must cover every public property of the element DTOs; the classification guard test
+    ///     (<c>CkSemVerClassificationGuardTests</c>) fails otherwise. Every compared property needs a probe in
+    ///     that guard test that proves the diff emits a change for it, and every emitted change must reach an
+    ///     explicit classifier rule (AB#6272). Identity keys (element ids, member names) are compared as keys:
+    ///     changing one surfaces as remove + add.
     /// </summary>
-    public static readonly IReadOnlyDictionary<Type, IReadOnlyCollection<string>> AccountedProperties =
+    public static readonly IReadOnlyDictionary<Type, IReadOnlyCollection<string>> ComparedProperties =
         new Dictionary<Type, IReadOnlyCollection<string>>
         {
-            // SchemaUri is a serialization constant; Migrations are not part of the schema
-            // contract (they always accompany a version bump by design) and are reconciled
-            // separately by the migration check of the ValidateVersion command.
-            // DependencyRanges / IsRangeRetaining (CK v2 range retention, AB#5664): conscious exclusion — the
-            // classification of range/floor changes (only a raised floor or a changed range
-            // counts) is Phase 2 (F2.1). Dependencies keeps carrying the exact closure and is still diffed.
-            [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.SchemaUri), nameof(CkCompiledModelRoot.Dependencies), nameof(CkCompiledModelRoot.Migrations),
-                nameof(CkCompiledModelRoot.DependencyRanges), nameof(CkCompiledModelRoot.IsRangeRetaining),
-                // F1.1-S6: derived from ckLanguage / range retention by the compiler, not diffed on its own.
-                nameof(CkCompiledModelRoot.MinEngineVersion)],
+            [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.Dependencies)],
             [typeof(CkModelRootBase)] =
             [
                 nameof(CkModelRootBase.Types), nameof(CkModelRootBase.AssociationRoles), nameof(CkModelRootBase.Attributes),
                 nameof(CkModelRootBase.Records), nameof(CkModelRootBase.Enums), nameof(CkModelRootBase.Interfaces)
             ],
-            // EffectiveCkLanguage is a computed view of CkLanguage (not serialized).
-            [typeof(CkModelPropertiesDto)] = [nameof(CkModelPropertiesDto.ModelId), nameof(CkModelPropertiesDto.Description),
-                nameof(CkModelPropertiesDto.CkLanguage), nameof(CkModelPropertiesDto.EffectiveCkLanguage)],
+            [typeof(CkModelPropertiesDto)] = [nameof(CkModelPropertiesDto.Description), nameof(CkModelPropertiesDto.CkLanguage)],
             [typeof(CkCompiledTypeDto)] = [nameof(CkCompiledTypeDto.IsCollectionRoot)],
             [typeof(CkTypeDto)] =
             [
@@ -52,18 +43,22 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkTypeDto.IsAbstract), nameof(CkTypeDto.Indexes), nameof(CkTypeDto.Associations),
                 nameof(CkTypeDto.EnableChangeStreamPreAndPostImages), nameof(CkTypeDto.Description),
                 nameof(CkTypeDto.DisplayNameRule), nameof(CkTypeDto.DisplayDescriptionRule),
-                nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods), nameof(CkTypeDto.Visibility), nameof(CkTypeDto.Derivable)],
+                nameof(CkTypeDto.OwnerAttributePath), nameof(CkTypeDto.Implements), nameof(CkTypeDto.Methods),
+                nameof(CkTypeDto.Visibility), nameof(CkTypeDto.Derivable)
+            ],
             [typeof(CkTypeWithAttributesDto)] = [nameof(CkTypeWithAttributesDto.Attributes)],
             [typeof(CkAttributeDto)] =
             [
                 nameof(CkAttributeDto.AttributeId), nameof(CkAttributeDto.ValueType), nameof(CkAttributeDto.ValueCkRecordId),
                 nameof(CkAttributeDto.ValueCkEnumId), nameof(CkAttributeDto.DefaultValues), nameof(CkAttributeDto.IsRuntimeState),
-                nameof(CkAttributeDto.Ownership),
-                nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData), nameof(CkAttributeDto.Visibility)],
+                nameof(CkAttributeDto.Ownership), nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData),
+                nameof(CkAttributeDto.Visibility)
+            ],
             [typeof(CkEnumDto)] =
             [
                 nameof(CkEnumDto.EnumId), nameof(CkEnumDto.UseFlags), nameof(CkEnumDto.IsExtensible),
-                nameof(CkEnumDto.Values), nameof(CkEnumDto.Description), nameof(CkEnumDto.Visibility)],
+                nameof(CkEnumDto.Values), nameof(CkEnumDto.Description), nameof(CkEnumDto.Visibility)
+            ],
             [typeof(CkEnumValueDto)] =
             [
                 nameof(CkEnumValueDto.Key), nameof(CkEnumValueDto.Name), nameof(CkEnumValueDto.Description),
@@ -72,12 +67,16 @@ public class CkModelDiffService : ICkModelDiffService
             [typeof(CkRecordDto)] =
             [
                 nameof(CkRecordDto.RecordId), nameof(CkRecordDto.DerivedFromCkRecordId), nameof(CkRecordDto.IsFinal),
-                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description), nameof(CkRecordDto.RecordKey), nameof(CkRecordDto.Visibility), nameof(CkRecordDto.Derivable)],
+                nameof(CkRecordDto.IsAbstract), nameof(CkRecordDto.Description), nameof(CkRecordDto.RecordKey),
+                nameof(CkRecordDto.Visibility), nameof(CkRecordDto.Derivable)
+            ],
             [typeof(CkAssociationRoleDto)] =
             [
                 nameof(CkAssociationRoleDto.AssociationRoleId), nameof(CkAssociationRoleDto.InboundName),
                 nameof(CkAssociationRoleDto.OutboundName), nameof(CkAssociationRoleDto.InboundMultiplicity),
-                nameof(CkAssociationRoleDto.OutboundMultiplicity), nameof(CkAssociationRoleDto.Description), nameof(CkAssociationRoleDto.Visibility)],
+                nameof(CkAssociationRoleDto.OutboundMultiplicity), nameof(CkAssociationRoleDto.Description),
+                nameof(CkAssociationRoleDto.Visibility)
+            ],
             [typeof(CkTypeAttributeDto)] =
             [
                 nameof(CkTypeAttributeDto.CkAttributeId), nameof(CkTypeAttributeDto.AttributeName),
@@ -91,7 +90,8 @@ public class CkModelDiffService : ICkModelDiffService
             ],
             [typeof(CkTypeIndexDto)] = [nameof(CkTypeIndexDto.IndexType), nameof(CkTypeIndexDto.Language), nameof(CkTypeIndexDto.Fields)],
             [typeof(CkIndexFieldsDto)] = [nameof(CkIndexFieldsDto.Weight), nameof(CkIndexFieldsDto.AttributePaths)],
-            [typeof(CkAttributeMetaDataDto)] = [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)],
+            [typeof(CkAttributeMetaDataDto)] =
+                [nameof(CkAttributeMetaDataDto.Key), nameof(CkAttributeMetaDataDto.Value), nameof(CkAttributeMetaDataDto.Description)],
             // CK v2 (AB#5667 / AB#5669)
             [typeof(CkInterfaceDto)] =
             [
@@ -115,7 +115,8 @@ public class CkModelDiffService : ICkModelDiffService
             [
                 nameof(CkMethodDto.MethodId), nameof(CkMethodDto.Kind), nameof(CkMethodDto.Description),
                 nameof(CkMethodDto.Parameters), nameof(CkMethodDto.Result), nameof(CkMethodDto.Errors),
-                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution), nameof(CkMethodDto.Visibility)],
+                nameof(CkMethodDto.Authorization), nameof(CkMethodDto.Execution), nameof(CkMethodDto.Visibility)
+            ],
             [typeof(CkMethodParameterDto)] =
             [
                 nameof(CkMethodParameterDto.Name), nameof(CkMethodParameterDto.ValueType),
@@ -136,6 +137,105 @@ public class CkModelDiffService : ICkModelDiffService
             ],
             [typeof(CkMethodExecutionDto)] = [nameof(CkMethodExecutionDto.TimeoutSeconds), nameof(CkMethodExecutionDto.Idempotent)]
         };
+
+    /// <summary>
+    ///     DTO properties the diff consciously does not compare, per DTO type, each with the written reason
+    ///     (AB#6272: an exclusion is a decision, not a code comment). The classification guard test fails for an
+    ///     exclusion without a reason and for a property that is both compared and excluded.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<Type, IReadOnlyDictionary<string, string>> ExcludedProperties =
+        new Dictionary<Type, IReadOnlyDictionary<string, string>>
+        {
+            [typeof(CkCompiledModelRoot)] = new Dictionary<string, string>
+            {
+                [nameof(CkCompiledModelRoot.SchemaUri)] = "serialization constant, identical for every compiled model",
+                [nameof(CkCompiledModelRoot.Migrations)] =
+                    "migrations always accompany a version bump by design; ValidateVersion reconciles them separately " +
+                    "(migration check, OCTO-CK104)",
+                [nameof(CkCompiledModelRoot.DependencyRanges)] =
+                    "CK v2 range retention (AB#5664): the range/floor classification is F2.1 AB#6271 (known gap); " +
+                    "Dependencies keeps the exact closure and is still diffed",
+                [nameof(CkCompiledModelRoot.IsRangeRetaining)] =
+                    "computed from DependencyRanges (DependencyRanges != null); classified with it in F2.1 AB#6271 (known gap)",
+                [nameof(CkCompiledModelRoot.MinEngineVersion)] =
+                    "derived by the compiler from ckLanguage, range retention and the dependencies' minEngineVersion " +
+                    "(F1.1-S6); its causes are diffed"
+            },
+            [typeof(CkModelPropertiesDto)] = new Dictionary<string, string>
+            {
+                [nameof(CkModelPropertiesDto.ModelId)] =
+                    "the model identity: the name is equal by construction and the version is what ValidateVersion " +
+                    "checks against the diff",
+                [nameof(CkModelPropertiesDto.EffectiveCkLanguage)] =
+                    "computed view of CkLanguage (not serialized); the diff compares ckLanguage on this effective value"
+            }
+        };
+
+    /// <summary>
+    ///     Registry of all DTO properties this diff accounts for: the union of <see cref="ComparedProperties" />
+    ///     and <see cref="ExcludedProperties" />. Kept for consumers of the Phase 1 registry.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<Type, IReadOnlyCollection<string>> AccountedProperties =
+        ComparedProperties.Keys.Union(ExcludedProperties.Keys).ToDictionary(type => type,
+            type => (IReadOnlyCollection<string>)(ComparedProperties.TryGetValue(type, out var compared) ? compared : [])
+                .Concat(ExcludedProperties.TryGetValue(type, out var excluded) ? excluded.Keys : [])
+                .ToList());
+
+    /// <summary>
+    ///     Every change shape this diff can emit (AB#6272). The classification guard test classifies one
+    ///     synthetic change per shape and fails when it reaches the classifier's defensive default, and its probes
+    ///     fail when the diff emits a shape that is missing here. Extend this list together with the diff.
+    /// </summary>
+    public static readonly IReadOnlyList<CkModelChangeShape> EmittableChanges = BuildEmittableChanges();
+
+    private static List<CkModelChangeShape> BuildEmittableChanges()
+    {
+        var shapes = new List<CkModelChangeShape>();
+
+        void Element(CkModelElementKind kind, params string[] modifiedProperties)
+        {
+            shapes.Add(new CkModelChangeShape(kind, CkModelChangeKind.Added));
+            shapes.Add(new CkModelChangeShape(kind, CkModelChangeKind.Removed));
+            Modified(kind, modifiedProperties);
+        }
+
+        void Modified(CkModelElementKind kind, params string[] properties) =>
+            shapes.AddRange(properties.Select(p => new CkModelChangeShape(kind, CkModelChangeKind.Modified, p)));
+
+        Modified(CkModelElementKind.Model, "description", "ckLanguage");
+        Element(CkModelElementKind.Dependency, "version");
+        Element(CkModelElementKind.Type, "derivedFromCkTypeId", "isFinal", "isAbstract", "isCollectionRoot",
+            "enableChangeStreamPreAndPostImages", "description", "displayNameRule", "displayDescriptionRule",
+            "ownerAttributePath", "visibility", "derivable");
+        foreach (var assignmentKind in new[]
+                 {
+                     CkModelElementKind.TypeAttribute, CkModelElementKind.RecordAttribute,
+                     CkModelElementKind.AssociationRoleAttribute
+                 })
+        {
+            Element(assignmentKind, "id", "isOptional", "autoCompleteValues", "autoIncrementReference", "ownership",
+                "access");
+        }
+
+        Element(CkModelElementKind.TypeAssociation, "targetCkAttributeIds", "targetCkInterfaceId");
+        Element(CkModelElementKind.TypeIndex);
+        Element(CkModelElementKind.TypeInterface);
+        Element(CkModelElementKind.TypeMethod, "description", "signature", "documentation", "visibility");
+        Element(CkModelElementKind.Attribute, "valueType", "valueCkRecordId", "valueCkEnumId", "defaultValues",
+            "isRuntimeState", "ownership", "metaData", "description", "visibility");
+        Element(CkModelElementKind.Enum, "useFlags", "isExtensible", "description", "visibility");
+        Element(CkModelElementKind.EnumValue, "key", "isExtension", "description");
+        Element(CkModelElementKind.Record, "derivedFromCkRecordId", "isFinal", "isAbstract", "recordKey", "description",
+            "visibility", "derivable");
+        Element(CkModelElementKind.AssociationRole, "inboundName", "outboundName", "inboundMultiplicity",
+            "outboundMultiplicity", "description", "visibility");
+        Element(CkModelElementKind.Interface, "description", "deprecated", "visibility");
+        Element(CkModelElementKind.InterfaceAttribute, "id", "isOptional");
+        Element(CkModelElementKind.InterfaceExtends);
+        Element(CkModelElementKind.InterfaceAssociation, "multiplicity", "isOptional");
+        Element(CkModelElementKind.InterfaceMethod, "description", "signature", "documentation", "visibility");
+        return shapes;
+    }
 
     /// <inheritdoc />
     public IReadOnlyList<CkModelChange> Diff(CkCompiledModelRoot baseline, CkCompiledModelRoot current)

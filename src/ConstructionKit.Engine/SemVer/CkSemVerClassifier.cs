@@ -11,6 +11,20 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 /// </summary>
 public class CkSemVerClassifier : ICkSemVerClassifier
 {
+    /// <summary>
+    ///     Start of the reason of every defensive default ("no classification rule for this change / dependency
+    ///     change / attribute assignment change"). The classification guard test (AB#6272) uses it to detect a
+    ///     change that has no explicit rule.
+    /// </summary>
+    internal const string DefensiveDefaultReasonPrefix = "no classification rule for this ";
+
+    /// <summary>
+    ///     True when <paramref name="classifiedChange" /> was classified by a defensive default, i.e. no explicit
+    ///     rule matched it (AB#6272).
+    /// </summary>
+    internal static bool IsDefensiveDefault(CkClassifiedModelChange classifiedChange) =>
+        classifiedChange.Reason.StartsWith(DefensiveDefaultReasonPrefix, StringComparison.Ordinal);
+
     /// <inheritdoc />
     public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
         CkCompiledModelRoot baseline, CkCompiledModelRoot current)
@@ -232,7 +246,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // ── Defensive default ───────────────────────────────────────────────────────────
             // Changes without an explicit rule are classified as major: only a minimum level is
             // enforced, so an overly strict classification is never wrong — an overly lax one is.
-            _ => (CkSemVerLevel.Major, "no classification rule for this change — defensively classified as major")
+            _ => (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "change — defensively classified as major")
         };
 
         return new CkClassifiedModelChange { Change = change, Level = result.Item1, Reason = result.Item2 };
@@ -253,7 +267,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                     ? (CkSemVerLevel.Major, "dependency switched to a new major version — transitively breaking")
                     : (CkSemVerLevel.Minor, "compatible dependency version change");
             default:
-                return (CkSemVerLevel.Major, "no classification rule for this dependency change — defensively classified as major");
+                return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "dependency change — defensively classified as major");
         }
     }
 
@@ -314,7 +328,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                     "access/security: GraphQL exposure of this attribute changes — review generic API clients");
 
             default:
-                return (CkSemVerLevel.Major, "no classification rule for this attribute assignment change — defensively classified as major");
+                return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "attribute assignment change — defensively classified as major");
         }
     }
 

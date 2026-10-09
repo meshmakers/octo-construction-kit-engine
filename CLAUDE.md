@@ -936,6 +936,11 @@ changed Major and cleared Minor).
 
 ### Touch-point checklist (keep for every new CK field — contract §2.7)
 
+**Mandatory persistence gate:** every new meta-model field must pass the generic reflection round-trip gate in
+`octo-construction-kit-engine-mongodb` — `CkModelReflectionComparer` (F1.3-S3, H-M2 `c3a4911`) compares every
+public property of the compiled model after import → Mongo → read-back, so a field that is not written or not read
+back (the isRuntimeState class of bug, AB#4589) fails there. Row 10 below is not done until that gate is green.
+
 | # | Touch point | `ckLanguage` | `interfaces` | `implements` | `access` | `methods` | `visibility` / `derivable` | interface completion (S5) |
 | - | ----------- | ------------ | ------------ | ------------ | -------- | --------- | -------------------------- | ------------------------- |
 | 1 | Source schema | meta (enum 1/2) | interface schema + elements root | `CkType` | `CkTypeAttribute` | method schema + `CkType` | type, record, enum, attribute, association-role, interface, method schemas | interface schema (`extends`, `associations`, `methods`, `deprecated`), type schema `targetCkInterfaceId` |
@@ -947,7 +952,7 @@ changed Major and cleared Minor).
 | 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `abstract`/`sealed` (v2) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
-| 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
+| 10 | Mongo entity + write + read-back (gate: `CkModelReflectionComparer`, mandatory) | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |
 | 12 | Studio CK browser query | `getCkTypeDetails.graphql` in refinery-studio (F1.5-S5, AB#5927) — add every new field there when it should be visible | same | same | same | same | same | same |
 

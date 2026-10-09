@@ -835,7 +835,9 @@ Notes:
 - F1.2-S3 visibility/derivable enforcement runs in `ReferenceResolver`, which compile **and** every import
   (`CatalogModelResolver` / `RepositoryModelResolver.HardResolveAsync`) execute, so a forged or old-compiler model
   is refused on import (pinned by `CkV2VisibilityCompileTests.ForgedBase_IsRefusedWhenTheDependentIsResolved`).
-  It runs over the whole graph, so an installed dependent of a base that became internal fails to resolve with 112.
+  The importing model is refused. **Known limitation (review G3 D-M1):** the re-validation of already installed
+  dependents (`RepositoryModelResolver.SoftResolveAsync`) only collects inheritance failures, so a dependent of a
+  base that became `internal` / `derivable: Model` stays `Available` until it is itself re-imported.
 - F1.2-S2 Hidden parity (review N5/N6/M12): index and derived-rule paths are resolved **case-insensitively**
   (`InheritanceResolver.WalkAttributePath`; `passwordHash` reaches `PasswordHash`, as in Mongo). **Hidden on archived
   types (M12)** cannot be a compile rule: archives are runtime entities (`System.StreamData` `Archive` with
@@ -851,7 +853,7 @@ Notes:
   query paths (asset-repo) refuse columns for which `ArchiveHiddenColumnGuard.FindHiddenAttribute` returns a value.
   It needs the optional `ICkCacheService` constructor argument — the mongodb
   `TenantContext` must pass it; without it the check is skipped. **Models imported before F1.2-S2** that violate
-  106–109 now fail on repository load (cache rebuild) — only dev tenants from the CK v2 spike can have such models.
+  106–109 now fail on repository load (cache rebuild) — only dev tenants that imported pre-release CK v2 models can have such models.
 - F1.1-S5 resolution: `InheritanceResolver.ResolveInterfaceHierarchy` computes `AllExtendedInterfaces` depth first
   (unknown entries and cycles are skipped there and reported as 118 by the compiler rules), and implementing an interface implements every
   interface it extends (`CkTypeGraph.AllImplementedInterfaces`, `ImplementingTypes`). The "exactly one target" rule
@@ -866,8 +868,12 @@ Notes:
 - Message codes for CK v2: 90–113 and 118–128 are in use (table below); **spare: 111, 114–117, 129**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
-  Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (log level Warning) and by the
-  `CkCompile` MSBuild task.
+  Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
+  `-v none`, so stdout keeps only the `-cr` file path) and by the `CkCompile` MSBuild task (`Log.LogWarning`; not
+  promoted by `TreatWarningsAsErrors`, which applies to the C# compiler only). Known v1 sources hitting 110:
+  `octo-construction-kit/src/ConstructionKits/Octo.Energy.Demo/ConstructionKit/types/UkDale*.yaml` (top-level
+  `attributes:` in `types/` — were silently ignored before); that project is not in `Octo.ConstructionKit.sln` nor in
+  any pipeline, so no build breaks.
   `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
   `MessageCodesSyncTests` fails when the two tables differ in key, number, level or text, or a number repeats.
 

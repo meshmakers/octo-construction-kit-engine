@@ -14,7 +14,9 @@ public static class CkEngineVersion
     ///     The lowest engine version that reads <c>ckLanguage: 2</c> and range-retaining models. Deterministic (not
     ///     the compiling engine's own version) so compile output does not depend on the build configuration. Engines
     ///     before CK v2 ignore the key and are kept away from such models by the <c>ck-models/v3/</c> catalog path;
-    ///     raise this value when a later engine adds model features that this engine line cannot read.
+    ///     raise this value when a later engine adds model features that this engine line cannot read. 3.4.0 is at or
+    ///     below every engine of the current lib line (3.4.x); once the first lib-train release containing CK v2 is
+    ///     known it may be raised to that version, which also stops older 3.4.x engines that read <c>v3/</c> by hand.
     /// </summary>
     public const string CkV2MinEngineVersion = "3.4.0";
 

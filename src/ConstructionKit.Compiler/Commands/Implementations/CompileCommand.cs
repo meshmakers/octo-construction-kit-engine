@@ -107,13 +107,15 @@ internal class CompileCommand : CkcCommand
 
         try
         {
-            // CK v2 (Phase 1): warnings (e.g. 124 deprecated interface) of a successful compile are printed, too;
+            // CK v2: warnings (e.g. 110, 124) of a successful compile are printed, too;
             // the overload without an OperationResult discarded them.
             var operationResult = new OperationResult();
             var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath, operationResult);
+            // Review G3 E-L5: to stderr, independent of the log verbosity — stdout carries the compiled file path
+            // (-cr), which MSBuild captures into @(CompiledModelFiles).
             foreach (var warning in operationResult.Messages.Where(m => m.MessageLevel == MessageLevel.Warning))
             {
-                Logger.LogWarning("{Message}", warning.ToString());
+                await Console.Error.WriteLineAsync($"warning: {warning}");
             }
 
             if (writeCompileResult)

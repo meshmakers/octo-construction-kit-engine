@@ -60,6 +60,14 @@ public interface IArchiveLifecycleService
     Task DeleteAsync(OctoObjectId archiveRtId);
 
     /// <summary>
+    ///     CK v2 (review G3 E-M2): re-checks an archive against attribute access after a CK model change. When an
+    ///     ingested column now reaches a Hidden attribute (directly or through a record), an activated archive is set
+    ///     to <see cref="CkArchiveStatus.Failed" /> so it stops ingesting; returns <c>false</c>. Call it for the
+    ///     archives of a tenant after a CK model import. Without a CK cache the check is skipped (<c>true</c>).
+    /// </summary>
+    Task<bool> RevalidateAccessAsync(OctoObjectId archiveRtId);
+
+    /// <summary>
     /// Adds a computed column to an <c>Activated</c> raw or time-range archive and backfills it
     /// (AB#4189 Phase 7, §8). Validates the prospective column set, persists the column
     /// <c>Pending</c>, adds the physical column, backfills the existing rows while the column stays

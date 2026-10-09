@@ -32,11 +32,15 @@ public class ArchiveHiddenColumnGuardTests
         var reading = new CkRecordGraph(new CkId<CkRecordId>($"{ModelId}/Reading"), false, false, [], null, [], [],
             new[] { Attr("Value"), Attr("Calibration", CkAttributeAccessDto.Hidden) }.ToDictionary(a => a.CkAttributeId),
             "Reading");
+        var wrapper = new CkRecordGraph(new CkId<CkRecordId>($"{ModelId}/Wrapper"), false, false, [], null, [], [],
+            new[] { Attr("Label"), Attr("Inner", recordId: reading.CkRecordId) }.ToDictionary(a => a.CkAttributeId),
+            "Wrapper");
+        A.CallTo(() => _cache.GetRtCkRecord(TenantId, wrapper.CkRecordId.ToRtCkId())).Returns(wrapper);
         var sensor = new CkTypeGraph(new CkId<CkTypeId>($"{ModelId}/Sensor"), false, false, true, [], null, null, [], [],
             new[]
             {
                 Attr("Temperature"), Attr("Secret", CkAttributeAccessDto.Hidden), Attr("Status", CkAttributeAccessDto.ReadOnly),
-                Attr("Reading", recordId: reading.CkRecordId)
+                Attr("Reading", recordId: reading.CkRecordId), Attr("Wrapper", recordId: wrapper.CkRecordId)
             }.ToDictionary(a => a.CkAttributeId), [], new CkGraphDirectedAssociations([]), "Sensor", false);
         _sensor = sensor.CkTypeId.ToRtCkId();
         A.CallTo(() => _cache.GetRtCkType(TenantId, _sensor)).Returns(sensor);
@@ -71,6 +75,8 @@ public class ArchiveHiddenColumnGuardTests
     [InlineData("secret")] // case-insensitive, like the attribute resolution of the data store
     [InlineData("Reading.Calibration")]
     [InlineData("reading[*].calibration")]
+    [InlineData("Reading")] // review G3 E-M2: a whole-record column stores the Hidden sub-attribute
+    [InlineData("Wrapper")] // ...also transitively through a nested record
     public async Task ColumnReachingAHiddenAttribute_IsRefused(string path)
     {
         Stub(CkArchiveStatus.Created, "Temperature", path);
@@ -117,5 +123,33 @@ public class ArchiveHiddenColumnGuardTests
         await Sut(withCache: false).ActivateAsync(Rt);
 
         A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Activated)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Revalidation_FailsAnActiveArchiveThatNowReachesHidden()
+    {
+        Stub(CkArchiveStatus.Activated, "Temperature", "Reading");
+
+        Assert.False(await Sut().RevalidateAccessAsync(Rt));
+
+        A.CallTo(() => _store.SetStatusAsync(Rt, CkArchiveStatus.Failed)).MustHaveHappenedOnceExactly();
+    }
+
+    [Fact]
+    public async Task Revalidation_KeepsAVisibleArchive()
+    {
+        Stub(CkArchiveStatus.Activated, "Temperature", "Reading.Value");
+
+        Assert.True(await Sut().RevalidateAccessAsync(Rt));
+
+        A.CallTo(() => _store.SetStatusAsync(A<OctoObjectId>._, A<CkArchiveStatus>._)).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Guard_NamesTheHiddenSubAttribute()
+    {
+        Assert.Equal("Wrapper.Inner.Calibration",
+            ArchiveHiddenColumnGuard.FindHiddenAttribute(_cache, TenantId, _sensor, "wrapper"));
+        Assert.Null(ArchiveHiddenColumnGuard.FindHiddenAttribute(_cache, TenantId, _sensor, "Wrapper.Label"));
     }
 }

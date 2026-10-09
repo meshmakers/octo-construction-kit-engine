@@ -129,58 +129,41 @@ public sealed class ArchiveLifecycleService : IArchiveLifecycleService
     /// </summary>
     private void EnsureNoHiddenColumns(ArchiveSnapshot snapshot)
     {
-        if (_ckCacheService == null || snapshot.RollupAggregations is not null)
+        if (_ckCacheService == null)
         {
             return;
         }
 
-        CkTypeWithAttributesGraph scope;
-        try
+        if (ArchiveHiddenColumnGuard.FindHiddenColumn(_ckCacheService, _tenantId, snapshot) is { } hidden)
         {
-            scope = _ckCacheService.GetRtCkType(_tenantId, snapshot.TargetCkTypeId);
+            throw new HiddenAttributeInArchiveException(snapshot.RtId, snapshot.TargetCkTypeId, hidden.Path,
+                hidden.Attribute);
         }
-        catch (Exception e) when (e is not OutOfMemoryException)
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> RevalidateAccessAsync(OctoObjectId archiveRtId)
+    {
+        if (_ckCacheService == null)
         {
-            return; // an unknown target type is reported by provisioning
+            return true;
         }
 
-        foreach (var column in snapshot.Columns.Where(c => !c.IsComputed && !string.IsNullOrWhiteSpace(c.Path)))
+        var snapshot = await LoadAsync(archiveRtId);
+        if (ArchiveHiddenColumnGuard.FindHiddenColumn(_ckCacheService, _tenantId, snapshot) is not { } hidden)
         {
-            CkTypeWithAttributesGraph? current = scope;
-            foreach (var segment in column.Path.Split('.').Select(s => s.Replace("[*]", "")))
-            {
-                if (current == null)
-                {
-                    break;
-                }
-
-                var attribute = current.AllAttributesByName
-                    .FirstOrDefault(a => string.Equals(a.Key, segment, StringComparison.OrdinalIgnoreCase)).Value;
-                if (attribute == null)
-                {
-                    break;
-                }
-
-                if (attribute.Access == CkAttributeAccessDto.Hidden)
-                {
-                    throw new HiddenAttributeInArchiveException(snapshot.RtId, snapshot.TargetCkTypeId, column.Path,
-                        attribute.AttributeName);
-                }
-
-                current = null;
-                if (attribute.ValueCkRecordId != null)
-                {
-                    try
-                    {
-                        current = _ckCacheService.GetRtCkRecord(_tenantId, attribute.ValueCkRecordId.ToRtCkId());
-                    }
-                    catch (Exception e) when (e is not OutOfMemoryException)
-                    {
-                        current = null;
-                    }
-                }
-            }
+            return true;
         }
+
+        _logger.LogWarning(
+            "Archive {ArchiveRtId} captures column {ColumnPath}, which now reaches the Hidden attribute {Attribute}; " +
+            "the archive is set to Failed and stops ingesting", archiveRtId, hidden.Path, hidden.Attribute);
+        if (snapshot.Status == CkArchiveStatus.Activated)
+        {
+            await TransitionAsync(snapshot, CkArchiveStatus.Failed);
+        }
+
+        return false;
     }
 
     /// <inheritdoc />

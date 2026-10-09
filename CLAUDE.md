@@ -833,9 +833,17 @@ Notes:
 - F1.2-S2 Hidden parity (review N5/N6/M12): index and derived-rule paths are resolved **case-insensitively**
   (`InheritanceResolver.WalkAttributePath`; `passwordHash` reaches `PasswordHash`, as in Mongo). **Hidden on archived
   types (M12)** cannot be a compile rule: archives are runtime entities (`System.StreamData` `Archive` with
-  `TargetCkTypeId` + column paths), so `ArchiveLifecycleService` refuses activation, retry and re-provisioning when an
-  ingested column path reaches a Hidden attribute (`HiddenAttributeInArchiveException`, case-insensitive, `[*]`
-  ignored, rollup columns skipped). It needs the optional `ICkCacheService` constructor argument — the mongodb
+  `TargetCkTypeId` + column paths). The rule — **no archive column may reach a Hidden attribute** — is implemented by
+  `ArchiveHiddenColumnGuard` (Runtime.Engine): a path reaches Hidden when a segment is Hidden **or when it ends at a
+  record / record array whose record, transitively, contains a Hidden sub-attribute** (a whole-record column stores
+  it; review G3 E-M2). Case-insensitive, `[*]` ignored, rollup and computed columns skipped. `ArchiveLifecycleService`
+  applies it on activation, retry and re-provisioning (`HiddenAttributeInArchiveException`), and
+  `RevalidateAccessAsync(archiveRtId)` sets an **active** archive to `Failed` (stops ingesting) when a model change
+  made one of its columns reach Hidden. **Wiring owed by the consumers:** the mongodb `TenantContext` passes the CK
+  cache, calls `RevalidateAccessAsync` for the tenant's archives after a CK model import, and the ingest/column
+  builder (`ArchivePathTypeResolver.BuildRecordObject`) skips Hidden sub-attributes like Secret ones; the stream-data
+  query paths (asset-repo) refuse columns for which `ArchiveHiddenColumnGuard.FindHiddenAttribute` returns a value.
+  It needs the optional `ICkCacheService` constructor argument — the mongodb
   `TenantContext` must pass it; without it the check is skipped. **Models imported before F1.2-S2** that violate
   106–109 now fail on repository load (cache rebuild) — only dev tenants from the CK v2 spike can have such models.
 - F1.1-S5 resolution: `InheritanceResolver.ResolveInterfaceHierarchy` computes `AllExtendedInterfaces` depth first

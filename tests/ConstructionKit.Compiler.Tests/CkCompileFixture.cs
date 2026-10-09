@@ -32,6 +32,9 @@ internal sealed class CkCompileFixture : IDisposable
         });
         services.Configure<PublicGitHubCatalogOptions>(options => options.IsEnabled = false);
         services.Configure<PrivateGitHubCatalogOptions>(options => options.IsEnabled = false);
+        // Review G3 E-L6: pin the flag — CkCompilerOptions.RangeRetention defaults from the OctoCkRangeRetention
+        // environment variable, which must not change what the v1 tests (incl. the golden test) compile.
+        services.Configure<CkCompilerOptions>(o => o.RangeRetention = false);
         configure?.Invoke(services);
         _serviceProvider = services.BuildServiceProvider();
     }

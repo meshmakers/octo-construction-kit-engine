@@ -67,7 +67,9 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
 
         if (compileCandidate.DependencyRanges != null)
         {
-            resolvedModelIds = await _catalogDependencyResolver.HardResolveDependenciesAsync(compileCandidate.DependencyRanges,
+            resolvedModelIds = await _catalogDependencyResolver.HardResolveDependenciesAsync(
+                    RangeRetainingDependencyRanges.For(compileCandidate.DependencyRanges,
+                        _compilerOptions.Value.RangeRetention),
                     modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
@@ -121,7 +123,7 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
         if (dependencyRanges.Count > 0)
         {
             await _catalogDependencyResolver.HardResolveDependenciesAsync(
-                    dependencyRanges.ToList(), modelGraph,
+                    RangeRetainingDependencyRanges.For(dependencyRanges, compiledModel.IsRangeRetaining), modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);

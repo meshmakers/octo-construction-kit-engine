@@ -103,6 +103,7 @@ internal class CatalogDependencyResolver(
             ..ckRootDependencies.Select(range =>
                 Tuple.Create(new List<CkModelId>(), range))
         ];
+        var rangeMatcher = new DependencyRangeMatcher(ckRootDependencies, dependencies);
         // List of already resolved dependencies to avoid circular references
         List<CkModelId> resolvedDependencies = [];
 
@@ -203,21 +204,9 @@ internal class CatalogDependencyResolver(
             // AB#5665: range-retaining models contribute their range + floor, classic models their exact pins.
             foreach (var childDependencyRange in ckDependencyRootModel.GetResolutionRanges())
             {
-                // Structural match (name + identical range), not CkModelIdVersionRange.Equals: that one is
-                // "overlaps" and not transitive — with range retention System-[2.5,3.0) overlaps both the
-                // exact pins System-[2.5.0] and System-[2.6.0], which made SingleOrDefault throw (D2).
-                var childDependencyOrigins = dependencies
-                    .FirstOrDefault(d => IsSameRange(d.Item2, childDependencyRange))?.Item1;
-                if (childDependencyOrigins == null)
-                {
-                    dependencies.Add(
-                        new Tuple<List<CkModelId>, CkModelIdVersionRange>([ckDependencyRootModel.ModelId],
-                            childDependencyRange));
-                }
-                else
-                {
-                    childDependencyOrigins.Add(ckDependencyRootModel.ModelId);
-                }
+                // Review G3 E-H1: classic children merge by overlap as on main; range-retaining ones structurally (D2).
+                rangeMatcher.Add(dependencies, ckDependencyRootModel.ModelId, childDependencyRange,
+                    ckDependencyRootModel.IsRangeRetaining);
             }
 
             ckResolvedModels.Add(ckDependencyRootModel);
@@ -296,10 +285,5 @@ internal class CatalogDependencyResolver(
             SkippedModelIds = skippedDependencies.AsReadOnly(),
             UnresolvedDependencyModelIds = unresolvedDependencies.AsReadOnly()
         };
-    }
-
-    private static bool IsSameRange(CkModelIdVersionRange a, CkModelIdVersionRange b)
-    {
-        return a.Name == b.Name && a.ModelVersionRange.Equals(b.ModelVersionRange);
     }
 }

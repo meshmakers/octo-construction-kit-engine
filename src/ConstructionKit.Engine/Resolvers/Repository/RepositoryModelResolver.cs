@@ -104,7 +104,7 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
         if (dependencyRanges.Count > 0)
         {
             dependencyResolveResult = await _repositoryDependencyResolver.SoftResolveDependenciesAsync(
-                    dependencyRanges.ToList(), modelGraph,
+                    RangeRetainingDependencyRanges.For(dependencyRanges, compiledModel.IsRangeRetaining), modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);
@@ -132,7 +132,7 @@ internal class RepositoryModelResolver : ModelResolver, IRepositoryModelResolver
         if (dependencyRanges.Count > 0)
         {
             await _repositoryDependencyResolver.HardResolveDependenciesAsync(
-                    dependencyRanges.ToList(), modelGraph,
+                    RangeRetainingDependencyRanges.For(dependencyRanges, compiledModel.IsRangeRetaining), modelGraph,
                     _variableResolver,
                     originFileResolver, operationResult, sourceIdentifier)
                 .ConfigureAwait(false);

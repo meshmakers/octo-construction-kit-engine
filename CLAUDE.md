@@ -770,8 +770,13 @@ generator reports `OM1004 Unbound major-qualified CK reference` naming the refer
 instead of the opaque `OM1003 … not found in CkCache`. Pinned by `UnboundReference_IsReportedWithReferenceAndCacheContent`.
 
 **Range identity in the resolvers (D2).** `CkModelIdVersionRange.Equals` means *overlaps* (not transitive,
-inconsistent with `GetHashCode`). The dependency resolvers therefore match queued ranges structurally
-(`IsSameRange`: same name, identical `CkVersionRange`). With range retention `System-[2.5,3.0)` overlaps
+inconsistent with `GetHashCode`). `DependencyRangeMatcher` therefore matches structurally (same name, identical
+`CkVersionRange`) whenever range retention is involved — a child range of a range-retaining dependency, or the root
+ranges of a range-retaining root (`RangeRetainingDependencyRanges`: compile with the flag on, hard resolve of a
+range-retaining compiled model). **Classic children of a classic root keep main's overlap merge** (review G3 E-H1):
+with the flag off a v1 compile behaves exactly like main (`V1DependencyMergeTests`, verified against main 0db1c50 —
+a library pinned to System-2.5.0 next to System 2.6.0 fails with "unknown base type", as on main, not with
+error 66). With range retention `System-[2.5,3.0)` overlaps
 both exact pins `System-[2.5.0]` and `System-[2.6.0]`; the overlap lookup threw "Sequence contains more than
 one matching element" when a System minor was imported into a tenant holding exact-pinned and
 range-retaining models (or silently merged the range into the wrong exact entry). Pinned by

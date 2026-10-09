@@ -146,6 +146,9 @@ stages:
           # until released.
           - template: templates/steps/validate-ck-versions.yml@pipelineTemplates
             parameters:
+              # r3.5.0 line bootstrap (AB#5803): the first build of a new release line cannot resolve
+              # an octo-ckc 3.5.* (this very build produces it). Pin the newest main-built tool.
+              toolVersion: '0.1.2610.8019'
               constructionKitPaths:
                 - 'src/SystemCkModel/ConstructionKit'
                 - 'src/StreamDataCkModel/ConstructionKit'

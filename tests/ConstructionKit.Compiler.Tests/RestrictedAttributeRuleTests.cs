@@ -146,4 +146,43 @@ public sealed class RestrictedAttributeRuleTests : IDisposable
         Assert.Contains("108", description);
         Assert.Null(await CompileAsync("", secretAccess: "", extraFiles: Role("ReadOnly")));
     }
+
+    // ── Review G3 E-M1: sibling types share the collection's document shape ────────────────────────────────
+
+    [Theory]
+    [InlineData("Text", "105")]
+    [InlineData("Ascending", "106")]
+    public async Task IndexOnASibling_ReachingAHiddenAssignment_IsRejected(string indexType, string code)
+    {
+        await _fixture.CompileAndPublishAsync(_fixture.WriteSystemModel("2.5.0"));
+        var index = indexType == "Text"
+            ? "    indexes:\n      - indexType: Text\n        language: en\n        fields:\n          - weight: 1\n            attributePaths:\n              - Code\n"
+            : "    indexes:\n      - indexType: Ascending\n        fields:\n          - attributePaths:\n              - Code\n";
+        var source = _fixture.WriteSource($"sib-{Guid.NewGuid():N}", "Siblings-1.0.0", ["System-[2.5,3.0)"],
+            new Dictionary<string, string>
+            {
+                ["attributes/a.yaml"] = "attributes:\n  - id: Code\n    valueType: String\n",
+                ["types/t.yaml"] =
+                    "types:\n  - typeId: Base\n    derivedFromCkTypeId: ${System}/Entity\n    isAbstract: true\n" +
+                    "    derivable: Any\n" +
+                    "  - typeId: Indexed\n    derivedFromCkTypeId: ${this}/Base\n" + index +
+                    "    attributes:\n      - id: ${this}/Code\n        name: Code\n        isOptional: true\n" +
+                    "  - typeId: Secretive\n    derivedFromCkTypeId: ${this}/Base\n" +
+                    "    attributes:\n      - id: ${this}/Code\n        name: Code\n        isOptional: true\n        access: Hidden\n"
+            }, ckLanguage: 2);
+
+        Exception? exception = null;
+        try
+        {
+            await _fixture.CompileAsync(source);
+        }
+        catch (Exception e)
+        {
+            exception = e;
+        }
+
+        var description = Describe(exception);
+        Assert.Contains(code, description);
+        Assert.Contains("Secretive", description);
+    }
 }

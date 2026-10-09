@@ -694,25 +694,44 @@ internal class InheritanceResolver : IInheritanceResolver
         // ckLanguage 2 model unknown paths are rejected instead of silently skipped.
         var rejectUnknownPaths = modelGraph.Models.TryGetValue(ckTypeId.ModelId, out var modelProperties) &&
                                  modelProperties.EffectiveCkLanguage >= 2;
+        // Review G3 E-M1: all types of a collection share one document shape (attributes.<name>), and a collection
+        // root carries the text indexes merged from its derived types — so an index path is checked against the type
+        // itself AND every derived type: a sibling that assigns the attribute as Hidden would otherwise have its
+        // values indexed (text search as a word oracle, unique index as an existence oracle).
+        // Scopes for the Hidden check: the type, its derived types and every other type stored in the same collection
+        // (the defining collection root and all its derived types — siblings included).
+        CkTypeGraph? Lookup(CkId<CkTypeId> id) => modelGraph.Types.TryGetValue(id, out var graph) ? graph : null;
+        var ownScopes = new List<CkTypeGraph> { typeGraph };
+        ownScopes.AddRange(typeGraph.GetAllDerivedTypes(false).Select(Lookup).Where(d => d != null).Select(d => d!));
+        var collectionRoot = typeGraph.DefiningCollectionRootCkTypeId is { } rootId ? Lookup(rootId) : null;
+        var scopes = ownScopes.ToList();
+        if (collectionRoot != null)
+        {
+            scopes.AddRange(new[] { collectionRoot }
+                .Concat(collectionRoot.GetAllDerivedTypes(false).Select(Lookup).Where(d => d != null).Select(d => d!))
+                .Where(c => !scopes.Contains(c)));
+        }
         foreach (var index in typeGraph.Indexes)
         {
             foreach (var path in index.Fields.SelectMany(f => f.AttributePaths ?? []))
             {
-                var walk = WalkAttributePath(modelGraph, typeGraph, path, IsHidden);
-                if (walk.Restricted is { } restricted)
+                var walks = scopes.Select(scope => (Scope: scope, Walk: WalkAttributePath(modelGraph, scope, path, IsHidden)))
+                    .ToList();
+                var hidden = walks.FirstOrDefault(w => w.Walk.Restricted != null);
+                if (hidden.Walk.Restricted is { } restricted)
                 {
+                    var name = hidden.Scope == typeGraph
+                        ? restricted.Name
+                        : $"{restricted.Name}' (assigned by '{hidden.Scope.CkTypeId}')";
                     operationResult.AddMessage(index.IndexType == IndexTypeDto.Text
                         ? MessageCodes.RestrictedAttributeInDerivedRule(location, "text index", path, ckTypeId,
-                            restricted.Name, restricted.Access)
-                        : MessageCodes.HiddenAttributeIndexed(location, index.IndexType, ckTypeId, restricted.Name,
-                            path));
+                            name, restricted.Access)
+                        : MessageCodes.HiddenAttributeIndexed(location, index.IndexType, ckTypeId, name, path));
                 }
-                else if (walk.UnknownSegment is { } unknown && rejectUnknownPaths && !IsSystemIndexPath(path) &&
+                else if (walks[0].Walk.UnknownSegment is { } unknown && rejectUnknownPaths && !IsSystemIndexPath(path) &&
                          // A collection root also carries the text/ascending indexes merged from its derived types
-                         // (CkTypeGraph.MergeTextIndexes); such a path is checked at the derived type itself.
-                         !typeGraph.GetAllDerivedTypes(false).Any(d =>
-                             modelGraph.Types.TryGetValue(d, out var derived) &&
-                             WalkAttributePath(modelGraph, derived, path, IsHidden).UnknownSegment == null))
+                         // (CkTypeGraph.MergeTextIndexes); such a path is valid when a derived type resolves it.
+                         walks.Where(w => ownScopes.Contains(w.Scope)).Skip(1).All(w => w.Walk.UnknownSegment != null))
                 {
                     operationResult.AddMessage(MessageCodes.UnknownIndexAttributePath(location, index.IndexType,
                         ckTypeId, path, unknown));

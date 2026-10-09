@@ -6,6 +6,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Engine.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
@@ -419,6 +420,8 @@ public sealed class CkV2CompileTests : IDisposable
     [Fact]
     public async Task Dependency_requiring_a_newer_engine_fails_with_126()
     {
+        // Pin the running engine: DebugL is 999.0.0, CI 0.1.* (check skipped), release builds 3.x (AB#6274).
+        using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));
         await PublishSystemAsync(_fixture);
         var system = await _fixture.CompileAsync(_fixture.WriteSource("system26", "System-2.6.0", null,
             new Dictionary<string, string>
@@ -426,7 +429,7 @@ public sealed class CkV2CompileTests : IDisposable
                 ["attributes/attributes.yaml"] = "attributes:\n  - id: Name\n    valueType: String\n",
                 ["types/entity.yaml"] = "types:\n  - typeId: Entity\n    isAbstract: true\n"
             }));
-        system.MinEngineVersion = "1000.0.0"; // DebugL engines are 999.0.0
+        system.MinEngineVersion = "1000.0.0";
         // The catalog service resolves before it publishes and would refuse the model (126); write it directly.
         await _fixture.Services.GetServices<ICatalog>().OfType<LocalFileSystemCatalog>().Single()
             .PublishAsync(system, force: true);

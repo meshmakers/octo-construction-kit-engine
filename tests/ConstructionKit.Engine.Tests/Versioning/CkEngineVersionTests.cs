@@ -45,7 +45,8 @@ public class CkEngineVersionTests(ITestOutputHelper output) : CkV2ResolverTestBa
     [Fact]
     public void Code126_ModelRequiresANewerEngine()
     {
-        // DebugL engines are 999.0.0.
+        // Pin the running engine: DebugL is 999.0.0, CI 0.1.* (check skipped), release builds 3.x (AB#6274).
+        using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));
         var model = Model();
         model.MinEngineVersion = "1000.0.0";
 

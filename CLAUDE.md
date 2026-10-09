@@ -698,7 +698,11 @@ the current lib line produces (3.4.x); after the first lib-train release that co
 version to also stop older 3.4.x engines that read `v3/` by hand. `ElementResolver` and both dependency resolvers refuse a model above the
 running engine's version with **message 126** (`CkModelRequiresNewerEngine`; a dependency is skipped like a 91).
 The running version is the `ConstructionKit.Engine` assembly version; DebugL is `999.0.0` (accepts everything),
-and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. Raise the constant when a later
+and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. **Tests of message 126 must not
+depend on the ambient assembly version** (DebugL `999.0.0`, CI `0.1.*` = check skipped, r-tag builds `3.x`): pin it
+with the internal test seam `using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));`
+(AsyncLocal, restored on dispose, never set in production; AB#6274), or pass `engineVersion` to `CheckModel`
+directly. Raise the constant when a later
 engine writes features this engine line cannot read. `CatalogService.PublishAsync` resolves before it publishes, so
 it refuses such a model, too.
 

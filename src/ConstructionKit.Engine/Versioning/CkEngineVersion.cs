@@ -22,12 +22,28 @@ public static class CkEngineVersion
 
     private static readonly Version? RunningVersion = ParseVersion(typeof(CkEngineVersion).Assembly.GetName().Version);
 
+    // Test seam (AB#6274): never set outside tests, so production always reads RunningVersion.
+    private static readonly AsyncLocal<Version?> CurrentOverride = new();
+
     /// <summary>
     ///     The version of the running engine (major.minor.patch), or <c>null</c> for a development build whose
     ///     assembly version is below 1.0 (e.g. private-feed builds <c>0.1.*</c>); those skip the check. DebugL builds
     ///     are <c>999.0.0</c> and therefore accept every model.
     /// </summary>
-    public static Version? Current => RunningVersion;
+    public static Version? Current => CurrentOverride.Value ?? RunningVersion;
+
+    /// <summary>
+    ///     Test seam (AB#6274): makes <see cref="Current" /> return <paramref name="engineVersion" /> for the current
+    ///     async flow until the returned scope is disposed, so tests of message 126 behave the same under DebugL
+    ///     (<c>999.0.0</c>), private-feed CI builds (<c>0.1.*</c>, where <see cref="Current" /> is otherwise
+    ///     <c>null</c>) and release builds (<c>3.x</c>). Production code never calls it.
+    /// </summary>
+    internal static IDisposable OverrideCurrentForTests(Version engineVersion)
+    {
+        var previous = CurrentOverride.Value;
+        CurrentOverride.Value = Normalize(engineVersion);
+        return new RestoreScope(() => CurrentOverride.Value = previous);
+    }
 
     /// <summary>
     ///     The <c>minEngineVersion</c> the compiler writes for a model: <see cref="CkV2MinEngineVersion" /> for a
@@ -80,6 +96,11 @@ public static class CkEngineVersion
         operationResult.AddMessage(MessageCodes.CkModelRequiresNewerEngine(location, model.ModelId, minEngineVersion,
             running?.ToString(3) ?? "unknown"));
         return false;
+    }
+
+    private sealed class RestoreScope(Action restore) : IDisposable
+    {
+        public void Dispose() => restore();
     }
 
     private static Version Normalize(Version version) =>

@@ -15,10 +15,11 @@ namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
 ///     Command-level tests for <see cref="ValidateVersionCommand" />: the command is executed
 ///     in-process through the real command parser (arguments injected via a faked
 ///     <see cref="IEnvironmentService" />) against real engine services and a
-///     <c>LocalFileSystemCatalog</c> in a temp directory — no network, no fakes below the
-///     command boundary. Covers the error paths that have no engine-level test surface:
+///     <c>LocalFileSystemCatalog</c> in a temp directory plus an in-memory published catalog
+///     (<see cref="InMemoryPublishedCatalog" />, standing in for the GitHub catalogs) — no network, no fakes
+///     below the command boundary. Covers the error paths that have no engine-level test surface:
 ///     OCTO-CK103, the unknown-catalog refresh failure, migration reconciliation
-///     skip/escalation and the changelog write gating.
+///     skip/escalation, the changelog write gating and (AB#5450) the per-major baseline.
 /// </summary>
 public sealed class ValidateVersionCommandTests : IDisposable
 {
@@ -48,6 +49,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
         });
         services.Configure<PublicGitHubCatalogOptions>(options => options.IsEnabled = false);
         services.Configure<PrivateGitHubCatalogOptions>(options => options.IsEnabled = false);
+        services.AddSingleton<ICatalog, InMemoryPublishedCatalog>();
 
         _environment = A.Fake<IEnvironmentService>();
         services.AddSingleton(_environment);
@@ -95,9 +97,10 @@ public sealed class ValidateVersionCommandTests : IDisposable
     }
 
     /// <summary>
-    ///     Publishes the current source as the baseline into the temp local catalog.
+    ///     Publishes the current source as the baseline into the in-memory published catalog (default) or another
+    ///     catalog, e.g. the temp local catalog to simulate an earlier local build.
     /// </summary>
-    private async Task PublishBaselineAsync()
+    private async Task PublishBaselineAsync(string catalogName = InMemoryPublishedCatalog.Name)
     {
         var operationResult = new OperationResult();
         var compiled = await _serviceProvider.GetRequiredService<ICompilerService>()
@@ -105,7 +108,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
         Assert.False(operationResult.HasErrors);
 
         await _serviceProvider.GetRequiredService<ICatalogService>().PublishAsync(
-            LocalFileSystemCatalog.Name, compiled, new OriginFileResolver(_sourceDir), isForced: true);
+            catalogName, compiled, new OriginFileResolver(_sourceDir), isForced: true);
     }
 
     private Task RunAsync(params string[] arguments)
@@ -320,6 +323,141 @@ public sealed class ValidateVersionCommandTests : IDisposable
         // CmdFixture-1.0.0 the first package registered a moment earlier.
         Assert.DoesNotContain("could not be compiled for sibling dependency resolution", report);
         Assert.DoesNotContain("could not be registered for sibling dependency resolution", report);
+    }
+
+    // ── AB#5450: the baseline is the newest published version of the same major ─────────────────────────
+
+    [Fact]
+    public async Task OlderMajorLine_ValidatesAgainstTheNewestVersionOfItsMajor()
+    {
+        WriteSource("3.3.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        WriteSource("4.5.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        // Additive change (enum value added) on the 3.x line
+        WriteSource("3.4.0");
+
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("VALID", report);
+        Assert.Contains("- Published: `3.3.0` (TestPublishedCatalog)", report);
+        Assert.Contains("**MINOR** bump → minimum version `3.4.0`", report);
+        Assert.DoesNotContain("OCTO-CK101", report);
+    }
+
+    [Fact]
+    public async Task OlderMajorLine_DowngradeWithinTheMajor_FailsWithCk101AgainstThatMajor()
+    {
+        WriteSource("3.3.0");
+        await PublishBaselineAsync();
+        WriteSource("4.5.0");
+        await PublishBaselineAsync();
+        WriteSource("3.2.0");
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "-o", _reportPath));
+
+        Assert.Contains("OCTO-CK101: Declared version 3.2.0 of model 'CmdFixture' is lower than the published version 3.3.0",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task NewMajor_IsDiffedAgainstThePreviousMajorLine_MinorChangeIsAValidMajorWithoutStructuralNeed()
+    {
+        WriteSource("3.3.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        WriteSource("4.0.0");
+
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("VALID", report);
+        Assert.Contains("- Published: `3.3.0`", report);
+        Assert.Contains("New major line 4: the baseline is CmdFixture-3.3.0", report);
+        Assert.Contains("Valid major bump without structural need", report);
+        Assert.Contains("Enum value", report);
+    }
+
+    [Fact]
+    public async Task NewMajor_BreakingChangeWithoutMigration_RunsTheMigrationCheckAgainstThePreviousLine()
+    {
+        WriteSource("3.3.0");
+        await PublishBaselineAsync();
+        WriteSource("4.0.0", removeEnumValue: true);
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "-rmm"));
+
+        Assert.Contains("OCTO-CK104", exception.Message);
+    }
+
+    [Fact]
+    public async Task PublishedEqualVersion_WithStructuralChange_StillRequiresABump_AlsoWithALocalSelfCopy()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        // The model under test, already in the local catalog from an earlier local build (AB#5434 symptom 2)
+        WriteSource("1.0.0", removeEnumValue: true);
+        await PublishBaselineAsync(LocalFileSystemCatalog.Name);
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "-o", _reportPath));
+
+        Assert.Contains("OCTO-CK100", exception.Message);
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", report);
+        Assert.Contains("ignored as baseline", report);
+        Assert.Contains("CmdFixture-1.0.0", report);
+    }
+
+    [Fact]
+    public async Task RepeatedRuns_WithRefresh_GiveTheSameBaselineAndVerdict()
+    {
+        WriteSource("1.0.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        WriteSource("1.1.0");
+
+        // The first run registers CmdFixture-1.1.0 in the local catalog (sibling resolution); the second run must
+        // not compare the model against that copy of itself.
+        await RunAsync("-p", _sourceDir, "-rf", "-o", _reportPath);
+        var first = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        await RunAsync("-p", _sourceDir, "-rf", "-o", _reportPath);
+        var second = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+
+        Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", first);
+        Assert.Contains("- Published: `1.0.0` (TestPublishedCatalog)", second);
+        Assert.Contains("**MINOR** bump → minimum version `1.1.0`", first);
+        Assert.Contains("**MINOR** bump → minimum version `1.1.0`", second);
+        Assert.Contains("Local catalog entries at or above the declared version were ignored as baseline", second);
+        Assert.Contains("CmdFixture-1.1.0", second);
+    }
+
+    [Fact]
+    public async Task LocalEntryAtDeclaredVersionOnly_IsNotABaseline_FirstPublication()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync(LocalFileSystemCatalog.Name);
+        WriteSource("1.0.0", removeEnumValue: true);
+
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("First publication", report);
+        Assert.Contains("ignored as baseline", report);
+    }
+
+    [Fact]
+    public async Task LocalBaselineBelowDeclared_IsMarkedLocalInTheReport()
+    {
+        WriteSource("1.0.0", removeEnumValue: true);
+        await PublishBaselineAsync(LocalFileSystemCatalog.Name);
+        WriteSource("1.1.0");
+
+        await RunAsync("-p", _sourceDir, "-o", _reportPath);
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        Assert.Contains("- Published: `1.0.0` (LocalFileSystemCatalog, local, not published)", report);
     }
 
     private async Task PublishDependentBaselineAsync(string dependentDir)

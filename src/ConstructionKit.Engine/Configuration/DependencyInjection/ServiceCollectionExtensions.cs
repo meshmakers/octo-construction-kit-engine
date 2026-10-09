@@ -74,6 +74,8 @@ public static class ServiceCollectionExtensions
         // SemVer version validation services (pure functions over compiled models)
         services.AddTransient<ICkModelDiffService, CkModelDiffService>();
         services.AddTransient<ICkSemVerClassifier, CkSemVerClassifier>();
+        // AB#5450: one shared, read-only baseline resolver for every compatibility gate
+        services.AddTransient<ICkBaselineResolver, CkBaselineResolver>();
         services.AddTransient<ICkChangelogGenerator, CkChangelogGenerator>();
 
         // Add here sources of Ck model repositories

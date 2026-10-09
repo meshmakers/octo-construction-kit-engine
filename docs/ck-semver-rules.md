@@ -3,7 +3,7 @@
 The version of a Construction Kit model lives in the `modelId` suffix of `ckModel.yaml`
 (e.g. `modelId: Basic-2.0.2`) and is maintained manually by the developer. The
 `ckc ValidateVersion` command enforces that this version is *honest*: it diffs the current model
-against the last published version, classifies every change according to the fixed rule set below,
+against its baseline — the newest published version of the same major (see "Baseline" below) —, classifies every change according to the fixed rule set below,
 and fails when the declared version does not satisfy the derived minimum bump level.
 
 The command **never writes** `ckModel.yaml` — the developer stays in control of the version; the
@@ -21,7 +21,7 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 | Argument | Description |
 | -------- | ----------- |
 | `-p, --path` | Root path(s) of Construction Kit model directories. Multiple paths are validated in the given order — pass them in **dependency order** (dependencies first): a later package may depend on a version a sibling package introduces in the same run (see the sibling-resolution note below). |
-| `-cn, --catalogName` | Pins **baseline retrieval and the FR-9 dependency-existence check** (`OCTO-CK102`/`OCTO-CK103`) to the named catalog. Without it, all readable catalogs are queried and the highest published version wins (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub). **It does not pin the compile-stage dependency *resolution*** — see the note below. |
+| `-cn, --catalogName` | Pins **baseline retrieval and the FR-9 dependency-existence check** (`OCTO-CK102`/`OCTO-CK103`) to the named catalog. Without it, all readable catalogs are queried (catalog order: Embedded → LocalFileSystem → PrivateGitHub → PublicGitHub) and the baseline follows the rules in "Baseline" below. **It does not pin the compile-stage dependency *resolution*** — see the note below. |
 | `-o, --output` | Additionally writes the report as Markdown (e.g. for PR comments). |
 | `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
 | `-cl, --changelog` | Writes/updates the `CHANGELOG.md` section of the declared version next to `ckModel.yaml`. Only runs after successful validation; older sections are never rewritten. |
@@ -53,9 +53,40 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 > packages resolves it. This is why the `-p` paths must be in dependency order — a consumer
 > validated *before* its same-run dependency still fails with `OCTO-CK103`, honestly.
 
+### Baseline (AB#5450)
+
+One shared, read-only resolver (`ICkBaselineResolver` in `ConstructionKit.Engine/SemVer/`) decides which version a
+model is compared against. `ValidateVersion` uses it; the compile gate (AB#6294) and the publish gate (F2.3) will use
+the same resolver, so every gate agrees. It queries each catalog separately (never the merged highest version).
+
+1. **Same major.** The baseline is the newest version within `[major.0.0, major+1.0.0)` of the declared version.
+   EnergyCommunity `3.4.0` with `3.3.0` and `4.5.0` published is compared against `3.3.0`; a declared `3.2.0` fails
+   with `OCTO-CK101` against `3.3.0`. A maintenance release on an older major line therefore passes the normal gate.
+2. **New major.** When the declared major has no version yet, the baseline is the newest version of the highest
+   *lower* major: `4.0.0` is still diffed against the newest `3.x`, so the migration check (`OCTO-CK104`) and the
+   changelog keep working. A major allows any change; when the changes only need a minor or patch bump, the report
+   notes a "valid major bump without structural need". Only a model without any version is a first publication.
+3. **Never the model under test (AB#5434, symptom 2).** Entries of the `LocalFileSystemCatalog` at or above the
+   declared version are never the baseline: they come from earlier local builds or from `ValidateVersion`'s own
+   sibling registration, not from a publish. They are listed as ignored in the report. A local entry *below* the
+   declared version can be the baseline (marked "local, not published"). A published (remote) entry equal to the
+   declared version stays the baseline, so an unchanged version with structural changes still fails with
+   `OCTO-CK100`. On a version tie the published entry wins over a local copy. Running `ValidateVersion -rf` twice gives
+   the same baseline and verdict.
+4. **Read-only.** The resolver never publishes, refreshes or restores. (`ValidateVersion` itself still registers a
+   validated model in the local catalog for sibling resolution; stopping that write is AB#5434 symptom 1, F2.3.)
+5. **Visible.** The report names the baseline version and catalog (e.g. `Published: 3.3.0 (PrivateGitHubCatalog)`),
+   marks a local baseline, says when the baseline comes from the previous major line, and lists ignored local entries.
+
+When a catalog source is unreachable and no same-major baseline was found, the resolver does not fall back to a
+lower major: the result is `OCTO-CK102`, as before.
+
+Blueprints (`octo-bpm validateVersion`) keep their own baseline lookup; they have no structural diff and are immutable
+per version (checked for AB#5450, not changed).
+
 ### Validation rule
 
-With *published* = last published version and *minimum* = published + exactly one bump of the
+With *published* = the baseline (see above) and *minimum* = published + exactly one bump of the
 highest level in the diff:
 
 - Diff empty and declared == published → **valid**.

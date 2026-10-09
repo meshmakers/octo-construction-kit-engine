@@ -222,6 +222,10 @@ internal class ValidateVersionCommand : CatalogReadCommand
 
         // 3. Determine the published baseline: the highest published version across the target
         //     catalogs, and — independently — whether the DECLARED version itself is published.
+        //     AB#5450 checked: this shares the "[0.0,)" pattern of the CK ValidateVersion, but it is deliberately not
+        //     moved to the CK baseline resolver (ICkBaselineResolver). Blueprints are immutable per version, have no
+        //     structural diff/classification and no local "model under test" in their target catalogs; a maintenance
+        //     line of an older blueprint major would need its own decision (follow-up, not part of AB#5450).
         var baselineRange = new BlueprintIdVersionRange(blueprintName, "[0.0,)");
         BlueprintId? highestPublished = null;
         IBlueprintCatalog? highestCatalog = null;

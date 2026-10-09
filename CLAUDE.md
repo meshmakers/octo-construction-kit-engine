@@ -476,6 +476,7 @@ Developers only need to create migration scripts for versions that actually tran
 | `IRuntimeRepositoryProvider` | `Runtime.Contracts` | Provides runtime repositories for tenants |
 | `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
 | `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
+| `ICkBaselineResolver` | `ConstructionKit.Engine.SemVer` | AB#5450: the one read-only baseline lookup of every compatibility gate (`ValidateVersion` now, compile gate AB#6294 and publish gate F2.3 next): newest version of the declared major, a new major against the previous major line, local-catalog entries at or above the declared version never (AB#5434). Rules: `docs/ck-semver-rules.md`, "Baseline" |
 
 ## Extensible Enum Import (WI #3324)
 

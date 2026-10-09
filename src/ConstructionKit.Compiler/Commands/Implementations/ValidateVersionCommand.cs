@@ -31,6 +31,7 @@ internal class ValidateVersionCommand : CkcCommand
     private readonly ICkModelDiffService _diffService;
     private readonly ICkSemVerClassifier _classifier;
     private readonly ICkChangelogGenerator _changelogGenerator;
+    private readonly ICkBaselineResolver _baselineResolver;
     private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
 
     private readonly IArgument _pathArg;
@@ -45,7 +46,7 @@ internal class ValidateVersionCommand : CkcCommand
     public ValidateVersionCommand(ILogger<ValidateVersionCommand> logger, IOptions<OctoToolOptions> options,
         ICatalogService catalogService, ICompilerService compilerService, ICkSerializer ckSerializer,
         ICkModelDiffService diffService, ICkSemVerClassifier classifier, ICkChangelogGenerator changelogGenerator,
-        IOptions<LocalFileSystemCatalogOptions> localCatalogOptions)
+        IOptions<LocalFileSystemCatalogOptions> localCatalogOptions, ICkBaselineResolver baselineResolver)
         : base(logger, "ValidateVersion",
             "Validates that the declared construction kit model version reflects the changes since the last published version",
             options)
@@ -57,6 +58,7 @@ internal class ValidateVersionCommand : CkcCommand
         _classifier = classifier;
         _changelogGenerator = changelogGenerator;
         _localCatalogOptions = localCatalogOptions;
+        _baselineResolver = baselineResolver;
 
         _pathArg = CommandArgumentValue.AddArgument("p", "path",
             ["Root path(s) of construction kit model directories. Multiple paths are validated in the given order (dependency order)."],
@@ -65,7 +67,9 @@ internal class ValidateVersionCommand : CkcCommand
         _catalogArg = CommandArgumentValue.AddArgument("cn", "catalogName",
             [
                 "Restricts baseline retrieval and the dependency-existence check to the named catalog.",
-                "By default, all readable catalogs are queried and the highest published version wins.",
+                "By default, all readable catalogs are queried. The baseline is the newest version of the declared",
+                "major (a new major: the newest version of the previous major line); local catalog entries at or",
+                "above the declared version are never the baseline.",
                 "Note: compile-stage dependency resolution still searches all catalogs — isolate a",
                 "stale local catalog via -lcr <empty-dir> (or disable it with -lce false)."
             ],
@@ -236,15 +240,14 @@ internal class ValidateVersionCommand : CkcCommand
         Logger.LogInformation("Validating version of construction kit model '{ModelName}' at '{RootPath}'",
             modelName, rootPath);
 
-        // 2. Determine the last published version (the baseline)
-        var baselineRange = new CkModelIdVersionRange(modelName, "[0.0,)");
-        var existingResult = catalogName != null
-            ? await _catalogService.IsExistingAsync(catalogName, baselineRange)
-            : await _catalogService.IsExistingAsync(baselineRange);
+        // 2. Determine the baseline (AB#5450): the newest version of the declared major (a new major: the newest
+        //    version of the previous major line), never a local entry at or above the declared version.
+        var baseline = await _baselineResolver.ResolveAsync(modelName, declaredVersion, catalogName);
+        AddBaselineNotes(baseline, notes);
 
-        if (!existingResult.Exists || existingResult.ModelId == null)
+        if (baseline.Baseline == null)
         {
-            if (existingResult.SourceUnreachable)
+            if (baseline.SourceUnreachable)
             {
                 errors.Add(
                     $"OCTO-CK102: The baseline for model '{modelName}' could not be determined because the catalog " +
@@ -269,8 +272,8 @@ internal class ValidateVersionCommand : CkcCommand
             return [];
         }
 
-        var publishedModelId = existingResult.ModelId;
-        if (existingResult.SourceUnreachable)
+        var publishedModelId = baseline.Baseline;
+        if (baseline.SourceUnreachable)
         {
             warnings.Add(
                 "At least one catalog source was unreachable during the last cache refresh — the baseline " +
@@ -284,18 +287,18 @@ internal class ValidateVersionCommand : CkcCommand
         await CheckDependenciesAsync(meta, modelName, catalogName, errors, validatedSiblings, notes);
         if (errors.Count > 0)
         {
-            WriteReport(markdownReport, modelName, rootPath, existingResult, declaredVersion, null, [],
+            WriteReport(markdownReport, modelName, rootPath, baseline, declaredVersion, null, [],
                 errors, warnings, notes);
             return errors.Select(e => $"{modelName}: {e}").ToList();
         }
 
         // 4. Load the baseline model
         var baselineOperationResult = new OperationResult();
-        var baselineCatalogName = catalogName ?? existingResult.CatalogName;
-        var baseline = baselineCatalogName != null
+        var baselineCatalogName = catalogName ?? baseline.CatalogName;
+        var baselineModel = baselineCatalogName != null
             ? await _catalogService.GetAsync(baselineCatalogName, publishedModelId, baselineOperationResult)
             : await _catalogService.GetAsync(publishedModelId, baselineOperationResult);
-        if (baseline == null || baselineOperationResult.HasErrors || baselineOperationResult.HasFatalErrors)
+        if (baselineModel == null || baselineOperationResult.HasErrors || baselineOperationResult.HasFatalErrors)
         {
             throw new CompilerException(
                 $"Error loading baseline model '{publishedModelId.FullName}' from catalog '{baselineCatalogName}'.",
@@ -308,8 +311,8 @@ internal class ValidateVersionCommand : CkcCommand
         var current = await _compilerService.CompileInMemoryAsync(rootPath, compileOperationResult);
 
         // 6. Diff and classify
-        var changes = _diffService.Diff(baseline, current);
-        var classifiedChanges = _classifier.Classify(changes, baseline, current);
+        var changes = _diffService.Diff(baselineModel, current);
+        var classifiedChanges = _classifier.Classify(changes, baselineModel, current);
         var requiredLevel = _classifier.GetRequiredLevel(classifiedChanges);
 
         // 7. Apply the validation rule and reconcile migrations for major bumps
@@ -331,6 +334,11 @@ internal class ValidateVersionCommand : CkcCommand
                 break;
             case CkSemVerVerdict.ValidBumpWithoutStructuralChange:
                 notes.Add("Version bump without structural model change (e.g. a semantic change) — legitimate.");
+                break;
+            case CkSemVerVerdict.Valid when baseline.IsFromLowerMajor && requiredLevel < CkSemVerLevel.Major:
+                notes.Add(
+                    $"Valid major bump without structural need: the changes against {publishedModelId.FullName} only " +
+                    $"require a {CkModelChangeFormatter.GetLevelLabel(requiredLevel)} bump.");
                 break;
         }
 
@@ -375,7 +383,7 @@ internal class ValidateVersionCommand : CkcCommand
         }
 
         // 10. Emit the report
-        WriteReport(markdownReport, modelName, rootPath, existingResult, declaredVersion, validationResult,
+        WriteReport(markdownReport, modelName, rootPath, baseline, declaredVersion, validationResult,
             classifiedChanges, errors, warnings, notes);
 
         // 11. Only on success and --changelog: write/replace the section of the declared version
@@ -561,7 +569,7 @@ internal class ValidateVersionCommand : CkcCommand
     }
 
     private void WriteReport(StringBuilder markdownReport, string modelName, string rootPath,
-        ModelExistingResult? baselineResult, CkVersion declaredVersion, CkSemVerValidationResult? validationResult,
+        CkBaselineResolution? baselineResult, CkVersion declaredVersion, CkSemVerValidationResult? validationResult,
         IReadOnlyList<CkClassifiedModelChange> classifiedChanges, List<string> errors, List<string> warnings,
         List<string> notes)
     {
@@ -571,12 +579,12 @@ internal class ValidateVersionCommand : CkcCommand
         // Console report
         Console.WriteLine();
         Console.WriteLine($"SemVer validation: {modelName} ({rootPath})");
-        if (baselineResult?.ModelId != null)
+        if (baselineResult?.Baseline != null)
         {
             var cacheAge = baselineResult.CacheUpdatedAt == null
                 ? "no cache timestamp"
                 : $"cache updated {baselineResult.CacheUpdatedAt:u}, age {FormatAge(DateTime.UtcNow - baselineResult.CacheUpdatedAt.Value)}";
-            Console.WriteLine($"  Published: {baselineResult.ModelId.Version} ({baselineResult.CatalogName ?? "unknown catalog"}, {cacheAge})");
+            Console.WriteLine($"  Published: {baselineResult.Baseline.Version} ({FormatCatalog(baselineResult)}, {cacheAge})");
         }
         else
         {
@@ -619,9 +627,9 @@ internal class ValidateVersionCommand : CkcCommand
 
         // Markdown report
         markdownReport.Append($"\n## {modelName} — {resultLabel}\n\n");
-        if (baselineResult?.ModelId != null)
+        if (baselineResult?.Baseline != null)
         {
-            markdownReport.Append($"- Published: `{baselineResult.ModelId.Version}` ({baselineResult.CatalogName ?? "unknown catalog"})\n");
+            markdownReport.Append($"- Published: `{baselineResult.Baseline.Version}` ({FormatCatalog(baselineResult)})\n");
         }
         else
         {
@@ -649,6 +657,33 @@ internal class ValidateVersionCommand : CkcCommand
         AppendMarkdownList(markdownReport, "Notes", notes);
         AppendMarkdownList(markdownReport, "Warnings", warnings);
         AppendMarkdownList(markdownReport, "Errors", errors);
+    }
+
+    /// <summary>
+    ///     Baseline catalog for the report; a local baseline is marked, published ones print as before.
+    /// </summary>
+    private static string FormatCatalog(CkBaselineResolution baseline) =>
+        (baseline.CatalogName ?? "unknown catalog") + (baseline.IsLocal ? ", local, not published" : "");
+
+    /// <summary>
+    ///     AB#5450 rule 5: the report says when the baseline comes from the previous major line and which local
+    ///     entries were ignored. Nothing is added for the common case (published baseline of the same major).
+    /// </summary>
+    private static void AddBaselineNotes(CkBaselineResolution baseline, List<string> notes)
+    {
+        if (baseline.IsFromLowerMajor && baseline.Baseline != null)
+        {
+            notes.Add(
+                $"New major line {baseline.DeclaredVersion.Major}: the baseline is {baseline.Baseline.FullName}, the newest " +
+                "version of the previous major line (diff, migration check and changelog run against it).");
+        }
+
+        if (baseline.IgnoredLocalEntries.Count > 0)
+        {
+            notes.Add(
+                "Local catalog entries at or above the declared version were ignored as baseline (earlier local builds, " +
+                $"not published): {string.Join(", ", baseline.IgnoredLocalEntries.Select(id => id.FullName))}.");
+        }
     }
 
     private static void AppendMarkdownList(StringBuilder markdownReport, string heading, List<string> entries)

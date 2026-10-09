@@ -1,4 +1,6 @@
 ﻿using Meshmakers.Common.CommandLineParser;
+using Meshmakers.Octo.ConstructionKit.Contracts;
+using Meshmakers.Octo.ConstructionKit.Contracts.Messages;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Microsoft.Extensions.Logging;
@@ -105,7 +107,15 @@ internal class CompileCommand : CkcCommand
 
         try
         {
-            var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath);
+            // CK v2 (Phase 1): warnings (e.g. 124 deprecated interface) of a successful compile are printed, too;
+            // the overload without an OperationResult discarded them.
+            var operationResult = new OperationResult();
+            var compileResult = await _compilerService.CompileAsync(rootPath, outputPath, cacheFilePath, operationResult);
+            foreach (var warning in operationResult.Messages.Where(m => m.MessageLevel == MessageLevel.Warning))
+            {
+                Logger.LogWarning("{Message}", warning.ToString());
+            }
+
             if (writeCompileResult)
             {
                 Console.WriteLine(compileResult.CompiledModelFile);

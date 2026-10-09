@@ -422,6 +422,25 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.Contains(operationResult.Messages, m => m.MessageNumber == 126 && m.MessageText.Contains("1000.0.0"));
     }
 
+    [Fact]
+    public async Task Elements_in_the_wrong_folder_warn_with_110()
+    {
+        await PublishSystemAsync(_fixture);
+        var files = KitchenSinkFiles();
+        files["types/types.yaml"] += "\ninterfaces:\n  - interfaceId: Stray-1\n    attributes:\n      - id: ${System}/Name\n        name: Name\n";
+        var operationResult = new OperationResult();
+
+        var compiled = await _fixture.Services.GetRequiredService<ICompilerService>().CompileInMemoryAsync(
+            _fixture.WriteSource("ks-stray", "KitchenSink-1.0.0", ["System-[2.5,3.0)"], files, ckLanguage: 2),
+            operationResult);
+
+        var warning = Assert.Single(operationResult.Messages, m => m.MessageNumber == 110);
+        Assert.Equal(Contracts.Messages.MessageLevel.Warning, warning.MessageLevel);
+        Assert.Contains("'interfaces'", warning.MessageText);
+        Assert.Contains("'interfaces/'", warning.MessageText);
+        Assert.DoesNotContain(compiled.Interfaces!, i => i.InterfaceId.FullName == "Stray-1");
+    }
+
     private static async Task<string> ToYamlAsync(CkCompileFixture fixture, CkCompiledModelRoot model)
     {
         await using var memoryStream = new MemoryStream();

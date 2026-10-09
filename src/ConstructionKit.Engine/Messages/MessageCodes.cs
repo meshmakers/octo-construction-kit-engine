@@ -355,6 +355,9 @@ internal static class MessageCodes
     internal static OperationMessage CkMethodGeneratedNameCollision(string? location, object first, object second, object modelId, object generatedName) =>
         GetMessage("CkMethodGeneratedNameCollision", location, first, second, modelId, generatedName);
 
+    internal static OperationMessage CkElementsInWrongFolder(string? location, object file, object key, object expectedFolder) =>
+        GetMessage("CkElementsInWrongFolder", location, file, key, expectedFolder);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1016,6 +1019,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Error,
                  125, "Methods '{first}' and '{second}' of model '{modelId}' produce the same generated name '{generatedName}' (constant '{generatedName}MethodId', record '{generatedName}Parameters'). Rename one of the types or methods.",
                  new [] {"first", "second", "modelId", "generatedName"})
+        },
+        {
+            "CkElementsInWrongFolder",
+             new OperationMessageTemplate(MessageLevel.Warning,
+                 110, "File '{file}' declares '{key}', which is only read from files in the '{expectedFolder}/' folder. These elements are ignored; move them into '{expectedFolder}/'.",
+                 new [] {"file", "key", "expectedFolder"})
         },
     };
 }

@@ -246,6 +246,31 @@ public class CompilerService : ICompilerService
         return new CompileResult(compiledModelFilePath);
     }
 
+    /// <summary>
+    ///     Phase 1 (docs review): every element folder reads only its own root key, so elements declared under another
+    ///     key (e.g. <c>interfaces:</c> in <c>types/x.yaml</c>) were silently dropped. Message 110 (warning) names them;
+    ///     behaviour is otherwise unchanged for every element kind.
+    /// </summary>
+    private static void ReportElementsInWrongFolder(CkElementsRootDto elements, string file, string folder,
+        OperationResult operationResult)
+    {
+        foreach (var (key, expectedFolder, count) in new[]
+                 {
+                     ("types", CompilerStatics.TypesDirectoryName, elements.Types?.Count ?? 0),
+                     ("records", CompilerStatics.RecordsDirectoryName, elements.Records?.Count ?? 0),
+                     ("enums", CompilerStatics.EnumsDirectoryName, elements.Enums?.Count ?? 0),
+                     ("attributes", CompilerStatics.AttributesDirectoryName, elements.Attributes?.Count ?? 0),
+                     ("associationRoles", CompilerStatics.AssociationsDirectoryName, elements.AssociationRoles?.Count ?? 0),
+                     ("interfaces", CompilerStatics.InterfacesFolder, elements.Interfaces?.Count ?? 0)
+                 })
+        {
+            if (count > 0 && expectedFolder != folder)
+            {
+                operationResult.AddMessage(MessageCodes.CkElementsInWrongFolder(file, file, key, expectedFolder));
+            }
+        }
+    }
+
     /// <inheritdoc />
     public async Task<CkCompiledModelRoot> CompileInMemoryAsync(string rootPath, OperationResult operationResult)
     {
@@ -295,6 +320,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamType, typeFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, typeFile, CompilerStatics.TypesDirectoryName, operationResult);
                     if (elementsRootDto.Types != null)
                     {
                         foreach (var ckTypeDto in elementsRootDto.Types)
@@ -361,6 +387,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamRecord, recordFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, recordFile, CompilerStatics.RecordsDirectoryName, operationResult);
                     if (elementsRootDto.Records != null)
                     {
                         foreach (var ckRecordDto in elementsRootDto.Records)
@@ -398,6 +425,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamEnum, enumFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, enumFile, CompilerStatics.EnumsDirectoryName, operationResult);
                     if (elementsRootDto.Enums != null)
                     {
                         foreach (var ckEnumDto in elementsRootDto.Enums)
@@ -434,6 +462,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamAttribute, attributeFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, attributeFile, CompilerStatics.AttributesDirectoryName, operationResult);
                     if (elementsRootDto.Attributes != null)
                     {
                         foreach (var ckAttributeDto in elementsRootDto.Attributes)
@@ -471,6 +500,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamAssociation, associationFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, associationFile, CompilerStatics.AssociationsDirectoryName, operationResult);
                     if (elementsRootDto.AssociationRoles != null)
                     {
                         foreach (var ckAssociationRoleDto in elementsRootDto.AssociationRoles)
@@ -509,6 +539,7 @@ public class CompilerService : ICompilerService
                     var elementsRootDto = await _ckSerializer
                         .DeserializeElementsAsync(streamInterface, interfaceFile, operationResult)
                         .ConfigureAwait(false);
+                    ReportElementsInWrongFolder(elementsRootDto, interfaceFile, CompilerStatics.InterfacesFolder, operationResult);
                     if (elementsRootDto.Interfaces != null)
                     {
                         foreach (var ckInterfaceDto in elementsRootDto.Interfaces)

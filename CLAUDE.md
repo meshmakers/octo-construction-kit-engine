@@ -701,7 +701,8 @@ The running version is the `ConstructionKit.Engine` assembly version; DebugL is 
 and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. **Tests of message 126 must not
 depend on the ambient assembly version** (DebugL `999.0.0`, CI `0.1.*` = check skipped, r-tag builds `3.x`): pin it
 with the internal test seam `using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));`
-(AsyncLocal, restored on dispose, never set in production; AB#6274), or pass `engineVersion` to `CheckModel`
+(AsyncLocal, restored on dispose, never set in production; AB#6274; visible to Engine.Tests, Compiler.Tests and
+the engine-mongodb `Runtime.Engine.MongoDb.IntegrationTests`), or pass `engineVersion` to `CheckModel`
 directly. Raise the constant when a later
 engine writes features this engine line cannot read. `CatalogService.PublishAsync` resolves before it publishes, so
 it refuses such a model, too.

@@ -5,6 +5,8 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 [assembly: InternalsVisibleTo("ConstructionKit.Engine.SystemTests")]
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.SystemTests")]
 [assembly: InternalsVisibleTo("Meshmakers.Octo.ConstructionKit.Compiler.Tests")]
+// AB#6274: engine-mongodb integration tests pin CkEngineVersion.Current (OverrideCurrentForTests) for message 126.
+[assembly: InternalsVisibleTo("Meshmakers.Octo.Runtime.Engine.MongoDb.IntegrationTests")]
 [assembly: InternalsVisibleTo("DynamicProxyGenAssembly2")]
 namespace Meshmakers.Octo.ConstructionKit.Engine;
 

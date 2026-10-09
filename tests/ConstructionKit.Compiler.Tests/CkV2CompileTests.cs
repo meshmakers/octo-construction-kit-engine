@@ -397,6 +397,26 @@ public sealed class CkV2CompileTests : IDisposable
     }
 
     [Fact]
+    public async Task V1_model_on_a_v2_dependency_inherits_minEngineVersion_and_goes_to_v3()
+    {
+        // Review G3 E-M4: an engine that cannot read the dependency must not see the dependent either.
+        await PublishSystemAsync(_fixture);
+        await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], KitchenSinkFiles(), ckLanguage: 2));
+        var consumer = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("v1consumer", "Consumer-1.0.0",
+            ["System-[2.5,3.0)", "KitchenSink-[1.0,2.0)"], new Dictionary<string, string>
+            {
+                ["types/t.yaml"] = "types:\n  - typeId: Gadget\n    derivedFromCkTypeId: ${System}/Entity\n" +
+                                   "    attributes:\n      - id: ${KitchenSink}/Serial\n        name: Serial\n        isOptional: true\n"
+            }));
+
+        Assert.Null(consumer.CkLanguage);
+        Assert.Equal(Engine.Versioning.CkEngineVersion.CkV2MinEngineVersion, consumer.MinEngineVersion);
+        Assert.True(File.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v3/c/Consumer/1/ck-consumer-1.0.0.json")));
+        Assert.False(Directory.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v2/c")));
+    }
+
+    [Fact]
     public async Task Dependency_requiring_a_newer_engine_fails_with_126()
     {
         await PublishSystemAsync(_fixture);

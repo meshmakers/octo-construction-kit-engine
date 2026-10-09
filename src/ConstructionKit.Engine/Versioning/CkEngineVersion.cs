@@ -35,6 +35,14 @@ public static class CkEngineVersion
         model.EffectiveCkLanguage >= 2 || model.IsRangeRetaining ? CkV2MinEngineVersion : null;
 
     /// <summary>
+    ///     The highest of several <c>minEngineVersion</c> values (<c>null</c> entries ignored; <c>null</c> when none).
+    /// </summary>
+    public static string? Max(IEnumerable<string?> minEngineVersions) =>
+        minEngineVersions.Where(v => v != null && Version.TryParse(v, out _))
+            .OrderByDescending(v => Version.Parse(v!))
+            .FirstOrDefault();
+
+    /// <summary>
     ///     True when an engine of version <paramref name="engineVersion" /> can read a model with the given
     ///     <c>minEngineVersion</c>. An unparsable value is treated as not satisfied (fail closed).
     /// </summary>

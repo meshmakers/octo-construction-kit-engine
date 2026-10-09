@@ -688,8 +688,12 @@ and (local catalog) deletes the old file. The catalog CI side (Pages deploy of `
 
 **`minEngineVersion` (F1.1-S6).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
 `CkEngineVersion.CkV2MinEngineVersion` (`3.4.0`, a deterministic constant — not the compiling engine's own
-version, so DebugL and release builds produce the same output) for `ckLanguage: 2` and range-retaining models;
-`null` otherwise (v1 output unchanged). `ElementResolver` and both dependency resolvers refuse a model above the
+version, so DebugL and release builds produce the same output) for `ckLanguage: 2` and range-retaining models,
+**and the highest `minEngineVersion` of its resolved dependencies** (review G3 E-M4: a v1 model on a v2 or
+range-retaining dependency gets it too and therefore lands in `ck-models/v3/`, so an older engine never sees a model
+it cannot resolve); `null` otherwise (v1 output on v1 dependencies unchanged). 3.4.0 is at or below every engine
+the current lib line produces (3.4.x); after the first lib-train release that contains CK v2 it can be raised to that
+version to also stop older 3.4.x engines that read `v3/` by hand. `ElementResolver` and both dependency resolvers refuse a model above the
 running engine's version with **message 126** (`CkModelRequiresNewerEngine`; a dependency is skipped like a 91).
 The running version is the `ConstructionKit.Engine` assembly version; DebugL is `999.0.0` (accepts everything),
 and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. Raise the constant when a later

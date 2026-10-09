@@ -106,8 +106,21 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
                 modelGraph, sourceIdentifier).ConfigureAwait(false);
         }
 
-        // F1.1-S6: ckLanguage 2 and range-retaining output name the lowest engine that can read them.
-        compiledModel.MinEngineVersion = CkEngineVersion.GetRequiredMinEngineVersion(compiledModel);
+        // F1.1-S6: ckLanguage 2 and range-retaining output name the lowest engine that can read them. Review G3 E-M4:
+        // so does a model whose dependencies need it — an older engine could not resolve them, so the model goes to
+        // ck-models/v3 as well (CkCatalogLayout.RequiresV3 follows MinEngineVersion).
+        var required = new List<string?> { CkEngineVersion.GetRequiredMinEngineVersion(compiledModel) };
+        foreach (var dependencyId in resolvedModelIds)
+        {
+            var dependency = await _catalogManager.Value
+                .TryGetAsync(dependencyId, new OperationResult(), sourceIdentifier).ConfigureAwait(false);
+            if (dependency != null)
+            {
+                required.Add(dependency.MinEngineVersion ?? CkEngineVersion.GetRequiredMinEngineVersion(dependency));
+            }
+        }
+
+        compiledModel.MinEngineVersion = CkEngineVersion.Max(required);
 
         return (modelGraph, compiledModel);
     }

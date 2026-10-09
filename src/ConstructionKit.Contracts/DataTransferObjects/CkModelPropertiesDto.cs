@@ -24,8 +24,8 @@ public class CkModelPropertiesDto
 
     /// <summary>
     ///     CK v2 (AB#5584): the CK language version of the model. <c>null</c> (omitted) means 1. Version 2 enables
-    ///     <c>interfaces</c>, <c>implements</c>, attribute <c>access</c> and <c>methods</c>; Phase 0 gives it no
-    ///     other semantics. A model with a version above <see cref="MaxSupportedCkLanguage" /> is rejected
+    ///     <c>interfaces</c>, <c>implements</c>, attribute <c>access</c>, <c>methods</c>, <c>visibility</c>,
+    ///     <c>derivable</c> (whose default it changes to <c>Model</c>) and <c>targetCkInterfaceId</c>. A model with a version above <see cref="MaxSupportedCkLanguage" /> is rejected
     ///     (message 91).
     /// </summary>
     [YamlMember(Alias = "ckLanguage", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]

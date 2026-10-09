@@ -30,8 +30,8 @@ public class CkModelDiffService : ICkModelDiffService
             // SchemaUri is a serialization constant; Migrations are not part of the schema
             // contract (they always accompany a version bump by design) and are reconciled
             // separately by the migration check of the ValidateVersion command.
-            // DependencyRanges / IsRangeRetaining (CK v2 range retention, AB#5664): conscious exclusion in the
-            // Phase 0 spike — the classification of range/floor changes (only a raised floor or a changed range
+            // DependencyRanges / IsRangeRetaining (CK v2 range retention, AB#5664): conscious exclusion — the
+            // classification of range/floor changes (only a raised floor or a changed range
             // counts) is Phase 2 (F2.1). Dependencies keeps carrying the exact closure and is still diffed.
             [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.SchemaUri), nameof(CkCompiledModelRoot.Dependencies), nameof(CkCompiledModelRoot.Migrations),
                 nameof(CkCompiledModelRoot.DependencyRanges), nameof(CkCompiledModelRoot.IsRangeRetaining),

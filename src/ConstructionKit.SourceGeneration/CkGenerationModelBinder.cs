@@ -5,7 +5,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.RangeRetention;
 namespace Meshmakers.Octo.ConstructionKit.SourceGeneration;
 
 /// <summary>
-///     D1 (CK v2 Phase 0): a range-retaining compiled model references its dependencies major-qualified
+///     D1 (CK v2): a range-retaining compiled model references its dependencies major-qualified
 ///     (<c>System@2/Enabled-1</c>) while the compile cache the generator restores holds the concrete versions the
 ///     model was resolved against (<c>System-2.5.0/Enabled-1</c>). Binds the references to those versions before
 ///     any per-element generator looks them up, so generation sees exactly what a classic model provides.

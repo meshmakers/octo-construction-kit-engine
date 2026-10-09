@@ -5,7 +5,7 @@
     "CkMethod": {
       "type": "object",
       "title": "CkMethod",
-      "description": "A method of a CK type (CK v2, AB#5669; minimal Phase 0 subset). Requires ckLanguage: 2.",
+      "description": "A method of a CK type or interface (CK v2, AB#5669). Definitions only: the signature, errors, authorization and execution settings; there is no invocation runtime yet. Requires ckLanguage: 2.",
       "properties": {
         "methodId": {
           "type": "string",
@@ -18,7 +18,7 @@
             "Instance",
             "Static"
           ],
-          "description": "Omitted = Instance. Phase 0 GraphQL generates Instance methods only."
+          "description": "Omitted = Instance. Instance = called on one entity; Static = called on the type."
         },
         "description": {
           "type": "string"

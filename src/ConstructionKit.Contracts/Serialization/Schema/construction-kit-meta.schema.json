@@ -27,7 +27,7 @@
         1,
         2
       ],
-      "description": "CK language version. Omitted = 1. Version 2 enables 'interfaces', 'implements', attribute 'access' and 'methods' (CK v2, AB#5584)."
+      "description": "CK language version. Omitted = 1. Version 2 enables 'interfaces' (incl. extends, association and method members, deprecated), 'implements', attribute 'access', 'methods', 'visibility', 'derivable' and association 'targetCkInterfaceId' (CK v2, AB#5584)."
     }
   },
   "additionalProperties": false,

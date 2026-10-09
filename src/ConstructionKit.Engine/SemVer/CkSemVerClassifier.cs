@@ -78,7 +78,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // ── Dependencies ────────────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change),
 
-            // ── CK v2 Phase 0 (AB#5584) ──────────────────────────────────────────────────────
+            // ── CK v2 (AB#5584) ──────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "ckLanguage" } =>
                 // Review L16: compared numerically ("10" > "2"), not ordinally.
                 ParseCkLanguage(change.NewValue) > ParseCkLanguage(change.OldValue)
@@ -306,7 +306,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             case CkModelChangeKind.Modified when change.Property == "ownership":
                 return (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change for this assignment");
 
-            // CK v2 (AB#5668), Phase 0 rule: an access change is Minor with an "access/security" changelog note.
+            // CK v2 (AB#5668): an access change is Minor with an "access/security" changelog note.
             // A stricter access can break generic GraphQL clients (concept §4.3.2); hiding a credential such as
             // PasswordHash is the documented security exception. Phase 2 refines this classification.
             case CkModelChangeKind.Modified when change.Property == "access":

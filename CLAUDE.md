@@ -832,21 +832,23 @@ Notes:
   ingested column path reaches a Hidden attribute (`HiddenAttributeInArchiveException`, case-insensitive, `[*]`
   ignored, rollup columns skipped). It needs the optional `ICkCacheService` constructor argument — the mongodb
   `TenantContext` must pass it; without it the check is skipped. **Models imported before F1.2-S2** that violate
-  106–109 now fail on repository load (cache rebuild) — only dev/phase0 tenants can have such models.
+  106–109 now fail on repository load (cache rebuild) — only dev tenants from the CK v2 spike can have such models.
 - F1.1-S5 resolution: `InheritanceResolver.ResolveInterfaceHierarchy` computes `AllExtendedInterfaces` depth first
-  (unknown entries and cycles are skipped; reporting them is F1.2-S4), and implementing an interface implements every
+  (unknown entries and cycles are skipped there and reported as 118 by the compiler rules), and implementing an interface implements every
   interface it extends (`CkTypeGraph.AllImplementedInterfaces`, `ImplementingTypes`). The "exactly one target" rule
-  of an interface association and "an interface needs at least one member" are compiler rules (F1.2-S4), not schema
+  of an interface association and "an interface needs at least one member" are compiler rules (120, 123), not schema
   `oneOf`/`anyOf`: the schema validator reports no message for a failed `anyOf` branch set.
 - `visibility` / `derivable` values are PascalCase (`Public`/`Internal`, `Model`/`Any`), consistent with `access`;
-  lowercase is a schema error. F1.1-S4 only carries the values — enforcement (cross-model references to
-  `Internal` elements, deriving from a `Model`-derivable type) is F1.2-S3.
+  lowercase is a schema error. They are enforced across models by `CkVisibilityValidator` (112, 113).
 - The CK cache JSON omits the CK v2 members while they hold their default (empty collections, access
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes: 78–89 F0.2 (range retention), 90–105 CK v2 rules (in use), **106–129 reserved for Phase 1**
-  (F1.2-S2 106–111, F1.2-S3 112–117, F1.2-S4 118–124, F1.4-S2 125, F1.1-S6 126, F1.2-S1 L17 127, F1.2-S4 128, spare 129).
+- Message codes for CK v2: 90–113 and 118–128 are in use (table below); **spare: 111, 114–117, 129**. Range
+  retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
+  unbound-reference diagnostic is the source-generator diagnostic OM1004.
+  Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (log level Warning) and by the
+  `CkCompile` MSBuild task.
   `MessageCodes.cs` is generated from `MessageCodes.json` by `MessageCodes.tt` (not part of the build);
   `MessageCodesSyncTests` fails when the two tables differ in key, number, level or text, or a number repeats.
 
@@ -871,6 +873,7 @@ Notes:
 | 107 | `HiddenAttributeAutoCompleteValues` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): a Hidden type/record assignment declares `autoCompleteValues` (published in the model; Secret equivalent: 71) |
 | 108 | `HiddenAttributeOnAssociationRole` | `ElementResolver.CheckHiddenAssignments` | F1.2-S2 (N5): association-role attributes cannot be Hidden (no access guard on association attributes). `ReadOnly` / `MethodOnly` stay allowed |
 | 109 | `UnknownIndexAttributePath` | `InheritanceResolver.ValidateRestrictedAttributeUse` | F1.2-S2 (review N6): in a `ckLanguage: 2` model every index path segment must name an attribute (matched case-insensitively, like Mongo). Paths starting with `Rt`/`CkTypeId` (entity system fields) are exempt; a path merged into a collection root from a derived type is checked at that type. v1 models: unchanged |
+| 110 | `CkElementsInWrongFolder` | `CompilerService` (per element file) | **warning**: an element file declares a root key that is only read from another folder (e.g. `interfaces:` in `types/x.yaml`); those elements are ignored. Applies to every element kind (each folder reads only its own key) |
 | 112 | `CkReferenceToInternalElement` | `CkVisibilityValidator` (end of `ReferenceResolver`) | F1.2-S3: a reference from another model to a `visibility: Internal` element — base type/record, attribute assignment (type, record, role, interface member), attribute `valueCkRecordId`/`valueCkEnumId`, `implements`, interface `extends`, type/interface association role and targets, method parameter/result records and enums. Models compared by name |
 | 113 | `CkElementNotDerivable` | `CkVisibilityValidator` | F1.2-S3: a type or record derives from a type/record of another model whose effective `derivable` is `Model` (a v2 base without `derivable: Any`) |
 | 118 | `CkInterfaceExtendsInvalid` | `ReferenceResolver` (unknown, self) + `InheritanceResolver.ValidateInterfaces` (cycle) | F1.2-S4: an `extends` entry is unknown, the interface itself, or the chain leads back (cycle; reported at every interface on it) |
@@ -880,10 +883,10 @@ Notes:
 | 122 | `CkInterfaceMethodConflict` | `InheritanceResolver.InheritInterfaceMethods` | F1.2-S4: a type redeclares an interface method id with another signature (`CkModelDiffService.FormatMethod`). Interface methods are inherited into `CkTypeGraph.AllMethods` (declaring type = highest type of the chain that implements the interface); interface methods follow 100 (duplicate id) and 101-104 |
 | 123 | `CkInterfaceHasNoMembers` | `ReferenceResolver` | F1.2-S4: no attribute, association or method member and no `extends` (replaces the former schema `minItems`) |
 | 124 | `CkInterfaceDeprecated` | `ReferenceResolver` | F1.2-S4: **warning** for `implements`, `extends`, interface association targets and type association `targetCkInterfaceId` that reference a `deprecated: true` interface |
-| 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
 | 125 | `CkMethodGeneratedNameCollision` | `ElementResolver.CheckGeneratedMethodNames` | F1.4-S2 (review L15): two type methods of a model produce the same generated name `{Type}{Method}` (constant / parameter record) |
 | 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
+| 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -894,7 +897,8 @@ ids, method `valueCkRecordId` / `valueCkEnumId`) go through the `VariableResolve
 Source generator: the `*CkIds` class gains `RtCk{Name}InterfaceId`, `Ck{Name}InterfaceId`,
 `RtCk{Name}InterfaceIdString` and `{Type}{Method}MethodId` constants (e.g.
 `SystemIdentityCkIds.UserChangePasswordMethodId = "System.Identity/User.ChangePassword-1"`; a method version > 1 is
-appended: `UserChangePassword2MethodId`). Typed parameter records are not generated yet (F1.4-S2).
+appended: `UserChangePassword2MethodId`). Typed parameter/result records: see "v2 class modifiers and method contracts"
+below.
 **v2 class modifiers and method contracts (F1.4-S2, AB#5919).** For a `ckLanguage: 2` model (the source generator
 passes `EffectiveCkLanguage` to `CkTypeCodeGenerator`) the Rt class is `abstract` for `isAbstract`, `sealed` for
 `isFinal` or for an effective `derivable: Model` without a subtype in its own model; v1 output is unchanged.
@@ -939,12 +943,13 @@ changed Major and cleared Minor).
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91 | 92–94 | 95–99 | 90, 99 | 100–104 | 90 (F1.2-S3: 112–117) | 90 (F1.2-S4: 118–124) |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113 | 90, 118–124, 128 |
 | 7 | SemVer diff/classifier + guard test | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `abstract`/`sealed` (v2) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |
 | 10 | Mongo entity + write + read-back | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
-| 11 | GraphQL CK meta | P1 | P1 | P1 | asset-repo `CkTypeAttributeDtoType.access` | P1 | P1 | P1 |
+| 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |
+| 12 | Studio CK browser query | `getCkTypeDetails.graphql` in refinery-studio (F1.5-S5, AB#5927) — add every new field there when it should be visible | same | same | same | same | same | same |
 
 Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/ConstructionKit.Engine.Tests/CkV2`),
 `CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` / `CkV2ModifierResolverTests` /

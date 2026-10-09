@@ -5,10 +5,10 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 ///     assignment (<see cref="CkTypeAttributeDto.Access" />); omitted means <see cref="ReadWrite" />.
 /// </summary>
 /// <remarks>
-///     Phase 0 enforces <see cref="Hidden" /> only (never exposed in GraphQL output or input, rejected by generic
-///     mutations). <see cref="ReadOnly" /> and <see cref="MethodOnly" /> are parsed, persisted and carried through
-///     the graph; their enforcement follows in a later phase. The value restricts the API surface only — the
-///     engine repository, imports and exports still read and write the attribute.
+///     The engine parses, persists and carries the value through the graph; the API layer (asset-repo GraphQL)
+///     enforces it — <see cref="Hidden" /> is never exposed in output or input. The compiler keeps Hidden out of
+///     display rules, indexes, auto-complete values and association roles (messages 105–108). The value restricts
+///     the API surface only — the engine repository, imports and exports still read and write the attribute.
 /// </remarks>
 public enum CkAttributeAccessDto
 {

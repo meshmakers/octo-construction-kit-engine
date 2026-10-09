@@ -14,7 +14,7 @@ namespace Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 public enum CkMethodKindDto
 {
     /// <summary>
-    ///     The method is invoked on a runtime entity (default). Phase 0 generates GraphQL for instance methods only.
+    ///     The method is invoked on a runtime entity (default).
     /// </summary>
     Instance = 0,
 
@@ -25,8 +25,9 @@ public enum CkMethodKindDto
 }
 
 /// <summary>
-///     A method declared on a CK type (CK v2, AB#5669, minimal Phase 0 subset). Methods are inherited by derived
-///     types; a derived type must not re-declare an inherited method id.
+///     A method declared on a CK type or interface (CK v2, AB#5669) — a definition only, there is no invocation
+///     runtime yet. Methods are inherited by derived and implementing types; a derived type must not re-declare an
+///     inherited method id, and a type must not redeclare an interface method with another signature.
 /// </summary>
 [DebuggerDisplay("{" + nameof(MethodId) + "}")]
 public class CkMethodDto
@@ -213,7 +214,7 @@ public class CkMethodAuthorizationDto
 }
 
 /// <summary>
-///     Execution options of a <see cref="CkMethodDto" /> (CK v2, AB#5669). Phase 0 methods execute synchronously.
+///     Execution options of a <see cref="CkMethodDto" /> (CK v2, AB#5669).
 /// </summary>
 public class CkMethodExecutionDto
 {

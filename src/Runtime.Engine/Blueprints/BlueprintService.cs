@@ -956,6 +956,12 @@ internal class BlueprintService : IBlueprintService
             preview.EntitiesToAdd = diff.ToAdd;
             preview.EntitiesToDelete = diff.ToDelete;
             preview.Warnings.AddRange(diff.Warnings);
+            preview.BlankedAttributes.AddRange(diff.Blanked);
+            if (diff.Blanked.Count > 0)
+            {
+                preview.Warnings.Add(
+                    $"{diff.Blanked.Count} attribute(s) hold values the seed would blank (see BlankedAttributes); the update keeps them unless blanking is confirmed explicitly");
+            }
 
             // Safe adds only - it never touches an existing entity, so there is nothing to
             // report as updated, unchanged or changed. The counts describe what the apply
@@ -1157,6 +1163,26 @@ internal class BlueprintService : IBlueprintService
                                 enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
                                 recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null);
 
+                        // AB#6315: the same guard the apply runs (SeedBlankingDetector), so the
+                        // preview announces exactly the attributes the import will keep or blank.
+                        if (ckTypeGraph != null && updateMode != BlueprintUpdateMode.Safe)
+                        {
+                            foreach (var finding in SeedBlankingDetector.Detect(seed, tenant,
+                                         ImportRtModelCommand.SelectGuardedAttributes(ckTypeGraph)))
+                            {
+                                diff.Blanked.Add(new BlueprintBlankedAttribute
+                                {
+                                    RtId = tenant.RtId.ToString() ?? string.Empty,
+                                    CkTypeId = ckTypeId.ToString(),
+                                    AttributeName = finding.Attribute.AttributeName,
+                                    Reason = finding.Reason.ToString(),
+                                    CurrentSummary = SeedBlankingDetector.Summarize(finding.ExistingValue),
+                                    IncomingSummary = SeedBlankingDetector.Summarize(finding.SeedValue, finding.SeedPresent),
+                                    AppliedOnUpdate = false
+                                });
+                            }
+                        }
+
                         if (attributeChanges == null)
                         {
                             // No CK type at hand: cannot compare, so count it as a change rather
@@ -1274,6 +1300,9 @@ internal class BlueprintService : IBlueprintService
         public int Unchanged { get; set; }
         public int ToDelete { get; set; }
         public List<BlueprintEntityChange> ChangedEntities { get; } = [];
+
+        /// <summary>Attributes the seed would blank (AB#6315), found by the shared engine guard.</summary>
+        public List<BlueprintBlankedAttribute> Blanked { get; } = [];
         public List<BlueprintUpdateConflict> Conflicts { get; } = [];
         public List<string> Warnings { get; } = [];
         public List<RtEntityTcDto> EntitiesToAdd { get; } = [];
@@ -1381,6 +1410,7 @@ internal class BlueprintService : IBlueprintService
                 result.EntitiesUpdated = preview.EntitiesToUpdate;
                 result.EntitiesUnchanged = preview.EntitiesUnchanged;
                 result.EntitiesDeleted = preview.EntitiesToDelete;
+                result.BlankedAttributes.AddRange(preview.BlankedAttributes);
                 result.Warnings.AddRange(preview.Warnings);
                 result.Warnings.Add("DryRun: No changes were made");
                 return result;
@@ -1773,11 +1803,16 @@ internal class BlueprintService : IBlueprintService
                     Entities = entitiesToImport
                 };
 
+                var confirmations = ToImportConfirmations(options, result);
                 await _importRtModelCommand.ImportModelAsync(
                     repository,
                     importRoot,
                     ImportStrategy.Upsert,
-                    cancellationToken).ConfigureAwait(false);
+                    cancellationToken,
+                    options.AllowBlanking ? RtImportBlankingPolicy.Allow : RtImportBlankingPolicy.Keep,
+                    confirmations).ConfigureAwait(false);
+
+                ReportBlankedAttributes(diff.Blanked, options, confirmations, result);
             }
             catch (Exception ex)
             {
@@ -1807,6 +1842,92 @@ internal class BlueprintService : IBlueprintService
         }
 
         result.Success = result.Errors.Count == 0;
+    }
+
+    /// <summary>
+    /// AB#6315: translates the caller's per-attribute confirmations into the engine's. Entries with
+    /// an unparsable entity id are reported as a warning and ignored (never widened).
+    /// </summary>
+    internal static List<RtImportBlankingConfirmation>? ToImportConfirmations(
+        BlueprintUpdateOptions options, BlueprintUpdateResult result)
+    {
+        if (options.AllowBlanking || options.ConfirmedBlankings is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var confirmations = new List<RtImportBlankingConfirmation>();
+        foreach (var confirmation in options.ConfirmedBlankings)
+        {
+            if (OctoObjectId.TryParse(confirmation.RtId, out var rtId) &&
+                !string.IsNullOrWhiteSpace(confirmation.AttributeName))
+            {
+                confirmations.Add(new RtImportBlankingConfirmation(rtId, confirmation.AttributeName));
+            }
+            else
+            {
+                result.Warnings.Add(
+                    $"Ignored blanking confirmation with invalid entity id or attribute ('{confirmation.RtId}')");
+            }
+        }
+
+        return confirmations;
+    }
+
+    /// <summary>
+    /// AB#6315: puts the attributes the seed would blank into the result - applied or kept, so a
+    /// kept tenant value is never silent. Starts from the diff (with summaries) and adds what the
+    /// import's own guard reported beyond it (e.g. an entity promoted by a conflict resolution).
+    /// </summary>
+    internal void ReportBlankedAttributes(
+        IReadOnlyList<BlueprintBlankedAttribute> detected,
+        BlueprintUpdateOptions options,
+        List<RtImportBlankingConfirmation>? confirmations,
+        BlueprintUpdateResult result)
+    {
+        var guardEntries = _importRtModelCommand.GuardEntries;
+        var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var blanked in detected)
+        {
+            var applied = options.AllowBlanking ||
+                          (confirmations?.Any(c => c.RtId.ToString() == blanked.RtId &&
+                                                   string.Equals(c.AttributeName, blanked.AttributeName,
+                                                       StringComparison.OrdinalIgnoreCase)) ?? false);
+            result.BlankedAttributes.Add(new BlueprintBlankedAttribute
+            {
+                RtId = blanked.RtId,
+                CkTypeId = blanked.CkTypeId,
+                AttributeName = blanked.AttributeName,
+                Reason = blanked.Reason,
+                CurrentSummary = blanked.CurrentSummary,
+                IncomingSummary = blanked.IncomingSummary,
+                AppliedOnUpdate = applied
+            });
+            reported.Add($"{blanked.RtId}/{blanked.AttributeName}");
+        }
+
+        foreach (var entry in guardEntries)
+        {
+            if (reported.Add($"{entry.RtId}/{entry.AttributeName}"))
+            {
+                result.BlankedAttributes.Add(new BlueprintBlankedAttribute
+                {
+                    RtId = entry.RtId.ToString() ?? string.Empty,
+                    CkTypeId = entry.CkTypeId.ToString(),
+                    AttributeName = entry.AttributeName,
+                    Reason = entry.Reason.ToString(),
+                    AppliedOnUpdate = entry.Applied
+                });
+            }
+        }
+
+        var kept = result.BlankedAttributes.Count(b => !b.AppliedOnUpdate);
+        if (kept > 0)
+        {
+            result.Warnings.Add(
+                $"{kept} attribute(s) were kept because the seed would have blanked them; confirm explicitly (AllowBlanking / ConfirmedBlankings) to apply (see BlankedAttributes)");
+        }
     }
 
     private static void ApplyConflictOverrides(

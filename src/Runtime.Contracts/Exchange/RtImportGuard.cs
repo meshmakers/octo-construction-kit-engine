@@ -53,3 +53,12 @@ public sealed record RtImportGuardEntry(
     string AttributeName,
     RtImportBlankingReason Reason,
     bool Applied);
+
+/// <summary>
+/// An operator's explicit confirmation that the seed may blank one attribute of one entity
+/// (AB#6315), taken from the update preview. Matches a <see cref="RtImportGuardEntry"/> by entity
+/// and attribute name.
+/// </summary>
+/// <param name="RtId">Runtime id of the entity.</param>
+/// <param name="AttributeName">Attribute name (case-insensitive).</param>
+public sealed record RtImportBlankingConfirmation(OctoObjectId RtId, string AttributeName);

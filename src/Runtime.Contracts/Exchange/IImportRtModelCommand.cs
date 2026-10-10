@@ -19,10 +19,15 @@ public interface IImportRtModelCommand
     ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
     ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
     /// </param>
+    /// <param name="confirmedBlankings">
+    ///     Entity/attribute pairs whose blanking is confirmed individually (AB#6315) although
+    ///     <paramref name="blankingPolicy" /> is <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText, ImportStrategy importStrategy,
         CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null);
 
     /// <summary>
     ///     Imports a model root
@@ -35,10 +40,15 @@ public interface IImportRtModelCommand
     ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
     ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
     /// </param>
+    /// <param name="confirmedBlankings">
+    ///     Entity/attribute pairs whose blanking is confirmed individually (AB#6315) although
+    ///     <paramref name="blankingPolicy" /> is <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRootTc,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null);
 
     /// <summary>
     ///     Imports from a file
@@ -52,10 +62,15 @@ public interface IImportRtModelCommand
     ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
     ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
     /// </param>
+    /// <param name="confirmedBlankings">
+    ///     Entity/attribute pairs whose blanking is confirmed individually (AB#6315) although
+    ///     <paramref name="blankingPolicy" /> is <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null);
 
     /// <summary>
     ///     The attributes found blanked by seed values during this command's imports (AB#6313), kept

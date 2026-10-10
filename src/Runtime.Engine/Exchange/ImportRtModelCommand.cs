@@ -37,6 +37,7 @@ internal class ImportRtModelCommand(
     private readonly IRtSerializer _rtYamlSerializer = rtYamlSerializer;
     private readonly ConcurrentQueue<RtImportGuardEntry> _guardEntries = new();
     private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
+    private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
     private int _associationsCount;
 
     /// <inheritdoc />
@@ -44,9 +45,11 @@ internal class ImportRtModelCommand(
 
     public async Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
         _blankingPolicy = blankingPolicy;
+        _confirmedBlankings = confirmedBlankings;
         logger.LogInformation("Importing RT entities using text started");
 
         var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
@@ -75,9 +78,11 @@ internal class ImportRtModelCommand(
 
     public async Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRoot,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
         _blankingPolicy = blankingPolicy;
+        _confirmedBlankings = confirmedBlankings;
         logger.LogInformation("Importing RT entities using text started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -108,9 +113,11 @@ internal class ImportRtModelCommand(
 
     public async Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
-        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
         _blankingPolicy = blankingPolicy;
+        _confirmedBlankings = confirmedBlankings;
         logger.LogInformation("Importing RT entities using file started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -939,7 +946,8 @@ internal class ImportRtModelCommand(
                 preservedForEntity += PreserveSecretRecordMembers(modelEntity, existing, secretRecordAttributes,
                     resolveRecord);
                 var guardEntries = GuardSeedOwnedAttributesForEntity(modelEntity, existing, seedOwnedAttributes,
-                    value => ToTransportValue(cacheService, runtimeRepository.TenantId, value), _blankingPolicy);
+                    value => ToTransportValue(cacheService, runtimeRepository.TenantId, value), _blankingPolicy,
+                    _confirmedBlankings);
                 foreach (var entry in guardEntries)
                 {
                     _guardEntries.Enqueue(entry);
@@ -1255,39 +1263,37 @@ internal class ImportRtModelCommand(
         RtEntity existing,
         IReadOnlyList<CkTypeAttributeGraph> seedOwnedAttributes,
         Func<object?, object?> convertValue,
-        RtImportBlankingPolicy policy)
+        RtImportBlankingPolicy policy,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
     {
         var entries = new List<RtImportGuardEntry>();
-        foreach (var attr in seedOwnedAttributes)
+        // AB#6315: detection is shared with the blueprint update preview (SeedBlankingDetector).
+        foreach (var finding in SeedBlankingDetector.Detect(modelEntity, existing, seedOwnedAttributes))
         {
-            var existingPresent = existing.Attributes.TryGetValue(attr.AttributeName, out var existingValue);
-            var modelAttr = modelEntity.Attributes.FirstOrDefault(a => a.Id.Equals(attr.CkAttributeId));
-
-            var verdict = SeedValueGuard.Decide(attr.ValueType, attr.Ownership, existingPresent, existingValue,
-                modelAttr != null, modelAttr?.Value, policy);
-            if (!verdict.IsBlanking)
+            var attr = finding.Attribute;
+            var allow = policy == RtImportBlankingPolicy.Allow ||
+                        (confirmedBlankings?.Any(c => c.RtId.Equals(modelEntity.RtId) &&
+                                                      string.Equals(c.AttributeName, attr.AttributeName,
+                                                          StringComparison.OrdinalIgnoreCase)) ?? false);
+            if (!allow)
             {
-                continue;
-            }
-
-            if (verdict.Kind == SeedValueDecisionKind.KeepExisting)
-            {
+                var modelAttr = modelEntity.Attributes.FirstOrDefault(a => a.Id.Equals(attr.CkAttributeId));
                 if (modelAttr == null)
                 {
                     modelEntity.Attributes.Add(new RtAttributeTcDto
                     {
                         Id = attr.CkAttributeId.ToRtCkId(),
-                        Value = convertValue(existingValue),
+                        Value = convertValue(finding.ExistingValue),
                     });
                 }
                 else
                 {
-                    modelAttr.Value = convertValue(existingValue);
+                    modelAttr.Value = convertValue(finding.ExistingValue);
                 }
             }
 
             entries.Add(new RtImportGuardEntry(modelEntity.RtId, modelEntity.CkTypeId, attr.AttributeName,
-                verdict.Blanking, verdict.Kind == SeedValueDecisionKind.TakeSeed));
+                finding.Reason, allow));
         }
 
         return entries;

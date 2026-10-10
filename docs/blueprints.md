@@ -398,6 +398,25 @@ let the operator confirm the blanking explicitly. Blueprint-owned changes to a n
 working unchanged. Merge, Safe and Full update modes only decide which entities are imported; the
 guard applies to all of them.
 
+### Preview and explicit confirmation (AB#6315)
+
+The same detection (`SeedBlankingDetector`, built on `SeedValueGuard`) feeds the update preview, so
+what the preview announces is exactly what the apply keeps.
+
+- `BlueprintUpdatePreview.BlankedAttributes` lists, for every locked entity the update would touch,
+  each attribute whose non-empty tenant value the seed would blank: `rtId`, `ckTypeId`,
+  `attributeName`, `reason` (`SeedEmpty` / `SeedOmitted`), `currentSummary`, `incomingSummary`
+  (kind and size only, e.g. `string (223 chars)`, `empty string`, `omitted`; never the value, which
+  may be a credential) and `appliedOnUpdate` (always `false` in a preview).
+- `BlueprintUpdateOptions.AllowBlanking` (engine policy `Allow`) confirms every listed blanking;
+  `BlueprintUpdateOptions.ConfirmedBlankings` (`[{ rtId, attributeName }]`) confirms exactly those
+  entity/attribute pairs. Default: nothing is confirmed, the update proceeds and keeps the tenant
+  values.
+- `BlueprintUpdateResult.BlankedAttributes` repeats the list with `appliedOnUpdate` telling what
+  happened (`false` = kept, `true` = blanked on confirmation), so nothing is silent. A warning
+  counts the kept ones.
+- Engine level: `IImportRtModelCommand.ImportModelAsync(..., blankingPolicy, confirmedBlankings)`.
+
 ## Updates
 
 ```csharp

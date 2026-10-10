@@ -73,6 +73,16 @@ public class BlueprintUpdatePreview
     public List<BlueprintEntityChange> Changes { get; set; } = [];
 
     /// <summary>
+    /// Attributes whose non-empty tenant value the seed would blank (AB#6315, incident AB#6310): the
+    /// seed carries an empty value or omits the attribute. Detected by the same engine guard the
+    /// update applies (<c>SeedValueGuard</c>). Without confirmation the update keeps the tenant
+    /// values (<see cref="BlueprintBlankedAttribute.AppliedOnUpdate" /> is false); to blank them the
+    /// caller confirms explicitly via <see cref="BlueprintUpdateOptions.AllowBlanking" /> or
+    /// <see cref="BlueprintUpdateOptions.ConfirmedBlankings" />. Never carries values, only summaries.
+    /// </summary>
+    public List<BlueprintBlankedAttribute> BlankedAttributes { get; set; } = [];
+
+    /// <summary>
     /// Detected conflicts that need resolution
     /// </summary>
     public List<BlueprintUpdateConflict> Conflicts { get; set; } = [];
@@ -150,6 +160,69 @@ public class BlueprintAttributeChange
     /// turns into a cleared value.
     /// </summary>
     public object? NewValue { get; set; }
+}
+
+/// <summary>
+/// One attribute whose non-empty tenant value a blueprint update would blank (AB#6315). Values are
+/// described, never included: the attribute may hold credentials.
+/// </summary>
+public class BlueprintBlankedAttribute
+{
+    /// <summary>
+    /// Runtime id of the tenant entity.
+    /// </summary>
+    public required string RtId { get; set; }
+
+    /// <summary>
+    /// CK type of the entity.
+    /// </summary>
+    public required string CkTypeId { get; set; }
+
+    /// <summary>
+    /// Attribute name as stored.
+    /// </summary>
+    public required string AttributeName { get; set; }
+
+    /// <summary>
+    /// Why the seed counts as blanking: <c>SeedEmpty</c> (the seed declares an empty value, or a JSON
+    /// text that empties a string the tenant filled) or <c>SeedOmitted</c> (the seed does not declare
+    /// the attribute).
+    /// </summary>
+    public required string Reason { get; set; }
+
+    /// <summary>
+    /// Value-free description of what the tenant holds, e.g. <c>string (223 chars)</c>.
+    /// </summary>
+    public string? CurrentSummary { get; set; }
+
+    /// <summary>
+    /// Value-free description of what the seed carries, e.g. <c>string (110 chars)</c>, <c>empty string</c>
+    /// or <c>omitted</c>.
+    /// </summary>
+    public string? IncomingSummary { get; set; }
+
+    /// <summary>
+    /// <c>false</c>: the update keeps the tenant value (default). <c>true</c>: the update blanks it
+    /// (on a result: it did; on a preview: never, as a preview applies nothing).
+    /// </summary>
+    public bool AppliedOnUpdate { get; set; }
+}
+
+/// <summary>
+/// An operator's explicit confirmation that one attribute of one entity may be blanked by the
+/// update (AB#6315). Take the values from <see cref="BlueprintUpdatePreview.BlankedAttributes" />.
+/// </summary>
+public class BlueprintBlankingConfirmation
+{
+    /// <summary>
+    /// Runtime id of the entity.
+    /// </summary>
+    public required string RtId { get; set; }
+
+    /// <summary>
+    /// Attribute name (case-insensitive).
+    /// </summary>
+    public required string AttributeName { get; set; }
 }
 
 /// <summary>
@@ -266,6 +339,20 @@ public class BlueprintUpdateOptions
     /// If true, continue on non-fatal errors
     /// </summary>
     public bool ContinueOnError { get; set; } = false;
+
+    /// <summary>
+    /// AB#6315: explicit confirmation that the update may blank EVERY attribute listed in
+    /// <see cref="BlueprintUpdatePreview.BlankedAttributes" /> (engine policy
+    /// <c>RtImportBlankingPolicy.Allow</c>). Default <c>false</c>: tenant values are kept and the
+    /// result lists them. Prefer <see cref="ConfirmedBlankings" /> to confirm single attributes.
+    /// </summary>
+    public bool AllowBlanking { get; set; } = false;
+
+    /// <summary>
+    /// AB#6315: confirms blanking for exactly these entity/attribute pairs; everything else listed
+    /// stays kept. Ignored when <see cref="AllowBlanking" /> is true.
+    /// </summary>
+    public List<BlueprintBlankingConfirmation>? ConfirmedBlankings { get; set; }
 }
 
 /// <summary>
@@ -303,6 +390,13 @@ public class BlueprintUpdateResult
     /// Number of entities skipped due to conflicts
     /// </summary>
     public int EntitiesSkipped { get; set; }
+
+    /// <summary>
+    /// AB#6315: the attributes the seed would have blanked, with what happened to each
+    /// (<see cref="BlueprintBlankedAttribute.AppliedOnUpdate" />). Empty when nothing was blanked.
+    /// Nothing is silent: a kept tenant value is listed here as well.
+    /// </summary>
+    public List<BlueprintBlankedAttribute> BlankedAttributes { get; set; } = [];
 
     /// <summary>
     /// Errors that occurred during the update

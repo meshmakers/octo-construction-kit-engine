@@ -169,6 +169,10 @@
             "Internal"
           ],
           "description": "CK v2 (F1.1-S4): Internal = may only be referenced inside the declaring model. Omitted = Public. Requires ckLanguage: 2."
+        },
+        "securitySensitive": {
+          "type": "boolean",
+          "description": "CK v2 (AB#6269): marks a security-sensitive attribute (password hashes, security stamps, tokens, 2FA secrets). Tightening the access of an assignment of such an attribute is classified Minor + requiresAcknowledge instead of Major. Omitted = false. Requires ckLanguage: 2."
         }
       },
       "additionalProperties": false,

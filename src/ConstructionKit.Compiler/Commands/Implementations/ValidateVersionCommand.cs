@@ -608,6 +608,17 @@ internal class ValidateVersionCommand : CkcCommand
             }
         }
 
+        // AB#6270: behavioural changes and changes that require an acknowledge, listed once more (only when present).
+        var behavioural = classifiedChanges.Where(c => c.IsBehavioural || c.RequiresAcknowledge).ToList();
+        if (behavioural.Count > 0)
+        {
+            Console.WriteLine($"  Behavioural changes ({behavioural.Count}):");
+            foreach (var classifiedChange in behavioural)
+            {
+                Console.WriteLine($"    {CkModelChangeFormatter.Format(classifiedChange)}{AcknowledgeSuffix(classifiedChange)}");
+            }
+        }
+
         foreach (var note in notes)
         {
             Console.WriteLine($"  Note: {note}");
@@ -654,6 +665,16 @@ internal class ValidateVersionCommand : CkcCommand
             }
         }
 
+        if (behavioural.Count > 0)
+        {
+            markdownReport.Append($"\n### Behavioural changes ({behavioural.Count})\n\n");
+            foreach (var classifiedChange in behavioural)
+            {
+                markdownReport.Append(
+                    $"- **{CkModelChangeFormatter.GetLevelLabel(classifiedChange.Level)}** {CkModelChangeFormatter.Format(classifiedChange.Change)} — {classifiedChange.Reason}{AcknowledgeSuffix(classifiedChange)}\n");
+            }
+        }
+
         AppendMarkdownList(markdownReport, "Notes", notes);
         AppendMarkdownList(markdownReport, "Warnings", warnings);
         AppendMarkdownList(markdownReport, "Errors", errors);
@@ -685,6 +706,9 @@ internal class ValidateVersionCommand : CkcCommand
                 $"not published): {string.Join(", ", baseline.IgnoredLocalEntries.Select(id => id.FullName))}.");
         }
     }
+
+    private static string AcknowledgeSuffix(CkClassifiedModelChange change) =>
+        change.RequiresAcknowledge ? " (requires acknowledge)" : "";
 
     private static void AppendMarkdownList(StringBuilder markdownReport, string heading, List<string> entries)
     {

@@ -82,7 +82,7 @@ public class CkSemVerClassificationGuardTests
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
         .. Rows("N", 5), .. Rows("I", 11), .. Rows("M", 14), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
-        .. Rows("A", 2), .. Rows("B", 4), .. Rows("D", 7)
+        .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 7)
     ];
 
     /// <summary>
@@ -94,25 +94,11 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyDictionary<string, string> KnownGaps = BuildKnownGaps();
 
-    private static Dictionary<string, string> BuildKnownGaps()
-    {
-        var gaps = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        void AddRows(string prefix, int count, string story)
-        {
-            foreach (var row in Rows(prefix, count))
-            {
-                gaps[$"row:{row}"] = story;
-            }
-        }
-
-        AddRows("T", 7, "AB#6269");
-        AddRows("E", 2, "AB#6269");
-        AddRows("R", 2, "AB#6269");
-        AddRows("A", 2, "AB#6269");
-        AddRows("B", 4, "AB#6270");
-        return gaps;
-    }
+    /// <remarks>
+    ///     Empty since the F2.1 rule stories (AB#6266–AB#6271) landed. A later rule story may add entries of the form
+    ///     <c>["row:X1"] = "AB#…"</c> while it is in progress; the list must be empty again at its feature gate.
+    /// </remarks>
+    private static Dictionary<string, string> BuildKnownGaps() => new(StringComparer.Ordinal);
 
     private static IEnumerable<string> Rows(string prefix, int count) =>
         Enumerable.Range(1, count).Select(i => $"{prefix}{i}");
@@ -596,6 +582,7 @@ public class CkSemVerClassificationGuardTests
             ["CkAttributeDto.Description"] = m => Attribute(m).Description = "changed",
             ["CkAttributeDto.MetaData"] = m => Attribute(m).MetaData = [],
             ["CkAttributeDto.Visibility"] = m => Attribute(m).Visibility = CkVisibilityDto.Internal,
+            ["CkAttributeDto.SecuritySensitive"] = m => Attribute(m).SecuritySensitive = true,
             ["CkEnumDto.EnumId"] = m => SemVerTestModels.GetEnum(m).EnumId = "State2",
             ["CkEnumDto.UseFlags"] = m => SemVerTestModels.GetEnum(m).UseFlags = true,
             ["CkEnumDto.IsExtensible"] = m => SemVerTestModels.GetEnum(m).IsExtensible = true,

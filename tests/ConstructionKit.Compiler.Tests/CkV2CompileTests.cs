@@ -196,6 +196,43 @@ public sealed class CkV2CompileTests : IDisposable
     }
 
     [Fact]
+    public async Task SecuritySensitive_ReachesCompiledOutputGraphAndDocs_AndRequiresCkLanguage2()
+    {
+        // AB#6269
+        await PublishSystemAsync(_fixture);
+        var files = KitchenSinkFiles();
+        files["attributes/attributes.yaml"] = files["attributes/attributes.yaml"]
+            .Replace("  - id: PasswordHash\n    valueType: String", "  - id: PasswordHash\n    valueType: String\n    securitySensitive: true");
+
+        var compiled = await _fixture.CompileAndPublishAsync(_fixture.WriteSource("ks", "KitchenSink-1.0.0",
+            ["System-[2.5,3.0)"], files, ckLanguage: 2));
+        Assert.True(compiled.Attributes!.Single(a => a.AttributeId.Name == "PasswordHash").SecuritySensitive);
+        Assert.All(compiled.Attributes!.Where(a => a.AttributeId.Name != "PasswordHash"), a => Assert.Null(a.SecuritySensitive));
+        Assert.Contains("securitySensitive: true", await ToYamlAsync(_fixture, compiled));
+
+        var graph = await _fixture.Services.GetRequiredService<ICatalogModelResolver>()
+            .HardResolveAsync(compiled, new OriginFileResolver("-"), new OperationResult());
+        var docs = Path.Combine(_fixture.Root, "docs-security");
+        await _fixture.Services.GetRequiredService<Engine.Documentation.IContentGenerator>()
+            .GenerateAttributesMarkdownTable(graph, docs, compiled.ModelId, "1.0.0", "/docs/");
+        var attributes = await File.ReadAllTextAsync(
+            Directory.GetFiles(docs, "*.md", SearchOption.AllDirectories).Single(f => f.EndsWith("Attributes.md")),
+            TestContext.Current.CancellationToken);
+        Assert.Contains("Security-sensitive: `true`", attributes);
+
+        // ckLanguage 1: the key is a CK v2 feature (message 90)
+        var v1Files = new Dictionary<string, string>
+        {
+            ["attributes/attributes.yaml"] = "attributes:\n  - id: PasswordHash\n    valueType: String\n    securitySensitive: true\n"
+        };
+        var operationResult = new OperationResult();
+        await Assert.ThrowsAnyAsync<Exception>(() => _fixture.Services.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_fixture.WriteSource("v1", "V1Sensitive-1.0.0", ["System-[2.5,3.0)"], v1Files),
+                operationResult));
+        Assert.Contains(operationResult.Messages, m => m.MessageNumber == 90 && m.MessageText.Contains("securitySensitive"));
+    }
+
+    [Fact]
     public async Task RangeRetention_MajorQualifiesForeignInterfaceReferences_AndResolvesLater()
     {
         await PublishSystemAsync(_rangeRetention);

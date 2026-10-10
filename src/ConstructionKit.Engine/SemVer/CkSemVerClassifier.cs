@@ -33,7 +33,8 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         var baselineVisibility = new CkVisibilityIndex(baseline);
         var currentVisibility = new CkVisibilityIndex(current);
         return changes
-            .Select(change => CapInternal(ClassifyChange(change, baseline, current), baselineVisibility, currentVisibility))
+            .Select(change => CapInternal(Mark(ClassifyChange(change, baseline, current), baseline, current),
+                baselineVisibility, currentVisibility))
             .ToList();
     }
 
@@ -259,11 +260,15 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change"),
             { ElementKind: CkModelElementKind.Attribute, Property: "metaData" } =>
                 (CkSemVerLevel.Minor, "attribute metadata changes, no data break"),
+            // AB#6269 row A3: the marker alone changes no data and no API; it only decides how a later access
+            // tightening is classified.
+            { ElementKind: CkModelElementKind.Attribute, Property: "securitySensitive" } =>
+                (CkSemVerLevel.Minor, "security-sensitivity marker set or cleared, no data or API change (row A3)"),
 
             // ── Attribute assignments on types, records and association roles ──────────────
             { ElementKind: CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
                 or CkModelElementKind.AssociationRoleAttribute } =>
-                ClassifyAttributeAssignmentChange(change, current),
+                ClassifyAttributeAssignmentChange(change, baseline, current),
 
             // ── Type associations ───────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.TypeAssociation, ChangeKind: CkModelChangeKind.Added } =>
@@ -570,7 +575,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     }
 
     private static (CkSemVerLevel, string) ClassifyAttributeAssignmentChange(CkModelChange change,
-        CkCompiledModelRoot current)
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
         switch (change.ChangeKind)
         {
@@ -618,16 +623,130 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             case CkModelChangeKind.Modified when change.Property == "ownership":
                 return (CkSemVerLevel.Minor, "blueprint re-apply and export behavior change for this assignment");
 
-            // CK v2 (AB#5668): an access change is Minor with an "access/security" changelog note.
-            // A stricter access can break generic GraphQL clients (concept §4.3.2); hiding a credential such as
-            // PasswordHash is the documented security exception. Phase 2 refines this classification.
+            // CK v2 (AB#6269 row T7): access is ordered ReadWrite < ReadOnly < MethodOnly < Hidden. Tightening breaks
+            // generic GraphQL clients and dependents (Major), relaxing is Minor. Platform-owner exception: tightening
+            // an attribute that is security-sensitive in both versions is Minor + requiresAcknowledge (see Mark).
             case CkModelChangeKind.Modified when change.Property == "access":
-                return (CkSemVerLevel.Minor,
-                    "access/security: GraphQL exposure of this attribute changes — review generic API clients");
+                if (!IsAccessTightening(change))
+                {
+                    return (CkSemVerLevel.Minor,
+                        "access/security: access relaxed — GraphQL exposure of this attribute widens (row T7)");
+                }
+
+                return IsSecuritySensitiveInBoth(change, baseline, current)
+                    ? (CkSemVerLevel.Minor,
+                        "access/security: access tightened on a security-sensitive attribute — accepted security " +
+                        "exception, requires acknowledge (row T7)")
+                    : (CkSemVerLevel.Major,
+                        "access/security: access tightened, generic GraphQL clients and dependents lose write/read access (row T7)");
 
             default:
                 return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "attribute assignment change — defensively classified as major");
         }
+    }
+
+    private static int AccessRank(string? access) => access switch
+    {
+        nameof(CkAttributeAccessDto.ReadOnly) => 1,
+        nameof(CkAttributeAccessDto.MethodOnly) => 2,
+        nameof(CkAttributeAccessDto.Hidden) => 3,
+        _ => 0
+    };
+
+    private static bool IsAccessTightening(CkModelChange change) =>
+        change.Property == "access" && AccessRank(change.NewValue) > AccessRank(change.OldValue);
+
+    /// <summary>
+    ///     AB#6269: the attribute definition behind an assignment is <c>securitySensitive</c> in the baseline and in
+    ///     the current version. Definitions of another model cannot be inspected and never qualify.
+    /// </summary>
+    private static bool IsSecuritySensitiveInBoth(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        bool IsSensitive(CkCompiledModelRoot model)
+        {
+            var assignment = FindAttributeAssignment(model, change.ElementKind, change.ElementId);
+            if (assignment == null || assignment.CkAttributeId.ModelId.Name != model.ModelId.Name)
+            {
+                return false;
+            }
+
+            return model.Attributes?.FirstOrDefault(a =>
+                a.AttributeId.FullName == assignment.CkAttributeId.ElementId.FullName)?.SecuritySensitive == true;
+        }
+
+        return IsSensitive(baseline) && IsSensitive(current);
+    }
+
+    /// <summary>
+    ///     AB#6270 rows B1–B4 and the AB#6269 security exception: markers on top of the level. Behavioural changes keep
+    ///     their level and are reported in their own section; a unique index on a stable base and a security-sensitive
+    ///     access tightening require an acknowledge.
+    /// </summary>
+    private static CkClassifiedModelChange Mark(CkClassifiedModelChange classified, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        var change = classified.Change;
+        var isBehavioural = change switch
+        {
+            { ElementKind: CkModelElementKind.Attribute, Property: "defaultValues" } => true,
+            { ElementKind: CkModelElementKind.Type, Property: "displayNameRule" or "displayDescriptionRule"
+                or "enableChangeStreamPreAndPostImages" } => true,
+            { ElementKind: CkModelElementKind.TypeAttribute or CkModelElementKind.RecordAttribute
+                or CkModelElementKind.AssociationRoleAttribute, Property: "autoCompleteValues" or "autoIncrementReference" } => true,
+            { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod, Property: "timeoutSeconds" } => true,
+            { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Removed } => true,
+            { ElementKind: CkModelElementKind.TypeIndex } => !IsUniqueIndex(change.NewValue),
+            _ => false
+        };
+
+        if (change is { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Added } &&
+            IsUniqueIndex(change.NewValue) && IsStableBase(current, OwnerTypeOfIndex(change.ElementId)))
+        {
+            return classified with
+            {
+                RequiresAcknowledge = true,
+                Reason = "unique index added on a stable base — every derived type in every dependent model gets it, " +
+                         "and existing data there may violate it; requires acknowledge (row B4)"
+            };
+        }
+
+        var requiresAcknowledge = change.ElementKind is CkModelElementKind.TypeAttribute
+                                      or CkModelElementKind.RecordAttribute or CkModelElementKind.AssociationRoleAttribute &&
+                                  IsAccessTightening(change) && IsSecuritySensitiveInBoth(change, baseline, current);
+        return isBehavioural || requiresAcknowledge
+            ? classified with { IsBehavioural = isBehavioural, RequiresAcknowledge = requiresAcknowledge }
+            : classified;
+    }
+
+    private static string OwnerTypeOfIndex(string elementId)
+    {
+        const string suffix = "/index";
+        return elementId.EndsWith(suffix, StringComparison.Ordinal)
+            ? elementId.Substring(0, elementId.Length - suffix.Length)
+            : elementId;
+    }
+
+    /// <summary>
+    ///     AB#6270: a stable base is a type other models may derive from. In a <c>ckLanguage: 2</c> model: public, not
+    ///     final and effectively <c>derivable: Any</c>. In a v1 model only <c>System/Entity</c> and
+    ///     <c>System/Configuration</c> (no new meta-model field, platform-owner decision).
+    /// </summary>
+    internal static bool IsStableBase(CkCompiledModelRoot model, string typeFullName)
+    {
+        var type = model.Types?.FirstOrDefault(t => t.TypeId.FullName == typeFullName);
+        if (type == null)
+        {
+            return false;
+        }
+
+        if (model.EffectiveCkLanguage >= 2)
+        {
+            return CkModifiers.ResolveVisibility(type.Visibility) == CkVisibilityDto.Public && !type.IsFinal &&
+                   CkModifiers.ResolveDerivable(type.Derivable, model.EffectiveCkLanguage) == CkDerivableDto.Any;
+        }
+
+        return model.ModelId.Name == "System" && type.TypeId.Name is "Entity" or "Configuration";
     }
 
     /// <summary>

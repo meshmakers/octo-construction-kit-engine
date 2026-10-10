@@ -94,7 +94,8 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         var json = Encoding.UTF8.GetString(stream.ToArray());
 
         foreach (var key in new[] { "\"interfaces\"", "\"declaredImplements\"", "\"allImplementedInterfaces\"",
-                     "\"definedMethods\"", "\"allMethods\"", "\"access\"", "\"ckLanguage\"", "\"visibility\"", "\"derivable\"" })
+                     "\"definedMethods\"", "\"allMethods\"", "\"access\"", "\"ckLanguage\"", "\"visibility\"", "\"derivable\"",
+                     "\"securitySensitive\"" })
         {
             Assert.DoesNotContain(key, json);
         }
@@ -145,6 +146,22 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
             cache.GetRtCkAttribute("target", new RtCkId<CkAttributeId>($"{M}/Name")).Visibility);
         Assert.Equal(CkVisibilityDto.Internal,
             cache.GetRtCkInterface("target", new RtCkId<CkInterfaceId>($"{M}/Named-1")).Visibility);
+    }
+
+    [Fact]
+    public async Task SecuritySensitive_SurvivesTheCacheJson()
+    {
+        // AB#6269
+        var model = Model();
+        model.Attributes!.Single(a => a.AttributeId == "PasswordHash").SecuritySensitive = true;
+        var operationResult = new OperationResult();
+        var graph = Resolve(model, operationResult);
+        Assert.Empty(operationResult.Messages);
+
+        var cache = await RoundTripAsync(graph);
+
+        Assert.True(cache.GetRtCkAttribute("target", new RtCkId<CkAttributeId>($"{M}/PasswordHash")).SecuritySensitive);
+        Assert.False(cache.GetRtCkAttribute("target", new RtCkId<CkAttributeId>($"{M}/Name")).SecuritySensitive);
     }
 
     [Fact]

@@ -176,6 +176,7 @@ surface in the dependency diff.
 | CK v2: method **removed** | Callers of the method break |
 | CK v2: breaking method field change (rows M3–M10, M12) | Callers break — publish a new method version (`ChangePassword-2`) instead |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
+| CK v2: attribute-assignment `access` tightened (`ReadWrite < ReadOnly < MethodOnly < Hidden`; row T7) | Generic GraphQL clients and dependents lose write/read access |
 | CK v2: `visibility` `Public → Internal` (type, record, enum, attribute, association role, interface, method; resolved value, omitted = `Public`) | Other models referencing the element break |
 | CK v2: `derivable` `Any → Model` (type, record; resolved value) | Other models deriving from the element break |
 | CK v2: `ckLanguage` raised (`1 → 2`) without declaring `derivable: Any` on every type/record | The `derivable` default flips from `Any` to `Model`; reported as a `derivable` change per element |
@@ -208,7 +209,9 @@ surface in the dependency diff.
 | CK v2: new interface | Purely additive |
 | CK v2: new `implements` entry on a type | Additive |
 | CK v2: new method | Additive |
-| CK v2: attribute-assignment `access` changed (resolved value; omitted = `ReadWrite`) | **Phase 1 rule, with an "access/security" changelog note.** The concept (§4.3.2) calls a stricter access breaking for generic GraphQL clients; hiding a credential (`PasswordHash`) is the documented security exception. Phase 2 refines this classification |
+| CK v2: attribute-assignment `access` relaxed (resolved value; omitted = `ReadWrite`; row T7) | "access/security" changelog note |
+| CK v2: `access` tightened on an attribute that is `securitySensitive` in both versions (row T7 exception) | Accepted security exception: Minor + `requiresAcknowledge` |
+| CK v2: attribute `securitySensitive` set or cleared (row A3) | Marker only, no data or API change |
 | CK v2: `ckLanguage` raised (`1 → 2`; omitted = 1) | Older engines reject the model with message 91 instead of misreading it. Major instead when it flips a `derivable` default (see Major) |
 | CK v2: `visibility` `Internal → Public` | Relaxation |
 | CK v2: interface `deprecated` set or cleared | Dependents get (or lose) a compile warning; nothing breaks |
@@ -228,7 +231,8 @@ surface in the dependency diff.
 
 Every row has an id and a test named after it (`N1_…` in `tests/ConstructionKit.Engine.Tests/SemVer/Rows/`); the
 classification guard checks both directions. Rows apply to `ckLanguage: 2` elements (interfaces, methods, visibility,
-range retention); no level of a v1 rule changes. Rows T, E, R, A (AB#6269) and B (AB#6270) follow.
+range retention, `securitySensitive`); no level of a v1 rule changes. Rows T, E, R and A restate the v1 rules for public
+types, enums, records and attribute definitions with one test each and add the CK v2 access rule (T7).
 
 **Internal elements (AB#6266).** Other models can never reference an internal element, so it is not part of the
 compatibility surface. A change counts as internal when the element — itself or through its owner (type, record,
@@ -281,9 +285,50 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M9 | `kind` static ↔ instance | Major |
 | M10 | `idempotent` true → false / false → true | Major / Minor |
 | M11 | `timeoutSeconds` changed | Minor (behavioural) |
-| M12 | Authorization stricter (role or scope removed, `allowSelf` true → false, authorization added) / looser | Major / Minor; mixed → Major. Assumption until the method gateway exists (Phase 3): roles and scopes are any-of |
+| M12 | Authorization stricter (role or scope removed, `allowSelf` true → false, authorization added) / looser | Major / Minor; mixed → Major. **Assumption:** roles and scopes are any-of (any one listed role or scope suffices); Phase 3 (method gateway) confirms it |
 | M13 | Parameter `sensitive` changed | Minor |
 | M14 | Description of the method, a parameter or an error | Patch |
+
+**Public types, stable bases, enums, records, attribute definitions (AB#6269).** A *stable base* is a type other
+models may derive from: in a `ckLanguage: 2` model a public, non-final type with effective `derivable: Any`; in a v1
+model only `System/Entity` and `System/Configuration` (derived, no meta-model field). Stable bases are public types,
+so T1–T7 apply to them unchanged.
+
+| Row | Change | Level |
+| --- | ------ | ----- |
+| T1 | Optional attribute added to a public type | Minor |
+| T2 | Implemented interface added | Minor |
+| T3 | Attribute, association, implemented interface or method removed | Major |
+| T4 | Base type changed | Major |
+| T5 | `isAbstract` / `isFinal` false → true / true → false | Major / Minor |
+| T6 | `derivable` Any → Model / Model → Any | Major / Minor |
+| T7 | Attribute `access` stricter (order `ReadWrite < ReadOnly < MethodOnly < Hidden`) / looser | Major / Minor. **Security exception** (platform-owner decision 2026-10-10): tightening an attribute that is `securitySensitive: true` in the baseline and the current version is Minor + `requiresAcknowledge`; every other change of such an attribute follows the normal rules |
+| E1 | Enum value added (also to a non-extensible enum) | Minor |
+| E2 | Enum value removed or renumbered; `useFlags` changed; `isExtensible` true → false | Major |
+| R1 | Optional record attribute added | Minor |
+| R2 | Record attribute removed, its attribute id changed, optional → required | Major |
+| A1 | Attribute definition `description` / `metaData` | Patch / Minor |
+| A2 | Attribute definition value type, record id or enum id (`String → Secret` stays Minor, AB#5528) | Major |
+| A3 | Attribute `securitySensitive` set or cleared (`ckLanguage: 2`, resolved value: omitted = false) | Minor |
+
+`securitySensitive: true` marks password hashes, security stamps, tokens and 2FA secrets (System.Identity marks them in
+Phase 4, F4.2). It is a stored meta-model field (schema, DTO, graph, Mongo, reflection round-trip gate); a v1 model that
+declares it fails with message 90.
+
+**Behavioural changes (AB#6270).** Changes that keep the schema compatible but change runtime behaviour keep their
+level and are flagged `IsBehavioural`; the verdict report lists them under "Behavioural changes" (after the change
+list) and the changelog moves them from "Added" / "Changed" into a section `### Behavioural changes`. Changes that
+require an acknowledge (`RequiresAcknowledge`) are listed there too, with "(requires acknowledge)"; breaking ones stay
+under "Breaking" with the same suffix. The acknowledge itself is built in F2.2 / F2.3. **Format change for v1 models:**
+a changelog section that contains behavioural changes gets the new heading and those lines move under it; a report
+gets the extra list. Without behavioural changes the output is unchanged.
+
+| Row | Change | Level |
+| --- | ------ | ----- |
+| B1 | Attribute default values, `displayNameRule` / `displayDescriptionRule`, `autoCompleteValues`, `autoIncrementReference`, `enableChangeStreamPreAndPostImages`, method `timeoutSeconds` | unchanged (Minor/Patch), marked behavioural |
+| B2 | Non-unique index added or removed (any index removed) | Minor, marked behavioural |
+| B3 | Unique index added on a type that is not a stable base | Major, no marker |
+| B4 | Unique index added on a stable base | Major + `requiresAcknowledge`; the reason names the impact on derived types in other models |
 
 **Range retention (AB#6271).** For a range-retaining model the declared ranges are compared by dependency name
 (`Dependency range '<name>'`). The exact closure (`dependencies`) is still diffed as before; removing the rule "resolved

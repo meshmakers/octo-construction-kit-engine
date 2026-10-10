@@ -121,9 +121,15 @@ public class CkChangelogGenerator : ICkChangelogGenerator
             AppendGroup(section, "Breaking", classifiedChanges
                 .Where(c => c.Level == CkSemVerLevel.Major));
             AppendGroup(section, "Added", classifiedChanges
-                .Where(c => c.Level != CkSemVerLevel.Major && c.Change.ChangeKind == CkModelChangeKind.Added));
+                .Where(c => c.Level != CkSemVerLevel.Major && !IsBehavioural(c) &&
+                            c.Change.ChangeKind == CkModelChangeKind.Added));
             AppendGroup(section, "Changed", classifiedChanges
-                .Where(c => c.Level != CkSemVerLevel.Major && c.Change.ChangeKind != CkModelChangeKind.Added));
+                .Where(c => c.Level != CkSemVerLevel.Major && !IsBehavioural(c) &&
+                            c.Change.ChangeKind != CkModelChangeKind.Added));
+            // AB#6270: behavioural changes and acknowledged exceptions get their own section (breaking ones stay
+            // under "Breaking"). Without such changes the section output is unchanged.
+            AppendGroup(section, "Behavioural changes", classifiedChanges
+                .Where(c => c.Level != CkSemVerLevel.Major && IsBehavioural(c)));
         }
 
         // Trim the trailing blank line of the last group, then terminate the section
@@ -141,6 +147,9 @@ public class CkChangelogGenerator : ICkChangelogGenerator
         return section.ToString();
     }
 
+    private static bool IsBehavioural(CkClassifiedModelChange change) =>
+        change.IsBehavioural || change.RequiresAcknowledge;
+
     private static void AppendGroup(StringBuilder section, string heading,
         IEnumerable<CkClassifiedModelChange> changes)
     {
@@ -154,7 +163,8 @@ public class CkChangelogGenerator : ICkChangelogGenerator
         foreach (var change in changeList)
         {
             section.Append(
-                $"- {CkModelChangeFormatter.Format(change.Change)} _({CkModelChangeFormatter.GetLevelLabel(change.Level).ToLowerInvariant()} — {change.Reason})_\n");
+                $"- {CkModelChangeFormatter.Format(change.Change)} _({CkModelChangeFormatter.GetLevelLabel(change.Level).ToLowerInvariant()} — {change.Reason}" +
+                (change.RequiresAcknowledge ? " — requires acknowledge" : "") + ")_\n");
         }
 
         section.Append('\n');

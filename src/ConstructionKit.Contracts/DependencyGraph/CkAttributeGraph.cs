@@ -30,6 +30,7 @@ public class CkAttributeGraph
         Ownership = AttributeOwnership.Resolve(attributeDto.Ownership, attributeDto.IsRuntimeState);
         Description = attributeDto.Description;
         MetaData = attributeDto.MetaData;
+        SecuritySensitive = attributeDto.SecuritySensitive ?? false;
     }
 
     /// <summary>
@@ -143,4 +144,10 @@ public class CkAttributeGraph
     ///     Settable so a cache written before CK v2 (no key) reads <c>Public</c>.
     /// </summary>
     public CkVisibilityDto Visibility { get; set; } = CkVisibilityDto.Public;
+
+    /// <summary>
+    ///     CK v2 (AB#6269): the attribute is marked security-sensitive. Settable so a cache written before (no key)
+    ///     reads false; omitted from the cache JSON while false.
+    /// </summary>
+    public bool SecuritySensitive { get; set; }
 }

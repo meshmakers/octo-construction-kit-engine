@@ -54,7 +54,7 @@ public class CkModelDiffService : ICkModelDiffService
                 nameof(CkAttributeDto.AttributeId), nameof(CkAttributeDto.ValueType), nameof(CkAttributeDto.ValueCkRecordId),
                 nameof(CkAttributeDto.ValueCkEnumId), nameof(CkAttributeDto.DefaultValues), nameof(CkAttributeDto.IsRuntimeState),
                 nameof(CkAttributeDto.Ownership), nameof(CkAttributeDto.Description), nameof(CkAttributeDto.MetaData),
-                nameof(CkAttributeDto.Visibility)
+                nameof(CkAttributeDto.Visibility), nameof(CkAttributeDto.SecuritySensitive)
             ],
             [typeof(CkEnumDto)] =
             [
@@ -230,7 +230,7 @@ public class CkModelDiffService : ICkModelDiffService
         ];
         Element(CkModelElementKind.TypeMethod, methodProperties);
         Element(CkModelElementKind.Attribute, "valueType", "valueCkRecordId", "valueCkEnumId", "defaultValues",
-            "isRuntimeState", "ownership", "metaData", "description", "visibility");
+            "isRuntimeState", "ownership", "metaData", "description", "visibility", "securitySensitive");
         Element(CkModelElementKind.Enum, "useFlags", "isExtensible", "description", "visibility");
         Element(CkModelElementKind.EnumValue, "key", "isExtension", "description");
         Element(CkModelElementKind.Record, "derivedFromCkRecordId", "isFinal", "isAbstract", "recordKey", "description",
@@ -646,6 +646,9 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatMetaData(baselineAttribute.MetaData), FormatMetaData(currentAttribute.MetaData));
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "description",
                     baselineAttribute.Description, currentAttribute.Description);
+                // AB#6269: compared on the effective value, an omitted flag and 'securitySensitive: false' are equal.
+                AddModified(attributeChanges, CkModelElementKind.Attribute, id, "securitySensitive",
+                    baselineAttribute.SecuritySensitive ?? false, currentAttribute.SecuritySensitive ?? false);
             });
     }
 

@@ -39,7 +39,10 @@ public class CkV2SemVerTests
         Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.TypeInterface, ChangeKind: CkModelChangeKind.Added });
         Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Added });
         Assert.Contains(classified, c => c.Change is { Property: "access" } && c.Reason.StartsWith("access/security"));
-        Assert.All(classified, c => Assert.Equal(CkSemVerLevel.Minor, c.Level));
+        // AB#6269 (row T7): the access tightenings of the adoption (ReadWrite -> Hidden / ReadOnly) are Major now;
+        // everything else of the adoption stays Minor.
+        Assert.All(classified.Where(c => c.Change.Property != "access"), c => Assert.Equal(CkSemVerLevel.Minor, c.Level));
+        Assert.All(classified.Where(c => c.Change.Property == "access"), c => Assert.Equal(CkSemVerLevel.Major, c.Level));
     }
 
     [Fact]
@@ -305,11 +308,13 @@ public class CkV2SemVerTests
         Assert.Equal(CkSemVerLevel.Patch, Level(CkV2TestModels.CreateModel(), current));
     }
 
+    // AB#6269 (row T7): a stricter access is Major now, a looser one Minor; the note stays.
     [Theory]
-    [InlineData(null, CkAttributeAccessDto.Hidden)]
-    [InlineData(CkAttributeAccessDto.Hidden, CkAttributeAccessDto.ReadWrite)]
-    [InlineData(CkAttributeAccessDto.ReadOnly, CkAttributeAccessDto.MethodOnly)]
-    public void AccessChanged_IsMinorWithSecurityNote(CkAttributeAccessDto? before, CkAttributeAccessDto after)
+    [InlineData(null, CkAttributeAccessDto.Hidden, CkSemVerLevel.Major)]
+    [InlineData(CkAttributeAccessDto.Hidden, CkAttributeAccessDto.ReadWrite, CkSemVerLevel.Minor)]
+    [InlineData(CkAttributeAccessDto.ReadOnly, CkAttributeAccessDto.MethodOnly, CkSemVerLevel.Major)]
+    public void AccessChanged_IsClassifiedByDirectionWithSecurityNote(CkAttributeAccessDto? before,
+        CkAttributeAccessDto after, CkSemVerLevel expected)
     {
         var baseline = SemVerTestModels.CreateModel();
         SemVerTestModels.GetMachine(baseline).Attributes![0].Access = before;
@@ -318,7 +323,7 @@ public class CkV2SemVerTests
 
         var change = Assert.Single(Classify(baseline, current));
         Assert.Equal("access", change.Change.Property);
-        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.Equal(expected, change.Level);
         Assert.StartsWith("access/security", change.Reason);
     }
 

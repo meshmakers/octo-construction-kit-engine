@@ -62,6 +62,12 @@ internal class ContentGenerator(
             await AddTitle(outputFile, null, attribute.CkAttributeId.ElementId.SemanticVersionedFullName)
                 .ConfigureAwait(false);
             await WriteCkV2Modifiers(outputFile, attribute.Visibility).ConfigureAwait(false);
+            if (attribute.SecuritySensitive)
+            {
+                // AB#6269: written only when set, so v1 docs are unchanged.
+                await outputFile.WriteLineAsync("Security-sensitive: `true`").ConfigureAwait(false);
+                await outputFile.WriteLineAsync().ConfigureAwait(false);
+            }
 
             if (attribute.Description != null)
             {

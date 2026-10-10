@@ -114,4 +114,13 @@ public class CkAttributeDto
     [YamlMember(Alias = "visibility", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public CkVisibilityDto? Visibility { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#6269): marks a security-sensitive attribute (password hashes, security stamps, tokens, 2FA
+    ///     secrets). Tightening the <c>access</c> of an assignment of an attribute that is security-sensitive in the
+    ///     baseline and the current version is classified Minor + <c>requiresAcknowledge</c> instead of Major (row T7).
+    ///     <c>null</c> (omitted) means false. Requires <c>ckLanguage: 2</c>.
+    /// </summary>
+    [YamlMember(Alias = "securitySensitive", DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public bool? SecuritySensitive { get; set; }
 }

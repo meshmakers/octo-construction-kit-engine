@@ -494,6 +494,12 @@ internal class ElementResolver : IElementResolver
         foreach (var ckAttribute in model.Attributes ?? [])
         {
             CheckModifiers(new CkId<CkAttributeId>(model.ModelId, ckAttribute.AttributeId), ckAttribute.Visibility);
+            if (ckAttribute.SecuritySensitive != null)
+            {
+                // AB#6269
+                Report(new CkId<CkAttributeId>(model.ModelId, ckAttribute.AttributeId), "securitySensitive",
+                    new CkId<CkAttributeId>(model.ModelId, ckAttribute.AttributeId));
+            }
         }
 
         foreach (var ckRole in model.AssociationRoles ?? [])

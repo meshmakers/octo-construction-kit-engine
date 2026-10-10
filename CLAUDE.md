@@ -974,7 +974,11 @@ N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal
 owners at Minor), I1–I11 interfaces (AB#6267, optional members Minor, association members keyed by role with a `target`
 property), M1–M14 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
 rendered `signature` stays as a level-None summary), D1–D7 range retention (AB#6271, element kind `DependencyRange`,
-model property `rangeRetention`). Rows T/E/R/A (AB#6269) and B (AB#6270) are known gaps of the classification guard.
+model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute
+definitions and access (AB#6269; access tightening Major, security exception Minor + `RequiresAcknowledge` for
+`securitySensitive` attributes), B1–B4 behavioural changes (AB#6270; `CkClassifiedModelChange.IsBehavioural` /
+`RequiresAcknowledge`, own "Behavioural changes" section in report and changelog, stable base =
+`CkSemVerClassifier.IsStableBase`). The guard's `KnownGaps` list is empty.
 
 ### Touch-point checklist (keep for every new CK field — contract §2.7)
 
@@ -1009,6 +1013,13 @@ that gate is green.
 | 10 | Mongo entity + write + read-back (gate: `CkModelReflectionComparer`, mandatory) | engine-mongodb (Persistence agent) | | | | | engine-mongodb (Persistence agent) | engine-mongodb (Persistence agent) |
 | 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |
 | 12 | Studio CK browser query (refinery-studio `src/app/graphQL/`, AB#5924) — v2 fields go into the CK v2 follow-up documents run by `CkLanguage2Service`, **never** into the v1 queries (`getCkTypeDetails` etc. must keep working against asset repos without the CK v2 meta API; studio `CLAUDE.md` "CK language 2 in the CK browser") | `getCkModelsLanguage2` | `getCkInterfaces`, `getCkInterfaceDetails`, `getCkTypeLanguage2` | `getCkTypeLanguage2` | `getCkTypeAttributesAccess` | `getCkTypeLanguage2` | `getCkTypeLanguage2`, `getCkElementLanguage2` | `getCkInterfaceDetails` |
+
+**`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
+(2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied
+by reference; (5) `CkAttributeGraph.SecuritySensitive`, omitted from the cache JSON while false (`OmitCkV2Defaults`);
+(6) message 90 in a v1 model; (7) diff property `securitySensitive`, rows A3 and T7, guard probe; (8) —;
+(9) "Security-sensitive: `true`" line in `Attributes.md`; (10) engine-mongodb `CkAttribute.SecuritySensitive`
+(reflection gate); (11) asset-repo CK meta API and (12) Studio: follow-up (not needed for classification).
 
 Tests: `CkV2SchemaTests`, `CkV2ContractTests`, `CkV2SemVerTests` (`tests/ConstructionKit.Engine.Tests/CkV2`),
 `CkV2InterfaceResolverTests` / `CkV2MethodResolverTests` / `CkV2ModifierResolverTests` /

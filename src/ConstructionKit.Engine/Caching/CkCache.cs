@@ -297,6 +297,11 @@ internal class CkCache : IDisposable
             {
                 property.ShouldSerialize = (_, value) => value is IEnumerable enumerable && enumerable.GetEnumerator().MoveNext();
             }
+            else if (typeInfo.Type == typeof(CkAttributeGraph) && property.Name == "securitySensitive")
+            {
+                // AB#6269
+                property.ShouldSerialize = (_, value) => value is true;
+            }
             else if (typeInfo.Type == typeof(CkTypeAttributeGraph) && property.Name == "access")
             {
                 property.ShouldSerialize = (_, value) => value is CkAttributeAccessDto access &&

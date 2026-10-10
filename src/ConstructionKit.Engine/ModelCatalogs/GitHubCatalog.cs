@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
@@ -98,6 +99,13 @@ public abstract class GitHubCatalog : CachedCatalog
     private readonly IGitHubClientFactory _gitHubClientFactory;
     private readonly GitHubCatalogOptions _gitHubOptions;
 
+    // Raw JSON payload of compiled models per model id (AB#6330). A published model version is immutable, so the
+    // downloaded file never goes stale except when this catalog republishes it (entry invalidated in PublishAsync).
+    // The bytes are cached, not the deserialized object: every caller deserializes its own instance, so a caller
+    // mutating the returned CkCompiledModelRoot can never corrupt the cache. Failures / 404s are never cached.
+    private const int MaxCachedModelPayloads = 512;
+    private readonly ConcurrentDictionary<CkModelId, byte[]> _modelPayloadCache = new();
+
     // Static gh-pages reads cost nothing against the per-user 5000/h GitHub REST quota
     // that Octokit pulls from. Prefer the pages URL for every read; the Octokit client is
     // only fallback for setups that explicitly disabled gh-pages, plus the publish path.
@@ -186,6 +194,10 @@ public abstract class GitHubCatalog : CachedCatalog
     private async Task<CkCompiledModelRoot?> GetFromPathAsync(CkModelId modelId, string pagesUrl,
         OperationResult operationResult, CancellationToken? cancellationToken)
     {
+        if (_modelPayloadCache.TryGetValue(modelId, out var cachedPayload))
+        {
+            return await DeserializeAndCacheAsync(modelId, cachedPayload, operationResult).ConfigureAwait(false);
+        }
 
         if (IsPagesUriConfigured)
         {
@@ -195,21 +207,8 @@ public abstract class GitHubCatalog : CachedCatalog
                 var response = await httpClient.GetAsync(pagesUrl, cancellationToken ?? CancellationToken.None).ConfigureAwait(false);
                 if (response.IsSuccessStatusCode)
                 {
-#if NETSTANDARD2_0
-                using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-#else
-                    await using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
-#endif
-                    var ckCompiledModelRoot = await _ckJsonSerializer
-                        .DeserializeCompiledModelRootAsync(stream, "", operationResult,
-                            tolerantToUnknownProperties: true).ConfigureAwait(false);
-                    if (operationResult.HasErrors)
-                    {
-                        throw ModelCatalogException.ErrorDuringModelLoad(modelId, CatalogName,
-                            operationResult);
-                    }
-
-                    return ckCompiledModelRoot;
+                    var payload = await response.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+                    return await DeserializeAndCacheAsync(modelId, payload, operationResult).ConfigureAwait(false);
                 }
 
                 if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -239,15 +238,29 @@ public abstract class GitHubCatalog : CachedCatalog
             return null;
         }
 
-        var ckCompiledModelRoot2 = await _ckJsonSerializer
-            .DeserializeCompiledModelRootAsync(r.Value.Item1, "", operationResult,
+        return await DeserializeAndCacheAsync(modelId, System.Text.Encoding.UTF8.GetBytes(r.Value.Item1),
+            operationResult).ConfigureAwait(false);
+    }
+
+    private async Task<CkCompiledModelRoot> DeserializeAndCacheAsync(CkModelId modelId, byte[] payload,
+        OperationResult operationResult)
+    {
+        using var stream = new MemoryStream(payload, false);
+        var ckCompiledModelRoot = await _ckJsonSerializer
+            .DeserializeCompiledModelRootAsync(stream, "", operationResult,
                 tolerantToUnknownProperties: true).ConfigureAwait(false);
         if (operationResult.HasErrors)
         {
-            throw ModelCatalogException.ErrorDuringModelLoad(modelId, CatalogName,
-                operationResult);
+            throw ModelCatalogException.ErrorDuringModelLoad(modelId, CatalogName, operationResult);
         }
-        return ckCompiledModelRoot2;
+
+        if (_modelPayloadCache.Count >= MaxCachedModelPayloads)
+        {
+            _modelPayloadCache.Clear();
+        }
+
+        _modelPayloadCache[modelId] = payload;
+        return ckCompiledModelRoot;
     }
 
     /// <inheritdoc />
@@ -263,6 +276,7 @@ public abstract class GitHubCatalog : CachedCatalog
 
         try
         {
+            _modelPayloadCache.TryRemove(ckCompiledModel.ModelId, out _);
             var content = await ReadContentAsync(ckCompiledModel).ConfigureAwait(false);
 
             // Review G3 E-M5: a version lives under one root only, as in the local catalog — the same version in v2
@@ -323,6 +337,9 @@ public abstract class GitHubCatalog : CachedCatalog
         {
             throw ModelCatalogException.PublishFailed(ckCompiledModel.ModelId, CatalogName, e);
         }
+
+        // Drop again: a read racing the upload may have cached the pre-publish file.
+        _modelPayloadCache.TryRemove(ckCompiledModel.ModelId, out _);
 
         try
         {

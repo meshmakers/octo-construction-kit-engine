@@ -143,6 +143,8 @@ When true, evaluation results whose `EvaluationPath` contains `/additionalProper
 
 `LocalFileSystemCatalog.GetAsync` and `GitHubCatalog`'s reads pass `true`. **Publish, compile, and source-input paths always pass `false`** so authoring mistakes are still caught.
 
+`GitHubCatalog.GetAsync` caches the downloaded JSON payload of a compiled model per `CkModelId` in memory (published versions are immutable; bounded to 512 entries), so repeated lookups cost one HTTP GET (or Octokit call) per model and process. The bytes are cached, not the object: each call deserializes its own `CkCompiledModelRoot`, so callers may mutate the result. Failures, 404s and deserialization errors are never cached; `PublishAsync` drops the entry of the republished model.
+
 ### Phase 3: Element Resolution
 
 **File**: `src/ConstructionKit.Engine/Resolvers/ElementResolver.cs`

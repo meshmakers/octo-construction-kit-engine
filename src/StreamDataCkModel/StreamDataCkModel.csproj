@@ -17,6 +17,14 @@
              the dependency resolves from the remote catalog cache, which only knows the System versions
              published so far (a new System minor would fail the System floor, AB#5532). -->
         <OctoLocalCatalogIsEnabled>true</OctoLocalCatalogIsEnabled>
+        <!-- AB#6326: every attribute in ConstructionKit/attributes/*.yaml declares its ownership
+             (SeedOwned / TenantOwned / RuntimeState / Secret, or the older isRuntimeState), reviewed
+             against the seed ownership audit AB#6317. The CkLintRuntimeStateMarkers task is armed: a new
+             attribute without a marker FAILS the build (OCTO-CK001) instead of silently defaulting to
+             seed-owned, where the next blueprint update would overwrite a value the tenant entered.
+             Review question for every new attribute: could an operator or user type this value in the
+             product? -->
+        <OctoEnforceRuntimeStateMarkers>true</OctoEnforceRuntimeStateMarkers>
     </PropertyGroup>
 
     <ItemGroup>
@@ -43,6 +51,20 @@
         </ProjectReference>
         <ProjectReference Include="..\Runtime.Contracts\Runtime.Contracts.csproj"/>
         <ProjectReference Include="..\SystemCkModel\SystemCkModel.csproj"/>
+    </ItemGroup>
+
+    <!-- AB#6326: build order only. The ownership lint (OctoEnforceRuntimeStateMarkers above) runs the
+         CkLintRuntimeStateMarkers task from this repository's build output (Directory.Build.targets), so the
+         task assembly must be built before this project. Nothing flows into the package. -->
+    <ItemGroup>
+        <ProjectReference Include="..\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"
+                          SetTargetFramework="TargetFramework=net10.0"
+                          Condition="'$(MSBuildRuntimeType)' == 'Core'" />
+        <ProjectReference Include="..\ConstructionKit.MsBuildTasks\ConstructionKit.MsBuildTasks.csproj"
+                          ReferenceOutputAssembly="false" PrivateAssets="all"
+                          SetTargetFramework="TargetFramework=netstandard2.0"
+                          Condition="'$(MSBuildRuntimeType)' != 'Core'" />
     </ItemGroup>
 
     <ItemGroup>

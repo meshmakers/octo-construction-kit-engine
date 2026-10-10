@@ -263,4 +263,36 @@
                  Text="Embedded migration files: @(_OctoMigrationResourceFilesNew->'%(Filename)%(Extension)', ', ')" />
     </Target>
 
+    <!--
+        Attribute ownership lint for the CK models of THIS repository (AB#6326). Other repositories get the
+        CkLintRuntimeStateMarkers target from the Meshmakers.Octo.ConstructionKit.MsBuildTasks package
+        (build/Meshmakers.Octo.ConstructionKit.MsBuildTasks.targets). This repository cannot consume its own
+        package (see CkCompile above), so it runs the same task from the project's build output instead: a CK
+        model project that sets OctoEnforceRuntimeStateMarkers=true references ConstructionKit.MsBuildTasks
+        (ReferenceOutputAssembly=false) so the task assembly is built first. TaskHostFactory runs the task in a
+        separate MSBuild node, so the freshly built DLL is never locked by a reused build node (CS8032 class of
+        problems, see CLAUDE.md "MSBuild/Roslyn server reuse"). The rules and messages (OCTO-CK001..004) are
+        the task's; nothing is duplicated here.
+    -->
+    <PropertyGroup>
+        <OctoEnforceRuntimeStateMarkers Condition="'$(OctoEnforceRuntimeStateMarkers)' == ''">false</OctoEnforceRuntimeStateMarkers>
+        <_OctoLintTasksTfm Condition="'$(MSBuildRuntimeType)' == 'Core'">net10.0</_OctoLintTasksTfm>
+        <_OctoLintTasksTfm Condition="'$(MSBuildRuntimeType)' != 'Core'">netstandard2.0</_OctoLintTasksTfm>
+        <OctoCkLintTasksAssembly Condition="'$(OctoCkLintTasksAssembly)' == ''">$(MSBuildThisFileDirectory)bin/$(Configuration)/tasks/$(_OctoLintTasksTfm)/Meshmakers.Octo.ConstructionKit.MsBuildTasks.dll</OctoCkLintTasksAssembly>
+    </PropertyGroup>
+
+    <UsingTask TaskName="Meshmakers.Octo.ConstructionKit.MsBuildTasks.CkLintRuntimeStateMarkers"
+               AssemblyFile="$(OctoCkLintTasksAssembly)"
+               TaskFactory="TaskHostFactory" />
+
+    <Target Name="CkLintRuntimeStateMarkers"
+            AfterTargets="CkCompile"
+            BeforeTargets="CoreCompile"
+            Condition="'@(ConstructionKitFolder)' != '' AND '$(OctoEnforceRuntimeStateMarkers)' == 'true'">
+        <Error Condition="!Exists('$(OctoCkLintTasksAssembly)')"
+               Text="OctoEnforceRuntimeStateMarkers is true but the lint task assembly '$(OctoCkLintTasksAssembly)' does not exist. Add a ProjectReference to src/ConstructionKit.MsBuildTasks with ReferenceOutputAssembly=false (see StreamDataCkModel.csproj)." />
+        <Message Importance="High" Text="Linting CK attribute ownership markers (target framework $(TargetFramework))" />
+        <Meshmakers.Octo.ConstructionKit.MsBuildTasks.CkLintRuntimeStateMarkers ConstructionKitFolders="@(ConstructionKitFolder)" />
+    </Target>
+
 </Project>

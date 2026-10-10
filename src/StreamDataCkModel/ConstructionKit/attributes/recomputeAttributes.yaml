@@ -40,91 +40,118 @@ attributes:
   - id: CkArchiveDirtyWindow.WindowStart
     description: "Inclusive start of the changed window (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveDirtyWindow.WindowEnd
     description: "Exclusive end of the changed window (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveDirtyWindow.ChangeKind
     description: "Whether the change was a forward Append or a RetroactiveModify (only the latter makes dependents dirty)."
     valueType: Enum
     valueCkEnumId: ${this}/CkRecomputeChangeKind
+    ownership: SeedOwned
   - id: CkArchiveDirtyWindow.Source
     description: "Through which path the change arrived (Manual / Pipeline / Import)."
     valueType: Enum
     valueCkEnumId: ${this}/CkRecomputeChangeSource
+    ownership: SeedOwned
   - id: CkArchiveDirtyWindow.DetectedAt
     description: "When the storage layer detected and recorded the change (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
 
   # ---------- CkArchiveRecomputeRange members -------------------------------------------------
   - id: CkArchiveRecomputeRange.DependentArchiveRtId
     description: "Runtime id of the dependent archive that must be recomputed for this range."
     valueType: String
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.RangeStart
     description: "Inclusive, bucket-aligned start of the range to recompute on the dependent (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.RangeEnd
     description: "Exclusive, bucket-aligned end of the range to recompute on the dependent (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.RtIdScope
     description: "Optional single rtId (metering point / stream) the recompute is restricted to. Null means all rtIds in the range."
     valueType: String
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.EnqueuedAt
     description: "When this obligation was enqueued (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.Attempts
     description: "How many times a recompute of this range has already failed (AB#5189). Zero on a freshly enqueued obligation; incremented each time the drain re-enqueues the range after a failure. Once it reaches the orchestrator's MaxRangeAttempts the obligation is parked (NextAttemptAt far in the future) instead of retried forever, and LastError explains why."
     valueType: Int
+    ownership: SeedOwned
     defaultValues:
       - 0
   - id: CkArchiveRecomputeRange.NextAttemptAt
     description: "Earliest UTC time the drain may retry this range (AB#5189). Set to an exponentially backed-off point in time after each failure so a permanently broken rollup stops consuming a recompute run every tick; set to the year 9999 once the attempt cap is reached, which parks the obligation until a recompute covering it succeeds. Null means retry on the next tick."
     valueType: DateTime
+    ownership: SeedOwned
   - id: CkArchiveRecomputeRange.LastError
     description: "Error message of the most recent failed attempt at this range (AB#5189). Null while the obligation has never failed. Kept per range so an operator can tell which part of a partially recomputed range is stuck and why."
     valueType: String
+    ownership: SeedOwned
 
   # ---------- RecomputeJob members ------------------------------------------------------------
   - id: RecomputeJob.ArchiveRtId
     description: "Runtime id of the archive this job recomputed. Back-reference used by recomputeJobsFor(archiveRtId)."
     valueType: String
+    ownership: SeedOwned
   - id: RecomputeJob.State
     description: "Current lifecycle state of the job."
     valueType: Enum
     valueCkEnumId: ${this}/CkRecomputeJobState
+    ownership: SeedOwned
   - id: RecomputeJob.Trigger
     description: "What initiated the job (Manual / Periodic / ChainPropagation)."
     valueType: Enum
     valueCkEnumId: ${this}/CkRecomputeTrigger
+    ownership: SeedOwned
   - id: RecomputeJob.RangeStart
     description: "Inclusive start of the recomputed range (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: RecomputeJob.RangeEnd
     description: "Exclusive end of the recomputed range (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: RecomputeJob.RtIdScope
     description: "Optional single rtId the job was scoped to. Null means all rtIds in the range."
     valueType: String
+    ownership: SeedOwned
   - id: RecomputeJob.RowsProcessed
     description: "Number of rows written into the staging table during compute."
     valueType: Int
+    ownership: SeedOwned
   - id: RecomputeJob.WindowsProcessed
     description: "Number of buckets / windows recomputed."
     valueType: Int
+    ownership: SeedOwned
   - id: RecomputeJob.StartedAt
     description: "When compute started (UTC)."
     valueType: DateTime
+    ownership: SeedOwned
   - id: RecomputeJob.FinishedAt
     description: "When the job reached a terminal state (Completed / Failed / Coalesced) (UTC). Null while running."
     valueType: DateTime
+    ownership: SeedOwned
   - id: RecomputeJob.DurationMs
     description: "Wall-clock duration from StartedAt to FinishedAt in milliseconds. Null while running."
     valueType: Int
+    ownership: SeedOwned
   - id: RecomputeJob.ErrorReason
     description: "Failure reason when State is Failed; null otherwise."
     valueType: String
+    ownership: SeedOwned
   - id: RecomputeJob.StagingTableName
     description: "Name of the per-job CrateDB staging table used for the compute, for post-mortem inspection. Null once swept."
     valueType: String
+    ownership: SeedOwned
   - id: RecomputeJob.LastProgressAt
     description: "Heartbeat of a non-terminal job (AB#5189, UTC): stamped when the job is created or starts computing and after every committed chunk. A Pending or Running job whose heartbeat is older than the orchestrator's stale-job timeout belongs to a process that died; the drain fails it and continues with the work still queued on the archive. Null on jobs written before the field existed."
     valueType: DateTime
+    ownership: SeedOwned

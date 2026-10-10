@@ -200,7 +200,7 @@ internal static class DataPermissionWriteGuard
         }
     }
 
-    private static bool IsBlueprintLocked(RtEntity entity)
+    internal static bool IsBlueprintLocked(RtEntity entity)
     {
         return entity.GetAttributeValueOrDefault(RtBlueprintLockProtectionNames.LockedAttributeName) is true;
     }
@@ -254,7 +254,7 @@ internal static class DataPermissionWriteGuard
         return Equals(oldValue, newValue) || oldValue.ToString() == newValue.ToString();
     }
 
-    private static OperationMessage LockedMessage(RtCkId<CkTypeId> ckTypeId, OctoObjectId? rtId,
+    internal static OperationMessage LockedMessage(RtCkId<CkTypeId> ckTypeId, OctoObjectId? rtId,
         EntityModOptions modOption)
     {
         var verb = modOption == EntityModOptions.Delete ? "deleted" : "changed";

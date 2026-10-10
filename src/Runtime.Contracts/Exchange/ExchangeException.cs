@@ -32,6 +32,35 @@ public class ExchangeException : PersistenceException
     {
     }
 
+    /// <summary>
+    /// The stable message number of the error, when the failure has one (for example 6384 for the
+    /// blueprint-lock protection), otherwise null.
+    /// </summary>
+    public int? MessageNumber { get; private init; }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ExchangeException"/> class with a message number.
+    /// </summary>
+    /// <param name="message">Message that describes the error.</param>
+    /// <param name="messageNumber">Stable message number of the error.</param>
+    public ExchangeException(string message, int messageNumber) : base(message)
+    {
+        MessageNumber = messageNumber;
+    }
+
+    /// <summary>
+    /// AB#6392: a user-initiated import would overwrite entities that are locked by a blueprint (opted-in
+    /// types, <c>ProtectBlueprintLocked</c>). Raised before anything is written; lists every offender.
+    /// </summary>
+    internal static Exception BlueprintLockedEntities(int messageNumber, IReadOnlyList<string> offenders)
+    {
+        return new ExchangeException(
+            $"Import rejected [{messageNumber}]: {offenders.Count} entit" +
+            (offenders.Count == 1 ? "y is" : "ies are") +
+            " locked by blueprint and cannot be overwritten by users (access denied). Nothing was written. " +
+            $"Locked: {string.Join("; ", offenders)}", messageNumber);
+    }
+
     internal static Exception AttributeNotFound<TKey>(RtCkId<CkAttributeId> modelAttributeId, string elementType, CkId<TKey> ckId)
         where TKey : IComparable<TKey>, ICkElementId
     {

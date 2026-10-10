@@ -5,6 +5,8 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.Runtime.Contracts;
+using Meshmakers.Octo.Runtime.Contracts.AuditTrails;
+using Meshmakers.Octo.Runtime.Contracts.DataPermissions;
 using Meshmakers.Octo.Runtime.Contracts.Exchange;
 using Meshmakers.Octo.Runtime.Contracts.Repositories;
 using Meshmakers.Octo.Runtime.Contracts.Repositories.Query;
@@ -23,7 +25,9 @@ internal class ImportRtModelCommand(
     IRtYamlSerializer rtYamlSerializer,
     IRtJsonSerializer rtJsonSerializer,
     IRtImportAuditTrail rtImportAuditTrail,
-    RtImportOptions importOptions)
+    RtImportOptions importOptions,
+    IDataPermissionResolver dataPermissionResolver,
+    IAuditEventSink auditEventSink)
     : IImportRtModelCommand
 {
     private readonly ConcurrentDictionary<OctoObjectId, byte> _entityImportIds = new();
@@ -40,8 +44,15 @@ internal class ImportRtModelCommand(
     private IReadOnlyCollection<RtImportBlankingConfirmation>? _confirmedBlankings;
     private int _associationsCount;
 
+    // AB#6392: only set while a user-initiated import runs on a tenant with an opted-in policy.
+    private ImportBlueprintLockEnforcer? _lockEnforcer;
+    private RtImportBlueprintLockSummary _blueprintLockSummary = RtImportBlueprintLockSummary.Empty;
+
     /// <inheritdoc />
     public IReadOnlyList<RtImportGuardEntry> GuardEntries => _guardEntries.ToArray();
+
+    /// <inheritdoc />
+    public RtImportBlueprintLockSummary BlueprintLockSummary => _lockEnforcer?.Summary ?? _blueprintLockSummary;
 
     public async Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
@@ -50,6 +61,7 @@ internal class ImportRtModelCommand(
     {
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
+        _lockEnforcer = null; // AB#6392: text imports are system flows
         logger.LogInformation("Importing RT entities using text started");
 
         var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
@@ -83,6 +95,7 @@ internal class ImportRtModelCommand(
     {
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
+        _lockEnforcer = null; // AB#6392: model imports are system flows
         logger.LogInformation("Importing RT entities using text started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -111,10 +124,28 @@ internal class ImportRtModelCommand(
         }
     }
 
-    public async Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
+    public Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
         ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
         RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
         IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
+    {
+        return ImportFileAsync(runtimeRepository, filePath, contentType, importStrategy, null, cancellationToken,
+            blankingPolicy, confirmedBlankings);
+    }
+
+    public Task ImportAsCallerAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
+        ImportStrategy importStrategy, RtImportCallerContext caller, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep,
+        IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings = null)
+    {
+        ArgumentNullException.ThrowIfNull(caller);
+        return ImportFileAsync(runtimeRepository, filePath, contentType, importStrategy, caller, cancellationToken,
+            blankingPolicy, confirmedBlankings);
+    }
+
+    private async Task ImportFileAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
+        ImportStrategy importStrategy, RtImportCallerContext? caller, CancellationToken? cancellationToken,
+        RtImportBlankingPolicy blankingPolicy, IReadOnlyCollection<RtImportBlankingConfirmation>? confirmedBlankings)
     {
         _blankingPolicy = blankingPolicy;
         _confirmedBlankings = confirmedBlankings;
@@ -129,6 +160,11 @@ internal class ImportRtModelCommand(
         try
         {
             session.StartTransaction();
+
+            // AB#6392: zero cost unless a user-initiated import meets a tenant with an opted-in policy.
+            _lockEnforcer = await ImportBlueprintLockEnforcer.TryCreateAsync(logger, cacheService,
+                dataPermissionResolver, auditEventSink, runtimeRepository, caller).ConfigureAwait(false);
+
             await using (var stream = File.OpenRead(filePath))
             {
                 if (contentType.ToLower() == ExchangeMimeTypes.MimeTypeYaml)
@@ -137,11 +173,22 @@ internal class ImportRtModelCommand(
                     var rtModelRootDto = await _rtYamlSerializer.DeserializeAsync(stream, filePath, operationResult)
                         .ConfigureAwait(false);
                     ValidateCkModels(runtimeRepository.TenantId, rtModelRootDto.Dependencies);
+                    await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
+                        rtModelRootDto.Entities.Select(e => (e.CkTypeId, e.RtId))).ConfigureAwait(false);
                     await ImportEntityAsync(session, rtModelRootDto.Entities, runtimeRepository, importStrategy)
                         .ConfigureAwait(false);
                 }
                 else
                 {
+                    if (_lockEnforcer != null && importStrategy == ImportStrategy.Upsert)
+                    {
+                        // The JSON stream is imported in bulks; the preflight must see the whole file before
+                        // the first bulk is written, so the ids are collected in a first pass over the file.
+                        await PreflightBlueprintLockAsync(session, runtimeRepository, importStrategy,
+                            await CollectEntityIdsAsync(filePath, cancellationToken).ConfigureAwait(false))
+                            .ConfigureAwait(false);
+                    }
+
                     var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream, cancellationToken)
                         .ConfigureAwait(false);
                     rtDeserializeStream.BulkDeserialized += async (_, args) =>
@@ -158,6 +205,12 @@ internal class ImportRtModelCommand(
 
             await session.CommitTransactionAsync().ConfigureAwait(false);
 
+            if (_lockEnforcer != null)
+            {
+                await _lockEnforcer.ReportAsync().ConfigureAwait(false);
+                _blueprintLockSummary = _lockEnforcer.Summary;
+            }
+
             logger.LogInformation("{Count} entities, {AssociationsCount} associations imported", _entityImportIds.Count,
                 _associationsCount);
         }
@@ -166,6 +219,38 @@ internal class ImportRtModelCommand(
             logger.LogError(e, "Import of RT model failed");
             throw;
         }
+    }
+
+    /// <summary>
+    /// AB#6392: preflight of a user-initiated import over the whole file (see
+    /// <see cref="ImportBlueprintLockEnforcer.PreflightAsync"/>). An Insert cannot overwrite an existing entity
+    /// (the database refuses a duplicate id), so only Upsert needs the stored state.
+    /// </summary>
+    private async Task PreflightBlueprintLockAsync(IOctoSession session, IRuntimeRepository runtimeRepository,
+        ImportStrategy importStrategy, IEnumerable<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)> entityIds)
+    {
+        if (_lockEnforcer == null || importStrategy != ImportStrategy.Upsert)
+        {
+            return;
+        }
+
+        await _lockEnforcer.PreflightAsync(session, entityIds, runtimeRepository).ConfigureAwait(false);
+    }
+
+    private async Task<List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>> CollectEntityIdsAsync(string filePath,
+        CancellationToken? cancellationToken)
+    {
+        var ids = new List<(RtCkId<CkTypeId> CkTypeId, OctoObjectId RtId)>();
+        await using var stream = File.OpenRead(filePath);
+        var rtDeserializeStream = await rtJsonSerializer.DeserializeStreamAsync(stream, cancellationToken)
+            .ConfigureAwait(false);
+        rtDeserializeStream.BulkDeserialized += (_, args) =>
+        {
+            ids.AddRange(args.DeserializedEntities.Select(e => (e.CkTypeId, e.RtId)));
+            args.IsHandled = true;
+        };
+        await rtDeserializeStream.ReadAsync().ConfigureAwait(false);
+        return ids;
     }
 
     private void ValidateCkModels(string tenantId, ICollection<CkModelIdVersionRange> ckModelIdRanges)
@@ -184,6 +269,11 @@ internal class ImportRtModelCommand(
         // operate on the same DTO instances (the preserve pass rewrites seed attribute values
         // in place) and a lazy/single-pass IEnumerable can't be enumerated twice.
         var entities = modelRtEntities as IReadOnlyList<RtEntityTcDto> ?? modelRtEntities.ToList();
+
+        // AB#6392: a user-initiated import never sets the blueprint bookkeeping attributes of opted-in types
+        // (an export of another tenant carries them). Synchronous, before the first await.
+        _lockEnforcer?.StripBlueprintAttributes(entities,
+            value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));
 
         // On Upsert the DB layer runs a full ReplaceOne, which would overwrite every attribute
         // on the existing document — including CK attributes flagged isRuntimeState that
@@ -915,23 +1005,33 @@ internal class ImportRtModelCommand(
             var modelEntities = typeGroup.ToList();
             var rtIds = modelEntities.Select(e => e.RtId).ToList();
 
-            IResultSet<RtEntity> existingEntities;
-            try
+            IReadOnlyDictionary<OctoObjectId, RtEntity> existingByRtId;
+            if (_lockEnforcer != null && _lockEnforcer.TryGetStoredEntities(typeGroup.Key, out var sharedStored))
             {
-                existingEntities = await runtimeRepository.GetRtEntitiesByIdAsync(
-                    session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+                // AB#6392: the blueprint-lock preflight already read the stored entities of this type for the
+                // whole file - reuse them instead of reading again.
+                existingByRtId = sharedStored;
             }
-            catch (Exception ex)
+            else
             {
-                // Don't fail the whole import — if we can't look up existing entities the
-                // import will still proceed with the imported values (i.e. the old behaviour).
-                logger.LogWarning(ex,
-                    "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; falling back to imported values",
-                    typeGroup.Key);
-                continue;
-            }
+                IResultSet<RtEntity> existingEntities;
+                try
+                {
+                    existingEntities = await runtimeRepository.GetRtEntitiesByIdAsync(
+                        session, typeGroup.Key, rtIds, RtEntityQueryOptions.Create()).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    // Don't fail the whole import — if we can't look up existing entities the
+                    // import will still proceed with the imported values (i.e. the old behaviour).
+                    logger.LogWarning(ex,
+                        "Failed to look up existing entities of type {CkTypeId} for runtime-state preservation; falling back to imported values",
+                        typeGroup.Key);
+                    continue;
+                }
 
-            var existingByRtId = existingEntities.Items.ToDictionary(e => e.RtId);
+                existingByRtId = existingEntities.Items.ToDictionary(e => e.RtId);
+            }
 
             foreach (var modelEntity in modelEntities)
             {

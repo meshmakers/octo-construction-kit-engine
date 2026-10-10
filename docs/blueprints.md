@@ -336,12 +336,48 @@ By default `rtBlueprintLocked` only steers blueprint updates; users can still ed
   locked entity).
 - Callers running as system are exempt: blueprint install, `UpdateBlueprint` (Safe/Merge/Full, forced re-apply),
   blueprint migrations and the CK model migration/upgrade services all open their session with
-  `GetSessionAsync()` (system context). `ImportRt` (`ImportRtModelCommand` and `BulkInsertRtEntitiesAsync`) also runs on
-  a system session and does **not** pass the write guard, so a tenant administrator who may call the ImportRt API can
-  still overwrite locked entities with it; restrict that API by role, the guard does not.
+  `GetSessionAsync()` (system context). `ImportRt` is covered separately, see
+  [ImportRt on opted-in types](#importrt-on-opted-in-types-ab6392).
+- **ServiceAccount pipelines (AB#6392 finding).** A mesh-adapter node with `Identity: ServiceAccount` does *not* run as
+  the system context: `PipelineIdentityResolver.ResolveServiceAccountAsync` opens the session as
+  `RtSecurityContext.ForUser(<service account subject>, <its roles>)`. Only `IsSystem` sessions bypass the guard, so a
+  configured service account is **guarded like a user** and cannot change a locked entity of an opted-in type (no
+  exemption in v1). Pipelines run as the system context only when the node sets `Identity: System`, when the pipeline
+  has no service account configured at all (legacy tenants), or when the host builds the context by hand. A
+  pipeline that must write product-owned locked entities has to use `Identity: System`.
 - Out of scope in v1: associations of locked entities.
 - Put the opted-in policies in a policy group of their own, one per opted-in type; do not set the flag on shared
   master-data policies.
+
+### ImportRt on opted-in types (AB#6392)
+
+`POST Models/ImportRt` hands the uploaded file to a bus command, so the caller identity does not reach the
+engine's write guard, and the import itself runs on a system session (replace semantics, `RtCreatedBy` round trip, the
+preserve pass and the grants stay exactly as they were). The route therefore passes the initiating caller along
+(`ImportRtCommandRequest.InitiatedBySubjectId`) and the consumer calls `IImportRtModelCommand.ImportAsCallerAsync` with
+`RtImportCallerContext.UserInitiated(subject)`. Only that call enforces; blueprint install/update, forced re-apply and
+CK migrations call the command without it and are unchanged. A request without a subject (an older producer) is
+enforced as well, never treated as system; the controller rejects an unauthenticated caller outright.
+
+For CK types opted in with `ProtectBlueprintLocked` (same classification, lock predicate and message as the write
+guard - one code path):
+
+- **Preflight over the whole file before any write** (`Upsert`; an `Insert` cannot overwrite an existing entity anyway).
+  If any rtId of the file exists with a stored `rtBlueprintLocked = true`, the whole import fails atomically with the
+  6384 error and the job result lists **every** offending `ckTypeId@rtId`. JSON files are read once to collect the
+  ids before the bulks are imported.
+- `AuditOnly` policy: the import proceeds and one `DataPermissions.BlueprintLockViolation` audit event is published per
+  type.
+- **Round trip between tenants:** `ExportRt` output may carry `rtBlueprintLocked`, `rtBlueprintSource` and
+  `rtBlueprintAppliedAt`. On import into an opted-in type these three are stripped from the incoming entities instead
+  of rejecting the file: new entities become tenant-owned (unlocked, no blueprint source), existing entities keep
+  their stored values. The number of stripped values is reported as a warning (log and the audit event
+  `RtImport.BlueprintAttributesStripped`; `IImportRtModelCommand.BlueprintLockSummary`).
+- Unlocked or absent flags, types that are not opted in, and `ImportRt -r` on them behave as before.
+- Cost: a tenant without any `ProtectBlueprintLocked` policy pays nothing (the cached policy table is the only
+  lookup). Otherwise one batched read by rtId per opted-in type that occurs in the file, shared with the preserve pass.
+- Request contract: `InitiatedBySubjectId` is an optional additive field; an old consumer ignores it (no protection,
+  no break).
 
 ## Seed Data Format
 

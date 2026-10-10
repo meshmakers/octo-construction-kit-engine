@@ -81,15 +81,19 @@ public class DependencyRangeRowTests
     [Fact]
     public void D7_UsedSurface_IsNotClassifiedOnItsOwn()
     {
-        var usedSurface = typeof(CkModelDependencyDto).GetProperty("UsedSurface");
-        if (usedSurface == null)
+        foreach (var property in new[] { nameof(CkModelDependencyDto.UsedSurface), nameof(CkModelDependencyDto.UsedSurfaceHash) })
         {
-            Assert.DoesNotContain("UsedSurface", CkModelDiffService.ComparedProperties[typeof(CkModelDependencyDto)]);
-            return;
+            Assert.DoesNotContain(property, CkModelDiffService.ComparedProperties[typeof(CkModelDependencyDto)]);
+            Assert.True(CkModelDiffService.ExcludedProperties[typeof(CkModelDependencyDto)].ContainsKey(property),
+                $"{property} must be a documented exclusion (row D7), not a compared property.");
         }
 
-        Assert.True(CkModelDiffService.ExcludedProperties[typeof(CkModelDependencyDto)].ContainsKey("UsedSurface"),
-            "usedSurface must be a documented exclusion (row D7), not a compared property.");
+        // A changed usedSurface alone produces no change.
+        var baseline = RangeRetaining();
+        baseline.DependencyRanges![0].UsedSurface = ["Base@2/Entity-1"];
+        var current = RangeRetaining();
+        current.DependencyRanges![0].UsedSurface = ["Base@2/Entity-1", "Base@2/Name-1"];
+        Assert.Empty(Classify(baseline, current));
     }
 
     [Fact]

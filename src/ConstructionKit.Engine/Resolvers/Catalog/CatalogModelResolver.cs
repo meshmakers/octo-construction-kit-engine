@@ -200,6 +200,8 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             ? id.ToMajorQualified()
             : null);
         output.DependencyRanges = dependencies;
+        // AB#4472: which elements and members of each declared dependency the model uses.
+        CkUsedSurfaceCollector.Apply(output, modelGraph);
         return output;
     }
 

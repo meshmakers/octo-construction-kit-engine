@@ -31,6 +31,18 @@
           "floor": {
             "type": "string",
             "pattern": "^[0-9]+(\\.[0-9]+){0,2}$"
+          },
+          "usedSurface": {
+            "description": "CK v2 (AB#4472): sorted, de-duplicated, major-qualified ids of the dependency's elements this model uses (element level: System@2/Entity-1; member level: System@2/Entity-1.Name).",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "usedSurfaceHash": {
+            "description": "CK v2 (AB#4472): sha256 over usedSurface (one id per line, UTF-8), written as 'sha256:<hex>'.",
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
           }
         },
         "additionalProperties": false,

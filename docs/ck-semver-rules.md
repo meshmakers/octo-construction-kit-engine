@@ -344,6 +344,43 @@ dependency changed → Minor" is F2.4 (AB#5686).
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6) |
 | D7 | `usedSurface` changed | not classified on its own (derived from the model's own changes); documented exclusion once it exists (AB#4472) |
 
+### usedSurface (AB#4472)
+
+A range-retaining compiled model records, per declared dependency, which elements and members of that dependency it
+uses: `dependencyRanges[].usedSurface` (sorted, de-duplicated, major-qualified, version-less ids) and
+`usedSurfaceHash` (`sha256:<hex>` over the list, one id per line). Both are computed by the compiler
+(`CkUsedSurfaceCollector`) and stored in the catalog JSON and in the tenant's `CkModel` document.
+
+**What is tracked.**
+
+- Element level, for every reference the compiler resolves: base types and base records, implemented interfaces,
+  interface `extends`, reused attribute definitions (type, record, role and interface assignments), records and enums
+  used as value types (attributes, method parameters and results), association roles, association target types,
+  interfaces and target attributes. Deriving from a type or implementing an interface binds its whole public
+  surface, so these are recorded as the element (`System@2/Entity-1`).
+- Member level: attribute paths into an inherited dependency type — index fields and `ownerAttributePath` — as
+  `System@2/Entity-1.Name` (the nearest base type that declares the attribute).
+- Not tracked: references into the model itself; references into transitive dependencies that the model does not
+  declare (they have no `dependencyRanges` entry; they are floor-checked); display rules (`displayNameRule`) and
+  computed-column formulas, which are not parsed for attribute paths. Internal dependency elements cannot appear,
+  the compiler rejects references to them (message 112).
+
+**Which change classes it covers (the research question of AB#4472).** A change of a dependency can be tolerated for a
+consumer — even across a major — exactly when it touches nothing listed in that consumer's `usedSurface`: removing or
+renaming an element or member, changing its value type, record or enum, its multiplicity, a base type, or tightening
+`access` / `visibility` / `derivable` of a listed element. With the F2.1 rules every such change of a *public* element
+is Major, so the classifier and `usedSurface` together answer "would break: Industry.Energy uses
+System@2/Entity-1.Name" (F2.5, AB#5687, consumes it at tenant import).
+
+**What it cannot prove.** Behavioural and semantic changes keep the surface intact: a changed default value, display
+rule, index, method timeout or authorization semantics, a changed meaning of an enum value or attribute, or data a
+migration rewrites. These are flagged as behavioural changes (rows B1–B4) but not tracked per consumer. A derive or an
+implement binds the whole element, so a consumer counts as affected by every member change of that element, even of
+members it never reads.
+
+`usedSurface` is not classified on its own (row D7): it is derived from the model's own references, which are diffed and
+classified elsewhere.
+
 ### Defensive default
 
 A change without an explicit rule is classified as **Major**. Since only a minimum level is

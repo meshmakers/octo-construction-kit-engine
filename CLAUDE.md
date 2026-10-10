@@ -1014,6 +1014,13 @@ that gate is green.
 | 11 | GraphQL CK meta | asset-repo F1.5-S3 (CK meta introspection) | asset-repo F1.5-S2/S3 | asset-repo F1.5-S2 | asset-repo `CkTypeAttributeDtoType.access` | asset-repo F1.5-S3 | asset-repo F1.5-S3 | asset-repo F1.5-S2/S3 |
 | 12 | Studio CK browser query (refinery-studio `src/app/graphQL/`, AB#5924) — v2 fields go into the CK v2 follow-up documents run by `CkLanguage2Service`, **never** into the v1 queries (`getCkTypeDetails` etc. must keep working against asset repos without the CK v2 meta API; studio `CLAUDE.md` "CK language 2 in the CK browser") | `getCkModelsLanguage2` | `getCkInterfaces`, `getCkInterfaceDetails`, `getCkTypeLanguage2` | `getCkTypeLanguage2` | `getCkTypeAttributesAccess` | `getCkTypeLanguage2` | `getCkTypeLanguage2`, `getCkElementLanguage2` | `getCkInterfaceDetails` |
 
+**`usedSurface` (AB#4472) touch points**, same numbering: (2) compiled schema `dependencyRanges[].usedSurface` /
+`usedSurfaceHash`; (3) `CkModelDependencyDto.UsedSurface` / `UsedSurfaceHash`; (4) computed by `CkUsedSurfaceCollector`
+in `CatalogModelResolver.ApplyRangeRetentionAsync` (range retention only, so v1 output is unchanged); (7) documented
+exclusion in `CkModelDiffService.ExcludedProperties` (row D7); (10) engine-mongodb `CkModelDependency.UsedSurface` /
+`UsedSurfaceHash` (reflection gate via the C# kitchen sink); consumer: F2.5 (AB#5687). Rules and limits:
+`docs/ck-semver-rules.md`, "usedSurface".
+
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied
 by reference; (5) `CkAttributeGraph.SecuritySensitive`, omitted from the cache JSON while false (`OmitCkV2Defaults`);

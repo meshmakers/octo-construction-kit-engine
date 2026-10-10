@@ -25,6 +25,23 @@ public class CkModelDependencyDto
     public string Floor { get; set; } = null!;
 
     /// <summary>
+    ///     CK v2 (AB#4472): the elements and members of this dependency the model uses, as sorted, de-duplicated,
+    ///     major-qualified, version-less ids — element level for references (<c>System@2/Entity-1</c>, a base type,
+    ///     an implemented interface, a reused attribute definition, a record or enum value type, an association role
+    ///     or target) and member level for attribute paths into an inherited dependency type
+    ///     (<c>System@2/Entity-1.Name</c>). <c>null</c> when not computed (models compiled before AB#4472).
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public List<string>? UsedSurface { get; set; }
+
+    /// <summary>
+    ///     CK v2 (AB#4472): <c>sha256:&lt;hex&gt;</c> over <see cref="UsedSurface" /> (one id per line, UTF-8). Lets a
+    ///     consumer compare two surfaces without the list; the list stays authoritative.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public string? UsedSurfaceHash { get; set; }
+
+    /// <summary>
     ///     <see cref="Floor" /> as <see cref="CkVersion" />.
     /// </summary>
     [JsonIgnore]

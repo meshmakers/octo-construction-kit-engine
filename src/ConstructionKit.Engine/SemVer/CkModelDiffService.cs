@@ -162,7 +162,11 @@ public class CkModelDiffService : ICkModelDiffService
             },
             [typeof(CkModelDependencyDto)] = new Dictionary<string, string>
             {
-                [nameof(CkModelDependencyDto.FloorVersion)] = "computed view of Floor (not serialized)"
+                [nameof(CkModelDependencyDto.FloorVersion)] = "computed view of Floor (not serialized)",
+                // Row D7 (AB#4472): derived from the model's own references, which are classified elsewhere.
+                [nameof(CkModelDependencyDto.UsedSurface)] =
+                    "derived from the model's own references, which are diffed and classified elsewhere (row D7)",
+                [nameof(CkModelDependencyDto.UsedSurfaceHash)] = "hash of UsedSurface (row D7)"
             },
             [typeof(CkModelPropertiesDto)] = new Dictionary<string, string>
             {

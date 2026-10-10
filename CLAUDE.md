@@ -437,6 +437,22 @@ The `CkLintRuntimeStateMarkers` MSBuild task (opt-in per project via
 that declares neither (`OCTO-CK001`), both (`OCTO-CK003`), or an unknown
 ownership value (`OCTO-CK004`).
 
+Armed models (AB#6326 and earlier): System.Communication, System.Identity, System.Ai,
+System.Notification, Meshmakers.Accounting(.Tesla) via the package targets, and
+**System.StreamData in this repository**. This repository cannot consume its own
+MsBuildTasks package, so `Directory.Build.targets` registers the same task from
+`bin/<Configuration>/tasks/<tfm>/` with `TaskFactory="TaskHostFactory"` (no DLL lock in
+a reused node); a model project that sets `OctoEnforceRuntimeStateMarkers=true` adds a
+`ProjectReference` to `ConstructionKit.MsBuildTasks` with `ReferenceOutputAssembly="false"`
+for the build order (see `StreamDataCkModel.csproj`). System.StreamData 1.17.0 got 56
+restating `ownership: SeedOwned` markers (no bump, `ValidateVersion` VALID); the F4
+retention attributes (`Archive.RawRetentionMs`, `Archive.MaxRetroactiveReachMs`) carry the
+comment "under review in AB#6328". `SystemCkModel` is not armed yet.
+
+**Review question for every new attribute:** could an operator or user type this value in
+the product? Yes → `TenantOwned` (or `Secret` for a credential); a service writes it →
+`RuntimeState`; the product ships and corrects it → `SeedOwned`.
+
 ### CK Model Migrations
 CK Model Migrations update runtime entities when CK model versions change. See `docs/ck-model-migrations.md` for details.
 

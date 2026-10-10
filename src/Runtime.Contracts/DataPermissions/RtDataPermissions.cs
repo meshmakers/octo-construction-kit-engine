@@ -66,13 +66,20 @@ public static class RtDataPermissionTypes
 /// <param name="OwnedOnly">True when the grant is restricted to entities created by the caller</param>
 /// <param name="AuditOnly">True when violations are only logged, nothing is filtered or rejected</param>
 /// <param name="GrantedRoleNames">Role names the permission is granted to</param>
+/// <param name="ProtectBlueprintLocked">
+///     Opt-in restriction (AB#6384, DataPolicy attribute <c>ProtectBlueprintLocked</c>, default false): for
+///     non-system callers, entities of the target types whose stored <c>RtBlueprintLocked</c> is true cannot be
+///     updated or deleted, and the blueprint bookkeeping attributes cannot be set or changed. A restriction,
+///     not a grant: it applies whatever other policies grant. Honours <paramref name="AuditOnly" />.
+/// </param>
 public sealed record RtDataPolicyRule(
     string PermissionId,
     IReadOnlyCollection<string> TargetCkTypeIds,
     IReadOnlyCollection<RtDataAction> Actions,
     bool OwnedOnly,
     bool AuditOnly,
-    IReadOnlyCollection<string> GrantedRoleNames);
+    IReadOnlyCollection<string> GrantedRoleNames,
+    bool ProtectBlueprintLocked = false);
 
 /// <summary>
 ///     The resolved data-policy table of a tenant. An empty table means no type is protected.
@@ -96,6 +103,7 @@ public sealed record RtDataPolicyTable
         }).ToList();
         AllTargetCkTypeIds = new HashSet<string>(Rules.SelectMany(r => r.TargetCkTypeIds),
             StringComparer.Ordinal);
+        HasBlueprintLockProtection = Rules.Any(r => r.ProtectBlueprintLocked);
     }
 
     /// <summary>
@@ -112,6 +120,12 @@ public sealed record RtDataPolicyTable
     ///     True when at least one policy rule exists.
     /// </summary>
     public bool HasRules => Rules.Count > 0;
+
+    /// <summary>
+    ///     True when at least one rule opts in to the blueprint-lock restriction (AB#6384). O(1) pre-check:
+    ///     when false the write guard does nothing blueprint-lock related and reads nothing.
+    /// </summary>
+    public bool HasBlueprintLockProtection { get; }
 
     /// <summary>
     ///     All CK type ids any rule targets (for cheap "is anything protected here" pre-checks).
@@ -138,4 +152,49 @@ public interface IDataPermissionResolver
     /// </summary>
     /// <param name="tenantId">The tenant id</param>
     void Invalidate(string tenantId);
+}
+
+/// <summary>
+///     How a caller is restricted by the blueprint-lock opt-in of the data policies for one CK type (AB#6384).
+/// </summary>
+public enum RtBlueprintLockProtection
+{
+    /// <summary>No opted-in policy targets the type (or the caller is the system) — nothing is restricted.</summary>
+    None,
+
+    /// <summary>Only AuditOnly policies opt in — violations are audited, not rejected.</summary>
+    AuditOnly,
+
+    /// <summary>At least one Enforce policy opts in — violations reject the change set.</summary>
+    Enforce
+}
+
+/// <summary>
+///     Well-known names of the blueprint-lock restriction (AB#6384).
+/// </summary>
+public static class RtBlueprintLockProtectionNames
+{
+    /// <summary>
+    ///     Stable message number of the error raised when a change touches a blueprint-locked entity or a
+    ///     protected blueprint attribute (by convention the work item number; distinct from 4973).
+    /// </summary>
+    public const int ForbiddenMessageNumber = 6384;
+
+    /// <summary>Name of the System.Identity DataPolicy attribute that opts a policy in (Boolean, default false).</summary>
+    public const string DataPolicyAttributeName = "ProtectBlueprintLocked";
+
+    /// <summary>Attribute (PascalCase) that marks an entity as owned by the blueprint.</summary>
+    public const string LockedAttributeName = "RtBlueprintLocked";
+
+    /// <summary>Attribute (PascalCase) naming the blueprint that seeded the entity.</summary>
+    public const string SourceAttributeName = "RtBlueprintSource";
+
+    /// <summary>Attribute (PascalCase) holding the time the blueprint last applied the entity.</summary>
+    public const string AppliedAtAttributeName = "RtBlueprintAppliedAt";
+
+    /// <summary>
+    ///     The blueprint bookkeeping attributes a user may not set or change on opted-in types.
+    /// </summary>
+    public static readonly IReadOnlyList<string> ProtectedAttributeNames =
+        [LockedAttributeName, SourceAttributeName, AppliedAtAttributeName];
 }

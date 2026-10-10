@@ -88,4 +88,40 @@ public static class RtDataAccessEvaluator
 
         return RtDataAccessLevel.Denied;
     }
+
+    /// <summary>
+    ///     Classifies the blueprint-lock restriction (AB#6384) for a CK type. Pure, O(rules) and only when at
+    ///     least one rule opted in; derived types inherit via <paramref name="selfAndBaseCkTypeIds" />. The
+    ///     restriction does not depend on the caller's grants — only system callers are exempt. An Enforce
+    ///     policy wins over an AuditOnly one targeting the same type.
+    /// </summary>
+    /// <param name="table">The tenant's policy table</param>
+    /// <param name="selfAndBaseCkTypeIds">The type id plus all its base type ids</param>
+    /// <param name="securityContext">The caller</param>
+    public static RtBlueprintLockProtection ClassifyBlueprintLockProtection(RtDataPolicyTable table,
+        IReadOnlyCollection<string> selfAndBaseCkTypeIds, RtSecurityContext securityContext)
+    {
+        if (securityContext.IsSystem || !table.HasBlueprintLockProtection)
+        {
+            return RtBlueprintLockProtection.None;
+        }
+
+        var result = RtBlueprintLockProtection.None;
+        foreach (var rule in table.Rules)
+        {
+            if (!rule.ProtectBlueprintLocked || !selfAndBaseCkTypeIds.Any(rule.TargetCkTypeIds.Contains))
+            {
+                continue;
+            }
+
+            if (!rule.AuditOnly)
+            {
+                return RtBlueprintLockProtection.Enforce;
+            }
+
+            result = RtBlueprintLockProtection.AuditOnly;
+        }
+
+        return result;
+    }
 }

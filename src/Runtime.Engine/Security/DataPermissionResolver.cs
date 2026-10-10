@@ -133,6 +133,8 @@ internal class DataPermissionResolver(
 
             var ownedOnly = GetEnumKey(policy, "Scope") == 1;
             var auditOnly = GetEnumKey(policy, "EnforcementMode") == 1;
+            // AB#6384: tolerant to an older System.Identity without the attribute (absent = false).
+            var protectBlueprintLocked = GetBool(policy, RtBlueprintLockProtectionNames.DataPolicyAttributeName);
 
             var grantedRoleNames = new HashSet<string>(StringComparer.Ordinal);
             var permissionId = policy.RtId.ToString();
@@ -154,7 +156,7 @@ internal class DataPermissionResolver(
             }
 
             rules.Add(new RtDataPolicyRule(permissionId, targets, actions, ownedOnly, auditOnly,
-                grantedRoleNames));
+                grantedRoleNames, protectBlueprintLocked));
         }
 
         logger.LogDebug("[{TenantId}] Resolved data-policy table: {RuleCount} rules", tenantId, rules.Count);
@@ -223,6 +225,16 @@ internal class DataPermissionResolver(
             default:
                 return [];
         }
+    }
+
+    private static bool GetBool(RtEntity entity, string attributeName)
+    {
+        return entity.GetAttributeValueOrDefault(attributeName) switch
+        {
+            bool b => b,
+            string s => bool.TryParse(s, out var parsed) && parsed,
+            _ => false
+        };
     }
 
     private static int GetEnumKey(RtEntity entity, string attributeName)

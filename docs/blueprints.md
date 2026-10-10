@@ -313,6 +313,36 @@ Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mo
 
 Effect on existing unlocked seed entities: before AB#6383 an update that found such an entity on the tenant raised a `UserModified` conflict, and `ApplyUpdateAsync` refused the whole update unless `ContinueOnError` or a per-entity resolution was given. Such an entity is now **skipped** and does not block the update. Example: the unlocked FamilyOs entities (AB#6317 F10) went from "blocks the update" to "skipped".
 
+### Read-only for users: `ProtectBlueprintLocked` (AB#6384)
+
+By default `rtBlueprintLocked` only steers blueprint updates; users can still edit or delete a locked entity. A
+`System.Identity/DataPolicy` can opt a CK type in to enforcement at the engine write guard
+(`DataPermissionWriteGuard`, so every GraphQL mutation and REST write is covered):
+
+- Policy attribute `ProtectBlueprintLocked` (Boolean, default `false`; an older System.Identity without the attribute
+  reads as `false`). It is a **restriction, not a grant**: it applies whatever other policies grant, and derived types
+  of the policy's target types inherit it.
+- For a non-system caller, updating, replacing or deleting an entity of an opted-in type whose **stored**
+  `rtBlueprintLocked` is `true` is refused for the whole change set (atomically) with message number **6384**
+  (`RtBlueprintLockProtectionNames.ForbiddenMessageNumber`; text carries the type, rtId and "locked by blueprint").
+  Entities with `rtBlueprintLocked` `false` or absent stay editable; reads are never affected.
+- On opted-in types users may not set `rtBlueprintLocked`, `rtBlueprintSource` or `rtBlueprintAppliedAt` on insert, nor
+  change them on update or replace (a form round trip with unchanged values passes). Other types are unchanged.
+- The policy's own enforcement mode applies: `Enforce` refuses; `AuditOnly` lets the change through and publishes one
+  `DataPermissions.BlueprintLockViolation` audit event per type and change set. If an `Enforce` and an `AuditOnly`
+  policy opt in the same type, `Enforce` wins.
+- Cost: nothing for types that are not opted in. For an opted-in type the guard reads the stored state of all
+  non-insert items in **one** batched read by rtId (on a system session, so the caller's own read filter cannot hide a
+  locked entity).
+- Callers running as system are exempt: blueprint install, `UpdateBlueprint` (Safe/Merge/Full, forced re-apply),
+  blueprint migrations and the CK model migration/upgrade services all open their session with
+  `GetSessionAsync()` (system context). `ImportRt` (`ImportRtModelCommand` and `BulkInsertRtEntitiesAsync`) also runs on
+  a system session and does **not** pass the write guard, so a tenant administrator who may call the ImportRt API can
+  still overwrite locked entities with it; restrict that API by role, the guard does not.
+- Out of scope in v1: associations of locked entities.
+- Put the opted-in policies in a policy group of their own, one per opted-in type; do not set the flag on shared
+  master-data policies.
+
 ## Seed Data Format
 
 Seed data is a runtime-model YAML file. The blueprint engine stamps the source attributes during import; you do not write them yourself.

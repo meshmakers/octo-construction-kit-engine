@@ -15,7 +15,8 @@ namespace Meshmakers.Octo.Runtime.Engine.Security;
 ///     entity/association change against the policy table, verifies ownership for owned-only grants
 ///     (batch pre-read of the stored creators) and publishes audit events for AuditOnly violations.
 ///     Denied changes land as errors in the operation result — the whole change set is rejected
-///     atomically by the caller.
+///     atomically by the caller. Opt-in blueprint-lock restriction (AB#6384): see
+///     <see cref="CheckBlueprintLockAsync" />.
 /// </summary>
 internal static class DataPermissionWriteGuard
 {
@@ -63,6 +64,13 @@ internal static class DataPermissionWriteGuard
                 await CheckOwnershipAsync(runtimeRepository, ckCacheService, session, securityContext, typeGroup.Key,
                     ownershipCheckIds, operationResult).ConfigureAwait(false);
             }
+
+            if (access.BlueprintLock != RtBlueprintLockProtection.None)
+            {
+                // AB#6384: only opted-in types reach this; every other type costs nothing here.
+                await CheckBlueprintLockAsync(runtimeRepository, auditEventSink, securityContext, typeGroup.Key,
+                    access.BlueprintLock, typeGroup.ToList(), operationResult).ConfigureAwait(false);
+            }
         }
 
         foreach (var associationGroup in associationUpdateInfoList.GroupBy(a => a.Origin.CkTypeId))
@@ -100,7 +108,169 @@ internal static class DataPermissionWriteGuard
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, false),
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, false),
             RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Write, securityContext, true),
-            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true));
+            RtDataAccessEvaluator.Classify(policyTable, selfAndBase, RtDataAction.Delete, securityContext, true),
+            RtDataAccessEvaluator.ClassifyBlueprintLockProtection(policyTable, selfAndBase, securityContext));
+    }
+
+    /// <summary>
+    ///     Blueprint-lock restriction (AB#6384) for the items of one opted-in type: updates/replaces/deletes
+    ///     of stored entities with <c>RtBlueprintLocked = true</c> are refused, and the blueprint bookkeeping
+    ///     attributes cannot be set on insert or changed on update/replace. The stored state comes from ONE
+    ///     batched read by rtId for all non-insert items of the type, taken on a system session: the caller's
+    ///     own read filter must not hide a locked entity from its own lock check (fail closed). AuditOnly
+    ///     mode publishes one audit event per type and lets the change through. Associations of locked
+    ///     entities are out of scope in v1.
+    /// </summary>
+    private static async Task CheckBlueprintLockAsync(IRuntimeRepository runtimeRepository,
+        IAuditEventSink? auditEventSink, RtSecurityContext securityContext, RtCkId<CkTypeId> ckTypeId,
+        RtBlueprintLockProtection mode, IReadOnlyList<IEntityUpdateInfo<RtEntity>> items,
+        OperationResult operationResult)
+    {
+        var storedIds = items.Where(i => i.ModOption != EntityModOptions.Insert && i.RtId != null)
+            .Select(i => i.RtId!.Value).Distinct().ToList();
+
+        var stored = new Dictionary<OctoObjectId, RtEntity>();
+        if (storedIds.Count > 0)
+        {
+            using var systemSession = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
+            var result = await runtimeRepository.GetRtEntitiesByIdAsync(systemSession, ckTypeId, storedIds,
+                RtEntityQueryOptions.Create(), take: storedIds.Count).ConfigureAwait(false);
+            foreach (var entity in result.Items)
+            {
+                stored[entity.RtId] = entity;
+            }
+        }
+
+        var violations = new List<OperationMessage>();
+        foreach (var item in items)
+        {
+            if (item.ModOption == EntityModOptions.Insert)
+            {
+                var attributeNames = ChangedProtectedAttributes(null, item.RtEntity, EntityModOptions.Insert);
+                if (attributeNames.Count > 0)
+                {
+                    violations.Add(ProtectedAttributesMessage(ckTypeId, item.RtId, attributeNames));
+                }
+
+                continue;
+            }
+
+            // Ids without a stored entity are left to the normal write path (no-op semantics).
+            if (item.RtId == null || !stored.TryGetValue(item.RtId.Value, out var storedEntity))
+            {
+                continue;
+            }
+
+            if (IsBlueprintLocked(storedEntity))
+            {
+                violations.Add(LockedMessage(ckTypeId, item.RtId, item.ModOption));
+            }
+            else if (item.ModOption != EntityModOptions.Delete)
+            {
+                var attributeNames = ChangedProtectedAttributes(storedEntity, item.RtEntity, item.ModOption);
+                if (attributeNames.Count > 0)
+                {
+                    violations.Add(ProtectedAttributesMessage(ckTypeId, item.RtId, attributeNames));
+                }
+            }
+        }
+
+        if (violations.Count == 0)
+        {
+            return;
+        }
+
+        if (mode == RtBlueprintLockProtection.Enforce)
+        {
+            foreach (var violation in violations)
+            {
+                operationResult.AddMessage(violation);
+            }
+
+            return;
+        }
+
+        if (auditEventSink != null)
+        {
+            await auditEventSink.PublishAsync(new AuditEvent(runtimeRepository.TenantId, AuditEventLevel.Warning,
+                "DataPermissions.BlueprintLockViolation",
+                $"Subject '{securityContext.SubjectId}' changed {violations.Count} blueprint-locked entity(ies) " +
+                $"or blueprint attributes of '{ckTypeId.SemanticVersionedFullName}' (AuditOnly policy — not blocked).")
+            ).ConfigureAwait(false);
+        }
+    }
+
+    private static bool IsBlueprintLocked(RtEntity entity)
+    {
+        return entity.GetAttributeValueOrDefault(RtBlueprintLockProtectionNames.LockedAttributeName) is true;
+    }
+
+    /// <summary>
+    ///     Names of the protected attributes the change would set (insert) or change (update/replace)
+    ///     relative to the stored entity. An update only touches attributes present in the payload; a replace
+    ///     rewrites all, so an omitted protected attribute counts as removed.
+    /// </summary>
+    private static List<string> ChangedProtectedAttributes(RtEntity? stored, RtEntity? payload,
+        EntityModOptions modOption)
+    {
+        var changed = new List<string>();
+        foreach (var name in RtBlueprintLockProtectionNames.ProtectedAttributeNames)
+        {
+            var present = payload != null && payload.Attributes.ContainsKey(name);
+            if (!present && modOption != EntityModOptions.Replace)
+            {
+                continue;
+            }
+
+            var newValue = present ? payload!.Attributes[name] : null;
+            var oldValue = stored?.GetAttributeValueOrDefault(name);
+            if (!ProtectedValuesEqual(name, oldValue, newValue))
+            {
+                changed.Add(name);
+            }
+        }
+
+        return changed;
+    }
+
+    private static bool ProtectedValuesEqual(string attributeName, object? oldValue, object? newValue)
+    {
+        if (attributeName == RtBlueprintLockProtectionNames.LockedAttributeName)
+        {
+            // absent == false: a form round trip of "false" must not count as a change
+            return (oldValue is true) == (newValue is true);
+        }
+
+        if (oldValue == null || newValue == null)
+        {
+            return oldValue == null && newValue == null;
+        }
+
+        if (oldValue is DateTime oldDate && newValue is DateTime newDate)
+        {
+            return oldDate.ToUniversalTime() == newDate.ToUniversalTime();
+        }
+
+        return Equals(oldValue, newValue) || oldValue.ToString() == newValue.ToString();
+    }
+
+    private static OperationMessage LockedMessage(RtCkId<CkTypeId> ckTypeId, OctoObjectId? rtId,
+        EntityModOptions modOption)
+    {
+        var verb = modOption == EntityModOptions.Delete ? "deleted" : "changed";
+        return new OperationMessage(MessageLevel.Error, $"{ckTypeId}@{rtId}",
+            RtBlueprintLockProtectionNames.ForbiddenMessageNumber,
+            $"Access denied: entity '{ckTypeId.SemanticVersionedFullName}@{rtId}' is locked by blueprint and cannot be {verb}.");
+    }
+
+    private static OperationMessage ProtectedAttributesMessage(RtCkId<CkTypeId> ckTypeId, OctoObjectId? rtId,
+        IReadOnlyCollection<string> attributeNames)
+    {
+        return new OperationMessage(MessageLevel.Error, $"{ckTypeId}@{rtId}",
+            RtBlueprintLockProtectionNames.ForbiddenMessageNumber,
+            $"Access denied: attribute(s) {string.Join(", ", attributeNames)} of " +
+            $"'{ckTypeId.SemanticVersionedFullName}@{rtId}' are managed by blueprints (locked by blueprint) and " +
+            "cannot be set or changed by users.");
     }
 
     private static async Task CheckOwnershipAsync(IRuntimeRepository runtimeRepository,
@@ -158,5 +328,6 @@ internal static class DataPermissionWriteGuard
         RtDataAccessLevel EnforcedWrite,
         RtDataAccessLevel EnforcedDelete,
         RtDataAccessLevel AuditWrite,
-        RtDataAccessLevel AuditDelete);
+        RtDataAccessLevel AuditDelete,
+        RtBlueprintLockProtection BlueprintLock);
 }

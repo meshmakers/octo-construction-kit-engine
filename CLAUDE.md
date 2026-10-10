@@ -977,7 +977,7 @@ property), M1–M14 methods (AB#6268, one change per method field, element kinds
 rendered `signature` stays as a level-None summary; AB#6338: M12 under default-deny — roles any-of, scopes all-of, an omitted block or empty roles admit administrators only, block add/remove is one change, looser changes are behavioural "security: method access widened"; AB#6336: I12 lifts every invocation-contract change of an interface method to Major), D1–D7 range retention (AB#6271, element kind `DependencyRange`,
 model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute
 definitions and access (AB#6269; access tightening Major, security exception Minor + `RequiresAcknowledge` for
-`securitySensitive` attributes), B1–B4 behavioural changes (AB#6270; `CkClassifiedModelChange.IsBehavioural` /
+`securitySensitive` attributes), B1–B4 behavioural changes (AB#6270; AB#6341: removing the default of a required-assigned or public definition is Major in a v2 model; `CkClassifiedModelChange.IsBehavioural` /
 `RequiresAcknowledge`, own "Behavioural changes" section in report and changelog, stable base =
 `CkSemVerClassifier.IsStableBase`). The guard's `KnownGaps` list is empty.
 

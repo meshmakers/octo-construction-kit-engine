@@ -44,6 +44,68 @@ public class BehaviouralRowTests
     }
 
     [Fact]
+    public void B1_DefaultRemovedFromARequiredOrPublicDefinition_IsMajor()
+    {
+        // AB#6341 (gate case 7u): the public definition WithDefault, default removed — a dependent model may assign
+        // it as required.
+        var current = Model();
+        SemVerTestModels.GetAttribute(current, "WithDefault").DefaultValues = null;
+        var change = Assert.Single(Classify(Model(), current));
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.True(change.IsBehavioural);
+        Assert.Contains("major release", change.Reason);
+
+        // Two-step: 1.0.0 -> 1.1.0 adds a required attribute WITH default (Minor), 1.1.0 -> 1.2.0 removes the default
+        // (Major) — both steps are visible, the second is not a silent Minor.
+        static CkCompiledModelRoot WithRequiredInternalCount(bool withDefault)
+        {
+            var model = Model();
+            model.Attributes!.Add(new CkAttributeDto
+            {
+                AttributeId = "Count", ValueType = AttributeValueTypesDto.Int,
+                Visibility = CkVisibilityDto.Internal, DefaultValues = withDefault ? [1] : null
+            });
+            Machine(model).Attributes!.Add(new CkTypeAttributeDto { CkAttributeId = $"{M}/Count", AttributeName = "Count" });
+            return model;
+        }
+
+        Assert.Equal(CkSemVerLevel.Minor, Level(Model(), WithRequiredInternalCount(true)));
+        Assert.Equal(CkSemVerLevel.Major, Level(WithRequiredInternalCount(true), WithRequiredInternalCount(false)));
+    }
+
+    [Fact]
+    public void B1_DefaultRemovedFromAnInternalOptionalDefinition_StaysMinorAndBehavioural()
+    {
+        static CkCompiledModelRoot WithOptionalInternalCount(bool withDefault)
+        {
+            var model = Model();
+            model.Attributes!.Add(new CkAttributeDto
+            {
+                AttributeId = "Count", ValueType = AttributeValueTypesDto.Int,
+                Visibility = CkVisibilityDto.Internal, DefaultValues = withDefault ? [1] : null
+            });
+            Machine(model).Attributes!.Add(new CkTypeAttributeDto
+            {
+                CkAttributeId = $"{M}/Count", AttributeName = "Count", IsOptional = true
+            });
+            return model;
+        }
+
+        var change = Assert.Single(Classify(WithOptionalInternalCount(true), WithOptionalInternalCount(false)));
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.IsBehavioural);
+
+        // A default changed to another value stays Minor; a ckLanguage 1 model keeps Minor (no v1 level change).
+        var changed = Model();
+        SemVerTestModels.GetAttribute(changed, "WithDefault").DefaultValues = [7];
+        Assert.Equal(CkSemVerLevel.Minor, Level(Model(), changed));
+        var v1Baseline = SemVerTestModels.CreateModel();
+        var v1Current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetAttribute(v1Current, "WithDefault").DefaultValues = null;
+        Assert.Equal(CkSemVerLevel.Minor, Level(v1Baseline, v1Current));
+    }
+
+    [Fact]
     public void B2_NonUniqueIndexAddedOrRemoved_IsMinorAndBehavioural()
     {
         var current = Model();

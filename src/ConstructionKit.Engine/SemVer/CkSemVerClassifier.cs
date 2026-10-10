@@ -248,7 +248,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             { ElementKind: CkModelElementKind.Attribute, Property: "valueCkEnumId" or "valueCkRecordId" } =>
                 (CkSemVerLevel.Major, "reference target breaks"),
             { ElementKind: CkModelElementKind.Attribute, Property: "defaultValues" } =>
-                (CkSemVerLevel.Minor, "behavior of newly created instances changes"),
+                ClassifyDefaultValuesChange(change, baseline, current),
             { ElementKind: CkModelElementKind.Attribute, Property: "isRuntimeState" } =>
                 (CkSemVerLevel.Minor, "blueprint re-apply behavior changes"),
             // AB#5187: ownership changes who wins on re-apply and whether the value is carried in
@@ -348,6 +348,46 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         var owner = OwnerOf(change.ElementId);
         return (baseline.Interfaces ?? []).Concat(current.Interfaces ?? [])
             .Any(i => string.Equals(i.InterfaceId.FullName, owner, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     Row B1 with the AB#6341 exception (gate medium finding): removing the default of an attribute definition is
+    ///     Major in a ckLanguage 2 model when the definition is assigned as required anywhere in the model (type or
+    ///     record) or is public (a dependent model may assign it as required) — otherwise "required with default"
+    ///     (Minor) followed by "default removed" (Minor) reaches "required without default" (Major) in two minor steps.
+    ///     Every other default change stays Minor (behavioural); v1 models keep their classification.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyDefaultValuesChange(CkModelChange change,
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
+    {
+        const string behaviour = "behavior of newly created instances changes";
+        var before = baseline.Attributes?.FirstOrDefault(a => a.AttributeId.FullName == change.ElementId);
+        var after = current.Attributes?.FirstOrDefault(a => a.AttributeId.FullName == change.ElementId);
+        if (current.EffectiveCkLanguage < 2 || before?.DefaultValues is not { Count: > 0 } ||
+            after == null || after.DefaultValues is { Count: > 0 })
+        {
+            return (CkSemVerLevel.Minor, behaviour);
+        }
+
+        var modelName = current.ModelId.Name;
+        bool AssignsRequired(IEnumerable<CkTypeAttributeDto>? assignments) =>
+            (assignments ?? []).Any(a => !a.IsOptional &&
+                                         string.Equals(a.CkAttributeId.ModelId.Name, modelName, StringComparison.Ordinal) &&
+                                         a.CkAttributeId.ElementId.FullName == change.ElementId);
+        var requiredHere = (current.Types ?? []).Any(t => AssignsRequired(t.Attributes)) ||
+                           (current.Records ?? []).Any(r => AssignsRequired(r.Attributes));
+        var isPublic = CkModifiers.ResolveVisibility(after.Visibility) == CkVisibilityDto.Public;
+        if (!requiredHere && !isPublic)
+        {
+            return (CkSemVerLevel.Minor, behaviour);
+        }
+
+        var why = requiredHere
+            ? "the attribute is assigned as required in this model"
+            : "the definition is public, so a dependent model may assign it as required";
+        return (CkSemVerLevel.Major,
+            $"default value removed — {why}; instances created without the value now fail. Keep the default, or " +
+            "remove it in a major release (row B1)");
     }
 
     /// <summary>

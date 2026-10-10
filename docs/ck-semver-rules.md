@@ -357,7 +357,7 @@ gets the extra list. Without behavioural changes the output is unchanged.
 
 | Row | Change | Level |
 | --- | ------ | ----- |
-| B1 | Attribute default values, `displayNameRule` / `displayDescriptionRule`, `autoCompleteValues`, `autoIncrementReference`, `enableChangeStreamPreAndPostImages`, method `timeoutSeconds` | unchanged (Minor/Patch), marked behavioural |
+| B1 | Attribute default values, `displayNameRule` / `displayDescriptionRule`, `autoCompleteValues`, `autoIncrementReference`, `enableChangeStreamPreAndPostImages`, method `timeoutSeconds` | unchanged (Minor/Patch), marked behavioural. **Exception (AB#6341, ckLanguage 2):** removing the default values of an attribute definition that is assigned as required anywhere in the model or is public is Major — otherwise "required with default" (Minor) plus "default removed" (Minor) would reach "required without default" (Major) in two minor releases |
 | B2 | Non-unique index added or removed (any index removed) | Minor, marked behavioural |
 | B3 | Unique index added on a type that is not a stable base | Major, no marker |
 | B4 | Unique index added on a stable base | Major + `requiresAcknowledge`; the reason names the impact on derived types in other models |

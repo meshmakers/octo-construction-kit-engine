@@ -197,6 +197,11 @@ public class MethodRowTests
         Assert.True(added.IsBehavioural);
         Assert.Contains("security: method access widened", added.Reason);
 
+        // Strict default-deny: an omitted block admits no self-calls, so adding a block without allowSelf is looser too.
+        current = Model();
+        Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = false };
+        Assert.Equal(CkSemVerLevel.Minor, Level(baseline, current));
+
         // Adding a block that requires a scope is stricter.
         current = Model();
         Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = true, Scopes = ["s1"] };

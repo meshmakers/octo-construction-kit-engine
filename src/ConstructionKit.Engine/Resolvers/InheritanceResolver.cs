@@ -507,8 +507,29 @@ internal class InheritanceResolver : IInheritanceResolver
                 operationResult.AddMessage(MessageCodes.CkMethodAuthorizationInvalid(location, method.MethodId,
                     ckTypeId, "'allowSelf: true' requires an instance method, a static method has no target entity"));
             }
+
+            // N4 (AB#6338): role and scope names are compared as sets by the classifier and the F3.4 gateway; a name
+            // with separators or spaces could be mistaken for several names or an empty one.
+            foreach (var (kind, names) in new[] { ("role", method.Authorization?.Roles), ("scope", method.Authorization?.Scopes) })
+            {
+                foreach (var name in names ?? [])
+                {
+                    if (!IsValidAuthorizationName(name))
+                    {
+                        operationResult.AddMessage(MessageCodes.CkMethodAuthorizationInvalid(location, method.MethodId,
+                            ckTypeId,
+                            $"{kind} name '{name}' is invalid — use letters, digits and '_', '-', '.', ':' or '/', " +
+                            "starting with a letter or digit"));
+                    }
+                }
+            }
         }
     }
+
+    private static bool IsValidAuthorizationName(string? name) =>
+        name != null && name.Length > 0 &&
+        name[0] is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' &&
+        name.All(c => c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '_' or '-' or '.' or ':' or '/');
 
     private static void ValidateValueType(string what, AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId,
         CkId<CkEnumId>? enumId, string methodId, object ckTypeId, string location,

@@ -254,6 +254,48 @@ public class CkV2InterfaceValidationTests(ITestOutputHelper output) : CkV2Resolv
         ResolveExpectingNoMessages(Build(CkMethodKindDto.Instance));
     }
 
+    [Theory]
+    [InlineData("roles", "Admin, Ops")]
+    [InlineData("roles", "x; scopes []")]
+    [InlineData("scopes", " s1")]
+    [InlineData("scopes", "")]
+    public void Code104_InvalidRoleOrScopeName(string field, string name)
+    {
+        // N4 (AB#6338): names are compared as sets; separators, spaces or empty names are refused.
+        var model = Model();
+        var method = new CkMethodDto { MethodId = "Relabel-1", Authorization = new CkMethodAuthorizationDto() };
+        if (field == "roles")
+        {
+            method.Authorization.Roles = [name];
+        }
+        else
+        {
+            method.Authorization.Scopes = [name];
+        }
+
+        Type(model, "Tag").Methods = [method];
+        var message = Assert.Single(ResolveExpectingOnly(model, 104));
+        Assert.Contains("name", message.MessageText);
+    }
+
+    [Fact]
+    public void Code104_ValidRoleAndScopeNames_AreAccepted()
+    {
+        var model = Model();
+        Type(model, "Tag").Methods =
+        [
+            new CkMethodDto
+            {
+                MethodId = "Relabel-1",
+                Authorization = new CkMethodAuthorizationDto
+                {
+                    Roles = ["UserManagement", "Octo.Admin", "tenant:ops"], Scopes = ["octo_api", "assets/read", "x-1"]
+                }
+            }
+        ];
+        ResolveExpectingNoMessages(model);
+    }
+
     // ── AB#6337 (gate finding H4): why I1 depends on the member's attribute definition, and I2 does not ──
 
     [Fact]

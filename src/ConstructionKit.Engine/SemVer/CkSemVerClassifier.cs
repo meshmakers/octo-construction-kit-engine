@@ -559,11 +559,10 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     }
 
     /// <summary>
-    ///     AB#6338 row M12, block added or removed. DEFAULT-DENY (platform-owner decision 2026-10-10): an omitted block
-    ///     admits administrators only — like empty roles and no scopes. Whether the owner of an instance may call a
-    ///     method without a block is the gateway's decision (F3.4); the classifier assumes the stricter reading on the
-    ///     side that matters: removing a block that allowed self-calls loses them, adding a block that forbids them may
-    ///     lose an owner access the omitted block granted. Major when any part is stricter, otherwise Minor.
+    ///     AB#6338 row M12, block added or removed. DEFAULT-DENY in the strict reading (platform-owner decision
+    ///     2026-10-10, confirmed): an omitted block admits administrators only — no roles, no scopes and no self-calls
+    ///     (the owner is NOT admitted); the F3.4 gateway (AB#5692) enforces the same. The two blocks are compared field
+    ///     by field; Major when any part is stricter, otherwise Minor.
     /// </summary>
     private static (CkSemVerLevel, string) ClassifyAuthorizationBlockChange(CkModelChange change)
     {
@@ -580,7 +579,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             stricter.Add("scope required");
         }
 
-        if (before.Declared ? before.AllowSelf && !after.AllowSelf : !after.AllowSelf)
+        if (before.AllowSelf && !after.AllowSelf)
         {
             stricter.Add("self-calls not admitted");
         }

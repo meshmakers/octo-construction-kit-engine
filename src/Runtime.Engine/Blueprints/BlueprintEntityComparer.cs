@@ -56,13 +56,18 @@ internal static class BlueprintEntityComparer
     /// unequal to the stored key 4, and every dashboard query reports a phantom change.
     /// </param>
     /// <param name="resolveEnum">Enum lookup by id; null when the enum is unknown.</param>
+    /// <param name="maskedAttributeNames">
+    /// AB#6315: string attributes whose old/new text is reported as a value-free summary (the
+    /// attributes the blanking guard lists). JSON texts are always masked, whether listed or not.
+    /// </param>
     internal static List<BlueprintAttributeChange> Compare(
         RtEntityTcDto seed,
         RtEntity tenant,
         CkTypeWithAttributesGraph ckType,
         Func<object?, object?> toTransport,
         Func<CkId<CkEnumId>, CkEnumGraph?> resolveEnum,
-        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord = null)
+        Func<RtCkId<CkRecordId>, CkRecordGraph?>? resolveRecord = null,
+        IReadOnlySet<string>? maskedAttributeNames = null)
     {
         var changes = new List<BlueprintAttributeChange>();
 
@@ -170,6 +175,21 @@ internal static class BlueprintEntityComparer
                 continue;
             }
 
+            // AB#6315: attributes the guard reports as blanked, and JSON texts (serialized
+            // configurations carry host, user and password), never leave the comparer as text.
+            if (attribute.ValueType == AttributeValueTypesDto.String &&
+                ((maskedAttributeNames?.Contains(attribute.AttributeName) ?? false) ||
+                 LooksLikeJsonText(storedValue) || LooksLikeJsonText(seedValue)))
+            {
+                changes.Add(new BlueprintAttributeChange
+                {
+                    AttributeName = attribute.AttributeName,
+                    OldValue = MaskValue(storedValue),
+                    NewValue = MaskValue(seedValue)
+                });
+                continue;
+            }
+
             // AB#5532: the fallback after a failed record conversion reports the raw values - their
             // Secret members are redacted here too (a raw RtRecord may carry a legacy string).
             var isRecordValued = attribute.ValueType is AttributeValueTypesDto.Record or AttributeValueTypesDto.RecordArray;
@@ -232,6 +252,17 @@ internal static class BlueprintEntityComparer
         return attribute.ValueCkRecordId == null || resolveRecord == null
             ? null
             : resolveRecord(attribute.ValueCkRecordId.ToRtCkId());
+    }
+
+    private static bool LooksLikeJsonText(object? value)
+    {
+        return value is string text && text.AsSpan().Trim() is { Length: > 1 } t && (t[0] == '{' || t[0] == '[');
+    }
+
+    /// <summary>Value-free description (kind and size) of a non-null value; null stays null.</summary>
+    private static object? MaskValue(object? value)
+    {
+        return value == null ? null : SeedBlankingDetector.Summarize(value);
     }
 
     private static bool IsEmptyOrNullSequence(object? value)

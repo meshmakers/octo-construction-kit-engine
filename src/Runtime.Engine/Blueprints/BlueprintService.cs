@@ -1156,20 +1156,15 @@ internal class BlueprintService : IBlueprintService
                         // three enabled-flag resets hiding among them were invisible.
                         diff.EntitiesToUpdate.Add(seed);
 
-                        var attributeChanges = ckTypeGraph == null
-                            ? null
-                            : BlueprintEntityComparer.Compare(seed, tenant, ckTypeGraph,
-                                v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
-                                enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
-                                recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null);
-
                         // AB#6315: the same guard the apply runs (SeedBlankingDetector), so the
                         // preview announces exactly the attributes the import will keep or blank.
+                        var blankedNames = new HashSet<string>(StringComparer.Ordinal);
                         if (ckTypeGraph != null && updateMode != BlueprintUpdateMode.Safe)
                         {
                             foreach (var finding in SeedBlankingDetector.Detect(seed, tenant,
                                          ImportRtModelCommand.SelectGuardedAttributes(ckTypeGraph)))
                             {
+                                blankedNames.Add(finding.Attribute.AttributeName);
                                 diff.Blanked.Add(new BlueprintBlankedAttribute
                                 {
                                     RtId = tenant.RtId.ToString() ?? string.Empty,
@@ -1182,6 +1177,14 @@ internal class BlueprintService : IBlueprintService
                                 });
                             }
                         }
+
+                        var attributeChanges = ckTypeGraph == null
+                            ? null
+                            : BlueprintEntityComparer.Compare(seed, tenant, ckTypeGraph,
+                                v => ImportRtModelCommand.ToTransportValue(_ckCacheService, tenantId, v),
+                                enumId => _ckCacheService.TryGetCkEnum(tenantId, enumId, out var e) ? e : null,
+                                recordId => _ckCacheService.TryGetRtCkRecord(tenantId, recordId, out var r) ? r : null,
+                                blankedNames);
 
                         if (attributeChanges == null)
                         {

@@ -486,6 +486,61 @@ public class BlueprintEntityComparerTests
 
     // ---- helpers -------------------------------------------------------------------------
 
+    // ---- AB#6315: no credential text in the change list ------------------------------------------------
+
+    private const string CredentialJson =
+        """{"EdaHttpAdapter":{"Host":"http://ponton.internal","User":"edauser","Password":"Passw0rd-Pon7on"}}""";
+
+    [Fact]
+    public void JsonTextAttribute_IsReportedAsSummary_NeverAsText()
+    {
+        var type = BuildType(Attr("Configuration", AttributeValueTypesDto.String));
+        var seed = Seed(("Configuration", """{"EdaHttpAdapter":{"Host":"","User":"","Password":""}}"""));
+        var stored = Stored(("Configuration", CredentialJson));
+
+        var change = Assert.Single(Compare(seed, stored, type));
+
+        Assert.Equal($"string ({CredentialJson.Length} chars)", change.OldValue);
+        Assert.StartsWith("string (", (string)change.NewValue!);
+        Assert.DoesNotContain("Passw0rd", $"{change.OldValue}{change.NewValue}");
+    }
+
+    [Fact]
+    public void AttributeReportedAsBlanked_IsMasked_EvenWhenNotJson()
+    {
+        var type = BuildType(Attr("ApiToken", AttributeValueTypesDto.String));
+        var seed = Seed(("ApiToken", ""));
+        var stored = Stored(("ApiToken", "tok-0123456789"));
+
+        var change = Assert.Single(BlueprintEntityComparer.Compare(seed, stored, type, v => v, ResolveEnum,
+            ResolveRecord, new HashSet<string> { "ApiToken" }));
+
+        Assert.Equal("string (14 chars)", change.OldValue);
+        Assert.Equal("empty string", change.NewValue);
+    }
+
+    [Fact]
+    public void PlainAttributeNotBlanked_KeepsItsValues_ForTheOperatorsDiff()
+    {
+        var type = BuildType(Attr("Comment", AttributeValueTypesDto.String));
+
+        var change = Assert.Single(Compare(Seed(("Comment", "new")), Stored(("Comment", "old")), type));
+
+        Assert.Equal("old", change.OldValue);
+        Assert.Equal("new", change.NewValue);
+    }
+
+    [Fact]
+    public void NullSides_StayNull_WhenMasking()
+    {
+        var type = BuildType(Attr("Configuration", AttributeValueTypesDto.String));
+
+        var change = Assert.Single(Compare(Seed(("Configuration", CredentialJson)), Stored(), type));
+
+        Assert.Null(change.OldValue);
+        Assert.StartsWith("string (", (string)change.NewValue!);
+    }
+
     private static List<Meshmakers.Octo.Runtime.Contracts.Blueprints.BlueprintAttributeChange> Compare(
         RtEntityTcDto seed, RtEntity stored, CkTypeGraph type)
     {

@@ -32,11 +32,23 @@ public class CkBaselineResolver : ICkBaselineResolver
                 : _catalogService.GetCatalogList().Select(c => c.Item1).ToList());
 
     /// <inheritdoc />
-    public Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
-        CkBaselineSource source) =>
-        ResolveCoreAsync(modelName, declaredVersion,
-            _catalogService.GetCatalogList().Select(c => c.Item1)
-                .Where(c => source == CkBaselineSource.Local || !IsLocalCatalog(c)).ToList());
+    public async Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
+        CkBaselineSource source)
+    {
+        var catalogs = _catalogService.GetCatalogList().Select(c => c.Item1)
+            .Where(c => source == CkBaselineSource.Local || !IsLocalCatalog(c)).ToList();
+        var resolution = await ResolveCoreAsync(modelName, declaredVersion, catalogs).ConfigureAwait(false);
+
+        // Remote with no readable catalog beyond the embedded one (e.g. both GitHub catalogs disabled by a missing
+        // token) cannot tell "first publication" from "nothing could be asked": treat it as unreachable (OCTO-CK202).
+        if (source == CkBaselineSource.Remote && resolution.Baseline == null && !resolution.SourceUnreachable &&
+            !catalogs.Any(c => !string.Equals(c, "EmbeddedResourceCatalog", StringComparison.OrdinalIgnoreCase)))
+        {
+            return resolution with { SourceUnreachable = true };
+        }
+
+        return resolution;
+    }
 
     private async Task<CkBaselineResolution> ResolveCoreAsync(string modelName, CkVersion declaredVersion,
         List<string> catalogs)

@@ -200,10 +200,15 @@ public class CkSurfaceSatisfactionChecker : ICkSurfaceSatisfactionChecker
             }
 
             var parent = type.DerivedFromCkTypeId;
-            if (parent == null || parent.IsEmpty || parent.ModelId == null! ||
+            if (parent != null && !parent.IsEmpty && parent.ModelId != null! &&
                 parent.ModelId.Name != candidate.Model.ModelId.Name)
             {
-                return;
+                return; // the base type lives in another model and cannot be inspected here
+            }
+
+            if (parent == null || parent.IsEmpty)
+            {
+                break; // root of the hierarchy: the member is not declared anywhere
             }
 
             type = candidate.Model.Types?.FirstOrDefault(t => t.TypeId.FullName == parent.ElementId.FullName);

@@ -139,7 +139,9 @@ public sealed class CkCascadeTests : IDisposable
         // Breaks first in the list
         Assert.Equal(CkDependentVerdict.Breaks, result.Dependents[0].Verdict);
         // The transitive dependent is listed with its own verdict (it references PlantR only).
-        Assert.Equal(CkDependentVerdict.Compatible, Dependent(result, "LineR").Verdict);
+        var transitive = Dependent(result, "LineR");
+        Assert.Equal(CkDependentVerdict.Compatible, transitive.Verdict);
+        Assert.Contains(transitive.Reasons, r => r.Contains("builds on PlantR"));
     }
 
     [Fact]

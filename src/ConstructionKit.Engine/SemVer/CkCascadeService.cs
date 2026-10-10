@@ -48,6 +48,31 @@ public class CkCascadeService : ICkCascadeService
             .ThenBy(c => c.Dependent.Version)
             .ToList();
 
+        // A transitive-only dependent is not affected by the candidate itself, but by the dependents it builds on:
+        // say which of them break.
+        var breaking = new HashSet<string>(checks.Where(c => c.Verdict == CkDependentVerdict.Breaks).Select(c => c.Dependent.Name));
+        for (var i = 0; i < checks.Count; i++)
+        {
+            if (checks[i].Verdict != CkDependentVerdict.Compatible ||
+                !checks[i].Reasons.Any(r => r.StartsWith("no direct dependency", StringComparison.Ordinal) ||
+                                         r.StartsWith("no references into the candidate", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+
+            var model = dependents.First(d => d.ModelId == checks[i].Dependent);
+            var via = (model.Dependencies ?? []).Select(d => d.Name)
+                .Concat((model.DependencyRanges ?? []).Select(d => d.Range.Name))
+                .Where(breaking.Contains).Distinct(StringComparer.Ordinal).ToList();
+            if (via.Count > 0)
+            {
+                checks[i] = checks[i] with
+                {
+                    Reasons = [.. checks[i].Reasons, $"builds on {string.Join(", ", via)}, which would break"]
+                };
+            }
+        }
+
         return new CkCascadeResult
         {
             Candidate = candidate, Baseline = baseline, CandidateVerdict = verdict, Dependents = checks,

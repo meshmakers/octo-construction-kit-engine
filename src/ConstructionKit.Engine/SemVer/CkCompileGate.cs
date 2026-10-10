@@ -167,6 +167,9 @@ public class CkCompileGate
         }
 
         var verdict = await _verdictService.EvaluateAsync(resolution, current);
+        // A published ckLanguage 2 model stays under the hard gate even when the new source drops the key: leaving
+        // ckLanguage 2 is itself a change the declared version has to cover.
+        isHardGate |= verdict.BaselineModel.EffectiveCkLanguage >= 2;
         messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null, FormatVerdictLine(current, verdict)));
         if (resolution.SourceUnreachable)
         {

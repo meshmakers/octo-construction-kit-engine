@@ -55,4 +55,62 @@ public class CkSurfaceSatisfactionCheckerTests
         Assert.Equal(CkDependentVerdict.NeedsRepin, check.Verdict);
         Assert.Equal(Contracts.SemVer.CkSemVerLevel.Minor, check.RequiredLevel);
     }
+
+    [Fact]
+    public void A_used_member_the_candidate_no_longer_declares_breaks_the_dependent()
+    {
+        var candidate = CkSurfaceCandidate.Create(new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("Base", "2.3.0"),
+            Types = [new CkCompiledTypeDto { TypeId = "Entity", Attributes = [] }]
+        }, null, []);
+        var dependent = new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("Dep", "1.0.0"),
+            DependencyRanges =
+            [
+                new CkModelDependencyDto
+                {
+                    Range = new CkModelIdVersionRange("Base", "[2.0,3.0)"), Floor = "2.0.0",
+                    UsedSurface = ["Base@2/Entity-1.Name"]
+                }
+            ]
+        };
+
+        var check = Checker.Check(candidate, dependent);
+
+        Assert.Equal(CkDependentVerdict.Breaks, check.Verdict);
+        Assert.Contains("'Name' is no longer declared", Assert.Single(check.Reasons));
+    }
+
+    [Fact]
+    public void A_used_member_the_candidate_still_declares_keeps_the_dependent_compatible()
+    {
+        var candidate = CkSurfaceCandidate.Create(new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("Base", "2.3.0"),
+            Types =
+            [
+                new CkCompiledTypeDto
+                {
+                    TypeId = "Entity",
+                    Attributes = [new CkTypeAttributeDto { CkAttributeId = "Base/Name", AttributeName = "Name" }]
+                }
+            ]
+        }, null, []);
+        var dependent = new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("Dep", "1.0.0"),
+            DependencyRanges =
+            [
+                new CkModelDependencyDto
+                {
+                    Range = new CkModelIdVersionRange("Base", "[2.0,3.0)"), Floor = "2.0.0",
+                    UsedSurface = ["Base@2/Entity-1.name"]
+                }
+            ]
+        };
+
+        Assert.Equal(CkDependentVerdict.Compatible, Checker.Check(candidate, dependent).Verdict);
+    }
 }

@@ -229,6 +229,8 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 - **Upstream major.** When a dependency's catalog holds a newer version outside the declared range, `--apply` reports
   `not reconciled automatically: range [2.4.0,3.0.0) of System excludes System-3.0.0; update the range of '<model>' and run again.`
   The range is never changed; the author updates it and runs the command again.
+- The file is written as soon as the version is merely too low; findings that only appear for the new version (for example a
+  missing migration with `-rmm`, `OCTO-CK104`) are reported by the validation that follows.
 - No git is involved, and `--apply` writes to no catalog beyond what `ValidateVersion` already does (the validated package is
   registered in the local catalog for sibling resolution).
 
@@ -241,7 +243,7 @@ repositories). `octo-ckc -c ValidateCascade -p <candidate model path>` is the re
 octo-ckc -c ValidateCascade -p <candidate model path> [-cn <catalogName>] [-o <report.md>] [-rf] [-lce <bool>] [-lcr <path>]
 ```
 
-The candidate is compiled in memory (registered nowhere, no catalog is written, no remote call except an explicit `-rf`). The
+The candidate is compiled in memory (registered nowhere, no catalog is written; catalog reads may fetch uncached remote models, a refresh only happens with `-rf`). The
 dependents are the newest version per major line of every model in the readable catalogs whose dependencies name the candidate,
 directly or through another dependent. The command prints one verdict per dependent (console, and Markdown with `-o`) and exits
 non-zero when at least one dependent **Breaks**. The same catalog options as `ValidateVersion` apply; it works offline against the
@@ -283,7 +285,7 @@ Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
   Compatible  LineR-1.0.0 (range-retaining)
       no references into the candidate
 
-3 dependent(s): 1 Breaks, 0 NeedsRepin, 1 Compatible, 0 NotInRange
+2 dependent(s): 1 Breaks, 0 NeedsRepin, 1 Compatible, 0 NotInRange
 ```
 
 ### First publication vs. unreachable catalogs

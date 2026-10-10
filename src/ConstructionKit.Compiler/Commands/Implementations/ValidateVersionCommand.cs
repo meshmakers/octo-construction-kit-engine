@@ -664,7 +664,9 @@ internal class ValidateVersionCommand : CkcCommand
             var newer = catalogName != null
                 ? await _catalogService.IsExistingAsync(catalogName, above)
                 : await _catalogService.IsExistingAsync(above);
-            if (newer is { Exists: true, ModelId: not null })
+            // Only a newer MAJOR is a remediation case; a newer minor/patch inside the same major line is not.
+            if (newer is { Exists: true, ModelId: not null } &&
+                newer.ModelId.Version.Major > (range.ModelVersionRange.MinVersion ?? upper.Value).Major)
             {
                 warnings.Add(
                     $"not reconciled automatically: range {range.ModelVersionRange} of {range.Name} excludes " +

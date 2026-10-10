@@ -313,4 +313,32 @@ public sealed class CkCompileGateTests : IDisposable
     {
         Assert.False(CkCompileGate.TryGetBaselineSource("Nearby", false, out _));
     }
+
+    [Fact]
+    public async Task Dropping_ckLanguage_2_does_not_leave_the_hard_gate()
+    {
+        await PublishAsync(WriteModel("2.4.0"), InMemoryPublishedCatalog.Name);
+
+        // The new source declares no ckLanguage and removes an enum value with a minor bump.
+        var result = await RunGateAsync(WriteModel("2.5.0", ckLanguage: null, enumValues: "A"), CkBaselineSource.Remote);
+
+        Assert.True(result.HasErrors);
+        Assert.Contains("OCTO-CK200", Codes(result));
+    }
+
+    [Fact]
+    public async Task Remote_without_any_enabled_remote_catalog_is_CK202_not_a_first_publication()
+    {
+        // No published catalog registered: only the local and the embedded catalog exist (GitHub catalogs disabled).
+        using var bare = new CkCompileFixture();
+        var dir = bare.WriteSource("gate", "GateModel-2.5.0", null, new Dictionary<string, string>
+        {
+            ["attributes/attributes.yaml"] = "attributes:\n  - id: Serial\n    valueType: String\n"
+        }, 2);
+        var compiled = await bare.CompileAsync(dir);
+
+        var result = await bare.Services.GetRequiredService<CkCompileGate>().RunAsync(compiled, CkBaselineSource.Remote);
+
+        Assert.Equal(["OCTO-CK202"], Codes(result));
+    }
 }

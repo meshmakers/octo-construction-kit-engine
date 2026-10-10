@@ -285,6 +285,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                     : (CkSemVerLevel.Minor, "query behavior changes, no data break"),
             { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Removed } =>
                 (CkSemVerLevel.Minor, "query behavior changes, no data break"),
+            // AB#6339: an index paired by its field paths whose index type changed (ckLanguage 2 models).
+            { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Modified, Property: "indexType" } =>
+                ClassifyIndexTypeChange(change),
 
             // ── Enums ───────────────────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Enum, Property: "useFlags" } =>
@@ -958,11 +961,16 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             { ElementKind: CkModelElementKind.DependencyRange, Property: "range" } =>
                 classified.Level == CkSemVerLevel.Minor && classified.Reason.Contains("cannot import"),
             { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Removed } => true,
+            { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Modified } =>
+                classified.Level == CkSemVerLevel.Minor,
             { ElementKind: CkModelElementKind.TypeIndex } => !IsUniqueIndex(change.NewValue),
             _ => false
         };
 
-        if (change is { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Added } &&
+        if (change is { ElementKind: CkModelElementKind.TypeIndex } &&
+            (change.ChangeKind == CkModelChangeKind.Added ||
+             change is { ChangeKind: CkModelChangeKind.Modified, Property: "indexType" } &&
+             classified.Level == CkSemVerLevel.Major) &&
             IsUniqueIndex(change.NewValue) && IsStableBase(current, OwnerTypeOfIndex(change.ElementId)))
         {
             return classified with
@@ -1102,6 +1110,38 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             nameof(MultiplicitiesDto.N) => 2,
             _ => null
         };
+    }
+
+    /// <summary>
+    ///     AB#6339 rows B2–B4 for a paired index whose type changed: Unique → UniqueNotDeleted and unique → non-unique
+    ///     relax the constraint (Minor, behavioural); a stricter uniqueness (UniqueNotDeleted → Unique, non-unique →
+    ///     unique) may be violated by existing data (Major, B3; on a stable base Major + acknowledge, B4, see
+    ///     <see cref="Mark" />); non-unique → non-unique changes query behaviour only (Minor, behavioural).
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyIndexTypeChange(CkModelChange change)
+    {
+        var before = IndexTypeOf(change.OldValue);
+        var after = IndexTypeOf(change.NewValue);
+        return (before, after) switch
+        {
+            (nameof(IndexTypeDto.Unique), nameof(IndexTypeDto.UniqueNotDeleted)) =>
+                (CkSemVerLevel.Minor,
+                    "unique index relaxed to non-deleted entities — existing data cannot violate it (row B3)"),
+            (nameof(IndexTypeDto.UniqueNotDeleted), nameof(IndexTypeDto.Unique)) =>
+                (CkSemVerLevel.Major,
+                    "unique index now also covers deleted entities — existing data may violate it (row B3)"),
+            _ when IsUniqueIndex(change.NewValue) && !IsUniqueIndex(change.OldValue) =>
+                (CkSemVerLevel.Major, "index made unique — existing data may violate the new unique index (row B3)"),
+            _ when IsUniqueIndex(change.OldValue) && !IsUniqueIndex(change.NewValue) =>
+                (CkSemVerLevel.Minor, "unique index made non-unique — relaxation, query behaviour changes (row B2)"),
+            _ => (CkSemVerLevel.Minor, "index type changed — query behaviour changes, no data break (row B2)")
+        };
+    }
+
+    private static string? IndexTypeOf(string? renderedIndex)
+    {
+        var separator = renderedIndex?.IndexOf(' ') ?? -1;
+        return separator < 0 ? renderedIndex : renderedIndex!.Substring(0, separator);
     }
 
     private static bool IsUniqueIndex(string? renderedIndex)

@@ -362,6 +362,14 @@ gets the extra list. Without behavioural changes the output is unchanged.
 | B3 | Unique index added on a type that is not a stable base | Major, no marker |
 | B4 | Unique index added on a stable base | Major + `requiresAcknowledge`; the reason names the impact on derived types in other models |
 
+**Index pairing (AB#6339, ckLanguage 2 models).** Indexes have no id. In a `ckLanguage: 2` model a baseline and a
+current index of a type with the same ordered field paths — compared case-insensitively, as the compiler and the
+database resolve them — are a pair: a pair that differs only in path case is no change; a pair whose `indexType`
+changed is one modification: `Unique` → `UniqueNotDeleted` and unique → non-unique are Minor (behavioural),
+`UniqueNotDeleted` → `Unique` and non-unique → unique are Major (B3; on a stable base Major + acknowledge, B4),
+non-unique → non-unique is Minor (behavioural). Unpaired indexes keep the added/removed rules above; ckLanguage 1
+models keep the v1 comparison.
+
 **Range retention (AB#6271).** For a range-retaining model the declared ranges are compared by dependency name
 (`Dependency range '<name>'`). The exact closure (`dependencies`) is still diffed as before; removing the rule "resolved
 dependency changed → Minor" is F2.4 (AB#5686).

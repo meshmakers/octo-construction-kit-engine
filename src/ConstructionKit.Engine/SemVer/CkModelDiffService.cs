@@ -225,7 +225,7 @@ public class CkModelDiffService : ICkModelDiffService
         }
 
         Element(CkModelElementKind.TypeAssociation, "targetCkAttributeIds", "targetCkInterfaceId");
-        Element(CkModelElementKind.TypeIndex);
+        Element(CkModelElementKind.TypeIndex, "indexType");
         Element(CkModelElementKind.TypeInterface);
         string[] methodProperties =
         [
@@ -267,7 +267,9 @@ public class CkModelDiffService : ICkModelDiffService
 
         DiffDependencies(changes, baseline.Dependencies, current.Dependencies);
         DiffDependencyRanges(changes, baseline, current, modelName);
-        DiffTypes(changes, baseline.Types, current.Types, modelName);
+        // AB#6339: ckLanguage 2 models pair indexes by their (case-insensitive) field paths.
+        DiffTypes(changes, baseline.Types, current.Types, modelName,
+            baseline.EffectiveCkLanguage >= 2 && current.EffectiveCkLanguage >= 2);
         DiffAttributes(changes, baseline.Attributes, current.Attributes, modelName);
         DiffEnums(changes, baseline.Enums, current.Enums);
         DiffRecords(changes, baseline.Records, current.Records, modelName);
@@ -398,7 +400,7 @@ public class CkModelDiffService : ICkModelDiffService
     }
 
     private static void DiffTypes(List<CkModelChange> changes, List<CkCompiledTypeDto>? baseline,
-        List<CkCompiledTypeDto>? current, string modelName)
+        List<CkCompiledTypeDto>? current, string modelName, bool pairIndexes)
     {
         DiffElements(changes, CkModelElementKind.Type, baseline, current, t => t.TypeId.FullName,
             (typeChanges, id, baselineType, currentType) =>
@@ -424,7 +426,7 @@ public class CkModelDiffService : ICkModelDiffService
                 DiffAttributeAssignments(typeChanges, CkModelElementKind.TypeAttribute, id,
                     baselineType.Attributes, currentType.Attributes, modelName);
                 DiffTypeAssociations(typeChanges, id, baselineType.Associations, currentType.Associations, modelName);
-                DiffTypeIndexes(typeChanges, id, baselineType.Indexes, currentType.Indexes);
+                DiffTypeIndexes(typeChanges, id, baselineType.Indexes, currentType.Indexes, pairIndexes);
                 DiffTypeInterfaces(typeChanges, id, baselineType.Implements, currentType.Implements, modelName);
                 DiffTypeMethods(typeChanges, id, baselineType.Methods, currentType.Methods, modelName);
             });
@@ -794,11 +796,45 @@ public class CkModelDiffService : ICkModelDiffService
             });
     }
 
+    /// <summary>
+    ///     Indexes have no id: they are compared by their rendering (<c>FormatIndex</c>) and reported as added or
+    ///     removed. AB#6339 (ckLanguage 2 models only, <paramref name="pairIndexes" />): a baseline and a current index
+    ///     with the same ordered field paths — compared case-insensitively, as the compiler and the database resolve
+    ///     them — are a pair: no change when they differ only in path case, one <c>indexType</c> modification when only
+    ///     the index type differs. Unpaired indexes stay added/removed.
+    /// </summary>
     private static void DiffTypeIndexes(List<CkModelChange> changes, string typeId,
-        List<CkTypeIndexDto>? baseline, List<CkTypeIndexDto>? current)
+        List<CkTypeIndexDto>? baseline, List<CkTypeIndexDto>? current, bool pairIndexes)
     {
-        var baselineSet = new HashSet<string>((baseline ?? []).Select(FormatIndex));
-        var currentSet = new HashSet<string>((current ?? []).Select(FormatIndex));
+        var baselineIndexes = (baseline ?? []).ToList();
+        var currentIndexes = (current ?? []).ToList();
+        if (pairIndexes)
+        {
+            string Key(CkTypeIndexDto index) => FormatIndex(index, typeAgnostic: true).ToLowerInvariant();
+            var baselineByKey = baselineIndexes.GroupBy(Key).Where(g => g.Count() == 1)
+                .ToDictionary(g => g.Key, g => g.Single(), StringComparer.Ordinal);
+            var currentByKey = currentIndexes.GroupBy(Key).Where(g => g.Count() == 1)
+                .ToDictionary(g => g.Key, g => g.Single(), StringComparer.Ordinal);
+            foreach (var key in baselineByKey.Keys.Where(currentByKey.ContainsKey).ToList())
+            {
+                var before = baselineByKey[key];
+                var after = currentByKey[key];
+                baselineIndexes.Remove(before);
+                currentIndexes.Remove(after);
+                if (before.IndexType != after.IndexType)
+                {
+                    changes.Add(new CkModelChange
+                    {
+                        ChangeKind = CkModelChangeKind.Modified, ElementKind = CkModelElementKind.TypeIndex,
+                        ElementId = $"{typeId}/index", Property = "indexType", OldValue = FormatIndex(before),
+                        NewValue = FormatIndex(after)
+                    });
+                }
+            }
+        }
+
+        var baselineSet = new HashSet<string>(baselineIndexes.Select(FormatIndex));
+        var currentSet = new HashSet<string>(currentIndexes.Select(FormatIndex));
 
         foreach (var index in currentSet.Where(i => !baselineSet.Contains(i)))
         {
@@ -967,7 +1003,9 @@ public class CkModelDiffService : ICkModelDiffService
         return rendered.Count == 0 ? null : string.Join("; ", rendered);
     }
 
-    private static string FormatIndex(CkTypeIndexDto index)
+    private static string FormatIndex(CkTypeIndexDto index) => FormatIndex(index, typeAgnostic: false);
+
+    private static string FormatIndex(CkTypeIndexDto index, bool typeAgnostic)
     {
         var fields = index.Fields
             .Select(f => f.Weight == null
@@ -975,6 +1013,8 @@ public class CkModelDiffService : ICkModelDiffService
                 : $"{string.Join("+", f.AttributePaths)}(weight {f.Weight.Value.ToString(CultureInfo.InvariantCulture)})")
             .ToList();
         var language = string.IsNullOrEmpty(index.Language) ? "" : $", language {index.Language}";
-        return $"{index.IndexType} on {string.Join("; ", fields)}{language}";
+        return typeAgnostic
+            ? $"on {string.Join("; ", fields)}{language}"
+            : $"{index.IndexType} on {string.Join("; ", fields)}{language}";
     }
 }

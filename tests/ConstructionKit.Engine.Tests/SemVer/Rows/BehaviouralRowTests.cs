@@ -203,4 +203,75 @@ public class BehaviouralRowTests
         Assert.Contains("defaultValues", behaviouralSection);
         Assert.DoesNotContain("Extra", behaviouralSection);
     }
+
+    // ── AB#6339: indexes are paired by their (case-insensitive) field paths in ckLanguage 2 models ──
+
+    private static CkCompiledModelRoot WithIndex(IndexTypeDto type, string path = "serialNumber", bool stableBase = false,
+        int ckLanguage = 2)
+    {
+        var model = ckLanguage == 2 ? Model() : SemVerTestModels.CreateModel();
+        Machine(model).IsFinal = !stableBase;
+        Machine(model).Indexes =
+        [
+            new CkTypeIndexDto
+            {
+                IndexType = type,
+                Fields = [new CkIndexFieldsDto { AttributePaths = [path] }, new CkIndexFieldsDto { AttributePaths = ["rtWellKnownName"] }]
+            }
+        ];
+        return model;
+    }
+
+    [Fact]
+    public void B3_IndexPathChangedOnlyInCase_IsNoChange()
+    {
+        // Gate cases 7r (unique) and 6a (non-unique): paths resolve case-insensitively.
+        Assert.Empty(Classify(WithIndex(IndexTypeDto.Unique), WithIndex(IndexTypeDto.Unique, "SerialNumber")));
+        Assert.Empty(Classify(WithIndex(IndexTypeDto.Ascending), WithIndex(IndexTypeDto.Ascending, "SERIALNUMBER")));
+
+        // A ckLanguage 1 model keeps the v1 verdict (no v1 level changes): remove + add, the unique one is Major.
+        Assert.Equal(CkSemVerLevel.Major,
+            Level(WithIndex(IndexTypeDto.Unique, ckLanguage: 1), WithIndex(IndexTypeDto.Unique, "SerialNumber", ckLanguage: 1)));
+    }
+
+    [Theory]
+    [InlineData(IndexTypeDto.Unique, IndexTypeDto.UniqueNotDeleted, CkSemVerLevel.Minor)] // gate case 7p
+    [InlineData(IndexTypeDto.UniqueNotDeleted, IndexTypeDto.Unique, CkSemVerLevel.Major)]
+    [InlineData(IndexTypeDto.Ascending, IndexTypeDto.Unique, CkSemVerLevel.Major)]
+    [InlineData(IndexTypeDto.Ascending, IndexTypeDto.UniqueNotDeleted, CkSemVerLevel.Major)]
+    [InlineData(IndexTypeDto.Unique, IndexTypeDto.Ascending, CkSemVerLevel.Minor)]
+    [InlineData(IndexTypeDto.Ascending, IndexTypeDto.Text, CkSemVerLevel.Minor)]
+    public void B3_IndexTypeChanged_IsOneModification(IndexTypeDto before, IndexTypeDto after, CkSemVerLevel expected)
+    {
+        var change = Assert.Single(Classify(WithIndex(before), WithIndex(after)));
+        Assert.Equal(CkModelChangeKind.Modified, change.Change.ChangeKind);
+        Assert.Equal("indexType", change.Change.Property);
+        Assert.Equal(expected, change.Level);
+        Assert.Equal(expected == CkSemVerLevel.Minor, change.IsBehavioural);
+        Assert.False(change.RequiresAcknowledge);
+    }
+
+    [Fact]
+    public void B4_UniqueNotDeletedToUniqueOnAStableBase_IsMajorWithAcknowledge()
+    {
+        var change = Assert.Single(Classify(WithIndex(IndexTypeDto.UniqueNotDeleted, stableBase: true),
+            WithIndex(IndexTypeDto.Unique, stableBase: true)));
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.True(change.RequiresAcknowledge);
+
+        // The relaxation on a stable base needs no acknowledge.
+        var relaxed = Assert.Single(Classify(WithIndex(IndexTypeDto.Unique, stableBase: true),
+            WithIndex(IndexTypeDto.UniqueNotDeleted, stableBase: true)));
+        Assert.Equal(CkSemVerLevel.Minor, relaxed.Level);
+        Assert.False(relaxed.RequiresAcknowledge);
+    }
+
+    [Fact]
+    public void B3_CompoundUniqueKeyLosesAField_StaysMajor()
+    {
+        // Gate control 7q: a different field list is not a pair; the new (narrower) unique index is Major.
+        var current = WithIndex(IndexTypeDto.Unique);
+        Machine(current).Indexes![0].Fields = [new CkIndexFieldsDto { AttributePaths = ["serialNumber"] }];
+        Assert.Equal(CkSemVerLevel.Major, Level(WithIndex(IndexTypeDto.Unique), current));
+    }
 }

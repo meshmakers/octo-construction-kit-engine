@@ -626,6 +626,12 @@ internal class ValidateVersionCommand : CkcCommand
 
         try
         {
+            if (new FileInfo(metadataFilePath).LinkTarget != null)
+            {
+                Logger.LogError("'{MetadataFilePath}' is a symbolic link; edit the target by hand.", metadataFilePath);
+                return false;
+            }
+
             var bytes = await File.ReadAllBytesAsync(metadataFilePath);
             var hasBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
             if (Array.IndexOf(bytes, (byte)0) >= 0)
@@ -650,7 +656,7 @@ internal class ValidateVersionCommand : CkcCommand
 
             var encoded = new UTF8Encoding(false).GetBytes(updated);
             var output = hasBom ? new byte[] { 0xEF, 0xBB, 0xBF }.Concat(encoded).ToArray() : encoded;
-            var temp = metadataFilePath + ".apply.tmp";
+            var temp = $"{metadataFilePath}.apply.{Guid.NewGuid():N}.tmp";
             await File.WriteAllBytesAsync(temp, output);
             File.Move(temp, metadataFilePath, true);
         }

@@ -87,7 +87,7 @@ public class CkCascadeService : ICkCascadeService
     private static List<CkCompiledModelRoot> SelectDependents(string candidateName,
         IReadOnlyList<CkCompiledModelRoot> models)
     {
-        var affected = new HashSet<string>(StringComparer.Ordinal) { candidateName };
+        var affected = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { candidateName };
         var selected = new HashSet<CkCompiledModelRoot>();
         bool changed;
         do

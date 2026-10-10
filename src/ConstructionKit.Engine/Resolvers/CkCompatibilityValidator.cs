@@ -48,8 +48,7 @@ internal static class CkCompatibilityValidator
                 Add(operationResult, location, meta, index, $"the change '{change}' is acknowledged more than once");
             }
 
-            if (change.IndexOfAny(['\r', '\n']) >= 0 || reason.IndexOfAny(['\r', '\n']) >= 0 ||
-                reason.Contains("##vso[") || change.Contains("##vso["))
+            if (!IsPlainSingleLine(change) || !IsPlainSingleLine(reason))
             {
                 Add(operationResult, location, meta, index, "'change' and 'reason' must be a single line of plain text");
             }
@@ -64,6 +63,11 @@ internal static class CkCompatibilityValidator
 
         return new CkCompatibilityDto { Acknowledge = normalized };
     }
+
+    /// <summary>One line of plain text: no control characters (C0/C1, NEL), no line/paragraph separators, no bidi override, no pipeline commands.</summary>
+    private static bool IsPlainSingleLine(string text) =>
+        !text.Any(c => char.IsControl(c) || c is '\u2028' or '\u2029' or '\u202E' or '\u202D' or '\u2066' or '\u2067' or '\u2068' or '\u2069') &&
+        text.IndexOf("##", StringComparison.Ordinal) < 0;
 
     private static void Add(OperationResult operationResult, string? location, CkMetaRootDto meta, int index,
         string reason) =>

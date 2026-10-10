@@ -128,6 +128,13 @@ internal class ValidateCascadeCommand : CkcCommand
             Logger.LogInformation("Markdown report written to '{OutputFilePath}'", outputFilePath);
         }
 
+        if (result.LoadWarnings.Count > 0)
+        {
+            throw new ModelValidationException(
+                $"{result.LoadWarnings.Count} model(s) could not be loaded and were not checked; the dry run is incomplete" +
+                (result.HasBreaks ? " and at least one dependent breaks" : "") + ".");
+        }
+
         var breaking = result.Dependents.Where(d => d.Verdict == CkDependentVerdict.Breaks).ToList();
         if (breaking.Count > 0)
         {

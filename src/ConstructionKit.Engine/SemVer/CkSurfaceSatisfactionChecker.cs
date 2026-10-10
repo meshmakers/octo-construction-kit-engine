@@ -27,8 +27,8 @@ public class CkSurfaceSatisfactionChecker : ICkSurfaceSatisfactionChecker
         var baseName = candidateId.Name;
         var candidateVersion = candidateId.Version;
         var isRange = dependent.IsRangeRetaining;
-        var entry = dependent.DependencyRanges?.FirstOrDefault(d => d.Range.Name == baseName);
-        var pin = dependent.Dependencies?.FirstOrDefault(d => d.Name == baseName);
+        var entry = dependent.DependencyRanges?.FirstOrDefault(d => string.Equals(d.Range.Name, baseName, StringComparison.OrdinalIgnoreCase));
+        var pin = dependent.Dependencies?.FirstOrDefault(d => string.Equals(d.Name, baseName, StringComparison.OrdinalIgnoreCase));
 
         CkDependentCheck Result(CkDependentVerdict verdict, IReadOnlyList<string> reasons,
             CkSemVerLevel? level = null) => new()
@@ -72,7 +72,7 @@ public class CkSurfaceSatisfactionChecker : ICkSurfaceSatisfactionChecker
         // 2. Referenced surface
         var findings = new List<string>();
         var references = CkReferenceRewriter.CollectReferences(dependent)
-            .Where(r => r.ModelId.Name == baseName && r.ModelId.Version.Major == candidateVersion.Major)
+            .Where(r => string.Equals(r.ModelId.Name, baseName, StringComparison.OrdinalIgnoreCase) && r.ModelId.Version.Major == candidateVersion.Major)
             .Distinct()
             .OrderBy(r => r.Kind, StringComparer.Ordinal).ThenBy(r => r.ElementId, StringComparer.Ordinal)
             .ToList();

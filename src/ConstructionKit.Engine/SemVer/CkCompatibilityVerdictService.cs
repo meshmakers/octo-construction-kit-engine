@@ -61,7 +61,7 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
             Validation = validation,
             CoveredLevel = coveredLevel,
             Acknowledgement = CkAcknowledgementResult.Evaluate(classifiedChanges, current.Compatibility,
-                current.EffectiveCkLanguage >= 2),
+                current.EffectiveCkLanguage >= 2 || baselineModel.EffectiveCkLanguage >= 2),
             UncoveredChanges = validation.Verdict == CkSemVerVerdict.VersionTooLow
                 ? classifiedChanges.Where(c => c.Level > coveredLevel).ToList()
                 : []

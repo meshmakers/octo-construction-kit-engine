@@ -278,4 +278,32 @@ public sealed class CkCascadeTests : IDisposable
         Assert.Empty(result.Dependents);
         Assert.Contains("first publication", string.Join("\n", CkCascadeReport.Header(result)));
     }
+
+    [Fact]
+    public async Task A_dependency_name_that_differs_only_in_case_is_still_a_dependent()
+    {
+        await PublishWorldAsync();
+        await PublishAsync(WritePlant("PlantL", "system-[2.2,3.0)"), true);
+
+        var result = await AnalyzeAsync(WriteSystem("2.3.0", ["Name"], ["Name"]));
+
+        Assert.Equal(CkDependentVerdict.Breaks, Dependent(result, "PlantL").Verdict);
+    }
+
+    [Fact]
+    public async Task Models_that_cannot_be_loaded_are_counted_as_unchecked_and_fail_the_dry_run_command_summary()
+    {
+        await PublishWorldAsync();
+        foreach (var file in Directory.EnumerateFiles(_fixture.CatalogDir, "ck-planter*", SearchOption.AllDirectories)
+                     .Concat(Directory.EnumerateFiles(_fixture.CatalogDir, "*plantr*", SearchOption.AllDirectories))
+                     .Where(f => f.EndsWith(".json")))
+        {
+            File.WriteAllText(file, "{ not json");
+        }
+
+        var result = await AnalyzeAsync(WriteSystem("2.3.0", ["Name", "Description"], ["Name"]));
+
+        Assert.NotEmpty(result.LoadWarnings);
+        Assert.Contains("UNCHECKED", CkCascadeReport.Summary(result));
+    }
 }

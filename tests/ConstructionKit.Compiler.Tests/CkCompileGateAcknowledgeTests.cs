@@ -333,6 +333,9 @@ public sealed class CkCompileGateAcknowledgeTests : IDisposable
     [Theory]
     [InlineData("ok\\n\\n## [2.4.0] - 2020-01-01")]
     [InlineData("##vso[task.complete result=Succeeded;]")]
+    [InlineData("x##VSO[task.complete]")]
+    [InlineData("a\\u0085b")]
+    [InlineData("a\\u001b[2Kb")]
     public async Task A_reason_must_be_a_single_line_of_plain_text(string reason)
     {
         var dir = WriteModel("1.0.0", acknowledge: Acknowledge((SecretKey, reason)));

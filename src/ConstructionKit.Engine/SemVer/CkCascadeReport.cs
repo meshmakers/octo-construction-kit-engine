@@ -23,7 +23,8 @@ public static class CkCascadeReport
         int Count(CkDependentVerdict v) => result.Dependents.Count(d => d.Verdict == v);
         return $"{result.Dependents.Count} dependent(s): {Count(CkDependentVerdict.Breaks)} Breaks, " +
                $"{Count(CkDependentVerdict.NeedsRepin)} NeedsRepin, {Count(CkDependentVerdict.Compatible)} Compatible, " +
-               $"{Count(CkDependentVerdict.NotInRange)} NotInRange";
+               $"{Count(CkDependentVerdict.NotInRange)} NotInRange" +
+               (result.LoadWarnings.Count > 0 ? $", {result.LoadWarnings.Count} UNCHECKED (could not be loaded)" : "");
     }
 
     /// <summary>The header lines: candidate, baseline and the candidate's own verdict.</summary>

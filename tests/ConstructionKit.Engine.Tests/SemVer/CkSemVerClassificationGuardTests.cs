@@ -81,7 +81,7 @@ public class CkSemVerClassificationGuardTests
     /// </summary>
     internal static readonly IReadOnlyList<string> ExpectedRuleRows =
     [
-        .. Rows("N", 5), .. Rows("I", 11), .. Rows("M", 14), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
+        .. Rows("N", 5), .. Rows("I", 12), .. Rows("M", 14), .. Rows("T", 7), .. Rows("E", 2), .. Rows("R", 2),
         .. Rows("A", 3), .. Rows("B", 4), .. Rows("D", 7)
     ];
 

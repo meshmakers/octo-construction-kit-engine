@@ -37,16 +37,16 @@ public class MethodRowTests
     }
 
     [Theory]
-    [InlineData("type")]
-    [InlineData("interface")]
-    public void M2_OptionalParameterAdded_IsMinor(string owner)
+    [InlineData("type", CkSemVerLevel.Minor)]
+    [InlineData("interface", CkSemVerLevel.Major)] // row I12 (AB#6336): contract change on an interface method
+    public void M2_OptionalParameterAdded_IsMinor(string owner, CkSemVerLevel expected)
     {
         var classified = Change(owner, m => m.Parameters!.Add(new CkMethodParameterDto
         {
             Name = "comment", ValueType = AttributeValueTypesDto.String, IsOptional = true
         }));
 
-        Assert.Equal(CkSemVerLevel.Minor, Required(classified));
+        Assert.Equal(expected, Required(classified));
         Assert.Contains(classified, c => c.Change is { ElementKind: CkModelElementKind.MethodParameter, ChangeKind: CkModelChangeKind.Added });
         // The readable before/after signature is still reported, without deciding the level.
         Assert.Contains(classified, c => c.Change.Property == "signature" && c.Level == CkSemVerLevel.None);
@@ -76,12 +76,12 @@ public class MethodRowTests
     }
 
     [Theory]
-    [InlineData("type")]
-    [InlineData("interface")]
-    public void M5_ParameterMadeRequired_IsMajor_MadeOptional_IsMinor(string owner)
+    [InlineData("type", CkSemVerLevel.Minor)]
+    [InlineData("interface", CkSemVerLevel.Major)] // row I12 (AB#6336)
+    public void M5_ParameterMadeRequired_IsMajor_MadeOptional_IsMinor(string owner, CkSemVerLevel relaxed)
     {
         Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Parameters![0].IsOptional = false)));
-        Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Parameters![1].IsOptional = true)));
+        Assert.Equal(relaxed, Required(Change(owner, m => m.Parameters![1].IsOptional = true)));
     }
 
     [Theory]
@@ -160,11 +160,11 @@ public class MethodRowTests
     }
 
     [Theory]
-    [InlineData("type")]
-    [InlineData("interface")]
-    public void M13_SensitiveChanged_IsMinor(string owner)
+    [InlineData("type", CkSemVerLevel.Minor)]
+    [InlineData("interface", CkSemVerLevel.Major)] // row I12 (AB#6336): sensitive is part of the contract
+    public void M13_SensitiveChanged_IsMinor(string owner, CkSemVerLevel expected)
     {
-        Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Parameters![0].Sensitive = false)));
+        Assert.Equal(expected, Required(Change(owner, m => m.Parameters![0].Sensitive = false)));
     }
 
     [Theory]

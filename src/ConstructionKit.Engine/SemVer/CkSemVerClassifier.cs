@@ -314,7 +314,40 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             _ => (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "change — defensively classified as major")
         };
 
+        // AB#6336 row I12: on an interface method every change of the invocation contract is Major — a type in
+        // another model that redeclares the method with the previous contract breaks with error 122. This lifts the
+        // Minor rows M2, M5 (required → optional) and M13 for interface methods; metadata keeps its M-row level.
+        if (result.Item1 < CkSemVerLevel.Major && CkMethodContract.IsContractChange(change) &&
+            IsInterfaceMethodChange(change, baseline, current))
+        {
+            result = (CkSemVerLevel.Major,
+                $"interface method invocation contract changed — {result.Item2}; a type that redeclares the method " +
+                "with the previous contract breaks (error 122), so publish a new interface or method version instead " +
+                "(row I12)");
+        }
+
         return new CkClassifiedModelChange { Change = change, Level = result.Item1, Reason = result.Item2 };
+    }
+
+    /// <summary>
+    ///     True when the change concerns a method of an interface (the method itself, a parameter or an error code).
+    /// </summary>
+    private static bool IsInterfaceMethodChange(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        if (change.ElementKind == CkModelElementKind.InterfaceMethod)
+        {
+            return true;
+        }
+
+        if (change.ElementKind is not (CkModelElementKind.MethodParameter or CkModelElementKind.MethodError))
+        {
+            return false;
+        }
+
+        var owner = OwnerOf(change.ElementId);
+        return (baseline.Interfaces ?? []).Concat(current.Interfaces ?? [])
+            .Any(i => string.Equals(i.InterfaceId.FullName, owner, StringComparison.Ordinal));
     }
 
     /// <summary>

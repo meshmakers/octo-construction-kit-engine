@@ -359,13 +359,14 @@ internal class InheritanceResolver : IInheritanceResolver
                             "lose it; a redeclared interface method must be public)"));
                     }
 
+                    // AB#6336 (gate finding H2): only the invocation contract must match; descriptions,
+                    // authorization and execution of the redeclaration may differ (the type's own apply).
                     if (existing.DeclaringCkTypeId == ckTypeId &&
                         typeGraph.DefinedMethods.Contains(existing.Definition) &&
-                        SemVer.CkModelDiffService.FormatMethod(existing.Definition, "") !=
-                        SemVer.CkModelDiffService.FormatMethod(method.Definition, ""))
+                        SemVer.CkMethodContract.FirstDifference(method.Definition, existing.Definition) is { } difference)
                     {
                         operationResult.AddMessage(MessageCodes.CkInterfaceMethodConflict(location, ckTypeId,
-                            method.Definition.MethodId, method.DeclaringCkInterfaceId));
+                            method.Definition.MethodId, method.DeclaringCkInterfaceId, difference));
                     }
 
                     continue;

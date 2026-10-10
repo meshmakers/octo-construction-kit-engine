@@ -340,8 +340,8 @@ internal static class MessageCodes
     internal static OperationMessage CkInterfaceAssociationMissing(string? location, object ckTypeId, object ckInterfaceId, object ckRoleId, object target, object multiplicity) =>
         GetMessage("CkInterfaceAssociationMissing", location, ckTypeId, ckInterfaceId, ckRoleId, target, multiplicity);
 
-    internal static OperationMessage CkInterfaceMethodConflict(string? location, object ckTypeId, object methodId, object ckInterfaceId) =>
-        GetMessage("CkInterfaceMethodConflict", location, ckTypeId, methodId, ckInterfaceId);
+    internal static OperationMessage CkInterfaceMethodConflict(string? location, object ckTypeId, object methodId, object ckInterfaceId, object difference) =>
+        GetMessage("CkInterfaceMethodConflict", location, ckTypeId, methodId, ckInterfaceId, difference);
 
     internal static OperationMessage CkInterfaceHasNoMembers(string? location, object ckInterfaceId) =>
         GetMessage("CkInterfaceHasNoMembers", location, ckInterfaceId);
@@ -996,8 +996,8 @@ internal static class MessageCodes
         {
             "CkInterfaceMethodConflict",
              new OperationMessageTemplate(MessageLevel.Error,
-                 122, "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different signature. A type may not redeclare an interface method with another signature.",
-                 new [] {"ckTypeId", "methodId", "ckInterfaceId"})
+                 122, "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different invocation contract (kind, parameters, result, errors): {difference}. A type may not redeclare an interface method with another invocation contract; descriptions, authorization and execution may differ.",
+                 new [] {"ckTypeId", "methodId", "ckInterfaceId", "difference"})
         },
         {
             "CkInterfaceHasNoMembers",

@@ -634,7 +634,7 @@
       "key": "CkInterfaceMethodConflict",
       "number": 122,
       "level": "ERROR",
-      "text": "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different signature. A type may not redeclare an interface method with another signature."
+      "text": "Type '{ckTypeId}' declares method '{methodId}', which interface '{ckInterfaceId}' declares with a different invocation contract (kind, parameters, result, errors): {difference}. A type may not redeclare an interface method with another invocation contract; descriptions, authorization and execution may differ."
     },
     {
       "key": "CkInterfaceHasNoMembers",

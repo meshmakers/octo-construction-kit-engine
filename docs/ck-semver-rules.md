@@ -289,8 +289,17 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 | I9 | `deprecated` set or withdrawn | Minor |
 | I10 | Interface added / removed | Minor / Major |
 | I11 | Method added to an interface | Major (an optional interface method does not exist yet); an `internal` method on a public interface is a compile error (129), so it cannot be added as a capped Minor |
+| I12 | Invocation contract of an interface method changed (`kind`; parameter added or removed; parameter `valueType`, record, enum, `isOptional` in either direction, `sensitive`; `result`; error code added or removed) | Major — a type in another model that redeclares the method with the previous contract breaks with error 122; this lifts M2, M5 (required → optional) and M13 on interface methods. Metadata (descriptions, authorization, execution) keeps its M-row level. Type methods are unchanged (M1–M14) |
 
-**Methods (AB#6268).** Type methods and interface methods follow the same rows. The diff emits one change per method
+**Invocation contract (AB#6336, gate finding H2).** A type may redeclare a method of an interface it implements; error
+**122** fires only when the redeclaration has another **invocation contract**: `kind`, the parameters as a set keyed
+by name (`valueType`, `valueCkRecordId`, `valueCkEnumId`, `isOptional`, `sensitive`), `result` (present or absent and
+its type) and the set of error codes. Descriptions, `authorization`, `execution` and the order of parameters and
+errors may differ; the redeclaring type's own authorization and execution apply. The definition lives in one place,
+`CkMethodContract`, used by error 122 and by row I12.
+
+**Methods (AB#6268).** Type methods and interface methods follow the same rows (for interface methods, I12 lifts every
+contract change to Major). The diff emits one change per method
 field; parameters (`Method parameter '<owner>/<method>/<name>'`) and error codes (`Method error '<owner>/<method>/<code>'`)
 are members of their own. The rendered `signature` is still reported as a readable before/after summary with level
 `None`; the level comes from the field changes. A change of several fields takes the highest level.
@@ -298,10 +307,10 @@ are members of their own. The rendered `signature` is still reported as a readab
 | Row | Change | Level |
 | --- | ------ | ----- |
 | M1 | Method added to a public type / removed | Minor / Major (on an interface the addition is row I11) |
-| M2 | Optional parameter added | Minor |
+| M2 | Optional parameter added | Minor (interface method: Major, row I12) |
 | M3 | Required parameter added; parameter removed or renamed | Major |
 | M4 | Parameter value type, record id or enum id changed | Major |
-| M5 | Parameter optional → required / required → optional | Major / Minor |
+| M5 | Parameter optional → required / required → optional | Major / Minor; on an interface method relaxing is Major too (row I12) |
 | M6 | Result changed (none ↔ value, other type, record or enum) | Major; widening a result record by an optional attribute is a record change |
 | M7 | Error code removed | Major |
 | M8 | Error code added | Major (Minor needs `errors: open`, which does not exist yet) |
@@ -309,7 +318,7 @@ are members of their own. The rendered `signature` is still reported as a readab
 | M10 | `idempotent` true → false / false → true | Major / Minor |
 | M11 | `timeoutSeconds` changed | Minor (behavioural) |
 | M12 | Authorization stricter (role or scope removed, `allowSelf` true → false, authorization added) / looser | Major / Minor; mixed → Major. **Assumption:** roles and scopes are any-of (any one listed role or scope suffices); Phase 3 (method gateway) confirms it |
-| M13 | Parameter `sensitive` changed | Minor |
+| M13 | Parameter `sensitive` changed | Minor (interface method: Major, row I12) |
 | M14 | Description of the method, a parameter or an error | Patch |
 
 **Public types, stable bases, enums, records, attribute definitions (AB#6269).** A *stable base* is a type other

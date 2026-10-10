@@ -254,6 +254,110 @@ public class CkV2InterfaceValidationTests(ITestOutputHelper output) : CkV2Resolv
         ResolveExpectingNoMessages(Build(CkMethodKindDto.Instance));
     }
 
+    // ── AB#6336 (gate finding H2): 122 compares only the invocation contract ─────────────
+
+    private static CkMethodDto ContractMethod() => new()
+    {
+        MethodId = "Relabel-1",
+        Description = "relabels",
+        Parameters =
+        [
+            new() { Name = "label", ValueType = AttributeValueTypesDto.String, Description = "the label" },
+            new() { Name = "secret", ValueType = AttributeValueTypesDto.String, IsOptional = true, Sensitive = true },
+            new() { Name = "mode", ValueType = AttributeValueTypesDto.Enum, ValueCkEnumId = $"{M}/Mode", IsOptional = true }
+        ],
+        Result = new() { ValueType = AttributeValueTypesDto.Record, ValueCkRecordId = $"{M}/Address" },
+        Errors = [new() { Code = "E1", Description = "first" }, new() { Code = "E2" }],
+        Authorization = new() { Roles = ["Admin"], AllowSelf = true, Scopes = ["s1"] },
+        Execution = new() { TimeoutSeconds = 15, Idempotent = true }
+    };
+
+    private static CkCompiledModelRoot Redeclaring(Action<CkMethodDto> mutate)
+    {
+        var model = Model();
+        Add(model, new CkInterfaceDto { InterfaceId = "Labeled-1", Methods = [ContractMethod()] });
+        Type(model, "Tag").Implements = [$"{M}/Labeled-1"];
+        var redeclared = ContractMethod();
+        mutate(redeclared);
+        Type(model, "Tag").Methods = [redeclared];
+        return model;
+    }
+
+    public static TheoryData<string> ContractFields =>
+    [
+        "kind", "parameter added", "parameter removed", "parameter valueType", "parameter record", "parameter enum",
+        "parameter isOptional", "parameter sensitive", "result added", "result removed", "result changed",
+        "error added", "error removed"
+    ];
+
+    [Theory]
+    [MemberData(nameof(ContractFields))]
+    public void Code122_ContractFieldDiffers(string field)
+    {
+        Action<CkMethodDto> mutate = field switch
+        {
+            "kind" => m => m.Kind = CkMethodKindDto.Static,
+            "parameter added" => m => m.Parameters!.Add(new() { Name = "extra", ValueType = AttributeValueTypesDto.String, IsOptional = true }),
+            "parameter removed" => m => m.Parameters!.RemoveAt(1),
+            "parameter valueType" => m => m.Parameters![0].ValueType = AttributeValueTypesDto.Int,
+            "parameter record" => m =>
+            {
+                m.Parameters![0].ValueType = AttributeValueTypesDto.Record;
+                m.Parameters![0].ValueCkRecordId = $"{M}/Address";
+            },
+            "parameter enum" => m => m.Parameters![2].ValueCkEnumId = "System/Missing",
+            "parameter isOptional" => m => m.Parameters![0].IsOptional = true,
+            "parameter sensitive" => m => m.Parameters![1].Sensitive = false,
+            "result added" => m => m.Result = m.Result,
+            "result removed" => m => m.Result = null,
+            "result changed" => m => m.Result = new() { ValueType = AttributeValueTypesDto.String },
+            "error added" => m => m.Errors!.Add(new() { Code = "E3" }),
+            "error removed" => m => m.Errors!.RemoveAt(0),
+            _ => throw new ArgumentOutOfRangeException(nameof(field))
+        };
+
+        if (field == "result added")
+        {
+            // The interface method has no result, the redeclaration has one.
+            var model = Model();
+            var declared = ContractMethod();
+            declared.Result = null;
+            Add(model, new CkInterfaceDto { InterfaceId = "Labeled-1", Methods = [declared] });
+            Type(model, "Tag").Implements = [$"{M}/Labeled-1"];
+            Type(model, "Tag").Methods = [ContractMethod()];
+            var added = Assert.Single(ResolveExpectingOnly(model, 122));
+            Assert.Contains("invocation contract", added.MessageText);
+            Assert.Contains("result added", added.MessageText);
+            return;
+        }
+
+        var operationResult = new OperationResult();
+        Resolve(Redeclaring(mutate), operationResult);
+        var message = Assert.Single(operationResult.Messages, m => m.MessageNumber == 122);
+        Assert.Contains("invocation contract", message.MessageText);
+    }
+
+    [Fact]
+    public void Code122_MetadataAndOrder_MayDiffer()
+    {
+        // Gate cases X4 (timeout), X6 (roles), X7 (idempotent) and 7i/7j (order): no 122.
+        ResolveExpectingNoMessages(Redeclaring(m =>
+        {
+            m.Description = "other";
+            m.Parameters![0].Description = "other";
+            m.Errors![0].Description = "other";
+            m.Authorization = new() { Roles = ["Admin", "Ops"], AllowSelf = false, Scopes = [] };
+            m.Execution = new() { TimeoutSeconds = 45, Idempotent = false };
+            m.Parameters.Reverse();
+            m.Errors.Reverse();
+        }));
+        ResolveExpectingNoMessages(Redeclaring(m =>
+        {
+            m.Authorization = null;
+            m.Execution = null;
+        }));
+    }
+
     // ── 123 empty interface ───────────────────────────────────────────────────────────
 
     [Fact]

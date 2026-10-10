@@ -174,4 +174,53 @@ public class InternalElementRowTests
         Assert.Equal(CkSemVerLevel.Major, change.Level);
         Assert.DoesNotContain(CkSemVerClassifier.InternalReason, change.Reason);
     }
+
+    private static CkCompiledModelRoot WithInternalHelperPointingAtMachine(string inboundName = "OwnedBy")
+    {
+        var model = PublicModel();
+        model.AssociationRoles!.Add(new CkAssociationRoleDto
+        {
+            AssociationRoleId = "Owns", Visibility = CkVisibilityDto.Internal, InboundName = inboundName,
+            OutboundName = "Owns", InboundMultiplicity = MultiplicitiesDto.N, OutboundMultiplicity = MultiplicitiesDto.N
+        });
+        model.Types!.Add(new CkCompiledTypeDto
+        {
+            TypeId = "Helper", Visibility = CkVisibilityDto.Internal, DerivedFromCkTypeId = "Base/Entity",
+            Associations = [new CkTypeAssociationDto { CkRoleId = $"{M}/Owns", TargetCkTypeId = $"{M}/Machine" }]
+        });
+        return model;
+    }
+
+    [Fact]
+    public void N_InternalTypesAssociationToAPublicType_IsPublicSurface()
+    {
+        // N1 (platform-owner decision 2026-10-10): the association adds an inbound navigation on the public Machine
+        // (GraphQL), inherited by derived types in other models. Removing it or renaming its role is Major.
+        var removed = WithInternalHelperPointingAtMachine();
+        removed.Types!.Single(t => t.TypeId.Name == "Helper").Associations = [];
+        var change = Assert.Single(Classify(WithInternalHelperPointingAtMachine(), removed));
+        Assert.Equal(CkModelElementKind.TypeAssociation, change.Change.ElementKind);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.DoesNotContain(CkSemVerClassifier.InternalReason, change.Reason);
+
+        var renamed = Assert.Single(Classify(WithInternalHelperPointingAtMachine(),
+            WithInternalHelperPointingAtMachine("Owners")));
+        Assert.Equal(CkModelElementKind.AssociationRole, renamed.Change.ElementKind);
+        Assert.Equal(CkSemVerLevel.Major, renamed.Level);
+
+        // An internal type's association to another INTERNAL type stays capped (row N2).
+        static CkCompiledModelRoot InternalToInternal(bool withAssociation)
+        {
+            var model = WithInternalHelperPointingAtMachine();
+            model.Types!.Add(new CkCompiledTypeDto { TypeId = "Other", Visibility = CkVisibilityDto.Internal, DerivedFromCkTypeId = "Base/Entity" });
+            var helper = model.Types!.Single(t => t.TypeId.Name == "Helper");
+            helper.Associations = withAssociation
+                ? [new CkTypeAssociationDto { CkRoleId = $"{M}/Parent", TargetCkTypeId = $"{M}/Other" }]
+                : [];
+            return model;
+        }
+
+        var capped = Assert.Single(Classify(InternalToInternal(true), InternalToInternal(false)));
+        Assert.Equal(CkSemVerLevel.Minor, capped.Level);
+    }
 }

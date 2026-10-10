@@ -227,9 +227,9 @@ internal static class CkVisibilityValidator
             var methodVisibility = CkModifiers.ResolveVisibility(method.Visibility);
             if (onInterface && referrer.IsPublic && methodVisibility == CkVisibilityDto.Internal)
             {
-                referrer.Report($"declares the internal method '{method.MethodId}' (a public interface may not " +
-                                "declare internal methods; every implementor must provide it and callers reach it " +
-                                "through the interface)");
+                referrer.Report($"is a public interface and declares the internal method '{method.MethodId}' — every " +
+                                "implementor must provide it and callers reach it through the interface; make the " +
+                                "method public or the interface internal");
             }
 
             var methodReferrer = referrer.ForMethod(method.MethodId, methodVisibility);
@@ -285,7 +285,8 @@ internal static class CkVisibilityValidator
             }
             else if (IsPublic)
             {
-                Report($"references the internal {elementKind} '{referenced}' ({referenceKind})");
+                Report($"is public and references the internal {elementKind} '{referenced}' ({referenceKind}) — make " +
+                       $"'{referenced}' public or '{Owner}' internal");
             }
         }
 
@@ -293,7 +294,8 @@ internal static class CkVisibilityValidator
         {
             if (IsPublic && referencedVisibility == CkVisibilityDto.Internal)
             {
-                Report($"references the internal {referenceKind.Split(' ').Last()} '{referenced}' ({referenceKind})");
+                Report($"is public and references the internal {referenceKind.Split(' ').Last()} '{referenced}' " +
+                       $"({referenceKind}) — make '{referenced}' public or '{Owner}' internal");
             }
         }
 

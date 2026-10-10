@@ -355,8 +355,8 @@ internal class InheritanceResolver : IInheritanceResolver
                     {
                         operationResult.AddMessage(MessageCodes.CkInconsistentVisibility(location, ckTypeId,
                             $"redeclares method '{method.Definition.MethodId}' of the public interface " +
-                            $"'{method.DeclaringCkInterfaceId}' as internal (callers through the interface would " +
-                            "lose it; a redeclared interface method must be public)"));
+                            $"'{method.DeclaringCkInterfaceId}' as internal — callers through the interface would " +
+                            "lose it; make the redeclaration public"));
                     }
 
                     // AB#6336 (gate finding H2): only the invocation contract must match; descriptions,

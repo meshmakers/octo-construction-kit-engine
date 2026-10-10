@@ -269,9 +269,9 @@ public sealed class CkV2InconsistentVisibilityCompileTests : IDisposable
 
         var messages = result.Messages.Where(m => m.MessageNumber == 129).Select(m => m.MessageText).ToList();
         Assert.Equal(2, messages.Count);
-        Assert.Contains(messages, m => m.Contains("Own-1.0.0/Mode-1' references the internal enum") &&
+        Assert.Contains(messages, m => m.Contains("Own-1.0.0/Mode-1' is public and references the internal enum") &&
                                        m.Contains("(value enum)"));
-        Assert.Contains(messages, m => m.Contains("Own-1.0.0/Home-1' references the internal record") &&
+        Assert.Contains(messages, m => m.Contains("Own-1.0.0/Home-1' is public and references the internal record") &&
                                        m.Contains("(value record)"));
     }
 
@@ -411,6 +411,27 @@ public sealed class CkV2InconsistentVisibilityCompileTests : IDisposable
             """));
 
         Assert129(result, "Own-1.0.0/Gadget-1", "redeclares method 'Reset-1' of the public interface");
+    }
+
+    [Fact]
+    public async Task InternalTypeRedeclaringAPublicInterfaceMethodAsInternal_Is129_WithoutCallingItPublic()
+    {
+        // N6: the message must not call an internal type "public".
+        var result = await CompileAsync(InterfaceWithMethod("Public", "Public", """
+              - typeId: Gadget
+                derivedFromCkTypeId: ${System}/Entity
+                visibility: Internal
+                implements:
+                  - ${this}/Named-1
+                methods:
+                  - methodId: Reset-1
+                    visibility: Internal
+            """));
+
+        var message = Assert.Single(result.Messages, m => m.MessageNumber == 129);
+        Assert.StartsWith("'Own-1.0.0/Gadget-1' redeclares method 'Reset-1'",
+            message.MessageText.Substring(message.MessageText.IndexOf('\'', StringComparison.Ordinal)));
+        Assert.DoesNotContain("Public 'Own-1.0.0/Gadget-1'", message.MessageText);
     }
 
     [Fact]

@@ -14,6 +14,12 @@ internal sealed class CkVisibilityIndex
     private readonly Dictionary<CkModelElementKind, Dictionary<string, bool>> _elements = new();
     private readonly Dictionary<string, bool> _methods = new(StringComparer.Ordinal);
 
+    /// <summary>
+    ///     AB#6334 / N1: associations of internal types that target a public type (element ids as in the diff). They
+    ///     create an inbound navigation on the public target (GraphQL), so they are public surface.
+    /// </summary>
+    private readonly HashSet<string> _exposedAssociations = new(StringComparer.Ordinal);
+
     public CkVisibilityIndex(CkCompiledModelRoot model)
     {
         void Add<T>(CkModelElementKind kind, IEnumerable<T>? elements, Func<T, string> id, Func<T, CkVisibilityDto?> visibility)
@@ -114,6 +120,29 @@ internal sealed class CkVisibilityIndex
         while (changed)
         {
             changed = false;
+
+            // N1 (platform-owner decision 2026-10-10): an association of an INTERNAL type that targets a PUBLIC type
+            // (of this model or a dependency) adds an inbound navigation to the public target in GraphQL; derived
+            // types in other models inherit it. The association and its role (inbound name, multiplicities) are
+            // therefore public surface — removing the association or renaming the role is not capped.
+            foreach (var type in (model.Types ?? []).Where(t => !IsPublic(CkModelElementKind.Type, t.TypeId.FullName)))
+            {
+                foreach (var association in type.Associations ?? [])
+                {
+                    var target = association.TargetCkTypeId;
+                    var targetIsPublic = !string.Equals(target.ModelId.Name, modelName, StringComparison.Ordinal) ||
+                                         IsPublic(CkModelElementKind.Type, target.ElementId.FullName);
+                    if (!targetIsPublic)
+                    {
+                        continue;
+                    }
+
+                    _exposedAssociations.Add(AssociationKey(type.TypeId.FullName, association.CkRoleId.ElementId.FullName,
+                        association.TargetCkTypeId.ElementId.FullName));
+                    Expose(CkModelElementKind.AssociationRole, association.CkRoleId);
+                }
+            }
+
             foreach (var type in (model.Types ?? []).Where(t => IsPublic(CkModelElementKind.Type, t.TypeId.FullName)))
             {
                 Expose(CkModelElementKind.Type, type.DerivedFromCkTypeId);
@@ -231,6 +260,8 @@ internal sealed class CkVisibilityIndex
             case CkModelElementKind.Type or CkModelElementKind.Record or CkModelElementKind.Enum
                 or CkModelElementKind.Attribute or CkModelElementKind.AssociationRole or CkModelElementKind.Interface:
                 return Lookup(kind, elementId);
+            case CkModelElementKind.TypeAssociation when IsExposedAssociation(elementId):
+                return false;
             case CkModelElementKind.TypeAttribute or CkModelElementKind.TypeAssociation or CkModelElementKind.TypeIndex
                 or CkModelElementKind.TypeInterface:
                 return Lookup(CkModelElementKind.Type, Segments(elementId, 1));
@@ -250,6 +281,33 @@ internal sealed class CkVisibilityIndex
             default:
                 return null;
         }
+    }
+
+    private static string AssociationKey(string typeId, string roleElementId, string targetElementId) =>
+        $"{typeId}|{roleElementId}|{targetElementId}";
+
+    /// <summary>
+    ///     Type association element ids are <c>&lt;type&gt;/&lt;role reference&gt; -&gt; &lt;target reference&gt;</c>;
+    ///     references end with <c>/&lt;element&gt;</c> whatever their model rendering, so the key uses element names.
+    /// </summary>
+    private bool IsExposedAssociation(string elementId)
+    {
+        if (_exposedAssociations.Count == 0)
+        {
+            return false;
+        }
+
+        var ownerEnd = elementId.IndexOf('/');
+        var arrow = elementId.IndexOf(" -> ", StringComparison.Ordinal);
+        if (ownerEnd < 0 || arrow < ownerEnd)
+        {
+            return false;
+        }
+
+        var role = elementId.Substring(ownerEnd + 1, arrow - ownerEnd - 1);
+        var target = elementId.Substring(arrow + 4);
+        return _exposedAssociations.Contains(AssociationKey(elementId.Substring(0, ownerEnd),
+            role.Substring(role.LastIndexOf('/') + 1), target.Substring(target.LastIndexOf('/') + 1)));
     }
 
     private bool? Lookup(CkModelElementKind kind, string? id) =>

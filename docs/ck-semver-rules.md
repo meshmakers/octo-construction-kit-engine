@@ -269,7 +269,11 @@ enums). Without the rule, an internal record behind a public attribute could los
 dependent model that uses the public attribute breaks (gate case X1: error 109 downstream). Defence in depth: when the
 classifier is handed a model in which a public element still reaches an internal one (compiled by an older ckc), that
 internal element — transitively — is treated as public and the cap of N1/N2 does not apply; an internal method of a
-public interface follows I11. `CkVisibilityReferenceCoverageTests` fails when a CK DTO gains an element reference that the
+public interface follows I11. **Inbound associations (N1, platform-owner decision 2026-10-10):** an association of an internal
+type that targets a public type (of this model or a dependency) adds an inbound navigation to that public type in
+GraphQL, which derived types in other models inherit; the association and its role (inbound name, multiplicities) are
+therefore public surface — removing the association or renaming the role is Major. The compiler does not forbid such
+associations (classifier rule only). `CkVisibilityReferenceCoverageTests` fails when a CK DTO gains an element reference that the
 visibility walk does not cover.
 
 **Interfaces (AB#6267).** An interface `X-n` grows by optional members; every change that breaks implementors or

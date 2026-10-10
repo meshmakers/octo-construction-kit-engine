@@ -83,6 +83,20 @@ public class BlueprintUpdatePreview
     public List<BlueprintBlankedAttribute> BlankedAttributes { get; set; } = [];
 
     /// <summary>
+    /// AB#6383: tenant-owned seed entities (<c>rtBlueprintLocked: false</c> in the seed) the tenant
+    /// still holds. The update does not touch their attributes; it only refreshes their blueprint
+    /// stamp. They raise no conflict.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedSkipped { get; set; } = [];
+
+    /// <summary>
+    /// AB#6383: tenant-owned seed entities the tenant no longer holds although the previously
+    /// installed version's seed contained them - the tenant deleted them, so the update does not
+    /// bring them back.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; set; } = [];
+
+    /// <summary>
     /// Detected conflicts that need resolution
     /// </summary>
     public List<BlueprintUpdateConflict> Conflicts { get; set; } = [];
@@ -137,6 +151,34 @@ public class BlueprintEntityChange
     /// way or the other.
     /// </summary>
     public string? Note { get; set; }
+}
+
+/// <summary>
+/// A tenant-owned seed entity (AB#6383) an update did not write: either the tenant still holds it
+/// (<see cref="BlueprintUpdatePreview.TenantOwnedSkipped" />) or deleted it
+/// (<see cref="BlueprintUpdatePreview.TenantOwnedStaysDeleted" />).
+/// </summary>
+public class BlueprintTenantOwnedEntity
+{
+    /// <summary>
+    /// Identity key of the seed entity: its <c>rtWellKnownName</c>, else its <c>rtId</c>.
+    /// </summary>
+    public required string Key { get; set; }
+
+    /// <summary>
+    /// CK type of the entity.
+    /// </summary>
+    public required string CkTypeId { get; set; }
+
+    /// <summary>
+    /// Runtime id of the tenant entity; null when the tenant no longer holds it.
+    /// </summary>
+    public string? EntityId { get; set; }
+
+    /// <summary>
+    /// Well-known name of the entity, when it has one.
+    /// </summary>
+    public string? WellKnownName { get; set; }
 }
 
 /// <summary>
@@ -397,6 +439,18 @@ public class BlueprintUpdateResult
     /// Nothing is silent: a kept tenant value is listed here as well.
     /// </summary>
     public List<BlueprintBlankedAttribute> BlankedAttributes { get; set; } = [];
+
+    /// <summary>
+    /// AB#6383: tenant-owned seed entities the tenant holds; left untouched apart from their stamp.
+    /// Counted in <see cref="EntitiesSkipped" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedSkipped { get; set; } = [];
+
+    /// <summary>
+    /// AB#6383: tenant-owned seed entities the tenant deleted; not re-created. Counted in
+    /// <see cref="EntitiesSkipped" />.
+    /// </summary>
+    public List<BlueprintTenantOwnedEntity> TenantOwnedStaysDeleted { get; set; } = [];
 
     /// <summary>
     /// Errors that occurred during the update

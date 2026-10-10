@@ -288,7 +288,30 @@ Every seed entity is stamped with three system attributes when applied:
 | `rtBlueprintLocked`    | bool     | `true` = managed by blueprint, updates will overwrite; `false` = user-released.   |
 | `rtBlueprintAppliedAt` | DateTime | UTC timestamp of the most recent apply/update touching this entity.               |
 
-A blueprint that ships an entity but wants to leave it user-editable from day one can set `rtBlueprintLocked: false` in its seed data.
+A blueprint that ships an entity but wants to leave it user-editable from day one can set `rtBlueprintLocked: false` in its seed data. Such an entity is **tenant-owned**, see the next section.
+
+## Product-owned and tenant-owned seed entities (AB#6383)
+
+The `rtBlueprintLocked` flag **in the seed** says who owns an entity once it exists on the tenant:
+
+| Seed says                        | Owner    | First install            | Update, tenant holds it                               | Update, tenant lacks it                                      |
+|----------------------------------|----------|--------------------------|-------------------------------------------------------|--------------------------------------------------------------|
+| flag absent or `true` (default)  | product  | created                  | renewed from the seed (Merge/Full)                    | created again (a deleted entity comes back)                  |
+| `rtBlueprintLocked: false`       | tenant   | created with seed values | **not touched**, no conflict (only the stamp is moved) | created only if it is new; **stays deleted** if the previous version's seed already had its key |
+
+Rules for a tenant-owned seed entity (`UpdateBlueprint` in `Merge` and `Full` mode, and `Safe` for the creation part):
+
+- **Created once.** On the first install, and when a later version of the seed brings a key the previously installed version did not have, it is created with the seed values.
+- **Never updated.** If the tenant holds it, none of its attribute values is written, however the seed changed. The update only moves the blueprint stamp: `rtBlueprintLocked` is set to `false`, `rtBlueprintSource` and `rtBlueprintAppliedAt` are refreshed (not in `Safe` mode, and not for an entity another blueprint or the user owns by `rtBlueprintSource`). No `UserModified` conflict is raised, so the entity does not block the update.
+- **Never re-created after a delete.** If the tenant lacks it and the seed of the previously installed version (read from the catalog) contains the same key (`rtWellKnownName`, else `rtId`) with the same CK type, the tenant deleted it and it stays deleted. If that previous seed cannot be read from the catalog, the update does **not** create the absent tenant-owned entities and returns a warning, because it cannot tell a deleted entity from a new one.
+- **The seed decides, not the tenant's stamp.** A tenant that still carries the stamp `rtBlueprintLocked: true` from an earlier version is handled as tenant-owned from the first update whose seed declares the entity unlocked; its edits are kept. The key counts as "contained in the previous seed" whatever flag the previous seed gave it, so an entity that was product-owned and is handed over to the tenant stays deleted if the tenant had deleted it.
+- **Reported.** `PreviewUpdateAsync` lists them in `TenantOwnedSkipped` and `TenantOwnedStaysDeleted`, the apply result carries the same two lists (and counts them in `EntitiesSkipped`). A forced re-apply or an install over another version reports them as messages of the `OperationResult`.
+- **A forced re-apply (`InstallBlueprint --force`) and an install over another version** follow the same rules (the "previous version" is the version recorded on the tenant; for a forced re-apply of the same version that is the version itself, so a deleted tenant-owned entity stays deleted).
+- **Not covered: `ImportRt -r`** (and any plain RT import). It is not blueprint-aware, ignores `rtBlueprintLocked` and overwrites by `rtId`; use `UpdateBlueprint` / `InstallBlueprint` to apply a blueprint seed.
+- Associations declared on a tenant-owned seed entity that is skipped are not applied either; an association from another seed entity to a tenant-owned entity the tenant deleted is dropped as dangling.
+- The reverse flip (seed locks an entity that the tenant copy carries as unlocked) is unchanged: the unlocked tenant copy raises a `UserModified` conflict.
+
+Effect on existing unlocked seed entities: before AB#6383 an update that found such an entity on the tenant raised a `UserModified` conflict, and `ApplyUpdateAsync` refused the whole update unless `ContinueOnError` or a per-entity resolution was given. Such an entity is now **skipped** and does not block the update. Example: the unlocked FamilyOs entities (AB#6317 F10) went from "blocks the update" to "skipped".
 
 ## Seed Data Format
 
@@ -358,7 +381,7 @@ fetched anyway.
 | Mode        | Behaviour                                                                                                    |
 |-------------|--------------------------------------------------------------------------------------------------------------|
 | `Safe`      | Add new entities only. Existing entities are left alone, even if locked.                                     |
-| `Merge`     | Add new + upsert locked entities. Unlocked entities raise `UserModified` conflicts (default: skip).          |
+| `Merge`     | Add new + upsert locked entities. Tenant-owned seed entities (`rtBlueprintLocked: false` in the seed) are skipped without a conflict; an unlocked tenant copy of a product-owned seed entity raises a `UserModified` conflict (default: skip). |
 | `Full`      | Like Merge, plus delete entities that exist in the tenant but no longer in the seed. Unlocked → conflict.    |
 | `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. Fails the update when the target ships no script for the installed version (see below). |
 
@@ -470,7 +493,7 @@ Two consequences worth knowing:
 
 ## Conflict Resolution
 
-A conflict is raised when an unlocked entity (`rtBlueprintLocked = false`) is in the way of an update. Two conflict types exist:
+A conflict is raised when an unlocked tenant entity (`rtBlueprintLocked = false`) is in the way of an update, unless the seed itself declares the entity tenant-owned (see above): that entity is skipped without a conflict. Two conflict types exist:
 
 | Type             | Triggered when                                                                                                |
 |------------------|---------------------------------------------------------------------------------------------------------------|
@@ -802,7 +825,7 @@ See `octo-cli/CLAUDE.md` § "Blueprints" for the exact argument forms.
 1. **Small, focused blueprints.** One blueprint per domain/feature. Compose via `blueprintDependencies`, not by bundling unrelated entities.
 2. **Use version ranges for dependencies.** `[1.0,)` keeps things flexible; pinning exact versions is fine for `blueprintId` but rarely helpful in dependencies.
 3. **Sparse seed data.** Ship essential bootstrap data only — no test data, no per-customer specifics.
-4. **Lock managed entities.** Default `rtBlueprintLocked` is `true`; only override to `false` when you genuinely intend the user to take ownership immediately.
+4. **Lock managed entities.** Default `rtBlueprintLocked` is `true`; only override to `false` when you genuinely intend the user to take ownership immediately. An unlocked seed entity is created once and then belongs to the tenant: no update changes it and none brings it back after a delete. Keep entities the product needs (the rules a feature depends on) locked and unlock only defaults the tenant is meant to edit or remove.
 5. **Migration scripts for breaking changes.** Schema renames, deletes, and value transformations need an explicit script. Additive changes work via Merge alone.
 6. **Test with `-dr`.** Use `UpdateBlueprint -dr` (dry-run) before applying to production tenants.
 7. **Keep backups.** Blueprint updates do not snapshot the tenant — rely on the infrastructure-level tenant dump/restore jobs or database snapshots before risky updates.

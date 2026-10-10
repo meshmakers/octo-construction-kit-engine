@@ -433,7 +433,7 @@ public sealed class CkV2CompileTests : IDisposable
         Assert.True(File.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v3/k/KitchenSink/1/ck-kitchensink-1.0.0.json")));
         Assert.True(File.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v2/s/System/2/ck-system-2.5.0.json")));
         Assert.False(Directory.Exists(Path.Combine(_fixture.CatalogDir, "ck-models/v2/k")));
-        Assert.Contains("minEngineVersion: 3.4.0", await ToYamlAsync(_fixture, compiled));
+        Assert.Contains("minEngineVersion: 3.5.1", await ToYamlAsync(_fixture, compiled));
     }
 
     [Fact]

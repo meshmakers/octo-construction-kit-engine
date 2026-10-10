@@ -689,24 +689,38 @@ A version lives in one root only: publishing it into the other root needs `force
 local **and** the GitHub catalog (review G3 E-M5). Known limitation (E-L3): the old root's `catalog.json` keeps a
 stale listing entry for a moved version (listing only; lookups use the files). The catalog CI side (Pages deploy of `ck-models/v3/`) is F2.3.
 
-**`minEngineVersion` (F1.1-S6).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
-`CkEngineVersion.CkV2MinEngineVersion` (`3.4.0`, a deterministic constant — not the compiling engine's own
-version, so DebugL and release builds produce the same output) for `ckLanguage: 2` and range-retaining models,
-**and the highest `minEngineVersion` of its resolved dependencies** (review G3 E-M4: a v1 model on a v2 or
-range-retaining dependency gets it too and therefore lands in `ck-models/v3/`, so an older engine never sees a model
-it cannot resolve); `null` otherwise (v1 output on v1 dependencies unchanged). 3.4.0 is at or below every engine
-the current lib line produces (3.4.x); after the first lib-train release that contains CK v2 it can be raised to that
-version to also stop older 3.4.x engines that read `v3/` by hand. `ElementResolver` and both dependency resolvers refuse a model above the
-running engine's version with **message 126** (`CkModelRequiresNewerEngine`; a dependency is skipped like a 91).
-The running version is the `ConstructionKit.Engine` assembly version; DebugL is `999.0.0` (accepts everything),
-and an assembly version below 1.0 (private-feed `0.1.*` builds) skips the check. **Tests of message 126 must not
-depend on the ambient assembly version** (DebugL `999.0.0`, CI `0.1.*` = check skipped, r-tag builds `3.x`): pin it
+**`minEngineVersion` (F1.1-S6, AB#6390).** The compiler writes `CkCompiledModelRoot.MinEngineVersion` =
+`CkEngineVersion.CkV2MinEngineVersion` (**`3.5.1`**, the first libs release with the full CK v2 Phase 1 reader; a
+deterministic constant — not the compiling engine's own version, so DebugL and release builds produce the same
+output) for `ckLanguage: 2` and range-retaining models, **and the highest `minEngineVersion` of its resolved
+dependencies** (review G3 E-M4: a v1 model on a v2 or range-retaining dependency gets it too and therefore lands in
+`ck-models/v3/`, so an older engine never sees a model it cannot resolve); `null` otherwise (v1 output on v1
+dependencies byte-identical). Models published earlier keep their stored value (published models are immutable; the
+older `3.4.0` value stays valid for them). `ElementResolver` and both dependency resolvers refuse a model above the
+running engine's version with **message 126** (`CkModelRequiresNewerEngine`, names the running engine as
+major.minor.patch; a dependency is skipped like a 91): a 3.4.x or 3.5.0 engine refuses a v2 model, 3.5.1+ reads it.
+
+**The running engine version is patch-exact.** `set-version.yml` stamps the AssemblyVersion as `Major.Minor.0.0`, so
+it cannot tell 3.5.0 from 3.5.2. `CkEngineVersion.ReadRunningVersion` therefore reads, in this order, the
+`AssemblyFileVersion` (`$(BuildNumberLong)`: `3.5.2.0` on an `r3.5.2` build, `0.1.YYMM.NNNN` on main, `3.5.N.R` on a
+`test/3.5-*` build), then the `AssemblyInformationalVersion` (suffixes `-branch` and `+sourcelink` stripped), then
+the AssemblyVersion; the first value that parses wins and nothing throws. The FileVersion is preferred because it is
+always purely numeric. No pipeline-template change is needed. (`test/X.Y-*` lane builds report
+`X.Y.<buildCounter>`, not a release patch.)
+
+**Defined rules for non-release engines.** DebugL is `999.0.0` (accepts every model it can compare, refuses
+`1000.0.0`). **Engines below 1.0 (main line, private-feed `0.1.*` builds) skip the check** — an explicit rule in
+`CkEngineVersion.IsSatisfiedBy` (and `Current` is `null` for them): the main line carries no number comparable with
+the release line, it is covered by the main-line floor `0.1.2610.9010` of
+`octo-mesh-deployment/docs/ck-v2-engine-inventory.md` and by rebuilt images. **Tests of message 126 must not depend
+on the ambient assembly version** (DebugL `999.0.0`, CI `0.1.*` = check skipped, r-tag builds `3.x`): pin it
 with the internal test seam `using var _ = CkEngineVersion.OverrideCurrentForTests(new Version(3, 4, 149));`
 (AsyncLocal, restored on dispose, never set in production; AB#6274; visible to Engine.Tests, Compiler.Tests and
 the engine-mongodb `Runtime.Engine.MongoDb.IntegrationTests`), or pass `engineVersion` to `CheckModel`
-directly. Raise the constant when a later
-engine writes features this engine line cannot read. `CatalogService.PublishAsync` resolves before it publishes, so
-it refuses such a model, too.
+directly. `CkEngineVersionTests` cover the version table (3.4.149/3.5.0 refuse, 3.5.1/3.5.2/3.6.0/999.0.0 accept,
+0.x skips), the stamping (a dynamic assembly with AssemblyVersion `3.5.0.0` and FileVersion `3.5.2.0` reads 3.5.2)
+and the unparsable fallback. Raise the constant when a later engine writes features this engine line cannot read.
+`CatalogService.PublishAsync` resolves before it publishes, so it refuses such a model, too.
 
 **Fail fast with the visible versions.** When a dependency range cannot be satisfied,
 `CatalogDependencyResolver` lists the versions each readable catalog knows for that model

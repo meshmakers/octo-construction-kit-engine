@@ -59,7 +59,7 @@ internal sealed class CkCompileFixture : IDisposable
     ///     (e.g. <c>types/thing.yaml</c>) to its YAML body without the schema line.
     /// </summary>
     public string WriteSource(string name, string modelId, IEnumerable<string>? dependencies,
-        IDictionary<string, string> files, int? ckLanguage = null)
+        IDictionary<string, string> files, int? ckLanguage = null, string? extraMetadata = null)
     {
         var dir = Path.Combine(Root, "src", name);
         Directory.CreateDirectory(dir);
@@ -69,7 +69,8 @@ internal sealed class CkCompileFixture : IDisposable
             : "dependencies:\n" + string.Concat(deps.Select(d => $"  - {d}\n"));
         File.WriteAllText(Path.Combine(dir, "ckModel.yaml"),
             "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-meta.schema.json\"\n" +
-            $"modelId: {modelId}\n" + (ckLanguage == null ? "" : $"ckLanguage: {ckLanguage}\n") + dependencyBlock);
+            $"modelId: {modelId}\n" + (ckLanguage == null ? "" : $"ckLanguage: {ckLanguage}\n") + dependencyBlock +
+            extraMetadata);
 
         foreach (var (relativePath, body) in files)
         {

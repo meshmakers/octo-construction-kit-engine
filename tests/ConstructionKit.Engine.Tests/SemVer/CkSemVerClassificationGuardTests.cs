@@ -71,7 +71,10 @@ public class CkSemVerClassificationGuardTests
         [typeof(CkMetaRootDto)] = "source ckModel.yaml root, compiled into CkCompiledModelRoot",
         [typeof(CkModelCompileCandidate)] = "compiler input, not part of the compiled model",
         [typeof(CkModelConfigDto)] = "model configuration file of a consuming project, not part of a model",
-        [typeof(CkTypeAssociationTuple)] = "internal tuple, not serialized"
+        [typeof(CkTypeAssociationTuple)] = "internal tuple, not serialized",
+        [typeof(CkCompatibilityDto)] =
+            "AB#6295: the author's acknowledgements for this release; a decision about the gate, not model structure",
+        [typeof(CkAcknowledgeDto)] = "AB#6295: one acknowledgement entry of CkCompatibilityDto"
     };
 
     /// <summary>

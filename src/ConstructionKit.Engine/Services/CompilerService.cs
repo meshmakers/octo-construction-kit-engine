@@ -6,6 +6,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts.DependencyGraph;
 using Meshmakers.Octo.ConstructionKit.Contracts.Serialization;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.Messages;
+using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
 using Meshmakers.Octo.ConstructionKit.Engine.Serialization;
 using Microsoft.Extensions.Logging;
@@ -574,7 +575,9 @@ public class CompilerService : ICompilerService
             Enums = enums.OrderBy(x => x.EnumId).ToList(),
             // CK v2: null when absent, so a ckLanguage 1 model serializes exactly as before.
             Interfaces = interfaces.Count == 0 ? null : interfaces.OrderBy(x => x.InterfaceId).ToList(),
-            CkLanguage = ckMetaDto.CkLanguage
+            CkLanguage = ckMetaDto.CkLanguage,
+            // AB#6295: null unless the author acknowledged something, so existing models serialize exactly as before.
+            Compatibility = CkCompatibilityValidator.Validate(ckMetaDto, originFileResolver, operationResult)
         };
 
         var (ckModelGraph, compiledModelRoot) = await _catalogModelResolver

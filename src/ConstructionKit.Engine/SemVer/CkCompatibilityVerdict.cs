@@ -38,6 +38,12 @@ public sealed record CkCompatibilityVerdict
     /// </summary>
     public required IReadOnlyList<CkClassifiedModelChange> UncoveredChanges { get; init; }
 
+    /// <summary>
+    ///     AB#6295: how the model's <c>compatibility.acknowledge</c> entries match the changes that need an
+    ///     acknowledgement. An acknowledgement never changes <see cref="RequiredLevel" /> or <see cref="Validation" />.
+    /// </summary>
+    public CkAcknowledgementResult Acknowledgement { get; init; } = CkAcknowledgementResult.None;
+
     /// <summary>The baseline version id.</summary>
     public CkModelId BaselineId => Resolution.Baseline!;
 }

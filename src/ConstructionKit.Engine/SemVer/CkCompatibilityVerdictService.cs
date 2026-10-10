@@ -60,6 +60,8 @@ public class CkCompatibilityVerdictService : ICkCompatibilityVerdictService
             RequiredLevel = requiredLevel,
             Validation = validation,
             CoveredLevel = coveredLevel,
+            Acknowledgement = CkAcknowledgementResult.Evaluate(classifiedChanges, current.Compatibility,
+                current.EffectiveCkLanguage >= 2),
             UncoveredChanges = validation.Verdict == CkSemVerVerdict.VersionTooLow
                 ? classifiedChanges.Where(c => c.Level > coveredLevel).ToList()
                 : []

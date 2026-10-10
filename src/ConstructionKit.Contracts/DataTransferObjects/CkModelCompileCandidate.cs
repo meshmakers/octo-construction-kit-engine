@@ -13,4 +13,9 @@ public class CkModelCompileCandidate : CkModelRootBase
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public List<CkModelIdVersionRange>? DependencyRanges { get; set;}
+
+    /// <summary>
+    ///     AB#6295: the acknowledgements declared in <c>ckModel.yaml</c>, null when there are none.
+    /// </summary>
+    public CkCompatibilityDto? Compatibility { get; set; }
 }

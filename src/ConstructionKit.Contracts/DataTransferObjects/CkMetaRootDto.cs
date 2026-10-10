@@ -36,4 +36,10 @@ public class CkMetaRootDto : CkModelPropertiesDto
     /// </summary>
     // ReSharper disable once UnusedAutoPropertyAccessor.Global
     public List<CkModelIdVersionRange>? Dependencies { get; set; }
+
+    /// <summary>
+    ///     AB#6295: acknowledgements of changes that need one. Omitted when absent.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public CkCompatibilityDto? Compatibility { get; set; }
 }

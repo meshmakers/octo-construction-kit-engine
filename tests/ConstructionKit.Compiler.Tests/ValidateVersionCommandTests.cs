@@ -522,4 +522,82 @@ public sealed class ValidateVersionCommandTests : IDisposable
             Assert.Equal(commandMinimum, gate.Verdict.Validation.MinimumVersion.ToString());
         }
     }
+
+    private const string AckKey = "RecordAttribute:Login-1/Secret#Modified:access";
+
+    /// <summary>A ckLanguage 2 record with a security-sensitive attribute; the access and the acknowledgement vary.</summary>
+    private void WriteAcknowledgeSource(string version, string access, string? reason = null, string key = AckKey)
+    {
+        Directory.CreateDirectory(Path.Combine(_sourceDir, "attributes"));
+        Directory.CreateDirectory(Path.Combine(_sourceDir, "records"));
+        Directory.CreateDirectory(Path.Combine(_sourceDir, "enums"));
+        File.WriteAllText(Path.Combine(_sourceDir, "ckModel.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-meta.schema.json\"\n" +
+            $"ckLanguage: 2\nmodelId: CmdFixture-{version}\n" +
+            (reason == null
+                ? ""
+                : $"compatibility:\n  acknowledge:\n    - change: \"{key}\"\n      reason: \"{reason}\"\n"));
+        File.WriteAllText(Path.Combine(_sourceDir, "attributes", "secret.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+            "attributes:\n  - id: Secret\n    valueType: String\n    securitySensitive: true\n");
+        File.WriteAllText(Path.Combine(_sourceDir, "records", "login.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+            "records:\n  - recordId: Login\n    attributes:\n      - id: ${this}/Secret\n        name: Secret\n" +
+            $"        isOptional: true\n        access: {access}\n");
+        File.WriteAllText(Path.Combine(_sourceDir, "enums", "state.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+            "enums:\n  - enumId: State\n    values:\n      - key: 0\n        name: IdleState\n");
+    }
+
+    /// <summary>
+    ///     AB#6295: ValidateVersion and the compile gate give the same acknowledge verdict (OCTO-CK203 / OCTO-CK204),
+    ///     and ValidateVersion lists acknowledged changes in the report and the generated CHANGELOG.
+    /// </summary>
+    [Theory]
+    [InlineData("Hidden", null, "OCTO-CK203")]
+    [InlineData("Hidden", "Accepted risk R13", null)]
+    [InlineData("ReadOnly", "Accepted risk R13", "OCTO-CK204")]
+    public async Task ValidateVersion_AndCompileGate_AgreeOnTheAcknowledgeVerdict(string access, string? reason,
+        string? expectedCode)
+    {
+        WriteAcknowledgeSource("2.4.0", "ReadOnly");
+        await PublishBaselineAsync();
+        WriteAcknowledgeSource("2.5.0", access, reason);
+
+        string? commandMessage = null;
+        try
+        {
+            await RunAsync("-p", _sourceDir, "-o", _reportPath, "-cl");
+        }
+        catch (ModelValidationException exception)
+        {
+            commandMessage = exception.Message;
+        }
+
+        var current = await _serviceProvider.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_sourceDir, new OperationResult());
+        var gate = await _serviceProvider.GetRequiredService<CkCompileGate>()
+            .RunAsync(current, CkBaselineSource.Remote);
+
+        var gateCodes = gate.Messages.Where(m => m.Code != null && m.Severity == CkCompileGateSeverity.Error)
+            .Select(m => m.Code!).ToArray();
+        if (expectedCode == null)
+        {
+            Assert.Null(commandMessage);
+            Assert.Empty(gateCodes);
+            var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+            Assert.Contains("Acknowledged changes", report);
+            Assert.Contains("Accepted risk R13", report);
+            var changelog = await File.ReadAllTextAsync(Path.Combine(_sourceDir, "CHANGELOG.md"),
+                TestContext.Current.CancellationToken);
+            Assert.Contains("### Acknowledged changes", changelog);
+            Assert.Contains("acknowledged: Accepted risk R13", changelog);
+        }
+        else
+        {
+            Assert.NotNull(commandMessage);
+            Assert.Contains(expectedCode, commandMessage);
+            Assert.Equal([expectedCode], gateCodes);
+        }
+    }
 }

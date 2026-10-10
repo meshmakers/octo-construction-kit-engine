@@ -45,6 +45,13 @@ public class CkCompiledModelRoot : CkModelRootBase
     public List<CkModelDependencyDto>? DependencyRanges { get; set; }
 
     /// <summary>
+    ///     AB#6295: the acknowledgements the author declared for this release (omitted when empty), so the publish gate
+    ///     can enforce the acknowledge rule from the compiled model alone.
+    /// </summary>
+    [YamlMember(DefaultValuesHandling = DefaultValuesHandling.OmitNull)]
+    public CkCompatibilityDto? Compatibility { get; set; }
+
+    /// <summary>
     ///     CK v2 (F1.1-S6, AB#5909): the lowest construction kit engine version that can read this model. Written by
     ///     the compiler for <c>ckLanguage: 2</c> and range-retaining output (<c>null</c> = any engine, so v1 output
     ///     is unchanged). An engine refuses to import a model whose value is above its own version (message 126).

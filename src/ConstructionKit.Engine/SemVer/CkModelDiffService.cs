@@ -156,6 +156,10 @@ public class CkModelDiffService : ICkModelDiffService
                     "(migration check, OCTO-CK104)",
                 [nameof(CkCompiledModelRoot.IsRangeRetaining)] =
                     "computed from DependencyRanges (DependencyRanges != null); diffed as the model change 'rangeRetention' (AB#6271)",
+                [nameof(CkCompiledModelRoot.Compatibility)] =
+                    "AB#6295: the author's acknowledgements for this release (compatibility.acknowledge); a decision about " +
+                    "the gate, not model structure. They are matched against the diff by CkAcknowledgementResult and never " +
+                    "change a level",
                 [nameof(CkCompiledModelRoot.MinEngineVersion)] =
                     "derived by the compiler from ckLanguage, range retention and the dependencies' minEngineVersion " +
                     "(F1.1-S6); its causes are diffed"

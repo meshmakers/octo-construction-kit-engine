@@ -257,6 +257,12 @@ internal class ValidateVersionCommand : CkcCommand
 
             // First publication: any version is valid — the declared version is the starting point
             notes.Add("First publication — the model exists in no catalog yet; the declared version is the baseline.");
+            if (AddStaleAcknowledgementsOnFirstPublication(meta, modelName, errors))
+            {
+                WriteReport(markdownReport, modelName, rootPath, null, declaredVersion, null, [], errors, warnings, notes);
+                return errors.Select(e => $"{modelName}: {e}").ToList();
+            }
+
             await RegisterValidatedSiblingAsync(rootPath, modelName, declaredVersion, null, validatedSiblings,
                 warnings);
             WriteReport(markdownReport, modelName, rootPath, null, declaredVersion, null, [], errors, warnings, notes);
@@ -329,6 +335,13 @@ internal class ValidateVersionCommand : CkcCommand
 
         AddRenameHints(classifiedChanges, warnings);
 
+        // AB#6295: the acknowledge rule (OCTO-CK203/204), shared with the compile gate. Never lowers a level.
+        var acknowledgement = verdict.Acknowledgement;
+        foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(acknowledgement, modelName))
+        {
+            errors.Add($"{code}: {text}");
+        }
+
         // Migration reconciliation (FR-10). Skip it while the declared version itself is still wrong
         // (too low, or a downgrade): OCTO-CK100/OCTO-CK101 already tell the developer to raise the
         // version, and reconciling here would name the *declared* version as the missing migration's
@@ -369,7 +382,7 @@ internal class ValidateVersionCommand : CkcCommand
 
         // 10. Emit the report
         WriteReport(markdownReport, modelName, rootPath, baseline, declaredVersion, validationResult,
-            classifiedChanges, errors, warnings, notes);
+            classifiedChanges, errors, warnings, notes, acknowledgement);
 
         // 11. Only on success and --changelog: write/replace the section of the declared version
         if (errors.Count == 0 && writeChangelog)
@@ -377,7 +390,8 @@ internal class ValidateVersionCommand : CkcCommand
             var note = validationResult.Verdict == CkSemVerVerdict.ValidBumpWithoutStructuralChange
                 ? "Version bump without structural model change."
                 : null;
-            await WriteChangelogAsync(rootPath, declaredVersion, requiredLevel, classifiedChanges, note);
+            await WriteChangelogAsync(rootPath, declaredVersion, requiredLevel, classifiedChanges, note,
+                acknowledgement.Acknowledged);
         }
 
         return errors.Select(e => $"{modelName}: {e}").ToList();
@@ -538,8 +552,30 @@ internal class ValidateVersionCommand : CkcCommand
         }
     }
 
+    /// <summary>
+    ///     AB#6295: a first publication has nothing to compare with, so an acknowledgement of a ckLanguage 2 model is
+    ///     stale (OCTO-CK204). Reads the language from the metadata, no compile needed.
+    /// </summary>
+    private static bool AddStaleAcknowledgementsOnFirstPublication(CkMetaRootDto meta, string modelName,
+        List<string> errors)
+    {
+        if (meta.EffectiveCkLanguage < 2 || meta.Compatibility?.Acknowledge is not { Count: > 0 })
+        {
+            return false;
+        }
+
+        var result = CkAcknowledgementResult.Evaluate([], meta.Compatibility, true);
+        foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(result, modelName))
+        {
+            errors.Add($"{code}: {text}");
+        }
+
+        return errors.Count > 0;
+    }
+
     private async Task WriteChangelogAsync(string rootPath, CkVersion declaredVersion, CkSemVerLevel requiredLevel,
-        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note)
+        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note,
+        IReadOnlyList<CkAcknowledgedChange>? acknowledgedChanges = null)
     {
         var changelogFilePath = Path.Combine(rootPath, "CHANGELOG.md");
         var existingContent = File.Exists(changelogFilePath)
@@ -547,7 +583,7 @@ internal class ValidateVersionCommand : CkcCommand
             : null;
 
         var updatedContent = _changelogGenerator.Generate(existingContent, declaredVersion, DateTime.UtcNow,
-            requiredLevel, classifiedChanges, note);
+            requiredLevel, classifiedChanges, note, acknowledgedChanges);
         await File.WriteAllTextAsync(changelogFilePath, updatedContent);
         Logger.LogInformation("Changelog section for version {Version} written to '{ChangelogFilePath}'",
             declaredVersion, changelogFilePath);
@@ -556,8 +592,11 @@ internal class ValidateVersionCommand : CkcCommand
     private void WriteReport(StringBuilder markdownReport, string modelName, string rootPath,
         CkBaselineResolution? baselineResult, CkVersion declaredVersion, CkSemVerValidationResult? validationResult,
         IReadOnlyList<CkClassifiedModelChange> classifiedChanges, List<string> errors, List<string> warnings,
-        List<string> notes)
+        List<string> notes, CkAcknowledgementResult? acknowledgement = null)
     {
+        var acknowledgedLines = acknowledgement == null
+            ? []
+            : CkAcknowledgementFormatter.GetAcknowledgedLines(acknowledgement);
         var isValid = errors.Count == 0;
         var resultLabel = isValid ? "VALID" : "ERROR";
 
@@ -601,6 +640,15 @@ internal class ValidateVersionCommand : CkcCommand
             foreach (var classifiedChange in behavioural)
             {
                 Console.WriteLine($"    {CkModelChangeFormatter.Format(classifiedChange)}{AcknowledgeSuffix(classifiedChange)}");
+            }
+        }
+
+        if (acknowledgedLines.Count > 0)
+        {
+            Console.WriteLine($"  Acknowledged changes ({acknowledgedLines.Count}):");
+            foreach (var line in acknowledgedLines)
+            {
+                Console.WriteLine($"    {line}");
             }
         }
 
@@ -657,6 +705,15 @@ internal class ValidateVersionCommand : CkcCommand
             {
                 markdownReport.Append(
                     $"- **{CkModelChangeFormatter.GetLevelLabel(classifiedChange.Level)}** {CkModelChangeFormatter.Format(classifiedChange.Change)} — {classifiedChange.Reason}{AcknowledgeSuffix(classifiedChange)}\n");
+            }
+        }
+
+        if (acknowledgedLines.Count > 0)
+        {
+            markdownReport.Append($"\n### Acknowledged changes ({acknowledgedLines.Count})\n\n");
+            foreach (var line in acknowledgedLines)
+            {
+                markdownReport.Append($"- {line}\n");
             }
         }
 

@@ -358,6 +358,9 @@ internal static class MessageCodes
     internal static OperationMessage CkElementsInWrongFolder(string? location, object file, object key, object expectedFolder) =>
         GetMessage("CkElementsInWrongFolder", location, file, key, expectedFolder);
 
+    internal static OperationMessage InvalidCompatibilityAcknowledge(string? location, object modelId, object index, object reason) =>
+        GetMessage("InvalidCompatibilityAcknowledge", location, modelId, index, reason);
+
     internal static OperationMessage CkInconsistentVisibility(string? location, object element, object reason) =>
         GetMessage("CkInconsistentVisibility", location, element, reason);
 
@@ -1028,6 +1031,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Warning,
                  110, "File '{file}' declares '{key}', which is only read from files in the '{expectedFolder}/' folder. These elements are ignored; move them into '{expectedFolder}/'.",
                  new [] {"file", "key", "expectedFolder"})
+        },
+        {
+            "InvalidCompatibilityAcknowledge",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 130, "Entry {index} of 'compatibility.acknowledge' in the ckModel.yaml of model '{modelId}' is invalid: {reason}",
+                 new [] {"modelId", "index", "reason"})
         },
         {
             "CkInconsistentVisibility",

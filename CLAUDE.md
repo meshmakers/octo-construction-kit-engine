@@ -477,7 +477,7 @@ Developers only need to create migration scripts for versions that actually tran
 | `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
 | `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
 | `ICkBaselineResolver` | `ConstructionKit.Engine.SemVer` | AB#5450: the one read-only baseline lookup of every compatibility gate (`ValidateVersion` now, compile gate AB#6294 and publish gate F2.3 next): newest version of the declared major, a new major against the previous major line, local-catalog entries at or above the declared version never (AB#5434). Rules: `docs/ck-semver-rules.md`, "Baseline" |
-| `ICkCompatibilityVerdictService` | `ConstructionKit.Engine.SemVer` | AB#6294: the one verdict (baseline model, diff, classification, validation of the declared version, uncovered changes) shared by `ValidateVersion` and the compile gate; read-only. `CkCompileGate` (same namespace) is the decision logic of `CkCompile` for ckLanguage 2 models: `OCTO-CK200`/`201`/`202`, baseline source `OctoCkCompatibilityBaseline` (`Local`/`Remote`, CI default `Remote`). Rules: `docs/ck-semver-rules.md`, "Compile gate" |
+| `ICkCompatibilityVerdictService` | `ConstructionKit.Engine.SemVer` | AB#6294: the one verdict (baseline model, diff, classification, validation of the declared version, uncovered changes) shared by `ValidateVersion` and the compile gate; read-only. `CkCompileGate` (same namespace) is the decision logic of `CkCompile` for ckLanguage 2 models: `OCTO-CK200`/`201`/`202`, `OCTO-CK203`/`204` (AB#6295, `CkAcknowledgementResult`, `CkChangeKey`), baseline source `OctoCkCompatibilityBaseline` (`Local`/`Remote`, CI default `Remote`). Rules: `docs/ck-semver-rules.md`, "Compile gate" |
 
 ## Extensible Enum Import (WI #3324)
 
@@ -886,7 +886,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–129 are in use (table below); **spare: 111, 114–117, 130**. Range
+- Message codes for CK v2: 90–113 and 118–130 are in use (table below); **spare: 111, 114–117, 131**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -934,6 +934,7 @@ Notes:
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 | 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
 | 129 | `CkInconsistentVisibility` | `CkVisibilityValidator` (end of `ReferenceResolver`) + `InheritanceResolver.InheritInterfaceMethods` | AB#6334 / AB#6335 (F2.1 gate findings H1/H3): in a `ckLanguage: 2` model a **public** element references an **internal** element of its own model (same reference walk as 112, plus type association `targetCkAttributeIds`), a public interface declares an internal method, or a type redeclares a method of a public interface it implements as internal. One message per offending reference. Coverage of the walk is guarded by `CkVisibilityReferenceCoverageTests`; the classifier mirror is `CkVisibilityIndex.ExposeInternalElementsReachableFromPublicOnes` (defence in depth; it also treats associations of internal types that target a public type, and their roles, as public surface — N1) |
+| 130 | `InvalidCompatibilityAcknowledge` | `CkCompatibilityValidator` (from `CompilerService`) | AB#6295: an entry of `compatibility.acknowledge` in `ckModel.yaml` has an empty `change`, a wildcard (`*`, `?`), an empty `reason`, or repeats a key. The JSON schema rejects empty reasons and wildcard keys first; this is the same rule for sources that skip the schema. Using the section in a `ckLanguage` 1 model is message 90 (feature `compatibility.acknowledge`) |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1032,6 +1033,17 @@ in `CatalogModelResolver.ApplyRangeRetentionAsync` (range retention only, so v1 
 exclusion in `CkModelDiffService.ExcludedProperties` (row D7); (10) engine-mongodb `CkModelDependency.UsedSurface` /
 `UsedSurfaceHash` (reflection gate via the C# kitchen sink); consumer: F2.5 (AB#5687). Rules and limits:
 `docs/ck-semver-rules.md`, "usedSurface".
+
+**`compatibility.acknowledge` (AB#6295) touch points**, same numbering: (1) meta schema `compatibility.acknowledge[]`
+(`change` without wildcards, `reason` non-blank); (2) compiled schema, same shape; (3) `CkMetaRootDto.Compatibility`,
+`CkModelCompileCandidate.Compatibility`, `CkCompiledModelRoot.Compatibility` (`CkCompatibilityDto`, `CkAcknowledgeDto`);
+(4) `CompilerService` -> `CkCompatibilityValidator` -> candidate -> `CatalogModelResolver.CompileAsync` (omitted when
+empty, so existing models serialize as before); (5) not part of the graph; (6) 130, and 90 in a v1 model;
+(7) conscious exclusion `CkCompiledModelRoot.Compatibility` in `CkModelDiffService.ExcludedProperties` (the entries are
+matched against the diff by `CkAcknowledgementResult`, they are not model structure) and `CkCompatibilityDto` /
+`CkAcknowledgeDto` in the guard's `NotDiffedDtoTypes`; (8), (9) -; (10) conscious exclusion in `CkModelReflectionComparer.AllowList`
+(`CkCompiledModelRoot.Compatibility`: build and publish-time metadata, read from the catalog JSON by the publish gate, not
+needed in tenants); (11), (12) not needed. Rules: `docs/ck-semver-rules.md`, "Acknowledge".
 
 **`securitySensitive` (AB#6269) touch points**, same numbering: (1) attribute schema `CkAttribute.securitySensitive`;
 (2) compiled schema via the shared `$ref`; (3) `CkAttributeDto.SecuritySensitive` (`bool?`, omitted when null); (4) copied

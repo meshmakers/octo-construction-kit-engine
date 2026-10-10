@@ -14,14 +14,16 @@ public class CkChangelogGenerator : ICkChangelogGenerator
 
     /// <inheritdoc />
     public string Generate(string? existingContent, CkVersion version, DateTime date, CkSemVerLevel requiredLevel,
-        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note = null)
+        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note = null,
+        IReadOnlyList<CkAcknowledgedChange>? acknowledgedChanges = null)
     {
         var (header, sections) = ParseSections(existingContent);
         var versionToken = version.ToString();
 
         var replaceIndex = sections.FindIndex(s => s.VersionToken == versionToken);
         var hasFollowingSection = replaceIndex >= 0 ? replaceIndex < sections.Count - 1 : sections.Count > 0;
-        var newSection = BuildSection(version, date, requiredLevel, classifiedChanges, note, hasFollowingSection);
+        var newSection = BuildSection(version, date, requiredLevel, classifiedChanges, note, hasFollowingSection,
+            acknowledgedChanges);
 
         var result = new StringBuilder(header);
         if (replaceIndex >= 0)
@@ -102,7 +104,8 @@ public class CkChangelogGenerator : ICkChangelogGenerator
     }
 
     private static string BuildSection(CkVersion version, DateTime date, CkSemVerLevel requiredLevel,
-        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note, bool hasFollowingSection)
+        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note, bool hasFollowingSection,
+        IReadOnlyList<CkAcknowledgedChange>? acknowledgedChanges)
     {
         var section = new StringBuilder();
         section.Append(
@@ -130,6 +133,20 @@ public class CkChangelogGenerator : ICkChangelogGenerator
             // under "Breaking"). Without such changes the section output is unchanged.
             AppendGroup(section, "Behavioural changes", classifiedChanges
                 .Where(c => c.Level != CkSemVerLevel.Major && IsBehavioural(c)));
+            // AB#6295: changes the author acknowledged, with level and reason. Without any the output is unchanged.
+            if (acknowledgedChanges is { Count: > 0 })
+            {
+                section.Append("### Acknowledged changes\n\n");
+                foreach (var acknowledged in acknowledgedChanges)
+                {
+                    section.Append(
+                        $"- {CkModelChangeFormatter.Format(acknowledged.Change.Change)} " +
+                        $"_({CkModelChangeFormatter.GetLevelLabel(acknowledged.Change.Level).ToLowerInvariant()} — " +
+                        $"acknowledged: {acknowledged.Reason})_\n");
+                }
+
+                section.Append('\n');
+            }
         }
 
         // Trim the trailing blank line of the last group, then terminate the section

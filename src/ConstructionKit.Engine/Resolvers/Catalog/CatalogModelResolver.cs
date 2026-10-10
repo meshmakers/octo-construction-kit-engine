@@ -96,7 +96,8 @@ internal class CatalogModelResolver : ModelResolver, ICatalogModelResolver
             Enums = compileCandidate.Enums,
             // CK v2 (AB#5667 / AB#5584)
             Interfaces = compileCandidate.Interfaces,
-            CkLanguage = compileCandidate.CkLanguage
+            CkLanguage = compileCandidate.CkLanguage,
+            Compatibility = compileCandidate.Compatibility
         };
 
         if (_compilerOptions.Value.RangeRetention && compileCandidate.DependencyRanges is { Count: > 0 } &&

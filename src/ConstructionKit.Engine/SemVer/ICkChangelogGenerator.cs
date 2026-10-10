@@ -21,7 +21,12 @@ public interface ICkChangelogGenerator
     /// <param name="requiredLevel">The minimum bump level required by the diff</param>
     /// <param name="classifiedChanges">The classified changes of the diff</param>
     /// <param name="note">Optional note rendered below the heading (e.g. for a first publication)</param>
+    /// <param name="acknowledgedChanges">
+    ///     AB#6295: the changes the author acknowledged; rendered as the section "Acknowledged changes" with level and
+    ///     reason. Null or empty adds nothing.
+    /// </param>
     /// <returns>The updated changelog content</returns>
     string Generate(string? existingContent, CkVersion version, DateTime date, CkSemVerLevel requiredLevel,
-        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note = null);
+        IReadOnlyList<CkClassifiedModelChange> classifiedChanges, string? note = null,
+        IReadOnlyList<CkAcknowledgedChange>? acknowledgedChanges = null);
 }

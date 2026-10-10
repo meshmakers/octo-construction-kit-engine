@@ -159,7 +159,7 @@ the verdict line.
 | `OCTO-CK201` | The declared version is lower than the baseline of the same major | Use a version >= the baseline version |
 | `OCTO-CK202` | The baseline source was unreachable and no baseline is known. An **error** in `Remote`, a high-importance message (not an error) in `Local` | Check network/VPN and the catalog tokens, retry; offline development uses `Local` |
 
-`OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism.
+`OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism (next section).
 
 ### Verdict line
 
@@ -170,6 +170,45 @@ Compatibility: model 'GateModel', declared 2.5.0, baseline GateModel-2.4.0 (Loca
 ```
 
 A first publication logs `first publication (no baseline in the Remote baseline source)`.
+
+## Acknowledge (AB#6295)
+
+Some changes are accepted only when the publisher says so explicitly. The classifier marks them `requiresAcknowledge`
+(F2.1): tightening `access` on a **security-sensitive** attribute (Minor instead of Major, platform-owner decision
+2026-10-09) and a **unique index on a stable base** (row B4, Major). The author acknowledges such a change in
+`ckModel.yaml` (ckLanguage 2 only; in a ckLanguage 1 model the section is message 90):
+
+```yaml
+compatibility:
+  acknowledge:
+    - change: "RecordAttribute:Login-1/Secret#Modified:access"
+      reason: "Close accepted risk R13: password hash readable via GraphQL"
+```
+
+| Code | Meaning | Remediation |
+| ---- | ------- | ----------- |
+| `OCTO-CK203` | A change that needs an acknowledgement has no matching entry. The message prints the **change key** and an example entry | Copy the entry into `compatibility.acknowledge` and give a reason |
+| `OCTO-CK204` | An entry matches no change in this release that needs an acknowledgement (stale, or it names an ordinary change) | Remove the entry; an acknowledgement is valid for one release only |
+
+Rules:
+
+- **The change key** is stable, free of model version numbers and exact (`CkChangeKey`): `{ElementKind}:{ElementId}#{ChangeKind}`,
+  plus `:{property}` for a modification, for example `RecordAttribute:Login-1/Secret#Modified:access`. The element id is the id
+  inside the model. Type indexes have no identity of their own, so their key carries the definition
+  (`TypeIndex:Machine-1/index#Added:UniqueNotDeleted on Serial`). The gate prints the key verbatim. Matching is ordinal;
+  there are no wildcards.
+- **`reason` is mandatory.** An empty reason or a wildcard key is rejected by the schema (and by the compiler, message 130).
+- **An acknowledgement never lowers a level.** A unique index on a stable base still needs a major bump
+  (`OCTO-CK200` for a lower version); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
+  (and the entry is then stale, `OCTO-CK204`).
+- **One release only.** Entries are matched against the diff of exactly this build; on a first publication (no baseline) every
+  entry is stale. Nothing carries over to the next release.
+- **Visible.** Acknowledged changes appear as "Acknowledged changes" (change, level, reason) in the `ValidateVersion` report, the
+  build log of `CkCompile` and the `CHANGELOG.md` section, next to "Behavioural changes". Both gates report the same codes, because
+  both use `ICkCompatibilityVerdictService`.
+- **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate (F2.3)
+  can enforce the same rule without the source. ckLanguage 1 models cannot declare entries; for them "requires acknowledge" stays
+  advisory (no `OCTO-CK203`).
 
 ### First publication vs. unreachable catalogs
 

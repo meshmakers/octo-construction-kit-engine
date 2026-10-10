@@ -147,6 +147,15 @@ public class CkCompileGate
             {
                 messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null,
                     $"Compatibility: model '{current.ModelId}', first publication (no baseline in the {source} baseline source)."));
+                if (isHardGate)
+                {
+                    // Nothing to compare with, so no change can be acknowledged: every entry is stale (OCTO-CK204).
+                    foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(
+                                 CkAcknowledgementResult.Evaluate([], current.Compatibility, true), modelName))
+                    {
+                        messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, code, text));
+                    }
+                }
             }
 
             return new CkCompileGateResult { Messages = messages };
@@ -161,9 +170,18 @@ public class CkCompileGate
                 $"'{resolution.Baseline.FullName}' may be stale."));
         }
 
+        foreach (var line in CkAcknowledgementFormatter.GetAcknowledgedLines(verdict.Acknowledgement))
+        {
+            messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Info, null, $"Acknowledged change: {line}"));
+        }
+
         if (isHardGate)
         {
             AddErrors(messages, verdict, modelName, declared);
+            foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(verdict.Acknowledgement, modelName))
+            {
+                messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, code, text));
+            }
         }
 
         return new CkCompileGateResult { Messages = messages, Verdict = verdict };

@@ -449,6 +449,13 @@ internal class ElementResolver : IElementResolver
             Report(key, "interfaces", key);
         }
 
+        // AB#6295: acknowledgements are a CK v2 feature (a v1 model has no change that needs one, and an older engine
+        // could not read the compiled section).
+        if (model is CkModelCompileCandidate { Compatibility: not null } or CkCompiledModelRoot { Compatibility: not null })
+        {
+            Report(model.ModelId, "compatibility.acknowledge", "ckModel.yaml");
+        }
+
         // F1.1-S4: visibility / derivable are CK v2 keys.
         void CheckModifiers(object key, CkVisibilityDto? visibility, CkDerivableDto? derivable = null)
         {

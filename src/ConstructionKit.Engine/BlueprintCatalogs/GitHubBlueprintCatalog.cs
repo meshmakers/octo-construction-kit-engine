@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.BlueprintCatalogs.DataTransferObjects;
@@ -54,6 +55,11 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
     private readonly GitHubBlueprintCatalogOptions _gitHubOptions;
     private readonly bool _isGitHubClientAvailable;
 
+    // Parsed blueprint.yaml per blueprint id (AB#6306). A published blueprint version is immutable, so the
+    // parsed manifest never goes stale except when the version is unpublished / republished by this catalog
+    // (entries are invalidated there). Failures are never cached. Callers get a copy, never the cached instance.
+    private readonly ConcurrentDictionary<BlueprintId, BlueprintMetaRootDto> _metaCache = new();
+
     /// <summary>
     /// Creates a new instance of the <see cref="GitHubBlueprintCatalog"/> class.
     /// </summary>
@@ -88,6 +94,11 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         object? sourceIdentifier = null,
         CancellationToken? cancellationToken = null)
     {
+        if (_metaCache.TryGetValue(blueprintId, out var cachedMeta))
+        {
+            return CloneMeta(cachedMeta);
+        }
+
         var blueprintPath = CreateBlueprintMetaPath(blueprintId);
         var httpClient = CreateHttpClient();
 
@@ -112,7 +123,8 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
                     throw BlueprintCatalogException.ErrorDuringBlueprintLoad(blueprintId, CatalogName, operationResult);
                 }
 
-                return blueprintMeta;
+                _metaCache[blueprintId] = blueprintMeta;
+                return CloneMeta(blueprintMeta);
             }
 
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
@@ -130,6 +142,28 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
         {
             throw BlueprintCatalogException.RequestTimeout(CatalogName, _gitHubOptions.GitHubPagesUri);
         }
+    }
+
+    private static BlueprintMetaRootDto CloneMeta(BlueprintMetaRootDto source)
+    {
+        // Copy the mutable collections so a caller changing its result cannot corrupt the cached manifest.
+        // The list elements (ids / version ranges / references) and RequiresMap are treated as read-only.
+        return new BlueprintMetaRootDto
+        {
+            BlueprintId = source.BlueprintId,
+            Description = source.Description,
+            CkModelDependencies = source.CkModelDependencies == null ? null : [..source.CkModelDependencies],
+            BlueprintDependencies = source.BlueprintDependencies == null ? null : [..source.BlueprintDependencies],
+            SeedDataPath = source.SeedDataPath,
+            SeedDataPaths = source.SeedDataPaths == null ? null : [..source.SeedDataPaths],
+            Migrations = source.Migrations == null ? null : [..source.Migrations],
+            Requires = source.Requires
+        };
+    }
+
+    private void InvalidateMetaCache(BlueprintId blueprintId)
+    {
+        _metaCache.TryRemove(blueprintId, out _);
     }
 
     /// <inheritdoc />
@@ -250,6 +284,8 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
 
         try
         {
+            InvalidateMetaCache(blueprintId);
+
             // Upload all blueprint files to GitHub
             await UploadBlueprintFilesAsync(blueprintId, blueprintDirectory, force, gitHubClient, cancellationToken)
                 .ConfigureAwait(false);
@@ -273,6 +309,7 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
 
             // Refresh the in-memory catalog
             await RefreshCatalogAsync(true).ConfigureAwait(false);
+            InvalidateMetaCache(blueprintId);
         }
         catch (ApiValidationException e)
         {
@@ -297,6 +334,7 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
             // (which would 404 a concurrent Get / install).
             await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
             await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+            InvalidateMetaCache(blueprintId);
 
             await RefreshCatalogAsync(true).ConfigureAwait(false);
         }
@@ -326,6 +364,7 @@ public abstract class GitHubBlueprintCatalog : CachedBlueprintCatalog
                 // leaves orphan blobs rather than dangling index pointers.
                 await PruneVersionsCatalogAsync(blueprintId, gitHubClient).ConfigureAwait(false);
                 await DeleteBlueprintFilesAsync(blueprintId, gitHubClient, cancellationToken).ConfigureAwait(false);
+                InvalidateMetaCache(blueprintId);
             }
 
             await RefreshCatalogAsync(true).ConfigureAwait(false);

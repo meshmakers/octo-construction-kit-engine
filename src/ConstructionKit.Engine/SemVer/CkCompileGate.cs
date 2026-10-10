@@ -208,7 +208,7 @@ public class CkCompileGate
                 break;
             case CkSemVerVerdict.VersionTooLow:
                 var minimum = $"{validation.MinimumVersion} (modelId: {modelName}-{validation.MinimumVersion}); " +
-                              $"`octo-ckc -c ValidateVersion -p {modelPath ?? "<model folder>"} --apply` writes it";
+                              $"`octo-ckc -c ValidateVersion -p {(modelPath == null ? "<model folder>" : modelPath.Contains(' ') ? $"\"{modelPath}\"" : modelPath)} --apply` writes it";
                 if (verdict.UncoveredChanges.Count == 0)
                 {
                     messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, "OCTO-CK200",

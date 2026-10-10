@@ -144,8 +144,7 @@ public class CkCascadeService : ICkCascadeService
                     }
                 }
             }
-            catch (Exception ex) when (ex is ModelCatalogException or CompilerException or IOException
-                                           or HttpRequestException)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 lock (models)
                 {

@@ -624,24 +624,46 @@ internal class ValidateVersionCommand : CkcCommand
             return false;
         }
 
-        var text = await File.ReadAllTextAsync(metadataFilePath);
-        if (!CkModelVersionWriter.TryReplaceVersion(text, modelName, minimumVersion, out var updated))
+        try
         {
+            var bytes = await File.ReadAllBytesAsync(metadataFilePath);
+            var hasBom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+            if (Array.IndexOf(bytes, (byte)0) >= 0)
+            {
+                return false; // UTF-16/32: refuse rather than convert the encoding
+            }
+
+            string text;
+            try
+            {
+                text = new UTF8Encoding(false, true).GetString(bytes, hasBom ? 3 : 0, bytes.Length - (hasBom ? 3 : 0));
+            }
+            catch (DecoderFallbackException)
+            {
+                return false; // not UTF-8: refuse rather than corrupt characters
+            }
+
+            if (!CkModelVersionWriter.TryReplaceVersion(text, modelName, minimumVersion, out var updated))
+            {
+                return false;
+            }
+
+            var encoded = new UTF8Encoding(false).GetBytes(updated);
+            var output = hasBom ? new byte[] { 0xEF, 0xBB, 0xBF }.Concat(encoded).ToArray() : encoded;
+            var temp = metadataFilePath + ".apply.tmp";
+            await File.WriteAllBytesAsync(temp, output);
+            File.Move(temp, metadataFilePath, true);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            Logger.LogError("Could not write '{MetadataFilePath}': {Message}", metadataFilePath, ex.Message);
             return false;
         }
 
-        await File.WriteAllTextAsync(metadataFilePath, updated, new UTF8Encoding(HasUtf8Bom(metadataFilePath)));
         Console.WriteLine($"Applied {modelName}: {declaredVersion} → {minimumVersion} ({metadataFilePath})");
         Logger.LogInformation("Version of '{ModelName}' in '{MetadataFilePath}' changed {Old} -> {New}", modelName,
             metadataFilePath, declaredVersion, minimumVersion);
         return true;
-    }
-
-    private static bool HasUtf8Bom(string path)
-    {
-        using var stream = File.OpenRead(path);
-        var bom = new byte[3];
-        return stream.Read(bom, 0, 3) == 3 && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
     }
 
     /// <summary>

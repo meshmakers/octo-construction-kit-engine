@@ -198,7 +198,9 @@ Rules:
   inside the model. Type indexes have no identity of their own, so their key carries the definition
   (`TypeIndex:Machine-1/index#Added:UniqueNotDeleted on Serial`). The gate prints the key verbatim. Matching is ordinal;
   there are no wildcards.
-- **`reason` is mandatory.** An empty reason or a wildcard key is rejected by the schema (and by the compiler, message 130).
+- **Type indexes** have no identity of their own, so their key carries the definition: `…#Added:<definition>` and, for a
+  change, `…#Modified:indexType:<old> -> <new>`; two indexes of a type never share a key.
+- **`reason` is mandatory** and, like `change`, a single line of plain text (no line breaks, no `##vso[`). An empty reason or a wildcard key is rejected by the schema (and by the compiler, message 130).
 - **An acknowledgement never lowers a level.** A unique index on a stable base still needs a major bump
   (`OCTO-CK200` for a lower version); an ordinary breaking change still fails with `OCTO-CK200` even if it is "acknowledged"
   (and the entry is then stale, `OCTO-CK204`).
@@ -221,6 +223,9 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 
 - **The build never rewrites `ckModel.yaml`**; applying is an explicit command (a build that edits its own sources is not
   reproducible, and an automatic bump would hide exactly the breaking change the gate surfaces).
+- **The file is rewritten byte-faithfully:** only the version of the root-level `modelId` key changes (a look-alike line in a block
+  scalar is never touched); a file that is not valid UTF-8 (or is UTF-16) is refused instead of converted; the write goes through a
+  temporary file, and a read-only file is reported as an error without a stack trace.
 - **Only a version that is merely too low is written.** Nothing is written when the verdict is already valid, on a downgrade
   (`OCTO-CK101`/`OCTO-CK201`), when an acknowledgement is missing or stale (`OCTO-CK203`/`OCTO-CK204`), on a compile error,
   or when the file has no single `modelId: <Name>-<version>` line. A version is never lowered.

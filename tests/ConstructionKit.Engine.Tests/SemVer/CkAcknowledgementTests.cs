@@ -127,4 +127,17 @@ public class CkAcknowledgementTests
         // Idempotent for the same version and input
         Assert.Equal(withAck, generator.Generate(withAck, version, date, CkSemVerLevel.Major, changes, null, acknowledged));
     }
+
+    [Fact]
+    public void Index_modifications_of_one_type_have_distinct_keys()
+    {
+        CkModelChange Change(string oldValue, string newValue) => new()
+        {
+            ChangeKind = CkModelChangeKind.Modified, ElementKind = CkModelElementKind.TypeIndex,
+            ElementId = "Machine-1/index", Property = "indexType", OldValue = oldValue, NewValue = newValue
+        };
+
+        Assert.NotEqual(CkChangeKey.Of(Change("Ascending on Serial", "Unique on Serial")),
+            CkChangeKey.Of(Change("Ascending on Tag", "Unique on Tag")));
+    }
 }

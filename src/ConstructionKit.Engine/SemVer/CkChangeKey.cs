@@ -26,7 +26,11 @@ public static class CkChangeKey
         var key = $"{change.ElementKind}:{change.ElementId}#{change.ChangeKind}";
         if (change.ChangeKind == CkModelChangeKind.Modified)
         {
-            return change.Property == null ? key : $"{key}:{change.Property}";
+            key = change.Property == null ? key : $"{key}:{change.Property}";
+            // Several indexes of a type share one element id: the definitions tell them apart.
+            return change.ElementKind == CkModelElementKind.TypeIndex
+                ? $"{key}:{change.OldValue} -> {change.NewValue}"
+                : key;
         }
 
         if (change.ElementKind == CkModelElementKind.TypeIndex)

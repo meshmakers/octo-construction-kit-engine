@@ -15,7 +15,7 @@ public class CkModelVersionWriterTests
     [InlineData("modelId: \"Basic-2.5.0\"\n", "modelId: \"Basic-3.0.0\"\n")]
     [InlineData("modelId: 'Basic-2.5.0'   # the version\n", "modelId: 'Basic-3.0.0'   # the version\n")]
     [InlineData("modelId:    Basic-2.5\n", "modelId:    Basic-3.0.0\n")]
-    [InlineData("  modelId: Basic-2.5.0", "  modelId: Basic-3.0.0")]
+    [InlineData("\"modelId\": Basic-2.5.0", "\"modelId\": Basic-3.0.0")]
     public void Only_the_version_text_changes(string input, string expected)
     {
         Assert.True(CkModelVersionWriter.TryReplaceVersion(input, "Basic", Three, out var updated));
@@ -51,5 +51,23 @@ public class CkModelVersionWriterTests
     {
         Assert.False(CkModelVersionWriter.TryReplaceVersion(input, "Basic", Three, out var updated));
         Assert.Equal(input, updated);
+    }
+
+    [Fact]
+    public void A_look_alike_line_inside_a_block_scalar_is_never_touched()
+    {
+        const string yaml = "\"modelId\": Basic-2.5.0\ndescription: |\n  modelId: Basic-2.5.0\n";
+
+        Assert.True(CkModelVersionWriter.TryReplaceVersion(yaml, "Basic", Three, out var updated));
+
+        Assert.Equal("\"modelId\": Basic-3.0.0\ndescription: |\n  modelId: Basic-2.5.0\n", updated);
+    }
+
+    [Fact]
+    public void Only_an_indented_look_alike_means_there_is_nothing_to_rewrite()
+    {
+        const string yaml = "description: |\n  modelId: Basic-2.5.0\n";
+
+        Assert.False(CkModelVersionWriter.TryReplaceVersion(yaml, "Basic", Three, out _));
     }
 }

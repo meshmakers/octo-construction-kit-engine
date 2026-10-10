@@ -48,6 +48,12 @@ internal static class CkCompatibilityValidator
                 Add(operationResult, location, meta, index, $"the change '{change}' is acknowledged more than once");
             }
 
+            if (change.IndexOfAny(['\r', '\n']) >= 0 || reason.IndexOfAny(['\r', '\n']) >= 0 ||
+                reason.Contains("##vso[") || change.Contains("##vso["))
+            {
+                Add(operationResult, location, meta, index, "'change' and 'reason' must be a single line of plain text");
+            }
+
             if (reason.Length == 0)
             {
                 Add(operationResult, location, meta, index, "'reason' is mandatory and must not be empty");

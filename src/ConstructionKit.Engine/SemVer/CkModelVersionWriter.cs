@@ -10,7 +10,8 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 public static class CkModelVersionWriter
 {
     /// <summary>
-    ///     Replaces the version in the single <c>modelId: Name-X.Y.Z</c> line of <paramref name="yaml" />.
+    ///     Replaces the version in the single root-level <c>modelId: Name-X.Y.Z</c> line of <paramref name="yaml" />
+    ///     (no indentation, so a look-alike line inside a block scalar is never touched).
     /// </summary>
     /// <param name="yaml">The text of <c>ckModel.yaml</c>.</param>
     /// <param name="modelName">The model name the line has to carry (guards against editing the wrong line).</param>
@@ -20,7 +21,7 @@ public static class CkModelVersionWriter
     public static bool TryReplaceVersion(string yaml, string modelName, CkVersion newVersion, out string updated)
     {
         var pattern = new Regex(
-            @"^(?<head>[ \t]*modelId[ \t]*:[ \t]*[""']?" + Regex.Escape(modelName) + @"-)(?<version>\d+(?:\.\d+){0,2})(?<tail>[""']?[ \t]*(?:#.*)?)\r?$",
+            @"^(?<head>(?<k>[""']?)modelId\k<k>[ \t]*:[ \t]*[""']?" + Regex.Escape(modelName) + @"-)(?<version>\d+(?:\.\d+){0,2})(?<tail>[""']?[ \t]*(?:#.*)?)\r?$",
             RegexOptions.Multiline | RegexOptions.CultureInvariant);
         var matches = pattern.Matches(yaml);
         if (matches.Count != 1)

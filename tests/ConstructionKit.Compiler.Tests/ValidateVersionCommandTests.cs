@@ -775,4 +775,19 @@ public sealed class ValidateVersionCommandTests : IDisposable
         Assert.Contains("excludes", ReadReport());
         Assert.Equal(dependentBefore, File.ReadAllText(Path.Combine(dependentDir, "ckModel.yaml")));
     }
+
+    [Fact]
+    public async Task Apply_RefusesAFileThatIsNotUtf8_AndWritesNothing()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.5.0", removeEnumValue: true, ckLanguage: 2);
+        var latin1 = System.Text.Encoding.Latin1.GetBytes(ReadMetadata().Replace("ckLanguage: 2", "description: Prüfung für Maschinen\nckLanguage: 2"));
+        File.WriteAllBytes(MetadataPath, latin1);
+
+        await Assert.ThrowsAsync<ModelValidationException>(() => RunAsync("-p", _sourceDir, "--apply"));
+
+        Assert.Equal(latin1, File.ReadAllBytes(MetadataPath));
+        Assert.False(File.Exists(MetadataPath + ".apply.tmp"));
+    }
 }

@@ -875,7 +875,7 @@ Notes:
   `ReadWrite`, visibility `Public`, derivable `Any`) through a `JsonTypeInfo` modifier in `CkCache` (`OmitCkV2Defaults`), so v1 caches stay
   byte-identical; reading tolerates the missing keys (trailing defaulted `[JsonConstructor]` parameters on
   `CkTypeGraph`, init setter on `CkTypeAttributeGraph.Access`).
-- Message codes for CK v2: 90–113 and 118–128 are in use (table below); **spare: 111, 114–117, 129**. Range
+- Message codes for CK v2: 90–113 and 118–129 are in use (table below); **spare: 111, 114–117, 130**. Range
   retention (F0.2) has no message codes of its own — its failures are `ModelValidationException`s and the
   unbound-reference diagnostic is the source-generator diagnostic OM1004.
   Warnings (e.g. 110, 124) of a successful compile are printed by `octo-ckc -c compile` (to **stderr**, also with
@@ -922,6 +922,7 @@ Notes:
 | 126 | `CkModelRequiresNewerEngine` | `ElementResolver`, catalog + repository dependency resolvers | F1.1-S6: the compiled model's `minEngineVersion` is above the running engine version (see "minEngineVersion" above) |
 | 127 | `CkInterfaceMemberNotUnique` | `ReferenceResolver.CheckCkInterfaces` | review L17: an interface declares the same attribute twice or two members with the same name (case-insensitive); reported at the interface instead of silently dropping the duplicate. Implementation checks (96–99) run on the merged members, so a duplicate produces no follow-up error |
 | 128 | `UnknownTargetCkInterfaceOfAssociation` | `ReferenceResolver` | F1.2-S4: a type association's `targetCkInterfaceId` is unknown |
+| 129 | `CkInconsistentVisibility` | `CkVisibilityValidator` (end of `ReferenceResolver`) + `InheritanceResolver.InheritInterfaceMethods` | AB#6334 / AB#6335 (F2.1 gate findings H1/H3): in a `ckLanguage: 2` model a **public** element references an **internal** element of its own model (same reference walk as 112, plus type association `targetCkAttributeIds`), a public interface declares an internal method, or a type redeclares a method of a public interface it implements as internal. One message per offending reference. Coverage of the walk is guarded by `CkVisibilityReferenceCoverageTests`; the classifier mirror is `CkVisibilityIndex.ExposeInternalElementsReachableFromPublicOnes` (defence in depth) |
 
 `InheritanceResolver.ResolveInterfacesAndMethods` also completes `AllImplementedInterfaces` (own ∪ every base
 type's declared interfaces), `AllMethods` (nearest declaration wins; `CkMethodGraph.DeclaringCkTypeId` is the
@@ -1006,7 +1007,7 @@ that gate is green.
 | 3 | DTO | `CkModelPropertiesDto.CkLanguage` | `CkInterfaceDto`, `CkElementsRootDto`, `CkModelRootBase` | `CkTypeDto.Implements` | `CkTypeAttributeDto.Access` | `CkTypeDto.Methods` + `CkMethodDto` family | `CkVisibilityDto` / `CkDerivableDto` on the 7 element DTOs | `CkInterfaceDto`, `CkInterfaceAssociationDto`, `CkTypeAssociationDto.TargetCkInterfaceId` |
 | 4 | Compiler hand-copies | `CompilerService` candidate, `CatalogModelResolver` | same + `interfaces/` loop | `CompilerService` type copy | by reference | `CompilerService` type copy | `CompilerService` type copy (others by reference) | by reference |
 | 5 | Graph + `[JsonConstructor]` | `CkCacheRoot.Models` (set in `ElementResolver` / `AppendModel`) | `CkInterfaceGraph`, `CkModelGraph`, `CkCacheRoot`, cache getters | `CkTypeGraph` | `CkTypeAttributeGraph` (init setter) | `CkTypeGraph` + `CkMethodGraph` | settable effective properties, set by `CkModelGraph.ApplyCkV2Modifiers` | `CkInterfaceGraph` (defaulted `[JsonConstructor]` params), `CkInterfaceAssociationGraph`, `CkInterfaceMethodGraph`, `CkTypeAssociationGraph` |
-| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113 | 90, 118–124, 128 |
+| 6 | Resolvers + codes | 90/91, 126 | 92–94, 118–124, 127 | 95–99, 121, 124 | 90, 99, 105–108 | 100–104, 122, 125 | 90, 112, 113, 129 | 90, 118–124, 128 |
 | 7 | SemVer diff + classifier rule + row test (gate: `CkSemVerClassificationGuardTests`, mandatory) | yes | yes | yes | yes | yes | yes (`CkModelDiffService.DiffModifiers`) | yes |
 | 8 | Source generator | — | yes (ids + `IRt<Name>`) | yes (explicit impls) | — | yes (ids, parameter/result records) | `sealed` (v2; no `abstract`, E-M3) | `IRt<Name>` (extends = interface inheritance) |
 | 9 | Docs generator | — | yes | yes | — | yes | yes (non-default only) | yes |

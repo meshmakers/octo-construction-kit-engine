@@ -6,11 +6,27 @@ using Meshmakers.Octo.ConstructionKit.Engine.Messages;
 namespace Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 
 /// <summary>
-///     CK v2 (F1.2-S3, AB#5912, concept §4.2): an element with <c>visibility: Internal</c> cannot be referenced from
-///     another model (112), and a type or record with <c>derivable: Model</c> cannot be derived from in another
-///     model (113). Runs on the whole graph after reference resolution — at compile time and on every import
-///     (<c>HardResolveAsync</c> runs the same resolvers), so a forged or old-compiler model cannot bypass it. Unknown
+///     CK v2 visibility rules on the whole graph after reference resolution — at compile time and on every import
+///     (<c>HardResolveAsync</c> runs the same resolvers), so a forged or old-compiler model cannot bypass them. Unknown
 ///     references are skipped here (reported by the reference rules). v1 models are all Public / Any.
+///     <list type="bullet">
+///         <item>
+///             112 (F1.2-S3, AB#5912, concept §4.2): an element with <c>visibility: Internal</c> cannot be referenced
+///             from another model.
+///         </item>
+///         <item>113: a type or record with <c>derivable: Model</c> cannot be derived from in another model.</item>
+///         <item>
+///             129 (AB#6334 / AB#6335, F2.1 gate findings H1/H3): inconsistent visibility — a <b>public</b> element
+///             cannot reference an <b>internal</b> element of its own model, and a public interface cannot declare an
+///             internal method. Otherwise a breaking change to the internal element would be capped at Minor by the
+///             compatibility classifier (rows N1–N5) while dependents reach it through the public element. The
+///             redeclaration of a public interface method as internal is checked in
+///             <c>InheritanceResolver.InheritInterfaceMethods</c>.
+///         </item>
+///     </list>
+///     The reference walk below is the single list of CK reference properties checked for visibility;
+///     <c>CkVisibilityReferenceCoverageTests</c> fails when a CK DTO gains a <c>CkId&lt;…&gt;</c> reference that is
+///     neither walked here nor listed there with a reason.
 /// </summary>
 internal static class CkVisibilityValidator
 {
@@ -21,112 +37,119 @@ internal static class CkVisibilityValidator
         {
             var owner = type.CkTypeId;
             var location = originFileResolver.Resolve(owner);
-            var ownerModel = owner.ModelId;
+            var referrer = new Referrer(modelGraph, owner.ModelId, owner, type.Visibility, location, operationResult);
 
-            void Report(string kind, object referenced) =>
-                operationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(location, owner, kind, referenced));
-
-            if (type.DerivedFromCkTypeId is { } baseId && IsForeign(ownerModel, baseId.ModelId) &&
-                modelGraph.Types.TryGetValue(baseId, out var baseType))
+            if (type.DerivedFromCkTypeId is { } baseId && modelGraph.Types.TryGetValue(baseId, out var baseType))
             {
-                if (baseType.Visibility == CkVisibilityDto.Internal)
+                if (IsForeign(owner.ModelId, baseId.ModelId))
                 {
-                    Report("type", baseId);
+                    if (baseType.Visibility == CkVisibilityDto.Internal)
+                    {
+                        referrer.ReportForeign("type", baseId);
+                    }
+                    else if (baseType.Derivable == CkDerivableDto.Model)
+                    {
+                        operationResult.AddMessage(MessageCodes.CkElementNotDerivable(location, "Type", owner, baseId));
+                    }
                 }
-                else if (baseType.Derivable == CkDerivableDto.Model)
+                else
                 {
-                    operationResult.AddMessage(MessageCodes.CkElementNotDerivable(location, "Type", owner, baseId));
+                    referrer.CheckOwn(baseType.Visibility, "base type", baseId);
                 }
             }
 
-            CheckAttributes(modelGraph, ownerModel, type.DefinedAttributes, Report);
+            CheckAttributes(referrer, type.DefinedAttributes);
 
             foreach (var implemented in type.DeclaredImplements)
             {
-                CheckInterface(modelGraph, ownerModel, implemented, Report);
+                CheckInterface(referrer, implemented, "implemented interface");
             }
 
             foreach (var association in type.Associations.DefinedAssociations)
             {
-                CheckRole(modelGraph, ownerModel, association.CkRoleId, Report);
-                CheckType(modelGraph, ownerModel, association.TargetCkTypeId, Report);
-                CheckInterface(modelGraph, ownerModel, association.TargetCkInterfaceId, Report);
+                CheckRole(referrer, association.CkRoleId);
+                CheckType(referrer, association.TargetCkTypeId, "association target type");
+                CheckInterface(referrer, association.TargetCkInterfaceId, "association target interface");
+                foreach (var targetAttribute in association.TargetCkAttributeIds ?? [])
+                {
+                    CheckAttribute(referrer, targetAttribute, "association target attribute");
+                }
             }
 
-            CheckMethods(modelGraph, ownerModel, type.DefinedMethods, Report);
+            CheckMethods(referrer, type.DefinedMethods, false);
         }
 
         foreach (var record in modelGraph.Records.Values)
         {
             var owner = record.CkRecordId;
             var location = originFileResolver.Resolve(owner);
+            var referrer = new Referrer(modelGraph, owner.ModelId, owner, record.Visibility, location,
+                operationResult);
 
-            void Report(string kind, object referenced) =>
-                operationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(location, owner, kind, referenced));
-
-            if (record.DerivedFromCkRecordId is { } baseId && IsForeign(owner.ModelId, baseId.ModelId) &&
+            if (record.DerivedFromCkRecordId is { } baseId &&
                 modelGraph.Records.TryGetValue(baseId, out var baseRecord))
             {
-                if (baseRecord.Visibility == CkVisibilityDto.Internal)
+                if (IsForeign(owner.ModelId, baseId.ModelId))
                 {
-                    Report("record", baseId);
+                    if (baseRecord.Visibility == CkVisibilityDto.Internal)
+                    {
+                        referrer.ReportForeign("record", baseId);
+                    }
+                    else if (baseRecord.Derivable == CkDerivableDto.Model)
+                    {
+                        operationResult.AddMessage(
+                            MessageCodes.CkElementNotDerivable(location, "Record", owner, baseId));
+                    }
                 }
-                else if (baseRecord.Derivable == CkDerivableDto.Model)
+                else
                 {
-                    operationResult.AddMessage(MessageCodes.CkElementNotDerivable(location, "Record", owner, baseId));
+                    referrer.CheckOwn(baseRecord.Visibility, "base record", baseId);
                 }
             }
 
-            CheckAttributes(modelGraph, owner.ModelId, record.DefinedAttributes, Report);
+            CheckAttributes(referrer, record.DefinedAttributes);
         }
 
         foreach (var role in modelGraph.AssociationRoles.Values)
         {
             var owner = role.CkRoleId;
-            var location = originFileResolver.Resolve(owner);
-            CheckAttributes(modelGraph, owner.ModelId, role.DefinedAttributes, (kind, referenced) =>
-                operationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(location, owner, kind, referenced)));
+            CheckAttributes(new Referrer(modelGraph, owner.ModelId, owner, role.Visibility,
+                originFileResolver.Resolve(owner), operationResult), role.DefinedAttributes);
         }
 
         foreach (var attribute in modelGraph.Attributes.Values)
         {
             var owner = attribute.CkAttributeId;
-            var location = originFileResolver.Resolve(owner);
-
-            void Report(string kind, object referenced) =>
-                operationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(location, owner, kind, referenced));
-
-            CheckRecord(modelGraph, owner.ModelId, attribute.ValueCkRecordId, Report);
-            CheckEnum(modelGraph, owner.ModelId, attribute.ValueCkEnumId, Report);
+            var referrer = new Referrer(modelGraph, owner.ModelId, owner, attribute.Visibility,
+                originFileResolver.Resolve(owner), operationResult);
+            CheckRecord(referrer, attribute.ValueCkRecordId, "value record");
+            CheckEnum(referrer, attribute.ValueCkEnumId, "value enum");
         }
 
         foreach (var ckInterface in modelGraph.Interfaces.Values)
         {
             var owner = ckInterface.CkInterfaceId;
-            var location = originFileResolver.Resolve(owner);
-            var ownerModel = owner.ModelId;
-
-            void Report(string kind, object referenced) =>
-                operationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(location, owner, kind, referenced));
+            var referrer = new Referrer(modelGraph, owner.ModelId, owner, ckInterface.Visibility,
+                originFileResolver.Resolve(owner), operationResult);
 
             foreach (var member in ckInterface.DefinedAttributes)
             {
-                CheckAttribute(modelGraph, ownerModel, member.CkAttributeId, Report);
+                CheckAttribute(referrer, member.CkAttributeId, "member attribute");
             }
 
             foreach (var extended in ckInterface.DeclaredExtends)
             {
-                CheckInterface(modelGraph, ownerModel, extended, Report);
+                CheckInterface(referrer, extended, "extended interface");
             }
 
             foreach (var association in ckInterface.DefinedAssociations.Select(a => a.Definition))
             {
-                CheckRole(modelGraph, ownerModel, association.CkRoleId, Report);
-                CheckType(modelGraph, ownerModel, association.TargetCkTypeId, Report);
-                CheckInterface(modelGraph, ownerModel, association.TargetCkInterfaceId, Report);
+                CheckRole(referrer, association.CkRoleId);
+                CheckType(referrer, association.TargetCkTypeId, "association target type");
+                CheckInterface(referrer, association.TargetCkInterfaceId, "association target interface");
             }
 
-            CheckMethods(modelGraph, ownerModel, ckInterface.DefinedMethods, Report);
+            CheckMethods(referrer, ckInterface.DefinedMethods, true);
         }
     }
 
@@ -136,88 +159,148 @@ internal static class CkVisibilityValidator
     private static bool IsForeign(CkModelId owner, CkModelId referenced) =>
         !string.Equals(owner.Name, referenced.Name, StringComparison.Ordinal);
 
-    private static void CheckAttributes(CkModelGraph modelGraph, CkModelId ownerModel,
-        IEnumerable<CkTypeAttributeDto> assignments, Action<string, object> report)
+    private static void CheckAttributes(Referrer referrer, IEnumerable<CkTypeAttributeDto> assignments)
     {
         foreach (var assignment in assignments)
         {
-            CheckAttribute(modelGraph, ownerModel, assignment.CkAttributeId, report);
+            CheckAttribute(referrer, assignment.CkAttributeId, "attribute");
         }
     }
 
-    private static void CheckAttribute(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkAttributeId>? id,
-        Action<string, object> report)
+    private static void CheckAttribute(Referrer referrer, CkId<CkAttributeId>? id, string kind)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) && modelGraph.Attributes.TryGetValue(id, out var graph) &&
-            graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.Attributes.TryGetValue(id, out var graph))
         {
-            report("attribute", id);
+            referrer.Check(id.ModelId, graph.Visibility, "attribute", kind, id);
         }
     }
 
-    private static void CheckType(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkTypeId>? id,
-        Action<string, object> report)
+    private static void CheckType(Referrer referrer, CkId<CkTypeId>? id, string kind)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) && modelGraph.Types.TryGetValue(id, out var graph) &&
-            graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.Types.TryGetValue(id, out var graph))
         {
-            report("type", id);
+            referrer.Check(id.ModelId, graph.Visibility, "type", kind, id);
         }
     }
 
-    private static void CheckRecord(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkRecordId>? id,
-        Action<string, object> report)
+    private static void CheckRecord(Referrer referrer, CkId<CkRecordId>? id, string kind)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) && modelGraph.Records.TryGetValue(id, out var graph) &&
-            graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.Records.TryGetValue(id, out var graph))
         {
-            report("record", id);
+            referrer.Check(id.ModelId, graph.Visibility, "record", kind, id);
         }
     }
 
-    private static void CheckEnum(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkEnumId>? id,
-        Action<string, object> report)
+    private static void CheckEnum(Referrer referrer, CkId<CkEnumId>? id, string kind)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) && modelGraph.Enums.TryGetValue(id, out var graph) &&
-            graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.Enums.TryGetValue(id, out var graph))
         {
-            report("enum", id);
+            referrer.Check(id.ModelId, graph.Visibility, "enum", kind, id);
         }
     }
 
-    private static void CheckRole(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkAssociationRoleId>? id,
-        Action<string, object> report)
+    private static void CheckRole(Referrer referrer, CkId<CkAssociationRoleId>? id)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) &&
-            modelGraph.AssociationRoles.TryGetValue(id, out var graph) && graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.AssociationRoles.TryGetValue(id, out var graph))
         {
-            report("association role", id);
+            referrer.Check(id.ModelId, graph.Visibility, "association role", "association role", id);
         }
     }
 
-    private static void CheckInterface(CkModelGraph modelGraph, CkModelId ownerModel, CkId<CkInterfaceId>? id,
-        Action<string, object> report)
+    private static void CheckInterface(Referrer referrer, CkId<CkInterfaceId>? id, string kind)
     {
-        if (id != null && IsForeign(ownerModel, id.ModelId) && modelGraph.Interfaces.TryGetValue(id, out var graph) &&
-            graph.Visibility == CkVisibilityDto.Internal)
+        if (id != null && referrer.Graph.Interfaces.TryGetValue(id, out var graph))
         {
-            report("interface", id);
+            referrer.Check(id.ModelId, graph.Visibility, "interface", kind, id);
         }
     }
 
-    private static void CheckMethods(CkModelGraph modelGraph, CkModelId ownerModel,
-        IEnumerable<CkMethodDto> methods, Action<string, object> report)
+    /// <summary>
+    ///     Parameter and result records/enums of the methods. An internal method of a public type is an internal
+    ///     element (row N) and may use internal records/enums; an internal method on a public interface is itself an
+    ///     inconsistency (AB#6335).
+    /// </summary>
+    private static void CheckMethods(Referrer referrer, IEnumerable<CkMethodDto> methods, bool onInterface)
     {
         foreach (var method in methods)
         {
-            foreach (var parameter in method.Parameters ?? [])
+            var methodVisibility = CkModifiers.ResolveVisibility(method.Visibility);
+            if (onInterface && referrer.IsPublic && methodVisibility == CkVisibilityDto.Internal)
             {
-                CheckRecord(modelGraph, ownerModel, parameter.ValueCkRecordId, report);
-                CheckEnum(modelGraph, ownerModel, parameter.ValueCkEnumId, report);
+                referrer.Report($"declares the internal method '{method.MethodId}' (a public interface may not " +
+                                "declare internal methods; every implementor must provide it and callers reach it " +
+                                "through the interface)");
             }
 
-            CheckRecord(modelGraph, ownerModel, method.Result?.ValueCkRecordId, report);
-            CheckEnum(modelGraph, ownerModel, method.Result?.ValueCkEnumId, report);
+            var methodReferrer = referrer.ForMethod(method.MethodId, methodVisibility);
+            foreach (var parameter in method.Parameters ?? [])
+            {
+                CheckRecord(methodReferrer, parameter.ValueCkRecordId, $"record of parameter '{parameter.Name}'");
+                CheckEnum(methodReferrer, parameter.ValueCkEnumId, $"enum of parameter '{parameter.Name}'");
+            }
+
+            CheckRecord(methodReferrer, method.Result?.ValueCkRecordId, "result record");
+            CheckEnum(methodReferrer, method.Result?.ValueCkEnumId, "result enum");
         }
+    }
+
+    /// <summary>
+    ///     The element whose references are walked: reports 112 for an internal element of another model and 129 for
+    ///     an internal element of its own model when the referrer itself is public.
+    /// </summary>
+    private sealed record Referrer(
+        CkModelGraph Graph,
+        CkModelId OwnerModel,
+        object Owner,
+        CkVisibilityDto Visibility,
+        string? Location,
+        OperationResult OperationResult)
+    {
+        /// <summary>
+        ///     129 applies to ckLanguage 2 models only: a v1 model has no visibility (90 reports any declaration).
+        /// </summary>
+        public bool IsPublic => Visibility == CkVisibilityDto.Public &&
+                                Graph.Models.TryGetValue(OwnerModel, out var model) && model.EffectiveCkLanguage >= 2;
+
+        public Referrer ForMethod(string methodId, CkVisibilityDto methodVisibility) =>
+            this with
+            {
+                Owner = $"{Owner}.{methodId}",
+                Visibility = IsPublic && methodVisibility == CkVisibilityDto.Public
+                    ? CkVisibilityDto.Public
+                    : CkVisibilityDto.Internal
+            };
+
+        public void Check(CkModelId referencedModel, CkVisibilityDto referencedVisibility, string elementKind,
+            string referenceKind, object referenced)
+        {
+            if (referencedVisibility != CkVisibilityDto.Internal)
+            {
+                return;
+            }
+
+            if (IsForeign(OwnerModel, referencedModel))
+            {
+                ReportForeign(elementKind, referenced);
+            }
+            else if (IsPublic)
+            {
+                Report($"references the internal {elementKind} '{referenced}' ({referenceKind})");
+            }
+        }
+
+        public void CheckOwn(CkVisibilityDto referencedVisibility, string referenceKind, object referenced)
+        {
+            if (IsPublic && referencedVisibility == CkVisibilityDto.Internal)
+            {
+                Report($"references the internal {referenceKind.Split(' ').Last()} '{referenced}' ({referenceKind})");
+            }
+        }
+
+        public void ReportForeign(string kind, object referenced) =>
+            OperationResult.AddMessage(MessageCodes.CkReferenceToInternalElement(Location, Owner, kind, referenced));
+
+        public void Report(string reason) =>
+            OperationResult.AddMessage(MessageCodes.CkInconsistentVisibility(Location, Owner, reason));
     }
 }

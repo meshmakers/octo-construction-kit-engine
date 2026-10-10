@@ -123,6 +123,10 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         model.Interfaces!.Single(i => i.InterfaceId == "Named-1").Visibility = CkVisibilityDto.Internal;
         var method = Type(model, "Account").Methods![0];
         method.Visibility = CkVisibilityDto.Internal;
+        // AB#6334 (129): the referrers of the internal elements are internal, too.
+        Type(model, "Principal").Visibility = CkVisibilityDto.Internal;
+        Type(model, "Account").Visibility = CkVisibilityDto.Internal;
+        model.Attributes!.Single(a => a.ValueCkRecordId != null).Visibility = CkVisibilityDto.Internal;
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);
         Assert.Empty(operationResult.Messages);
@@ -133,7 +137,7 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         Assert.Equal(CkVisibilityDto.Internal, tag.Visibility);
         Assert.Equal(CkDerivableDto.Any, tag.Derivable);
         var account = cache.GetRtCkType("target", new RtCkId<CkTypeId>($"{M}/Account"));
-        Assert.Equal(CkVisibilityDto.Public, account.Visibility);
+        Assert.Equal(CkVisibilityDto.Internal, account.Visibility);
         Assert.Equal(CkDerivableDto.Model, account.Derivable);
         Assert.Equal(CkVisibilityDto.Internal, account.AllMethods[method.MethodId.ToString()].Visibility);
         var address = cache.GetRtCkRecord("target", new RtCkId<CkRecordId>($"{M}/Address"));
@@ -170,6 +174,8 @@ public class CkV2GraphJsonRoundTripTests(ITestOutputHelper output) : CkV2Resolve
         var model = sampleData.sample1.Builder.Build();
         model.CkLanguage = 2;
         model.AssociationRoles!.Single().Visibility = CkVisibilityDto.Internal;
+        // AB#6334 (129): the type that uses the internal role must be internal, too.
+        model.Types!.Single(t => t.TypeId == "Demo3").Visibility = CkVisibilityDto.Internal;
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);
         Assert.Empty(operationResult.Messages);

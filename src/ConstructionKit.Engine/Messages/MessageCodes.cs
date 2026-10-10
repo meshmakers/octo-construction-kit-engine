@@ -358,6 +358,9 @@ internal static class MessageCodes
     internal static OperationMessage CkElementsInWrongFolder(string? location, object file, object key, object expectedFolder) =>
         GetMessage("CkElementsInWrongFolder", location, file, key, expectedFolder);
 
+    internal static OperationMessage CkInconsistentVisibility(string? location, object element, object reason) =>
+        GetMessage("CkInconsistentVisibility", location, element, reason);
+
     private static readonly Dictionary<string, OperationMessageTemplate> Templates = new()
     {
         {
@@ -1025,6 +1028,12 @@ internal static class MessageCodes
              new OperationMessageTemplate(MessageLevel.Warning,
                  110, "File '{file}' declares '{key}', which is only read from files in the '{expectedFolder}/' folder. These elements are ignored; move them into '{expectedFolder}/'.",
                  new [] {"file", "key", "expectedFolder"})
+        },
+        {
+            "CkInconsistentVisibility",
+             new OperationMessageTemplate(MessageLevel.Error,
+                 129, "Public '{element}' {reason}. A public element may only reference public elements of its own model (visibility consistency): make the referenced element public or '{element}' internal.",
+                 new [] {"element", "reason"})
         },
     };
 }

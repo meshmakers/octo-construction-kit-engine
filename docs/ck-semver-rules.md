@@ -249,6 +249,29 @@ association role, enum, interface, method) — is `internal` in every version in
 Minor rather than none: a same-version re-import is short-circuited, so a structural change still needs a bump to reach
 tenants.
 
+**No internal element is reachable from a public one (AB#6334 / AB#6335, gate findings H1/H3).** The rows above are only
+sound when "internal" really means "unreachable from other models". The compiler therefore rejects **inconsistent
+visibility** in a `ckLanguage: 2` model with message **129** (`CkInconsistentVisibility`): a public element may only
+reference public elements of its own model.
+
+| Public referrer | References that must be public |
+| --------------- | ------------------------------ |
+| Type | `derivedFromCkTypeId`, `implements`, attribute assignments (attribute definition), association role, association `targetCkTypeId` / `targetCkInterfaceId` / `targetCkAttributeIds` |
+| Attribute definition | `valueCkRecordId`, `valueCkEnumId` |
+| Record | `derivedFromCkRecordId`, attribute assignments |
+| Association role | attribute assignments |
+| Interface | `extends`, attribute members, association members (role, targets), **methods** (a public interface may not declare an internal method) |
+| Public method of a public type | parameter and result `valueCkRecordId` / `valueCkEnumId` |
+
+A type may also not redeclare a method of a public interface it implements as `internal` (129). Allowed: internal →
+public, internal → internal, public → public, internal methods on public types (they may use internal records and
+enums). Without the rule, an internal record behind a public attribute could lose a member as a "Minor" change while a
+dependent model that uses the public attribute breaks (gate case X1: error 109 downstream). Defence in depth: when the
+classifier is handed a model in which a public element still reaches an internal one (compiled by an older ckc), that
+internal element — transitively — is treated as public and the cap of N1/N2 does not apply; an internal method of a
+public interface follows I11. `CkVisibilityReferenceCoverageTests` fails when a CK DTO gains an element reference that the
+visibility walk does not cover.
+
 **Interfaces (AB#6267).** An interface `X-n` grows by optional members; every change that breaks implementors or
 consumers is Major and the reason recommends publishing `X-(n+1)` (e.g. `Named-2`) next to `X-n`. Association members are
 keyed by their role, so a changed target is one change (`target`), not remove + add.
@@ -265,7 +288,7 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 | I8 | `extends` entry added or removed | Major |
 | I9 | `deprecated` set or withdrawn | Minor |
 | I10 | Interface added / removed | Minor / Major |
-| I11 | Method added to an interface | Major (an optional interface method does not exist yet) |
+| I11 | Method added to an interface | Major (an optional interface method does not exist yet); an `internal` method on a public interface is a compile error (129), so it cannot be added as a capped Minor |
 
 **Methods (AB#6268).** Type methods and interface methods follow the same rows. The diff emits one change per method
 field; parameters (`Method parameter '<owner>/<method>/<name>'`) and error codes (`Method error '<owner>/<method>/<code>'`)

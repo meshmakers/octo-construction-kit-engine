@@ -347,6 +347,18 @@ internal class InheritanceResolver : IInheritanceResolver
             {
                 if (typeGraph.AllMethods.TryGetValue(method.Definition.MethodId, out var existing))
                 {
+                    // AB#6335 (gate finding H3): a redeclaration may not hide a public interface's method.
+                    if (existing.DeclaringCkTypeId == ckTypeId &&
+                        typeGraph.DefinedMethods.Contains(existing.Definition) &&
+                        interfaceGraph.Visibility == CkVisibilityDto.Public &&
+                        CkModifiers.ResolveVisibility(existing.Definition.Visibility) == CkVisibilityDto.Internal)
+                    {
+                        operationResult.AddMessage(MessageCodes.CkInconsistentVisibility(location, ckTypeId,
+                            $"redeclares method '{method.Definition.MethodId}' of the public interface " +
+                            $"'{method.DeclaringCkInterfaceId}' as internal (callers through the interface would " +
+                            "lose it; a redeclared interface method must be public)"));
+                    }
+
                     if (existing.DeclaringCkTypeId == ckTypeId &&
                         typeGraph.DefinedMethods.Contains(existing.Definition) &&
                         SemVer.CkModelDiffService.FormatMethod(existing.Definition, "") !=

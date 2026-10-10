@@ -665,6 +665,12 @@
       "number": 110,
       "level": "WARNING",
       "text": "File '{file}' declares '{key}', which is only read from files in the '{expectedFolder}/' folder. These elements are ignored; move them into '{expectedFolder}/'."
+    },
+    {
+      "key": "CkInconsistentVisibility",
+      "number": 129,
+      "level": "ERROR",
+      "text": "Public '{element}' {reason}. A public element may only reference public elements of its own model (visibility consistency): make the referenced element public or '{element}' internal."
     }
   ]
 }

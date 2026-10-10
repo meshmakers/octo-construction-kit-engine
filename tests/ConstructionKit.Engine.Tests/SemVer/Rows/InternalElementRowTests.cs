@@ -10,9 +10,21 @@ namespace Meshmakers.Octo.ConstructionKit.Engine.Tests.SemVer.Rows;
 /// </summary>
 public class InternalElementRowTests
 {
-    private static CkCompiledModelRoot WithInternalMachine()
+    /// <summary>
+    ///     The row model without the public interface association member that targets Machine: with it, an internal
+    ///     Machine would be reachable from the public interface Serialized-1 (129, AB#6334) and the classifier treats
+    ///     it as public (defence in depth).
+    /// </summary>
+    private static CkCompiledModelRoot PublicModel()
     {
         var model = Model();
+        Serialized(model).Associations![0].TargetCkTypeId = "Base/Entity";
+        return model;
+    }
+
+    private static CkCompiledModelRoot WithInternalMachine()
+    {
+        var model = PublicModel();
         Machine(model).Visibility = CkVisibilityDto.Internal;
         return model;
     }
@@ -27,11 +39,14 @@ public class InternalElementRowTests
         Assert.Equal(CkSemVerLevel.Minor, change.Level);
         Assert.StartsWith(CkSemVerClassifier.InternalReason, change.Reason);
 
-        // Removed: an internal enum
+        // Removed: an internal enum that no public element references
         var baseline = Model();
-        SemVerTestModels.GetEnum(baseline).Visibility = CkVisibilityDto.Internal;
+        baseline.Enums!.Add(new CkEnumDto
+        {
+            EnumId = "Hidden", Visibility = CkVisibilityDto.Internal,
+            Values = [new CkEnumValueDto { Key = 0, Name = "Off" }]
+        });
         var withoutEnum = Model();
-        withoutEnum.Enums = [];
         Assert.Equal(CkSemVerLevel.Minor, Level(baseline, withoutEnum));
 
         // Added: an internal record
@@ -70,10 +85,11 @@ public class InternalElementRowTests
         Method(current, "type").Parameters!.Add(new CkMethodParameterDto { Name = "reason", ValueType = AttributeValueTypesDto.String });
         Assert.Equal(CkSemVerLevel.Minor, Level(baseline, current));
 
-        // Required member of an internal interface
-        baseline = Model();
+        // Required member of an internal interface (its implementor Machine is internal, too: a public implementor
+        // would expose the interface, AB#6334)
+        baseline = WithInternalMachine();
         Serialized(baseline).Visibility = CkVisibilityDto.Internal;
-        current = Model();
+        current = WithInternalMachine();
         Serialized(current).Visibility = CkVisibilityDto.Internal;
         Serialized(current).Attributes.Add(new CkInterfaceAttributeDto { CkAttributeId = $"{M}/WithDefault", AttributeName = "Extra" });
         Assert.All(Classify(baseline, current), c => Assert.StartsWith(CkSemVerClassifier.InternalReason, c.Reason));
@@ -94,18 +110,18 @@ public class InternalElementRowTests
     [Fact]
     public void N4_VisibilityPublicToInternal_IsMajor_InternalToPublic_IsMinor()
     {
-        var change = Assert.Single(Classify(Model(), WithInternalMachine()));
+        var change = Assert.Single(Classify(PublicModel(), WithInternalMachine()));
         Assert.Equal("visibility", change.Change.Property);
         Assert.Equal(CkSemVerLevel.Major, change.Level);
 
-        change = Assert.Single(Classify(WithInternalMachine(), Model()));
+        change = Assert.Single(Classify(WithInternalMachine(), PublicModel()));
         Assert.Equal(CkSemVerLevel.Minor, change.Level);
     }
 
     [Fact]
     public void N5_ElementMadePublicAndChangedInTheSameRelease_FollowsThePublicRules()
     {
-        var current = Model();
+        var current = PublicModel();
         Machine(current).IsFinal = true;
         Machine(current).Attributes!.Add(new CkTypeAttributeDto { CkAttributeId = $"{M}/SerialNumber", AttributeName = "Second" });
 
@@ -114,5 +130,48 @@ public class InternalElementRowTests
         Assert.Contains(classified, c => c.Change.Property == "isFinal" && c.Level == CkSemVerLevel.Major);
         Assert.Contains(classified, c => c.Change.ElementKind == CkModelElementKind.TypeAttribute && c.Level == CkSemVerLevel.Major);
         Assert.DoesNotContain(classified, c => c.Reason.StartsWith(CkSemVerClassifier.InternalReason, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void N_InternalElementReachableFromAPublicOne_IsNotCapped()
+    {
+        // AB#6334 defence in depth: a model compiled by an older ckc may let a public element reference an internal
+        // one (the compiler now rejects it with 129). The public attribute StateAttr, assigned by the public Machine,
+        // uses the internal enum State: removing a value of it follows the public rule (E2, Major).
+        static CkCompiledModelRoot Inconsistent()
+        {
+            var model = PublicModel();
+            SemVerTestModels.GetEnum(model).Visibility = CkVisibilityDto.Internal;
+            return model;
+        }
+
+        var current = Inconsistent();
+        var enumDto = SemVerTestModels.GetEnum(current);
+        enumDto.Values = enumDto.Values!.Take(1).ToList();
+
+        var change = Assert.Single(Classify(Inconsistent(), current));
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.DoesNotContain(CkSemVerClassifier.InternalReason, change.Reason);
+
+        // An internal type reached from the public interface Serialized-1 (association member target) exposes its
+        // members: removing an attribute is Major (T3), not the capped Minor.
+        var baseline = Model();
+        Machine(baseline).Visibility = CkVisibilityDto.Internal;
+        current = Model();
+        Machine(current).Visibility = CkVisibilityDto.Internal;
+        Machine(current).Attributes!.RemoveAt(1);
+        Assert.Equal(CkSemVerLevel.Major, Level(baseline, current));
+    }
+
+    [Fact]
+    public void N_InternalMethodOfAPublicInterface_IsNotCapped()
+    {
+        // AB#6335 defence in depth: an internal method added to a public interface follows I11 (Major).
+        var current = Model();
+        Methods(current, "interface").Add(new CkMethodDto { MethodId = "Reset-1", Visibility = CkVisibilityDto.Internal });
+
+        var change = Assert.Single(Classify(Model(), current));
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.DoesNotContain(CkSemVerClassifier.InternalReason, change.Reason);
     }
 }

@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.SemVer;
 
@@ -48,8 +49,173 @@ internal sealed class CkVisibilityIndex
             var ownerInternal = _elements[CkModelElementKind.Interface][ckInterface.InterfaceId.FullName];
             foreach (var method in ckInterface.Methods ?? [])
             {
-                _methods[$"{ckInterface.InterfaceId.FullName}/{method.MethodId}"] =
-                    ownerInternal || CkModifiers.ResolveVisibility(method.Visibility) == CkVisibilityDto.Internal;
+                // AB#6335 defence in depth: a method of a public interface is part of the interface contract even
+                // when it is (inconsistently) declared internal.
+                _methods[$"{ckInterface.InterfaceId.FullName}/{method.MethodId}"] = ownerInternal;
+            }
+        }
+
+        ExposeInternalElementsReachableFromPublicOnes(model);
+    }
+
+    /// <summary>
+    ///     AB#6334 defence in depth: the compiler rejects a public element that references an internal element of its
+    ///     own model (129). A model compiled by an older ckc may still contain such references; an internal element a
+    ///     public element reaches is part of the compatibility surface, so it is treated as public here (the cap of
+    ///     rows N1–N5 does not apply). Transitive: an exposed element exposes what it references. The reference walk
+    ///     mirrors <c>CkVisibilityValidator</c>.
+    /// </summary>
+    private void ExposeInternalElementsReachableFromPublicOnes(CkCompiledModelRoot model)
+    {
+        var modelName = model.ModelId.Name;
+        var changed = true;
+
+        void Expose<T>(CkModelElementKind kind, CkId<T>? id) where T : IComparable<T>, ICkElementId
+        {
+            if (id != null && string.Equals(id.ModelId.Name, modelName, StringComparison.Ordinal) &&
+                _elements[kind].TryGetValue(id.ElementId.FullName, out var isInternal) && isInternal)
+            {
+                _elements[kind][id.ElementId.FullName] = false;
+                changed = true;
+            }
+        }
+
+        bool IsPublic(CkModelElementKind kind, string id) =>
+            _elements[kind].TryGetValue(id, out var isInternal) && !isInternal;
+
+        void ExposeMethods(string ownerKey, IEnumerable<CkMethodDto>? methods)
+        {
+            foreach (var method in methods ?? [])
+            {
+                if (_methods.TryGetValue($"{ownerKey}/{method.MethodId}", out var isInternal) && isInternal)
+                {
+                    continue;
+                }
+
+                foreach (var parameter in method.Parameters ?? [])
+                {
+                    Expose(CkModelElementKind.Record, parameter.ValueCkRecordId);
+                    Expose(CkModelElementKind.Enum, parameter.ValueCkEnumId);
+                }
+
+                Expose(CkModelElementKind.Record, method.Result?.ValueCkRecordId);
+                Expose(CkModelElementKind.Enum, method.Result?.ValueCkEnumId);
+            }
+        }
+
+        void ExposeAssignments(IEnumerable<CkTypeAttributeDto>? assignments)
+        {
+            foreach (var assignment in assignments ?? [])
+            {
+                Expose(CkModelElementKind.Attribute, assignment.CkAttributeId);
+            }
+        }
+
+        while (changed)
+        {
+            changed = false;
+            foreach (var type in (model.Types ?? []).Where(t => IsPublic(CkModelElementKind.Type, t.TypeId.FullName)))
+            {
+                Expose(CkModelElementKind.Type, type.DerivedFromCkTypeId);
+                ExposeAssignments(type.Attributes);
+                foreach (var implemented in type.Implements ?? [])
+                {
+                    Expose(CkModelElementKind.Interface, implemented);
+                }
+
+                foreach (var association in type.Associations ?? [])
+                {
+                    Expose(CkModelElementKind.AssociationRole, association.CkRoleId);
+                    Expose(CkModelElementKind.Type, association.TargetCkTypeId);
+                    Expose(CkModelElementKind.Interface, association.TargetCkInterfaceId);
+                    foreach (var targetAttribute in association.TargetCkAttributeIds ?? [])
+                    {
+                        Expose(CkModelElementKind.Attribute, targetAttribute);
+                    }
+                }
+
+                ExposeMethods(type.TypeId.FullName, type.Methods);
+            }
+
+            foreach (var record in (model.Records ?? []).Where(r =>
+                         IsPublic(CkModelElementKind.Record, r.RecordId.FullName)))
+            {
+                Expose(CkModelElementKind.Record, record.DerivedFromCkRecordId);
+                ExposeAssignments(record.Attributes);
+            }
+
+            foreach (var role in (model.AssociationRoles ?? []).Where(r =>
+                         IsPublic(CkModelElementKind.AssociationRole, r.AssociationRoleId.FullName)))
+            {
+                ExposeAssignments(role.Attributes);
+            }
+
+            foreach (var attribute in (model.Attributes ?? []).Where(a =>
+                         IsPublic(CkModelElementKind.Attribute, a.AttributeId.FullName)))
+            {
+                Expose(CkModelElementKind.Record, attribute.ValueCkRecordId);
+                Expose(CkModelElementKind.Enum, attribute.ValueCkEnumId);
+            }
+
+            foreach (var ckInterface in (model.Interfaces ?? []).Where(i =>
+                         IsPublic(CkModelElementKind.Interface, i.InterfaceId.FullName)))
+            {
+                foreach (var member in ckInterface.Attributes)
+                {
+                    Expose(CkModelElementKind.Attribute, member.CkAttributeId);
+                }
+
+                foreach (var extended in ckInterface.Extends ?? [])
+                {
+                    Expose(CkModelElementKind.Interface, extended);
+                }
+
+                foreach (var association in ckInterface.Associations ?? [])
+                {
+                    Expose(CkModelElementKind.AssociationRole, association.CkRoleId);
+                    Expose(CkModelElementKind.Type, association.TargetCkTypeId);
+                    Expose(CkModelElementKind.Interface, association.TargetCkInterfaceId);
+                }
+
+                ExposeMethods(ckInterface.InterfaceId.FullName, ckInterface.Methods);
+            }
+
+            // An exposed owner exposes its methods (the method keys were computed from the declared visibility).
+            foreach (var type in model.Types ?? [])
+            {
+                if (!IsPublic(CkModelElementKind.Type, type.TypeId.FullName))
+                {
+                    continue;
+                }
+
+                foreach (var method in type.Methods ?? [])
+                {
+                    var key = $"{type.TypeId.FullName}/{method.MethodId}";
+                    var declaredInternal = CkModifiers.ResolveVisibility(method.Visibility) == CkVisibilityDto.Internal;
+                    if (_methods[key] && !declaredInternal)
+                    {
+                        _methods[key] = false;
+                        changed = true;
+                    }
+                }
+            }
+
+            foreach (var ckInterface in model.Interfaces ?? [])
+            {
+                if (!IsPublic(CkModelElementKind.Interface, ckInterface.InterfaceId.FullName))
+                {
+                    continue;
+                }
+
+                foreach (var method in ckInterface.Methods ?? [])
+                {
+                    var key = $"{ckInterface.InterfaceId.FullName}/{method.MethodId}";
+                    if (_methods[key])
+                    {
+                        _methods[key] = false;
+                        changed = true;
+                    }
+                }
             }
         }
     }

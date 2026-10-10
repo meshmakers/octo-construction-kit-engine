@@ -303,7 +303,9 @@ public sealed class CkV2CompileTests : IDisposable
         files["types/types.yaml"] = files["types/types.yaml"]
             .Replace("  - typeId: Principal", "  - typeId: Principal\n    derivable: Any")
             .Replace("  - typeId: Account", "  - typeId: Account\n    visibility: Internal")
-            .Replace("      - methodId: Unlock-1", "      - methodId: Unlock-1\n        visibility: Internal");
+            .Replace("      - methodId: Unlock-1", "      - methodId: Unlock-1\n        visibility: Internal")
+            // AB#6334 (129): the method that uses the internal enum Mode must be internal, too.
+            .Replace("      - methodId: ChangePassword-1", "      - methodId: ChangePassword-1\n        visibility: Internal");
         files["associations/roles.yaml"] = """
             associationRoles:
               - id: Owns

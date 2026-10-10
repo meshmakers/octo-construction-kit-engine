@@ -31,7 +31,8 @@ public class CkV2InterfaceCompletionResolverTests(ITestOutputHelper output) : Ck
                     Multiplicity = MultiplicitiesDto.ZeroOrOne, IsOptional = true
                 }
             ],
-            Methods = [new() { MethodId = "Relabel-1", Visibility = CkVisibilityDto.Internal }]
+            // AB#6335 (129): a public interface may not declare internal methods.
+            Methods = [new() { MethodId = "Relabel-1" }]
         });
         model.Interfaces!.Add(new CkInterfaceDto
         {
@@ -59,7 +60,7 @@ public class CkV2InterfaceCompletionResolverTests(ITestOutputHelper output) : Ck
         Assert.Equal(MultiplicitiesDto.ZeroOrOne, association.Definition.Multiplicity);
         Assert.Equal(["Relabel-1", "Tag-1"], tagged.AllMethods.Keys.OrderBy(k => k));
         Assert.Equal($"{M}/Labeled-1", tagged.AllMethods["Relabel-1"].DeclaringCkInterfaceId.ToRtCkId().FullName);
-        Assert.Equal(CkVisibilityDto.Internal, tagged.AllMethods["Relabel-1"].Visibility);
+        Assert.Equal(CkVisibilityDto.Public, tagged.AllMethods["Relabel-1"].Visibility);
         Assert.False(graph.Interfaces[$"{M}/Named-1"].Deprecated);
     }
 

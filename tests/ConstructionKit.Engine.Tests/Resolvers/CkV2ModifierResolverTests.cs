@@ -64,6 +64,11 @@ public class CkV2ModifierResolverTests(ITestOutputHelper output) : CkV2ResolverT
         model.Enums!.Single().Visibility = CkVisibilityDto.Internal;
         model.Attributes!.Single(a => a.AttributeId == "PasswordHash").Visibility = CkVisibilityDto.Internal;
         model.Interfaces!.Single(i => i.InterfaceId == "Named-1").Visibility = CkVisibilityDto.Internal;
+        // AB#6334 (129): Principal and Account reference the internal record, enum, attribute and interface, so they
+        // must be internal themselves.
+        Type(model, "Principal").Visibility = CkVisibilityDto.Internal;
+        Type(model, "Account").Visibility = CkVisibilityDto.Internal;
+        model.Attributes!.Single(a => a.ValueCkRecordId != null).Visibility = CkVisibilityDto.Internal;
 
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);
@@ -87,6 +92,8 @@ public class CkV2ModifierResolverTests(ITestOutputHelper output) : CkV2ResolverT
         var model = sampleData.sample1.Builder.Build();
         model.CkLanguage = 2;
         model.AssociationRoles!.Single().Visibility = CkVisibilityDto.Internal;
+        // AB#6334 (129): the type that uses the internal role must be internal, too.
+        model.Types!.Single(t => t.TypeId == "Demo3").Visibility = CkVisibilityDto.Internal;
 
         var operationResult = new OperationResult();
         var graph = Resolve(model, operationResult);

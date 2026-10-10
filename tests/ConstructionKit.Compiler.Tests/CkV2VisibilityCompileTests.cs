@@ -30,9 +30,11 @@ public sealed class CkV2VisibilityCompileTests : IDisposable
               - id: Shade
                 valueType: Enum
                 valueCkEnumId: ${this}/Color
+                visibility: Internal
               - id: Where
                 valueType: Record
                 valueCkRecordId: ${this}/Address
+                visibility: Internal
             """,
         ["enums/e.yaml"] = """
             enums:
@@ -85,6 +87,18 @@ public sealed class CkV2VisibilityCompileTests : IDisposable
                 derivedFromCkTypeId: ${System}/Entity
                 derivable: Any
                 attributes:
+                  - id: ${this}/Pub
+                    name: Pub
+                    isOptional: true
+              - typeId: Closed
+                derivedFromCkTypeId: ${this}/Open
+              - typeId: Secret
+                derivedFromCkTypeId: ${this}/Open
+                visibility: Internal
+                derivable: Any
+                implements:
+                  - ${this}/Secretive-1
+                attributes:
                   - id: ${this}/Shade
                     name: Shade
                     isOptional: true
@@ -94,21 +108,14 @@ public sealed class CkV2VisibilityCompileTests : IDisposable
                 associations:
                   - id: ${this}/Link
                     targetCkTypeId: ${this}/Open
-              - typeId: Closed
-                derivedFromCkTypeId: ${this}/Open
-              - typeId: Secret
-                derivedFromCkTypeId: ${this}/Open
-                visibility: Internal
-                derivable: Any
-                implements:
-                  - ${this}/Secretive-1
             """
     };
 
     private async Task<CkCompiledModelRoot> PublishLibAsync(Dictionary<string, string>? files = null)
     {
         await _fixture.CompileAndPublishAsync(_fixture.WriteSystemModel("2.5.0"));
-        // Inside its own model every internal element and every derivation is allowed.
+        // Inside its own model every derivation is allowed, and internal elements may be referenced by internal
+        // elements (a public element referencing an internal one is 129, AB#6334).
         return await _fixture.CompileAndPublishAsync(_fixture.WriteSource($"lib-{Guid.NewGuid():N}", "Lib-1.0.0",
             ["System-[2.5,3.0)"], files ?? LibFiles(), ckLanguage: 2));
     }
@@ -245,7 +252,9 @@ public sealed class CkV2VisibilityCompileTests : IDisposable
         var forgedFiles = LibFiles();
         forgedFiles["types/t.yaml"] = forgedFiles["types/t.yaml"].Replace(
             "  - typeId: Open\n    derivedFromCkTypeId: ${System}/Entity\n    derivable: Any",
-            "  - typeId: Open\n    derivedFromCkTypeId: ${System}/Entity\n    derivable: Any\n    visibility: Internal");
+            "  - typeId: Open\n    derivedFromCkTypeId: ${System}/Entity\n    derivable: Any\n    visibility: Internal")
+            .Replace("  - typeId: Closed\n    derivedFromCkTypeId: ${this}/Open",
+                "  - typeId: Closed\n    derivedFromCkTypeId: ${this}/Open\n    visibility: Internal");
         var forged = await _fixture.CompileAsync(_fixture.WriteSource("lib-forged", "Lib-1.0.0", ["System-[2.5,3.0)"],
             forgedFiles, ckLanguage: 2));
         Assert.Equal(CkVisibilityDto.Internal, forged.Types!.Single(t => t.TypeId.Name == "Open").Visibility);

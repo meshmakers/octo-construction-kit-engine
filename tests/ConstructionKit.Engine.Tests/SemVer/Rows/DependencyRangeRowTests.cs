@@ -92,6 +92,36 @@ public class DependencyRangeRowTests
     }
 
     [Fact]
+    public void D1_FloorRaised_WithinThePreviousResolution_IsMinor_BeyondIt_IsMajor()
+    {
+        // N5 (platform-owner decision 2026-10-10): raising the floor up to the version the previous release resolved
+        // is Minor; beyond it the previous resolution is excluded (Major, with a reason that does not claim a
+        // downgrade).
+        Assert.Equal(CkSemVerLevel.Minor, Level(ResolvedAt("2.6.0"), ResolvedAt("2.6.0", floor: "2.6.0")));
+        var beyond = Assert.Single(Classify(ResolvedAt("2.6.0"), ResolvedAt("2.6.0", floor: "2.7.0")),
+            c => c.Change.Property == "floor");
+        Assert.Equal(CkSemVerLevel.Major, beyond.Level);
+        Assert.DoesNotContain("downgrade", beyond.Reason);
+        Assert.Contains("(2.6.0)", beyond.Reason);
+    }
+
+    [Fact]
+    public void D6_SwitchToExactPinsExcludingThePreviousResolution_IsMajor()
+    {
+        // N3 (platform-owner decision 2026-10-10): the previous release was range-retaining and resolved Base 2.6.0;
+        // the new release pins exactly another version.
+        var exact = SemVerTestModels.CreateModel();
+        exact.Dependencies = [new CkModelId("Base-2.5.0")];
+        var change = Assert.Single(Classify(ResolvedAt("2.6.0"), exact), c => c.Change.ElementKind == CkModelElementKind.Dependency);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+
+        // The same pin as the previous resolution stays the D6 Minor.
+        var same = SemVerTestModels.CreateModel();
+        same.Dependencies = [new CkModelId("Base-2.6.0")];
+        Assert.Equal(CkSemVerLevel.Minor, Level(ResolvedAt("2.6.0"), same));
+    }
+
+    [Fact]
     public void D4_RangeMovedToAnotherMajor_IsMajor()
     {
         var classified = Classify(RangeRetaining(), RangeRetaining("[3.0,4.0)", "3.0.0"));

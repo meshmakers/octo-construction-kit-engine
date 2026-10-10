@@ -130,7 +130,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Patch, "purely documentational change"),
 
             // ── Dependencies ────────────────────────────────────────────────────────────────
-            { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change, current),
+            { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change, baseline, current),
 
             // ── CK v2 range retention (AB#6271, rows D1–D6) ─────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "rangeRetention" } =>
@@ -682,8 +682,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             ExcludedBaselineVersion(change.ElementId, baseline, current) is { } excluded)
         {
             return (CkSemVerLevel.Major,
-                $"dependency range excludes the version the previous release resolved ({excluded}) — tenants that " +
-                "installed it cannot import this release (row D3)");
+                $"dependency {change.Property} excludes the version the previous release resolved ({excluded}) — a " +
+                "tenant that installed the previous release with it cannot import this release without changing the " +
+                "dependency first (rows D1/D3)");
         }
 
         switch (change.ChangeKind)
@@ -800,19 +801,26 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         }
     }
 
-    private static (CkSemVerLevel, string) ClassifyDependencyChange(CkModelChange change, CkCompiledModelRoot current)
+    private static (CkSemVerLevel, string) ClassifyDependencyChange(CkModelChange change,
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
-        // AB#6340: on a range-retaining model a resolved dependency version that goes DOWN cannot be imported by a
-        // tenant holding the previous resolution (exact pins keep their v1 classification).
-        if (current.IsRangeRetaining && change is { ChangeKind: CkModelChangeKind.Modified, Property: "version" } &&
-            change.OldValue != null && change.NewValue != null &&
-            new CkVersion(change.NewValue).CompareTo(new CkVersion(change.OldValue)) < 0)
+        // AB#6340: a tenant that installed the previous release keeps the dependency version it resolved. On a
+        // range-retaining model a resolved version that goes DOWN excludes it; N3 (2026-10-10): when the previous
+        // release was range-retaining and this one switches to exact pins, ANY other pinned version excludes it.
+        if (change is { ChangeKind: CkModelChangeKind.Modified, Property: "version" } &&
+            change.OldValue != null && change.NewValue != null)
         {
-            return (CkSemVerLevel.Major,
-                $"resolved dependency version went down ({change.OldValue} -> {change.NewValue}) — tenants that installed " +
-                "the previous release with it cannot import this release (row D3)");
+            var older = new CkVersion(change.NewValue).CompareTo(new CkVersion(change.OldValue)) < 0;
+            var switchedToExactPins = baseline.IsRangeRetaining && !current.IsRangeRetaining;
+            if ((current.IsRangeRetaining && older) || switchedToExactPins)
+            {
+                return (CkSemVerLevel.Major,
+                    $"the release no longer admits the dependency version the previous release resolved " +
+                    $"({change.OldValue} -> {change.NewValue}{(switchedToExactPins ? ", exact pin" : "")}) — a tenant " +
+                    "that installed the previous release with it cannot import this release without changing the " +
+                    "dependency first (row D3)");
+            }
         }
-
 
         switch (change.ChangeKind)
         {

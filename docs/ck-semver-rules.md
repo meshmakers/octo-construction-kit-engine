@@ -380,12 +380,12 @@ dependency changed → Minor" is F2.4 (AB#5686).
 
 | Row | Change (range-retaining model) | Level |
 | --- | ------------------------------ | ----- |
-| D1 | Floor raised within the same major | Minor |
+| D1 | Floor raised within the same major | Minor while the new floor does not exceed the version the previous release resolved; **Major beyond it** (N5, 2026-10-10: the previous resolution is excluded — a tenant that installed the previous release with it cannot import this release without changing the dependency first) |
 | D2 | Floor lowered or range widened within the same major | Minor |
 | D3 | Upper bound narrowed within the same major | Minor, with a behavioural note (tenants with an excluded newer version cannot import the release) — **Major when the new range or floor excludes the version the previous release resolved** (AB#6340: a tenant that installed the previous release with it would need a dependency downgrade); a resolved dependency version that goes down on a range-retaining model is Major for the same reason (exact pins keep the v1 rule) |
 | D4 | Range or floor moves to another major | Major |
 | D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
-| D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6) |
+| D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6); **Major** when the switch back to exact pins pins a version other than the one the previous release resolved (N3, 2026-10-10) |
 | D7 | `usedSurface` / `usedSurfaceHash` changed | not classified on its own (derived from the model's own changes); listed in `CkModelDiffService.ExcludedProperties` with that reason (AB#4472) |
 
 ### usedSurface (AB#4472)

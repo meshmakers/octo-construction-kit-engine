@@ -24,13 +24,23 @@ public class CkBaselineResolver : ICkBaselineResolver
     }
 
     /// <inheritdoc />
-    public async Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
-        string? catalogName = null)
-    {
-        var catalogs = catalogName != null
-            ? [catalogName]
-            : _catalogService.GetCatalogList().Select(c => c.Item1).ToList();
+    public Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
+        string? catalogName = null) =>
+        ResolveCoreAsync(modelName, declaredVersion,
+            catalogName != null
+                ? [catalogName]
+                : _catalogService.GetCatalogList().Select(c => c.Item1).ToList());
 
+    /// <inheritdoc />
+    public Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion,
+        CkBaselineSource source) =>
+        ResolveCoreAsync(modelName, declaredVersion,
+            _catalogService.GetCatalogList().Select(c => c.Item1)
+                .Where(c => source == CkBaselineSource.Local || !IsLocalCatalog(c)).ToList());
+
+    private async Task<CkBaselineResolution> ResolveCoreAsync(string modelName, CkVersion declaredVersion,
+        List<string> catalogs)
+    {
         var majorStart = new CkVersion(declaredVersion.Major, 0, 0);
         var nextMajorStart = new CkVersion(declaredVersion.Major + 1, 0, 0);
         var sourceUnreachable = false;

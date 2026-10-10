@@ -477,6 +477,7 @@ Developers only need to create migration scripts for versions that actually tran
 | `IBlueprintService` | `Runtime.Contracts.Blueprints` | Applies blueprints to tenants |
 | `ICatalogService` | `ConstructionKit.Contracts.Services` | Manages CK model catalog |
 | `ICkBaselineResolver` | `ConstructionKit.Engine.SemVer` | AB#5450: the one read-only baseline lookup of every compatibility gate (`ValidateVersion` now, compile gate AB#6294 and publish gate F2.3 next): newest version of the declared major, a new major against the previous major line, local-catalog entries at or above the declared version never (AB#5434). Rules: `docs/ck-semver-rules.md`, "Baseline" |
+| `ICkCompatibilityVerdictService` | `ConstructionKit.Engine.SemVer` | AB#6294: the one verdict (baseline model, diff, classification, validation of the declared version, uncovered changes) shared by `ValidateVersion` and the compile gate; read-only. `CkCompileGate` (same namespace) is the decision logic of `CkCompile` for ckLanguage 2 models: `OCTO-CK200`/`201`/`202`, baseline source `OctoCkCompatibilityBaseline` (`Local`/`Remote`, CI default `Remote`). Rules: `docs/ck-semver-rules.md`, "Compile gate" |
 
 ## Extensible Enum Import (WI #3324)
 

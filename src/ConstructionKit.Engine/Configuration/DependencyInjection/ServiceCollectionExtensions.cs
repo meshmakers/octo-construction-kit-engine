@@ -76,6 +76,9 @@ public static class ServiceCollectionExtensions
         services.AddTransient<ICkSemVerClassifier, CkSemVerClassifier>();
         // AB#5450: one shared, read-only baseline resolver for every compatibility gate
         services.AddTransient<ICkBaselineResolver, CkBaselineResolver>();
+        // AB#6294: one shared verdict (baseline model, diff, classification, validation) for every compatibility gate
+        services.AddTransient<ICkCompatibilityVerdictService, CkCompatibilityVerdictService>();
+        services.AddTransient<CkCompileGate>();
         services.AddTransient<ICkChangelogGenerator, CkChangelogGenerator>();
 
         // Add here sources of Ck model repositories

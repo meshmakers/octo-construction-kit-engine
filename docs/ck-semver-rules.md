@@ -107,11 +107,69 @@ highest level in the diff:
 | `OCTO-CK103` | A dependency range is satisfied by no published version and no sibling package validated earlier in the same run | Publish the dependency first, correct the range, or pass the dependency's source path before the consumer's (dependency order) |
 | `OCTO-CK104` | Major bump without a matching migration (only with `--requireMigrationForMajor`) | Add a migration with `toVersion` == declared version |
 
+The compile gate (next section) uses the `OCTO-CK2xx` range.
+
 Exit codes: `0` = valid, non-zero = violation or error (CI-friendly). Concretely, a version
 violation (any `OCTO-CK1xx` finding, an unknown catalog, or a compile failure) exits with the
 process code `-6` (`ModelValidationException`); because process exit codes are unsigned bytes this
 surfaces as `250` in PowerShell's `$LASTEXITCODE` and `250` in a POSIX shell's `$?`. **CI must gate
 on `-ne 0`, never on `-eq 1`** — the command never exits with `1`.
+
+## Compile gate (AB#6294)
+
+Gate 1 of the CK v2 compatibility concept (§4.3.3). `CkCompile` (the MSBuild task behind `dotnet build`, local
+and CI) checks a freshly compiled model against its baseline **after compiling and before any publish** and fails
+the build for every change the declared version does not cover. The gate never writes to a catalog; after an
+`OCTO-CK2xx` error the model is published nowhere (neither to `OctoPublishCatalog` nor to the local catalog).
+
+The verdict itself (baseline model, diff, classification, validation of the declared version) comes from the engine
+service `ICkCompatibilityVerdictService`, which `ValidateVersion` uses as well: for the same model and baseline both
+report the same required level and minimum version (test `ValidateVersion_AndCompileGate_AgreeOnTheVerdict`). The
+baseline comes from the shared `ICkBaselineResolver` (rules: "Baseline" above); the decision logic is the class
+`CkCompileGate`.
+
+| Model | Behaviour |
+| ----- | --------- |
+| `ckLanguage: 2` | Hard gate: `OCTO-CK200`, `OCTO-CK201`, `OCTO-CK202` fail the build. |
+| `ckLanguage` 1 (default) | One informational verdict line, never a warning or an error; a failing check is swallowed into an information line. The compiled JSON is byte-identical to a build without the gate. The CI step `validate-ck-versions` stays the v1 gate. |
+
+### Baseline source: `OctoCkCompatibilityBaseline`
+
+| Value | Catalogs consulted | Default |
+| ----- | ------------------ | ------- |
+| `Local` | the local file-system catalog plus the cached remote catalogs; needs no network | outside CI (`DebugL`) |
+| `Remote` | the remote (GitHub) catalogs only; the local catalog is ignored | when `TF_BUILD` or `ContinuousIntegrationBuild` is true |
+
+The MSBuild property overrides the default (`<OctoCkCompatibilityBaseline>Remote</OctoCkCompatibilityBaseline>`);
+any other value fails the build. Feature branches in CI that publish to a per-run local catalog therefore still
+diff against GitHub. There is deliberately no switch that turns the gate off for a ckLanguage 2 model; the accepted
+bypass is deleting the baseline (a model without a baseline is a first publication).
+
+Never the model under test: in `Local` mode entries of the local catalog at or above the declared version are never
+the baseline, because they come from earlier local builds of the same model. Building the same model twice, or for
+two target frameworks, yields the same baseline both times, and a breaking edit at an unchanged version fails again
+on the next build. A local baseline below the declared version is allowed and is marked "local, not published" in
+the verdict line.
+
+### Codes
+
+| Code | Meaning | Remediation |
+| ---- | ------- | ----------- |
+| `OCTO-CK200` | A change is not covered by the declared version. One error **per uncovered change**: element, change, required level, minimum version | Raise the version in `ckModel.yaml` to at least the reported minimum (`modelId: Name-X.Y.Z`) or revert the change |
+| `OCTO-CK201` | The declared version is lower than the baseline of the same major | Use a version >= the baseline version |
+| `OCTO-CK202` | The baseline source was unreachable and no baseline is known. An **error** in `Remote`, a high-importance message (not an error) in `Local` | Check network/VPN and the catalog tokens, retry; offline development uses `Local` |
+
+`OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism.
+
+### Verdict line
+
+Every build with a baseline logs one line (high importance), for example:
+
+```
+Compatibility: model 'GateModel', declared 2.5.0, baseline GateModel-2.4.0 (LocalFileSystemCatalog, local, not published), required level MINOR, minimum version 2.5.0: ok.
+```
+
+A first publication logs `first publication (no baseline in the Remote baseline source)`.
 
 ### First publication vs. unreachable catalogs
 

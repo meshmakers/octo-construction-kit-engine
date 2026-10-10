@@ -31,4 +31,16 @@ public interface ICkBaselineResolver
     /// <param name="catalogName">Restricts the lookup to this catalog; null queries every readable catalog.</param>
     /// <returns>The baseline decision.</returns>
     Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion, string? catalogName = null);
+
+    /// <summary>
+    ///     Resolves the baseline of <paramref name="modelName" /> for the <paramref name="declaredVersion" /> from the
+    ///     given <paramref name="source" /> (AB#6294): <see cref="CkBaselineSource.Local" /> queries every readable
+    ///     catalog (the local file-system catalog and the cached remote catalogs), <see cref="CkBaselineSource.Remote" />
+    ///     ignores the local file-system catalog entirely. All other rules are those of the overload above.
+    /// </summary>
+    /// <param name="modelName">Name of the model (without version).</param>
+    /// <param name="declaredVersion">The version declared in <c>ckModel.yaml</c>.</param>
+    /// <param name="source">Which catalogs may supply the baseline.</param>
+    /// <returns>The baseline decision.</returns>
+    Task<CkBaselineResolution> ResolveAsync(string modelName, CkVersion declaredVersion, CkBaselineSource source);
 }

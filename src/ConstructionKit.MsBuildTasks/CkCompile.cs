@@ -8,6 +8,7 @@ using Meshmakers.Octo.ConstructionKit.Engine.Documentation;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers;
 using Meshmakers.Octo.ConstructionKit.Engine.Resolvers.Catalog;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Microsoft.Build.Framework;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -73,6 +74,14 @@ public class CkCompile : Microsoft.Build.Utilities.Task
     /// Empty keeps the compiler default (environment variable OctoCkRangeRetention).
     /// </summary>
     public string? RangeRetention { get; set; }
+
+    /// <summary>
+    /// AB#6294: where the compile gate takes the compatibility baseline from (MSBuild property
+    /// OctoCkCompatibilityBaseline): "Local" (local file-system catalog plus cached remote catalogs, needs no
+    /// network) or "Remote" (GitHub catalogs, local catalog ignored). Empty selects the default: Remote on a CI
+    /// build (TF_BUILD / ContinuousIntegrationBuild), otherwise Local.
+    /// </summary>
+    public string? CompatibilityBaseline { get; set; }
 
     /// <summary>
     /// When true, the compiled construction kit model is generated as .md files
@@ -218,6 +227,15 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         Log.LogMessage(MessageImportance.High, "Private GitHub catalog: {0} (enabled: {1})",
             PrivateGitHubCatalogCoordinates.Describe(privateCatalogOptions), privateCatalogOptions.IsEnabled);
 
+        if (!CkCompileGate.TryGetBaselineSource(CompatibilityBaseline, IsContinuousIntegration(),
+                out var baselineSource))
+        {
+            Log.LogError("OctoCkCompatibilityBaseline must be 'Local' or 'Remote', but is '{0}'.",
+                CompatibilityBaseline);
+            return false;
+        }
+
+        var compileGate = serviceProvider.GetRequiredService<CkCompileGate>();
         var compilerService = serviceProvider.GetRequiredService<ICompilerService>();
         var catalogService = serviceProvider.GetRequiredService<ICatalogService>();
         var ckSerializer = serviceProvider.GetRequiredService<ICkSerializer>();
@@ -280,6 +298,14 @@ public class CkCompile : Microsoft.Build.Utilities.Task
                             if (compileResult.CompiledModelCacheFilePath != null)
                             {
                                 cacheFiles.Add(compileResult.CompiledModelCacheFilePath);
+                            }
+
+                            // AB#6294: compatibility gate (concept §4.3.3, gate 1) — after compiling and BEFORE any
+                            // PublishAsync; it never writes to a catalog. Runs whether or not the model is published.
+                            if (!await RunCompatibilityGateAsync(compileGate, ckSerializer, compileResult.CompiledModelFile,
+                                    constructionKitFolderPath, baselineSource, operationResult))
+                            {
+                                return;
                             }
 
                             if (PublishCkModel)
@@ -467,6 +493,57 @@ public class CkCompile : Microsoft.Build.Utilities.Task
         }
 
         return !Log.HasLoggedErrors;
+    }
+
+    private static bool IsContinuousIntegration() =>
+        IsTrue(Environment.GetEnvironmentVariable("TF_BUILD")) ||
+        IsTrue(Environment.GetEnvironmentVariable("ContinuousIntegrationBuild"));
+
+    private static bool IsTrue(string? value) =>
+        string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     AB#6294: runs the compile gate on the freshly compiled model and renders its messages into the build log.
+    ///     Returns false when the build has to fail (nothing is published then).
+    /// </summary>
+    private async Task<bool> RunCompatibilityGateAsync(CkCompileGate compileGate, ICkSerializer ckSerializer,
+        string compiledModelFile, string constructionKitFolderPath, CkBaselineSource baselineSource,
+        OperationResult operationResult)
+    {
+#if NETSTANDARD2_0
+        using var stream = File.OpenRead(compiledModelFile);
+#else
+        await using var stream = File.OpenRead(compiledModelFile);
+#endif
+        var compiled = await ckSerializer.DeserializeCompiledModelRootAsync(stream, compiledModelFile,
+            operationResult);
+        if (operationResult.HasErrors || operationResult.HasFatalErrors)
+        {
+            Log.LogError("Error loading model \'{0}\'", compiledModelFile);
+            LogOperationResults(operationResult);
+            return false;
+        }
+
+        var result = await compileGate.RunAsync(compiled, baselineSource);
+        var metadataFile = Path.Combine(constructionKitFolderPath, "ckModel.yaml");
+        foreach (var message in result.Messages)
+        {
+            if (message.Severity == CkCompileGateSeverity.Error)
+            {
+                Log.LogError(null, message.Code, null, metadataFile, 0, 0, 0, 0, message.Text);
+            }
+            else if (message.Code != null)
+            {
+                Log.LogMessage(null, message.Code, null, metadataFile, 0, 0, 0, 0, MessageImportance.High,
+                    message.Text, null);
+            }
+            else
+            {
+                Log.LogMessage(MessageImportance.High, message.Text);
+            }
+        }
+
+        return !result.HasErrors;
     }
 
     /// <summary>

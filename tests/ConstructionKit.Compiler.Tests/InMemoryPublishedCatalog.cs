@@ -15,6 +15,9 @@ internal sealed class InMemoryPublishedCatalog : ICatalog
 
     private readonly Dictionary<CkModelId, CkCompiledModelRoot> _models = new();
 
+    /// <summary>When true, every range lookup reports an unreachable source (the cache refresh failed, AB#5450).</summary>
+    public bool SourceUnreachable { get; set; }
+
     public int Order => 50;
     public string CatalogName => Name;
     public string Description => "In-memory published catalog (tests)";
@@ -35,7 +38,8 @@ internal sealed class InMemoryPublishedCatalog : ICatalog
             .FirstOrDefault();
         return Task.FromResult(new ModelExistingResult
         {
-            Exists = highest != null, ModelId = highest, CatalogName = highest == null ? null : Name
+            Exists = highest != null, ModelId = highest, CatalogName = highest == null ? null : Name,
+            SourceUnreachable = SourceUnreachable
         });
     }
 

@@ -58,6 +58,7 @@
                    Compile="$(OctoCompileCkModel)"
                    PublishCkModel="$(OctoPublishCkModel)"
                    RangeRetention="$(OctoCkRangeRetention)"
+                   CompatibilityBaseline="$(OctoCkCompatibilityBaseline)"
                    PublishCatalogName="$(OctoPublishCatalog)"
                    IsLocalCatalogEnabled="$(OctoLocalCatalogIsEnabled)"
                    LocalCatalogRootPath="$(OctoLocalCatalogRootPath)"

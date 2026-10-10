@@ -7,6 +7,7 @@ using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.ModelCatalogs;
 using Meshmakers.Octo.ConstructionKit.Contracts.Services;
 using Meshmakers.Octo.ConstructionKit.Engine.ModelCatalogs;
+using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Meshmakers.Octo.ConstructionKit.Compiler.Tests;
@@ -74,7 +75,8 @@ public sealed class ValidateVersionCommandTests : IDisposable
     ///     Writes a minimal, self-contained CK source (one attribute, one enum, no types) so
     ///     compilation needs no catalog content besides the model itself.
     /// </summary>
-    private void WriteSource(string version, bool removeEnumValue = false, string? dependency = null)
+    private void WriteSource(string version, bool removeEnumValue = false, string? dependency = null,
+        int? ckLanguage = null)
     {
         Directory.CreateDirectory(Path.Combine(_sourceDir, "attributes"));
         Directory.CreateDirectory(Path.Combine(_sourceDir, "enums"));
@@ -83,6 +85,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
         File.WriteAllText(Path.Combine(_sourceDir, "ckModel.yaml"),
             "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-meta.schema.json\"\n" +
             dependencies +
+            (ckLanguage == null ? "" : $"ckLanguage: {ckLanguage}\n") +
             $"modelId: CmdFixture-{version}\n");
 
         File.WriteAllText(Path.Combine(_sourceDir, "attributes", "serial.yaml"),
@@ -469,5 +472,54 @@ public sealed class ValidateVersionCommandTests : IDisposable
 
         await _serviceProvider.GetRequiredService<ICatalogService>().PublishAsync(
             LocalFileSystemCatalog.Name, compiled, new OriginFileResolver(dependentDir), isForced: true);
+    }
+
+    /// <summary>
+    ///     AB#6294 "same verdict everywhere": ValidateVersion and the compile gate share one verdict service, so for
+    ///     the same model and baseline they agree on pass/fail, the required level and the minimum version.
+    /// </summary>
+    [Theory]
+    [InlineData("2.4.0", "2.5.0", false)] // additive-free: nothing changed, bump without structural change
+    [InlineData("2.4.0", "2.5.0", true)] // breaking, minor bump: too low
+    [InlineData("2.4.0", "3.0.0", true)] // breaking, major bump: valid
+    [InlineData("2.4.0", "2.4.0", true)] // breaking, version untouched
+    [InlineData("2.4.0", "2.3.0", false)] // downgrade
+    public async Task ValidateVersion_AndCompileGate_AgreeOnTheVerdict(string baselineVersion, string declaredVersion,
+        bool removeEnumValue)
+    {
+        WriteSource(baselineVersion, ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource(declaredVersion, removeEnumValue, ckLanguage: 2);
+
+        string? commandMinimum = null;
+        var commandFailed = false;
+        try
+        {
+            await RunAsync("-p", _sourceDir, "-o", _reportPath);
+        }
+        catch (ModelValidationException)
+        {
+            commandFailed = true;
+        }
+
+        var report = await File.ReadAllTextAsync(_reportPath, TestContext.Current.CancellationToken);
+        var match = System.Text.RegularExpressions.Regex.Match(report, "minimum version `([0-9.]+)`");
+        if (match.Success)
+        {
+            commandMinimum = match.Groups[1].Value;
+        }
+
+        var operationResult = new OperationResult();
+        var current = await _serviceProvider.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_sourceDir, operationResult);
+        var gate = await _serviceProvider.GetRequiredService<CkCompileGate>()
+            .RunAsync(current, CkBaselineSource.Remote);
+
+        Assert.Equal(commandFailed, gate.HasErrors);
+        Assert.NotNull(gate.Verdict);
+        if (commandMinimum != null)
+        {
+            Assert.Equal(commandMinimum, gate.Verdict.Validation.MinimumVersion.ToString());
+        }
     }
 }

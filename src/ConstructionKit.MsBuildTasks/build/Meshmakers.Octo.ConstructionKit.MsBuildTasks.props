@@ -47,6 +47,15 @@
               OctoPrivateGitHubCatalogBranch
               OctoPrivateGitHubCatalogPagesUri     (read path; publishes go through the GitHub API)
         -->
+        <!--
+            AB#6294: where the compile gate of a ckLanguage 2 model takes its compatibility baseline from.
+              Local  = local file-system catalog plus cached remote catalogs (no network needed); default outside CI
+              Remote = GitHub catalogs, the local catalog is ignored; default on a CI build
+                       (TF_BUILD / ContinuousIntegrationBuild)
+            The property overrides the default. ckLanguage 1 models only get an informational log line.
+        -->
+        <OctoCkCompatibilityBaseline Condition="'$(OctoCkCompatibilityBaseline)' == '' And ('$(TF_BUILD)' == 'True' Or '$(TF_BUILD)' == 'true' Or '$(ContinuousIntegrationBuild)' == 'true' Or '$(ContinuousIntegrationBuild)' == 'True')">Remote</OctoCkCompatibilityBaseline>
+        <OctoCkCompatibilityBaseline Condition="'$(OctoCkCompatibilityBaseline)' == ''">Local</OctoCkCompatibilityBaseline>
         <OctoGenerateCkModelServiceClass Condition="'$(OctoGenerateCkModelServiceClass)' == ''">true</OctoGenerateCkModelServiceClass>
         <OctoGenerateCkDocumentation Condition="'$(OctoGenerateCkDocumentation)' == ''">false</OctoGenerateCkDocumentation>
         <!--

@@ -28,8 +28,7 @@ internal class ValidateVersionCommand : CkcCommand
     private readonly ICatalogService _catalogService;
     private readonly ICompilerService _compilerService;
     private readonly ICkSerializer _ckSerializer;
-    private readonly ICkModelDiffService _diffService;
-    private readonly ICkSemVerClassifier _classifier;
+    private readonly ICkCompatibilityVerdictService _verdictService;
     private readonly ICkChangelogGenerator _changelogGenerator;
     private readonly ICkBaselineResolver _baselineResolver;
     private readonly IOptions<LocalFileSystemCatalogOptions> _localCatalogOptions;
@@ -45,7 +44,7 @@ internal class ValidateVersionCommand : CkcCommand
 
     public ValidateVersionCommand(ILogger<ValidateVersionCommand> logger, IOptions<OctoToolOptions> options,
         ICatalogService catalogService, ICompilerService compilerService, ICkSerializer ckSerializer,
-        ICkModelDiffService diffService, ICkSemVerClassifier classifier, ICkChangelogGenerator changelogGenerator,
+        ICkCompatibilityVerdictService verdictService, ICkChangelogGenerator changelogGenerator,
         IOptions<LocalFileSystemCatalogOptions> localCatalogOptions, ICkBaselineResolver baselineResolver)
         : base(logger, "ValidateVersion",
             "Validates that the declared construction kit model version reflects the changes since the last published version",
@@ -54,8 +53,7 @@ internal class ValidateVersionCommand : CkcCommand
         _catalogService = catalogService;
         _compilerService = compilerService;
         _ckSerializer = ckSerializer;
-        _diffService = diffService;
-        _classifier = classifier;
+        _verdictService = verdictService;
         _changelogGenerator = changelogGenerator;
         _localCatalogOptions = localCatalogOptions;
         _baselineResolver = baselineResolver;
@@ -292,32 +290,19 @@ internal class ValidateVersionCommand : CkcCommand
             return errors.Select(e => $"{modelName}: {e}").ToList();
         }
 
-        // 4. Load the baseline model
-        var baselineOperationResult = new OperationResult();
-        var baselineCatalogName = catalogName ?? baseline.CatalogName;
-        var baselineModel = baselineCatalogName != null
-            ? await _catalogService.GetAsync(baselineCatalogName, publishedModelId, baselineOperationResult)
-            : await _catalogService.GetAsync(publishedModelId, baselineOperationResult);
-        if (baselineModel == null || baselineOperationResult.HasErrors || baselineOperationResult.HasFatalErrors)
-        {
-            throw new CompilerException(
-                $"Error loading baseline model '{publishedModelId.FullName}' from catalog '{baselineCatalogName}'.",
-                baselineOperationResult);
-        }
-
-        // 5. Compile the current model in-memory (validation always runs against the compiled,
+        // 4. Compile the current model in-memory (validation always runs against the compiled,
         //    canonically sorted model, never against raw source YAMLs)
         var compileOperationResult = new OperationResult();
         var current = await _compilerService.CompileInMemoryAsync(rootPath, compileOperationResult);
 
-        // 6. Diff and classify
-        var changes = _diffService.Diff(baselineModel, current);
-        var classifiedChanges = _classifier.Classify(changes, baselineModel, current);
-        var requiredLevel = _classifier.GetRequiredLevel(classifiedChanges);
+        // 5. Load the baseline, diff, classify and validate the declared version (AB#6294: the shared verdict
+        //    service, also used by the compile gate)
+        var verdict = await _verdictService.EvaluateAsync(baseline, current, catalogName);
+        var classifiedChanges = verdict.ClassifiedChanges;
+        var requiredLevel = verdict.RequiredLevel;
+        var validationResult = verdict.Validation;
 
-        // 7. Apply the validation rule and reconcile migrations for major bumps
-        var validationResult = _classifier.ValidateDeclaredVersion(publishedModelId.Version, declaredVersion,
-            requiredLevel);
+        // 6. Report the validation verdict and reconcile migrations for major bumps
         switch (validationResult.Verdict)
         {
             case CkSemVerVerdict.VersionTooLow:

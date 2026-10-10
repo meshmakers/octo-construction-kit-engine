@@ -227,8 +227,11 @@ public class BlueprintBlankedAttribute
 
     /// <summary>
     /// Why the seed counts as blanking: <c>SeedEmpty</c> (the seed declares an empty value, or a JSON
-    /// text that empties a string the tenant filled) or <c>SeedOmitted</c> (the seed does not declare
-    /// the attribute).
+    /// text that empties a string the tenant filled), <c>SeedOmitted</c> (the seed does not declare
+    /// the attribute) or <c>ResetToDefault</c> (AB#6395: the seed does not declare an attribute that has
+    /// a CK default and the tenant's value differs from it, so the update resets it to the default;
+    /// <c>IncomingSummary</c> is then <c>default (&lt;value&gt;)</c>). Consumers must tolerate values they do
+    /// not know.
     /// </summary>
     public required string Reason { get; set; }
 
@@ -239,7 +242,7 @@ public class BlueprintBlankedAttribute
 
     /// <summary>
     /// Value-free description of what the seed carries, e.g. <c>string (110 chars)</c>, <c>empty string</c>
-    /// or <c>omitted</c>.
+    /// or <c>omitted</c>; <c>default (0)</c> for <c>ResetToDefault</c>.
     /// </summary>
     public string? IncomingSummary { get; set; }
 

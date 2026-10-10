@@ -1235,7 +1235,7 @@ internal class BlueprintService : IBlueprintService
                                     AttributeName = finding.Attribute.AttributeName,
                                     Reason = finding.Reason.ToString(),
                                     CurrentSummary = SeedBlankingDetector.Summarize(finding.ExistingValue),
-                                    IncomingSummary = SeedBlankingDetector.Summarize(finding.SeedValue, finding.SeedPresent),
+                                    IncomingSummary = SeedBlankingDetector.SummarizeIncoming(finding),
                                     AppliedOnUpdate = false
                                 });
                             }

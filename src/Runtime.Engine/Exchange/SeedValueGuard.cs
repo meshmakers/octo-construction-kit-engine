@@ -48,6 +48,8 @@ public readonly record struct SeedValueVerdict(SeedValueDecisionKind Kind, RtImp
 /// <item><term>SeedOwned, existing value is empty</term><description>TakeSeed (nothing to lose)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed non-empty</term><description>TakeSeed (blueprint-owned change wins, also when the value differs)</description></item>
 /// <item><term>SeedOwned, existing and seed are JSON texts and the seed carries an empty string where the existing has a non-empty one</term><description>Blanking (seed empty skeleton, see below)</description></item>
+/// <item><term>SeedOwned, existing non-empty, seed omits the attribute, attribute has a CK default, existing equals the default</term><description>TakeSeed, no finding (the default is materialised again, nothing changes; AB#6395)</description></item>
+/// <item><term>SeedOwned, existing non-empty, seed omits the attribute, attribute has a CK default, existing differs from it</term><description>ResetToDefault: KeepExisting under Keep, TakeSeed under Allow (AB#6395)</description></item>
 /// <item><term>SeedOwned, existing non-empty, seed empty or omitted</term><description>Blanking: KeepExisting under Keep, TakeSeed under Allow</description></item>
 /// </list>
 /// <para>
@@ -74,13 +76,19 @@ public static class SeedValueGuard
     /// <summary>
     /// Decides what to do with one attribute.
     /// </summary>
-    /// <param name="valueType">The attribute's value type (kept for documentation of intent and future rules).</param>
+    /// <param name="valueType">The attribute's value type (selects which default entry an omitted attribute gets).</param>
     /// <param name="ownership">The effective ownership of the attribute on this type.</param>
     /// <param name="existingPresent">True when the existing entity carries a value slot for the attribute.</param>
     /// <param name="existingValue">The existing value (repository shape).</param>
     /// <param name="seedPresent">True when the seed declares the attribute.</param>
     /// <param name="seedValue">The seed value (transport shape).</param>
     /// <param name="policy">What to do when the seed blanks a non-empty value.</param>
+    /// <param name="defaultValues">
+    /// The CK default values of the attribute, <c>null</c> when it has none (AB#6395). An omitted seed
+    /// attribute with a default is not blank: the import writes the default (the whole collection for
+    /// <c>StringArray</c>/<c>IntArray</c>, the first entry otherwise). A seed that declares the attribute
+    /// as empty is judged as before, because a declared null is written as null and the default is gone.
+    /// </param>
     public static SeedValueVerdict Decide(
         AttributeValueTypesDto valueType,
         AttributeOwnershipDto ownership,
@@ -88,9 +96,9 @@ public static class SeedValueGuard
         object? existingValue,
         bool seedPresent,
         object? seedValue,
-        RtImportBlankingPolicy policy)
+        RtImportBlankingPolicy policy,
+        ICollection<object>? defaultValues = null)
     {
-        _ = valueType;
 
         if (!existingPresent)
         {
@@ -110,7 +118,20 @@ public static class SeedValueGuard
         RtImportBlankingReason reason;
         if (!seedPresent)
         {
-            reason = RtImportBlankingReason.SeedOmitted;
+            if (defaultValues is { Count: > 0 })
+            {
+                // AB#6395: the omitted attribute comes back as its CK default, it is not blank.
+                if (ValuesEqual(existingValue, EffectiveDefault(valueType, defaultValues)))
+                {
+                    return new SeedValueVerdict(SeedValueDecisionKind.TakeSeed, RtImportBlankingReason.None);
+                }
+
+                reason = RtImportBlankingReason.ResetToDefault;
+            }
+            else
+            {
+                reason = RtImportBlankingReason.SeedOmitted;
+            }
         }
         else if (IsEmpty(seedValue))
         {
@@ -129,6 +150,54 @@ public static class SeedValueGuard
             policy == RtImportBlankingPolicy.Allow ? SeedValueDecisionKind.TakeSeed : SeedValueDecisionKind.KeepExisting,
             reason);
     }
+
+    /// <summary>
+    /// The value the import materialises for an omitted attribute: the whole collection for
+    /// <c>StringArray</c>/<c>IntArray</c>, the first entry for every other type (mirrors
+    /// <c>RuntimeRepositoryBase.CreateTransientRtEntity</c>).
+    /// </summary>
+    internal static object? EffectiveDefault(AttributeValueTypesDto valueType, ICollection<object> defaultValues)
+    {
+        return valueType is AttributeValueTypesDto.StringArray or AttributeValueTypesDto.IntArray
+            ? defaultValues
+            : defaultValues.FirstOrDefault();
+    }
+
+    /// <summary>
+    /// Value equality tolerant to the numeric CLR type (a stored <c>int</c> equals a default <c>0L</c>),
+    /// element-wise for collections, ordinal for strings.
+    /// </summary>
+    internal static bool ValuesEqual(object? left, object? right)
+    {
+        if (left is null || right is null)
+        {
+            return left is null && right is null;
+        }
+
+        if (left is string || right is string)
+        {
+            return left is string a && right is string b && string.Equals(a, b, StringComparison.Ordinal);
+        }
+
+        if (left is IEnumerable le && right is IEnumerable re && left is not byte[] && right is not byte[])
+        {
+            var l = le.Cast<object?>().ToList();
+            var r = re.Cast<object?>().ToList();
+            return l.Count == r.Count && l.Zip(r).All(p => ValuesEqual(p.First, p.Second));
+        }
+
+        if (IsNumeric(left) && IsNumeric(right))
+        {
+            return Convert.ToDecimal(left, System.Globalization.CultureInfo.InvariantCulture) ==
+                   Convert.ToDecimal(right, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return left.Equals(right);
+    }
+
+    private static bool IsNumeric(object value) =>
+        value is sbyte or byte or short or ushort or int or uint or long or ulong or decimal
+            or float or double;
 
     /// <summary>
     /// True when a value counts as empty: <c>null</c>, the empty string, an enumerable without

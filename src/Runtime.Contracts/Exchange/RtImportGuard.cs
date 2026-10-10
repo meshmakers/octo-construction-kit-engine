@@ -33,6 +33,14 @@ public enum RtImportBlankingReason
 
     /// <summary>The seed does not declare the attribute at all; the full replace would clear it.</summary>
     SeedOmitted = 2,
+
+    /// <summary>
+    /// The seed does not declare the attribute, the attribute has a CK default and the tenant's value
+    /// differs from it (AB#6395): the import materialises the default again, so the value is not blanked
+    /// but reset to its default. An omitted attribute whose stored value already equals the default is
+    /// not reported at all.
+    /// </summary>
+    ResetToDefault = 3,
 }
 
 /// <summary>

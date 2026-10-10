@@ -466,7 +466,9 @@ For a `SeedOwned` attribute the decision is made per attribute by `SeedValueGuar
 | empty value | anything | seed value lands |
 | non-empty | different non-empty value | **seed wins** (blueprint-owned change, as before) |
 | non-empty | empty value (`null`, `""`, empty array, record with only empty members) | **existing kept**, reported |
-| non-empty | attribute omitted | **existing kept**, reported |
+| non-empty | attribute omitted, attribute has no CK default | **existing kept**, reported (`SeedOmitted`) |
+| non-empty, equals the CK default | attribute omitted, attribute has a CK default | seed (the default lands again), **no finding** (AB#6395) |
+| non-empty, differs from the CK default | attribute omitted, attribute has a CK default | **existing kept**, reported as `ResetToDefault` (AB#6395) |
 | non-empty JSON text | JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported (an "empty skeleton" such as the EDA adapter configuration of AB#6310) |
 
 "Empty" is narrow on purpose: numbers, booleans, enums, dates and time spans are never empty, so an
@@ -475,8 +477,16 @@ the tenant's value. They are only kept when the seed omits the attribute altoget
 kept or replaced as one unit. For JSON text, properties the seed does not mention and numbers or
 booleans are never judged; only a string leaf that the seed empties counts.
 
+An attribute with a CK default is never blank once the seed omits it: the import writes the default
+again (the whole collection for `StringArray` / `IntArray`, the first entry otherwise). An enum such
+as `NavigationFilterMode` (default `0`) at its default therefore causes no finding at all; off its
+default the update would reset it, which is reported as `ResetToDefault` rather than as blanking.
+A seed that declares the attribute as `null` or empty is still `SeedEmpty`, because a declared null
+is written as null and the default does not apply.
+
 Every kept (or, under policy `Allow`, applied) case is logged as a warning and listed in
-`IImportRtModelCommand.GuardEntries` (rtId, CK type, attribute, reason `SeedEmpty` / `SeedOmitted`,
+`IImportRtModelCommand.GuardEntries` (rtId, CK type, attribute, reason `SeedEmpty` / `SeedOmitted` /
+`ResetToDefault`,
 applied or kept). The default policy is `RtImportBlankingPolicy.Keep`; `Allow` exists only for an
 explicit operator confirmation.
 
@@ -494,9 +504,11 @@ what the preview announces is exactly what the apply keeps.
 
 - `BlueprintUpdatePreview.BlankedAttributes` lists, for every locked entity the update would touch,
   each attribute whose non-empty tenant value the seed would blank: `rtId`, `ckTypeId`,
-  `attributeName`, `reason` (`SeedEmpty` / `SeedOmitted`), `currentSummary`, `incomingSummary`
-  (kind and size only, e.g. `string (223 chars)`, `empty string`, `omitted`; never the value, which
-  may be a credential) and `appliedOnUpdate` (always `false` in a preview).
+  `attributeName`, `reason` (`SeedEmpty` / `SeedOmitted` / `ResetToDefault`), `currentSummary`,
+  `incomingSummary` (kind and size only, e.g. `string (223 chars)`, `empty string`, `omitted`; never
+  the value, which may be a credential. For `ResetToDefault` the incoming summary names the CK default,
+  e.g. `default (0)` with current `int32`: model content, not tenant data). `reason` is an open set;
+  clients must tolerate values they do not know and `appliedOnUpdate` (always `false` in a preview).
 - `BlueprintUpdateOptions.AllowBlanking` (engine policy `Allow`) confirms every listed blanking;
   `BlueprintUpdateOptions.ConfirmedBlankings` (`[{ rtId, attributeName }]`) confirms exactly those
   entity/attribute pairs. Default: nothing is confirmed, the update proceeds and keeps the tenant

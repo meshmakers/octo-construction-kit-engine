@@ -370,7 +370,7 @@ dependency changed → Minor" is F2.4 (AB#5686).
 | --- | ------------------------------ | ----- |
 | D1 | Floor raised within the same major | Minor |
 | D2 | Floor lowered or range widened within the same major | Minor |
-| D3 | Upper bound narrowed within the same major | Minor |
+| D3 | Upper bound narrowed within the same major | Minor, with a behavioural note (tenants with an excluded newer version cannot import the release) — **Major when the new range or floor excludes the version the previous release resolved** (AB#6340: a tenant that installed the previous release with it would need a dependency downgrade); a resolved dependency version that goes down on a range-retaining model is Major for the same reason (exact pins keep the v1 rule) |
 | D4 | Range or floor moves to another major | Major |
 | D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
 | D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6) |

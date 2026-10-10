@@ -130,14 +130,14 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Patch, "purely documentational change"),
 
             // ── Dependencies ────────────────────────────────────────────────────────────────
-            { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change),
+            { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change, current),
 
             // ── CK v2 range retention (AB#6271, rows D1–D6) ─────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "rangeRetention" } =>
                 (CkSemVerLevel.Minor,
                     "dependency pinning switched between exact pins and range retention — the one-time re-pin (F2.6); " +
                     "the resolved dependencies are still compared"),
-            { ElementKind: CkModelElementKind.DependencyRange } => ClassifyDependencyRangeChange(change),
+            { ElementKind: CkModelElementKind.DependencyRange } => ClassifyDependencyRangeChange(change, baseline, current),
 
             // ── CK v2 (AB#5584) ──────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "ckLanguage" } =>
@@ -670,8 +670,20 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     /// <summary>
     ///     AB#6271 rows D1–D5: declared ranges and floors of a range-retaining model.
     /// </summary>
-    private static (CkSemVerLevel, string) ClassifyDependencyRangeChange(CkModelChange change)
+    private static (CkSemVerLevel, string) ClassifyDependencyRangeChange(CkModelChange change,
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
+        // AB#6340 (gate medium finding): a range or floor that excludes the version the previous release resolved
+        // cannot be imported by a tenant that installed the previous release with that version (it would need a
+        // dependency downgrade).
+        if (change is { ChangeKind: CkModelChangeKind.Modified, Property: "range" or "floor" } &&
+            ExcludedBaselineVersion(change.ElementId, baseline, current) is { } excluded)
+        {
+            return (CkSemVerLevel.Major,
+                $"dependency range excludes the version the previous release resolved ({excluded}) — tenants that " +
+                "installed it cannot import this release (row D3)");
+        }
+
         switch (change.ChangeKind)
         {
             case CkModelChangeKind.Added:
@@ -683,7 +695,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 var newMajor = RangeMajor(change.NewValue);
                 return oldMajor == null || newMajor == null || oldMajor != newMajor
                     ? (CkSemVerLevel.Major, "dependency range moved to another major version — transitively breaking (row D4)")
-                    : (CkSemVerLevel.Minor, "dependency range changed within the same major (row D2/D3)");
+                    : IsUpperBoundNarrowed(change.OldValue, change.NewValue)
+                        ? (CkSemVerLevel.Minor,
+                            "dependency range narrowed within the same major; it still includes the version the previous " +
+                            "release resolved — tenants with an excluded (newer) version installed cannot import this " +
+                            "release (row D3)")
+                        : (CkSemVerLevel.Minor, "dependency range changed within the same major (row D2/D3)");
             case CkModelChangeKind.Modified when change.Property == "floor":
                 var oldFloor = ParseVersion(change.OldValue);
                 var newFloor = ParseVersion(change.NewValue);
@@ -698,6 +715,52 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             default:
                 return (CkSemVerLevel.Major,
                     DefensiveDefaultReasonPrefix + "dependency range change — defensively classified as major");
+        }
+    }
+
+    /// <summary>
+    ///     The dependency version the baseline resolved (exact closure) when the current effective range (range raised
+    ///     to the floor) of that dependency no longer admits it; otherwise null.
+    /// </summary>
+    private static string? ExcludedBaselineVersion(string dependencyName, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        var resolved = baseline.Dependencies?.FirstOrDefault(d =>
+            string.Equals(d.Name, dependencyName, StringComparison.Ordinal) && !d.IsMajorQualified);
+        var range = current.DependencyRanges?.FirstOrDefault(r =>
+            string.Equals(r.Range.Name, dependencyName, StringComparison.Ordinal));
+        var baselineRange = baseline.DependencyRanges?.FirstOrDefault(r =>
+            string.Equals(r.Range.Name, dependencyName, StringComparison.Ordinal));
+        if (resolved == null || range == null || baselineRange == null)
+        {
+            return null;
+        }
+
+        try
+        {
+            // Only a version the previous release really admitted counts (its own range included it).
+            return baselineRange.GetEffectiveRange().IsSatisfiedBy(resolved) &&
+                   !range.GetEffectiveRange().IsSatisfiedBy(resolved)
+                ? resolved.Version.ToString()
+                : null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsUpperBoundNarrowed(string? oldRange, string? newRange)
+    {
+        try
+        {
+            var oldMax = oldRange is { Length: > 0 } ? new CkVersionRange(oldRange).MaxVersion : null;
+            var newMax = newRange is { Length: > 0 } ? new CkVersionRange(newRange).MaxVersion : null;
+            return newMax != null && (oldMax == null || newMax.Value.CompareTo(oldMax.Value) < 0);
+        }
+        catch (ArgumentException)
+        {
+            return false;
         }
     }
 
@@ -735,8 +798,20 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         }
     }
 
-    private static (CkSemVerLevel, string) ClassifyDependencyChange(CkModelChange change)
+    private static (CkSemVerLevel, string) ClassifyDependencyChange(CkModelChange change, CkCompiledModelRoot current)
     {
+        // AB#6340: on a range-retaining model a resolved dependency version that goes DOWN cannot be imported by a
+        // tenant holding the previous resolution (exact pins keep their v1 classification).
+        if (current.IsRangeRetaining && change is { ChangeKind: CkModelChangeKind.Modified, Property: "version" } &&
+            change.OldValue != null && change.NewValue != null &&
+            new CkVersion(change.NewValue).CompareTo(new CkVersion(change.OldValue)) < 0)
+        {
+            return (CkSemVerLevel.Major,
+                $"resolved dependency version went down ({change.OldValue} -> {change.NewValue}) — tenants that installed " +
+                "the previous release with it cannot import this release (row D3)");
+        }
+
+
         switch (change.ChangeKind)
         {
             case CkModelChangeKind.Added:
@@ -879,6 +954,9 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             // access widened), so reviewers see it; the level is unchanged.
             { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
                 Property: "roles" or "scopes" or "allowSelf" or "authorization" } => classified.Level == CkSemVerLevel.Minor,
+            // AB#6340: a narrowed range that still admits the previous resolution excludes newer installed versions.
+            { ElementKind: CkModelElementKind.DependencyRange, Property: "range" } =>
+                classified.Level == CkSemVerLevel.Minor && classified.Reason.Contains("cannot import"),
             { ElementKind: CkModelElementKind.TypeIndex, ChangeKind: CkModelChangeKind.Removed } => true,
             { ElementKind: CkModelElementKind.TypeIndex } => !IsUniqueIndex(change.NewValue),
             _ => false

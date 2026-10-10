@@ -1,3 +1,4 @@
+using Meshmakers.Octo.ConstructionKit.Contracts;
 using Meshmakers.Octo.ConstructionKit.Contracts.DataTransferObjects;
 using Meshmakers.Octo.ConstructionKit.Contracts.SemVer;
 using Meshmakers.Octo.ConstructionKit.Engine.SemVer;
@@ -41,6 +42,53 @@ public class DependencyRangeRowTests
 
         Assert.Equal("range", change.Change.Property);
         Assert.Equal(CkSemVerLevel.Minor, change.Level);
+    }
+
+    private static CkCompiledModelRoot ResolvedAt(string version, string range = "[2.4,3.0)", string floor = "2.4.0")
+    {
+        var model = RangeRetaining(range, floor);
+        model.Dependencies = [new CkModelId($"Base-{version}")];
+        return model;
+    }
+
+    [Fact]
+    public void D3_RangeExcludingThePreviousResolution_IsMajor()
+    {
+        // AB#6340 (gate case 5g): the previous release resolved Base 2.6.0; [2.4,2.5) excludes it, so a tenant that
+        // installed the previous release with 2.6.0 cannot import this minor (it would need a downgrade).
+        var classified = Classify(ResolvedAt("2.6.0"), ResolvedAt("2.4.0", "[2.4,2.5)"));
+        Assert.Contains(classified, c => c.Change.Property == "range" && c.Level == CkSemVerLevel.Major &&
+                                         c.Reason.Contains("(2.6.0)"));
+        Assert.Equal(CkSemVerLevel.Major, classified.Max(c => c.Level));
+
+        // A raised floor above the previous resolution is the same case.
+        Assert.Equal(CkSemVerLevel.Major, Level(ResolvedAt("2.6.0"), ResolvedAt("2.7.0", floor: "2.7.0")));
+    }
+
+    [Fact]
+    public void D3_NarrowingThatStillIncludesThePreviousResolution_IsMinorWithANote()
+    {
+        var classified = Classify(ResolvedAt("2.6.0"), ResolvedAt("2.6.0", "[2.4,2.7)"));
+        var change = Assert.Single(classified);
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.True(change.IsBehavioural);
+        Assert.Contains("cannot import", change.Reason);
+    }
+
+    [Fact]
+    public void D3_ResolvedDependencyVersionWentDown_IsMajor()
+    {
+        // Range unchanged, but the closure resolved a lower version than the previous release.
+        var change = Assert.Single(Classify(ResolvedAt("2.6.0"), ResolvedAt("2.5.0")));
+        Assert.Equal(CkModelElementKind.Dependency, change.Change.ElementKind);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+
+        // Exact pins (no range retention) keep the v1 rule: Minor.
+        var v1Baseline = SemVerTestModels.CreateModel();
+        v1Baseline.Dependencies = [new CkModelId("Base-2.6.0")];
+        var v1Current = SemVerTestModels.CreateModel();
+        v1Current.Dependencies = [new CkModelId("Base-2.5.0")];
+        Assert.Equal(CkSemVerLevel.Minor, Level(v1Baseline, v1Current));
     }
 
     [Fact]

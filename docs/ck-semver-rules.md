@@ -162,14 +162,22 @@ the verdict line.
 
 `OCTO-CK203` / `OCTO-CK204` belong to the acknowledge mechanism (next section).
 
-### Known limitations of the compile gate
+### Accepted limitations of the compile gate
 
-- Deleting the local baseline (or building a case-different model name, which the remote catalogs treat as an unknown model) leaves a
-  `Local` gate without a baseline; the catalog gate of F2.3 is the guarantee.
-- CI is detected through `TF_BUILD` and `ContinuousIntegrationBuild` only; other CI systems pass `-p:OctoCkCompatibilityBaseline=Remote`.
-  A project file that sets the property to `Local` switches the Remote gate off, so pipelines should pass it as a global property.
-- A `ckLanguage` transition (1 to 2 or 2 to 1) is a change like any other (Minor / Major) and keeps the gate hard.
-- `ValidateCascade` exits non-zero when a model could not be loaded: an incomplete dry run is not a green one.
+Accepted by the platform owner on 2026-10-10; the guarantee is the catalog gate at publish time (F2.3, AB#6386), not the local build.
+
+1. **Deleting the local baseline** leaves a `Local` gate without a baseline (a model without a baseline is a first publication).
+2. **A downgrade below a local copy** is not detected in `Local` mode: local-catalog entries at or above the declared version
+   are never the baseline (AB#5434). `OCTO-CK201` needs a published baseline.
+3. **A model name that differs only in case** from a published one has no remote baseline (the remote lookup is case-sensitive,
+   the local file system is not).
+4. **CI detection** uses `TF_BUILD` and `ContinuousIntegrationBuild` only; other CI systems pass
+   `-p:OctoCkCompatibilityBaseline=Remote`. A project file that sets the property to `Local` switches the Remote gate off, so
+   pipelines should pass it as a global property.
+
+Not a limitation: a `ckLanguage` transition (1 to 2 or 2 to 1) is a change like any other (Minor / Major) and keeps the gate
+hard; `ValidateCascade` exits non-zero when a model could not be loaded, because an incomplete dry run is not a green one.
+The task itself is covered in CI by `CkCompileTaskTests` (the real `CkCompile` MSBuild task).
 
 ### Verdict line
 

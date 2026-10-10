@@ -13,12 +13,42 @@ public class InterfaceRowTests
     [Fact]
     public void I1_OptionalInterfaceAttributeAdded_IsMinor()
     {
+        // AB#6337: Minor only with an attribute definition no type of another model can already assign — new in this
+        // release (here) or internal in the baseline.
+        var current = Model();
+        current.Attributes!.Add(new CkAttributeDto { AttributeId = "Extra", ValueType = AttributeValueTypesDto.String });
+        Serialized(current).Attributes.Add(new CkInterfaceAttributeDto { CkAttributeId = $"{M}/Extra", AttributeName = "Extra", IsOptional = true });
+
+        var change = Assert.Single(Classify(Model(), current), c => c.Change.ElementKind == CkModelElementKind.InterfaceAttribute);
+        Assert.Equal(CkSemVerLevel.Minor, change.Level);
+        Assert.Contains("Serialized-1", change.Reason);
+        Assert.Equal(CkSemVerLevel.Minor, Level(Model(), current));
+
+        // Internal in the baseline (made public in this release): no other model can assign it yet.
+        var baseline = Model();
+        baseline.Attributes!.Add(new CkAttributeDto
+        {
+            AttributeId = "Extra", ValueType = AttributeValueTypesDto.String, Visibility = CkVisibilityDto.Internal
+        });
+        Assert.Equal(CkSemVerLevel.Minor, Level(baseline, current));
+    }
+
+    [Fact]
+    public void I1_OptionalInterfaceAttributeReusingAnExistingPublicDefinition_IsMajor()
+    {
+        // AB#6337 (gate finding H4, case X3): a type of another model may already assign the existing public
+        // definition — as Hidden (error 99) or under another name (I-3) — and the new member binds to it.
         var current = Model();
         Serialized(current).Attributes.Add(new CkInterfaceAttributeDto { CkAttributeId = $"{M}/WithDefault", AttributeName = "Extra", IsOptional = true });
 
         var change = Assert.Single(Classify(Model(), current));
-        Assert.Equal(CkSemVerLevel.Minor, change.Level);
-        Assert.Contains("Serialized-1", change.Reason);
+        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        Assert.Contains("new attribute definition", change.Reason);
+
+        // A definition of another model (e.g. System/Name) is always assignable by others.
+        current = Model();
+        Serialized(current).Attributes.Add(new CkInterfaceAttributeDto { CkAttributeId = "Base/Name", AttributeName = "Name", IsOptional = true });
+        Assert.Equal(CkSemVerLevel.Major, Level(Model(), current));
     }
 
     [Fact]

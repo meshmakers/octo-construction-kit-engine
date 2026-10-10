@@ -254,6 +254,51 @@ public class CkV2InterfaceValidationTests(ITestOutputHelper output) : CkV2Resolv
         ResolveExpectingNoMessages(Build(CkMethodKindDto.Instance));
     }
 
+    // ── AB#6337 (gate finding H4): why I1 depends on the member's attribute definition, and I2 does not ──
+
+    [Fact]
+    public void OptionalAttributeMember_BindsAnExistingAssignment_HiddenOrRenamedBreaksTheImplementor()
+    {
+        // An optional interface member binds by attribute id: a type that already assigns the definition as Hidden
+        // (99) or under another name (98, I-3) breaks when the member is added. That is why the classifier rates an
+        // optional member with a previously public definition Major (row I1).
+        CkCompiledModelRoot Build(CkTypeAttributeDto assignment)
+        {
+            var model = Model();
+            Add(model, new CkInterfaceDto
+            {
+                InterfaceId = "Labeled-1",
+                Attributes = [new() { CkAttributeId = $"{M}/Street", AttributeName = "Street", IsOptional = true }]
+            });
+            Type(model, "Tag").Implements = [$"{M}/Labeled-1"];
+            Type(model, "Tag").Attributes = [.. Type(model, "Tag").Attributes ?? [], assignment];
+            return model;
+        }
+
+        Assert.Single(ResolveExpectingOnly(Build(new CkTypeAttributeDto
+        {
+            CkAttributeId = $"{M}/Street", AttributeName = "Street", IsOptional = true, Access = CkAttributeAccessDto.Hidden
+        }), 99));
+        Assert.Single(ResolveExpectingOnly(Build(new CkTypeAttributeDto
+        {
+            CkAttributeId = $"{M}/Street", AttributeName = "Strasse", IsOptional = true
+        }), 98));
+    }
+
+    [Fact]
+    public void I2_OptionalAssociationMember_NeverBindsAnImplementorsAssociation()
+    {
+        // I2 stays Minor: an optional association member is not checked against implementors (rule 121 skips it), so
+        // an implementor that already uses the role with another target or multiplicity keeps compiling.
+        ResolveExpectingNoMessages(TagImplementing(
+            new CkInterfaceAssociationDto
+            {
+                CkRoleId = $"{M}/Owns", TargetCkTypeId = $"{M}/Principal", Multiplicity = MultiplicitiesDto.One,
+                IsOptional = true
+            },
+            new CkTypeAssociationDto { CkRoleId = $"{M}/Owns", TargetCkTypeId = $"{M}/Tag" }));
+    }
+
     // ── AB#6336 (gate finding H2): 122 compares only the invocation contract ─────────────
 
     private static CkMethodDto ContractMethod() => new()

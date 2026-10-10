@@ -972,7 +972,7 @@ with an "access/security" note, `ckLanguage` 1→2 Minor unless it flips the `de
 Public→Internal and `derivable` Any→Model Major, the reverse Minor, type association `targetCkInterfaceId` set or
 changed Major and cleared Minor) plus the F2.1 rule rows with one test each (`tests/ConstructionKit.Engine.Tests/SemVer/Rows/`):
 N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal elements and of members of internal
-owners at Minor), I1–I11 interfaces (AB#6267, optional members Minor, association members keyed by role with a `target`
+owners at Minor), I1–I12 interfaces (AB#6267, optional members Minor — an optional attribute member only with a new or previously internal definition of this model, AB#6337, association members keyed by role with a `target`
 property), M1–M14 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
 rendered `signature` stays as a level-None summary; AB#6338: M12 under default-deny — roles any-of, scopes all-of, an omitted block or empty roles admit administrators only, block add/remove is one change, looser changes are behavioural "security: method access widened"; AB#6336: I12 lifts every invocation-contract change of an interface method to Major), D1–D7 range retention (AB#6271, element kind `DependencyRange`,
 model property `rangeRetention`), T1–T7 / E1–E2 / R1–R2 / A1–A3 public types, stable bases, enums, records, attribute

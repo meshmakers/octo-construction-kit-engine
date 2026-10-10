@@ -160,7 +160,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Major, "implementing types and interface consumers break"),
             // AB#6267 rows I1–I7: interface members grow additively within the element version
             { ElementKind: CkModelElementKind.InterfaceAttribute or CkModelElementKind.InterfaceAssociation } =>
-                ClassifyInterfaceMemberChange(change, current),
+                ClassifyInterfaceMemberChange(change, baseline, current),
             // ── CK v2 interface completion (F1.1-S5) ────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Interface, Property: "deprecated" } =>
                 change.NewValue == "true"
@@ -363,7 +363,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     ///     AB#6267 rows I1–I7 for attribute and association members of an interface.
     /// </summary>
     private static (CkSemVerLevel, string) ClassifyInterfaceMemberChange(CkModelChange change,
-        CkCompiledModelRoot current)
+        CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
         var member = change.ElementKind == CkModelElementKind.InterfaceAttribute ? "attribute" : "association";
         var interfaceId = OwnerOf(change.ElementId);
@@ -373,6 +373,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             case CkModelChangeKind.Added:
                 return IsOptionalMember(change, current) switch
                 {
+                    true when ReusesAssignableDefinition(change, baseline, current) is { } definition =>
+                        (CkSemVerLevel.Major,
+                            $"optional attribute added to interface '{interfaceId}' reuses the attribute definition " +
+                            $"'{definition}' that types of other models may already assign (with access: Hidden or " +
+                            "another name the member breaks them, errors 99/I-3); give the member a new attribute " +
+                            $"definition or {publish} (row I1)"),
                     true => (CkSemVerLevel.Minor,
                         $"optional {member} added to interface '{interfaceId}' — implementors need not provide it (row I1/I2)"),
                     false => (CkSemVerLevel.Major,
@@ -400,6 +406,45 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 return (CkSemVerLevel.Major,
                     DefensiveDefaultReasonPrefix + "interface member change — defensively classified as major");
         }
+    }
+
+    /// <summary>
+    ///     AB#6337 (gate finding H4): an optional interface ATTRIBUTE member binds by attribute id to any assignment
+    ///     an implementor already has. It is safe only when no type of another model can already assign the
+    ///     definition: the definition is declared in this model AND is new in this release or was internal in the
+    ///     baseline. Returns the reused definition when that is not the case, otherwise null. Association members
+    ///     (I2) never bind an implementor's association: optional association members are not checked against
+    ///     implementors at all (rule 121 skips them).
+    /// </summary>
+    private static string? ReusesAssignableDefinition(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
+    {
+        if (change.ElementKind != CkModelElementKind.InterfaceAttribute)
+        {
+            return null;
+        }
+
+        var separator = change.ElementId.LastIndexOf('/');
+        var ckInterface = current.Interfaces?.FirstOrDefault(i =>
+            i.InterfaceId.FullName == change.ElementId.Substring(0, Math.Max(separator, 0)));
+        var attributeId = ckInterface?.Attributes
+            .FirstOrDefault(a => a.AttributeName == change.ElementId.Substring(separator + 1))?.CkAttributeId;
+        if (attributeId == null)
+        {
+            return null;
+        }
+
+        if (!string.Equals(attributeId.ModelId.Name, current.ModelId.Name, StringComparison.Ordinal))
+        {
+            return attributeId.FullName;
+        }
+
+        var inBaseline = baseline.Attributes?.FirstOrDefault(a =>
+            a.AttributeId.FullName == attributeId.ElementId.FullName);
+        return inBaseline != null &&
+               CkModifiers.ResolveVisibility(inBaseline.Visibility) == CkVisibilityDto.Public
+            ? attributeId.ElementId.FullName
+            : null;
     }
 
     /// <summary>

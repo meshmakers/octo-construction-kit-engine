@@ -278,8 +278,8 @@ keyed by their role, so a changed target is one change (`target`), not remove + 
 
 | Row | Change | Level |
 | --- | ------ | ----- |
-| I1 | Optional interface attribute added | Minor |
-| I2 | Optional interface association added | Minor |
+| I1 | Optional interface attribute added | Minor when its attribute definition is declared in this model **and** is new in this release or was internal in the baseline; otherwise Major (AB#6337): a type of another model may already assign the existing definition — as `Hidden` (error 99) or under another name (I-3) — and the member binds to it. Remedy: a new attribute definition for the member, or a new interface version |
+| I2 | Optional interface association added | Minor (optional association members are never checked against implementors, rule 121, so they cannot collide) |
 | I3 | Required attribute or association added | Major |
 | I4 | Member removed or renamed (remove + add) | Major |
 | I5 | Member's attribute id changed (value type, record or enum change of the member) | Major |

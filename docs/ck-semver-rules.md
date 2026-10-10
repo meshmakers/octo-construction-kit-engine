@@ -167,14 +167,14 @@ surface in the dependency diff.
 | Dependency removed | Consumers may rely on the transitively provided model (defensive) |
 | Dependency switched to a new **major** version | Transitively breaking |
 | CK v2: interface **removed** | Implementing types and interface consumers break |
-| CK v2: interface member added, removed or changed (`id`, `isOptional`) | The contract changed — publish a new interface version (`Named-2`) instead |
+| CK v2: interface member removed, required member added, member `id` changed, member made required | The contract changed — publish a new interface version (`Named-2`) instead (rows I3–I7) |
 | CK v2: `implements` entry removed from a type | Consumers querying the type through the interface break |
 | CK v2: interface `extends` entry added or removed | The inherited members change the contract — publish a new interface version instead |
-| CK v2: interface association member added, removed or changed (`multiplicity`, `isOptional`) | The contract changed — publish a new interface version instead |
-| CK v2: interface method added, removed or its signature changed | The contract changed — publish a new interface version instead |
+| CK v2: interface association member removed, required one added, `target` or `multiplicity` changed, made required | The contract changed — publish a new interface version instead (rows I3–I7) |
+| CK v2: interface method added or removed | The contract changed — publish a new interface version instead (rows I11, M1); field changes follow rows M2–M14 |
 | CK v2: type association `targetCkInterfaceId` set or changed | The allowed targets narrow — existing associations may become invalid |
 | CK v2: method **removed** | Callers of the method break |
-| CK v2: method signature changed (kind, parameters, result, errors, authorization, execution) | Callers break — publish a new method version (`ChangePassword-2`) instead |
+| CK v2: breaking method field change (rows M3–M10, M12) | Callers break — publish a new method version (`ChangePassword-2`) instead |
 | CK v2: `ckLanguage` lowered (`2 → 1`) | CK v2 elements may disappear (defensive) |
 | CK v2: `visibility` `Public → Internal` (type, record, enum, attribute, association role, interface, method; resolved value, omitted = `Public`) | Other models referencing the element break |
 | CK v2: `derivable` `Any → Model` (type, record; resolved value) | Other models deriving from the element break |
@@ -219,10 +219,85 @@ surface in the dependency diff.
 
 | Change | Reasoning |
 | ------ | --------- |
-| `description` (all element kinds, model meta — including CK v2 interfaces and type/interface methods) and method `documentation` (parameter and error descriptions; not part of the method signature, review L16) | Purely documentational |
+| `description` (all element kinds, model meta — including CK v2 interfaces, type/interface methods, method parameters and error codes, row M14) | Purely documentational |
 | `displayNameRule` / `displayDescriptionRule` changed on a type | Computed display values change only, no data/schema break |
 | Pure formatting/comment changes in the source YAMLs | Compiled model identical → empty diff → no bump required |
 | `isRuntimeState: true` rewritten as `ownership: RuntimeState` (or `false` as `SeedOwned`) | Same resolved ownership → empty diff → **no bump required**. Both markers are compared on their resolved value, so migrating a declaration to the enum costs nothing; only a genuine change of owner does. |
+
+### CK v2 rule rows (F2.1)
+
+Every row has an id and a test named after it (`N1_…` in `tests/ConstructionKit.Engine.Tests/SemVer/Rows/`); the
+classification guard checks both directions. Rows apply to `ckLanguage: 2` elements (interfaces, methods, visibility,
+range retention); no level of a v1 rule changes. Rows T, E, R, A (AB#6269) and B (AB#6270) follow.
+
+**Internal elements (AB#6266).** Other models can never reference an internal element, so it is not part of the
+compatibility surface. A change counts as internal when the element — itself or through its owner (type, record,
+association role, enum, interface, method) — is `internal` in every version in which it exists.
+
+| Row | Change | Level |
+| --- | ------ | ----- |
+| N1 | Add, remove or modify an element that is internal in the baseline and in the current version (type, record, enum, attribute, association role, interface, method) | at most Minor (description-only stays Patch), reason "internal element, not part of the compatibility surface" |
+| N2 | Any change to a member of an internal owner (type/record/role attribute, type association, index, implemented interface, interface member, method parameter or error) | at most Minor |
+| N3 | Element removed that was public in the baseline | Major (unchanged) |
+| N4 | `visibility` public → internal / internal → public | Major / Minor |
+| N5 | Element made public and changed in the same release | classified by the public rules (no loophole) |
+
+Minor rather than none: a same-version re-import is short-circuited, so a structural change still needs a bump to reach
+tenants.
+
+**Interfaces (AB#6267).** An interface `X-n` grows by optional members; every change that breaks implementors or
+consumers is Major and the reason recommends publishing `X-(n+1)` (e.g. `Named-2`) next to `X-n`. Association members are
+keyed by their role, so a changed target is one change (`target`), not remove + add.
+
+| Row | Change | Level |
+| --- | ------ | ----- |
+| I1 | Optional interface attribute added | Minor |
+| I2 | Optional interface association added | Minor |
+| I3 | Required attribute or association added | Major |
+| I4 | Member removed or renamed (remove + add) | Major |
+| I5 | Member's attribute id changed (value type, record or enum change of the member) | Major |
+| I6 | Association `multiplicity` or `target` changed | Major |
+| I7 | Member `isOptional` true → false / false → true | Major / Minor |
+| I8 | `extends` entry added or removed | Major |
+| I9 | `deprecated` set or withdrawn | Minor |
+| I10 | Interface added / removed | Minor / Major |
+| I11 | Method added to an interface | Major (an optional interface method does not exist yet) |
+
+**Methods (AB#6268).** Type methods and interface methods follow the same rows. The diff emits one change per method
+field; parameters (`Method parameter '<owner>/<method>/<name>'`) and error codes (`Method error '<owner>/<method>/<code>'`)
+are members of their own. The rendered `signature` is still reported as a readable before/after summary with level
+`None`; the level comes from the field changes. A change of several fields takes the highest level.
+
+| Row | Change | Level |
+| --- | ------ | ----- |
+| M1 | Method added to a public type / removed | Minor / Major (on an interface the addition is row I11) |
+| M2 | Optional parameter added | Minor |
+| M3 | Required parameter added; parameter removed or renamed | Major |
+| M4 | Parameter value type, record id or enum id changed | Major |
+| M5 | Parameter optional → required / required → optional | Major / Minor |
+| M6 | Result changed (none ↔ value, other type, record or enum) | Major; widening a result record by an optional attribute is a record change |
+| M7 | Error code removed | Major |
+| M8 | Error code added | Major (Minor needs `errors: open`, which does not exist yet) |
+| M9 | `kind` static ↔ instance | Major |
+| M10 | `idempotent` true → false / false → true | Major / Minor |
+| M11 | `timeoutSeconds` changed | Minor (behavioural) |
+| M12 | Authorization stricter (role or scope removed, `allowSelf` true → false, authorization added) / looser | Major / Minor; mixed → Major. Assumption until the method gateway exists (Phase 3): roles and scopes are any-of |
+| M13 | Parameter `sensitive` changed | Minor |
+| M14 | Description of the method, a parameter or an error | Patch |
+
+**Range retention (AB#6271).** For a range-retaining model the declared ranges are compared by dependency name
+(`Dependency range '<name>'`). The exact closure (`dependencies`) is still diffed as before; removing the rule "resolved
+dependency changed → Minor" is F2.4 (AB#5686).
+
+| Row | Change (range-retaining model) | Level |
+| --- | ------------------------------ | ----- |
+| D1 | Floor raised within the same major | Minor |
+| D2 | Floor lowered or range widened within the same major | Minor |
+| D3 | Upper bound narrowed within the same major | Minor |
+| D4 | Range or floor moves to another major | Major |
+| D5 | Range dependency added / removed | Minor / Major (as for exact pins) |
+| D6 | Model switches from exact pins to range retention, or back (`rangeRetention`) | Minor, reason points to the one-time re-pin (F2.6) |
+| D7 | `usedSurface` changed | not classified on its own (derived from the model's own changes); documented exclusion once it exists (AB#4472) |
 
 ### Defensive default
 
@@ -256,16 +331,7 @@ rule to `CkSemVerClassifier`, and add the rule row to this page with a row test.
 part of the compatibility surface, add it to `ExcludedProperties` with the reason instead.
 
 **Known gaps.** Open items live in one place, `KnownGaps` in the guard test, each with the story that closes it:
-the CK v2 rule rows N1–N5 (AB#6266), I1–I11 (AB#6267), M1–M14 (AB#6268), T1–T7, E1–E2, R1–R2, A1–A2 (AB#6269),
-B1–B4 (AB#6270), D1–D7 (AB#6271), and the range-retention exclusions `DependencyRanges`, `IsRangeRetaining` and
-the DTO `CkModelDependencyDto` (AB#6271). The list only shrinks — an entry that is no longer a gap fails the guard
-— and it must be empty when F2.1 closes (AB#6273).
-
-**Conscious exclusion — range retention (AB#5664 / AB#5905, behind `OctoCkRangeRetention`, default off).**
-`CkCompiledModelRoot.DependencyRanges` (declared range + floor per direct dependency) and the derived
-`IsRangeRetaining` are not diffed yet. Per CK v2 concept §4.3.1 only a *raised floor* or a *changed range*
-will count as a change; that rule is Phase 2 (F2.1, AB#6271) and the exclusion is a known gap of the
-classification guard. `Dependencies` keeps the exact closure and is still diffed as before.
+the rule rows T1–T7, E1–E2, R1–R2, A1–A2 (AB#6269) and B1–B4 (AB#6270). The list only shrinks — and it must be empty when F2.1 closes (AB#6273).
 
 ### Renames
 
@@ -305,7 +371,8 @@ command is fully read-only.
 - **Foreign attribute defaults:** whether a *required* attribute referencing an attribute
   definition of another model carries default values cannot be inspected — such additions are
   classified Major defensively.
-- **Dependency ranges are classified via their resolved versions.** The compiled baseline model
+- **Dependency ranges of exact-pinned (v1) models are classified via their resolved versions** (range-retaining models
+  are compared on their declared ranges, rows D1–D7). The compiled baseline model
   persists only the *resolved* dependency versions, not the declared ranges (and the compiled
   model schema is closed, so persisting ranges is a catalog-format evolution). A range edit that
   changes the resolved version is classified (major switch → Major, otherwise → Minor); a range

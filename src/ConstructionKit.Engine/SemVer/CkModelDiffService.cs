@@ -29,7 +29,9 @@ public class CkModelDiffService : ICkModelDiffService
     public static readonly IReadOnlyDictionary<Type, IReadOnlyCollection<string>> ComparedProperties =
         new Dictionary<Type, IReadOnlyCollection<string>>
         {
-            [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.Dependencies)],
+            [typeof(CkCompiledModelRoot)] = [nameof(CkCompiledModelRoot.Dependencies), nameof(CkCompiledModelRoot.DependencyRanges)],
+            // CK v2 range retention (AB#6271)
+            [typeof(CkModelDependencyDto)] = [nameof(CkModelDependencyDto.Range), nameof(CkModelDependencyDto.Floor)],
             [typeof(CkModelRootBase)] =
             [
                 nameof(CkModelRootBase.Types), nameof(CkModelRootBase.AssociationRoles), nameof(CkModelRootBase.Attributes),
@@ -152,14 +154,15 @@ public class CkModelDiffService : ICkModelDiffService
                 [nameof(CkCompiledModelRoot.Migrations)] =
                     "migrations always accompany a version bump by design; ValidateVersion reconciles them separately " +
                     "(migration check, OCTO-CK104)",
-                [nameof(CkCompiledModelRoot.DependencyRanges)] =
-                    "CK v2 range retention (AB#5664): the range/floor classification is F2.1 AB#6271 (known gap); " +
-                    "Dependencies keeps the exact closure and is still diffed",
                 [nameof(CkCompiledModelRoot.IsRangeRetaining)] =
-                    "computed from DependencyRanges (DependencyRanges != null); classified with it in F2.1 AB#6271 (known gap)",
+                    "computed from DependencyRanges (DependencyRanges != null); diffed as the model change 'rangeRetention' (AB#6271)",
                 [nameof(CkCompiledModelRoot.MinEngineVersion)] =
                     "derived by the compiler from ckLanguage, range retention and the dependencies' minEngineVersion " +
                     "(F1.1-S6); its causes are diffed"
+            },
+            [typeof(CkModelDependencyDto)] = new Dictionary<string, string>
+            {
+                [nameof(CkModelDependencyDto.FloorVersion)] = "computed view of Floor (not serialized)"
             },
             [typeof(CkModelPropertiesDto)] = new Dictionary<string, string>
             {
@@ -202,7 +205,7 @@ public class CkModelDiffService : ICkModelDiffService
         void Modified(CkModelElementKind kind, params string[] properties) =>
             shapes.AddRange(properties.Select(p => new CkModelChangeShape(kind, CkModelChangeKind.Modified, p)));
 
-        Modified(CkModelElementKind.Model, "description", "ckLanguage");
+        Modified(CkModelElementKind.Model, "description", "ckLanguage", "rangeRetention");
         Element(CkModelElementKind.Dependency, "version");
         Element(CkModelElementKind.Type, "derivedFromCkTypeId", "isFinal", "isAbstract", "isCollectionRoot",
             "enableChangeStreamPreAndPostImages", "description", "displayNameRule", "displayDescriptionRule",
@@ -220,7 +223,12 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.TypeAssociation, "targetCkAttributeIds", "targetCkInterfaceId");
         Element(CkModelElementKind.TypeIndex);
         Element(CkModelElementKind.TypeInterface);
-        Element(CkModelElementKind.TypeMethod, "description", "signature", "documentation", "visibility");
+        string[] methodProperties =
+        [
+            "description", "signature", "visibility", "kind", "result", "timeoutSeconds", "idempotent", "authorization",
+            "roles", "scopes", "allowSelf"
+        ];
+        Element(CkModelElementKind.TypeMethod, methodProperties);
         Element(CkModelElementKind.Attribute, "valueType", "valueCkRecordId", "valueCkEnumId", "defaultValues",
             "isRuntimeState", "ownership", "metaData", "description", "visibility");
         Element(CkModelElementKind.Enum, "useFlags", "isExtensible", "description", "visibility");
@@ -232,8 +240,12 @@ public class CkModelDiffService : ICkModelDiffService
         Element(CkModelElementKind.Interface, "description", "deprecated", "visibility");
         Element(CkModelElementKind.InterfaceAttribute, "id", "isOptional");
         Element(CkModelElementKind.InterfaceExtends);
-        Element(CkModelElementKind.InterfaceAssociation, "multiplicity", "isOptional");
-        Element(CkModelElementKind.InterfaceMethod, "description", "signature", "documentation", "visibility");
+        Element(CkModelElementKind.InterfaceAssociation, "target", "multiplicity", "isOptional");
+        Element(CkModelElementKind.InterfaceMethod, methodProperties);
+        Element(CkModelElementKind.MethodParameter, "valueType", "valueCkRecordId", "valueCkEnumId", "isOptional",
+            "sensitive", "description");
+        Element(CkModelElementKind.MethodError, "description");
+        Element(CkModelElementKind.DependencyRange, "range", "floor");
         return shapes;
     }
 
@@ -250,6 +262,7 @@ public class CkModelDiffService : ICkModelDiffService
             current.EffectiveCkLanguage.ToString(CultureInfo.InvariantCulture));
 
         DiffDependencies(changes, baseline.Dependencies, current.Dependencies);
+        DiffDependencyRanges(changes, baseline, current, modelName);
         DiffTypes(changes, baseline.Types, current.Types, modelName);
         DiffAttributes(changes, baseline.Attributes, current.Attributes, modelName);
         DiffEnums(changes, baseline.Enums, current.Enums);
@@ -314,6 +327,35 @@ public class CkModelDiffService : ICkModelDiffService
             (baseline.Interfaces ?? []).SelectMany(i => (i.Methods ?? []).Select(m => (Interface: i, Method: m))),
             (current.Interfaces ?? []).SelectMany(i => (i.Methods ?? []).Select(m => (Interface: i, Method: m))),
             x => $"{x.Interface.InterfaceId.FullName}/{x.Method.MethodId}", x => x.Method.Visibility);
+    }
+
+    /// <summary>
+    ///     CK v2 (AB#6271): declared ranges and floors of a range-retaining model. Switching between exact pins and
+    ///     range retention is one model-level <c>rangeRetention</c> change (the entries are not compared then); otherwise
+    ///     every declared range is compared by dependency name. The exact closure (<c>Dependencies</c>) is still diffed
+    ///     as before ("resolved dependency changed" stays a rule until F2.4).
+    /// </summary>
+    private static void DiffDependencyRanges(List<CkModelChange> changes, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current, string modelName)
+    {
+        AddModified(changes, CkModelElementKind.Model, modelName, "rangeRetention",
+            baseline.IsRangeRetaining, current.IsRangeRetaining);
+        if (!baseline.IsRangeRetaining || !current.IsRangeRetaining)
+        {
+            return;
+        }
+
+        DiffElements(changes, CkModelElementKind.DependencyRange, baseline.DependencyRanges, current.DependencyRanges,
+            d => d.Range.Name,
+            (rangeChanges, id, baselineRange, currentRange) =>
+            {
+                AddModified(rangeChanges, CkModelElementKind.DependencyRange, id, "range",
+                    baselineRange.Range.ModelVersionRange.ToString(), currentRange.Range.ModelVersionRange.ToString());
+                AddModified(rangeChanges, CkModelElementKind.DependencyRange, id, "floor",
+                    baselineRange.Floor, currentRange.Floor);
+            },
+            added => $"{added.Range.FullName}, floor {added.Floor}",
+            removed => $"{removed.Range.FullName}, floor {removed.Floor}");
     }
 
     private static void DiffDependencies(List<CkModelChange> changes, List<CkModelId>? baseline, List<CkModelId>? current)
@@ -405,8 +447,8 @@ public class CkModelDiffService : ICkModelDiffService
                         AddModified(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "isOptional",
                             baselineMember.IsOptional, currentMember.IsOptional);
                     },
-                    added => FormatReference(added.CkAttributeId, modelName),
-                    removed => FormatReference(removed.CkAttributeId, modelName));
+                    added => $"{FormatReference(added.CkAttributeId, modelName)}, {(added.IsOptional ? "optional" : "required")}",
+                    removed => $"{FormatReference(removed.CkAttributeId, modelName)}, {(removed.IsOptional ? "optional" : "required")}");
 
                 // F1.1-S5: deprecated flag, extends, association and method members.
                 AddModified(interfaceChanges, CkModelElementKind.Interface, id, "deprecated",
@@ -416,25 +458,37 @@ public class CkModelDiffService : ICkModelDiffService
                     currentInterface.Extends?.Select(i => FormatReference(i, modelName)!).Distinct().ToList(),
                     reference => $"{id}/{reference}", (_, _, _, _) => { });
 
+                // AB#6267 (row I6): an association member is keyed by its role, so a target change is one "target"
+                // modification instead of remove + add. When a role occurs twice in one interface (either version),
+                // the target stays part of the key for that interface.
+                string Target(CkInterfaceAssociationDto a) =>
+                    (FormatReference(a.TargetCkTypeId, modelName) ?? FormatReference(a.TargetCkInterfaceId, modelName))!;
+                var keyIncludesTarget = HasDuplicateRole(baselineInterface.Associations) ||
+                                        HasDuplicateRole(currentInterface.Associations);
+
                 string AssociationKey(CkInterfaceAssociationDto a) =>
-                    $"{id}/{FormatReference(a.CkRoleId, modelName)} -> " +
-                    (FormatReference(a.TargetCkTypeId, modelName) ?? FormatReference(a.TargetCkInterfaceId, modelName));
+                    $"{id}/{FormatReference(a.CkRoleId, modelName)}" + (keyIncludesTarget ? $" -> {Target(a)}" : "");
 
                 DiffElements(interfaceChanges, CkModelElementKind.InterfaceAssociation, baselineInterface.Associations,
                     currentInterface.Associations, AssociationKey,
                     (memberChanges, memberId, baselineMember, currentMember) =>
                     {
+                        AddModified(memberChanges, CkModelElementKind.InterfaceAssociation, memberId, "target",
+                            Target(baselineMember), Target(currentMember));
                         AddModified(memberChanges, CkModelElementKind.InterfaceAssociation, memberId, "multiplicity",
                             baselineMember.Multiplicity?.ToString(), currentMember.Multiplicity?.ToString());
                         AddModified(memberChanges, CkModelElementKind.InterfaceAssociation, memberId, "isOptional",
                             baselineMember.IsOptional, currentMember.IsOptional);
                     },
-                    added => FormatBool(added.IsOptional),
-                    removed => FormatBool(removed.IsOptional));
+                    added => $"{Target(added)}, {(added.IsOptional ? "optional" : "required")}",
+                    removed => $"{Target(removed)}, {(removed.IsOptional ? "optional" : "required")}");
                 DiffMethods(interfaceChanges, CkModelElementKind.InterfaceMethod, id, baselineInterface.Methods,
                     currentInterface.Methods, modelName);
             });
     }
+
+    private static bool HasDuplicateRole(List<CkInterfaceAssociationDto>? associations) =>
+        (associations ?? []).GroupBy(a => a.CkRoleId.FullName).Any(g => g.Count() > 1);
 
     /// <summary>
     ///     CK v2 (AB#5667): <c>implements</c> entries of a type, compared as a set of references.
@@ -457,7 +511,11 @@ public class CkModelDiffService : ICkModelDiffService
         DiffMethods(changes, CkModelElementKind.TypeMethod, typeId, baseline, current, modelName);
 
     /// <summary>
-    ///     Methods of a type or (F1.1-S5) an interface, keyed by method id.
+    ///     Methods of a type or (F1.1-S5) an interface, keyed by method id. AB#6268: one change per method field
+    ///     (kind, result, execution, authorization), parameters and error codes as members of their own
+    ///     (<see cref="CkModelElementKind.MethodParameter" />, <see cref="CkModelElementKind.MethodError" />); the
+    ///     rendered <c>signature</c> is still emitted as a readable before/after summary and classified
+    ///     <see cref="CkSemVerLevel.None" /> — the level comes from the field changes.
     /// </summary>
     private static void DiffMethods(List<CkModelChange> changes, CkModelElementKind kind, string ownerId,
         List<CkMethodDto>? baseline, List<CkMethodDto>? current, string modelName)
@@ -469,21 +527,72 @@ public class CkModelDiffService : ICkModelDiffService
                     baselineMethod.Description, currentMethod.Description);
                 AddModified(methodChanges, kind, id, "signature",
                     FormatMethod(baselineMethod, modelName), FormatMethod(currentMethod, modelName));
-                // Review L16: parameter and error descriptions are documentation, not part of the signature.
-                AddModified(methodChanges, kind, id, "documentation",
-                    FormatMethodDocumentation(baselineMethod), FormatMethodDocumentation(currentMethod));
+                AddModified(methodChanges, kind, id, "kind", baselineMethod.Kind.ToString(), currentMethod.Kind.ToString());
+                AddModified(methodChanges, kind, id, "result",
+                    FormatMethodResult(baselineMethod, modelName), FormatMethodResult(currentMethod, modelName));
+                AddModified(methodChanges, kind, id, "timeoutSeconds",
+                    FormatTimeout(baselineMethod), FormatTimeout(currentMethod));
+                AddModified(methodChanges, kind, id, "idempotent",
+                    baselineMethod.Execution?.Idempotent ?? false, currentMethod.Execution?.Idempotent ?? false);
+                AddModified(methodChanges, kind, id, "authorization",
+                    baselineMethod.Authorization == null ? "none" : "declared",
+                    currentMethod.Authorization == null ? "none" : "declared");
+                AddModified(methodChanges, kind, id, "roles",
+                    FormatNameSet(baselineMethod.Authorization?.Roles), FormatNameSet(currentMethod.Authorization?.Roles));
+                AddModified(methodChanges, kind, id, "scopes",
+                    FormatNameSet(baselineMethod.Authorization?.Scopes), FormatNameSet(currentMethod.Authorization?.Scopes));
+                AddModified(methodChanges, kind, id, "allowSelf",
+                    baselineMethod.Authorization?.AllowSelf ?? false, currentMethod.Authorization?.AllowSelf ?? false);
+
+                DiffElements(methodChanges, CkModelElementKind.MethodParameter, baselineMethod.Parameters,
+                    currentMethod.Parameters, p => $"{id}/{p.Name}",
+                    (parameterChanges, parameterId, baselineParameter, currentParameter) =>
+                    {
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueType",
+                            baselineParameter.ValueType.ToString(), currentParameter.ValueType.ToString());
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkRecordId",
+                            FormatReference(baselineParameter.ValueCkRecordId, modelName),
+                            FormatReference(currentParameter.ValueCkRecordId, modelName));
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkEnumId",
+                            FormatReference(baselineParameter.ValueCkEnumId, modelName),
+                            FormatReference(currentParameter.ValueCkEnumId, modelName));
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "isOptional",
+                            baselineParameter.IsOptional, currentParameter.IsOptional);
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "sensitive",
+                            baselineParameter.Sensitive, currentParameter.Sensitive);
+                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "description",
+                            baselineParameter.Description, currentParameter.Description);
+                    },
+                    added => FormatParameter(added, modelName),
+                    removed => FormatParameter(removed, modelName));
+
+                DiffElements(methodChanges, CkModelElementKind.MethodError, baselineMethod.Errors,
+                    currentMethod.Errors, e => $"{id}/{e.Code}",
+                    (errorChanges, errorId, baselineError, currentError) =>
+                        AddModified(errorChanges, CkModelElementKind.MethodError, errorId, "description",
+                            baselineError.Description, currentError.Description));
             });
     }
 
-    /// <summary>Parameter and error descriptions of a method (documentation only, review L16).</summary>
-    private static string FormatMethodDocumentation(CkMethodDto method)
-    {
-        var parameters = string.Join(", ", (method.Parameters ?? [])
-            .Where(p => p.Description != null).Select(p => $"{p.Name} \"{p.Description}\""));
-        var errors = string.Join(", ", (method.Errors ?? [])
-            .Where(e => e.Description != null).Select(e => $"{e.Code} \"{e.Description}\""));
-        return $"parameters [{parameters}]; errors [{errors}]";
-    }
+    private static string ValueTypeText(AttributeValueTypesDto valueType, CkId<CkRecordId>? recordId,
+        CkId<CkEnumId>? enumId, string modelName) =>
+        valueType + (recordId != null ? $"<{FormatReference(recordId, modelName)}>" : "") +
+        (enumId != null ? $"<{FormatReference(enumId, modelName)}>" : "");
+
+    private static string FormatParameter(CkMethodParameterDto parameter, string modelName) =>
+        $"{ValueTypeText(parameter.ValueType, parameter.ValueCkRecordId, parameter.ValueCkEnumId, modelName)}, " +
+        (parameter.IsOptional ? "optional" : "required") + (parameter.Sensitive ? ", sensitive" : "");
+
+    private static string FormatMethodResult(CkMethodDto method, string modelName) =>
+        method.Result == null
+            ? "none"
+            : ValueTypeText(method.Result.ValueType, method.Result.ValueCkRecordId, method.Result.ValueCkEnumId, modelName);
+
+    private static string FormatTimeout(CkMethodDto method) =>
+        (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds).ToString(CultureInfo.InvariantCulture);
+
+    private static string FormatNameSet(IEnumerable<string>? names) =>
+        string.Join(", ", (names ?? []).Distinct(StringComparer.Ordinal).OrderBy(n => n, StringComparer.Ordinal));
 
     internal static string FormatMethod(CkMethodDto method, string modelName)
     {

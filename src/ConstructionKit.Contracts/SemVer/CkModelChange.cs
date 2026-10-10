@@ -124,7 +124,25 @@ public enum CkModelElementKind
     /// <summary>
     ///     CK v2 (F1.1-S5): a method of an interface.
     /// </summary>
-    InterfaceMethod
+    InterfaceMethod,
+
+    /// <summary>
+    ///     CK v2 (AB#6268): a parameter of a type or interface method. Element id
+    ///     <c>&lt;owner&gt;/&lt;methodId&gt;/&lt;parameterName&gt;</c>.
+    /// </summary>
+    MethodParameter,
+
+    /// <summary>
+    ///     CK v2 (AB#6268): a declared error code of a type or interface method. Element id
+    ///     <c>&lt;owner&gt;/&lt;methodId&gt;/&lt;code&gt;</c>.
+    /// </summary>
+    MethodError,
+
+    /// <summary>
+    ///     CK v2 (AB#6271): a declared dependency range (range + floor) of a range-retaining model. Element id = the
+    ///     dependency model name.
+    /// </summary>
+    DependencyRange
 }
 
 /// <summary>

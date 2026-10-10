@@ -966,11 +966,15 @@ Docs generator: `Interfaces.md` per model (members incl. inherited ones, "Extend
 tables, "Deprecated" marker) plus an "Implements" line and a methods table per type (only when present);
 "Visibility: `Internal`" / "Derivable: `Model`" lines per element and an "(internal)" method marker, written only
 when the value differs from the v1 default, so v1 docs are unchanged.
-SemVer rules: `docs/ck-semver-rules.md` (additions Minor, removals and contract/signature changes Major, `access`
-changes Minor with an "access/security" note, `ckLanguage` 1→2 Minor unless it flips the `derivable` default,
-`visibility` Public→Internal and `derivable` Any→Model Major, the reverse Minor; interface `extends`, association
-and method members added/removed/changed Major, `deprecated` Minor, type association `targetCkInterfaceId` set or
-changed Major and cleared Minor).
+SemVer rules: `docs/ck-semver-rules.md`. Phase 1 base rules (additions Minor, removals Major, `access` changes Minor
+with an "access/security" note, `ckLanguage` 1→2 Minor unless it flips the `derivable` default, `visibility`
+Public→Internal and `derivable` Any→Model Major, the reverse Minor, type association `targetCkInterfaceId` set or
+changed Major and cleared Minor) plus the F2.1 rule rows with one test each (`tests/ConstructionKit.Engine.Tests/SemVer/Rows/`):
+N1–N5 internal elements (AB#6266, `CkVisibilityIndex` caps changes of internal elements and of members of internal
+owners at Minor), I1–I11 interfaces (AB#6267, optional members Minor, association members keyed by role with a `target`
+property), M1–M14 methods (AB#6268, one change per method field, element kinds `MethodParameter` / `MethodError`, the
+rendered `signature` stays as a level-None summary), D1–D7 range retention (AB#6271, element kind `DependencyRange`,
+model property `rangeRetention`). Rows T/E/R/A (AB#6269) and B (AB#6270) are known gaps of the classification guard.
 
 ### Touch-point checklist (keep for every new CK field — contract §2.7)
 

@@ -73,6 +73,9 @@ public static class CkModelChangeFormatter
             CkModelElementKind.InterfaceExtends => "Extended interface",
             CkModelElementKind.InterfaceAssociation => "Interface association",
             CkModelElementKind.InterfaceMethod => "Interface method",
+            CkModelElementKind.MethodParameter => "Method parameter",
+            CkModelElementKind.MethodError => "Method error",
+            CkModelElementKind.DependencyRange => "Dependency range",
             _ => elementKind.ToString()
         };
     }

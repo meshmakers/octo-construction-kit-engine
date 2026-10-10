@@ -198,18 +198,21 @@ public class CkV2SemVerTests
         Assert.Equal(CkSemVerLevel.Major, Level(current, CkV2TestModels.CreateModel()));
     }
 
+    // AB#6268: one change per method field (rows M2–M13) plus the readable signature summary (level None);
+    // until then a single "signature" change was Major for every field.
     [Theory]
-    [InlineData("parameterAdded")]
-    [InlineData("parameterType")]
-    [InlineData("parameterSensitive")]
-    [InlineData("result")]
-    [InlineData("errors")]
-    [InlineData("roles")]
-    [InlineData("allowSelf")]
-    [InlineData("kind")]
-    [InlineData("timeout")]
-    [InlineData("idempotent")]
-    public void MethodSignatureChanged_IsMajor(string modification)
+    [InlineData("parameterAdded", CkModelElementKind.MethodParameter, null, CkSemVerLevel.Minor)]
+    [InlineData("parameterType", CkModelElementKind.MethodParameter, "valueType", CkSemVerLevel.Major)]
+    [InlineData("parameterSensitive", CkModelElementKind.MethodParameter, "sensitive", CkSemVerLevel.Minor)]
+    [InlineData("result", CkModelElementKind.TypeMethod, "result", CkSemVerLevel.Major)]
+    [InlineData("errors", CkModelElementKind.MethodError, null, CkSemVerLevel.Major)]
+    [InlineData("roles", CkModelElementKind.TypeMethod, "roles", CkSemVerLevel.Major)]
+    [InlineData("allowSelf", CkModelElementKind.TypeMethod, "allowSelf", CkSemVerLevel.Major)]
+    [InlineData("kind", CkModelElementKind.TypeMethod, "kind", CkSemVerLevel.Major)]
+    [InlineData("timeout", CkModelElementKind.TypeMethod, "timeoutSeconds", CkSemVerLevel.Minor)]
+    [InlineData("idempotent", CkModelElementKind.TypeMethod, "idempotent", CkSemVerLevel.Major)]
+    public void MethodFieldChanged_IsClassifiedPerField(string modification, CkModelElementKind expectedKind,
+        string? expectedProperty, CkSemVerLevel expectedLevel)
     {
         var current = CkV2TestModels.CreateModel();
         var method = SemVerTestModels.GetMachine(current).Methods![0];
@@ -247,13 +250,16 @@ public class CkV2SemVerTests
                 break;
         }
 
-        var change = Assert.Single(Classify(CkV2TestModels.CreateModel(), current));
-        Assert.Equal(CkModelElementKind.TypeMethod, change.Change.ElementKind);
-        Assert.Equal("signature", change.Change.Property);
-        Assert.Equal(CkSemVerLevel.Major, change.Level);
+        var classified = Classify(CkV2TestModels.CreateModel(), current);
+        var summary = Assert.Single(classified, c => c.Change.Property == "signature");
+        Assert.Equal(CkSemVerLevel.None, summary.Level);
+        var change = Assert.Single(classified, c => c.Change.Property != "signature");
+        Assert.Equal(expectedKind, change.Change.ElementKind);
+        Assert.Equal(expectedProperty, change.Change.Property);
+        Assert.Equal(expectedLevel, change.Level);
     }
 
-    // Review L16: documentation of parameters and errors is not part of the signature.
+    // Review L16: documentation of parameters and errors is not part of the signature (AB#6268: row M14).
     [Theory]
     [InlineData("parameter")]
     [InlineData("error")]
@@ -271,7 +277,9 @@ public class CkV2SemVerTests
         }
 
         var change = Assert.Single(Classify(CkV2TestModels.CreateModel(), current));
-        Assert.Equal("documentation", change.Change.Property);
+        Assert.Equal(what == "parameter" ? CkModelElementKind.MethodParameter : CkModelElementKind.MethodError,
+            change.Change.ElementKind);
+        Assert.Equal("description", change.Change.Property);
         Assert.Equal(CkSemVerLevel.Patch, change.Level);
     }
 
@@ -361,11 +369,11 @@ public class CkV2SemVerTests
     }
 
     [Theory]
+    // AB#6267: an optional association added (row I2) and an association made optional (row I7) are Minor now;
+    // they moved to InterfaceRowTests.
     [InlineData("extends added")]
-    [InlineData("association added")]
     [InlineData("association removed")]
     [InlineData("association multiplicity")]
-    [InlineData("association isOptional")]
     [InlineData("method added")]
     [InlineData("method removed")]
     [InlineData("method signature")]
@@ -378,21 +386,11 @@ public class CkV2SemVerTests
             case "extends added":
                 serialized.Extends = [$"{CkV2TestModels.ModelName}/Base-1"];
                 break;
-            case "association added":
-                serialized.Associations!.Add(new CkInterfaceAssociationDto
-                {
-                    CkRoleId = $"{CkV2TestModels.ModelName}/Parent", TargetCkInterfaceId = $"{CkV2TestModels.ModelName}/Base-1",
-                    IsOptional = true
-                });
-                break;
             case "association removed":
                 serialized.Associations = null;
                 break;
             case "association multiplicity":
                 serialized.Associations![0].Multiplicity = MultiplicitiesDto.N;
-                break;
-            case "association isOptional":
-                serialized.Associations![0].IsOptional = true;
                 break;
             case "method added":
                 serialized.Methods!.Add(new CkMethodDto { MethodId = "Reset-1" });
@@ -408,7 +406,8 @@ public class CkV2SemVerTests
         var classified = Classify(WithCompletedInterface(), current);
 
         Assert.NotEmpty(classified);
-        Assert.All(classified, c => Assert.Equal(CkSemVerLevel.Major, c.Level));
+        // AB#6268: the method signature summary is reported with level None next to the field changes.
+        Assert.All(classified.Where(c => c.Change.Property != "signature"), c => Assert.Equal(CkSemVerLevel.Major, c.Level));
         Assert.All(classified, c => Assert.Contains(c.Change.ElementKind,
             new[] { CkModelElementKind.InterfaceExtends, CkModelElementKind.InterfaceAssociation, CkModelElementKind.InterfaceMethod }));
     }

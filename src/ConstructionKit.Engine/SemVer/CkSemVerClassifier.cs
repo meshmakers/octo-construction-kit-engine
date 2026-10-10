@@ -29,7 +29,12 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     public IReadOnlyList<CkClassifiedModelChange> Classify(IReadOnlyList<CkModelChange> changes,
         CkCompiledModelRoot baseline, CkCompiledModelRoot current)
     {
-        return changes.Select(change => ClassifyChange(change, current)).ToList();
+        // AB#6266: internal elements and members of internal owners are not part of the compatibility surface.
+        var baselineVisibility = new CkVisibilityIndex(baseline);
+        var currentVisibility = new CkVisibilityIndex(current);
+        return changes
+            .Select(change => CapInternal(ClassifyChange(change, baseline, current), baselineVisibility, currentVisibility))
+            .ToList();
     }
 
     /// <inheritdoc />
@@ -81,7 +86,41 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         int.TryParse(value, System.Globalization.NumberStyles.Integer,
             System.Globalization.CultureInfo.InvariantCulture, out var language) ? language : 1;
 
-    private static CkClassifiedModelChange ClassifyChange(CkModelChange change, CkCompiledModelRoot current)
+    /// <summary>
+    ///     Reason of every change capped by rows N1/N2 (AB#6266).
+    /// </summary>
+    internal const string InternalReason = "internal element, not part of the compatibility surface";
+
+    /// <summary>
+    ///     Rows N1/N2 (AB#6266): a change of an element that is internal — itself or through its owner — in every
+    ///     version where it exists is at most Minor (description-only stays Patch). Minor rather than None: a
+    ///     structural change still needs a bump to reach tenants (a same-version re-import is short-circuited).
+    ///     Rows N3–N5 follow from "every version": an element public in the baseline (removed, made internal) or made
+    ///     public in this release is classified by the public rules.
+    /// </summary>
+    private static CkClassifiedModelChange CapInternal(CkClassifiedModelChange classified, CkVisibilityIndex baseline,
+        CkVisibilityIndex current)
+    {
+        var change = classified.Change;
+        var inBaseline = baseline.IsInternal(change.ElementKind, change.ElementId);
+        var inCurrent = current.IsInternal(change.ElementKind, change.ElementId);
+        var isInternal = change.ChangeKind switch
+        {
+            CkModelChangeKind.Added => inCurrent == true && inBaseline != false,
+            CkModelChangeKind.Removed => inBaseline == true && inCurrent != false,
+            _ => inBaseline == true && inCurrent == true
+        };
+        if (!isInternal || classified.Level == CkSemVerLevel.None)
+        {
+            return classified;
+        }
+
+        var level = classified.Level > CkSemVerLevel.Minor ? CkSemVerLevel.Minor : classified.Level;
+        return classified with { Level = level, Reason = $"{InternalReason} (public rule: {classified.Reason})" };
+    }
+
+    private static CkClassifiedModelChange ClassifyChange(CkModelChange change, CkCompiledModelRoot baseline,
+        CkCompiledModelRoot current)
     {
         var result = change switch
         {
@@ -91,6 +130,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
 
             // ── Dependencies ────────────────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Dependency } => ClassifyDependencyChange(change),
+
+            // ── CK v2 range retention (AB#6271, rows D1–D6) ─────────────────────────────────
+            { ElementKind: CkModelElementKind.Model, Property: "rangeRetention" } =>
+                (CkSemVerLevel.Minor,
+                    "dependency pinning switched between exact pins and range retention — the one-time re-pin (F2.6); " +
+                    "the resolved dependencies are still compared"),
+            { ElementKind: CkModelElementKind.DependencyRange } => ClassifyDependencyRangeChange(change),
 
             // ── CK v2 (AB#5584) ──────────────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Model, Property: "ckLanguage" } =>
@@ -111,19 +157,35 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "purely additive interface"),
             { ElementKind: CkModelElementKind.Interface, ChangeKind: CkModelChangeKind.Removed } =>
                 (CkSemVerLevel.Major, "implementing types and interface consumers break"),
-            { ElementKind: CkModelElementKind.InterfaceAttribute } =>
-                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
+            // AB#6267 rows I1–I7: interface members grow additively within the element version
+            { ElementKind: CkModelElementKind.InterfaceAttribute or CkModelElementKind.InterfaceAssociation } =>
+                ClassifyInterfaceMemberChange(change, current),
             // ── CK v2 interface completion (F1.1-S5) ────────────────────────────────────────────
             { ElementKind: CkModelElementKind.Interface, Property: "deprecated" } =>
                 change.NewValue == "true"
                     ? (CkSemVerLevel.Minor, "interface deprecated — dependents get a compile warning, nothing breaks")
                     : (CkSemVerLevel.Minor, "interface deprecation withdrawn"),
-            { ElementKind: CkModelElementKind.InterfaceExtends or CkModelElementKind.InterfaceAssociation } =>
-                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
-            { ElementKind: CkModelElementKind.InterfaceMethod, ChangeKind: CkModelChangeKind.Added or CkModelChangeKind.Removed } =>
-                (CkSemVerLevel.Major, "interface contract changed — publish a new interface version instead"),
-            { ElementKind: CkModelElementKind.InterfaceMethod, Property: "signature" } =>
-                (CkSemVerLevel.Major, "interface method signature changed — publish a new interface version instead"),
+            { ElementKind: CkModelElementKind.InterfaceExtends } =>
+                (CkSemVerLevel.Major,
+                    $"interface '{OwnerOf(change.ElementId)}' extends changed — implementors gain or lose required members; " +
+                    "publish a new interface version instead (row I8)"),
+            { ElementKind: CkModelElementKind.InterfaceMethod, ChangeKind: CkModelChangeKind.Added } =>
+                (CkSemVerLevel.Major,
+                    "interface method added — implementors must provide it; an optional interface method does not exist " +
+                    "yet, so publish a new interface version instead (row I11)"),
+            { ElementKind: CkModelElementKind.InterfaceMethod, ChangeKind: CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "interface method removed — callers through the interface break (row M1)"),
+            // ── CK v2 methods (AB#6268, rows M1–M14), type and interface methods alike ──────────
+            { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod, Property: "signature" } =>
+                (CkSemVerLevel.None, "signature summary — the level comes from the method field changes"),
+            { ElementKind: CkModelElementKind.TypeMethod or CkModelElementKind.InterfaceMethod,
+                ChangeKind: CkModelChangeKind.Modified } => ClassifyMethodChange(change),
+            { ElementKind: CkModelElementKind.MethodParameter } => ClassifyMethodParameterChange(change, current),
+            { ElementKind: CkModelElementKind.MethodError, ChangeKind: CkModelChangeKind.Removed } =>
+                (CkSemVerLevel.Major, "error code removed — callers handling it break (row M7)"),
+            { ElementKind: CkModelElementKind.MethodError, ChangeKind: CkModelChangeKind.Added } =>
+                (CkSemVerLevel.Major,
+                    "error code added — callers do not expect it; 'errors: open' does not exist yet (row M8)"),
             { ElementKind: CkModelElementKind.TypeAssociation, Property: "targetCkInterfaceId" } =>
                 change.NewValue == null
                     ? (CkSemVerLevel.Minor, "association target no longer narrowed to an interface")
@@ -136,8 +198,6 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 (CkSemVerLevel.Minor, "purely additive method"),
             { ElementKind: CkModelElementKind.TypeMethod, ChangeKind: CkModelChangeKind.Removed } =>
                 (CkSemVerLevel.Major, "callers of the removed method break"),
-            { ElementKind: CkModelElementKind.TypeMethod, Property: "signature" } =>
-                (CkSemVerLevel.Major, "method signature changed — publish a new method version instead"),
 
             // ── Element definitions: removal is always breaking, addition is additive ──────
             { ElementKind: CkModelElementKind.Type or CkModelElementKind.Attribute or CkModelElementKind.Enum
@@ -250,6 +310,244 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         };
 
         return new CkClassifiedModelChange { Change = change, Level = result.Item1, Reason = result.Item2 };
+    }
+
+    /// <summary>
+    ///     Owner part of a member element id (<c>&lt;owner&gt;/&lt;member&gt;</c>).
+    /// </summary>
+    private static string OwnerOf(string elementId)
+    {
+        var separator = elementId.IndexOf('/');
+        return separator < 0 ? elementId : elementId.Substring(0, separator);
+    }
+
+    /// <summary>
+    ///     AB#6267 rows I1–I7 for attribute and association members of an interface.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyInterfaceMemberChange(CkModelChange change,
+        CkCompiledModelRoot current)
+    {
+        var member = change.ElementKind == CkModelElementKind.InterfaceAttribute ? "attribute" : "association";
+        var interfaceId = OwnerOf(change.ElementId);
+        const string publish = "publish a new interface version (e.g. Named-2) instead";
+        switch (change.ChangeKind)
+        {
+            case CkModelChangeKind.Added:
+                return IsOptionalMember(change, current) switch
+                {
+                    true => (CkSemVerLevel.Minor,
+                        $"optional {member} added to interface '{interfaceId}' — implementors need not provide it (row I1/I2)"),
+                    false => (CkSemVerLevel.Major,
+                        $"required {member} added to interface '{interfaceId}' — every implementor must provide it; {publish} (row I3)"),
+                    null => (CkSemVerLevel.Major,
+                        $"{member} added to interface '{interfaceId}' could not be resolved — defensively classified as major (row I3)")
+                };
+            case CkModelChangeKind.Removed:
+                return (CkSemVerLevel.Major,
+                    $"{member} removed from interface '{interfaceId}' (or renamed) — consumers break; {publish} (row I4)");
+            case CkModelChangeKind.Modified when change.Property == "isOptional":
+                return change.NewValue == "false"
+                    ? (CkSemVerLevel.Major,
+                        $"{member} of interface '{interfaceId}' made required — implementors may lack it; {publish} (row I7)")
+                    : (CkSemVerLevel.Minor, $"{member} of interface '{interfaceId}' made optional — relaxation (row I7)");
+            case CkModelChangeKind.Modified when change.Property == "id":
+                return (CkSemVerLevel.Major,
+                    $"attribute of interface '{interfaceId}' now references another attribute definition (value type, " +
+                    $"record or enum change); {publish} (row I5)");
+            case CkModelChangeKind.Modified when change.Property is "target" or "multiplicity":
+                return (CkSemVerLevel.Major,
+                    $"association of interface '{interfaceId}' changed its {change.Property} — implementors and " +
+                    $"navigations break; {publish} (row I6)");
+            default:
+                return (CkSemVerLevel.Major,
+                    DefensiveDefaultReasonPrefix + "interface member change — defensively classified as major");
+        }
+    }
+
+    /// <summary>
+    ///     Optionality of an added interface member: attributes are looked up in the current model, association members
+    ///     carry it in their rendered value (<c>&lt;target&gt;, optional|required</c>); null when not resolvable.
+    /// </summary>
+    private static bool? IsOptionalMember(CkModelChange change, CkCompiledModelRoot current)
+    {
+        if (change.ElementKind == CkModelElementKind.InterfaceAttribute)
+        {
+            var separator = change.ElementId.LastIndexOf('/');
+            var ckInterface = current.Interfaces?.FirstOrDefault(i =>
+                i.InterfaceId.FullName == change.ElementId.Substring(0, Math.Max(separator, 0)));
+            var attribute = ckInterface?.Attributes.FirstOrDefault(a => a.AttributeName == change.ElementId.Substring(separator + 1));
+            if (attribute != null)
+            {
+                return attribute.IsOptional;
+            }
+        }
+
+        return change.NewValue switch
+        {
+            { } value when value.EndsWith(", optional", StringComparison.Ordinal) => true,
+            { } value when value.EndsWith(", required", StringComparison.Ordinal) => false,
+            _ => null
+        };
+    }
+
+    /// <summary>
+    ///     AB#6268 rows M6, M9–M12: method-level field changes (type and interface methods).
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyMethodChange(CkModelChange change)
+    {
+        switch (change.Property)
+        {
+            case "kind":
+                return (CkSemVerLevel.Major, "method kind changed (static ↔ instance) — every call breaks (row M9)");
+            case "result":
+                return (CkSemVerLevel.Major,
+                    "method result changed — callers read another value; widen a result record by an optional attribute " +
+                    "instead (row M6)");
+            case "idempotent":
+                return change.NewValue == "false"
+                    ? (CkSemVerLevel.Major, "method no longer idempotent — callers that retry break (row M10)")
+                    : (CkSemVerLevel.Minor, "method declared idempotent — relaxation (row M10)");
+            case "timeoutSeconds":
+                return (CkSemVerLevel.Minor, "method timeout changed — behavioural change, no contract break (row M11)");
+            case "authorization":
+                return change.NewValue == "none"
+                    ? (CkSemVerLevel.Minor, "method authorization removed — looser (row M12)")
+                    : (CkSemVerLevel.Major, "method authorization added — callers may lose access (row M12)");
+            case "roles" or "scopes":
+                // Assumption (no gateway yet, Phase 3): roles and scopes are any-of. Removing an entry is stricter,
+                // adding one looser; a mix of both is stricter.
+                var before = SplitNames(change.OldValue);
+                var after = SplitNames(change.NewValue);
+                return before.Except(after).Any()
+                    ? (CkSemVerLevel.Major, $"method authorization {change.Property} narrowed — callers may lose access (row M12)")
+                    : (CkSemVerLevel.Minor, $"method authorization {change.Property} widened — looser (row M12)");
+            case "allowSelf":
+                return change.NewValue == "false"
+                    ? (CkSemVerLevel.Major, "method no longer callable on the caller's own entity — stricter (row M12)")
+                    : (CkSemVerLevel.Minor, "method callable on the caller's own entity — looser (row M12)");
+            default:
+                return (CkSemVerLevel.Major, DefensiveDefaultReasonPrefix + "method change — defensively classified as major");
+        }
+    }
+
+    private static HashSet<string> SplitNames(string? value) =>
+        value == null || value.Length == 0
+            ? []
+            : new HashSet<string>(value.Split([", "], StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+
+    /// <summary>
+    ///     AB#6268 rows M2–M5, M13, M14: method parameters (type and interface methods).
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyMethodParameterChange(CkModelChange change, CkCompiledModelRoot current)
+    {
+        switch (change.ChangeKind)
+        {
+            case CkModelChangeKind.Added:
+                return FindParameter(change.ElementId, current)?.IsOptional switch
+                {
+                    true => (CkSemVerLevel.Minor, "optional method parameter added — existing calls stay valid (row M2)"),
+                    false => (CkSemVerLevel.Major, "required method parameter added — existing calls break (row M3)"),
+                    null => (CkSemVerLevel.Major,
+                        "added method parameter could not be resolved — defensively classified as major (row M3)")
+                };
+            case CkModelChangeKind.Removed:
+                return (CkSemVerLevel.Major, "method parameter removed (or renamed) — calls passing it break (row M3)");
+            case CkModelChangeKind.Modified when change.Property is "valueType" or "valueCkRecordId" or "valueCkEnumId":
+                return (CkSemVerLevel.Major, "method parameter type changed — calls break (row M4)");
+            case CkModelChangeKind.Modified when change.Property == "isOptional":
+                return change.NewValue == "false"
+                    ? (CkSemVerLevel.Major, "method parameter made required — calls without it break (row M5)")
+                    : (CkSemVerLevel.Minor, "method parameter made optional — relaxation (row M5)");
+            case CkModelChangeKind.Modified when change.Property == "sensitive":
+                return (CkSemVerLevel.Minor, "method parameter sensitivity changed — logging/audit behaviour only (row M13)");
+            default:
+                return (CkSemVerLevel.Major,
+                    DefensiveDefaultReasonPrefix + "method parameter change — defensively classified as major");
+        }
+    }
+
+    private static CkMethodParameterDto? FindParameter(string elementId, CkCompiledModelRoot current)
+    {
+        var methods = (current.Types ?? []).SelectMany(t => (t.Methods ?? []).Select(m => (Id: $"{t.TypeId.FullName}/{m.MethodId}", Method: m)))
+            .Concat((current.Interfaces ?? []).SelectMany(i => (i.Methods ?? []).Select(m => (Id: $"{i.InterfaceId.FullName}/{m.MethodId}", Method: m))));
+        foreach (var (id, method) in methods)
+        {
+            var prefix = id + "/";
+            if (elementId.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                return method.Parameters?.FirstOrDefault(p => p.Name == elementId.Substring(prefix.Length));
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    ///     AB#6271 rows D1–D5: declared ranges and floors of a range-retaining model.
+    /// </summary>
+    private static (CkSemVerLevel, string) ClassifyDependencyRangeChange(CkModelChange change)
+    {
+        switch (change.ChangeKind)
+        {
+            case CkModelChangeKind.Added:
+                return (CkSemVerLevel.Minor, "purely additive dependency (row D5)");
+            case CkModelChangeKind.Removed:
+                return (CkSemVerLevel.Major, "consumers may rely on the transitively provided model (defensive, row D5)");
+            case CkModelChangeKind.Modified when change.Property == "range":
+                var oldMajor = RangeMajor(change.OldValue);
+                var newMajor = RangeMajor(change.NewValue);
+                return oldMajor == null || newMajor == null || oldMajor != newMajor
+                    ? (CkSemVerLevel.Major, "dependency range moved to another major version — transitively breaking (row D4)")
+                    : (CkSemVerLevel.Minor, "dependency range changed within the same major (row D2/D3)");
+            case CkModelChangeKind.Modified when change.Property == "floor":
+                var oldFloor = ParseVersion(change.OldValue);
+                var newFloor = ParseVersion(change.NewValue);
+                if (oldFloor == null || newFloor == null || oldFloor.Value.Major != newFloor.Value.Major)
+                {
+                    return (CkSemVerLevel.Major, "dependency floor moved to another major version — transitively breaking (row D4)");
+                }
+
+                return newFloor.Value.CompareTo(oldFloor.Value) > 0
+                    ? (CkSemVerLevel.Minor, "dependency floor raised — tenants need the newer dependency version (row D1)")
+                    : (CkSemVerLevel.Minor, "dependency floor lowered — relaxation (row D2)");
+            default:
+                return (CkSemVerLevel.Major,
+                    DefensiveDefaultReasonPrefix + "dependency range change — defensively classified as major");
+        }
+    }
+
+    private static int? RangeMajor(string? range)
+    {
+        if (range == null || range.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return new CkVersionRange(range).MinVersion?.Major;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    private static CkVersion? ParseVersion(string? version)
+    {
+        if (version == null || version.Length == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            return new CkVersion(version);
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
     }
 
     private static (CkSemVerLevel, string) ClassifyDependencyChange(CkModelChange change)

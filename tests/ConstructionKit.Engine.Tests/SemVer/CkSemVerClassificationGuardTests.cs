@@ -55,12 +55,14 @@ public class CkSemVerClassificationGuardTests
         typeof(CkMethodResultDto),
         typeof(CkMethodErrorDto),
         typeof(CkMethodAuthorizationDto),
-        typeof(CkMethodExecutionDto)
+        typeof(CkMethodExecutionDto),
+        // CK v2 range retention (AB#6271)
+        typeof(CkModelDependencyDto)
     ];
 
     /// <summary>
     ///     DTO types that are not part of a compiled model's public surface and therefore not diffed, each with
-    ///     the reason. <see cref="CkModelDependencyDto" /> is a known gap (see <see cref="KnownGaps" />).
+    ///     the reason.
     /// </summary>
     private static readonly IReadOnlyDictionary<Type, string> NotDiffedDtoTypes = new Dictionary<Type, string>
     {
@@ -69,7 +71,6 @@ public class CkSemVerClassificationGuardTests
         [typeof(CkMetaRootDto)] = "source ckModel.yaml root, compiled into CkCompiledModelRoot",
         [typeof(CkModelCompileCandidate)] = "compiler input, not part of the compiled model",
         [typeof(CkModelConfigDto)] = "model configuration file of a consuming project, not part of a model",
-        [typeof(CkModelDependencyDto)] = "range-retention dependency entry; diffed with DependencyRanges in AB#6271 (known gap)",
         [typeof(CkTypeAssociationTuple)] = "internal tuple, not serialized"
     };
 
@@ -105,18 +106,11 @@ public class CkSemVerClassificationGuardTests
             }
         }
 
-        AddRows("N", 5, "AB#6266");
-        AddRows("I", 11, "AB#6267");
-        AddRows("M", 14, "AB#6268");
         AddRows("T", 7, "AB#6269");
         AddRows("E", 2, "AB#6269");
         AddRows("R", 2, "AB#6269");
         AddRows("A", 2, "AB#6269");
         AddRows("B", 4, "AB#6270");
-        AddRows("D", 7, "AB#6271");
-        gaps[$"property:{nameof(CkCompiledModelRoot)}.{nameof(CkCompiledModelRoot.DependencyRanges)}"] = "AB#6271";
-        gaps[$"property:{nameof(CkCompiledModelRoot)}.{nameof(CkCompiledModelRoot.IsRangeRetaining)}"] = "AB#6271";
-        gaps[$"dto:{nameof(CkModelDependencyDto)}"] = "AB#6271";
         return gaps;
     }
 
@@ -528,6 +522,7 @@ public class CkSemVerClassificationGuardTests
             }
         ];
         serialized.Methods = [CkV2TestModels.CreateFullMethod()];
+        model.DependencyRanges = [new CkModelDependencyDto { Range = "Base-[1.2,2.0)", Floor = "1.2.3" }];
         return model;
     }
 
@@ -549,6 +544,10 @@ public class CkSemVerClassificationGuardTests
         new Dictionary<string, Action<CkCompiledModelRoot>>
         {
             ["CkCompiledModelRoot.Dependencies"] = m => m.Dependencies = [new CkModelId("Base", "1.3.0")],
+            ["CkCompiledModelRoot.DependencyRanges"] = m =>
+                m.DependencyRanges!.Add(new CkModelDependencyDto { Range = "Other-[1.0,2.0)", Floor = "1.0.0" }),
+            ["CkModelDependencyDto.Range"] = m => m.DependencyRanges![0].Range = "Base-[1.2,3.0)",
+            ["CkModelDependencyDto.Floor"] = m => m.DependencyRanges![0].Floor = "1.4.0",
             ["CkModelRootBase.Types"] = m => m.Types!.Add(new CkCompiledTypeDto { TypeId = "Extra", DerivedFromCkTypeId = "Base/Entity" }),
             ["CkModelRootBase.AssociationRoles"] = m => m.AssociationRoles!.Add(new CkAssociationRoleDto
             {

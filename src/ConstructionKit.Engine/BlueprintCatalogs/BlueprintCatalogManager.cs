@@ -291,6 +291,19 @@ internal class BlueprintCatalogManager : IBlueprintCatalogManager
     }
 
     /// <inheritdoc />
+    public async Task<bool> IsExistingAsync(string catalogName, BlueprintId blueprintId,
+        object? sourceIdentifier = null)
+    {
+        var catalog = _catalogs.FirstOrDefault(c => c.CatalogName == catalogName);
+        if (catalog == null)
+        {
+            throw BlueprintCatalogException.CatalogNotFound(catalogName);
+        }
+
+        return await catalog.IsExistingAsync(blueprintId, sourceIdentifier).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsExistingAsync(BlueprintId blueprintId, object? sourceIdentifier = null)
     {
         foreach (var catalog in _catalogs.OrderBy(c => c.Order))

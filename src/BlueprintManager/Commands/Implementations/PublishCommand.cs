@@ -36,7 +36,7 @@ internal class PublishCommand : Command<BpmToolOptions>
             [$"Name of the target catalog (default: {LocalFileSystemBlueprintCatalog.Name})"], false, 1);
 
         _forceArg = CommandArgumentValue.AddArgument("f", "force",
-            ["Replace existing blueprint if it exists"], false, 0);
+            ["Replace the blueprint if it already exists in the target catalog"], false, 0);
     }
 
     public override async Task Execute()
@@ -69,13 +69,15 @@ internal class PublishCommand : Command<BpmToolOptions>
 
         Logger.LogInformation("Blueprint '{BlueprintId}' validated successfully", blueprintMeta.BlueprintId.FullName);
 
-        // Check if blueprint already exists
-        var exists = await _catalogManager.IsExistingAsync(blueprintMeta.BlueprintId);
+        // Check if the blueprint already exists in the TARGET catalog only (AB#6397). The catalog-wide
+        // IsExistingAsync(blueprintId) also matched a version that only lives in another catalog (e.g. the
+        // Private one) and so skipped the Public leg of a release publish.
+        var exists = await _catalogManager.IsExistingAsync(catalogName, blueprintMeta.BlueprintId);
 
         if (exists && !isForced)
         {
-            Logger.LogError("Blueprint '{BlueprintId}' already exists in catalog. Use --force to replace",
-                blueprintMeta.BlueprintId.FullName);
+            Logger.LogError("Blueprint '{BlueprintId}' already exists in catalog '{Catalog}'. Use --force to replace",
+                blueprintMeta.BlueprintId.FullName, catalogName);
             return;
         }
 

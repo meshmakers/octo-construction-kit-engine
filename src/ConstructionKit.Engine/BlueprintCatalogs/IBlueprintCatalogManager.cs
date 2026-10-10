@@ -163,6 +163,18 @@ public interface IBlueprintCatalogManager
     Task<bool> IsExistingAsync(BlueprintId blueprintId, object? sourceIdentifier = null);
 
     /// <summary>
+    /// Returns true if the blueprint exists in the named catalog. Unlike
+    /// <see cref="IsExistingAsync(BlueprintId, object?)"/> a version that only exists in another catalog does not
+    /// count; use this to decide whether a publish to <paramref name="catalogName"/> would overwrite something.
+    /// </summary>
+    /// <param name="catalogName">The catalog to check</param>
+    /// <param name="blueprintId">The blueprint id</param>
+    /// <param name="sourceIdentifier">Source identifier, null for default</param>
+    /// <returns>True if the blueprint exists in that catalog</returns>
+    /// <exception cref="BlueprintCatalogException">Thrown when no catalog with the given name exists</exception>
+    Task<bool> IsExistingAsync(string catalogName, BlueprintId blueprintId, object? sourceIdentifier = null);
+
+    /// <summary>
     /// Returns true if the blueprint within the version range exists in any catalog
     /// </summary>
     /// <param name="blueprintIdVersionRange">The blueprint id with version range</param>

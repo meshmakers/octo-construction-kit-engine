@@ -108,7 +108,11 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         var isInternal = change.ChangeKind switch
         {
             CkModelChangeKind.Added => inCurrent == true && inBaseline != false,
-            CkModelChangeKind.Removed => inBaseline == true && inCurrent != false,
+            // P3-1: removing (or renaming) an internal type that owns an exposed association takes the inbound
+            // navigation away from its public target.
+            CkModelChangeKind.Removed => inBaseline == true && inCurrent != false &&
+                                         !(change.ElementKind == CkModelElementKind.Type &&
+                                           baseline.OwnsExposedAssociation(change.ElementId)),
             _ => inBaseline == true && inCurrent == true
         };
         if (!isInternal || classified.Level == CkSemVerLevel.None)
@@ -568,6 +572,13 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     {
         var before = ParseAuthorization(change.OldValue);
         var after = ParseAuthorization(change.NewValue);
+        if (before.Roles.Count == 0 && after.Roles.Count == 0 && before.Scopes.Count == 0 && after.Scopes.Count == 0 &&
+            before.AllowSelf == after.AllowSelf)
+        {
+            // P3-2: a block that grants nothing (no roles, no scopes, no self-calls) means the same as no block.
+            return (CkSemVerLevel.None, "authorization block grants nothing — same meaning as no block under default-deny (row M12)");
+        }
+
         var stricter = new List<string>();
         if (before.Roles.Except(after.Roles).Any())
         {

@@ -197,6 +197,14 @@ public class MethodRowTests
         Assert.True(added.IsBehavioural);
         Assert.Contains("security: method access widened", added.Reason);
 
+        // P3-2: a block that grants nothing means the same as no block: no level, no security note.
+        var empty = Model();
+        Method(empty, owner).Authorization = new CkMethodAuthorizationDto();
+        var noBlock = Model();
+        Method(noBlock, owner).Authorization = null;
+        Assert.Equal(CkSemVerLevel.None, Level(noBlock, empty));
+        Assert.Equal(CkSemVerLevel.None, Level(empty, noBlock));
+
         // Strict default-deny: an omitted block admits no self-calls, so adding a block without allowSelf is looser too.
         current = Model();
         Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = false };

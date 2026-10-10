@@ -20,6 +20,9 @@ internal sealed class CkVisibilityIndex
     /// </summary>
     private readonly HashSet<string> _exposedAssociations = new(StringComparer.Ordinal);
 
+    /// <summary>Internal types that own at least one exposed association (see <see cref="_exposedAssociations" />).</summary>
+    private readonly HashSet<string> _typesWithExposedAssociations = new(StringComparer.Ordinal);
+
     public CkVisibilityIndex(CkCompiledModelRoot model)
     {
         void Add<T>(CkModelElementKind kind, IEnumerable<T>? elements, Func<T, string> id, Func<T, CkVisibilityDto?> visibility)
@@ -137,6 +140,7 @@ internal sealed class CkVisibilityIndex
                         continue;
                     }
 
+                    _typesWithExposedAssociations.Add(type.TypeId.FullName);
                     _exposedAssociations.Add(AssociationKey(type.TypeId.FullName, association.CkRoleId.ElementId.FullName,
                         association.TargetCkTypeId.ElementId.FullName));
                     Expose(CkModelElementKind.AssociationRole, association.CkRoleId);
@@ -282,6 +286,12 @@ internal sealed class CkVisibilityIndex
                 return null;
         }
     }
+
+    /// <summary>
+    ///     True for an internal type that owns an association to a public type (N1). Removing or renaming such a type
+    ///     removes the inbound navigation from the public target (gate re-run P3-1), so the removal is not capped.
+    /// </summary>
+    public bool OwnsExposedAssociation(string typeId) => _typesWithExposedAssociations.Contains(typeId);
 
     private static string AssociationKey(string typeId, string roleElementId, string targetElementId) =>
         $"{typeId}|{roleElementId}|{targetElementId}";

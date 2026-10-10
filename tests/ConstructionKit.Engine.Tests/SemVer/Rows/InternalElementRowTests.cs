@@ -208,6 +208,21 @@ public class InternalElementRowTests
         Assert.Equal(CkModelElementKind.AssociationRole, renamed.Change.ElementKind);
         Assert.Equal(CkSemVerLevel.Major, renamed.Level);
 
+        // P3-1: removing or renaming the internal type itself takes the inbound navigation away from Machine, too.
+        var typeRemoved = WithInternalHelperPointingAtMachine();
+        typeRemoved.Types = typeRemoved.Types!.Where(t => t.TypeId.Name != "Helper").ToList();
+        Assert.Contains(Classify(WithInternalHelperPointingAtMachine(), typeRemoved),
+            c => c.Change is { ElementKind: CkModelElementKind.Type, ChangeKind: CkModelChangeKind.Removed } &&
+                 c.Level == CkSemVerLevel.Major);
+        var typeRenamed = WithInternalHelperPointingAtMachine();
+        typeRenamed.Types!.Single(t => t.TypeId.Name == "Helper").TypeId = "Helper9";
+        Assert.Equal(CkSemVerLevel.Major, Level(WithInternalHelperPointingAtMachine(), typeRenamed));
+
+        // An internal type WITHOUT such an association is still removable as Minor (row N1).
+        var plainBaseline = PublicModel();
+        plainBaseline.Types!.Add(new CkCompiledTypeDto { TypeId = "Plain", Visibility = CkVisibilityDto.Internal, DerivedFromCkTypeId = "Base/Entity" });
+        Assert.Equal(CkSemVerLevel.Minor, Level(plainBaseline, PublicModel()));
+
         // An internal type's association to another INTERNAL type stays capped (row N2).
         static CkCompiledModelRoot InternalToInternal(bool withAssociation)
         {

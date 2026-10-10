@@ -1032,7 +1032,7 @@ internal static class MessageCodes
         {
             "CkInconsistentVisibility",
              new OperationMessageTemplate(MessageLevel.Error,
-                 129, "'{element}' {reason}. In a ckLanguage 2 model a public element may only reference public elements of its own model, and the methods of a public interface stay public (visibility consistency).",
+                 129, "'{element}' {reason}. (visibility consistency, ckLanguage 2: public elements reference only public elements of their model; public interface methods stay public)",
                  new [] {"element", "reason"})
         },
     };

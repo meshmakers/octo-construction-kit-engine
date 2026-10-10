@@ -545,7 +545,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
                 // AB#6338 (platform-owner decision 2026-10-10): roles are any-of under DEFAULT-DENY — empty roles mean
                 // "administrators only". Removing a role (also emptying the list) is stricter; adding one, also to an
                 // empty list, is looser.
-                return SplitNames(change.OldValue).Except(SplitNames(change.NewValue)).Any()
+                return RemovedFrom(SplitNames(change.OldValue, ignoreCase: true), SplitNames(change.NewValue, ignoreCase: true))
                     ? (CkSemVerLevel.Major, "method authorization roles narrowed — callers holding a removed role lose access (row M12)")
                     : (CkSemVerLevel.Minor, "method authorization roles widened — looser; security: method access widened (row M12)");
             case "scopes":
@@ -580,7 +580,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
         }
 
         var stricter = new List<string>();
-        if (before.Roles.Except(after.Roles).Any())
+        if (RemovedFrom(before.Roles, after.Roles))
         {
             stricter.Add("roles narrowed");
         }
@@ -609,7 +609,7 @@ public class CkSemVerClassifier : ICkSemVerClassifier
     {
         if (value == null || value == "none")
         {
-            return (false, [], false, []);
+            return (false, SplitNames(null, ignoreCase: true), false, SplitNames(null));
         }
 
         string Part(string name)
@@ -625,13 +625,17 @@ public class CkSemVerClassifier : ICkSemVerClassifier
             return (end < 0 ? value.Substring(start) : value.Substring(start, end - start)).Trim().Trim('[', ']');
         }
 
-        return (true, SplitNames(Part("roles")), Part("allowSelf") == "true", SplitNames(Part("scopes")));
+        return (true, SplitNames(Part("roles"), ignoreCase: true), Part("allowSelf") == "true", SplitNames(Part("scopes")));
     }
 
-    private static HashSet<string> SplitNames(string? value) =>
+    /// <summary>True when <paramref name="before" /> has a name that <paramref name="after" /> lacks (uses the sets' comparers).</summary>
+    private static bool RemovedFrom(HashSet<string> before, HashSet<string> after) => before.Any(n => !after.Contains(n));
+
+    private static HashSet<string> SplitNames(string? value, bool ignoreCase = false) =>
         value == null || value.Length == 0
-            ? []
-            : new HashSet<string>(value.Split([", "], StringSplitOptions.RemoveEmptyEntries), StringComparer.Ordinal);
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(value.Split([", "], StringSplitOptions.RemoveEmptyEntries),
+                ignoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
 
     /// <summary>
     ///     AB#6268 rows M2–M5, M13, M14: method parameters (type and interface methods).

@@ -177,6 +177,32 @@ public class MethodRowTests
     [Theory]
     [InlineData("type")]
     [InlineData("interface")]
+    public void M12_RoleNamesCompareCaseInsensitively(string owner)
+    {
+        // P3-3 (platform-owner decision 2026-10-10): like ASP.NET Identity's NormalizedName, 'Admin' and 'admin' are the
+        // same role — a change that only alters case is no change.
+        Assert.Empty(Change(owner, m => m.Authorization!.Roles = ["usermanagement"]));
+        Assert.Empty(Change(owner, m => m.Authorization!.Roles = ["USERMANAGEMENT", "USERMANAGEMENT"]));
+
+        // A case twin next to the real role adds no role; a really new role is looser; a removed role is stricter.
+        Assert.Empty(Change(owner, m => m.Authorization!.Roles = ["UserManagement", "usermanagement"]));
+        Assert.Equal(CkSemVerLevel.Minor, Required(Change(owner, m => m.Authorization!.Roles = ["usermanagement", "Ops"])));
+        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Roles = [])));
+
+        // Block added or removed: the case of the roles does not matter either (case-twin roles are a no-op).
+        var baseline = Model();
+        Method(baseline, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["Ops"], AllowSelf = true };
+        var current = Model();
+        Method(current, owner).Authorization = new CkMethodAuthorizationDto { Roles = ["OPS"], AllowSelf = true };
+        Assert.Empty(Classify(baseline, current));
+
+        // Scopes stay case-sensitive.
+        Assert.Equal(CkSemVerLevel.Major, Required(Change(owner, m => m.Authorization!.Scopes = ["EXTRA_SCOPE"])));
+    }
+
+    [Theory]
+    [InlineData("type")]
+    [InlineData("interface")]
     public void M12_AuthorizationBlockRemovedOrAdded_IsOneChange_UnderDefaultDeny(string owner)
     {
         // Gate case 7a: removing the whole block is ONE change (no contradictory field lines). Under default-deny it

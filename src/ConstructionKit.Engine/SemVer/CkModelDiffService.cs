@@ -568,8 +568,13 @@ public class CkModelDiffService : ICkModelDiffService
                 }
                 else
                 {
-                    AddModified(methodChanges, kind, id, "roles",
-                        FormatNameSet(baselineMethod.Authorization?.Roles), FormatNameSet(currentMethod.Authorization?.Roles));
+                    // P3-3: role names compare case-insensitively (ASP.NET Identity NormalizedName); a change that only
+                    // alters case is no change. Scopes stay case-sensitive.
+                    if (!RoleSet(baselineMethod.Authorization?.Roles).SetEquals(RoleSet(currentMethod.Authorization?.Roles)))
+                    {
+                        AddModified(methodChanges, kind, id, "roles",
+                            FormatNameSet(baselineMethod.Authorization?.Roles), FormatNameSet(currentMethod.Authorization?.Roles));
+                    }
                     AddModified(methodChanges, kind, id, "scopes",
                         FormatNameSet(baselineMethod.Authorization?.Scopes), FormatNameSet(currentMethod.Authorization?.Scopes));
                     AddModified(methodChanges, kind, id, "allowSelf",
@@ -631,6 +636,9 @@ public class CkModelDiffService : ICkModelDiffService
             : $"roles [{FormatNameSet(authorization.Roles)}]; allowSelf {FormatBool(authorization.AllowSelf)}; " +
               $"scopes [{FormatNameSet(authorization.Scopes)}]";
 
+    private static HashSet<string> RoleSet(IEnumerable<string>? roles) =>
+        new((roles ?? []).Select(r => r.ToUpperInvariant()), StringComparer.Ordinal);
+
     private static string FormatNameSet(IEnumerable<string>? names) =>
         string.Join(", ", (names ?? []).Distinct(StringComparer.Ordinal).OrderBy(n => n, StringComparer.Ordinal));
 
@@ -649,7 +657,7 @@ public class CkModelDiffService : ICkModelDiffService
         var errors = string.Join(", ", (method.Errors ?? []).Select(e => e.Code));
         var authorization = method.Authorization == null
             ? "none"
-            : $"roles [{string.Join(", ", method.Authorization.Roles ?? [])}], allowSelf " +
+            : $"roles [{string.Join(", ", RoleSet(method.Authorization.Roles).OrderBy(r => r, StringComparer.Ordinal))}], allowSelf " +
               $"{FormatBool(method.Authorization.AllowSelf)}, scopes [{string.Join(", ", method.Authorization.Scopes ?? [])}]";
         var timeout = (method.Execution?.TimeoutSeconds ?? CkMethodExecutionDto.DefaultTimeoutSeconds)
             .ToString(CultureInfo.InvariantCulture);

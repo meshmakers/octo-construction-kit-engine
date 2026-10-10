@@ -79,6 +79,9 @@ public static class ServiceCollectionExtensions
         // AB#6294: one shared verdict (baseline model, diff, classification, validation) for every compatibility gate
         services.AddTransient<ICkCompatibilityVerdictService, CkCompatibilityVerdictService>();
         services.AddTransient<CkCompileGate>();
+        // AB#5437: surface satisfaction checker and the cascade dry run built on it (read-only)
+        services.AddTransient<ICkSurfaceSatisfactionChecker, CkSurfaceSatisfactionChecker>();
+        services.AddTransient<ICkCascadeService, CkCascadeService>();
         services.AddTransient<ICkChangelogGenerator, CkChangelogGenerator>();
 
         // Add here sources of Ck model repositories

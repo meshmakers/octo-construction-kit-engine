@@ -104,6 +104,7 @@ internal static class Program
         services.AddTransient<ICommand, NewCommand>();
         services.AddTransient<ICommand, CompileCommand>();
         services.AddTransient<ICommand, ValidateVersionCommand>();
+        services.AddTransient<ICommand, ValidateCascadeCommand>();
         services.AddTransient<ICommand, GetCommand>();
         services.AddTransient<ICommand, GetCatalogsCommand>();
         services.AddTransient<ICommand, PublishCommand>();

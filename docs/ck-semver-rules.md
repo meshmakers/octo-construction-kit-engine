@@ -232,6 +232,57 @@ the new version. The `OCTO-CK200` message of the compile gate names this command
 - No git is involved, and `--apply` writes to no catalog beyond what `ValidateVersion` already does (the validated package is
   registered in the local catalog for sibling resolution).
 
+## Cascade dry run (`ValidateCascade`, AB#5437)
+
+`ValidateVersion` only looks at the model itself; it is the **dependents** that break (2026-09-30: nine publications across seven
+repositories). `octo-ckc -c ValidateCascade -p <candidate model path>` is the read-only dry run of a base model's next version:
+
+```
+octo-ckc -c ValidateCascade -p <candidate model path> [-cn <catalogName>] [-o <report.md>] [-rf] [-lce <bool>] [-lcr <path>]
+```
+
+The candidate is compiled in memory (registered nowhere, no catalog is written, no remote call except an explicit `-rf`). The
+dependents are the newest version per major line of every model in the readable catalogs whose dependencies name the candidate,
+directly or through another dependent. The command prints one verdict per dependent (console, and Markdown with `-o`) and exits
+non-zero when at least one dependent **Breaks**. The same catalog options as `ValidateVersion` apply; it works offline against the
+local and cached catalogs.
+
+| Verdict | Meaning |
+| ------- | ------- |
+| `Compatible` | The dependent keeps working unchanged. Range-retaining: its range admits the candidate, the floor is met, every referenced element (and every `usedSurface` member) exists, is public and is not changed incompatibly. |
+| `NeedsRepin` | Exact-pinned dependent (ckLanguage 1): everything it references still binds, but it must be recompiled and republished against the candidate. The required level comes from today's dependency rule (same major: minor, other major: major). |
+| `Breaks` | A referenced element is gone or re-identified (`System-2.2.2/Entity-1`), became internal, or changed incompatibly (a Major change of the classifier); the candidate is below the dependent's floor (`floor not met`); or a name collision (below). The finding names the member. |
+| `NotInRange` | The dependent's range or pin does not cover the candidate's major, or the candidate is older than the pin. Listed, not counted. |
+
+**Name collisions (rows H6 / N2).** The classifier sees two versions of one model, so an addition to a stable base stays Minor.
+The dry run, which sees the dependents, reports as `Breaks` an attribute (compile error 13) or method (error 100) the candidate
+newly declares on a type when a type of the dependent that derives from it already declares the same name. Row N2: a stable base
+that redeclares a method it already inherited from an implemented interface is such an addition for every derived type that also
+redeclares it; the finding says so.
+
+**What the dry run cannot prove.** It proves that the referenced surface still binds. It does not prove behavioural changes
+(defaults, display rules, non-unique indexes, change streams, method timeouts), data compatibility of existing runtime entities,
+or that a dependent that is not in any readable catalog still compiles. Dependents that cannot be loaded are listed as warnings.
+
+The checker is the public engine service `ICkSurfaceSatisfactionChecker` (one dependent against a prepared `CkSurfaceCandidate`),
+the discovery and the walk are `ICkCascadeService`; the publish gate (F2.3) and the tenant upgrade guard (F2.5) call them without
+the CLI.
+
+Sample report:
+
+```
+Candidate: System-2.3.0
+Baseline: System-2.2.0 (LocalFileSystemCatalog, local, not published)
+Candidate change level: MINOR (minimum version 2.3.0, declared 2.3.0: ok)
+
+  Breaks      PlantE-1.0.0 (exact pins)
+      PlantE-1.0.0 uses System-2.2.0/Description-1, which System-2.3.0 does not define (attribute removed or re-identified)
+  Compatible  LineR-1.0.0 (range-retaining)
+      no references into the candidate
+
+3 dependent(s): 1 Breaks, 0 NeedsRepin, 1 Compatible, 0 NotInRange
+```
+
 ### First publication vs. unreachable catalogs
 
 "No catalog responds" and "catalogs respond, model unknown" are strictly separated:

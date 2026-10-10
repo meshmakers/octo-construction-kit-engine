@@ -113,4 +113,29 @@ public class CkSurfaceSatisfactionCheckerTests
 
         Assert.Equal(CkDependentVerdict.Compatible, Checker.Check(candidate, dependent).Verdict);
     }
+
+    [Fact]
+    public void A_dependency_name_that_differs_only_in_case_is_still_checked()
+    {
+        // The compiler accepts "system-[2.2,3.0)" where the file system ignores case (macOS, Windows), so the
+        // dependent can carry a differently cased name. The check must not go blind for it. (Platform independent:
+        // the dependent is built by hand, not compiled.)
+        var candidate = CkSurfaceCandidate.Create(new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("System", "2.3.0"), Types = [], Attributes = []
+        }, null, []);
+        var dependent = new CkCompiledModelRoot
+        {
+            ModelId = new CkModelId("PlantL", "1.0.0"),
+            DependencyRanges =
+            [
+                new CkModelDependencyDto { Range = new CkModelIdVersionRange("system", "[2.2,3.0)"), Floor = "2.2.0" }
+            ]
+        };
+
+        var check = Checker.Check(candidate, dependent);
+
+        Assert.Equal(CkDependentVerdict.Compatible, check.Verdict);
+        Assert.Contains("range [2.2,3.0) admits 2.3.0", Assert.Single(check.Reasons));
+    }
 }

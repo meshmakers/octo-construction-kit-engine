@@ -280,17 +280,6 @@ public sealed class CkCascadeTests : IDisposable
     }
 
     [Fact]
-    public async Task A_dependency_name_that_differs_only_in_case_is_still_a_dependent()
-    {
-        await PublishWorldAsync();
-        await PublishAsync(WritePlant("PlantL", "system-[2.2,3.0)"), true);
-
-        var result = await AnalyzeAsync(WriteSystem("2.3.0", ["Name"], ["Name"]));
-
-        Assert.Equal(CkDependentVerdict.Breaks, Dependent(result, "PlantL").Verdict);
-    }
-
-    [Fact]
     public async Task Models_that_cannot_be_loaded_are_counted_as_unchecked_and_fail_the_dry_run_command_summary()
     {
         await PublishWorldAsync();

@@ -313,4 +313,49 @@ public class CkModelDiffServiceTests
         Assert.Contains(changes, c => c.ElementKind == CkModelElementKind.TypeAssociation &&
                                       c.ChangeKind == CkModelChangeKind.Added);
     }
+
+    [Fact]
+    public void FormatReference_MajorQualified_RendersWithAt_ExactVersionUnchanged()
+    {
+        // AB#6342 (gate case 5c): 'Aux@2/Asset-1', not 'Aux-2/Asset-1'; exact (v1) references render as before.
+        Assert.Equal("Aux@2/Asset-1", CkModelDiffService.FormatReferenceForDisplay(
+            new CkId<CkTypeId>(CkModelId.MajorQualified("Aux", 2), new CkTypeId("Asset-1")), "Rr"));
+        Assert.Equal("Aux/Asset-1", CkModelDiffService.FormatReferenceForDisplay( // unchanged v1 rendering
+            new CkId<CkTypeId>(new CkModelId("Aux-1.2.0"), new CkTypeId("Asset-1")), "Rr"));
+        Assert.Equal("Aux-2/Asset-1", CkModelDiffService.FormatReferenceForDisplay( // unchanged v1 rendering
+            new CkId<CkTypeId>(new CkModelId("Aux-2.0.0"), new CkTypeId("Asset-1")), "Rr"));
+        Assert.Equal("Rr/Pump-1", CkModelDiffService.FormatReferenceForDisplay(
+            new CkId<CkTypeId>(new CkModelId("Rr-1.0.0"), new CkTypeId("Pump-1")), "Rr"));
+    }
+
+    [Fact]
+    public void MajorQualifiedBaseType_IsShownWithAt_InTheChangeReason()
+    {
+        var baseline = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(baseline).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(CkModelId.MajorQualified("Aux", 1), new CkTypeId("Asset-1"));
+        var current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(current).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(CkModelId.MajorQualified("Aux", 2), new CkTypeId("Asset-1"));
+
+        var change = Assert.Single(new CkModelDiffService().Diff(baseline, current),
+            c => c.Property == "derivedFromCkTypeId");
+        Assert.Equal("Aux@1/Asset-1", change.OldValue);
+        Assert.Equal("Aux@2/Asset-1", change.NewValue);
+    }
+
+    [Fact]
+    public void ExactPinAndMajorQualifiedReferenceOfTheSameMajor_AreEqual()
+    {
+        // Row D6 (switch to range retention): 'Aux-1.2.0/Asset-1' and 'Aux@1/Asset-1' are the same reference; only
+        // the display of a real change uses '@' (AB#6342).
+        var baseline = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(baseline).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(new CkModelId("Aux-1.2.0"), new CkTypeId("Asset-1"));
+        var current = SemVerTestModels.CreateModel();
+        SemVerTestModels.GetMachine(current).DerivedFromCkTypeId =
+            new CkId<CkTypeId>(CkModelId.MajorQualified("Aux", 1), new CkTypeId("Asset-1"));
+
+        Assert.DoesNotContain(new CkModelDiffService().Diff(baseline, current), c => c.Property == "derivedFromCkTypeId");
+    }
 }

@@ -405,9 +405,8 @@ public class CkModelDiffService : ICkModelDiffService
         DiffElements(changes, CkModelElementKind.Type, baseline, current, t => t.TypeId.FullName,
             (typeChanges, id, baselineType, currentType) =>
             {
-                AddModified(typeChanges, CkModelElementKind.Type, id, "derivedFromCkTypeId",
-                    FormatReference(baselineType.DerivedFromCkTypeId, modelName),
-                    FormatReference(currentType.DerivedFromCkTypeId, modelName));
+                AddModifiedReference(typeChanges, CkModelElementKind.Type, id, "derivedFromCkTypeId",
+                    baselineType.DerivedFromCkTypeId, currentType.DerivedFromCkTypeId, modelName);
                 AddModified(typeChanges, CkModelElementKind.Type, id, "isFinal", baselineType.IsFinal, currentType.IsFinal);
                 AddModified(typeChanges, CkModelElementKind.Type, id, "isAbstract", baselineType.IsAbstract, currentType.IsAbstract);
                 AddModified(typeChanges, CkModelElementKind.Type, id, "isCollectionRoot",
@@ -447,9 +446,8 @@ public class CkModelDiffService : ICkModelDiffService
                     currentInterface.Attributes, a => $"{id}/{a.AttributeName}",
                     (memberChanges, memberId, baselineMember, currentMember) =>
                     {
-                        AddModified(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "id",
-                            FormatReference(baselineMember.CkAttributeId, modelName),
-                            FormatReference(currentMember.CkAttributeId, modelName));
+                        AddModifiedReference(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "id",
+                    baselineMember.CkAttributeId, currentMember.CkAttributeId, modelName);
                         AddModified(memberChanges, CkModelElementKind.InterfaceAttribute, memberId, "isOptional",
                             baselineMember.IsOptional, currentMember.IsOptional);
                     },
@@ -564,12 +562,10 @@ public class CkModelDiffService : ICkModelDiffService
                     {
                         AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueType",
                             baselineParameter.ValueType.ToString(), currentParameter.ValueType.ToString());
-                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkRecordId",
-                            FormatReference(baselineParameter.ValueCkRecordId, modelName),
-                            FormatReference(currentParameter.ValueCkRecordId, modelName));
-                        AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkEnumId",
-                            FormatReference(baselineParameter.ValueCkEnumId, modelName),
-                            FormatReference(currentParameter.ValueCkEnumId, modelName));
+                        AddModifiedReference(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkRecordId",
+                    baselineParameter.ValueCkRecordId, currentParameter.ValueCkRecordId, modelName);
+                        AddModifiedReference(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "valueCkEnumId",
+                    baselineParameter.ValueCkEnumId, currentParameter.ValueCkEnumId, modelName);
                         AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "isOptional",
                             baselineParameter.IsOptional, currentParameter.IsOptional);
                         AddModified(parameterChanges, CkModelElementKind.MethodParameter, parameterId, "sensitive",
@@ -649,12 +645,10 @@ public class CkModelDiffService : ICkModelDiffService
             {
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "valueType",
                     baselineAttribute.ValueType.ToString(), currentAttribute.ValueType.ToString());
-                AddModified(attributeChanges, CkModelElementKind.Attribute, id, "valueCkRecordId",
-                    FormatReference(baselineAttribute.ValueCkRecordId, modelName),
-                    FormatReference(currentAttribute.ValueCkRecordId, modelName));
-                AddModified(attributeChanges, CkModelElementKind.Attribute, id, "valueCkEnumId",
-                    FormatReference(baselineAttribute.ValueCkEnumId, modelName),
-                    FormatReference(currentAttribute.ValueCkEnumId, modelName));
+                AddModifiedReference(attributeChanges, CkModelElementKind.Attribute, id, "valueCkRecordId",
+                    baselineAttribute.ValueCkRecordId, currentAttribute.ValueCkRecordId, modelName);
+                AddModifiedReference(attributeChanges, CkModelElementKind.Attribute, id, "valueCkEnumId",
+                    baselineAttribute.ValueCkEnumId, currentAttribute.ValueCkEnumId, modelName);
                 AddModified(attributeChanges, CkModelElementKind.Attribute, id, "defaultValues",
                     FormatValueList(baselineAttribute.DefaultValues), FormatValueList(currentAttribute.DefaultValues));
                 // AB#5187: both markers are compared on their RESOLVED value, so migrating a
@@ -708,9 +702,8 @@ public class CkModelDiffService : ICkModelDiffService
         DiffElements(changes, CkModelElementKind.Record, baseline, current, r => r.RecordId.FullName,
             (recordChanges, id, baselineRecord, currentRecord) =>
             {
-                AddModified(recordChanges, CkModelElementKind.Record, id, "derivedFromCkRecordId",
-                    FormatReference(baselineRecord.DerivedFromCkRecordId, modelName),
-                    FormatReference(currentRecord.DerivedFromCkRecordId, modelName));
+                AddModifiedReference(recordChanges, CkModelElementKind.Record, id, "derivedFromCkRecordId",
+                    baselineRecord.DerivedFromCkRecordId, currentRecord.DerivedFromCkRecordId, modelName);
                 AddModified(recordChanges, CkModelElementKind.Record, id, "isFinal", baselineRecord.IsFinal, currentRecord.IsFinal);
                 AddModified(recordChanges, CkModelElementKind.Record, id, "isAbstract", baselineRecord.IsAbstract, currentRecord.IsAbstract);
                 AddModified(recordChanges, CkModelElementKind.Record, id, "recordKey",
@@ -751,9 +744,8 @@ public class CkModelDiffService : ICkModelDiffService
         DiffElements(changes, elementKind, baseline, current, a => $"{ownerId}/{a.AttributeName}",
             (assignmentChanges, id, baselineAssignment, currentAssignment) =>
             {
-                AddModified(assignmentChanges, elementKind, id, "id",
-                    FormatReference(baselineAssignment.CkAttributeId, modelName),
-                    FormatReference(currentAssignment.CkAttributeId, modelName));
+                AddModifiedReference(assignmentChanges, elementKind, id, "id",
+                    baselineAssignment.CkAttributeId, currentAssignment.CkAttributeId, modelName);
                 AddModified(assignmentChanges, elementKind, id, "isOptional",
                     baselineAssignment.IsOptional, currentAssignment.IsOptional);
                 AddModified(assignmentChanges, elementKind, id, "autoCompleteValues",
@@ -790,9 +782,8 @@ public class CkModelDiffService : ICkModelDiffService
                     FormatReferenceList(baselineAssociation.TargetCkAttributeIds, modelName),
                     FormatReferenceList(currentAssociation.TargetCkAttributeIds, modelName));
                 // F1.1-S5
-                AddModified(associationChanges, CkModelElementKind.TypeAssociation, id, "targetCkInterfaceId",
-                    FormatReference(baselineAssociation.TargetCkInterfaceId, modelName),
-                    FormatReference(currentAssociation.TargetCkInterfaceId, modelName));
+                AddModifiedReference(associationChanges, CkModelElementKind.TypeAssociation, id, "targetCkInterfaceId",
+                    baselineAssociation.TargetCkInterfaceId, currentAssociation.TargetCkInterfaceId, modelName);
             });
     }
 
@@ -932,7 +923,12 @@ public class CkModelDiffService : ICkModelDiffService
     ///     Renders a reference for comparison and display. Self references ignore the model
     ///     version, foreign references keep the semantic (major) version — see the class remarks.
     /// </summary>
-    private static string? FormatReference<TElementId>(CkId<TElementId>? reference, string modelName)
+    /// <summary>
+    ///     A reference as COMPARED (and used in keys and composite renderings): own-model references by name, other
+    ///     models by their semantic-versioned name (major only, <c>Aux</c> / <c>Aux-2</c>), so an exact pin and a
+    ///     major-qualified reference of the same major are equal.
+    /// </summary>
+    internal static string? FormatReference<TElementId>(CkId<TElementId>? reference, string modelName)
         where TElementId : IComparable<TElementId>, ICkElementId
     {
         if (reference == null)
@@ -943,6 +939,41 @@ public class CkModelDiffService : ICkModelDiffService
         return reference.ModelId.Name == modelName
             ? $"{reference.ModelId.Name}/{reference.ElementId.FullName}"
             : $"{reference.ModelId.SemanticVersionedFullName}/{reference.ElementId.FullName}";
+    }
+
+    /// <summary>
+    ///     A reference as SHOWN in change reasons and the changelog (AB#6342): a major-qualified reference of a
+    ///     range-retaining model renders as <c>Aux@2/Asset-1</c> (like usedSurface and the rewriter), never as
+    ///     <c>Aux-2/...</c>, which reads like an exact version. Everything else renders as
+    ///     <see cref="FormatReference{TElementId}" />.
+    /// </summary>
+    internal static string? FormatReferenceForDisplay<TElementId>(CkId<TElementId>? reference, string modelName)
+        where TElementId : IComparable<TElementId>, ICkElementId
+    {
+        if (reference == null || reference.ModelId.Name == modelName || !reference.ModelId.IsMajorQualified)
+        {
+            return FormatReference(reference, modelName);
+        }
+
+        return $"{reference.ModelId.FullName}/{reference.ElementId.FullName}";
+    }
+
+    /// <summary>
+    ///     A reference property change: compared on <see cref="FormatReference{TElementId}" /> (unchanged semantics),
+    ///     shown with <see cref="FormatReferenceForDisplay{TElementId}" />.
+    /// </summary>
+    private static void AddModifiedReference<TElementId>(List<CkModelChange> changes, CkModelElementKind elementKind,
+        string elementId, string property, CkId<TElementId>? oldValue, CkId<TElementId>? newValue, string modelName)
+        where TElementId : IComparable<TElementId>, ICkElementId
+    {
+        if (string.Equals(FormatReference(oldValue, modelName), FormatReference(newValue, modelName),
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        AddModified(changes, elementKind, elementId, property, FormatReferenceForDisplay(oldValue, modelName),
+            FormatReferenceForDisplay(newValue, modelName));
     }
 
     private static string? FormatReferenceList<TElementId>(IReadOnlyCollection<CkId<TElementId>>? references, string modelName)

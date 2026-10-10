@@ -15,9 +15,14 @@ public interface IImportRtModelCommand
     /// <param name="jsonText">Model as JSON text</param>
     /// <param name="importStrategy">Defines the import strategy</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
+    /// <param name="blankingPolicy">
+    ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
+    ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText, ImportStrategy importStrategy,
-        CancellationToken? cancellationToken = null);
+        CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
 
     /// <summary>
     ///     Imports a model root
@@ -26,9 +31,14 @@ public interface IImportRtModelCommand
     /// <param name="rtModelRootTc">The model root</param>
     /// <param name="importStrategy">Defines the import strategy</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
+    /// <param name="blankingPolicy">
+    ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
+    ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRootTc,
-        ImportStrategy importStrategy, CancellationToken? cancellationToken = null);
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
 
     /// <summary>
     ///     Imports from a file
@@ -38,7 +48,19 @@ public interface IImportRtModelCommand
     /// <param name="contentType">The content type of the file</param>
     /// <param name="importStrategy">Defines the import strategy</param>
     /// <param name="cancellationToken">An optional cancellation token</param>
+    /// <param name="blankingPolicy">
+    ///     What an Upsert does when a seed value would blank a non-empty value of an attribute the
+    ///     blueprint does not own (AB#6313). Default <see cref="RtImportBlankingPolicy.Keep" />.
+    /// </param>
     /// <returns></returns>
     Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
-        ImportStrategy importStrategy, CancellationToken? cancellationToken = null);
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep);
+
+    /// <summary>
+    ///     The attributes found blanked by seed values during this command's imports (AB#6313), kept
+    ///     or applied according to the policy. The command is transient, so this is the report of the
+    ///     import(s) run on this instance.
+    /// </summary>
+    IReadOnlyList<RtImportGuardEntry> GuardEntries { get; }
 }

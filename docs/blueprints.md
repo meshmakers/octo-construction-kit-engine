@@ -362,6 +362,42 @@ fetched anyway.
 | `Full`      | Like Merge, plus delete entities that exist in the tenant but no longer in the seed. Unlocked → conflict.    |
 | `Migration` | Execute the migration script from the installed version to the target. Required for any non-additive change. Fails the update when the target ships no script for the installed version (see below). |
 
+## Seed values never blank tenant values (AB#6313)
+
+Every `Upsert` import (blueprint apply and update, `ImportRt -r`, CK-migration entity writes) is a
+full replace of the entity. The engine therefore guards the attributes the blueprint owns
+(`SeedOwned`, the default for an attribute without an ownership mark). Attributes owned by the tenant
+(`TenantOwned`, `RuntimeState`, `Secret`) are kept as before.
+
+For a `SeedOwned` attribute the decision is made per attribute by `SeedValueGuard.Decide`:
+
+| Existing entity | Seed | Result |
+|-----------------|------|--------|
+| no value stored | anything | seed value lands |
+| empty value | anything | seed value lands |
+| non-empty | different non-empty value | **seed wins** (blueprint-owned change, as before) |
+| non-empty | empty value (`null`, `""`, empty array, record with only empty members) | **existing kept**, reported |
+| non-empty | attribute omitted | **existing kept**, reported |
+| non-empty JSON text | JSON text with an empty string where the existing has a non-empty one | **existing kept as a whole**, reported (an "empty skeleton" such as the EDA adapter configuration of AB#6310) |
+
+"Empty" is narrow on purpose: numbers, booleans, enums, dates and time spans are never empty, so an
+explicit `0`, `false` or the first enum member in a seed is a value the author chose and replaces
+the tenant's value. They are only kept when the seed omits the attribute altogether. Records are
+kept or replaced as one unit. For JSON text, properties the seed does not mention and numbers or
+booleans are never judged; only a string leaf that the seed empties counts.
+
+Every kept (or, under policy `Allow`, applied) case is logged as a warning and listed in
+`IImportRtModelCommand.GuardEntries` (rtId, CK type, attribute, reason `SeedEmpty` / `SeedOmitted`,
+applied or kept). The default policy is `RtImportBlankingPolicy.Keep`; `Allow` exists only for an
+explicit operator confirmation.
+
+**Consequence for blueprint authors.** A seed can no longer clear a value that a tenant has filled.
+If an update must really remove such a value, either mark the attribute's ownership correctly
+(an attribute a tenant types in belongs to `TenantOwned`), use a CK migration `Update` action, or
+let the operator confirm the blanking explicitly. Blueprint-owned changes to a non-empty value keep
+working unchanged. Merge, Safe and Full update modes only decide which entities are imported; the
+guard applies to all of them.
+
 ## Updates
 
 ```csharp

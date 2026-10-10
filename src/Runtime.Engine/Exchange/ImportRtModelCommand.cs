@@ -35,11 +35,18 @@ internal class ImportRtModelCommand(
         _mandatoryViolations = new();
 
     private readonly IRtSerializer _rtYamlSerializer = rtYamlSerializer;
+    private readonly ConcurrentQueue<RtImportGuardEntry> _guardEntries = new();
+    private RtImportBlankingPolicy _blankingPolicy = RtImportBlankingPolicy.Keep;
     private int _associationsCount;
 
+    /// <inheritdoc />
+    public IReadOnlyList<RtImportGuardEntry> GuardEntries => _guardEntries.ToArray();
+
     public async Task ImportTextAsync(IRuntimeRepository runtimeRepository, string jsonText,
-        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
     {
+        _blankingPolicy = blankingPolicy;
         logger.LogInformation("Importing RT entities using text started");
 
         var session = await runtimeRepository.GetSessionAsync().ConfigureAwait(false);
@@ -67,8 +74,10 @@ internal class ImportRtModelCommand(
     }
 
     public async Task ImportModelAsync(IRuntimeRepository runtimeRepository, RtModelRootTcDto rtModelRoot,
-        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
     {
+        _blankingPolicy = blankingPolicy;
         logger.LogInformation("Importing RT entities using text started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -98,8 +107,10 @@ internal class ImportRtModelCommand(
     }
 
     public async Task ImportAsync(IRuntimeRepository runtimeRepository, string filePath, string contentType,
-        ImportStrategy importStrategy, CancellationToken? cancellationToken = null)
+        ImportStrategy importStrategy, CancellationToken? cancellationToken = null,
+        RtImportBlankingPolicy blankingPolicy = RtImportBlankingPolicy.Keep)
     {
+        _blankingPolicy = blankingPolicy;
         logger.LogInformation("Importing RT entities using file started");
 
         if (!cacheService.IsTenantLoaded(runtimeRepository.TenantId))
@@ -835,6 +846,13 @@ internal class ImportRtModelCommand(
     /// bump) fall through to the imported value on a pre-existing entity, and entities that don't
     /// exist yet are untouched.
     /// </para>
+    /// <para>
+    /// AB#6313: the same pass also guards the attributes the blueprint owns (SeedOwned). A seed value
+    /// that is empty or omitted - or a JSON text that empties a string the tenant filled - never
+    /// replaces a non-empty tenant value (see <see cref="SeedValueGuard"/> for the rule); such cases
+    /// are logged and listed in <see cref="GuardEntries"/>. This is what would have protected the EDA
+    /// adapter configuration blanked by an EdaIntegration update (AB#6310).
+    /// </para>
     /// </remarks>
     private async Task PreserveRuntimeStateAttributesAsync(IOctoSession session,
         IReadOnlyList<RtEntityTcDto> modelRtEntities, IRuntimeRepository runtimeRepository)
@@ -877,9 +895,13 @@ internal class ImportRtModelCommand(
                             RecordHasSecretMembers(resolveRecord(a.ValueCkRecordId.ToRtCkId()), resolveRecord, []))
                 .ToList();
 
-            if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0)
+            // AB#6313: the seed-owned attributes are guarded against blanking, so a type needs the
+            // existing-entity lookup unless it has no attributes at all.
+            var seedOwnedAttributes = SelectGuardedAttributes(ckTypeGraph);
+
+            if (flaggedAttributes.Count == 0 && secretRecordAttributes.Count == 0 && seedOwnedAttributes.Count == 0)
             {
-                // Cheap fast path: this type has no runtime-state attrs, nothing to preserve.
+                // Cheap fast path: this type has no attributes, nothing to preserve or guard.
                 continue;
             }
 
@@ -916,6 +938,17 @@ internal class ImportRtModelCommand(
                     value => ToTransportValue(cacheService, runtimeRepository.TenantId, value));
                 preservedForEntity += PreserveSecretRecordMembers(modelEntity, existing, secretRecordAttributes,
                     resolveRecord);
+                var guardEntries = GuardSeedOwnedAttributesForEntity(modelEntity, existing, seedOwnedAttributes,
+                    value => ToTransportValue(cacheService, runtimeRepository.TenantId, value), _blankingPolicy);
+                foreach (var entry in guardEntries)
+                {
+                    _guardEntries.Enqueue(entry);
+                    logger.LogWarning(
+                        "Seed {Reason} for attribute {AttributeName} of entity {RtId} (type {CkTypeId}): existing value {Outcome} (policy {Policy})",
+                        entry.Reason, entry.AttributeName, entry.RtId, entry.CkTypeId,
+                        entry.Applied ? "replaced" : "kept", _blankingPolicy);
+                }
+
                 if (preservedForEntity > 0)
                 {
                     totalPreserved += preservedForEntity;
@@ -1192,6 +1225,72 @@ internal class ImportRtModelCommand(
         return ckTypeGraph.AllAttributes.Values
             .Where(a => a.Ownership.IsPreservedOnUpsert())
             .ToList();
+    }
+
+    /// <summary>
+    /// The attributes a seed may change but not blank (AB#6313): every effective
+    /// <see cref="AttributeOwnershipDto.SeedOwned"/> attribute except Secret-typed ones. Complement of
+    /// <see cref="SelectPreservedAttributes"/>.
+    /// </summary>
+    internal static List<CkTypeAttributeGraph> SelectGuardedAttributes(CkTypeWithAttributesGraph ckTypeGraph)
+    {
+        return ckTypeGraph.AllAttributes.Values
+            .Where(a => !a.Ownership.IsPreservedOnUpsert())
+            .ToList();
+    }
+
+    /// <summary>
+    /// AB#6313 guard for seed-owned attributes: an attribute the blueprint owns may be changed by the
+    /// seed, but a seed value that is empty or omitted never replaces a non-empty tenant value (the
+    /// full <c>ReplaceOne</c> of an Upsert would clear it; see AB#6310 where an EDA adapter
+    /// configuration was replaced by the empty seed skeleton). The decision per attribute is made by
+    /// <see cref="SeedValueGuard.Decide"/>; this loop applies it in place and returns what it found.
+    /// Under <see cref="RtImportBlankingPolicy.Keep"/> the existing value is carried into the model
+    /// (injected when the seed omits the attribute); under <see cref="RtImportBlankingPolicy.Allow"/>
+    /// the model stays untouched and the blanking is only reported.
+    /// </summary>
+    /// <returns>One entry per blanked attribute, applied or not.</returns>
+    internal static IReadOnlyList<RtImportGuardEntry> GuardSeedOwnedAttributesForEntity(
+        RtEntityTcDto modelEntity,
+        RtEntity existing,
+        IReadOnlyList<CkTypeAttributeGraph> seedOwnedAttributes,
+        Func<object?, object?> convertValue,
+        RtImportBlankingPolicy policy)
+    {
+        var entries = new List<RtImportGuardEntry>();
+        foreach (var attr in seedOwnedAttributes)
+        {
+            var existingPresent = existing.Attributes.TryGetValue(attr.AttributeName, out var existingValue);
+            var modelAttr = modelEntity.Attributes.FirstOrDefault(a => a.Id.Equals(attr.CkAttributeId));
+
+            var verdict = SeedValueGuard.Decide(attr.ValueType, attr.Ownership, existingPresent, existingValue,
+                modelAttr != null, modelAttr?.Value, policy);
+            if (!verdict.IsBlanking)
+            {
+                continue;
+            }
+
+            if (verdict.Kind == SeedValueDecisionKind.KeepExisting)
+            {
+                if (modelAttr == null)
+                {
+                    modelEntity.Attributes.Add(new RtAttributeTcDto
+                    {
+                        Id = attr.CkAttributeId.ToRtCkId(),
+                        Value = convertValue(existingValue),
+                    });
+                }
+                else
+                {
+                    modelAttr.Value = convertValue(existingValue);
+                }
+            }
+
+            entries.Add(new RtImportGuardEntry(modelEntity.RtId, modelEntity.CkTypeId, attr.AttributeName,
+                verdict.Blanking, verdict.Kind == SeedValueDecisionKind.TakeSeed));
+        }
+
+        return entries;
     }
 
     /// <summary>

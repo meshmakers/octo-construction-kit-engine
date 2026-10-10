@@ -15,7 +15,7 @@ tool only checks it. Enforcement happens as a CI gate (PR/main builds).
 ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
                     [-cn <catalogName>] [-o <report.md>]
                     [-rf|--refresh] [-cl|--changelog] [-rmm|--requireMigrationForMajor]
-                    [-lce <bool>] [-lcr <path>]
+                    [-ap|--apply] [-lce <bool>] [-lcr <path>]
 ```
 
 | Argument | Description |
@@ -26,6 +26,7 @@ ckc ValidateVersion -p <ck-folder> [-p <ck-folder2> ...]
 | `-rf, --refresh` | Forces a catalog cache refresh before the baseline is determined. Always use this in CI. |
 | `-cl, --changelog` | Writes/updates the `CHANGELOG.md` section of the declared version next to `ckModel.yaml`. Only runs after successful validation; older sections are never rewritten. |
 | `-rmm, --requireMigrationForMajor` | Escalates a missing migration for a required major bump from a warning to an error. |
+| `-ap, --apply` | AB#4467: writes the **minimum valid version** into `ckModel.yaml` for every package that fails with `OCTO-CK100`, see "Applying the minimum version" below. |
 | `-lce, -lcr` | Enable/point the local file system catalog for this invocation (same semantics as `Compile`). |
 
 > **`-cn` pins the baseline, not the compile-stage dependency resolution.** Determining the
@@ -209,6 +210,27 @@ Rules:
 - **Carried for the publish gate.** The compiled model contains `compatibility` (omitted when empty), so the publish gate (F2.3)
   can enforce the same rule without the source. ckLanguage 1 models cannot declare entries; for them "requires acknowledge" stays
   advisory (no `OCTO-CK203`).
+
+### Applying the minimum version (`--apply`, AB#4467)
+
+When the compile gate (`OCTO-CK200`) or `ValidateVersion` (`OCTO-CK100`) says the declared version is too low, the author does
+not have to work out the number: `octo-ckc -c ValidateVersion -p <model folder> --apply` computes the minimum with the same
+verdict service the gates use, replaces **only the version** in the `modelId` line of `ckModel.yaml` (comments, key order,
+quoting, line endings and the rest of the file stay byte-identical), prints `old → new` and validates the package again against
+the new version. The `OCTO-CK200` message of the compile gate names this command with the model's folder.
+
+- **The build never rewrites `ckModel.yaml`**; applying is an explicit command (a build that edits its own sources is not
+  reproducible, and an automatic bump would hide exactly the breaking change the gate surfaces).
+- **Only a version that is merely too low is written.** Nothing is written when the verdict is already valid, on a downgrade
+  (`OCTO-CK101`/`OCTO-CK201`), when an acknowledgement is missing or stale (`OCTO-CK203`/`OCTO-CK204`), on a compile error,
+  or when the file has no single `modelId: <Name>-<version>` line. A version is never lowered.
+- **Dependency order.** With several `-p` paths a dependent is validated after its applied sibling and sees the sibling's new
+  version (the sibling registration of "Sibling resolution").
+- **Upstream major.** When a dependency's catalog holds a newer version outside the declared range, `--apply` reports
+  `not reconciled automatically: range [2.4.0,3.0.0) of System excludes System-3.0.0; update the range of '<model>' and run again.`
+  The range is never changed; the author updates it and runs the command again.
+- No git is involved, and `--apply` writes to no catalog beyond what `ValidateVersion` already does (the validated package is
+  registered in the local catalog for sibling resolution).
 
 ### First publication vs. unreachable catalogs
 

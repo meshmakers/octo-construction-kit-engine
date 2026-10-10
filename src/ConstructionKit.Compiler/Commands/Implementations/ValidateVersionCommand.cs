@@ -39,6 +39,7 @@ internal class ValidateVersionCommand : CkcCommand
     private readonly IArgument _refreshArg;
     private readonly IArgument _changelogArg;
     private readonly IArgument _requireMigrationArg;
+    private readonly IArgument _applyArg;
     private readonly IArgument _localCatalogEnabled;
     private readonly IArgument _localCatalogRoot;
 
@@ -87,6 +88,16 @@ internal class ValidateVersionCommand : CkcCommand
         _requireMigrationArg = CommandArgumentValue.AddArgument("rmm", "requireMigrationForMajor",
             ["Escalates a missing migration for a required major bump from a warning to an error."], 0);
 
+        _applyArg = CommandArgumentValue.AddArgument("ap", "apply",
+            [
+                "Writes the minimum valid version into the modelId of ckModel.yaml for every package that fails with",
+                "OCTO-CK100 (declared version too low) and nothing else. Prints 'old -> new' per package. Never lowers a",
+                "version and never writes when the verdict is already valid, on a downgrade (OCTO-CK101), on a missing or",
+                "stale acknowledgement (OCTO-CK203/204) or on a compile error. A dependency range that excludes a newer",
+                "major is reported as 'not reconciled automatically' and never changed. The build itself never rewrites",
+                "ckModel.yaml."
+            ], 0);
+
         _localCatalogEnabled = CommandArgumentValue.AddArgument("lce", "localCatalogEnabled",
             ["Enable or disable the local Construction Kit Library catalog"], false, 1);
 
@@ -110,6 +121,7 @@ internal class ValidateVersionCommand : CkcCommand
             : null;
         var writeChangelog = CommandArgumentValue.IsArgumentUsed(_changelogArg);
         var requireMigrationForMajor = CommandArgumentValue.IsArgumentUsed(_requireMigrationArg);
+        var apply = CommandArgumentValue.IsArgumentUsed(_applyArg);
 
         if (CommandArgumentValue.IsArgumentUsed(_localCatalogEnabled))
         {
@@ -165,7 +177,7 @@ internal class ValidateVersionCommand : CkcCommand
             try
             {
                 var packageErrors = await ValidatePackageAsync(rootPath, catalogName, writeChangelog,
-                    requireMigrationForMajor, markdownReport, validatedSiblings);
+                    requireMigrationForMajor, markdownReport, validatedSiblings, apply);
                 failures.AddRange(packageErrors);
             }
             catch (Exception ex) when (ex is CompilerException or ModelParseException or CkModelException
@@ -208,11 +220,15 @@ internal class ValidateVersionCommand : CkcCommand
 
     private async Task<List<string>> ValidatePackageAsync(string rootPath, string? catalogName, bool writeChangelog,
         bool requireMigrationForMajor, StringBuilder markdownReport,
-        Dictionary<string, CkModelId> validatedSiblings)
+        Dictionary<string, CkModelId> validatedSiblings, bool apply = false, string? appliedNote = null)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
         var notes = new List<string>();
+        if (appliedNote != null)
+        {
+            notes.Add(appliedNote);
+        }
 
         // 1. Read ckModel.yaml — name, declared version, dependency ranges
         var metadataFilePath = Path.Combine(rootPath, MetadataFileName);
@@ -242,6 +258,10 @@ internal class ValidateVersionCommand : CkcCommand
         //    version of the previous major line), never a local entry at or above the declared version.
         var baseline = await _baselineResolver.ResolveAsync(modelName, declaredVersion, catalogName);
         AddBaselineNotes(baseline, notes);
+        if (apply)
+        {
+            await AddUnreconciledMajorsAsync(meta, modelName, catalogName, warnings);
+        }
 
         if (baseline.Baseline == null)
         {
@@ -340,6 +360,25 @@ internal class ValidateVersionCommand : CkcCommand
         foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(acknowledgement, modelName))
         {
             errors.Add($"{code}: {text}");
+        }
+
+        // AB#4467: --apply. Only a version that is merely too low (OCTO-CK100 and no other finding) is fixed; the
+        // file is rewritten before the report, then the package is validated again against the new version.
+        if (apply && validationResult.Verdict == CkSemVerVerdict.VersionTooLow && errors.Count == 1 &&
+            errors[0].StartsWith("OCTO-CK100", StringComparison.Ordinal))
+        {
+            var applied = await TryApplyMinimumVersionAsync(metadataFilePath, modelName, declaredVersion,
+                validationResult.MinimumVersion);
+            if (applied)
+            {
+                return await ValidatePackageAsync(rootPath, catalogName, writeChangelog, requireMigrationForMajor,
+                    markdownReport, validatedSiblings, apply: false,
+                    appliedNote: $"Applied: {MetadataFileName} version {declaredVersion} → {validationResult.MinimumVersion} " +
+                                 $"(modelId: {modelName}-{validationResult.MinimumVersion}).");
+            }
+
+            errors.Add($"The version in '{metadataFilePath}' could not be rewritten automatically: no single " +
+                       $"'modelId: {modelName}-<version>' line found. Edit the file by hand.");
         }
 
         // Migration reconciliation (FR-10). Skip it while the declared version itself is still wrong
@@ -571,6 +610,67 @@ internal class ValidateVersionCommand : CkcCommand
         }
 
         return errors.Count > 0;
+    }
+
+    /// <summary>
+    ///     AB#4467: replaces only the version of the <c>modelId</c> line. Returns false when the file does not have
+    ///     exactly one such line (nothing is written then).
+    /// </summary>
+    private async Task<bool> TryApplyMinimumVersionAsync(string metadataFilePath, string modelName,
+        CkVersion declaredVersion, CkVersion minimumVersion)
+    {
+        if (minimumVersion.CompareTo(declaredVersion) <= 0)
+        {
+            return false;
+        }
+
+        var text = await File.ReadAllTextAsync(metadataFilePath);
+        if (!CkModelVersionWriter.TryReplaceVersion(text, modelName, minimumVersion, out var updated))
+        {
+            return false;
+        }
+
+        await File.WriteAllTextAsync(metadataFilePath, updated, new UTF8Encoding(HasUtf8Bom(metadataFilePath)));
+        Console.WriteLine($"Applied {modelName}: {declaredVersion} → {minimumVersion} ({metadataFilePath})");
+        Logger.LogInformation("Version of '{ModelName}' in '{MetadataFilePath}' changed {Old} -> {New}", modelName,
+            metadataFilePath, declaredVersion, minimumVersion);
+        return true;
+    }
+
+    private static bool HasUtf8Bom(string path)
+    {
+        using var stream = File.OpenRead(path);
+        var bom = new byte[3];
+        return stream.Read(bom, 0, 3) == 3 && bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
+    }
+
+    /// <summary>
+    ///     AB#4467 remediation scenario: a dependency range that excludes a newer major available in the catalogs is
+    ///     reported, never changed. The author updates the range and runs the command again.
+    /// </summary>
+    private async Task AddUnreconciledMajorsAsync(CkMetaRootDto meta, string modelName, string? catalogName,
+        List<string> warnings)
+    {
+        foreach (var range in meta.Dependencies ?? [])
+        {
+            var upper = range.ModelVersionRange.MaxVersion;
+            if (upper == null)
+            {
+                continue;
+            }
+
+            var above = new CkModelIdVersionRange(range.Name,
+                $"[{(range.ModelVersionRange.MaxInclusive ? upper.Value.Bump(CkSemVerLevel.Patch) : upper.Value)},)");
+            var newer = catalogName != null
+                ? await _catalogService.IsExistingAsync(catalogName, above)
+                : await _catalogService.IsExistingAsync(above);
+            if (newer is { Exists: true, ModelId: not null })
+            {
+                warnings.Add(
+                    $"not reconciled automatically: range {range.ModelVersionRange} of {range.Name} excludes " +
+                    $"{newer.ModelId.FullName}; update the range of '{modelName}' and run again.");
+            }
+        }
     }
 
     private async Task WriteChangelogAsync(string rootPath, CkVersion declaredVersion, CkSemVerLevel requiredLevel,

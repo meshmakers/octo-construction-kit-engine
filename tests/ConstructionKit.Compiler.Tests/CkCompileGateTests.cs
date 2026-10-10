@@ -61,7 +61,7 @@ public sealed class CkCompileGateTests : IDisposable
         await using var stream = File.OpenRead(compileResult.CompiledModelFile);
         var compiled = await _fixture.Services.GetRequiredService<ICkSerializer>()
             .DeserializeCompiledModelRootAsync(stream, compileResult.CompiledModelFile, operationResult);
-        return await _fixture.Services.GetRequiredService<CkCompileGate>().RunAsync(compiled, source);
+        return await _fixture.Services.GetRequiredService<CkCompileGate>().RunAsync(compiled, source, sourceDir);
     }
 
     private static string[] Codes(CkCompileGateResult result) =>
@@ -85,6 +85,23 @@ public sealed class CkCompileGateTests : IDisposable
         Assert.Contains("MAJOR", error.Text);
         Assert.Contains("3.0.0", error.Text);
         Assert.Contains("GateModel-3.0.0", error.Text);
+        // AB#4467: the message names the command that writes the minimum version.
+        Assert.Contains("octo-ckc -c ValidateVersion -p ", error.Text);
+        Assert.Contains("--apply", error.Text);
+    }
+
+    [Fact]
+    public async Task A_failing_gate_never_modifies_ckModel_yaml()
+    {
+        await PublishAsync(WriteModel("2.4.0"), InMemoryPublishedCatalog.Name);
+        var dir = WriteModel("2.5.0", enumValues: "A");
+        var metadata = Path.Combine(dir, "ckModel.yaml");
+        var before = File.ReadAllBytes(metadata);
+
+        var result = await RunGateAsync(dir, CkBaselineSource.Remote);
+
+        Assert.True(result.HasErrors);
+        Assert.Equal(before, File.ReadAllBytes(metadata));
     }
 
     [Fact]

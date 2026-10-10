@@ -524,7 +524,7 @@ public class CkCompile : Microsoft.Build.Utilities.Task
             return false;
         }
 
-        var result = await compileGate.RunAsync(compiled, baselineSource);
+        var result = await compileGate.RunAsync(compiled, baselineSource, constructionKitFolderPath);
         var metadataFile = Path.Combine(constructionKitFolderPath, "ckModel.yaml");
         foreach (var message in result.Messages)
         {

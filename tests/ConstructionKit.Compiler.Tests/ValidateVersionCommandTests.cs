@@ -76,7 +76,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
     ///     compilation needs no catalog content besides the model itself.
     /// </summary>
     private void WriteSource(string version, bool removeEnumValue = false, string? dependency = null,
-        int? ckLanguage = null)
+        int? ckLanguage = null, string? description = null)
     {
         Directory.CreateDirectory(Path.Combine(_sourceDir, "attributes"));
         Directory.CreateDirectory(Path.Combine(_sourceDir, "enums"));
@@ -86,6 +86,7 @@ public sealed class ValidateVersionCommandTests : IDisposable
             "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-meta.schema.json\"\n" +
             dependencies +
             (ckLanguage == null ? "" : $"ckLanguage: {ckLanguage}\n") +
+            (description == null ? "" : $"description: {description}\n") +
             $"modelId: CmdFixture-{version}\n");
 
         File.WriteAllText(Path.Combine(_sourceDir, "attributes", "serial.yaml"),
@@ -599,5 +600,179 @@ public sealed class ValidateVersionCommandTests : IDisposable
             Assert.Contains(expectedCode, commandMessage);
             Assert.Equal([expectedCode], gateCodes);
         }
+    }
+
+    // ---- AB#4467: --apply -------------------------------------------------------------------------------------
+
+    private string MetadataPath => Path.Combine(_sourceDir, "ckModel.yaml");
+
+    private string ReadMetadata() => File.ReadAllText(MetadataPath);
+
+    private string ReadReport() => File.ReadAllText(_reportPath);
+
+    [Fact]
+    public async Task Apply_WritesTheMinimumVersion_ChangesOnlyTheVersionText_AndTheGatePassesAfterwards()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.5.0", removeEnumValue: true, ckLanguage: 2);
+        File.WriteAllText(MetadataPath, "# keep this comment\r\n" + ReadMetadata().Replace("\n", "\r\n") + "# trailing comment\r\n");
+        var before = ReadMetadata();
+
+        await RunAsync("-p", _sourceDir, "--apply", "-o", _reportPath);
+
+        // File diff test: the whole file is byte-identical except for the version text.
+        Assert.Equal(before.Replace("CmdFixture-2.5.0", "CmdFixture-3.0.0"), ReadMetadata());
+        var report = ReadReport();
+        Assert.Contains("2.5.0 → 3.0.0", report);
+        Assert.Contains("VALID", report);
+
+        // The following build (compile gate) passes.
+        var current = await _serviceProvider.GetRequiredService<ICompilerService>()
+            .CompileInMemoryAsync(_sourceDir, new OperationResult());
+        var gate = await _serviceProvider.GetRequiredService<CkCompileGate>().RunAsync(current, CkBaselineSource.Remote);
+        Assert.False(gate.HasErrors);
+        Assert.Equal(new CkVersion(3, 0, 0), current.ModelId.Version);
+    }
+
+    [Theory]
+    [InlineData("1.0.0", false, true, "1.1.0")] // v1, minor (enum value added)
+    [InlineData("1.0.0", true, false, "1.0.1")] // v1, patch (model description changed)
+    public async Task Apply_FixesCkLanguage1Models_Minor_And_Patch(string baselineVersion, bool withDescription,
+        bool addsAttribute, string expected)
+    {
+        WriteSource(baselineVersion);
+        await PublishBaselineAsync();
+        // Minor: an extra attribute (additive); patch: the model description changed.
+        WriteSource(baselineVersion, description: withDescription ? "changed text" : null);
+        if (addsAttribute)
+        {
+            File.WriteAllText(Path.Combine(_sourceDir, "attributes", "extra.yaml"),
+                "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+                "attributes:\n  - id: Extra\n    valueType: String\n    isRuntimeState: false\n");
+        }
+
+        await RunAsync("-p", _sourceDir, "-ap", "-o", _reportPath);
+
+        Assert.Contains($"modelId: CmdFixture-{expected}", ReadMetadata());
+        Assert.Contains($"{baselineVersion} → {expected}", ReadReport());
+    }
+
+    [Fact]
+    public async Task Apply_DoesNotWrite_WhenTheVerdictIsAlreadyValid()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.5.0", ckLanguage: 2);
+        var before = ReadMetadata();
+
+        await RunAsync("-p", _sourceDir, "--apply", "-o", _reportPath);
+
+        Assert.Equal(before, ReadMetadata());
+        Assert.DoesNotContain("Applied", ReadReport());
+    }
+
+    [Fact]
+    public async Task Apply_DoesNotWrite_OnADowngrade()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.3.0", removeEnumValue: true, ckLanguage: 2);
+        var before = ReadMetadata();
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "--apply"));
+
+        Assert.Contains("OCTO-CK101", exception.Message);
+        Assert.Equal(before, ReadMetadata());
+    }
+
+    [Theory]
+    [InlineData("Hidden", null, "OCTO-CK203")]
+    [InlineData("ReadOnly", "Accepted risk R13", "OCTO-CK204")]
+    public async Task Apply_DoesNotWrite_OnAMissingOrStaleAcknowledgement(string access, string? reason,
+        string expectedCode)
+    {
+        WriteAcknowledgeSource("2.4.0", "ReadOnly");
+        await PublishBaselineAsync();
+        // Version too low as well (a patch bump over a Minor change), but the acknowledgement is the finding to fix.
+        WriteAcknowledgeSource("2.4.1", access, reason);
+        var before = ReadMetadata();
+
+        var exception = await Assert.ThrowsAsync<ModelValidationException>(
+            () => RunAsync("-p", _sourceDir, "--apply"));
+
+        Assert.Contains(expectedCode, exception.Message);
+        Assert.Equal(before, ReadMetadata());
+    }
+
+    [Fact]
+    public async Task Apply_DoesNotWrite_OnACompileError()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.5.0", removeEnumValue: true, ckLanguage: 2);
+        File.WriteAllText(Path.Combine(_sourceDir, "enums", "broken.yaml"),
+            "\"$schema\": \"https://schemas.meshmakers.cloud/construction-kit-elements.schema.json\"\n" +
+            "enums:\n  - enumId: Broken\n    values: [ this is: not valid\n");
+        var before = ReadMetadata();
+
+        await Assert.ThrowsAnyAsync<Exception>(() => RunAsync("-p", _sourceDir, "--apply"));
+
+        Assert.Equal(before, ReadMetadata());
+    }
+
+    [Fact]
+    public async Task WithoutApply_TheFileIsNeverChanged()
+    {
+        WriteSource("2.4.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        WriteSource("2.5.0", removeEnumValue: true, ckLanguage: 2);
+        var before = ReadMetadata();
+
+        await Assert.ThrowsAsync<ModelValidationException>(() => RunAsync("-p", _sourceDir));
+
+        Assert.Equal(before, ReadMetadata());
+    }
+
+    [Fact]
+    public async Task Apply_TwoPackagesInDependencyOrder_TheDependentSeesTheSiblingsNewVersion()
+    {
+        WriteSource("1.0.0", ckLanguage: 2);
+        await PublishBaselineAsync();
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+        await PublishDependentBaselineAsync(dependentDir);
+
+        // CmdFixture breaks with a minor bump: --apply writes 2.0.0. The dependent already declares [2.0,3.0), which
+        // only the applied sibling satisfies.
+        WriteSource("1.1.0", removeEnumValue: true, ckLanguage: 2);
+        WriteDependentSource("2.0.0", "CmdFixture-[2.0,3.0)");
+
+        await RunAsync("-p", _sourceDir, "-p", dependentDir, "--apply", "-o", _reportPath);
+
+        Assert.Contains("modelId: CmdFixture-2.0.0", ReadMetadata());
+        var report = ReadReport();
+        Assert.DoesNotContain("OCTO-CK103", report);
+        Assert.DoesNotContain("ERROR", report);
+    }
+
+    [Fact]
+    public async Task Apply_ReportsADependencyRangeThatExcludesANewerMajor_AndDoesNotChangeTheRange()
+    {
+        WriteSource("1.0.0");
+        await PublishBaselineAsync();
+        var dependentDir = WriteDependentSource("1.0.0", "CmdFixture-[1.0,2.0)");
+        await PublishDependentBaselineAsync(dependentDir);
+        WriteSource("3.0.0", removeEnumValue: true);
+        await PublishBaselineAsync();
+        WriteSource("1.0.0");
+        var dependentBefore = File.ReadAllText(Path.Combine(dependentDir, "ckModel.yaml"));
+
+        await RunAsync("-p", dependentDir, "--apply", "-o", _reportPath);
+
+        Assert.True(ReadReport().Contains("not reconciled automatically"), ReadReport());
+        Assert.Contains("CmdFixture-3.0.0", ReadReport());
+        Assert.Contains("excludes", ReadReport());
+        Assert.Equal(dependentBefore, File.ReadAllText(Path.Combine(dependentDir, "ckModel.yaml")));
     }
 }

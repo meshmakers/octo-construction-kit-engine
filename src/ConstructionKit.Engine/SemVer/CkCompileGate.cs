@@ -100,13 +100,18 @@ public class CkCompileGate
     /// </summary>
     /// <param name="current">The compiled model under test; its model id carries the declared version.</param>
     /// <param name="source">Which catalogs may supply the baseline.</param>
+    /// <param name="modelPath">
+    ///     The folder of the model's <c>ckModel.yaml</c>, named in the <c>OCTO-CK200</c> remediation
+    ///     (<c>octo-ckc -c ValidateVersion -p … --apply</c>); a placeholder when null.
+    /// </param>
     /// <returns>The messages for the build log and the verdict.</returns>
-    public async Task<CkCompileGateResult> RunAsync(CkCompiledModelRoot current, CkBaselineSource source)
+    public async Task<CkCompileGateResult> RunAsync(CkCompiledModelRoot current, CkBaselineSource source,
+        string? modelPath = null)
     {
         var isHardGate = current.EffectiveCkLanguage >= 2;
         try
         {
-            return await RunCoreAsync(current, source, isHardGate);
+            return await RunCoreAsync(current, source, isHardGate, modelPath);
         }
         catch (Exception ex) when (!isHardGate)
         {
@@ -122,7 +127,7 @@ public class CkCompileGate
     }
 
     private async Task<CkCompileGateResult> RunCoreAsync(CkCompiledModelRoot current, CkBaselineSource source,
-        bool isHardGate)
+        bool isHardGate, string? modelPath)
     {
         var modelName = current.ModelId.Name;
         var declared = current.ModelId.Version;
@@ -177,7 +182,7 @@ public class CkCompileGate
 
         if (isHardGate)
         {
-            AddErrors(messages, verdict, modelName, declared);
+            AddErrors(messages, verdict, modelName, declared, modelPath);
             foreach (var (code, text) in CkAcknowledgementFormatter.GetFindings(verdict.Acknowledgement, modelName))
             {
                 messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, code, text));
@@ -188,7 +193,7 @@ public class CkCompileGate
     }
 
     private static void AddErrors(List<CkCompileGateMessage> messages, CkCompatibilityVerdict verdict,
-        string modelName, CkVersion declared)
+        string modelName, CkVersion declared, string? modelPath)
     {
         var validation = verdict.Validation;
         switch (validation.Verdict)
@@ -199,7 +204,8 @@ public class CkCompileGate
                     $"{validation.PublishedVersion} of the same major. Downgrades are not allowed."));
                 break;
             case CkSemVerVerdict.VersionTooLow:
-                var minimum = $"{validation.MinimumVersion} (modelId: {modelName}-{validation.MinimumVersion})";
+                var minimum = $"{validation.MinimumVersion} (modelId: {modelName}-{validation.MinimumVersion}); " +
+                              $"`octo-ckc -c ValidateVersion -p {modelPath ?? "<model folder>"} --apply` writes it";
                 if (verdict.UncoveredChanges.Count == 0)
                 {
                     messages.Add(new CkCompileGateMessage(CkCompileGateSeverity.Error, "OCTO-CK200",

@@ -251,4 +251,36 @@ public class BlueprintCatalogManagerTests
         Assert.True(result.Exists);
         Assert.Equal("EnergyCommunity.Base-2.11.1", result.BlueprintId?.FullName);
     }
+
+    // AB#6397: per-catalog existence check used by `octo-bpm publish` for the target catalog.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task IsExistingAsync_ByCatalogName_OnlyReflectsThatCatalog(bool publicHasIt, bool privateHasIt)
+    {
+        var id = new BlueprintId("Base", "2.11.1");
+        var publicCatalog = FakeCatalog("Public");
+        A.CallTo(() => publicCatalog.Order).Returns(20);
+        A.CallTo(() => publicCatalog.IsExistingAsync(id, A<object?>._)).Returns(publicHasIt);
+        var privateCatalog = FakeCatalog("Private");
+        A.CallTo(() => privateCatalog.Order).Returns(21);
+        A.CallTo(() => privateCatalog.IsExistingAsync(id, A<object?>._)).Returns(privateHasIt);
+        var manager = Manager(publicCatalog, privateCatalog);
+
+        Assert.Equal(publicHasIt, await manager.IsExistingAsync("Public", id));
+        Assert.Equal(privateHasIt, await manager.IsExistingAsync("Private", id));
+        // the catalog-wide overload keeps its "any catalog" meaning
+        Assert.Equal(publicHasIt || privateHasIt, await manager.IsExistingAsync(id));
+    }
+
+    [Fact]
+    public async Task IsExistingAsync_ByCatalogName_UnknownCatalog_ThrowsCatalogNotFound()
+    {
+        var manager = Manager(FakeCatalog("Known"));
+
+        await Assert.ThrowsAsync<BlueprintCatalogException>(
+            () => manager.IsExistingAsync("Missing", new BlueprintId("X", "1.0.0")));
+    }
 }
